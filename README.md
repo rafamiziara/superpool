@@ -54,9 +54,10 @@ The project is structured as a monorepo, allowing for seamless development and t
 
 ```
 superpool-dapp/
+├── apps/
+│ └── mobile/ # React Native / Expo application
 ├── packages/
 │ ├── contracts/ # Solidity smart contracts (PoolFactory, LendingPool)
-│ ├── mobile-app/ # React Native / Expo application
 │ └── backend/ # Firebase Cloud Functions & backend logic
 ├── .gitignore
 ├── pnpm-workspace.yaml
