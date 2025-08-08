@@ -3,3 +3,10 @@ node_modules
 
 # IDE
 .vscode/
+
+# Debug
+firestore-debug.log
+
+# Env Variables
+.env
+.env.*
