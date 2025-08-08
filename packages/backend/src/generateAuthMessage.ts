@@ -1,21 +1,23 @@
 import { isAddress } from 'ethers'
-import { initializeApp } from 'firebase-admin/app'
-import { getFirestore } from 'firebase-admin/firestore'
 import { HttpsError, onCall } from 'firebase-functions/v2/https'
 import { v4 as uuidv4 } from 'uuid'
+import { createAuthMessage } from './auth'
+import { AUTH_NONCES_COLLECTION } from './constants'
+import { firestore } from './services'
 
-initializeApp()
-const db = getFirestore()
-
-/**
- * Generates a unique message for a user to sign for wallet authentication.
- * The message includes a nonce and the wallet address to prevent replay attacks.
- */
-
+// Define the interface for your function's input
 interface AuthMessageRequest {
   walletAddress: string
 }
 
+/**
+ * Generates a unique message for a user to sign for wallet authentication.
+ * The message includes a nonce and the wallet address to prevent replay attacks.
+ *
+ * @param {CallableRequest<AuthMessageRequest>} request The callable function's request object, containing the wallet address.
+ * @returns {Promise<{ message: string }>} A promise that resolves with the unique message to be signed.
+ * @throws {HttpsError} If the walletAddress is invalid or not provided.
+ */
 export const generateAuthMessage = onCall<AuthMessageRequest>(async (request) => {
   const { walletAddress } = request.data
 
@@ -34,18 +36,13 @@ export const generateAuthMessage = onCall<AuthMessageRequest>(async (request) =>
   const timestamp = new Date().getTime()
 
   // Store the nonce in a temporary collection. This will be used for verification.
-  await db.collection('auth_nonces').doc(walletAddress).set({
+  await firestore.collection(AUTH_NONCES_COLLECTION).doc(walletAddress).set({
     nonce,
     timestamp,
   })
 
   // Construct the message to be signed
-  const message =
-    `Welcome to SuperPool!\n\n` +
-    `This request will not trigger a blockchain transaction.\n\n` +
-    `Wallet address:\n${walletAddress}\n\n` +
-    `Nonce:\n${nonce}\n` +
-    `Timestamp:\n${timestamp}`
+  const message = createAuthMessage(walletAddress, nonce, timestamp)
 
   return { message }
 })
