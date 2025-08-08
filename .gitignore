@@ -5,6 +5,7 @@ node_modules
 .vscode/
 
 # Debug
+firebase-debug.log
 firestore-debug.log
 
 # Env Variables
