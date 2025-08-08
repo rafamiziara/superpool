@@ -78,6 +78,12 @@ importers:
 
   packages/contracts: {}
 
+  scripts:
+    dependencies:
+      ethers:
+        specifier: ^6.15.0
+        version: 6.15.0
+
 packages:
 
   '@0no-co/graphql.web@1.2.0':
