@@ -134,7 +134,7 @@ POOL_FACTORY_ADDRESS=[DEPLOYED_POOL_FACTORY_ADDRESS_ON_AMOY]
 
 _Note: For actual Firebase Functions deployment, you should use `firebase functions:config:set` for secrets, not `.env`._
 
-- `packages/mobile-app/.env`
+- `apps/mobile/.env`
 
 ```
 # Public Firebase config (safe to be here, but still use .env for consistency)
@@ -145,6 +145,11 @@ EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET=your-project.appspot.com
 EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=...
 EXPO_PUBLIC_FIREBASE_APP_ID=...
 EXPO_PUBLIC_FIREBASE_MEASUREMENT_ID=...
+
+# Ngrok URL for Firebase Emulators (for local development)
+EXPO_PUBLIC_NGROK_URL_AUTH=...
+EXPO_PUBLIC_NGROK_URL_FUNCTIONS=...
+EXPO_PUBLIC_NGROK_URL_FIRESTORE=...
 
 # Cloud Functions Base URL
 EXPO_PUBLIC_CLOUD_FUNCTIONS_BASE_URL=https://[YOUR_REGION]-[YOUR_PROJECT_ID].cloudfunctions.net/api
@@ -162,7 +167,7 @@ cd packages/contracts
 pnpm deploy:amoy # This command should be defined in your package.json scripts
 ```
 
-- **Important:** Note the deployed `PoolFactory` address. You will need this for your `backend` and `mobile-app` `.env` files.
+- **Important:** Note the deployed `PoolFactory` address. You will need this for your `backend` and `mobile` `.env` files.
 
 - **Multi-sig Setup:** After `PoolFactory` is deployed, set up your multi-sig Safe (e.g., Gnosis Safe on Polygon Amoy) and transfer ownership of the `PoolFactory` to your Safe. All subsequent calls to `createPool` from your backend should be initiated via the Safe.
 
@@ -183,14 +188,14 @@ firebase functions:config:set contracts.pool_factory_address="[DEPLOYED_POOL_FAC
 firebase deploy --only functions
 ```
 
-- **Important:** Note the base URL for your deployed Cloud Functions. Update `EXPO_PUBLIC_CLOUD_FUNCTIONS_BASE_URL` in `packages/mobile-app/.env`.
+- **Important:** Note the base URL for your deployed Cloud Functions. Update `EXPO_PUBLIC_CLOUD_FUNCTIONS_BASE_URL` in `packages/mobile/.env`.
 
 ### 6. Run the Mobile Application
 
-Navigate to the `mobile-app` package and start the Expo development server:
+Navigate to the `mobile` package and start the Expo development server:
 
 ```bash
-cd packages/mobile-app
+cd packages/mobile
 pnpm start
 ```
 
