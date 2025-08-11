@@ -1,10 +1,18 @@
+import * as admin from 'firebase-admin'
 import { initializeApp } from 'firebase-admin/app'
+import { getAppCheck } from 'firebase-admin/app-check'
 import { getAuth } from 'firebase-admin/auth'
 import { getFirestore } from 'firebase-admin/firestore'
 
-// Initialize the Firebase Admin SDK once for the entire server.
-const adminApp = initializeApp()
+// Use require() to safely import the JSON file.
+const serviceAccountKey = require('../service-account-key.json')
 
-// Initialize and export auth and firestore services
+// Initialize the Firebase Admin SDK once for the entire server.
+const adminApp = initializeApp({
+  credential: admin.credential.cert(serviceAccountKey),
+})
+
+// Initialize and export auth, firestore & appCheck services
 export const auth = getAuth(adminApp)
 export const firestore = getFirestore(adminApp)
+export const appCheck = getAppCheck(adminApp)

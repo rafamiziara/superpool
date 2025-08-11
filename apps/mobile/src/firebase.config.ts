@@ -1,9 +1,11 @@
 // apps/mobile-app/src/firebase.config.ts
 
 import { initializeApp } from 'firebase/app'
+import { initializeAppCheck } from 'firebase/app-check'
 import { connectAuthEmulator, getAuth } from 'firebase/auth'
 import { connectFirestoreEmulator, getFirestore } from 'firebase/firestore'
 import { connectFunctionsEmulator, getFunctions } from 'firebase/functions'
+import { customAppCheckProviderFactory } from './utils/appCheckProvider'
 
 // Firebase Project Configuration
 const firebaseConfig = {
@@ -18,6 +20,12 @@ const firebaseConfig = {
 
 // Initialize Firebase App
 const FIREBASE_APP = initializeApp(firebaseConfig)
+
+// Initialize App Check with the custom provider
+initializeAppCheck(FIREBASE_APP, {
+  provider: customAppCheckProviderFactory(),
+  isTokenAutoRefreshEnabled: true,
+})
 
 // Initialize Firebase Services
 export const FIREBASE_AUTH = getAuth(FIREBASE_APP)
