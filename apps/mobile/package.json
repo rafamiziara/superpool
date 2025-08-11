@@ -10,10 +10,14 @@
   },
   "dependencies": {
     "expo": "~53.0.20",
+    "expo-application": "~6.1.5",
+    "expo-secure-store": "~14.2.3",
     "expo-status-bar": "~2.2.3",
     "firebase": "^12.1.0",
     "react": "19.0.0",
-    "react-native": "0.79.5"
+    "react-native": "0.79.5",
+    "react-native-get-random-values": "^1.11.0",
+    "uuid": "^11.1.0"
   },
   "devDependencies": {
     "@babel/core": "^7.25.2",
