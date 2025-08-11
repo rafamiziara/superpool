@@ -1,8 +1,9 @@
 import { isAddress, verifyMessage } from 'ethers'
 import { HttpsError, onCall } from 'firebase-functions/v2/https'
 import { AuthNonce, createAuthMessage } from './auth'
-import { AUTH_NONCES_COLLECTION } from './constants'
+import { AUTH_NONCES_COLLECTION, USERS_COLLECTION } from './constants'
 import { auth, firestore } from './services'
+import { UserProfile } from './types'
 
 // Define the interface for your function's input
 interface LoginRequest {
@@ -57,12 +58,38 @@ export const verifySignatureAndLogin = onCall<LoginRequest>(async (request) => {
     throw new HttpsError('unauthenticated', 'The signature does not match the provided wallet address.')
   }
 
-  // Issue a Firebase Custom Token
-  // Use the walletAddress as the user's unique UID in Firebase Auth.
-  const firebaseToken = await auth.createCustomToken(walletAddress)
+  // Create or Update User Profile
+  try {
+    const userProfileRef = firestore.collection(USERS_COLLECTION).doc(walletAddress)
+    const userProfileDoc = await userProfileRef.get()
+    const now = new Date().getTime()
+
+    if (!userProfileDoc.exists) {
+      // Profile does not exist, so create a new one
+      const newUserProfile: UserProfile = { walletAddress, createdAt: now, updatedAt: now }
+      await userProfileRef.set(newUserProfile)
+    } else {
+      // Profile exists, so update the updatedAt timestamp
+      await userProfileRef.update({ updatedAt: now })
+    }
+  } catch (error) {
+    throw new HttpsError('internal', 'Failed to create or update user profile. Please try again.')
+  }
 
   // Delete the nonce to prevent replay attacks
-  await nonceDoc.ref.delete()
+  try {
+    await nonceDoc.ref.delete()
+  } catch (error) {
+    // The user has already been authenticated, so a failure here is an acceptable cleanup error.
+    console.error('Failed to delete nonce document:', error)
+  }
 
-  return { firebaseToken }
+  // Issue a Firebase Custom Token
+  // Use the walletAddress as the user's unique UID in Firebase Auth.
+  try {
+    const firebaseToken = await auth.createCustomToken(walletAddress)
+    return { firebaseToken }
+  } catch (error) {
+    throw new HttpsError('unauthenticated', 'Failed to generate a valid session token.')
+  }
 })
