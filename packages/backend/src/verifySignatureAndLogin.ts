@@ -6,7 +6,7 @@ import { auth, firestore } from './services'
 import { UserProfile } from './types'
 
 // Define the interface for your function's input
-interface LoginRequest {
+interface VerifySignatureAndLoginRequest {
   walletAddress: string
   signature: string
 }
@@ -19,7 +19,7 @@ interface LoginRequest {
  * @returns {Promise<{ firebaseToken: string }>} A promise that resolves with a Firebase custom token upon successful verification.
  * @throws {HttpsError} If the walletAddress or signature are invalid, the nonce is not found, or the signature verification fails.
  */
-export const verifySignatureAndLogin = onCall<LoginRequest>(async (request) => {
+export const verifySignatureAndLogin = onCall<VerifySignatureAndLoginRequest>({ cors: true, enforceAppCheck: true }, async (request) => {
   const { walletAddress, signature } = request.data
 
   // Input Validation

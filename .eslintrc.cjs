@@ -1,17 +1,17 @@
 module.exports = {
   root: true,
-  parser: "@typescript-eslint/parser",
-  plugins: ["@typescript-eslint"],
+  parser: '@typescript-eslint/parser',
+  plugins: ['@typescript-eslint'],
   env: {
     node: true,
   },
   extends: [
-    "eslint:recommended",
-    "plugin:@typescript-eslint/recommended",
+    'eslint:recommended',
+    'plugin:@typescript-eslint/recommended',
   ],
-  ignorePatterns: ["dist", "node_modules", "lib"],
+  ignorePatterns: ['dist', 'node_modules', 'lib'],
   rules: {
-    "quotes": ["error", "double"],
-    "indent": ["error", 2],
+    'quotes': ['error', 'single'],
+    'indent': ['error', 2],
   },
 };

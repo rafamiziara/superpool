@@ -1,4 +1,4 @@
-# 🚀 **SuperPool: Decentralized Micro-Lending Pools on Polygon**
+# 🚀 **SuperPool: Decentralized Micro-Lending Pools**
 
 ![GitHub repo size](https://img.shields.io/github/repo-size/rafamiziara/superpool)
 ![GitHub last commit](https://img.shields.io/github/last-commit/rafamiziara/superpool)
