@@ -1,9 +1,7 @@
-// packages/backend/src/customAppCheckMinter.ts
-
 import { logger } from 'firebase-functions'
 import 'firebase-functions/v2/https'
 import { onRequest } from 'firebase-functions/v2/https'
-import { appCheck } from './services'
+import { appCheck } from '../../services'
 
 // Define the interface for the request body
 interface CustomAppCheckMinterRequest {
@@ -12,6 +10,34 @@ interface CustomAppCheckMinterRequest {
 
 const FIREBASE_APP_ID = process.env.APP_ID_FIREBASE
 
+/**
+ * Mints an App Check token for a custom provider.
+ *
+ * This HTTPS Cloud Function acts as the backend for a custom App Check provider.
+ * It receives a unique device ID from the client, performs a custom verification
+ * check on that ID, and if the verification is successful, uses the Firebase
+ * Admin SDK to mint a new App Check token for the specified Firebase App ID.
+ *
+ * @param {express.Request} req The HTTPS request.
+ * @param {express.Response} res The HTTPS response.
+ *
+ * @returns {Promise<void>} A promise that resolves when the response has been sent.
+ *
+ * @remarks
+ * The function expects a POST request with a JSON body containing a 'deviceId' string.
+ *
+ * @example
+ * // Successful response body (HTTP 200)
+ * {
+ *   "appCheckToken": "your-app-check-token-string",
+ *   "expireTimeMillis": 1678886400000
+ * }
+ *
+ * @throws {400 Bad Request} If the 'deviceId' is missing or invalid.
+ * @throws {403 Forbidden} If the custom verification logic fails for the device ID.
+ * @throws {500 Internal Server Error} For any server-side errors, such as a failure
+ * to mint the token.
+ */
 export const customAppCheckMinter = onRequest({ cors: true }, async (req, res) => {
   // Validate the Request Method
   if (req.method !== 'POST') {

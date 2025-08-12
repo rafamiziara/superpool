@@ -118,15 +118,8 @@ POLYGONSCAN_API_KEY=[YOUR_POLYGONSCAN_API_KEY] # For contract verification
 - `packages/backend/.env`
 
 ```
-# For Firebase Admin SDK if needed, or other backend-specific secrets
-# Typically, Firebase Admin SDK works via service account files,
-# or you'll use Firebase Functions environment config directly.
-
-# For local functions emulator:
-GOOGLE_APPLICATION_CREDENTIALS=/path/to/your/firebase-adminsdk.json
-
-# Or for other APIs your Cloud Functions might call
-AI_API_KEY=[YOUR_AI_SERVICE_API_KEY]
+# For appCheck.createToken
+APP_ID_FIREBASE=[YOUR_FIREBASE_APP_ID]
 
 # Contract addresses deployed to Amoy
 POOL_FACTORY_ADDRESS=[DEPLOYED_POOL_FACTORY_ADDRESS_ON_AMOY]
@@ -152,7 +145,7 @@ EXPO_PUBLIC_NGROK_URL_FUNCTIONS=...
 EXPO_PUBLIC_NGROK_URL_FIRESTORE=...
 
 # Cloud Functions Base URL
-EXPO_PUBLIC_CLOUD_FUNCTIONS_BASE_URL=https://[YOUR_REGION]-[YOUR_PROJECT_ID].cloudfunctions.net/api
+EXPO_PUBLIC_CLOUD_FUNCTIONS_BASE_URL=https://[HOST]:[PORT]/[YOUR_PROJECT_ID]/[YOUR_REGION]/
 
 # Contract addresses deployed to Amoy
 EXPO_PUBLIC_POOL_FACTORY_ADDRESS=[DEPLOYED_POOL_FACTORY_ADDRESS_ON_AMOY]
@@ -173,6 +166,36 @@ pnpm deploy:amoy # This command should be defined in your package.json scripts
 
 ### 5. Deploy Backend Cloud Functions
 
+---
+
+To run the backend functions locally, you need to provide the Firebase Admin SDK with credentials via a service account key.
+
+1.  **Generate a Service Account Key:**
+
+    - Navigate to your Firebase Console.
+    - Go to **Project settings > Service accounts**.
+    - Click the **Generate new private key** button and download the JSON file.
+
+2.  **Add the Key to the Project:**
+
+    - Rename the downloaded JSON file to `service-account-key.json`.
+    - Place this file in the **`packages/backend/`** directory.
+
+3.  **Secure the Key:**
+
+    - **Crucially**, add `service-account-key.json` to the `.gitignore` file in your `packages/backend` directory. This prevents sensitive credentials from being committed to the repository.
+
+    ```
+    # packages/backend/.gitignore
+
+    # Firebase Service Account Key
+    service-account-key.json
+    ```
+
+After completing these steps, the Firebase Functions emulator will be able to start and run your backend functions locally.
+
+---
+
 Navigate to the `backend` package and deploy your Firebase Functions:
 
 ```bash
@@ -182,13 +205,51 @@ cd packages/backend
 firebase use [YOUR_FIREBASE_PROJECT_ID]
 
 # Set config variables (e.g., contract addresses, any private API keys)
-firebase functions:config:set contracts.pool_factory_address="[DEPLOYED_POOL_FACTORY_ADDRESS_ON_AMOY]" ai.api_key="[YOUR_AI_SERVICE_API_KEY]"
+firebase functions:config:set contracts.pool_factory_address="[DEPLOYED_POOL_FACTORY_ADDRESS_ON_AMOY]"
 
 # Deploy
 firebase deploy --only functions
 ```
 
 - **Important:** Note the base URL for your deployed Cloud Functions. Update `EXPO_PUBLIC_CLOUD_FUNCTIONS_BASE_URL` in `packages/mobile/.env`.
+
+---
+
+### Development & Testing Tools
+
+To facilitate local testing of the authentication and signature verification flow, we use two utility scripts located in the `packages/backend/scripts` directory.
+
+#### 1. Generating a Key Pair
+
+The `generateKey` script creates a new public/private key pair used for signing messages during local development.
+
+- **Purpose**: Generates `privateKey.pem` and `publicKey.pem` files in the `scripts` directory. The private key is used by the `signMessage` script, and the public key is used by the backend to verify signatures.
+- **Usage**:
+  ```bash
+  pnpm generateKey
+  ```
+- **Note**: These files are automatically added to `.gitignore` and should **never** be committed to the repository.
+
+#### 2. Signing a Message
+
+The `signMessage` script signs a message using the generated private key and the `nonce` and `timestamp` from your backend.
+
+- **Purpose**: Creates a cryptographic signature that you can use to test the `verifySignatureAndLogin` backend function.
+- **Usage**:
+  ```bash
+  pnpm signMessage <nonce> <timestamp>
+  ```
+- **Output**: The script will print the generated signature, which you can then use in your test requests (e.g., Postman).
+
+#### 3. Testing Workflow
+
+Here is the complete workflow to test your authentication functions:
+
+1.  Call your `generateAuthMessage` backend function to get a unique `nonce` and `timestamp`.
+2.  Run the `signMessage` script with the `nonce` and `timestamp` values from the previous step.
+3.  Use the `signature` from the script's output, along with the original `walletAddress`, to call the `verifySignatureAndLogin` backend function.
+
+---
 
 ### 6. Run the Mobile Application
 
