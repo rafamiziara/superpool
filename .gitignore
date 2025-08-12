@@ -11,6 +11,3 @@ firestore-debug.log
 # Env Variables
 .env
 .env.*
-
-# Scripts
-scripts/

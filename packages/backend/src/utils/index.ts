@@ -16,11 +16,3 @@ export function createAuthMessage(walletAddress: string, nonce: string, timestam
     `Timestamp:\n${timestamp}`
   )
 }
-
-/**
- * Interface for the nonce object stored in Firestore.
- */
-export interface AuthNonce {
-  nonce: string
-  timestamp: number
-}

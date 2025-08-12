@@ -7,7 +7,7 @@ import { Platform } from 'react-native'
 import 'react-native-get-random-values'
 import { v4 as uuidv4 } from 'uuid'
 
-const APP_CHECK_MINTER_URL = process.env.EXPO_PUBLIC_APP_CHECK_MINTER_URL
+const APP_CHECK_MINTER_URL = process.env.EXPO_PUBLIC_CLOUD_FUNCTIONS_BASE_URL + 'customAppCheckMinter'
 
 // A helper function to get a unique ID that is persistent across app updates
 const getUniqueDeviceId = async (): Promise<string | null> => {
