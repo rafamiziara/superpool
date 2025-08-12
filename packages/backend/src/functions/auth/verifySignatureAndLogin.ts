@@ -1,9 +1,9 @@
 import { isAddress, verifyMessage } from 'ethers'
 import { HttpsError, onCall } from 'firebase-functions/v2/https'
-import { AuthNonce, createAuthMessage } from './auth'
-import { AUTH_NONCES_COLLECTION, USERS_COLLECTION } from './constants'
-import { auth, firestore } from './services'
-import { UserProfile } from './types'
+import { AUTH_NONCES_COLLECTION, USERS_COLLECTION } from '../../constants'
+import { auth, firestore } from '../../services'
+import { AuthNonce, UserProfile } from '../../types'
+import { createAuthMessage } from '../../utils'
 
 // Define the interface for your function's input
 interface VerifySignatureAndLoginRequest {

@@ -8,7 +8,9 @@
     "shell": "npm run build && firebase functions:shell",
     "start": "npm run shell",
     "deploy": "firebase deploy --only functions",
-    "logs": "firebase functions:log"
+    "logs": "firebase functions:log",
+    "generateKey": "ts-node ./scripts/generateKey.ts",
+    "signMessage": "ts-node ./scripts/signMessage.ts"
   },
   "engines": {
     "node": "22"
@@ -23,6 +25,7 @@
   },
   "devDependencies": {
     "firebase-functions-test": "^3.1.0",
+    "ts-node": "^10.9.2",
     "typescript": "^5.7.3"
   },
   "private": true

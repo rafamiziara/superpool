@@ -11,3 +11,7 @@ node_modules/
 
 # Firebase Service Account Key
 service-account-key.json
+
+# Generated development keys
+privateKey.pem
+publicKey.pem

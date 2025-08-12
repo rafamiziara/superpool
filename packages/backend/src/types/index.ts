@@ -6,3 +6,11 @@ export interface UserProfile {
   createdAt: number
   updatedAt: number
 }
+
+/**
+ * Interface for the nonce object stored in Firestore.
+ */
+export interface AuthNonce {
+  nonce: string
+  timestamp: number
+}
