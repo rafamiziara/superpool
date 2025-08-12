@@ -1,9 +1,9 @@
 import { isAddress } from 'ethers'
 import { HttpsError, onCall } from 'firebase-functions/v2/https'
 import { v4 as uuidv4 } from 'uuid'
-import { createAuthMessage } from './auth'
-import { AUTH_NONCES_COLLECTION } from './constants'
-import { firestore } from './services'
+import { AUTH_NONCES_COLLECTION } from '../../constants'
+import { firestore } from '../../services'
+import { createAuthMessage } from '../../utils'
 
 // Define the interface for your function's input
 interface AuthMessageRequest {
