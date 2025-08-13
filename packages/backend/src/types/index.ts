@@ -1,3 +1,5 @@
+/* istanbul ignore file */
+
 /**
  * Interface for a user's profile document stored in Firestore.
  */

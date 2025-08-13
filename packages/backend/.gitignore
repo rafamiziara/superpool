@@ -15,3 +15,6 @@ service-account-key.json
 # Generated development keys
 privateKey.pem
 publicKey.pem
+
+# Test coverage reports
+/coverage
