@@ -1,5 +1,5 @@
 import { isAddress, verifyMessage } from 'ethers'
-import { HttpsError, onCall } from 'firebase-functions/v2/https'
+import { CallableRequest, HttpsError, onCall } from 'firebase-functions/v2/https'
 import { AUTH_NONCES_COLLECTION, USERS_COLLECTION } from '../../constants'
 import { auth, firestore } from '../../services'
 import { AuthNonce, UserProfile } from '../../types'
@@ -11,15 +11,7 @@ interface VerifySignatureAndLoginRequest {
   signature: string
 }
 
-/**
- * Verifies a wallet signature against a stored nonce and issues a Firebase custom token.
- * This is the final step in the wallet-based authentication flow.
- *
- * @param {CallableRequest<LoginRequest>} request The callable function's request object, containing the wallet address and signature.
- * @returns {Promise<{ firebaseToken: string }>} A promise that resolves with a Firebase custom token upon successful verification.
- * @throws {HttpsError} If the walletAddress or signature are invalid, the nonce is not found, or the signature verification fails.
- */
-export const verifySignatureAndLogin = onCall<VerifySignatureAndLoginRequest>({ cors: true, enforceAppCheck: true }, async (request) => {
+export const verifySignatureAndLoginHandler = async (request: CallableRequest<VerifySignatureAndLoginRequest>) => {
   const { walletAddress, signature } = request.data
 
   // Input Validation
@@ -32,7 +24,8 @@ export const verifySignatureAndLogin = onCall<VerifySignatureAndLoginRequest>({ 
   }
 
   // Retrieve Nonce from Firestore
-  const nonceDoc = await firestore.collection(AUTH_NONCES_COLLECTION).doc(walletAddress).get()
+  const nonceRef = firestore.collection(AUTH_NONCES_COLLECTION).doc(walletAddress)
+  const nonceDoc = await nonceRef.get()
 
   if (!nonceDoc.exists) {
     throw new HttpsError('not-found', 'No authentication message found for this wallet address. Please generate a new message.')
@@ -78,7 +71,7 @@ export const verifySignatureAndLogin = onCall<VerifySignatureAndLoginRequest>({ 
 
   // Delete the nonce to prevent replay attacks
   try {
-    await nonceDoc.ref.delete()
+    await nonceRef.delete()
   } catch (error) {
     // The user has already been authenticated, so a failure here is an acceptable cleanup error.
     console.error('Failed to delete nonce document:', error)
@@ -92,4 +85,17 @@ export const verifySignatureAndLogin = onCall<VerifySignatureAndLoginRequest>({ 
   } catch (error) {
     throw new HttpsError('unauthenticated', 'Failed to generate a valid session token.')
   }
-})
+}
+
+/**
+ * Verifies a wallet signature against a stored nonce and issues a Firebase custom token.
+ * This is the final step in the wallet-based authentication flow.
+ *
+ * @param {CallableRequest<LoginRequest>} request The callable function's request object, containing the wallet address and signature.
+ * @returns {Promise<{ firebaseToken: string }>} A promise that resolves with a Firebase custom token upon successful verification.
+ * @throws {HttpsError} If the walletAddress or signature are invalid, the nonce is not found, or the signature verification fails.
+ */
+export const verifySignatureAndLogin = onCall<VerifySignatureAndLoginRequest>(
+  { cors: true, enforceAppCheck: true },
+  verifySignatureAndLoginHandler
+)
