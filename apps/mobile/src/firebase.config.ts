@@ -24,7 +24,6 @@ const FIREBASE_APP = initializeApp(firebaseConfig)
 // Initialize App Check with the custom provider
 initializeAppCheck(FIREBASE_APP, {
   provider: customAppCheckProviderFactory(),
-  isTokenAutoRefreshEnabled: true,
 })
 
 // Initialize Firebase Services
