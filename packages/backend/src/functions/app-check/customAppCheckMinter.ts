@@ -1,6 +1,7 @@
+import 'firebase-functions/v2/https'
+
 import * as express from 'express'
 import { logger } from 'firebase-functions/v2'
-import 'firebase-functions/v2/https'
 import { onRequest, Request } from 'firebase-functions/v2/https'
 import { appCheck } from '../../services'
 
