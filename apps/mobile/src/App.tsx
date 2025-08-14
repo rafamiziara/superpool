@@ -37,7 +37,7 @@ createAppKit({
   projectId,
   metadata,
   wagmiConfig,
-  defaultChain: polygonAmoy,
+  defaultChain: polygon,
   enableAnalytics: true,
 });
 

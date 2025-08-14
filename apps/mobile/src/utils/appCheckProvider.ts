@@ -40,10 +40,12 @@ export const customAppCheckProviderFactory = (): CustomProvider => {
           throw new Error('Could not get a unique device ID.')
         }
 
+        const body = JSON.stringify({ deviceId: uniqueDeviceId })
+
         const response = await fetch(APP_CHECK_MINTER_URL, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ deviceId: uniqueDeviceId }),
+          body,
         })
 
         if (!response.ok) {
