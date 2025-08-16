@@ -1,3 +1,4 @@
+import { router } from 'expo-router'
 import { signInWithCustomToken } from 'firebase/auth'
 import { httpsCallable } from 'firebase/functions'
 import { useEffect } from 'react'
@@ -28,6 +29,7 @@ export const useAuthentication = () => {
         await signInWithCustomToken(FIREBASE_AUTH, firebaseToken)
 
         console.log('User successfully signed in with Firebase!')
+        router.replace('/dashboard')
       } catch (error) {
         console.error('Authentication failed:', error)
         disconnect()
