@@ -1,8 +1,9 @@
 // apps/mobile-app/src/firebase.config.ts
 
+import ReactNativeAsyncStorage from '@react-native-async-storage/async-storage'
 import { initializeApp } from 'firebase/app'
 import { initializeAppCheck } from 'firebase/app-check'
-import { connectAuthEmulator, getAuth } from 'firebase/auth'
+import { connectAuthEmulator, getReactNativePersistence, initializeAuth } from 'firebase/auth'
 import { connectFirestoreEmulator, getFirestore } from 'firebase/firestore'
 import { connectFunctionsEmulator, getFunctions } from 'firebase/functions'
 import { customAppCheckProviderFactory } from './utils/appCheckProvider'
@@ -26,15 +27,22 @@ initializeAppCheck(FIREBASE_APP, {
   provider: customAppCheckProviderFactory(),
 })
 
-// Initialize Firebase Services
-export const FIREBASE_AUTH = getAuth(FIREBASE_APP)
+// Initialize Firebase Auth with AsyncStorage persistence
+export const FIREBASE_AUTH = initializeAuth(FIREBASE_APP, {
+  persistence: getReactNativePersistence(ReactNativeAsyncStorage),
+})
 export const FIREBASE_FIRESTORE = getFirestore(FIREBASE_APP)
 export const FIREBASE_FUNCTIONS = getFunctions(FIREBASE_APP)
 
 // --- Connect to Emulators in Development ---
 if (__DEV__) {
   console.log('Connecting to Firebase Emulators...')
-  connectAuthEmulator(FIREBASE_AUTH, process.env.EXPO_PUBLIC_NGROK_URL_AUTH)
-  connectFirestoreEmulator(FIREBASE_FIRESTORE, process.env.EXPO_PUBLIC_NGROK_URL_FIRESTORE, 80)
-  connectFunctionsEmulator(FIREBASE_FUNCTIONS, process.env.EXPO_PUBLIC_NGROK_URL_FUNCTIONS, 80)
+
+  const ngrokAuthUrl = process.env.EXPO_PUBLIC_NGROK_URL_AUTH
+  const ngrokFirestoreUrl = process.env.EXPO_PUBLIC_NGROK_URL_FIRESTORE
+  const ngrokFunctionsUrl = process.env.EXPO_PUBLIC_NGROK_URL_FUNCTIONS
+
+  if (ngrokAuthUrl) connectAuthEmulator(FIREBASE_AUTH, ngrokAuthUrl)
+  if (ngrokFirestoreUrl) connectFirestoreEmulator(FIREBASE_FIRESTORE, ngrokFirestoreUrl, 80)
+  if (ngrokFunctionsUrl) connectFunctionsEmulator(FIREBASE_FUNCTIONS, ngrokFunctionsUrl, 80)
 }
