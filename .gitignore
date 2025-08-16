@@ -11,3 +11,8 @@ firestore-debug.log
 # Env Variables
 .env
 .env.*
+
+# Claude Code files
+CLAUDE.md
+**/CLAUDE.md
+.claude/
