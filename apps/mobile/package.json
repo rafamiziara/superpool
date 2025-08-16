@@ -16,6 +16,7 @@
     "@walletconnect/react-native-compat": "^2.21.8",
     "expo": "~53.0.20",
     "expo-application": "~6.1.5",
+    "expo-router": "^5.1.4",
     "expo-secure-store": "~14.2.3",
     "expo-status-bar": "~2.2.3",
     "firebase": "^12.1.0",

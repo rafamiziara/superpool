@@ -2,9 +2,9 @@ import { AppKitButton } from '@reown/appkit-wagmi-react-native';
 import { StatusBar } from 'expo-status-bar';
 import { StyleSheet, Text, View } from 'react-native';
 import { useAccount } from 'wagmi';
-import { useAuthentication } from './hooks/useAuthentication';
+import { useAuthentication } from '../hooks/useAuthentication';
 
-export default function AppContainer() {
+export default function WalletConnectionScreen() {
   const { isConnected, chain } = useAccount()
   useAuthentication()
 
@@ -46,7 +46,7 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 32,
     marginBottom: 32,
-    fontWeight: 800
+    fontWeight: '800'
   },
   infoText: {
     fontSize: 16,
