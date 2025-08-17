@@ -6,6 +6,7 @@ import { useEffect } from 'react';
 import { StyleSheet, Text, View, TouchableOpacity, Alert } from 'react-native';
 import { useAccount, useDisconnect } from 'wagmi';
 import { FIREBASE_AUTH } from '../firebase.config';
+import { getGlobalLogoutState } from '../hooks/useLogoutState';
 
 export default function DashboardScreen() {
   const { address, chain, isConnected } = useAccount();
@@ -19,13 +20,25 @@ export default function DashboardScreen() {
   }, [isConnected]);
 
   const handleLogout = async () => {
+    const { startLogout, finishLogout } = getGlobalLogoutState()
+    
     try {
-      await signOut(FIREBASE_AUTH);
+      // Set logout state to prevent authentication hook from processing
+      startLogout()
+      
+      // Disconnect wallet first
       disconnect();
+      
+      // Then sign out of Firebase
+      await signOut(FIREBASE_AUTH);
+      
       router.replace('/');
     } catch (error) {
       console.error('Logout error:', error);
       Alert.alert('Error', 'Failed to logout. Please try again.');
+    } finally {
+      // Always clear logout state
+      finishLogout()
     }
   };
 
