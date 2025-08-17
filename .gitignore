@@ -12,6 +12,9 @@ firestore-debug.log
 .env
 .env.*
 
+# Ngrok config (contains personal authtoken)
+ngrok.yml
+
 # Claude Code files
 CLAUDE.md
 **/CLAUDE.md

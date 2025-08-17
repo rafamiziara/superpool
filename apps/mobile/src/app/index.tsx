@@ -2,16 +2,15 @@ import { AppKitButton } from '@reown/appkit-wagmi-react-native';
 import { StatusBar } from 'expo-status-bar';
 import { StyleSheet, Text, View } from 'react-native';
 import { useAccount } from 'wagmi';
-import { useAuthentication } from '../hooks/useAuthentication';
 
 export default function WalletConnectionScreen() {
   const { isConnected, chain } = useAccount()
-  useAuthentication()
 
   return (
     <View style={styles.container}>
       <Text style={styles.title}>SuperPool</Text>
       <AppKitButton balance='show' connectStyle={{ alignSelf: 'stretch' }} />
+      
       {isConnected ? (
         <View style={styles.infoContainer}>
           <Text style={styles.infoText}>✅ Connected</Text>
@@ -20,6 +19,9 @@ export default function WalletConnectionScreen() {
               You are on the {chain.name} network.
             </Text>
           )}
+          <Text style={styles.subText}>
+            Authentication in progress... Check the notification above.
+          </Text>
         </View>
       ) : (
         <View style={styles.infoContainer}>
@@ -42,6 +44,13 @@ const styles = StyleSheet.create({
   infoContainer: {
     marginTop: 20,
     alignItems: 'center',
+  },
+  subText: {
+    fontSize: 14,
+    color: '#666',
+    textAlign: 'center',
+    marginTop: 8,
+    fontStyle: 'italic',
   },
   title: {
     fontSize: 32,
