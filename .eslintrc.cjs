@@ -9,9 +9,9 @@ module.exports = {
     'eslint:recommended',
     'plugin:@typescript-eslint/recommended',
   ],
-  ignorePatterns: ['dist', 'node_modules', 'lib'],
+  ignorePatterns: ['dist', 'node_modules', 'lib', 'dev-start.js'],
   rules: {
     'quotes': ['error', 'single'],
-    'indent': ['error', 2],
+    'indent': ['error', 2, { 'SwitchCase': 1 }],
   },
 };

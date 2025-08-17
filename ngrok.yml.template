@@ -1,0 +1,42 @@
+# Ngrok Configuration Template for SuperPool Development
+# 
+# To use this configuration:
+# 1. Copy this file to ngrok.yml: cp ngrok.yml.template ngrok.yml
+# 2. Sign up for ngrok account at https://ngrok.com/
+# 3. Get your authtoken from https://dashboard.ngrok.com/get-started/your-authtoken
+# 4. Replace YOUR_AUTHTOKEN_HERE with your actual authtoken in ngrok.yml
+# 5. Run: pnpm dev (or ngrok start --all)
+#
+# This will create tunnels for all Firebase emulators used in SuperPool development
+
+version: "2"
+authtoken: YOUR_AUTHTOKEN_HERE
+
+tunnels:
+  # Firebase Auth Emulator (port 9099)
+  auth:
+    addr: 9099
+    proto: http
+    inspect: false
+    bind_tls: true
+
+  # Firebase Functions Emulator (port 5001)  
+  functions:
+    addr: 5001
+    proto: http
+    inspect: false
+    bind_tls: true
+
+  # Firebase Firestore Emulator (port 8080)
+  firestore:
+    addr: 8080
+    proto: http
+    inspect: false
+    bind_tls: true
+
+# Optional: Configure logging
+log_level: info
+log_format: term
+
+# Optional: Configure web interface (default port 4040)
+web_addr: localhost:4040

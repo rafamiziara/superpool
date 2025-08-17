@@ -6,9 +6,14 @@ import {
   defaultWagmiConfig,
 } from '@reown/appkit-wagmi-react-native';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { mainnet, polygon, polygonAmoy } from '@wagmi/core/chains';
+import { mainnet, polygon, polygonAmoy, arbitrum, base, bsc } from '@wagmi/core/chains';
 import { Stack } from 'expo-router';
+import { useEffect } from 'react';
+import Toast from 'react-native-toast-message';
 import { WagmiProvider } from 'wagmi';
+import { useWalletToasts } from '../hooks/useWalletToasts';
+import { useGlobalLogoutState } from '../hooks/useLogoutState';
+import { SessionManager } from '../utils/sessionManager';
 
 const queryClient = new QueryClient();
 
@@ -21,15 +26,15 @@ if (!projectId) {
 const metadata = {
   name: 'SuperPool',
   description: 'Decentralized Micro-Lending Pools',
-  url: 'https://reown.com/appkit',
+  url: 'https://superpool.app',
   icons: ['https://avatars.githubusercontent.com/u/179229932'],
   redirect: {
     native: 'superpool://',
-    universal: 'YOUR_APP_UNIVERSAL_LINK.com',
+    universal: 'https://superpool.app',
   },
 };
 
-const chains = [mainnet, polygon, polygonAmoy] as const;
+const chains = [mainnet, polygon, polygonAmoy, arbitrum, base, bsc] as const;
 
 const wagmiConfig = defaultWagmiConfig({ chains, projectId, metadata });
 
@@ -41,15 +46,44 @@ createAppKit({
   enableAnalytics: true,
 });
 
+function AppContent() {
+  useWalletToasts() // Global wallet toast notifications
+  useGlobalLogoutState() // Global logout state management
+  
+  // Debug session state on app start
+  useEffect(() => {
+    if (__DEV__) {
+      SessionManager.getSessionDebugInfo()
+        .then(debugInfo => {
+          console.log('App startup - Session debug info:', {
+            totalKeys: debugInfo.totalKeys,
+            walletConnectKeysCount: debugInfo.walletConnectKeys.length,
+            walletConnectKeys: debugInfo.walletConnectKeys.slice(0, 5) // Show first 5
+          })
+        })
+        .catch(error => {
+          console.warn('Failed to get session debug info on startup:', error)
+        })
+    }
+  }, [])
+  
+  return (
+    <>
+      <Stack screenOptions={{ headerShown: false }}>
+        <Stack.Screen name="index" />
+        <Stack.Screen name="dashboard" />
+      </Stack>
+      <AppKit />
+      <Toast />
+    </>
+  )
+}
+
 export default function RootLayout() {
   return (
     <WagmiProvider config={wagmiConfig}>
       <QueryClientProvider client={queryClient}>
-        <Stack screenOptions={{ headerShown: false }}>
-          <Stack.Screen name="index" />
-          <Stack.Screen name="dashboard" />
-        </Stack>
-        <AppKit />
+        <AppContent />
       </QueryClientProvider>
     </WagmiProvider>
   );
