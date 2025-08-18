@@ -1,0 +1,261 @@
+import AsyncStorage from '@react-native-async-storage/async-storage'
+
+const WALLETCONNECT_SESSION_KEY = '@walletconnect/client0.3//session'
+const REOWN_APPKIT_SESSION_KEY = '@reown/appkit'
+
+// Type definitions for session data
+type SessionDataValue = string | number | boolean | null | object | undefined
+type SessionData = Record<string, SessionDataValue>
+
+interface SessionDebugInfo {
+  totalKeys: number
+  walletConnectKeys: string[]
+  sessionData: SessionData
+}
+
+export class SessionManager {
+  static async clearAllWalletConnectSessions(): Promise<void> {
+    try {
+      console.log('🧹 Starting comprehensive WalletConnect session cleanup...')
+
+      // Get all AsyncStorage keys
+      const allKeys = await AsyncStorage.getAllKeys()
+
+      // More comprehensive filter for WalletConnect/Reown related keys
+      const walletConnectKeys = allKeys.filter((key) => {
+        const lowerKey = key.toLowerCase()
+        return (
+          // Standard WalletConnect patterns
+          lowerKey.includes('walletconnect') ||
+          lowerKey.includes('wc@2') ||
+          lowerKey.includes('reown') ||
+          lowerKey.includes('appkit') ||
+          lowerKey.includes('walletconnect') ||
+          lowerKey.includes('wc_') ||
+          lowerKey.startsWith('@walletconnect') ||
+          lowerKey.startsWith('@reown') ||
+          // Session-specific patterns
+          lowerKey.includes('session') ||
+          lowerKey.includes('pairing') ||
+          lowerKey.includes('client') ||
+          // Protocol patterns
+          lowerKey.includes('wc:') ||
+          lowerKey.includes('relay') ||
+          // Storage patterns
+          lowerKey.includes('wagmi') ||
+          lowerKey.includes('viem') ||
+          // AppKit specific
+          lowerKey.includes('w3m') ||
+          lowerKey.includes('modal')
+        )
+      })
+
+      console.log(`Found ${walletConnectKeys.length} WalletConnect-related keys:`, walletConnectKeys.slice(0, 10))
+
+      // Clear all WalletConnect related keys in batches
+      if (walletConnectKeys.length > 0) {
+        const batchSize = 20
+        for (let i = 0; i < walletConnectKeys.length; i += batchSize) {
+          const batch = walletConnectKeys.slice(i, i + batchSize)
+          await AsyncStorage.multiRemove(batch)
+          console.log(`Cleared batch ${Math.floor(i / batchSize) + 1}: ${batch.length} keys`)
+        }
+        console.log(`✅ Cleared ${walletConnectKeys.length} WalletConnect session keys`)
+      }
+
+      // Clear specific known problematic keys
+      const specificKeys = [
+        WALLETCONNECT_SESSION_KEY,
+        REOWN_APPKIT_SESSION_KEY,
+        'wagmi.store',
+        'wagmi.cache',
+        'wagmi.injected.shimConnected',
+        'wagmi.wallet',
+        'wagmi.connected',
+        'reown.sessions',
+        'wc.pairing',
+        'wc.session',
+        'wc.client',
+        'w3m.wallet',
+        'w3m.session',
+        '@w3m/wallet_id',
+        '@w3m/connected_wallet_image_url',
+        '@walletconnect/universal_provider',
+        '@walletconnect/ethereum_provider',
+      ]
+
+      console.log('🎯 Clearing specific known keys...')
+      for (const key of specificKeys) {
+        try {
+          await AsyncStorage.removeItem(key)
+        } catch (error) {
+          // Ignore errors for non-existent keys
+        }
+      }
+
+      // Clear any keys containing the specific session ID from the error
+      const sessionIdPattern = /[a-f0-9]{64}/g
+      const keysWithSessionIds = allKeys.filter((key) => sessionIdPattern.test(key))
+      if (keysWithSessionIds.length > 0) {
+        console.log(`🔍 Found ${keysWithSessionIds.length} keys with session IDs, clearing...`)
+        await AsyncStorage.multiRemove(keysWithSessionIds)
+      }
+
+      console.log('✅ Successfully completed comprehensive WalletConnect session cleanup')
+    } catch (error) {
+      console.error('❌ Failed to clear WalletConnect sessions:', error)
+      throw error
+    }
+  }
+
+  static async getSessionDebugInfo(): Promise<SessionDebugInfo> {
+    try {
+      const allKeys = await AsyncStorage.getAllKeys()
+      const walletConnectKeys = allKeys.filter(
+        (key) =>
+          key.includes('walletconnect') ||
+          key.includes('wc@2') ||
+          key.includes('reown') ||
+          key.includes('appkit') ||
+          key.includes('WALLETCONNECT') ||
+          key.includes('WC_') ||
+          key.startsWith('@walletconnect') ||
+          key.startsWith('@reown')
+      )
+
+      const sessionData: SessionData = {}
+
+      // Get data for each WalletConnect key (for debugging)
+      for (const key of walletConnectKeys.slice(0, 5)) {
+        // Limit to first 5 for performance
+        try {
+          const data = await AsyncStorage.getItem(key)
+          sessionData[key] = data ? JSON.parse(data) : null
+        } catch (error) {
+          sessionData[key] = 'Failed to parse'
+        }
+      }
+
+      return {
+        totalKeys: allKeys.length,
+        walletConnectKeys,
+        sessionData,
+      }
+    } catch (error) {
+      console.error('Failed to get session debug info:', error)
+      return {
+        totalKeys: 0,
+        walletConnectKeys: [],
+        sessionData: {},
+      }
+    }
+  }
+
+  static async clearSpecificSession(sessionId: string): Promise<void> {
+    try {
+      console.log(`Clearing specific session: ${sessionId}`)
+
+      const allKeys = await AsyncStorage.getAllKeys()
+      const sessionKeys = allKeys.filter((key) => key.includes(sessionId))
+
+      if (sessionKeys.length > 0) {
+        await AsyncStorage.multiRemove(sessionKeys)
+        console.log(`Cleared ${sessionKeys.length} keys for session ${sessionId}`)
+      }
+    } catch (error) {
+      console.error(`Failed to clear session ${sessionId}:`, error)
+      throw error
+    }
+  }
+
+  static async hasValidSession(): Promise<boolean> {
+    try {
+      const debugInfo = await this.getSessionDebugInfo()
+
+      // Check if we have any active WalletConnect sessions
+      const hasActiveSession = debugInfo.walletConnectKeys.length > 0
+
+      console.log('Session validation result:', {
+        hasActiveSession,
+        keyCount: debugInfo.walletConnectKeys.length,
+        keys: debugInfo.walletConnectKeys.slice(0, 3), // Show first 3 for debugging
+      })
+
+      return hasActiveSession
+    } catch (error) {
+      console.error('Failed to validate session:', error)
+      return false
+    }
+  }
+
+  static async forceResetAllConnections(): Promise<void> {
+    try {
+      console.log('🔄 Force resetting all wallet connections...')
+
+      // Clear all sessions
+      await this.clearAllWalletConnectSessions()
+
+      // Clear any remaining cache data
+      await this.clearQueryCache()
+
+      // Force reload app state (if needed)
+      console.log('✅ All connections force reset completed')
+    } catch (error) {
+      console.error('❌ Failed to force reset connections:', error)
+      throw error
+    }
+  }
+
+  static async clearQueryCache(): Promise<void> {
+    try {
+      // Clear TanStack Query cache keys that might hold stale connection data
+      const allKeys = await AsyncStorage.getAllKeys()
+      const queryCacheKeys = allKeys.filter((key) => key.includes('react-query') || key.includes('tanstack') || key.includes('query-cache'))
+
+      if (queryCacheKeys.length > 0) {
+        await AsyncStorage.multiRemove(queryCacheKeys)
+        console.log(`Cleared ${queryCacheKeys.length} query cache keys`)
+      }
+    } catch (error) {
+      console.warn('Failed to clear query cache:', error)
+    }
+  }
+
+  static async clearSessionByErrorId(sessionId: string): Promise<void> {
+    try {
+      console.log(`🎯 Clearing sessions containing ID: ${sessionId}`)
+
+      const allKeys = await AsyncStorage.getAllKeys()
+      const sessionKeys = allKeys.filter((key) => key.includes(sessionId))
+
+      if (sessionKeys.length > 0) {
+        console.log(`Found ${sessionKeys.length} keys with session ID:`, sessionKeys)
+        await AsyncStorage.multiRemove(sessionKeys)
+        console.log(`✅ Cleared ${sessionKeys.length} keys for session ${sessionId}`)
+      } else {
+        console.log('No keys found with that session ID')
+      }
+    } catch (error) {
+      console.error(`Failed to clear session ${sessionId}:`, error)
+      throw error
+    }
+  }
+
+  static async preventiveSessionCleanup(): Promise<void> {
+    try {
+      console.log('🛡️ Running preventive session cleanup before connection...')
+
+      // Multiple cleanup approaches
+      await this.clearAllWalletConnectSessions()
+      await this.clearQueryCache()
+
+      // Wait a moment for cleanup to settle
+      await new Promise((resolve) => setTimeout(resolve, 500))
+
+      console.log('✅ Preventive session cleanup completed')
+    } catch (error) {
+      console.error('❌ Preventive session cleanup failed:', error)
+      throw error
+    }
+  }
+}
