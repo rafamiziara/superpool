@@ -1,5 +1,5 @@
 import { router } from 'expo-router'
-import { signInWithCustomToken } from 'firebase/auth'
+import { signInWithCustomToken, signOut } from 'firebase/auth'
 import { httpsCallable } from 'firebase/functions'
 import { useCallback, useState } from 'react'
 import { useAccount, useDisconnect, useSignMessage } from 'wagmi'
@@ -22,7 +22,39 @@ export const useAuthentication = () => {
   const handleAuthentication = useCallback(
     async (walletAddress: string) => {
       console.log('🔐 Starting authentication flow for address:', walletAddress)
-      console.log('🔐 Current account state:', { isConnected, address, chainId: chain?.id })
+      
+      // Capture connection state at the start to prevent race conditions
+      const authStartState = {
+        isConnected,
+        address,
+        chainId: chain?.id,
+        timestamp: Date.now()
+      }
+      
+      console.log('🔐 Locked connection state:', authStartState)
+
+      // Helper function to validate connection state hasn't changed
+      const validateConnectionState = (checkPoint: string): boolean => {
+        const currentState = {
+          isConnected,
+          address,
+          chainId: chain?.id
+        }
+        
+        const isValid = 
+          currentState.isConnected === authStartState.isConnected &&
+          currentState.address === authStartState.address &&
+          currentState.chainId === authStartState.chainId
+
+        if (!isValid) {
+          console.log(`❌ Connection state changed at ${checkPoint}:`, {
+            initial: authStartState,
+            current: currentState
+          })
+        }
+
+        return isValid
+      }
 
       // Check if we're in the middle of a logout process
       try {
@@ -50,15 +82,24 @@ export const useAuthentication = () => {
 
       // Verify current connection state
       console.log('🔍 Current connection state:', {
-        isConnected,
-        address,
-        chainId: chain?.id,
+        isConnected: authStartState.isConnected,
+        address: authStartState.address,
+        chainId: authStartState.chainId,
         chainName: chain?.name,
-        addressMatches: address === walletAddress,
+        addressMatches: authStartState.address === walletAddress,
       })
 
+      // Validate initial connection state
+      if (!authStartState.isConnected || !authStartState.address || authStartState.address !== walletAddress) {
+        console.warn('❌ Invalid initial connection state')
+        const connectionError = categorizeError(new Error('Wallet connection state invalid'))
+        setAuthError(connectionError)
+        showErrorFromAppError(connectionError)
+        return
+      }
+
       // Check if connected to supported chain
-      if (!chain) {
+      if (!authStartState.chainId) {
         console.warn('❌ No chain detected')
         const chainError = categorizeError(new Error('ChainId not found'))
         setAuthError(chainError)
@@ -89,9 +130,9 @@ export const useAuthentication = () => {
         console.log('⏳ Waiting 1 second for session stabilization...')
         await new Promise((resolve) => setTimeout(resolve, 1000))
 
-        // Check if still connected after delay
-        if (!isConnected || address !== walletAddress) {
-          console.log('❌ Connection lost during message generation:', { isConnected, address, walletAddress })
+        // Check if connection state is still consistent after delay
+        if (!validateConnectionState('after message generation delay')) {
+          console.log('❌ Aborting authentication due to connection state change')
           return
         }
 
@@ -101,18 +142,24 @@ export const useAuthentication = () => {
         console.log('📱 Calling signMessageAsync with message:', message)
 
         let signature: string
+        let timeoutId: NodeJS.Timeout | undefined
         try {
           // Add timeout to signature request to prevent hanging
           const signaturePromise = signMessageAsync({ message })
           const timeoutPromise = new Promise<never>((_, reject) => {
-            setTimeout(() => {
+            timeoutId = setTimeout(() => {
               reject(new Error('Signature request timed out after 30 seconds'))
             }, 30000) // 30 second timeout
           })
 
           signature = await Promise.race([signaturePromise, timeoutPromise])
+          
+          // Clean up timeout when signature resolves first
+          if (timeoutId) clearTimeout(timeoutId)
           console.log('✅ Signature received:', signature?.substring(0, 20) + '...')
         } catch (signError: unknown) {
+          // Clean up timeout on error
+          if (timeoutId) clearTimeout(timeoutId)
           console.log('❌ Signature error:', signError)
           const errorMessage = signError instanceof Error ? signError.message : String(signError)
 
@@ -137,8 +184,11 @@ export const useAuthentication = () => {
           throw signError
         }
 
-        // Check if still connected after signature
-        if (!isConnected || address !== walletAddress) return
+        // Check if connection state is still consistent after signature
+        if (!validateConnectionState('after signature completion')) {
+          console.log('❌ Aborting authentication due to connection state change')
+          return
+        }
 
         // Step 3: Verify signature and get Firebase token
         authToasts.verifying()
@@ -149,12 +199,28 @@ export const useAuthentication = () => {
         })
         const { firebaseToken } = signatureResponse.data as { firebaseToken: string }
 
-        // Check if still connected before Firebase auth
-        if (!isConnected || address !== walletAddress) return
+        // Check if connection state is still consistent before Firebase auth
+        if (!validateConnectionState('before Firebase authentication')) {
+          console.log('❌ Aborting authentication due to connection state change')
+          return
+        }
 
         // Step 4: Sign in with Firebase
         console.log('Signing in with Firebase...')
         await signInWithCustomToken(FIREBASE_AUTH, firebaseToken)
+
+        // Final validation before declaring success
+        if (!validateConnectionState('authentication completion')) {
+          console.log('❌ Connection state changed during final authentication step')
+          // Sign out from Firebase since connection state is inconsistent
+          try {
+            await signOut(FIREBASE_AUTH)
+            console.log('🚪 Signed out from Firebase due to connection state change')
+          } catch (signOutError) {
+            console.error('❌ Failed to sign out from Firebase:', signOutError)
+          }
+          return
+        }
 
         // Success!
         console.log('User successfully signed in with Firebase!')
@@ -179,6 +245,7 @@ export const useAuthentication = () => {
           const sessionIdMatch = errorMessage.match(/session:\s*([a-f0-9]{64})/i)
           const sessionId = sessionIdMatch ? sessionIdMatch[1] : null
 
+          let cleanupSuccessful = false
           try {
             if (sessionId) {
               console.log(`🎯 Attempting to clear specific session: ${sessionId}`)
@@ -188,18 +255,35 @@ export const useAuthentication = () => {
             // Always perform comprehensive cleanup for session errors
             console.log('🧹 Performing comprehensive session cleanup...')
             await SessionManager.forceResetAllConnections()
-
-            console.log('✅ Session cleanup completed, disconnecting wallet...')
-            disconnect()
-
-            // Show specific error message for session issues
-            setTimeout(() => {
-              authToasts.sessionError()
-            }, 1500)
-            return
+            cleanupSuccessful = true
           } catch (sessionError) {
-            console.error('❌ Failed to clear sessions:', sessionError)
+            console.error('❌ Session cleanup failed, attempting fallback cleanup:', sessionError)
+            
+            // Fallback: Try preventive cleanup as last resort
+            try {
+              console.log('🔄 Attempting preventive session cleanup as fallback...')
+              await SessionManager.preventiveSessionCleanup()
+              cleanupSuccessful = true
+            } catch (fallbackError) {
+              console.error('❌ Fallback session cleanup also failed:', fallbackError)
+              // Continue with disconnect even if all cleanup fails
+            }
           }
+
+          // Always disconnect and show error, regardless of cleanup success
+          console.log('🔌 Disconnecting wallet after session error handling...')
+          disconnect()
+
+          // Show specific error message for session issues
+          setTimeout(() => {
+            authToasts.sessionError()
+          }, 1500)
+          
+          if (!cleanupSuccessful) {
+            console.warn('⚠️ Session cleanup incomplete - some orphaned sessions may remain')
+          }
+          
+          return
         }
 
         const appError = categorizeError(error)
