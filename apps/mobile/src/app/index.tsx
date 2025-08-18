@@ -4,7 +4,7 @@ import { StyleSheet, Text, View } from 'react-native';
 import { useAccount } from 'wagmi';
 
 export default function WalletConnectionScreen() {
-  const { isConnected, chain } = useAccount()
+  const { isConnected, chain, address } = useAccount()
 
   return (
     <View style={styles.container}>
@@ -17,6 +17,11 @@ export default function WalletConnectionScreen() {
           {chain && (
             <Text style={styles.infoText}>
               You are on the {chain.name} network.
+            </Text>
+          )}
+          {address && (
+            <Text style={styles.addressText}>
+              {address.slice(0, 6)}...{address.slice(-4)}
             </Text>
           )}
           <Text style={styles.subText}>
@@ -61,5 +66,12 @@ const styles = StyleSheet.create({
     fontSize: 16,
     marginTop: 8,
     textAlign: 'center',
+  },
+  addressText: {
+    fontSize: 14,
+    marginTop: 4,
+    textAlign: 'center',
+    color: '#666',
+    fontFamily: 'monospace',
   },
 });

@@ -1,4 +1,8 @@
 import '@walletconnect/react-native-compat';
+import { EventEmitter } from 'events';
+
+// Increase max listeners to prevent memory leak warnings from multiple WalletConnect sessions
+EventEmitter.defaultMaxListeners = 20;
 
 import {
   AppKit,
@@ -6,13 +10,13 @@ import {
   defaultWagmiConfig,
 } from '@reown/appkit-wagmi-react-native';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { mainnet, polygon, polygonAmoy, arbitrum, base, bsc } from '@wagmi/core/chains';
+import { arbitrum, base, bsc, mainnet, polygon, polygonAmoy } from '@wagmi/core/chains';
 import { Stack } from 'expo-router';
 import { useEffect } from 'react';
 import Toast from 'react-native-toast-message';
 import { WagmiProvider } from 'wagmi';
-import { useWalletToasts } from '../hooks/useWalletToasts';
 import { useGlobalLogoutState } from '../hooks/useLogoutState';
+import { useWalletToasts } from '../hooks/useWalletToasts';
 import { SessionManager } from '../utils/sessionManager';
 
 const queryClient = new QueryClient();
@@ -38,6 +42,9 @@ const chains = [mainnet, polygon, polygonAmoy, arbitrum, base, bsc] as const;
 
 const wagmiConfig = defaultWagmiConfig({ chains, projectId, metadata });
 
+// Clear stale sessions before AppKit initialization to prevent "No matching key" errors
+SessionManager.preventiveSessionCleanup().catch(console.warn);
+
 createAppKit({
   projectId,
   metadata,
@@ -50,19 +57,20 @@ function AppContent() {
   useWalletToasts() // Global wallet toast notifications
   useGlobalLogoutState() // Global logout state management
   
-  // Debug session state on app start
+  // Debug session state on app start (no aggressive cleanup)
   useEffect(() => {
     if (__DEV__) {
       SessionManager.getSessionDebugInfo()
         .then(debugInfo => {
-          console.log('App startup - Session debug info:', {
+          console.log('🚀 App startup - Session debug info:', {
             totalKeys: debugInfo.totalKeys,
             walletConnectKeysCount: debugInfo.walletConnectKeys.length,
             walletConnectKeys: debugInfo.walletConnectKeys.slice(0, 5) // Show first 5
           })
+          console.log('✅ Session state preserved - no aggressive cleanup on startup')
         })
         .catch(error => {
-          console.warn('Failed to get session debug info on startup:', error)
+          console.warn('⚠️ Failed to get session debug info on startup:', error)
         })
     }
   }, [])
