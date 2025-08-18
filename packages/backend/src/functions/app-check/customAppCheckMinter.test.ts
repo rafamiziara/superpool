@@ -34,9 +34,18 @@ jest.mock('firebase-admin', () => ({
 // Mock the logger to prevent console clutter during tests
 const mockLoggerError = jest.fn()
 const mockLoggerInfo = jest.fn()
+const mockLoggerWarn = jest.fn()
 
 jest.mock('firebase-functions/v2', () => ({
-  logger: { error: mockLoggerError, info: mockLoggerInfo },
+  logger: { error: mockLoggerError, info: mockLoggerInfo, warn: mockLoggerWarn },
+}))
+
+// Mock the DeviceVerificationService
+const mockIsDeviceApproved = jest.fn() as jest.MockedFunction<(deviceId: string) => Promise<boolean>>
+jest.mock('../../services/deviceVerification', () => ({
+  DeviceVerificationService: {
+    isDeviceApproved: mockIsDeviceApproved,
+  },
 }))
 
 const { customAppCheckMinterHandler } = require('./customAppCheckMinter')
@@ -52,6 +61,9 @@ describe('customAppCheckMinterHandler', () => {
   beforeEach(() => {
     jest.clearAllMocks()
     process.env.APP_ID_FIREBASE = FIREBASE_APP_ID
+
+    // Default to approved device for existing tests
+    mockIsDeviceApproved.mockResolvedValue(true)
   })
 
   // Test case: Successful token minting (Happy Path)
@@ -70,6 +82,7 @@ describe('customAppCheckMinterHandler', () => {
     await customAppCheckMinterHandler(mockRequest, mockResponse as express.Response)
 
     // Assert
+    expect(mockIsDeviceApproved).toHaveBeenCalledWith(testDeviceId)
     expect(mockCreateToken).toHaveBeenCalledWith(FIREBASE_APP_ID, { ttlMillis: TTL_MILLIS })
     expect(mockLoggerInfo).toHaveBeenCalledWith('App Check token minted successfully', { deviceId: testDeviceId })
     expect(mockResponse.status).toHaveBeenCalledWith(200)
@@ -132,5 +145,41 @@ describe('customAppCheckMinterHandler', () => {
     expect(mockResponse.status).toHaveBeenCalledWith(500)
     expect(mockResponse.send).toHaveBeenCalledWith('Internal Server Error: Failed to mint App Check token')
     expect(mockCreateToken).toHaveBeenCalledTimes(1)
+  })
+
+  // Test case: Device not approved (Security)
+  it('should return a 403 error if device is not approved', async () => {
+    // Arrange
+    const testDeviceId = 'unapproved-device-123'
+    mockRequest.body = { deviceId: testDeviceId }
+    mockIsDeviceApproved.mockResolvedValue(false)
+
+    // Act
+    await customAppCheckMinterHandler(mockRequest, mockResponse as express.Response)
+
+    // Assert
+    expect(mockIsDeviceApproved).toHaveBeenCalledWith(testDeviceId)
+    expect(mockLoggerWarn).toHaveBeenCalledWith('App Check token requested for unapproved device', { deviceId: testDeviceId })
+    expect(mockResponse.status).toHaveBeenCalledWith(403)
+    expect(mockResponse.send).toHaveBeenCalledWith('Forbidden: Device not approved. Please authenticate with your wallet first.')
+    expect(mockCreateToken).not.toHaveBeenCalled()
+  })
+
+  // Test case: Device verification throws error
+  it('should return a 403 error if device verification fails', async () => {
+    // Arrange
+    const testDeviceId = 'error-device-123'
+    mockRequest.body = { deviceId: testDeviceId }
+    mockIsDeviceApproved.mockRejectedValue(new Error('Verification service error'))
+
+    // Act
+    await customAppCheckMinterHandler(mockRequest, mockResponse as express.Response)
+
+    // Assert
+    expect(mockIsDeviceApproved).toHaveBeenCalledWith(testDeviceId)
+    expect(mockLoggerError).toHaveBeenCalledWith('Device verification failed', { error: expect.any(Error), deviceId: testDeviceId })
+    expect(mockResponse.status).toHaveBeenCalledWith(403)
+    expect(mockResponse.send).toHaveBeenCalledWith('Forbidden: Device not approved. Please authenticate with your wallet first.')
+    expect(mockCreateToken).not.toHaveBeenCalled()
   })
 })

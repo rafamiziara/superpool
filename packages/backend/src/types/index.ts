@@ -17,3 +17,11 @@ export interface AuthNonce {
   timestamp: number
   expiresAt: number
 }
+
+export interface ApprovedDevice {
+  deviceId: string
+  walletAddress: string
+  approvedAt: number
+  platform: 'android' | 'ios' | 'web'
+  lastUsed: number
+}

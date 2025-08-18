@@ -4,6 +4,7 @@ import * as express from 'express'
 import { logger } from 'firebase-functions/v2'
 import { onRequest, Request } from 'firebase-functions/v2/https'
 import { appCheck } from '../../services'
+import { DeviceVerificationService } from '../../services/deviceVerification'
 
 // Define the interface for the request body
 interface CustomAppCheckMinterRequest {
@@ -35,14 +36,19 @@ export const customAppCheckMinterHandler = async (req: Request, res: express.Res
     return
   }
 
-  // Optional: Add your custom verification logic here.
-  // For now, we'll trust the deviceId, but you could:
-  // - Check it against a Firestore database of known devices.
-  // - Use other device-specific information to ensure authenticity.
-  // if (!verifyDeviceIsAuthentic(deviceId)) {
-  //   res.status(403).send('Forbidden: Invalid device');
-  //   return;
-  // }
+  // Verify that the device is approved before minting App Check token
+  try {
+    const isApproved = await DeviceVerificationService.isDeviceApproved(deviceId)
+    if (!isApproved) {
+      logger.warn('App Check token requested for unapproved device', { deviceId })
+      res.status(403).send('Forbidden: Device not approved. Please authenticate with your wallet first.')
+      return
+    }
+  } catch (error) {
+    logger.error('Device verification failed', { error, deviceId })
+    res.status(403).send('Forbidden: Device not approved. Please authenticate with your wallet first.')
+    return
+  }
 
   // Use the Firebase Admin SDK to mint the App Check token
   try {

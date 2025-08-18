@@ -8,7 +8,9 @@ const mockUpdate = jest.fn<UpdateFunctionFirestore>()
 const mockSet = jest.fn<SetFunctionFirestore>()
 
 const mockNonceDoc = {
-  get: jest.fn(() => createMockDocumentSnapshot(true, { nonce: 'test-nonce', timestamp: 1234567890, expiresAt: 1678886400000 + (10 * 60 * 1000) })),
+  get: jest.fn(() =>
+    createMockDocumentSnapshot(true, { nonce: 'test-nonce', timestamp: 1234567890, expiresAt: 1678886400000 + 10 * 60 * 1000 })
+  ),
   delete: mockDelete,
 }
 
@@ -60,6 +62,14 @@ jest.mock('../../utils', () => ({
   createAuthMessage: mockCreateAuthMessage,
 }))
 
+// Mock the DeviceVerificationService  
+const mockApproveDevice = jest.fn() as jest.MockedFunction<(deviceId: string, walletAddress: string, platform: 'android' | 'ios' | 'web') => Promise<void>>
+jest.mock('../../services/deviceVerification', () => ({
+  DeviceVerificationService: {
+    approveDevice: mockApproveDevice,
+  },
+}))
+
 const { verifySignatureAndLoginHandler } = require('./verifySignatureAndLogin')
 const { createMockDocumentSnapshot } = require('../../utils/firestore-mock')
 
@@ -89,7 +99,7 @@ describe('verifySignatureAndLoginHandler', () => {
     mockCreateCustomToken.mockResolvedValue(firebaseToken)
 
     // Explicitly mock the Firestore calls for the happy path (nonce exists, user exists)
-    mockNonceDoc.get.mockResolvedValue(createMockDocumentSnapshot(true, { nonce, timestamp, expiresAt: mockNow + (10 * 60 * 1000) }))
+    mockNonceDoc.get.mockResolvedValue(createMockDocumentSnapshot(true, { nonce, timestamp, expiresAt: mockNow + 10 * 60 * 1000 }))
     mockUserDoc.get.mockResolvedValue(createMockDocumentSnapshot(true, { walletAddress, createdAt: timestamp }))
 
     // Set up the mocks for the other calls
@@ -132,7 +142,7 @@ describe('verifySignatureAndLoginHandler', () => {
   it('should create a new user profile if one does not exist', async () => {
     // Arrange
     const request = { data: { walletAddress, signature } }
-    mockNonceDoc.get.mockResolvedValue(createMockDocumentSnapshot(true, { nonce, timestamp, expiresAt: mockNow + (10 * 60 * 1000) }))
+    mockNonceDoc.get.mockResolvedValue(createMockDocumentSnapshot(true, { nonce, timestamp, expiresAt: mockNow + 10 * 60 * 1000 }))
     mockUserDoc.get.mockResolvedValue(createMockDocumentSnapshot(false))
 
     // Act
@@ -183,20 +193,22 @@ describe('verifySignatureAndLoginHandler', () => {
   it('should throw a deadline-exceeded error if the nonce has expired and clean up the expired nonce', async () => {
     // Arrange
     const request = { data: { walletAddress, signature } }
-    const expiredTimestamp = mockNow - (20 * 60 * 1000) // 20 minutes ago
-    const expiredExpiresAt = expiredTimestamp + (10 * 60 * 1000) // Expired 10 minutes ago
-    mockNonceDoc.get.mockResolvedValue(createMockDocumentSnapshot(true, { 
-      nonce, 
-      timestamp: expiredTimestamp, 
-      expiresAt: expiredExpiresAt 
-    }))
+    const expiredTimestamp = mockNow - 20 * 60 * 1000 // 20 minutes ago
+    const expiredExpiresAt = expiredTimestamp + 10 * 60 * 1000 // Expired 10 minutes ago
+    mockNonceDoc.get.mockResolvedValue(
+      createMockDocumentSnapshot(true, {
+        nonce,
+        timestamp: expiredTimestamp,
+        expiresAt: expiredExpiresAt,
+      })
+    )
 
     // Act & Assert
     await expect(verifySignatureAndLoginHandler(request)).rejects.toThrow(
       'Authentication message has expired. Please generate a new message.'
     )
     await expect(verifySignatureAndLoginHandler(request)).rejects.toHaveProperty('code', 'deadline-exceeded')
-    
+
     // Verify that the expired nonce was cleaned up
     expect(mockDelete).toHaveBeenCalled()
   })
@@ -261,5 +273,87 @@ describe('verifySignatureAndLoginHandler', () => {
     // Act & Assert
     await expect(verifySignatureAndLoginHandler(request)).rejects.toThrow('Failed to generate a valid session token.')
     await expect(verifySignatureAndLoginHandler(request)).rejects.toHaveProperty('code', 'unauthenticated')
+  })
+
+  // Test Case: Device approval on successful authentication
+  it('should approve device when deviceId and platform are provided', async () => {
+    // Arrange
+    const deviceId = 'test-device-123'
+    const platform = 'android'
+    const request = {
+      data: {
+        walletAddress,
+        signature,
+        deviceId,
+        platform,
+      },
+    }
+    mockApproveDevice.mockResolvedValue(undefined)
+
+    // Act
+    const result = await verifySignatureAndLoginHandler(request)
+
+    // Assert
+    expect(mockApproveDevice).toHaveBeenCalledWith(deviceId, walletAddress, platform)
+    expect(result).toEqual({ firebaseToken })
+  })
+
+  // Test Case: Authentication succeeds even if device approval fails
+  it('should continue authentication even if device approval fails', async () => {
+    // Arrange
+    const deviceId = 'test-device-456'
+    const platform = 'ios'
+    const request = {
+      data: {
+        walletAddress,
+        signature,
+        deviceId,
+        platform,
+      },
+    }
+    mockApproveDevice.mockRejectedValue(new Error('Device approval failed'))
+
+    // Spy on console.error to verify it's called
+    const consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => {})
+
+    // Act
+    const result = await verifySignatureAndLoginHandler(request)
+
+    // Assert
+    expect(mockApproveDevice).toHaveBeenCalledWith(deviceId, walletAddress, platform)
+    expect(consoleSpy).toHaveBeenCalledWith('Failed to approve device:', expect.any(Error))
+    expect(result).toEqual({ firebaseToken })
+
+    consoleSpy.mockRestore()
+  })
+
+  // Test Case: No device approval when deviceId not provided
+  it('should not attempt device approval when deviceId is not provided', async () => {
+    // Arrange
+    const request = { data: { walletAddress, signature } }
+
+    // Act
+    await verifySignatureAndLoginHandler(request)
+
+    // Assert
+    expect(mockApproveDevice).not.toHaveBeenCalled()
+  })
+
+  // Test Case: No device approval when platform not provided
+  it('should not attempt device approval when platform is not provided', async () => {
+    // Arrange
+    const request = {
+      data: {
+        walletAddress,
+        signature,
+        deviceId: 'test-device-789',
+      },
+    }
+
+    // Act
+    await verifySignatureAndLoginHandler(request)
+
+    // Assert
+    expect(mockApproveDevice).not.toHaveBeenCalled()
   })
 })

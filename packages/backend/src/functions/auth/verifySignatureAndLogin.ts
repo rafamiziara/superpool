@@ -2,6 +2,7 @@ import { isAddress, verifyMessage } from 'ethers'
 import { CallableRequest, HttpsError, onCall } from 'firebase-functions/v2/https'
 import { AUTH_NONCES_COLLECTION, USERS_COLLECTION } from '../../constants'
 import { auth, firestore } from '../../services'
+import { DeviceVerificationService } from '../../services/deviceVerification'
 import { AuthNonce, UserProfile } from '../../types'
 import { createAuthMessage } from '../../utils'
 
@@ -9,10 +10,12 @@ import { createAuthMessage } from '../../utils'
 interface VerifySignatureAndLoginRequest {
   walletAddress: string
   signature: string
+  deviceId?: string
+  platform?: 'android' | 'ios' | 'web'
 }
 
 export const verifySignatureAndLoginHandler = async (request: CallableRequest<VerifySignatureAndLoginRequest>) => {
-  const { walletAddress, signature } = request.data
+  const { walletAddress, signature, deviceId, platform } = request.data
 
   // Input Validation
   if (!walletAddress || !signature || !isAddress(walletAddress)) {
@@ -75,6 +78,16 @@ export const verifySignatureAndLoginHandler = async (request: CallableRequest<Ve
     }
   } catch (error) {
     throw new HttpsError('internal', 'Failed to create or update user profile. Please try again.')
+  }
+
+  // Approve device after successful authentication
+  if (deviceId && platform) {
+    try {
+      await DeviceVerificationService.approveDevice(deviceId, walletAddress, platform)
+    } catch (error) {
+      // Device approval failure shouldn't block authentication
+      console.error('Failed to approve device:', error)
+    }
   }
 
   // Delete the nonce to prevent replay attacks
