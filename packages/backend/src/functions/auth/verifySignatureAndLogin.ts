@@ -33,7 +33,15 @@ export const verifySignatureAndLoginHandler = async (request: CallableRequest<Ve
 
   // Cast the data to the AuthNonce interface for type safety
   const nonceData = nonceDoc.data() as AuthNonce
-  const { nonce, timestamp } = nonceData
+  const { nonce, timestamp, expiresAt } = nonceData
+
+  // Check if the nonce has expired
+  const currentTime = new Date().getTime()
+  if (currentTime > expiresAt) {
+    // Clean up expired nonce
+    await nonceRef.delete()
+    throw new HttpsError('deadline-exceeded', 'Authentication message has expired. Please generate a new message.')
+  }
 
   // Reconstruct the signed message
   const message = createAuthMessage(walletAddress, nonce, timestamp)

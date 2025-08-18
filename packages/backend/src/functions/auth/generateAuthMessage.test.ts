@@ -65,7 +65,7 @@ describe('generateAuthMessage', () => {
     expect(mockV4).toHaveBeenCalled()
     expect(mockCollection).toHaveBeenCalledWith(AUTH_NONCES_COLLECTION)
     expect(mockDoc).toHaveBeenCalledWith(walletAddress)
-    expect(mockSet).toHaveBeenCalledWith({ nonce: mockNonce, timestamp: mockTimestamp })
+    expect(mockSet).toHaveBeenCalledWith({ nonce: mockNonce, timestamp: mockTimestamp, expiresAt: mockTimestamp + 10 * 60 * 1000 })
     expect(createAuthMessage).toHaveBeenCalledWith(walletAddress, mockNonce, mockTimestamp)
     expect(result).toEqual({ message: mockMessage })
   })

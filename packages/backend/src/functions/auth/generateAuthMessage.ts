@@ -27,10 +27,13 @@ export const generateAuthMessageHandler = async (request: CallableRequest<AuthMe
   const nonce = uuidv4()
   const timestamp = new Date().getTime()
 
+  // Set nonce expiration to 10 minutes from now
+  const expiresAt = timestamp + 10 * 60 * 1000
+
   // Store the nonce in a temporary collection. This will be used for verification.
   // The try/catch block ensures we handle any potential errors during the database write.
   try {
-    await firestore.collection(AUTH_NONCES_COLLECTION).doc(walletAddress).set({ nonce, timestamp })
+    await firestore.collection(AUTH_NONCES_COLLECTION).doc(walletAddress).set({ nonce, timestamp, expiresAt })
   } catch (error) {
     throw new HttpsError('internal', 'Failed to save authentication nonce.')
   }
