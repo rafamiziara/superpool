@@ -241,26 +241,6 @@ export class SessionManager {
     }
   }
 
-  static async nuclearSessionReset(): Promise<void> {
-    try {
-      console.log('☢️ NUCLEAR SESSION RESET - Clearing ALL storage...')
-
-      // Get all keys
-      const allKeys = await AsyncStorage.getAllKeys()
-      console.log(`Found ${allKeys.length} total storage keys`)
-
-      // Clear absolutely everything (nuclear option)
-      if (allKeys.length > 0) {
-        await AsyncStorage.clear()
-        console.log('☢️ ALL AsyncStorage cleared')
-      }
-
-      console.log('✅ Nuclear session reset completed')
-    } catch (error) {
-      console.error('❌ Nuclear session reset failed:', error)
-      throw error
-    }
-  }
 
   static async preventiveSessionCleanup(): Promise<void> {
     try {
