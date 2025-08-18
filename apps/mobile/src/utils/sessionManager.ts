@@ -241,7 +241,6 @@ export class SessionManager {
     }
   }
 
-
   static async preventiveSessionCleanup(): Promise<void> {
     try {
       console.log('🛡️ Running preventive session cleanup before connection...')

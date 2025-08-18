@@ -13,12 +13,11 @@ export const useWalletConnectionTrigger = ({ onNewConnection, onDisconnection }:
     address: undefined,
   })
 
-
   // Reset previous connection state on mount to ensure clean detection
   useEffect(() => {
     previousConnection.current = { isConnected: false, address: undefined }
     console.log('🔄 Reset previous connection state on mount')
-    
+
     return () => {
       console.log('🧹 useWalletConnectionTrigger cleanup')
     }
