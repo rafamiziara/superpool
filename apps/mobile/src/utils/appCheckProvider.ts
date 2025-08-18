@@ -1,5 +1,3 @@
-// apps/mobile/src/utils/appCheckProvider.ts
-
 import * as Application from 'expo-application'
 import * as SecureStore from 'expo-secure-store'
 import { AppCheckToken, CustomProvider } from 'firebase/app-check'
