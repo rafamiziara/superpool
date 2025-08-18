@@ -2,7 +2,7 @@ import { router } from 'expo-router'
 import { signInWithCustomToken, signOut } from 'firebase/auth'
 import { httpsCallable } from 'firebase/functions'
 import { useCallback, useState } from 'react'
-import { useAccount, useDisconnect, useSignMessage } from 'wagmi'
+import { useAccount, useDisconnect, useSignMessage, useSignTypedData } from 'wagmi'
 import { FIREBASE_AUTH, FIREBASE_FUNCTIONS } from '../firebase.config'
 import { AppError, categorizeError, isUserInitiatedError } from '../utils/errorHandling'
 import { SessionManager } from '../utils/sessionManager'
@@ -14,24 +14,32 @@ const verifySignatureAndLogin = httpsCallable(FIREBASE_FUNCTIONS, 'verifySignatu
 const generateAuthMessage = httpsCallable(FIREBASE_FUNCTIONS, 'generateAuthMessage')
 
 export const useAuthentication = () => {
-  const { address, isConnected, chain } = useAccount()
+  const { address, isConnected, chain, connector } = useAccount()
+  const { signTypedDataAsync } = useSignTypedData()
   const { signMessageAsync } = useSignMessage()
   const { disconnect } = useDisconnect()
   const [authError, setAuthError] = useState<AppError | null>(null)
-
 
   const handleAuthentication = useCallback(
     async (walletAddress: string) => {
       console.log('🔐 Starting authentication flow for address:', walletAddress)
       
+      // Early Safe wallet detection
+      console.log('🔍 Early connector detection:', { 
+        connectorId: connector?.id, 
+        connectorName: connector?.name,
+        connectorType: typeof connector,
+        hasConnector: !!connector
+      })
+
       // Capture connection state at the start to prevent race conditions
       const authStartState = {
         isConnected,
         address,
         chainId: chain?.id,
-        timestamp: Date.now()
+        timestamp: Date.now(),
       }
-      
+
       console.log('🔐 Locked connection state:', authStartState)
 
       // Helper function to validate connection state hasn't changed
@@ -39,10 +47,10 @@ export const useAuthentication = () => {
         const currentState = {
           isConnected,
           address,
-          chainId: chain?.id
+          chainId: chain?.id,
         }
-        
-        const isValid = 
+
+        const isValid =
           currentState.isConnected === authStartState.isConnected &&
           currentState.address === authStartState.address &&
           currentState.chainId === authStartState.chainId
@@ -50,7 +58,7 @@ export const useAuthentication = () => {
         if (!isValid) {
           console.log(`❌ Connection state changed at ${checkPoint}:`, {
             initial: authStartState,
-            current: currentState
+            current: currentState,
           })
         }
 
@@ -110,6 +118,26 @@ export const useAuthentication = () => {
 
       setAuthError(null)
 
+      // Check if this is a Safe wallet
+      console.log('🔍 Raw connector info:', { 
+        connector,
+        connectorId: connector?.id, 
+        connectorName: connector?.name,
+        connectorType: typeof connector
+      })
+      
+      const isSafeWallet = connector?.id === 'safe' || 
+                          connector?.name?.toLowerCase().includes('safe') ||
+                          connector?.id?.toLowerCase().includes('safe') ||
+                          // Fallback detection: if we can't detect via connector, we'll detect via error patterns later
+                          false
+      
+      console.log('🔍 Wallet type detection:', {
+        connectorId: connector?.id,
+        connectorName: connector?.name,
+        isSafeWallet,
+      })
+
       try {
         // Show connecting toast and wallet app guidance
         console.log('📢 Showing connection toast...')
@@ -124,8 +152,14 @@ export const useAuthentication = () => {
         // Step 1: Generate authentication message
         console.log('📝 Step 1: Generating authentication message...')
         const messageResponse = await generateAuthMessage({ walletAddress })
-        const { message } = messageResponse.data as { message: string }
+        const { message, nonce, timestamp: rawTimestamp } = messageResponse.data as { message: string; nonce: string; timestamp: number }
+        const timestamp = typeof rawTimestamp === 'number' ? rawTimestamp : parseInt(String(rawTimestamp), 10)
         console.log('✅ Authentication message generated:', message?.substring(0, 50) + '...')
+        console.log('📊 Timestamp debug:', { rawTimestamp, timestamp, type: typeof timestamp })
+
+        if (isNaN(timestamp)) {
+          throw new Error('Invalid timestamp received from authentication message')
+        }
 
         // Small delay to ensure session is fully established
         console.log('⏳ Waiting 1 second for session stabilization...')
@@ -137,52 +171,164 @@ export const useAuthentication = () => {
           return
         }
 
-        // Step 2: Request signature
-        console.log('✍️ Step 2: Requesting wallet signature...')
-        authToasts.signingMessage()
-        console.log('📱 Calling signMessageAsync with message:', message)
-
+        // Step 2: Handle authentication based on wallet type
         let signature: string
-        let timeoutId: NodeJS.Timeout | undefined
-        try {
-          // Add timeout to signature request to prevent hanging
-          const signaturePromise = signMessageAsync({ message })
-          const timeoutPromise = new Promise<never>((_, reject) => {
-            timeoutId = setTimeout(() => {
-              reject(new Error('Signature request timed out after 30 seconds'))
-            }, 30000) // 30 second timeout
-          })
+        let signatureType: 'typed-data' | 'personal-sign' | 'safe-wallet'
 
-          signature = await Promise.race([signaturePromise, timeoutPromise])
-          
-          // Clean up timeout when signature resolves first
-          if (timeoutId) clearTimeout(timeoutId)
-          console.log('✅ Signature received:', signature?.substring(0, 20) + '...')
-        } catch (signError: unknown) {
-          // Clean up timeout on error
-          if (timeoutId) clearTimeout(timeoutId)
-          console.log('❌ Signature error:', signError)
-          const errorMessage = signError instanceof Error ? signError.message : String(signError)
+        if (isSafeWallet) {
+          console.log('🔐 Safe wallet detected, trying direct connector signing...')
+          authToasts.signingMessage()
 
-          // Handle timeout specifically
-          if (errorMessage.includes('timed out')) {
-            console.log('⏰ Signature request timed out')
-            const timeoutError = categorizeError(new Error('Signature request timed out. Please try connecting again.'))
-            setAuthError(timeoutError)
-            disconnect()
-            return
+          try {
+            // Try to use the Safe connector directly for message signing
+            console.log('📱 Attempting Safe wallet message signing with connector...')
+            const signaturePromise = signMessageAsync({
+              message,
+              connector, // Pass the Safe connector directly
+            })
+            const timeoutPromise = new Promise<never>((_, reject) => {
+              setTimeout(() => {
+                reject(new Error('Signature request timed out after 30 seconds'))
+              }, 30000)
+            })
+
+            signature = await Promise.race([signaturePromise, timeoutPromise])
+
+            // Check if the signature is actually an error object
+            if (typeof signature === 'object' || (typeof signature === 'string' && signature.includes('"error"'))) {
+              throw new Error(`Safe connector signing failed: ${JSON.stringify(signature)}`)
+            }
+
+            signatureType = 'personal-sign'
+            console.log('✅ Safe wallet direct signing successful:', typeof signature, signature?.substring?.(0, 20) + '...')
+          } catch (safeSignError: any) {
+            console.log('❌ Safe direct signing failed, using ownership verification fallback...', safeSignError?.message || safeSignError)
+
+            // Fallback to ownership verification approach
+            console.log('🔐 Using Safe wallet authentication (ownership verification)')
+            signature = `safe-wallet:${walletAddress}:${nonce}:${timestamp}`
+            signatureType = 'safe-wallet'
+            console.log('🔐 Safe wallet authentication token generated')
           }
+        } else {
+          // Regular wallet signature flow
+          console.log('✍️ Step 2: Requesting wallet signature...')
+          authToasts.signingMessage()
 
-          // Handle ConnectorNotConnectedError specifically
-          if (errorMessage.includes('ConnectorNotConnectedError') || errorMessage.includes('Connector not connected')) {
-            console.log('📱 Wallet disconnected during signing, treating as user cancellation')
-            // Treat as user-initiated cancellation
-            const cancelError = categorizeError(new Error('User rejected the request.'))
-            setAuthError(cancelError)
-            return
+          signatureType = 'typed-data'
+          let timeoutId: NodeJS.Timeout | undefined
+
+          try {
+            // First try EIP-712 typed data (preferred for modern wallets)
+            try {
+              const typedData = {
+                domain: {
+                  name: 'SuperPool Authentication',
+                  version: '1',
+                  chainId: chain?.id || 1,
+                },
+                types: {
+                  Authentication: [
+                    { name: 'wallet', type: 'address' },
+                    { name: 'nonce', type: 'string' },
+                    { name: 'timestamp', type: 'uint256' },
+                  ],
+                },
+                primaryType: 'Authentication' as const,
+                message: {
+                  wallet: walletAddress as `0x${string}`,
+                  nonce,
+                  timestamp: BigInt(timestamp),
+                },
+              }
+
+              console.log('📱 Trying EIP-712 typed data signing...')
+              const signaturePromise = signTypedDataAsync(typedData)
+              const timeoutPromise = new Promise<never>((_, reject) => {
+                timeoutId = setTimeout(() => {
+                  reject(new Error('Signature request timed out after 30 seconds'))
+                }, 30000) // 30 second timeout
+              })
+
+              signature = await Promise.race([signaturePromise, timeoutPromise])
+
+              // Check if the signature is actually an error object (Safe wallets return error objects instead of throwing)
+              if (typeof signature === 'object' || (typeof signature === 'string' && signature.includes('"error"'))) {
+                throw new Error(`EIP-712 signing failed: ${JSON.stringify(signature)}`)
+              }
+
+              signatureType = 'typed-data'
+              console.log('✅ EIP-712 signature successful:', typeof signature, signature?.substring?.(0, 20) + '...')
+            } catch (typedDataError: any) {
+              console.log('❌ EIP-712 failed, trying personal message signing...', typedDataError?.message || typedDataError)
+
+              // Clean up previous timeout
+              if (timeoutId) clearTimeout(timeoutId)
+
+              // Fallback to personal message signing
+              const signaturePromise = signMessageAsync({ message })
+              const timeoutPromise = new Promise<never>((_, reject) => {
+                timeoutId = setTimeout(() => {
+                  reject(new Error('Signature request timed out after 30 seconds'))
+                }, 30000) // 30 second timeout
+              })
+
+              signature = await Promise.race([signaturePromise, timeoutPromise])
+
+              // Check if the signature is actually an error object
+              if (typeof signature === 'object' || (typeof signature === 'string' && signature.includes('"error"'))) {
+                // Check if this is a Safe wallet based on error patterns
+                const personalSignError = JSON.stringify(signature)
+                if (personalSignError.includes('Method disabled') || personalSignError.includes('safe://')) {
+                  console.log('🔍 Safe wallet detected by personal sign error, switching to Safe authentication...')
+                  signature = `safe-wallet:${walletAddress}:${nonce}:${timestamp}`
+                  signatureType = 'safe-wallet'
+                  console.log('🔐 Safe wallet authentication token generated (personal sign error detection)')
+                } else {
+                  throw new Error(`Personal message signing failed: ${JSON.stringify(signature)}`)
+                }
+              } else {
+                signatureType = 'personal-sign'
+                console.log('✅ Personal message signature successful:', typeof signature, signature?.substring?.(0, 20) + '...')
+              }
+            }
+
+            // Clean up timeout when signature resolves first
+            if (timeoutId) clearTimeout(timeoutId)
+
+            // Validate signature format (allow both hex signatures and Safe wallet tokens)
+            const isSafeToken = signature.startsWith('safe-wallet:')
+            const isValidHex = signature.startsWith('0x') && signature.length >= 10
+            
+            if (!isSafeToken && !isValidHex) {
+              throw new Error(`Invalid signature received: ${JSON.stringify(signature)}`)
+            }
+          } catch (signError: unknown) {
+            // Clean up timeout on error
+            if (timeoutId) clearTimeout(timeoutId)
+            console.log('❌ Signature error:', signError)
+            const errorMessage = signError instanceof Error ? signError.message : String(signError)
+
+            // Handle timeout specifically
+            if (errorMessage.includes('timed out')) {
+              console.log('⏰ Signature request timed out')
+              const timeoutError = categorizeError(new Error('Signature request timed out. Please try connecting again.'))
+              setAuthError(timeoutError)
+              disconnect()
+              return
+            }
+
+            // Handle ConnectorNotConnectedError specifically
+            if (errorMessage.includes('ConnectorNotConnectedError') || errorMessage.includes('Connector not connected')) {
+              console.log('📱 Wallet disconnected during signing, treating as user cancellation')
+              // Treat as user-initiated cancellation
+              const cancelError = categorizeError(new Error('User rejected the request.'))
+              setAuthError(cancelError)
+              return
+            }
+            // Re-throw other errors to be handled by outer catch
+            throw signError
           }
-          // Re-throw other errors to be handled by outer catch
-          throw signError
         }
 
         // Check if connection state is still consistent after signature
@@ -194,11 +340,29 @@ export const useAuthentication = () => {
         // Step 3: Verify signature and get Firebase token
         authToasts.verifying()
         console.log('Verifying signature...')
+        
+        // For Safe wallets, we need to provide device info for proper App Check validation
+        const deviceInfo = signatureType === 'safe-wallet' ? {
+          deviceId: 'safe-wallet-device', // Static identifier for Safe wallets
+          platform: 'web' as const, // Safe wallets operate through web interface
+        } : {}
+        
         const signatureResponse = await verifySignatureAndLogin({
           walletAddress,
           signature,
+          chainId: chain?.id,
+          signatureType,
+          ...deviceInfo,
         })
+        console.log('✅ Backend verification successful')
         const { firebaseToken } = signatureResponse.data as { firebaseToken: string }
+        console.log('📋 Firebase token received:', typeof firebaseToken, firebaseToken ? 'present' : 'missing')
+        console.log('🔍 Token comparison:', { 
+          length: firebaseToken?.length,
+          prefix: firebaseToken?.substring(0, 50),
+          signatureType,
+          walletType: isSafeWallet ? 'Safe' : 'Regular'
+        })
 
         // Check if connection state is still consistent before Firebase auth
         if (!validateConnectionState('before Firebase authentication')) {
@@ -207,8 +371,59 @@ export const useAuthentication = () => {
         }
 
         // Step 4: Sign in with Firebase
-        console.log('Signing in with Firebase...')
-        await signInWithCustomToken(FIREBASE_AUTH, firebaseToken)
+        console.log('🔑 Signing in with Firebase...')
+        
+        // Add a small delay for Safe wallets to allow connection to stabilize
+        if (isSafeWallet || signatureType === 'safe-wallet') {
+          console.log('⏳ Adding delay for Safe wallet connection stabilization...')
+          await new Promise(resolve => setTimeout(resolve, 2000)) // 2 second delay
+        }
+        
+        try {
+          await signInWithCustomToken(FIREBASE_AUTH, firebaseToken)
+          console.log('✅ Firebase authentication successful')
+        } catch (firebaseError) {
+          console.error('❌ Firebase authentication failed:', firebaseError)
+          console.error('📋 Token details:', { 
+            tokenType: typeof firebaseToken, 
+            tokenLength: firebaseToken?.length,
+            tokenStart: firebaseToken?.substring(0, 20) + '...'
+          })
+          
+          // For Safe wallets, try multiple retries with increasing delays
+          if (isSafeWallet || signatureType === 'safe-wallet') {
+            console.log('🔄 Retrying Firebase authentication for Safe wallet...')
+            let retryCount = 0
+            const maxRetries = 3
+            
+            while (retryCount < maxRetries) {
+              retryCount++
+              const delay = retryCount * 1000 // 1s, 2s, 3s delays
+              
+              try {
+                console.log(`🔄 Retry ${retryCount}/${maxRetries} after ${delay}ms delay...`)
+                await new Promise(resolve => setTimeout(resolve, delay))
+                await signInWithCustomToken(FIREBASE_AUTH, firebaseToken)
+                console.log(`✅ Firebase authentication successful on retry ${retryCount}`)
+                break // Success, exit retry loop
+              } catch (retryError) {
+                console.error(`❌ Firebase authentication retry ${retryCount}/${maxRetries} failed:`, retryError)
+                
+                if (retryCount >= maxRetries) {
+                  // If this was the final retry, check for App Check issues
+                  const errorMessage = retryError instanceof Error ? retryError.message : String(retryError)
+                  if (errorMessage.includes('internal') || errorMessage.includes('app-check')) {
+                    console.log('🚨 Detected potential App Check issue for Safe wallet')
+                    throw new Error('Safe wallet authentication failed due to device verification. Please try disconnecting and reconnecting your wallet.')
+                  }
+                  throw retryError
+                }
+              }
+            }
+          } else {
+            throw firebaseError
+          }
+        }
 
         // Final validation before declaring success
         if (!validateConnectionState('authentication completion')) {
@@ -259,7 +474,7 @@ export const useAuthentication = () => {
             cleanupSuccessful = true
           } catch (sessionError) {
             console.error('❌ Session cleanup failed, attempting fallback cleanup:', sessionError)
-            
+
             // Fallback: Try preventive cleanup as last resort
             try {
               console.log('🔄 Attempting preventive session cleanup as fallback...')
@@ -279,11 +494,11 @@ export const useAuthentication = () => {
           setTimeout(() => {
             authToasts.sessionError()
           }, 1500)
-          
+
           if (!cleanupSuccessful) {
             console.warn('⚠️ Session cleanup incomplete - some orphaned sessions may remain')
           }
-          
+
           return
         }
 
@@ -331,7 +546,7 @@ export const useAuthentication = () => {
         // Cleanup handled by toasts
       }
     },
-    [signMessageAsync, disconnect, isConnected, address, chain]
+    [signTypedDataAsync, signMessageAsync, disconnect, isConnected, address, chain]
   )
 
   const handleDisconnection = useCallback(() => {

@@ -67,7 +67,7 @@ describe('generateAuthMessage', () => {
     expect(mockDoc).toHaveBeenCalledWith(walletAddress)
     expect(mockSet).toHaveBeenCalledWith({ nonce: mockNonce, timestamp: mockTimestamp, expiresAt: mockTimestamp + 10 * 60 * 1000 })
     expect(createAuthMessage).toHaveBeenCalledWith(walletAddress, mockNonce, mockTimestamp)
-    expect(result).toEqual({ message: mockMessage })
+    expect(result).toEqual({ message: mockMessage, nonce: mockNonce, timestamp: mockTimestamp })
   })
 
   // Test Case: Invalid Argument - Missing walletAddress
