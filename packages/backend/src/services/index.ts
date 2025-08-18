@@ -8,7 +8,12 @@ import { getFirestore } from 'firebase-admin/firestore'
 const serviceAccountKey = require('../../service-account-key.json')
 
 // Initialize the Firebase Admin SDK once for the entire server.
-const adminApp = initializeApp({ credential: admin.credential.cert(serviceAccountKey) })
+let adminApp
+try {
+  adminApp = admin.app()
+} catch {
+  adminApp = initializeApp({ credential: admin.credential.cert(serviceAccountKey) })
+}
 
 // Initialize and export auth, firestore & appCheck services
 export const auth = getAuth(adminApp)

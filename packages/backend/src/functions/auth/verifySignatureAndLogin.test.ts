@@ -54,6 +54,7 @@ jest.mock('firebase-admin/auth', () => ({
 jest.mock('ethers', () => ({
   isAddress: jest.fn<typeof isAddress>(),
   verifyMessage: jest.fn<typeof verifyMessage>(),
+  verifyTypedData: jest.fn(),
 }))
 
 // Mock the createAuthMessage utility
@@ -62,8 +63,10 @@ jest.mock('../../utils', () => ({
   createAuthMessage: mockCreateAuthMessage,
 }))
 
-// Mock the DeviceVerificationService  
-const mockApproveDevice = jest.fn() as jest.MockedFunction<(deviceId: string, walletAddress: string, platform: 'android' | 'ios' | 'web') => Promise<void>>
+// Mock the DeviceVerificationService
+const mockApproveDevice = jest.fn() as jest.MockedFunction<
+  (deviceId: string, walletAddress: string, platform: 'android' | 'ios' | 'web') => Promise<void>
+>
 jest.mock('../../services/deviceVerification', () => ({
   DeviceVerificationService: {
     approveDevice: mockApproveDevice,
@@ -95,6 +98,8 @@ describe('verifySignatureAndLoginHandler', () => {
     // Mock functions for a successful run
     jest.mocked(isAddress).mockReturnValue(true)
     jest.mocked(verifyMessage).mockReturnValue(walletAddress)
+    const { verifyTypedData } = require('ethers')
+    jest.mocked(verifyTypedData).mockReturnValue(walletAddress)
     mockCreateAuthMessage.mockReturnValue(mockMessage)
     mockCreateCustomToken.mockResolvedValue(firebaseToken)
 
@@ -164,14 +169,27 @@ describe('verifySignatureAndLoginHandler', () => {
     await expect(verifySignatureAndLoginHandler(request)).rejects.toHaveProperty('code', 'invalid-argument')
   })
 
-  // Test Case: Invalid Argument - Invalid signature format
+  // Test Case: Invalid Argument - Invalid signature format (missing 0x prefix)
   it('should throw an invalid-argument error if the signature format is incorrect', async () => {
     // Arrange
     const request = { data: { walletAddress, signature: 'invalid-signature' } }
 
     // Act & Assert
     await expect(verifySignatureAndLoginHandler(request)).rejects.toThrow(
-      'Invalid signature format. It must be a 132-character hex string prefixed with "0x".'
+      'Invalid signature format. It must be a hex string prefixed with "0x".'
+    )
+    await expect(verifySignatureAndLoginHandler(request)).rejects.toHaveProperty('code', 'invalid-argument')
+  })
+
+  // Test Case: Invalid Argument - Invalid hex characters in signature
+  it('should throw an invalid-argument error if signature contains invalid hex characters', async () => {
+    // Arrange - signature with invalid characters (G, H not valid hex)
+    const invalidHexSignature = '0x' + 'G'.repeat(10)
+    const request = { data: { walletAddress, signature: invalidHexSignature } }
+
+    // Act & Assert
+    await expect(verifySignatureAndLoginHandler(request)).rejects.toThrow(
+      'Invalid signature format. Signature must contain only hexadecimal characters.'
     )
     await expect(verifySignatureAndLoginHandler(request)).rejects.toHaveProperty('code', 'invalid-argument')
   })
@@ -222,7 +240,7 @@ describe('verifySignatureAndLoginHandler', () => {
     })
 
     // Act & Assert
-    await expect(verifySignatureAndLoginHandler(request)).rejects.toThrow('Signature verification failed. The signature is invalid.')
+    await expect(verifySignatureAndLoginHandler(request)).rejects.toThrow('Signature verification failed: Ethers verify failed')
     await expect(verifySignatureAndLoginHandler(request)).rejects.toHaveProperty('code', 'unauthenticated')
   })
 
@@ -313,18 +331,23 @@ describe('verifySignatureAndLoginHandler', () => {
     }
     mockApproveDevice.mockRejectedValue(new Error('Device approval failed'))
 
-    // Spy on console.error to verify it's called
-    const consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => {})
+    // Spy on logger.error to verify it's called (logger is used instead of console in actual code)
+    const loggerSpy = jest.spyOn(require('firebase-functions/v2').logger, 'error').mockImplementation(() => {})
 
     // Act
     const result = await verifySignatureAndLoginHandler(request)
 
     // Assert
     expect(mockApproveDevice).toHaveBeenCalledWith(deviceId, walletAddress, platform)
-    expect(consoleSpy).toHaveBeenCalledWith('Failed to approve device:', expect.any(Error))
+    expect(loggerSpy).toHaveBeenCalledWith('Failed to approve device', expect.objectContaining({
+      error: expect.any(Error),
+      deviceId,
+      walletAddress,
+      signatureType: 'personal-sign'
+    }))
     expect(result).toEqual({ firebaseToken })
 
-    consoleSpy.mockRestore()
+    loggerSpy.mockRestore()
   })
 
   // Test Case: No device approval when deviceId not provided
@@ -355,5 +378,214 @@ describe('verifySignatureAndLoginHandler', () => {
 
     // Assert
     expect(mockApproveDevice).not.toHaveBeenCalled()
+  })
+
+  // Test Case: Safe wallet authentication
+  it('should successfully verify Safe wallet signature', async () => {
+    // Arrange
+    const safeWalletSignature = `safe-wallet:${walletAddress}:${nonce}:${timestamp}`
+    const request = {
+      data: {
+        walletAddress,
+        signature: safeWalletSignature,
+        signatureType: 'safe-wallet',
+      },
+    }
+
+    // Act
+    const result = await verifySignatureAndLoginHandler(request)
+
+    // Assert
+    expect(isAddress).toHaveBeenCalledWith(walletAddress)
+    expect(verifyMessage).not.toHaveBeenCalled() // Safe wallet doesn't use verifyMessage
+    expect(mockCreateCustomToken).toHaveBeenCalledWith(walletAddress)
+    expect(result).toEqual({ firebaseToken })
+  })
+
+  // Test Case: Safe wallet with device approval
+  it('should approve device with Safe wallet specific deviceId', async () => {
+    // Arrange
+    const safeWalletSignature = `safe-wallet:${walletAddress}:${nonce}:${timestamp}`
+    const deviceId = 'safe-wallet-device'
+    const platform = 'web'
+    const request = {
+      data: {
+        walletAddress,
+        signature: safeWalletSignature,
+        signatureType: 'safe-wallet',
+        deviceId,
+        platform,
+      },
+    }
+
+    // Act
+    const result = await verifySignatureAndLoginHandler(request)
+
+    // Assert
+    const expectedDeviceId = `safe-wallet-${walletAddress.toLowerCase()}`
+    expect(mockApproveDevice).toHaveBeenCalledWith(expectedDeviceId, walletAddress, platform)
+    expect(result).toEqual({ firebaseToken })
+  })
+
+  // Test Case: Safe wallet invalid signature format
+  it('should throw an error for invalid Safe wallet signature format', async () => {
+    // Arrange
+    const invalidSafeSignature = `safe-wallet:${walletAddress}:invalid:format`
+    const request = {
+      data: {
+        walletAddress,
+        signature: invalidSafeSignature,
+        signatureType: 'safe-wallet',
+      },
+    }
+
+    // Act & Assert
+    await expect(verifySignatureAndLoginHandler(request)).rejects.toThrow('Invalid Safe wallet authentication token')
+    await expect(verifySignatureAndLoginHandler(request)).rejects.toHaveProperty('code', 'unauthenticated')
+  })
+
+  // Test Case: EIP-712 typed data signature verification
+  it('should successfully verify EIP-712 typed data signature', async () => {
+    // Arrange
+    const { verifyTypedData } = require('ethers')
+    const typedDataSignature = '0x' + 'b'.repeat(130)
+    const chainId = 137
+    const request = {
+      data: {
+        walletAddress,
+        signature: typedDataSignature,
+        signatureType: 'typed-data',
+        chainId,
+      },
+    }
+
+    jest.mocked(verifyTypedData).mockReturnValue(walletAddress)
+
+    // Act
+    const result = await verifySignatureAndLoginHandler(request)
+
+    // Assert
+    expect(verifyTypedData).toHaveBeenCalledWith(
+      {
+        name: 'SuperPool Authentication',
+        version: '1',
+        chainId,
+      },
+      {
+        Authentication: [
+          { name: 'wallet', type: 'address' },
+          { name: 'nonce', type: 'string' },
+          { name: 'timestamp', type: 'uint256' },
+        ],
+      },
+      {
+        wallet: walletAddress,
+        nonce,
+        timestamp: BigInt(Math.floor(timestamp)),
+      },
+      typedDataSignature
+    )
+    expect(verifyMessage).not.toHaveBeenCalled() // Should not fallback to personal sign
+    expect(result).toEqual({ firebaseToken })
+  })
+
+  // Test Case: EIP-712 signature verification failure
+  it('should throw an error when EIP-712 signature verification fails', async () => {
+    // Arrange
+    const { verifyTypedData } = require('ethers')
+    const typedDataSignature = '0x' + 'c'.repeat(130)
+    const request = {
+      data: {
+        walletAddress,
+        signature: typedDataSignature,
+        signatureType: 'typed-data',
+        chainId: 1,
+      },
+    }
+
+    jest.mocked(verifyTypedData).mockImplementation(() => {
+      throw new Error('EIP-712 verification failed')
+    })
+
+    // Act & Assert
+    await expect(verifySignatureAndLoginHandler(request)).rejects.toThrow('Signature verification failed: EIP-712 verification failed')
+    await expect(verifySignatureAndLoginHandler(request)).rejects.toHaveProperty('code', 'unauthenticated')
+  })
+
+  // Test Case: EIP-712 with default chainId when not provided
+  it('should use default chainId when not provided for EIP-712', async () => {
+    // Arrange
+    const { verifyTypedData } = require('ethers')
+    const typedDataSignature = '0x' + 'd'.repeat(130)
+    const request = {
+      data: {
+        walletAddress,
+        signature: typedDataSignature,
+        signatureType: 'typed-data',
+        // chainId not provided
+      },
+    }
+
+    jest.mocked(verifyTypedData).mockReturnValue(walletAddress)
+
+    // Act
+    const result = await verifySignatureAndLoginHandler(request)
+
+    // Assert
+    expect(verifyTypedData).toHaveBeenCalledWith(
+      {
+        name: 'SuperPool Authentication',
+        version: '1',
+        chainId: 1, // Should default to 1
+      },
+      expect.any(Object),
+      expect.any(Object),
+      typedDataSignature
+    )
+    expect(result).toEqual({ firebaseToken })
+  })
+
+  // Test Case: Non-Error object thrown during signature verification
+  it('should handle non-Error objects thrown during signature verification', async () => {
+    // Arrange
+    const request = { data: { walletAddress, signature } }
+    const nonErrorObject = { code: 'CUSTOM_ERROR', details: 'Some custom error' }
+    
+    jest.mocked(verifyMessage).mockImplementation(() => {
+      throw nonErrorObject // Throw non-Error object
+    })
+
+    // Act & Assert
+    await expect(verifySignatureAndLoginHandler(request)).rejects.toThrow('Signature verification failed: Invalid signature')
+    await expect(verifySignatureAndLoginHandler(request)).rejects.toHaveProperty('code', 'unauthenticated')
+  })
+
+  // Test Case: String thrown during signature verification
+  it('should handle string thrown during signature verification', async () => {
+    // Arrange
+    const request = { data: { walletAddress, signature } }
+    const stringError = 'Custom string error'
+    
+    jest.mocked(verifyMessage).mockImplementation(() => {
+      throw stringError // Throw string
+    })
+
+    // Act & Assert
+    await expect(verifySignatureAndLoginHandler(request)).rejects.toThrow('Signature verification failed: Invalid signature')
+    await expect(verifySignatureAndLoginHandler(request)).rejects.toHaveProperty('code', 'unauthenticated')
+  })
+
+  // Test Case: Null thrown during signature verification
+  it('should handle null thrown during signature verification', async () => {
+    // Arrange
+    const request = { data: { walletAddress, signature } }
+    
+    jest.mocked(verifyMessage).mockImplementation(() => {
+      throw null // Throw null
+    })
+
+    // Act & Assert
+    await expect(verifySignatureAndLoginHandler(request)).rejects.toThrow('Signature verification failed: Invalid signature')
+    await expect(verifySignatureAndLoginHandler(request)).rejects.toHaveProperty('code', 'unauthenticated')
   })
 })

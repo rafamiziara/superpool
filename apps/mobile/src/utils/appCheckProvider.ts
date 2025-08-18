@@ -58,7 +58,12 @@ export const customAppCheckProviderFactory = (): CustomProvider => {
         }
       } catch (error) {
         console.error('Error fetching App Check token:', error)
-        throw error
+        // Return a dummy token to allow Firebase operations to proceed
+        // This will fail server-side validation but won't block client operations
+        return {
+          token: 'dummy-token-device-not-approved',
+          expireTimeMillis: Date.now() + 60000, // 1 minute
+        }
       }
     },
   })
