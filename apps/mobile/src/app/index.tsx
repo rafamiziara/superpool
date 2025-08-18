@@ -2,9 +2,11 @@ import { AppKitButton } from '@reown/appkit-wagmi-react-native';
 import { StatusBar } from 'expo-status-bar';
 import { StyleSheet, Text, View } from 'react-native';
 import { useAccount } from 'wagmi';
+import { useAuthentication } from '../hooks/useAuthentication';
 
 export default function WalletConnectionScreen() {
   const { isConnected, chain, address } = useAccount()
+  const { authError } = useAuthentication()
 
   return (
     <View style={styles.container}>
@@ -24,9 +26,15 @@ export default function WalletConnectionScreen() {
               {address.slice(0, 6)}...{address.slice(-4)}
             </Text>
           )}
-          <Text style={styles.subText}>
-            Authentication in progress... Check the notification above.
-          </Text>
+          {authError ? (
+            <Text style={styles.errorText}>
+              Authentication failed: {authError.userFriendlyMessage}
+            </Text>
+          ) : (
+            <Text style={styles.subText}>
+              Authentication in progress... Please check your wallet app for signature requests and follow the toast notifications.
+            </Text>
+          )}
         </View>
       ) : (
         <View style={styles.infoContainer}>
@@ -73,5 +81,12 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     color: '#666',
     fontFamily: 'monospace',
+  },
+  errorText: {
+    fontSize: 14,
+    color: '#ff4444',
+    textAlign: 'center',
+    marginTop: 8,
+    fontWeight: '500',
   },
 });

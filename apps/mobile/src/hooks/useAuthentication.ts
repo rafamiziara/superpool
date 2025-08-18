@@ -19,6 +19,7 @@ export const useAuthentication = () => {
   const { disconnect } = useDisconnect()
   const [authError, setAuthError] = useState<AppError | null>(null)
 
+
   const handleAuthentication = useCallback(
     async (walletAddress: string) => {
       console.log('🔐 Starting authentication flow for address:', walletAddress)
@@ -90,7 +91,7 @@ export const useAuthentication = () => {
       })
 
       // Validate initial connection state
-      if (!authStartState.isConnected || !authStartState.address || authStartState.address !== walletAddress) {
+      if (!authStartState.isConnected || !authStartState.address || authStartState.address.toLowerCase() !== walletAddress.toLowerCase()) {
         console.warn('❌ Invalid initial connection state')
         const connectionError = categorizeError(new Error('Wallet connection state invalid'))
         setAuthError(connectionError)
