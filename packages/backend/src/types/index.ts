@@ -15,4 +15,5 @@ export interface UserProfile {
 export interface AuthNonce {
   nonce: string
   timestamp: number
+  expiresAt: number
 }

@@ -8,7 +8,7 @@ const mockUpdate = jest.fn<UpdateFunctionFirestore>()
 const mockSet = jest.fn<SetFunctionFirestore>()
 
 const mockNonceDoc = {
-  get: jest.fn(() => createMockDocumentSnapshot(true, { nonce: 'test-nonce', timestamp: 1234567890 })),
+  get: jest.fn(() => createMockDocumentSnapshot(true, { nonce: 'test-nonce', timestamp: 1234567890, expiresAt: 1678886400000 + (10 * 60 * 1000) })),
   delete: mockDelete,
 }
 
@@ -89,7 +89,7 @@ describe('verifySignatureAndLoginHandler', () => {
     mockCreateCustomToken.mockResolvedValue(firebaseToken)
 
     // Explicitly mock the Firestore calls for the happy path (nonce exists, user exists)
-    mockNonceDoc.get.mockResolvedValue(createMockDocumentSnapshot(true, { nonce, timestamp }))
+    mockNonceDoc.get.mockResolvedValue(createMockDocumentSnapshot(true, { nonce, timestamp, expiresAt: mockNow + (10 * 60 * 1000) }))
     mockUserDoc.get.mockResolvedValue(createMockDocumentSnapshot(true, { walletAddress, createdAt: timestamp }))
 
     // Set up the mocks for the other calls
@@ -132,7 +132,7 @@ describe('verifySignatureAndLoginHandler', () => {
   it('should create a new user profile if one does not exist', async () => {
     // Arrange
     const request = { data: { walletAddress, signature } }
-    mockNonceDoc.get.mockResolvedValue(createMockDocumentSnapshot(true, { nonce, timestamp }))
+    mockNonceDoc.get.mockResolvedValue(createMockDocumentSnapshot(true, { nonce, timestamp, expiresAt: mockNow + (10 * 60 * 1000) }))
     mockUserDoc.get.mockResolvedValue(createMockDocumentSnapshot(false))
 
     // Act
@@ -177,6 +177,28 @@ describe('verifySignatureAndLoginHandler', () => {
       'No authentication message found for this wallet address. Please generate a new message.'
     )
     await expect(verifySignatureAndLoginHandler(request)).rejects.toHaveProperty('code', 'not-found')
+  })
+
+  // Test Case: Deadline Exceeded - Nonce has expired
+  it('should throw a deadline-exceeded error if the nonce has expired and clean up the expired nonce', async () => {
+    // Arrange
+    const request = { data: { walletAddress, signature } }
+    const expiredTimestamp = mockNow - (20 * 60 * 1000) // 20 minutes ago
+    const expiredExpiresAt = expiredTimestamp + (10 * 60 * 1000) // Expired 10 minutes ago
+    mockNonceDoc.get.mockResolvedValue(createMockDocumentSnapshot(true, { 
+      nonce, 
+      timestamp: expiredTimestamp, 
+      expiresAt: expiredExpiresAt 
+    }))
+
+    // Act & Assert
+    await expect(verifySignatureAndLoginHandler(request)).rejects.toThrow(
+      'Authentication message has expired. Please generate a new message.'
+    )
+    await expect(verifySignatureAndLoginHandler(request)).rejects.toHaveProperty('code', 'deadline-exceeded')
+    
+    // Verify that the expired nonce was cleaned up
+    expect(mockDelete).toHaveBeenCalled()
   })
 
   // Test Case: Unauthenticated - Signature verification fails
