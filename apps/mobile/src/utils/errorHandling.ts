@@ -25,11 +25,7 @@ export const ERROR_MESSAGES: Record<ErrorType, string> = {
 }
 
 // Helper function to create structured app errors
-export function createAppError(
-  type: ErrorType,
-  message: string,
-  originalError?: unknown
-): AppError {
+export function createAppError(type: ErrorType, message: string, originalError?: unknown): AppError {
   const error = new Error(message) as AppError
   error.type = type
   error.originalError = originalError
@@ -55,7 +51,7 @@ export function categorizeError(error: unknown): AppError {
     return createAppError(ErrorType.WALLET_CONNECTION, 'Wallet session expired. Please reconnect your wallet.', error)
   }
 
-  if (lowerMessage.includes('chainid not found') || lowerMessage.includes('chain') && lowerMessage.includes('not found')) {
+  if (lowerMessage.includes('chainid not found') || (lowerMessage.includes('chain') && lowerMessage.includes('not found'))) {
     return createAppError(ErrorType.WALLET_CONNECTION, 'Unsupported network. Please switch to a supported chain.', error)
   }
 
@@ -71,7 +67,11 @@ export function categorizeError(error: unknown): AppError {
     return createAppError(ErrorType.WALLET_CONNECTION, errorMessage, error)
   }
 
-  if (lowerMessage.includes('signature format') || lowerMessage.includes('invalid signature') || lowerMessage.includes('signature') && lowerMessage.includes('invalid')) {
+  if (
+    lowerMessage.includes('signature format') ||
+    lowerMessage.includes('invalid signature') ||
+    (lowerMessage.includes('signature') && lowerMessage.includes('invalid'))
+  ) {
     return createAppError(ErrorType.AUTHENTICATION_FAILED, 'Signature validation failed. Please try connecting again.', error)
   }
 
