@@ -1,0 +1,20 @@
+# Compiled JavaScript files
+lib/**/*.js
+lib/**/*.js.map
+
+# TypeScript v1 declaration files
+typings/
+
+# Node.js dependency directory
+node_modules/
+*.local
+
+# Firebase Service Account Key
+service-account-key.json
+
+# Generated development keys
+privateKey.pem
+publicKey.pem
+
+# Test coverage reports
+/coverage

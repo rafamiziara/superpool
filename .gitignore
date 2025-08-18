@@ -1,0 +1,21 @@
+# Dependencies
+node_modules
+
+# IDE
+.vscode/
+
+# Debug
+firebase-debug.log
+firestore-debug.log
+
+# Env Variables
+.env
+.env.*
+
+# Ngrok config (contains personal authtoken)
+ngrok.yml
+
+# Claude Code files
+CLAUDE.md
+**/CLAUDE.md
+.claude/
