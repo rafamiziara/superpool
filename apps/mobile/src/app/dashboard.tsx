@@ -3,7 +3,7 @@ import { router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { signOut } from 'firebase/auth';
 import { useEffect } from 'react';
-import { StyleSheet, Text, View, TouchableOpacity, Alert } from 'react-native';
+import { Alert, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useAccount, useDisconnect } from 'wagmi';
 import { FIREBASE_AUTH } from '../firebase.config';
 import { getGlobalLogoutState } from '../hooks/useLogoutState';
