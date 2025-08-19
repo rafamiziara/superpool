@@ -134,7 +134,7 @@ PRIVATE_KEY=[YOUR_TESTNET_DEPLOYER_PRIVATE_KEY]
 
 # Polygon Amoy RPC URL (e.g., Alchemy, Infura)
 POLYGON_AMOY_RPC_URL=https://polygon-amoy.g.alchemy.com/v2/[YOUR_ALCHEMY_KEY]
-POLYGONSCAN_API_KEY=[YOUR_POLYGONSCAN_API_KEY] # For contract verification
+ETHERSCAN_API_KEY=[YOUR_ETHERSCAN_API_KEY] # For contract verification (works for all chains)
 ```
 
 - `packages/backend/.env`

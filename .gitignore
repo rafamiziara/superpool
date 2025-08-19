@@ -11,6 +11,7 @@ firestore-debug.log
 # Env Variables
 .env
 .env.*
+!.env.template
 
 # Ngrok config (contains personal authtoken)
 ngrok.yml
@@ -19,3 +20,18 @@ ngrok.yml
 CLAUDE.md
 **/CLAUDE.md
 .claude/
+
+# SuperDesign files
+.superdesign/
+
+# Hardhat contracts
+packages/contracts/artifacts/
+packages/contracts/cache/
+packages/contracts/coverage/
+packages/contracts/coverage.json
+packages/contracts/typechain-types/
+packages/contracts/.openzeppelin/
+packages/contracts/deployments/
+
+# Service account keys
+packages/backend/service-account-key.json

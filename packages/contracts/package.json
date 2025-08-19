@@ -1,13 +1,51 @@
 {
   "name": "contracts",
   "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "description": "Smart contracts for SuperPool decentralized lending platform",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "compile": "hardhat compile",
+    "test": "hardhat test",
+    "test:gas": "cross-env REPORT_GAS=true hardhat test",
+    "coverage": "hardhat coverage",
+    "deploy:amoy": "hardhat run scripts/deploy.ts --network polygonAmoy",
+    "verify": "hardhat verify --network polygonAmoy",
+    "lint": "solhint 'contracts/**/*.sol' && eslint --ext .ts .",
+    "clean": "hardhat clean"
   },
-  "keywords": [],
+  "keywords": [
+    "solidity",
+    "hardhat",
+    "smart-contracts",
+    "defi",
+    "lending"
+  ],
   "author": "",
   "license": "ISC",
-  "packageManager": "pnpm@10.12.4"
+  "packageManager": "pnpm@10.12.4",
+  "dependencies": {
+    "@openzeppelin/contracts": "^5.4.0",
+    "@openzeppelin/contracts-upgradeable": "^5.4.0"
+  },
+  "devDependencies": {
+    "@nomicfoundation/hardhat-toolbox": "^5.0.0",
+    "@nomicfoundation/hardhat-verify": "^2.0.11",
+    "@openzeppelin/hardhat-upgrades": "^3.5.0",
+    "@types/chai": "^5.0.0",
+    "@types/mocha": "^10.0.10",
+    "@types/node": "^22.10.2",
+    "@typescript-eslint/eslint-plugin": "^8.20.0",
+    "@typescript-eslint/parser": "^8.20.0",
+    "chai": "^5.1.2",
+    "cross-env": "^7.0.3",
+    "dotenv": "^17.2.1",
+    "eslint": "^9.18.0",
+    "ethers": "^6.15.0",
+    "hardhat": "^2.22.18",
+    "hardhat-gas-reporter": "^2.3.0",
+    "solhint": "^5.1.0",
+    "solidity-coverage": "^0.8.15",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.7.3"
+  },
+  "private": true
 }
