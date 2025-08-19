@@ -28,6 +28,7 @@
     "@types/jest": "^30.0.0",
     "firebase-functions-test": "^3.4.1",
     "jest": "^30.0.5",
+    "minimatch": "^10.0.3",
     "ts-jest": "^29.4.1",
     "ts-node": "^10.9.2",
     "typescript": "^5.7.3"
