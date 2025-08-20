@@ -25,7 +25,7 @@ This project serves as a comprehensive portfolio piece demonstrating expertise a
 
 - **Multi-Pool Architecture:** Supports the creation of multiple independent lending pools, each with its own members and potentially unique parameters.
 - **Permissioned Membership:** Pool administrators (initially controlled by a multi-sig Safe) approve members before they can contribute or borrow.
-- **Liquidity Contribution:** Pool members can contribute MATIC (or a custom ERC-20 token) to provide liquidity for loans.
+- **Liquidity Contribution:** Pool members can contribute POL (or a custom ERC-20 token) to provide liquidity for loans.
 - **Loan Request & Approval:** Members can request loans from their pool. Loan requests are initially reviewed by an off-chain AI agent (mocked/basic implementation) and then approved by the pool admin.
 - **Loan Repayment & Management:** Borrowers can repay loans. Admins can manage defaults.
 - **Multi-Sig Administration:** Core protocol contracts (like the Pool Factory) are controlled by a [e.g., 2-of-3] multi-signature Safe for enhanced security and progressive decentralization. Individual pools are managed by their respective admin.
@@ -85,6 +85,7 @@ superpool-dapp/
 3.  **Mobile App:** Provides the user interface for interacting with the platform. Features a comprehensive wallet connection system supporting multiple providers (MetaMask, WalletConnect, Coinbase, etc.), signature-based authentication, multi-chain support, and robust error handling with user-friendly feedback.
 
 **Authentication Flow:**
+
 1. User connects wallet via Reown AppKit (supports 100+ wallets)
 2. App requests authentication message from backend Cloud Function
 3. User signs message with their wallet (cryptographic proof of ownership)
@@ -100,7 +101,7 @@ Follow these steps to set up and run the SuperPool project locally.
 - Node.js (v18 or higher)
 - pnpm (install via `npm install -g pnpm`)
 - Git
-- A Polygon (Amoy Testnet recommended) wallet with some MATIC for gas.
+- A Polygon (Amoy Testnet recommended) wallet with some POL for gas.
 - A Firebase project set up with Firestore, Authentication, and Cloud Functions enabled.
 - A Reown Cloud account and project ID for wallet connections (sign up at [cloud.reown.com](https://cloud.reown.com)).
 - **ngrok account and authtoken** (sign up at [ngrok.com](https://ngrok.com) for local development with mobile devices).
@@ -176,20 +177,79 @@ EXPO_PUBLIC_CLOUD_FUNCTIONS_BASE_URL=https://[HOST]:[PORT]/[YOUR_PROJECT_ID]/[YO
 EXPO_PUBLIC_POOL_FACTORY_ADDRESS=[DEPLOYED_POOL_FACTORY_ADDRESS_ON_AMOY]
 ```
 
-### 4. Deploy Smart Contracts (Testnet)
+### 4. Smart Contract Development
 
-Navigate to the `contracts` package and deploy:
+You have multiple options for smart contract development and testing:
+
+#### Option A: Local Development (Recommended for Development)
+
+**Fastest iteration for development and testing:**
+
+```bash
+# Terminal 1: Start local Hardhat node
+cd packages/contracts
+pnpm node:local
+
+# Terminal 2: Deploy contracts with test data
+pnpm deploy:local
+
+# Terminal 3: Interactive testing
+pnpm console:local
+```
+
+**What you get:**
+
+- ✅ 3 pre-configured test pools with different parameters
+- ✅ 10 funded test accounts with clear roles (deployer, pool owners, borrowers, lenders)
+- ✅ 50 POL funding per pool for immediate testing
+- ✅ Complete deployment info for mobile app integration
+- ✅ Instant transactions, free gas, full control
+
+#### Option B: Forked Development (Most Realistic Testing)
+
+**Test against real network state:**
+
+```bash
+# Terminal 1: Start forked node (requires POLYGON_AMOY_RPC_URL in .env)
+cd packages/contracts
+pnpm node:fork
+
+# Terminal 2: Deploy to forked network
+pnpm deploy:fork
+
+# Terminal 3: Test against real network state
+pnpm test:fork
+```
+
+#### Option C: Testnet Deployment (Pre-Production Testing)
+
+**Deploy to Polygon Amoy testnet:**
 
 ```bash
 cd packages/contracts
-pnpm deploy:amoy # This command should be defined in your package.json scripts
+pnpm deploy:amoy
 ```
 
 - **Important:** Note the deployed `PoolFactory` address. You will need this for your `backend` and `mobile` `.env` files.
+- **Multi-sig Setup:** After `PoolFactory` is deployed, set up your multi-sig Safe (e.g., Gnosis Safe on Polygon Amoy) and transfer ownership of the `PoolFactory` to your Safe.
 
-- **Multi-sig Setup:** After `PoolFactory` is deployed, set up your multi-sig Safe (e.g., Gnosis Safe on Polygon Amoy) and transfer ownership of the `PoolFactory` to your Safe. All subsequent calls to `createPool` from your backend should be initiated via the Safe.
+### 5. Mobile App Integration
 
-### 5. Deploy Backend Cloud Functions
+The mobile app automatically supports localhost development:
+
+- **Localhost Network**: Automatically available in development mode (Chain ID 31337)
+- **Network Switching**: Appears in wallet connection UI when `__DEV__` is true
+- **Contract Integration**: Connect to `http://127.0.0.1:8545` to interact with local contracts
+
+**Quick Mobile Testing:**
+
+1. Start local contracts: `pnpm node:local` → `pnpm deploy:local`
+2. Note the Factory Address from deployment output
+3. Run mobile app: `pnpm start` (in apps/mobile/)
+4. Connect wallet and select "Localhost" network
+5. Interact with your local contracts instantly!
+
+### 6. Deploy Backend Cloud Functions
 
 ---
 
@@ -276,16 +336,19 @@ Here is the complete workflow to test your authentication functions:
 
 ---
 
-### 6. Set Up Wallet Connection (Reown Cloud)
+### 7. Set Up Wallet Connection (Reown Cloud)
 
 Before running the mobile app, you need to set up wallet connection capabilities:
 
 1. **Create a Reown Cloud Account:**
+
    - Visit [cloud.reown.com](https://cloud.reown.com) and create an account.
    - Create a new project and note your **Project ID**.
 
 2. **Update Environment Variables:**
+
    - Add your Reown Project ID to `apps/mobile/.env`:
+
    ```
    EXPO_PUBLIC_REOWN_PROJECT_ID=your_project_id_here
    ```
@@ -294,15 +357,16 @@ Before running the mobile app, you need to set up wallet connection capabilities
    - The app currently supports: Mainnet, Polygon, Arbitrum, Base, BSC, and Polygon Amoy.
    - Networks are configured in `apps/mobile/src/app/_layout.tsx`.
 
-### 7. Set Up Ngrok for Local Development (Mobile Device Testing)
+### 8. Set Up Ngrok for Local Development (Mobile Device Testing)
 
 For testing the mobile app on a physical device with local Firebase emulators, you'll need ngrok:
 
 1. **Configure Ngrok:**
+
    ```bash
    # Copy the template
    cp ngrok.yml.template ngrok.yml
-   
+
    # Edit ngrok.yml and add your authtoken
    # Get your authtoken from: https://dashboard.ngrok.com/get-started/your-authtoken
    ```
@@ -312,9 +376,9 @@ For testing the mobile app on a physical device with local Firebase emulators, y
    authtoken: your_ngrok_authtoken_here
    ```
 
-### 8. Run the Development Environment
+### 9. Complete Development Workflow
 
-Use the automated development script that handles all local setup:
+#### Quick Start (All-in-One)
 
 ```bash
 # Start everything with one command
@@ -322,14 +386,35 @@ pnpm dev
 ```
 
 This command will:
+
 - ✅ Start Firebase emulators (auth, functions, firestore)
 - ✅ Launch ngrok tunnels for mobile device access
 - ✅ Automatically update mobile app environment variables with ngrok URLs
 - ✅ Start the Expo development server
 
-**Manual alternative (if needed):**
+#### Smart Contract Development Workflow
+
+```bash
+# Terminal 1: Start local blockchain
+cd packages/contracts
+pnpm node:local
+
+# Terminal 2: Deploy with test data
+pnpm deploy:local
+
+# Terminal 3: Interactive testing (optional)
+pnpm console:local
+
+# Terminal 4: Start mobile app
+cd apps/mobile
+pnpm start
+```
+
+#### Manual Backend Setup (if needed)
+
 ```bash
 # Start Firebase emulators
+cd packages/backend
 firebase emulators:start
 
 # In another terminal, start ngrok
@@ -340,11 +425,13 @@ cd apps/mobile
 pnpm start
 ```
 
-**Testing the App:**
-- **Mobile Device:** Scan the QR code with Expo Go app on your phone
-- **Simulator:** Use Android/iOS simulator from your development machine
-- **Testing Wallet Connection:** Try connecting with MetaMask Mobile, Coinbase Wallet, or other WalletConnect-compatible wallets
-- **Authentication Flow:** After connecting, you'll be prompted to sign an authentication message to access the dashboard
+**Testing Options:**
+
+- **Local Contracts:** Instant testing with localhost network
+- **Mobile Device:** Scan QR code with Expo Go app
+- **Simulator:** Use Android/iOS simulator
+- **Wallet Connection:** MetaMask Mobile, Coinbase Wallet, WalletConnect-compatible wallets
+- **Network Switching:** Test with localhost, Polygon Amoy, or mainnet
 
 ## 🤝 Multi-Sig Administration
 
