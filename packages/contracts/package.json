@@ -16,6 +16,11 @@
     "console:local": "hardhat console --network localhost",
     "console:fork": "hardhat console --network polygonAmoyFork",
     "verify": "hardhat verify --network polygonAmoy",
+    "verify:contracts": "hardhat run scripts/verify-contracts.ts --network polygonAmoy",
+    "verify:proxy": "hardhat run scripts/verify-proxy.ts --network polygonAmoy",
+    "verify:implementation": "pnpm verify:contracts",
+    "verify:check": "echo 'Usage: pnpm verify:check <address> - Check verification status on Polygonscan'",
+    "verify:all": "echo 'Run verify:contracts to verify all deployed contracts'",
     "lint": "solhint 'contracts/**/*.sol' && eslint --ext .ts .",
     "clean": "hardhat clean"
   },

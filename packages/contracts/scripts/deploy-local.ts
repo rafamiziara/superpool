@@ -1,7 +1,55 @@
 import * as dotenv from 'dotenv'
-import { ethers, upgrades } from 'hardhat'
+import { ethers, network, run, upgrades } from 'hardhat'
 
 dotenv.config()
+
+/**
+ * Verify a contract with retry logic (skips on localhost)
+ */
+async function verifyContract(contractName: string, address: string, constructorArgs: any[] = [], maxRetries: number = 3): Promise<void> {
+  // Skip verification for local networks
+  if (network.name === 'localhost' || network.name === 'hardhat' || network.name === 'hardhatFork') {
+    console.log(`   ⏭️ Skipping verification for ${contractName} on local network`)
+    return
+  }
+
+  // Check if API key is configured
+  if (!process.env.ETHERSCAN_API_KEY || process.env.ETHERSCAN_API_KEY === '') {
+    console.log(`   ⚠️ ETHERSCAN_API_KEY not configured, skipping verification for ${contractName}`)
+    return
+  }
+
+  console.log(`\n🔍 Verifying ${contractName} at ${address}...`)
+
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      if (attempt > 1) {
+        console.log(`   🔄 Retry attempt ${attempt}/${maxRetries}...`)
+        await new Promise((resolve) => setTimeout(resolve, Math.pow(2, attempt) * 1000))
+      }
+
+      await run('verify:verify', {
+        address: address,
+        constructorArguments: constructorArgs,
+      })
+
+      console.log(`   ✅ ${contractName} verified successfully`)
+      return
+    } catch (error: any) {
+      if (error.message.toLowerCase().includes('already verified')) {
+        console.log(`   ✅ ${contractName} is already verified`)
+        return
+      }
+
+      if (attempt === maxRetries) {
+        console.log(`   ❌ Failed to verify ${contractName}: ${error.message}`)
+        return
+      }
+
+      console.log(`   ⚠️ Attempt ${attempt} failed: ${error.message}`)
+    }
+  }
+}
 
 async function main() {
   console.log('🚀 Starting LOCAL deployment...')
@@ -30,6 +78,9 @@ async function main() {
 
     console.log('✅ SampleLendingPool implementation deployed to:', implementationAddress)
 
+    // Verify SampleLendingPool implementation
+    await verifyContract('SampleLendingPool', implementationAddress, [])
+
     // Step 2: Deploy PoolFactory
     console.log('\n2️⃣ Deploying PoolFactory...')
     const PoolFactory = await ethers.getContractFactory('PoolFactory')
@@ -54,6 +105,12 @@ async function main() {
     // Get factory implementation address
     const factoryImplementationAddress = await upgrades.erc1967.getImplementationAddress(factoryAddress)
     console.log('📋 PoolFactory implementation address:', factoryImplementationAddress)
+
+    // Verify PoolFactory implementation
+    await verifyContract('PoolFactory Implementation', factoryImplementationAddress, [])
+
+    // Verify PoolFactory proxy (will skip on localhost)
+    await verifyContract('PoolFactory Proxy', factoryAddress, [])
 
     // Step 3: Create multiple sample pools for testing
     console.log('\n3️⃣ Creating sample pools for local testing...')
