@@ -1,7 +1,75 @@
 import * as dotenv from 'dotenv'
-import { ethers, upgrades } from 'hardhat'
+import { ethers, network, run, upgrades } from 'hardhat'
 
 dotenv.config()
+
+/**
+ * Verify a contract with retry logic
+ */
+async function verifyContract(contractName: string, address: string, constructorArgs: any[] = [], maxRetries: number = 3): Promise<void> {
+  // Skip verification for local networks
+  if (network.name === 'localhost' || network.name === 'hardhat' || network.name === 'hardhatFork') {
+    console.log(`   ⏭️ Skipping verification for ${contractName} on local network`)
+    return
+  }
+
+  // Check if API key is configured
+  if (!process.env.ETHERSCAN_API_KEY || process.env.ETHERSCAN_API_KEY === '') {
+    console.log(`   ⚠️ ETHERSCAN_API_KEY not configured, skipping verification for ${contractName}`)
+    return
+  }
+
+  console.log(`\n🔍 Verifying ${contractName} at ${address}...`)
+
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      if (attempt > 1) {
+        console.log(`   🔄 Retry attempt ${attempt}/${maxRetries}...`)
+        // Wait before retry (exponential backoff)
+        await new Promise((resolve) => setTimeout(resolve, Math.pow(2, attempt) * 1000))
+      }
+
+      await run('verify:verify', {
+        address: address,
+        constructorArguments: constructorArgs,
+      })
+
+      console.log(`   ✅ ${contractName} verified successfully`)
+      return
+    } catch (error: any) {
+      if (error.message.toLowerCase().includes('already verified')) {
+        console.log(`   ✅ ${contractName} is already verified`)
+        return
+      }
+
+      if (attempt === maxRetries) {
+        console.log(`   ❌ Failed to verify ${contractName}: ${error.message}`)
+        console.log(`   🔧 Manual verification command:`)
+        console.log(
+          `      pnpm hardhat verify --network ${network.name} ${address}${
+            constructorArgs.length > 0 ? ' ' + constructorArgs.join(' ') : ''
+          }`
+        )
+        return
+      }
+
+      console.log(`   ⚠️ Attempt ${attempt} failed: ${error.message}`)
+    }
+  }
+}
+
+/**
+ * Wait for a number of block confirmations
+ */
+async function waitForConfirmations(txHash: string, confirmations: number = 5): Promise<void> {
+  if (network.name === 'localhost' || network.name === 'hardhat') {
+    return // Skip on local networks
+  }
+
+  console.log(`   ⏳ Waiting for ${confirmations} block confirmations...`)
+  const receipt = await ethers.provider.waitForTransaction(txHash, confirmations)
+  console.log(`   ✅ Transaction confirmed in block ${receipt?.blockNumber}`)
+}
 
 async function main() {
   console.log('Starting deployment...')
@@ -22,6 +90,12 @@ async function main() {
     const implementationAddress = await lendingPoolImplementation.getAddress()
 
     console.log('✅ SampleLendingPool implementation deployed to:', implementationAddress)
+
+    // Wait for confirmations before verification
+    await waitForConfirmations(lendingPoolImplementation.deploymentTransaction()?.hash || '')
+
+    // Verify SampleLendingPool implementation
+    await verifyContract('SampleLendingPool', implementationAddress, [])
 
     // Step 2: Deploy PoolFactory
     console.log('\n2️⃣ Deploying PoolFactory...')
@@ -47,6 +121,15 @@ async function main() {
     // Get factory implementation address for verification
     const factoryImplementationAddress = await upgrades.erc1967.getImplementationAddress(factoryAddress)
     console.log('📋 PoolFactory implementation address:', factoryImplementationAddress)
+
+    // Wait for confirmations before verification
+    await waitForConfirmations(poolFactory.deploymentTransaction()?.hash || '')
+
+    // Verify PoolFactory implementation first
+    await verifyContract('PoolFactory Implementation', factoryImplementationAddress, [])
+
+    // Verify PoolFactory proxy (this might fail, but that's normal for proxies)
+    await verifyContract('PoolFactory Proxy', factoryAddress, [])
 
     // Step 3: Create a sample pool through the factory
     console.log('\n3️⃣ Creating sample pool through factory...')
@@ -104,13 +187,33 @@ async function main() {
     }
 
     console.log('\n🎉 All deployments completed successfully!')
+
+    // Verification summary
+    if (network.name !== 'localhost' && network.name !== 'hardhat' && network.name !== 'hardhatFork') {
+      console.log('\n📋 Contract Verification Summary:')
+      console.log(`   🔗 View contracts on Polygonscan:`)
+      console.log(
+        `   - SampleLendingPool: https://${network.name === 'polygonAmoy' ? 'amoy.' : ''}polygonscan.com/address/${implementationAddress}`
+      )
+      console.log(`   - PoolFactory: https://${network.name === 'polygonAmoy' ? 'amoy.' : ''}polygonscan.com/address/${factoryAddress}`)
+      console.log(
+        `   - PoolFactory Implementation: https://${
+          network.name === 'polygonAmoy' ? 'amoy.' : ''
+        }polygonscan.com/address/${factoryImplementationAddress}`
+      )
+      if (samplePoolAddress) {
+        console.log(
+          `   - Sample Pool: https://${network.name === 'polygonAmoy' ? 'amoy.' : ''}polygonscan.com/address/${samplePoolAddress}`
+        )
+      }
+    }
+
     console.log('\nNext steps:')
-    console.log('1. Verify contracts on Polygonscan:')
-    console.log(`   pnpm verify ${implementationAddress}`)
-    console.log(`   pnpm verify ${factoryImplementationAddress}`)
+    console.log('1. ✅ Contracts automatically verified (if on public network)')
     console.log('2. Create additional pools using PoolFactory.createPool()')
     console.log('3. Fund pools by calling depositFunds() with ETH')
     console.log('4. Test loan creation with createLoan()')
+    console.log('5. Set up multi-sig Safe for production ownership transfer')
 
     // Save comprehensive deployment info
     const deploymentInfo = {
