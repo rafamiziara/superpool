@@ -35,3 +35,12 @@ packages/contracts/deployments/
 
 # Service account keys
 packages/backend/service-account-key.json
+
+# Wallet information (contains private keys)
+wallet-info.json
+
+# Coverage reports (keep merge script and config files)
+coverage/
+!coverage/.gitkeep
+packages/*/coverage/
+apps/*/coverage/

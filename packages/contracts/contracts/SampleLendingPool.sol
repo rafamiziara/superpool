@@ -16,7 +16,7 @@ import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
  * - Pausable functionality for emergency stops
  * - Reentrancy protection
  */
-contract SampleLendingPool is 
+contract SampleLendingPool is
     Initializable,
     OwnableUpgradeable,
     PausableUpgradeable,
@@ -43,21 +43,33 @@ contract SampleLendingPool is
 
     /// @notice Pool configuration
     PoolConfig public poolConfig;
-    
+
     /// @notice Total funds available in the pool
     uint256 public totalFunds;
-    
+
     /// @notice Mapping of loan ID to loan details
     mapping(uint256 => Loan) public loans;
-    
+
     /// @notice Current loan ID counter
     uint256 public nextLoanId;
 
     /// @notice Events
-    event PoolConfigured(uint256 maxLoanAmount, uint256 interestRate, uint256 loanDuration);
+    event PoolConfigured(
+        uint256 maxLoanAmount,
+        uint256 interestRate,
+        uint256 loanDuration
+    );
     event FundsDeposited(address indexed depositor, uint256 amount);
-    event LoanCreated(uint256 indexed loanId, address indexed borrower, uint256 amount);
-    event LoanRepaid(uint256 indexed loanId, address indexed borrower, uint256 amount);
+    event LoanCreated(
+        uint256 indexed loanId,
+        address indexed borrower,
+        uint256 amount
+    );
+    event LoanRepaid(
+        uint256 indexed loanId,
+        address indexed borrower,
+        uint256 amount
+    );
 
     /// @notice Errors
     error InsufficientFunds();
@@ -98,7 +110,11 @@ contract SampleLendingPool is
     /**
      * @dev Required by UUPSUpgradeable to authorize upgrades
      */
-    function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
+    function _authorizeUpgrade(
+        address newImplementation
+    ) internal override onlyOwner {
+        // Only owner can authorize upgrades
+    }
 
     /**
      * @notice Deposit funds into the pool
@@ -114,19 +130,21 @@ contract SampleLendingPool is
      * @param _amount Loan amount requested
      * @return loanId The ID of the created loan
      */
-    function createLoan(uint256 _amount) external whenNotPaused nonReentrant returns (uint256) {
+    function createLoan(
+        uint256 _amount
+    ) external whenNotPaused nonReentrant returns (uint256) {
         require(poolConfig.isActive, "Pool is not active");
-        
+
         if (_amount > poolConfig.maxLoanAmount) {
             revert ExceedsMaxLoanAmount();
         }
-        
+
         if (_amount > totalFunds) {
             revert InsufficientFunds();
         }
 
         uint256 loanId = nextLoanId++;
-        
+
         loans[loanId] = Loan({
             borrower: msg.sender,
             amount: _amount,
@@ -137,7 +155,7 @@ contract SampleLendingPool is
         });
 
         totalFunds -= _amount;
-        
+
         // Transfer funds to borrower
         (bool success, ) = payable(msg.sender).call{value: _amount}("");
         require(success, "Transfer failed");
@@ -150,20 +168,22 @@ contract SampleLendingPool is
      * @notice Repay a loan with interest
      * @param _loanId The ID of the loan to repay
      */
-    function repayLoan(uint256 _loanId) external payable whenNotPaused nonReentrant {
+    function repayLoan(
+        uint256 _loanId
+    ) external payable whenNotPaused nonReentrant {
         Loan storage loan = loans[_loanId];
-        
+
         if (loan.borrower != msg.sender) {
             revert UnauthorizedBorrower();
         }
-        
+
         if (loan.isRepaid) {
             revert LoanAlreadyRepaid();
         }
 
         uint256 interest = (loan.amount * loan.interestRate) / 10000;
         uint256 totalRepayment = loan.amount + interest;
-        
+
         require(msg.value >= totalRepayment, "Insufficient repayment amount");
 
         loan.isRepaid = true;
@@ -171,7 +191,9 @@ contract SampleLendingPool is
 
         // Refund any excess payment
         if (msg.value > totalRepayment) {
-            (bool success, ) = payable(msg.sender).call{value: msg.value - totalRepayment}("");
+            (bool success, ) = payable(msg.sender).call{
+                value: msg.value - totalRepayment
+            }("");
             require(success, "Refund failed");
         }
 
@@ -192,7 +214,7 @@ contract SampleLendingPool is
         poolConfig.maxLoanAmount = _maxLoanAmount;
         poolConfig.interestRate = _interestRate;
         poolConfig.loanDuration = _loanDuration;
-        
+
         emit PoolConfigured(_maxLoanAmount, _interestRate, _loanDuration);
     }
 
@@ -231,10 +253,12 @@ contract SampleLendingPool is
      * @param _loanId The loan ID to calculate for
      * @return Total repayment amount including interest
      */
-    function calculateRepaymentAmount(uint256 _loanId) external view returns (uint256) {
+    function calculateRepaymentAmount(
+        uint256 _loanId
+    ) external view returns (uint256) {
         Loan storage loan = loans[_loanId];
         if (loan.amount == 0) return 0;
-        
+
         uint256 interest = (loan.amount * loan.interestRate) / 10000;
         return loan.amount + interest;
     }

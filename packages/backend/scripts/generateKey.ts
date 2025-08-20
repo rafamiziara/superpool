@@ -19,11 +19,12 @@ const publicKey = newWallet.publicKey
 const privateKeyPath = path.join(__dirname, 'privateKey.pem')
 const publicKeyPath = path.join(__dirname, 'publicKey.pem')
 const contractsEnvPath = path.join(__dirname, '../../contracts/.env')
+const walletInfoPath = path.join(__dirname, '../../../wallet-info.json')
 
 function updateContractsEnv(newPrivateKey: string): boolean {
   try {
     let envContent = ''
-    
+
     // Check if .env file exists, if not create from template
     if (fs.existsSync(contractsEnvPath)) {
       envContent = fs.readFileSync(contractsEnvPath, 'utf8')
@@ -48,7 +49,7 @@ function updateContractsEnv(newPrivateKey: string): boolean {
     } else {
       // Add PRIVATE_KEY line after the warning comment or at the beginning
       const lines = envContent.split('\n')
-      const insertIndex = lines.findIndex(line => line.includes('WARNING:')) + 1 || 0
+      const insertIndex = lines.findIndex((line) => line.includes('WARNING:')) + 1 || 0
       lines.splice(insertIndex, 0, `PRIVATE_KEY=${cleanPrivateKey}`)
       envContent = lines.join('\n')
     }
@@ -71,6 +72,19 @@ try {
   fs.writeFileSync(publicKeyPath, publicKey, { encoding: 'utf8' })
   console.log(`✅ Public key saved to: ${publicKeyPath}`)
 
+  // Save all wallet information to root directory
+  const walletInfo = {
+    address: newWallet.address,
+    publicKey: newWallet.publicKey,
+    privateKey: newWallet.privateKey,
+    mnemonic: newWallet.mnemonic?.phrase || null,
+    generatedAt: new Date().toISOString(),
+    network: 'polygon-amoy-testnet',
+  }
+
+  fs.writeFileSync(walletInfoPath, JSON.stringify(walletInfo, null, 2), { encoding: 'utf8' })
+  console.log(`✅ Wallet info saved to: ${walletInfoPath}`)
+
   // Update contracts .env file
   const envUpdated = updateContractsEnv(privateKey)
   if (envUpdated) {
@@ -83,11 +97,14 @@ try {
   console.log('Address:       ', newWallet.address)
   console.log('Public Key:    ', newWallet.publicKey)
   console.log('Private Key:   ', newWallet.privateKey)
+  console.log('Mnemonic:      ', newWallet.mnemonic?.phrase || 'N/A')
+  console.log('Generated:     ', new Date().toISOString())
   console.log('\n📋 READY FOR CONTRACT DEPLOYMENT!')
   console.log('✅ Private key automatically added to contracts/.env')
+  console.log('✅ Full wallet info saved to wallet-info.json')
   console.log('\n💰 GET TESTNET FUNDS:')
   console.log('🔗 https://faucet.polygon.technology/')
-  console.log('📍 Send MATIC to:', newWallet.address)
+  console.log('📍 Send POL to:', newWallet.address)
   console.log('\n🚀 DEPLOY CONTRACTS:')
   console.log('cd packages/contracts && pnpm deploy:amoy')
   console.log('-----------------------------------------')
