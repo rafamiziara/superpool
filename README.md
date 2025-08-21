@@ -104,6 +104,7 @@ Follow these steps to set up and run the SuperPool project locally.
 - A Polygon (Amoy Testnet recommended) wallet with some POL for gas.
 - A Firebase project set up with Firestore, Authentication, and Cloud Functions enabled.
 - A Reown Cloud account and project ID for wallet connections (sign up at [cloud.reown.com](https://cloud.reown.com)).
+- **Alchemy account and API key** (sign up at [alchemy.com](https://alchemy.com) for blockchain RPC access - required for contract deployment and forked network testing).
 - **ngrok account and authtoken** (sign up at [ngrok.com](https://ngrok.com) for local development with mobile devices).
 
 ### 1. Clone the Repository
