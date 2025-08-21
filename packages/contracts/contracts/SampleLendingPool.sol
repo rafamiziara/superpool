@@ -6,6 +6,7 @@ import "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
+import "@openzeppelin/contracts/utils/math/Math.sol";
 
 /**
  * @title SampleLendingPool
@@ -145,6 +146,7 @@ contract SampleLendingPool is
 
         uint256 loanId = nextLoanId++;
 
+        // Complete all state changes before external call (CEI pattern)
         loans[loanId] = Loan({
             borrower: msg.sender,
             amount: _amount,
@@ -156,11 +158,13 @@ contract SampleLendingPool is
 
         totalFunds -= _amount;
 
-        // Transfer funds to borrower
+        // Emit event before external call
+        emit LoanCreated(loanId, msg.sender, _amount);
+
+        // Transfer funds to borrower (external call moved to end)
         (bool success, ) = payable(msg.sender).call{value: _amount}("");
         require(success, "Transfer failed");
 
-        emit LoanCreated(loanId, msg.sender, _amount);
         return loanId;
     }
 
@@ -181,23 +185,26 @@ contract SampleLendingPool is
             revert LoanAlreadyRepaid();
         }
 
-        uint256 interest = (loan.amount * loan.interestRate) / 10000;
+        uint256 interest = Math.mulDiv(loan.amount, loan.interestRate, 10000);
         uint256 totalRepayment = loan.amount + interest;
 
         require(msg.value >= totalRepayment, "Insufficient repayment amount");
 
+        // Complete all state changes before external call (CEI pattern)
         loan.isRepaid = true;
         totalFunds += totalRepayment;
 
-        // Refund any excess payment
-        if (msg.value > totalRepayment) {
-            (bool success, ) = payable(msg.sender).call{
-                value: msg.value - totalRepayment
-            }("");
+        // Emit event before external call
+        emit LoanRepaid(_loanId, msg.sender, totalRepayment);
+
+        // Store refund amount for external call
+        uint256 refundAmount = msg.value > totalRepayment ? msg.value - totalRepayment : 0;
+
+        // Refund any excess payment (external call moved to end)
+        if (refundAmount > 0) {
+            (bool success, ) = payable(msg.sender).call{value: refundAmount}("");
             require(success, "Refund failed");
         }
-
-        emit LoanRepaid(_loanId, msg.sender, totalRepayment);
     }
 
     /**
@@ -259,7 +266,7 @@ contract SampleLendingPool is
         Loan storage loan = loans[_loanId];
         if (loan.amount == 0) return 0;
 
-        uint256 interest = (loan.amount * loan.interestRate) / 10000;
+        uint256 interest = Math.mulDiv(loan.amount, loan.interestRate, 10000);
         return loan.amount + interest;
     }
 
