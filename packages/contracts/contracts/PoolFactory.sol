@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.22;
 
-import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/access/Ownable2StepUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
@@ -24,7 +24,7 @@ import "./SampleLendingPool.sol";
  */
 contract PoolFactory is
     Initializable,
-    OwnableUpgradeable,
+    Ownable2StepUpgradeable,
     PausableUpgradeable,
     ReentrancyGuardUpgradeable,
     UUPSUpgradeable
@@ -122,6 +122,7 @@ contract PoolFactory is
         if (_implementation == address(0)) revert ImplementationNotSet();
 
         __Ownable_init(_owner);
+        __Ownable2Step_init();
         __Pausable_init();
         __ReentrancyGuard_init();
         __UUPSUpgradeable_init();
@@ -368,5 +369,63 @@ contract PoolFactory is
      */
     function version() external pure returns (string memory) {
         return "1.0.0";
+    }
+
+    /**
+     * @notice Get ownership status information
+     * @return currentOwner Current owner address
+     * @return pendingOwnerAddress Pending owner address (if any)
+     * @return hasPendingTransfer Whether there's a pending ownership transfer
+     */
+    function getOwnershipStatus()
+        external
+        view
+        returns (
+            address currentOwner,
+            address pendingOwnerAddress,
+            bool hasPendingTransfer
+        )
+    {
+        currentOwner = owner();
+        pendingOwnerAddress = pendingOwner();
+        hasPendingTransfer = pendingOwnerAddress != address(0);
+    }
+
+    /**
+     * @notice Verify if address is current owner
+     * @param _address Address to verify
+     * @return True if address is current owner
+     */
+    function isCurrentOwner(address _address) external view returns (bool) {
+        return owner() == _address;
+    }
+
+    /**
+     * @notice Verify if address is pending owner
+     * @param _address Address to verify
+     * @return True if address is pending owner
+     */
+    function isPendingOwner(address _address) external view returns (bool) {
+        return pendingOwner() == _address;
+    }
+
+    /**
+     * @notice Emergency pause function (only owner)
+     * @dev Can be used to halt all factory operations in emergency situations
+     */
+    function emergencyPause() external onlyOwner {
+        if (!paused()) {
+            _pause();
+        }
+    }
+
+    /**
+     * @notice Emergency unpause function (only owner)
+     * @dev Can be used to resume factory operations after emergency
+     */
+    function emergencyUnpause() external onlyOwner {
+        if (paused()) {
+            _unpause();
+        }
     }
 }

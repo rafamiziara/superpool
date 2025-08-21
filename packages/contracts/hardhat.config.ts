@@ -31,13 +31,9 @@ const config: HardhatUserConfig = {
       chainId: 80002, // Use Amoy chainId when forking
     },
     polygonAmoyFork: {
-      url: process.env.POLYGON_AMOY_RPC_URL || 'https://rpc-amoy.polygon.technology/',
-      forking: {
-        url: process.env.POLYGON_AMOY_RPC_URL || 'https://rpc-amoy.polygon.technology/',
-        enabled: true,
-      },
-      chainId: 80002,
-      accounts: process.env.PRIVATE_KEY ? [process.env.PRIVATE_KEY] : [],
+      url: 'http://127.0.0.1:8545', // Connect to local forked node
+      chainId: 31337, // Forked node uses Hardhat's default chain ID
+      // Uses default Hardhat accounts when no private key specified
     },
     polygonAmoy: {
       url: process.env.POLYGON_AMOY_RPC_URL || 'https://rpc-amoy.polygon.technology/',
@@ -82,6 +78,18 @@ const config: HardhatUserConfig = {
     outDir: 'typechain-types',
     target: 'ethers-v6',
   },
+  mocha: {
+    timeout: 120000, // 2 minutes for coverage tests
+  },
+  // Exclude Safe integration tests from coverage since they require external network
+  ...(process.env.COVERAGE
+    ? {
+        mocha: {
+          timeout: 120000,
+          grep: '^(?!.*Safe Integration Tests).*', // Exclude Safe Integration Tests during coverage
+        },
+      }
+    : {}),
 }
 
 export default config
