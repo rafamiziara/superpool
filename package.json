@@ -5,7 +5,7 @@
   "private": true,
   "main": "index.js",
   "scripts": {
-    "dev": "node dev-start.js",
+    "dev": "node scripts/dev-start.js",
     "test": "pnpm run test:backend && pnpm run test:contracts && pnpm run test:mobile",
     "test:backend": "pnpm --filter backend test",
     "test:contracts": "pnpm --filter contracts test",

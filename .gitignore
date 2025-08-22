@@ -38,6 +38,11 @@ packages/backend/service-account-key.json
 
 # Wallet information (contains private keys)
 wallet-info.json
+scripts/wallet-info.json
+
+# Development keys (never commit these!)
+scripts/privateKey.pem
+scripts/publicKey.pem
 
 # Coverage reports (keep merge script and config files)
 coverage/
