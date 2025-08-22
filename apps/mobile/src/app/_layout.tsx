@@ -15,6 +15,7 @@ import { Stack } from 'expo-router';
 import { useEffect } from 'react';
 import Toast from 'react-native-toast-message';
 import { WagmiProvider } from 'wagmi';
+import { localhost } from '../config/chains';
 import { useGlobalLogoutState } from '../hooks/useLogoutState';
 import { useWalletToasts } from '../hooks/useWalletToasts';
 import { SessionManager } from '../utils/sessionManager';
@@ -38,7 +39,7 @@ const metadata = {
   },
 };
 
-const chains = [mainnet, polygon, polygonAmoy, arbitrum, base, bsc] as const;
+const chains = [mainnet, polygon, polygonAmoy, arbitrum, base, bsc, ...(__DEV__ ? [localhost] : [])] as const;
 
 const wagmiConfig = defaultWagmiConfig({ chains, projectId, metadata });
 
