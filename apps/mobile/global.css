@@ -1,0 +1,7 @@
+/* Import design tokens from shared design system */
+@import '@superpool/design/tokens.css';
+
+/* Tailwind directives */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
