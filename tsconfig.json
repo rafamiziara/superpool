@@ -3,6 +3,11 @@
   "references": [
     { "path": "./packages/backend" },
     { "path": "./packages/contracts" },
-    { "path": "./apps/mobile" }
+    { "path": "./packages/design" },
+    { "path": "./packages/assets" },
+    { "path": "./packages/ui" },
+    { "path": "./packages/types" },
+    { "path": "./apps/mobile" },
+    { "path": "./apps/landing" }
   ]
 }
