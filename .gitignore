@@ -3,6 +3,9 @@ node_modules
 
 # IDE
 .vscode/
+!.vscode/settings.json
+!.vscode/tailwind.json
+!.vscode/README.md
 
 # Debug
 firebase-debug.log
@@ -43,6 +46,11 @@ scripts/wallet-info.json
 # Development keys (never commit these!)
 scripts/privateKey.pem
 scripts/publicKey.pem
+
+# Build artifacts
+packages/*/dist/
+apps/*/dist/
+*.tsbuildinfo
 
 # Coverage reports (keep merge script and config files)
 coverage/
