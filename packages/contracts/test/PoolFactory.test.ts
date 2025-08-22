@@ -161,10 +161,7 @@ describe('PoolFactory', function () {
         ...defaultPoolParams,
       }
 
-      await expect(poolFactory.connect(otherAccount).createPool(params)).to.be.revertedWithCustomError(
-        poolFactory,
-        'OwnableUnauthorizedAccount'
-      )
+      await expect(poolFactory.connect(otherAccount).createPool(params)).to.be.revertedWithCustomError(poolFactory, 'UnauthorizedCreator')
     })
 
     it('Should reject pool creation with invalid parameters', async function () {
@@ -285,11 +282,10 @@ describe('PoolFactory', function () {
       expect(poolOwner2Pools[0]).to.equal(2)
     })
 
-    it('Should return all pool addresses', async function () {
-      const allPools = await poolFactory.getAllPoolAddresses()
-      expect(allPools.length).to.equal(2)
-      expect(allPools[0]).to.not.equal(ethers.ZeroAddress)
-      expect(allPools[1]).to.not.equal(ethers.ZeroAddress)
+    it('Should not have getAllPoolAddresses function (removed for DoS prevention)', async function () {
+      // This function was removed to prevent DoS attacks
+      // Use getPoolsRange() instead for safe pagination
+      expect((poolFactory as any).getAllPoolAddresses).to.be.undefined
     })
 
     it('Should return pools in range', async function () {
@@ -619,10 +615,7 @@ describe('PoolFactory', function () {
         expect(await poolFactory.getPoolCount()).to.equal(1)
 
         // Pending owner should not be able to perform owner functions
-        await expect(poolFactory.connect(newOwner).createPool(params)).to.be.revertedWithCustomError(
-          poolFactory,
-          'OwnableUnauthorizedAccount'
-        )
+        await expect(poolFactory.connect(newOwner).createPool(params)).to.be.revertedWithCustomError(poolFactory, 'UnauthorizedCreator')
       })
     })
 
@@ -720,7 +713,7 @@ describe('PoolFactory', function () {
           })
         ).to.not.be.reverted
 
-        await expect(poolFactory.connect(owner).createPool(params)).to.be.revertedWithCustomError(poolFactory, 'OwnableUnauthorizedAccount')
+        await expect(poolFactory.connect(owner).createPool(params)).to.be.revertedWithCustomError(poolFactory, 'UnauthorizedCreator')
 
         expect(await poolFactory.getPoolCount()).to.equal(2)
       })
