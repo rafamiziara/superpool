@@ -11,7 +11,10 @@
     "logs": "firebase functions:log",
     "generateKey": "ts-node ./scripts/generateKey.ts",
     "signMessage": "ts-node ./scripts/signMessage.ts",
-    "test": "jest"
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage",
+    "test:integration": "RUN_INTEGRATION_TESTS=true jest --testPathPattern=integration"
   },
   "engines": {
     "node": "22"

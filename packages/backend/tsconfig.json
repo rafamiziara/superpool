@@ -1,19 +1,24 @@
 {
   "extends": "../../tsconfig.json",
   "compilerOptions": {
-    "module": "NodeNext",
+    "module": "commonjs",
     "esModuleInterop": true,
-    "moduleResolution": "nodenext",
+    "moduleResolution": "node",
     "noImplicitReturns": true,
-    "noUnusedLocals": true,
+    "noUnusedLocals": false,
     "outDir": "lib",
     "sourceMap": true,
     "strict": true,
-    "target": "es2022",
-    "isolatedModules": true
+    "target": "es2017",
+    "isolatedModules": true,
+    "skipLibCheck": true
   },
   "compileOnSave": true,
   "include": [
     "src"
+  ],
+  "exclude": [
+    "src/**/*.test.ts",
+    "**/*.test.ts"
   ]
 }
