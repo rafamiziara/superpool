@@ -159,10 +159,7 @@ describe('PoolFactory Ownable2Step', function () {
       expect(await poolFactory.getPoolCount()).to.equal(1)
 
       // Pending owner should not be able to perform owner functions
-      await expect(poolFactory.connect(newOwner).createPool(params)).to.be.revertedWithCustomError(
-        poolFactory,
-        'OwnableUnauthorizedAccount'
-      )
+      await expect(poolFactory.connect(newOwner).createPool(params)).to.be.revertedWithCustomError(poolFactory, 'UnauthorizedCreator')
     })
   })
 
@@ -264,7 +261,7 @@ describe('PoolFactory Ownable2Step', function () {
         })
       ).to.not.be.reverted
 
-      await expect(poolFactory.connect(owner).createPool(params)).to.be.revertedWithCustomError(poolFactory, 'OwnableUnauthorizedAccount')
+      await expect(poolFactory.connect(owner).createPool(params)).to.be.revertedWithCustomError(poolFactory, 'UnauthorizedCreator')
 
       expect(await poolFactory.getPoolCount()).to.equal(2)
     })

@@ -6,8 +6,23 @@ import { PoolFactory } from '../typechain-types'
 
 dotenv.config()
 
+// ⚠️  SECURITY WARNING: DEVELOPMENT ONLY SCRIPT ⚠️
+//
+// This script contains hardcoded Hardhat private keys that are:
+// - PUBLICLY KNOWN test keys from Hardhat documentation
+// - NEVER to be used on mainnet or with real funds
+// - ONLY safe for localhost/testnet development
+//
+// For production deployments:
+// - Use environment variables for private keys
+// - Use hardware wallets or secure key management
+// - Never commit private keys to version control
+//
+// These test keys are widely known and funds can be stolen!
+
 /**
  * Get signer private key for different environments
+ * @dev WARNING: Contains hardcoded test keys - DEVELOPMENT ONLY
  */
 function getSignerPrivateKey(networkName: string, signerAddress: string): string {
   if (networkName === 'localhost' || networkName === 'hardhat') {

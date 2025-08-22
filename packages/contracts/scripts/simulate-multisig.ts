@@ -5,8 +5,23 @@ import { ethers, network } from 'hardhat'
 
 dotenv.config()
 
+// ⚠️  SECURITY WARNING: DEVELOPMENT ONLY SCRIPT ⚠️
+//
+// This script contains hardcoded Hardhat private keys that are:
+// - PUBLICLY KNOWN test keys from Hardhat documentation
+// - NEVER to be used on mainnet or with real funds
+// - ONLY safe for localhost/testnet development
+//
+// For production deployments:
+// - Use environment variables for private keys
+// - Use hardware wallets or secure key management
+// - Never commit private keys to version control
+//
+// These test keys are widely known and funds can be stolen!
+
 /**
  * Hardhat's deterministic accounts for local development
+ * @dev WARNING: Contains hardcoded test keys - DEVELOPMENT ONLY
  */
 const HARDHAT_ACCOUNTS = {
   '0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266': '0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80', // Account 0

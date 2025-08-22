@@ -72,6 +72,12 @@ contract PoolFactory is
     /// @notice Array of all pool addresses for enumeration
     address[] public allPools;
 
+    /// @notice Mapping to track authorized pool creators (whitelist)
+    mapping(address => bool) public authorizedCreators;
+
+    /// @notice Whether pool creation is restricted to whitelist only
+    bool public isWhitelistEnabled;
+
     /// @notice Events
     event PoolCreated(
         uint256 indexed poolId,
@@ -90,8 +96,12 @@ contract PoolFactory is
         address indexed newImplementation
     );
 
+    event CreatorAuthorized(address indexed creator, bool authorized);
+    event WhitelistModeChanged(bool enabled);
+
     /// @notice Custom errors for gas optimization
     error InvalidPoolOwner();
+    error InvalidPoolOwnerAddress();
     error InvalidMaxLoanAmount();
     error InvalidInterestRate();
     error InvalidLoanDuration();
@@ -100,11 +110,32 @@ contract PoolFactory is
     error EmptyName();
     error ImplementationNotSet();
     error PoolCreationFailed();
+    error UnauthorizedCreator();
 
     /// @notice Modifier to check if pool exists
     modifier poolExists(uint256 _poolId) {
         if (_poolId == 0 || _poolId > poolCount) {
             revert PoolNotFound();
+        }
+        _;
+    }
+
+    /// @notice Modifier to check if caller is authorized to create pools
+    modifier onlyAuthorizedCreator() {
+        // Owner is always authorized
+        if (msg.sender == owner()) {
+            _;
+            return;
+        }
+
+        // If whitelist is disabled, only owner can create pools
+        if (!isWhitelistEnabled) {
+            revert UnauthorizedCreator();
+        }
+
+        // If whitelist is enabled, check if caller is authorized
+        if (!authorizedCreators[msg.sender]) {
+            revert UnauthorizedCreator();
         }
         _;
     }
@@ -129,6 +160,9 @@ contract PoolFactory is
 
         lendingPoolImplementation = _implementation;
         poolCount = 0;
+
+        // Initialize with whitelist disabled (owner-only by default)
+        isWhitelistEnabled = false;
     }
 
     /**
@@ -150,13 +184,17 @@ contract PoolFactory is
         PoolParams calldata _params
     )
         external
-        onlyOwner
+        onlyAuthorizedCreator
         whenNotPaused
         nonReentrant
         returns (uint256 poolId, address poolAddress)
     {
         // Validate parameters
         if (_params.poolOwner == address(0)) revert InvalidPoolOwner();
+
+        // Enhanced pool owner validation
+        _validatePoolOwner(_params.poolOwner);
+
         if (_params.maxLoanAmount == 0) revert InvalidMaxLoanAmount();
         if (_params.interestRate > 10000) revert InvalidInterestRate(); // Max 100%
         if (_params.loanDuration == 0) revert InvalidLoanDuration();
@@ -260,11 +298,13 @@ contract PoolFactory is
 
     /**
      * @notice Get all pool addresses
-     * @return Array of all pool addresses
+     * @dev DEPRECATED: This function has been removed to prevent DoS attacks
+     * from unbounded array returns with large numbers of pools.
+     * Use getPoolsRange() instead for safe pagination.
      */
-    function getAllPoolAddresses() external view returns (address[] memory) {
-        return allPools;
-    }
+    // function getAllPoolAddresses() external view returns (address[] memory) {
+    //     return allPools;
+    // }
 
     /**
      * @notice Get pools within a range (for pagination)
@@ -426,6 +466,86 @@ contract PoolFactory is
     function emergencyUnpause() external onlyOwner {
         if (paused()) {
             _unpause();
+        }
+    }
+
+    /**
+     * @notice Authorize or revoke pool creation permission for an address
+     * @param _creator Address to authorize or revoke
+     * @param _authorized Whether to authorize (true) or revoke (false)
+     */
+    function setCreatorAuthorization(
+        address _creator,
+        bool _authorized
+    ) external onlyOwner {
+        if (_creator == address(0)) revert InvalidPoolOwner();
+
+        authorizedCreators[_creator] = _authorized;
+        emit CreatorAuthorized(_creator, _authorized);
+    }
+
+    /**
+     * @notice Enable or disable whitelist mode for pool creation
+     * @param _enabled Whether to enable whitelist mode
+     * @dev When disabled, only owner can create pools (current behavior)
+     * @dev When enabled, authorized creators + owner can create pools
+     */
+    function setWhitelistMode(bool _enabled) external onlyOwner {
+        isWhitelistEnabled = _enabled;
+        emit WhitelistModeChanged(_enabled);
+    }
+
+    /**
+     * @notice Check if an address is authorized to create pools
+     * @param _creator Address to check
+     * @return True if authorized to create pools
+     */
+    function isAuthorizedCreator(
+        address _creator
+    ) external view returns (bool) {
+        // Owner is always authorized
+        if (_creator == owner()) {
+            return true;
+        }
+
+        // If whitelist is disabled, only owner can create
+        if (!isWhitelistEnabled) {
+            return false;
+        }
+
+        // Check whitelist authorization
+        return authorizedCreators[_creator];
+    }
+
+    /**
+     * @notice Internal function to validate pool owner address
+     * @param _poolOwner Address to validate as pool owner
+     * @dev Performs enhanced validation beyond zero address check
+     */
+    function _validatePoolOwner(address _poolOwner) internal view {
+        // Check if address is a contract
+        uint256 codeSize;
+        assembly {
+            codeSize := extcodesize(_poolOwner)
+        }
+
+        // Allow EOA addresses and certain contract addresses
+        // Reject if it's this factory contract (prevent circular ownership)
+        if (_poolOwner == address(this)) {
+            revert InvalidPoolOwnerAddress();
+        }
+
+        // Reject if it's the lending pool implementation
+        if (_poolOwner == lendingPoolImplementation) {
+            revert InvalidPoolOwnerAddress();
+        }
+
+        // Additional validation: warn if owner is a contract without proper interface
+        // This is a soft check - contracts are allowed but flagged for review
+        if (codeSize > 0) {
+            // Allow known contract types (like multi-sig wallets)
+            // For now, we just document this as a consideration
+            // Future versions could implement a whitelist
         }
     }
 }
