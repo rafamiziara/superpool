@@ -77,7 +77,7 @@ class DevEnvironment {
   async startFirebaseEmulators() {
     this.log('Starting Firebase Emulators...');
     
-    const firebaseProc = this.spawnProcess('firebase', ['emulators:start', '--config-dir', './config'], {
+    const firebaseProc = this.spawnProcess('firebase', ['emulators:start', '--config', './config/firebase.json'], {
       cwd: process.cwd()
     });
 
@@ -130,7 +130,9 @@ class DevEnvironment {
   async startNgrok() {
     this.log('Starting Ngrok tunnels...');
     
-    const ngrokProc = this.spawnProcess('ngrok', ['start', '--all', '--config', './config/ngrok.yml'], {
+    const ngrokConfigPath = path.join(process.cwd(), 'config', 'ngrok.yml');
+    this.log(`Using ngrok config: ${ngrokConfigPath}`);
+    const ngrokProc = this.spawnProcess('ngrok', ['start', '--all', '--config', ngrokConfigPath], {
       silent: true
     });
 
@@ -151,8 +153,10 @@ class DevEnvironment {
 
   async fetchNgrokUrls() {
     try {
+      this.log('Fetching ngrok URLs from API...');
       const response = await this.httpGet('http://localhost:4040/api/tunnels');
       const data = JSON.parse(response);
+      this.log(`Found ${data.tunnels?.length || 0} tunnels`);
       
       // Map tunnels by their local port to service names
       const portToService = {
@@ -173,7 +177,8 @@ class DevEnvironment {
       });
 
     } catch (error) {
-      this.log('Failed to fetch ngrok URLs from API, will use placeholder values', 'warning');
+      this.log(`Failed to fetch ngrok URLs from API: ${error.message}`, 'warning');
+      this.log('Will use placeholder values', 'warning');
       // Fallback to placeholder values that user can update manually
       this.ngrokUrls = {
         auth: 'your-auth-tunnel.ngrok-free.app',

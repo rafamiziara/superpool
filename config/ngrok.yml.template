@@ -18,25 +18,22 @@ tunnels:
     addr: 9099
     proto: http
     inspect: false
-    bind_tls: true
 
   # Firebase Functions Emulator (port 5001)  
   functions:
     addr: 5001
     proto: http
     inspect: false
-    bind_tls: true
 
   # Firebase Firestore Emulator (port 8080)
   firestore:
     addr: 8080
     proto: http
     inspect: false
-    bind_tls: true
 
-# Optional: Configure logging
+# Configure logging
 log_level: info
 log_format: term
 
-# Optional: Configure web interface (default port 4040)
+# Configure web interface (default port 4040)
 web_addr: localhost:4040

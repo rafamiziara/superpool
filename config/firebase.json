@@ -7,7 +7,7 @@
   },
   "functions": [
     {
-      "source": "packages/backend",
+      "source": "../packages/backend",
       "codebase": "default",
       "ignore": [
         "node_modules",

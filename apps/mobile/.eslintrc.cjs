@@ -50,5 +50,12 @@ module.exports = {
         '@typescript-eslint/no-unused-vars': 'off',
       },
     },
+    {
+      // Configuration files need CommonJS require() syntax
+      files: ['*.config.cjs', '*.cjs', 'babel.config.cjs', 'metro.config.cjs', 'tailwind.config.cjs', 'jest.config.cjs', 'jest.babel.config.cjs'],
+      rules: {
+        '@typescript-eslint/no-var-requires': 'off',
+      },
+    },
   ],
 };
