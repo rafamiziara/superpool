@@ -50,7 +50,7 @@ To build a functional micro-lending decentralized application on Polygon Amoy wh
   - **Backend (Cloud Functions):** Create an API endpoint for a pool admin to approve requests, triggering the `approveMember` call on-chain (via their respective Safe).
   - **Mobile App:** Develop admin UI to view pending join requests and approve/reject them.
 - **Contribute Liquidity to Pool**
-  - **Smart Contracts (`LendingPool.sol`):** Implement `deposit` function (for MATIC/ERC20 contribution into the pool).
+  - **Smart Contracts (`LendingPool.sol`):** Implement `deposit` function (for POL/ERC20 contribution into the pool).
   - **Backend (Cloud Functions):** Listen for `Deposit` events from the contract and update off-chain lender balances and pool liquidity data in Firestore.
   - **Mobile App:** Develop UI for approved members to contribute funds to the pool.
 

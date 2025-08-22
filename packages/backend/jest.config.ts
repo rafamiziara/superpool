@@ -20,6 +20,10 @@ const config: Config = {
   // Specify where to collect coverage from
   collectCoverageFrom: ['<rootDir>/src/**/*.ts'],
 
+  // Coverage output configuration
+  coverageDirectory: '<rootDir>/../../coverage/backend',
+  coverageReporters: ['lcov', 'text'],
+
   // Add the ts-jest default preset
   ...createDefaultPreset(),
 }

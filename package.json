@@ -6,7 +6,18 @@
   "main": "index.js",
   "scripts": {
     "dev": "node dev-start.js",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "pnpm run test:backend && pnpm run test:contracts && pnpm run test:mobile",
+    "test:backend": "pnpm --filter backend test",
+    "test:contracts": "pnpm --filter contracts test",
+    "test:mobile": "pnpm --filter mobile test",
+    "test:coverage": "pnpm run coverage:clean && pnpm run test:backend:coverage && pnpm run test:contracts:coverage && pnpm run test:mobile:coverage && pnpm run coverage:merge",
+    "test:backend:coverage": "pnpm --filter backend test --coverage",
+    "test:contracts:coverage": "pnpm --filter contracts coverage",
+    "test:mobile:coverage": "pnpm --filter mobile test:coverage",
+    "coverage:merge": "node scripts/merge-coverage.js",
+    "coverage:report": "nyc report --reporter=html --reporter=text-summary",
+    "coverage:open": "start coverage/merged/index.html",
+    "coverage:clean": "rimraf coverage"
   },
   "keywords": [],
   "author": "",
@@ -15,6 +26,8 @@
   "devDependencies": {
     "@typescript-eslint/eslint-plugin": "^5.62.0",
     "@typescript-eslint/parser": "^5.62.0",
-    "eslint": "^8.57.1"
+    "eslint": "^8.57.1",
+    "nyc": "^17.1.0",
+    "rimraf": "^6.0.1"
   }
 }

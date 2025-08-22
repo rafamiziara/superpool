@@ -35,8 +35,8 @@ module.exports = {
     '!src/firebase.config.ts', // Exclude Firebase config that imports Expo modules
     '!src/utils/appCheckProvider.ts', // Exclude App Check provider that imports Expo modules
   ],
-  coverageDirectory: 'coverage',
-  coverageReporters: ['text', 'lcov', 'html'],
+  coverageDirectory: '<rootDir>/../../coverage/mobile',
+  coverageReporters: ['lcov', 'text'],
   
   // Module mapping for mocks
   moduleNameMapper: {
