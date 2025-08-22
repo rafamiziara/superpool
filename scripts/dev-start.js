@@ -77,7 +77,7 @@ class DevEnvironment {
   async startFirebaseEmulators() {
     this.log('Starting Firebase Emulators...');
     
-    const firebaseProc = this.spawnProcess('firebase', ['emulators:start'], {
+    const firebaseProc = this.spawnProcess('firebase', ['emulators:start', '--config-dir', './config'], {
       cwd: process.cwd()
     });
 
@@ -130,7 +130,7 @@ class DevEnvironment {
   async startNgrok() {
     this.log('Starting Ngrok tunnels...');
     
-    const ngrokProc = this.spawnProcess('ngrok', ['start', '--all'], {
+    const ngrokProc = this.spawnProcess('ngrok', ['start', '--all', '--config', './config/ngrok.yml'], {
       silent: true
     });
 
