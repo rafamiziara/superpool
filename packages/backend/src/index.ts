@@ -23,5 +23,9 @@ export {
   executeTransaction,
   getTransactionStatus,
   listTransactions,
-  emergencyPause
+  emergencyPause,
+  syncPoolEvents,
+  processPoolEvents,
+  syncHistoricalEvents,
+  estimateSyncProgress
 } from './functions'
