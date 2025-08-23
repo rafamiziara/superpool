@@ -4,6 +4,7 @@ import { httpsCallable } from 'firebase/functions'
 import type { Connector } from 'wagmi'
 import { FIREBASE_AUTH, FIREBASE_FUNCTIONS } from '../firebase.config'
 import { getGlobalLogoutState } from '../hooks/useLogoutState'
+import { AuthStep } from '../hooks/useAuthProgress'
 import { AtomicConnectionState, ConnectionStateManager } from '../utils/connectionStateManager'
 import { SessionManager } from '../utils/sessionManager'
 import { authToasts } from '../utils/toast'
@@ -13,12 +14,19 @@ import { SignatureFunctions, SignatureService } from './signatureService'
 const verifySignatureAndLogin = httpsCallable(FIREBASE_FUNCTIONS, 'verifySignatureAndLogin')
 const generateAuthMessage = httpsCallable(FIREBASE_FUNCTIONS, 'generateAuthMessage')
 
+export interface AuthProgressCallbacks {
+  onStepStart?: (step: AuthStep) => void
+  onStepComplete?: (step: AuthStep) => void
+  onStepFail?: (step: AuthStep, error: string) => void
+}
+
 export interface AuthenticationContext {
   walletAddress: string
   connector?: Connector
   chainId?: number
   signatureFunctions: SignatureFunctions
   disconnect: () => void
+  progressCallbacks?: AuthProgressCallbacks
 }
 
 export interface AuthenticationLock {
@@ -37,10 +45,28 @@ export class AuthenticationOrchestrator {
    * Acquires authentication lock to prevent concurrent attempts
    */
   private acquireAuthLock(walletAddress: string): boolean {
-    if (this.authLock.current.isLocked) {
-      const timeSinceLock = Date.now() - this.authLock.current.startTime
-      console.log(`⚠️ Authentication already in progress for ${this.authLock.current.walletAddress} (${timeSinceLock}ms ago)`)
-      return false
+    const current = this.authLock.current
+    
+    if (current.isLocked) {
+      const timeSinceLock = Date.now() - current.startTime
+      
+      // If authentication has been running for more than 2 minutes, force release
+      if (timeSinceLock > 120000) {
+        console.warn(`🕐 Authentication lock expired (${timeSinceLock}ms), force releasing...`)
+        this.releaseAuthLock()
+      } else {
+        console.log(`⚠️ Authentication already in progress for ${current.walletAddress} (${timeSinceLock}ms ago)`)
+        
+        // If it's the same wallet address, this is likely a duplicate request
+        if (current.walletAddress === walletAddress) {
+          console.log('🚫 Duplicate authentication attempt for same wallet, ignoring')
+          return false
+        }
+        
+        // Different wallet - abort current and proceed with new one
+        console.log('🔄 Different wallet detected, aborting current authentication')
+        this.releaseAuthLock()
+      }
     }
 
     this.authLock.current = {
@@ -106,7 +132,6 @@ export class AuthenticationOrchestrator {
     nonce: string
     timestamp: number
   }> {
-    console.log('📝 Step 1: Generating authentication message...')
     const messageResponse = await generateAuthMessage({ walletAddress })
     const {
       message,
@@ -134,8 +159,7 @@ export class AuthenticationOrchestrator {
    * Requests signature from wallet
    */
   private async requestWalletSignature(context: AuthenticationContext, message: string, nonce: string, timestamp: number) {
-    console.log('✍️ Step 2: Requesting wallet signature...')
-    authToasts.signingMessage()
+    console.log('✍️ Step 4: Requesting wallet signature...')
 
     const signatureRequest = {
       message,
@@ -152,8 +176,7 @@ export class AuthenticationOrchestrator {
    * Verifies signature with backend and gets Firebase token
    */
   private async verifySignatureAndGetToken(context: AuthenticationContext, signature: string, signatureType: string): Promise<string> {
-    authToasts.verifying()
-    console.log('🔍 Step 3: Verifying signature...')
+    console.log('🔍 Step 5: Verifying signature...')
 
     // For Safe wallets, we need to provide device info for proper App Check validation
     const deviceInfo =
@@ -189,7 +212,7 @@ export class AuthenticationOrchestrator {
    * Signs in with Firebase using custom token
    */
   private async signInWithFirebase(firebaseToken: string, signatureType: string): Promise<void> {
-    console.log('🔑 Step 4: Signing in with Firebase...')
+    console.log('🔑 Step 6: Signing in with Firebase...')
 
     // Add a small delay for Safe wallets to allow connection to stabilize
     const isSafeWallet = signatureType === 'safe-wallet'
@@ -286,6 +309,32 @@ export class AuthenticationOrchestrator {
   }
 
   /**
+   * Determines which authentication step failed based on error context
+   */
+  private getCurrentStepFromError(error: unknown): AuthStep | null {
+    const errorMessage = error instanceof Error ? error.message : String(error)
+    
+    if (errorMessage.includes('signature') && errorMessage.includes('request')) {
+      return 'request-signature'
+    }
+    if (errorMessage.includes('signature') || errorMessage.includes('verify')) {
+      return 'verify-signature'
+    }
+    if (errorMessage.includes('firebase') || errorMessage.includes('token')) {
+      return 'firebase-auth'
+    }
+    if (errorMessage.includes('message') || errorMessage.includes('auth')) {
+      return 'generate-message'
+    }
+    if (errorMessage.includes('lock') || errorMessage.includes('state')) {
+      return 'acquire-lock'
+    }
+    
+    // Default to the step that was likely in progress
+    return 'request-signature'
+  }
+
+  /**
    * Shows session debug information for troubleshooting
    */
   private async logSessionDebugInfo(): Promise<void> {
@@ -331,62 +380,45 @@ export class AuthenticationOrchestrator {
       // Log session debug information
       await this.logSessionDebugInfo()
 
-      // Validate pre-conditions
+      // Step 2: Validate pre-conditions  
+      console.log('🔍 Step 2: Acquiring lock & validating state...')
+      context.progressCallbacks?.onStepStart?.('acquire-lock')
       await this.validatePreConditions(context, lockedConnectionState)
+      context.progressCallbacks?.onStepComplete?.('acquire-lock')
 
-      // Show connecting toast and wallet app guidance
-      console.log('📢 Showing connection toast...')
-      authToasts.connecting()
-
-      setTimeout(() => {
-        console.log('📱 Showing wallet app guidance...')
-        authToasts.walletAppGuidance()
-      }, 3000)
-
-      // Step 1: Generate authentication message
+      // Step 3: Generate authentication message
+      console.log('📝 Step 3: Generating authentication message...')
+      context.progressCallbacks?.onStepStart?.('generate-message')
       const { message, nonce, timestamp } = await this.generateAuthenticationMessage(context.walletAddress)
+      context.progressCallbacks?.onStepComplete?.('generate-message')
 
-      // Small delay for session stabilization
-      console.log('⏳ Waiting 1 second for session stabilization...')
-      await new Promise((resolve) => setTimeout(resolve, 1000))
-
-      // Validate state after message generation
-      if (!this.validateStateConsistency(lockedConnectionState, 'after message generation delay')) {
-        return
-      }
-
-      // Check if authentication was aborted
+      // Check if authentication was aborted before continuing
       if (this.checkAuthenticationAborted()) {
         return
       }
 
-      // Step 2: Request wallet signature
+      // Step 4: Request wallet signature
+      context.progressCallbacks?.onStepStart?.('request-signature')
       const signatureResult = await this.requestWalletSignature(context, message, nonce, timestamp)
-
-      // Validate state after signature
-      if (!this.validateStateConsistency(lockedConnectionState, 'after signature completion')) {
-        return
-      }
+      context.progressCallbacks?.onStepComplete?.('request-signature')
 
       // Check if authentication was aborted
       if (this.checkAuthenticationAborted()) {
         return
       }
 
-      // Step 3: Verify signature and get Firebase token
+      // Step 5: Verify signature and get Firebase token
+      context.progressCallbacks?.onStepStart?.('verify-signature')
       const firebaseToken = await this.verifySignatureAndGetToken(context, signatureResult.signature, signatureResult.signatureType)
-
-      // Validate state before Firebase auth
-      if (!this.validateStateConsistency(lockedConnectionState, 'before Firebase authentication')) {
-        return
-      }
+      context.progressCallbacks?.onStepComplete?.('verify-signature')
 
       // Check if authentication was aborted
       if (this.checkAuthenticationAborted()) {
         return
       }
 
-      // Step 4: Sign in with Firebase
+      // Step 6: Sign in with Firebase
+      context.progressCallbacks?.onStepStart?.('firebase-auth')
       await this.signInWithFirebase(firebaseToken, signatureResult.signatureType)
 
       // Final validation before declaring success
@@ -404,9 +436,17 @@ export class AuthenticationOrchestrator {
 
       // Success!
       console.log('User successfully signed in with Firebase!')
+      context.progressCallbacks?.onStepComplete?.('firebase-auth')
       authToasts.success()
       router.replace('/dashboard')
     } catch (error) {
+      // Determine which step failed and notify progress callbacks
+      const currentStep = this.getCurrentStepFromError(error)
+      if (currentStep) {
+        const errorMessage = error instanceof Error ? error.message : String(error)
+        context.progressCallbacks?.onStepFail?.(currentStep, errorMessage)
+      }
+
       // Handle all authentication errors through the recovery service
       const { appError, recoveryResult } = await AuthErrorRecoveryService.handleAuthenticationError(
         error,

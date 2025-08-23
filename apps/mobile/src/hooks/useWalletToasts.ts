@@ -1,29 +1,36 @@
 import { useEffect, useRef } from 'react'
-import { usePathname } from 'expo-router'
 import { useAccount } from 'wagmi'
 import { appToasts } from '../utils/toast'
 
-export const useWalletToasts = () => {
+interface WalletToastOptions {
+  showConnectionToasts?: boolean
+  showDisconnectionToasts?: boolean
+}
+
+export const useWalletToasts = (options: WalletToastOptions = {}) => {
+  const { 
+    showConnectionToasts = false,  // Changed: default to false - only show when explicitly needed
+    showDisconnectionToasts = true  // Keep disconnection toasts as they're always relevant
+  } = options
+  
   const { isConnected, connector } = useAccount()
   const previouslyConnected = useRef(false)
-  const pathname = usePathname()
 
   // Handle wallet connection/disconnection toast notifications
   useEffect(() => {
-    // Don't show toasts on connecting page since we show status directly
-    if (pathname === '/connecting') {
-      return
-    }
-
     if (isConnected && !previouslyConnected.current) {
-      // Wallet just connected
-      const walletName = connector?.name
-      appToasts.walletConnected(walletName)
+      // Wallet just connected - only show if explicitly enabled
+      if (showConnectionToasts) {
+        const walletName = connector?.name
+        appToasts.walletConnected(walletName)
+      }
       previouslyConnected.current = true
     } else if (!isConnected && previouslyConnected.current) {
-      // Wallet just disconnected
-      appToasts.walletDisconnected()
+      // Wallet disconnected - show if enabled (default: true)
+      if (showDisconnectionToasts) {
+        appToasts.walletDisconnected()
+      }
       previouslyConnected.current = false
     }
-  }, [isConnected, connector?.name, pathname])
+  }, [isConnected, connector?.name, showConnectionToasts, showDisconnectionToasts])
 }

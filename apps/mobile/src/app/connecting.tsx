@@ -1,22 +1,26 @@
 import { router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect } from 'react';
 import { Text, View } from 'react-native';
 import { useAccount } from 'wagmi';
 import { LoadingSpinner } from '../components/LoadingSpinner';
-import { useAuthentication } from '../hooks/useAuthentication';
-
-const progressSteps = [
-  'Connecting to wallet...',
-  'Verifying signature...',
-  'Authenticating with Firebase...',
-  'Setting up your account...',
-];
+import { useAuthenticationWithProgress } from '../hooks/useAuthenticationWithProgress';
 
 export default function ConnectingScreen() {
   const { isConnected } = useAccount();
-  const { authError, isAuthenticating, authWalletAddress } = useAuthentication();
-  const [currentStep, setCurrentStep] = useState(0);
+  const {
+    authError,
+    isAuthenticating,
+    authWalletAddress,
+    currentStep,
+    completedSteps,
+    failedStep,
+    isComplete,
+    error,
+    getStepStatus,
+    getStepInfo,
+    getAllSteps,
+  } = useAuthenticationWithProgress();
 
   // Redirect based on connection state
   useEffect(() => {
@@ -34,22 +38,18 @@ export default function ConnectingScreen() {
     }
   }, [isConnected, authWalletAddress, authError, isAuthenticating]);
 
-  // Simulate progress steps
-  useEffect(() => {
-    if (isAuthenticating) {
-      const interval = setInterval(() => {
-        setCurrentStep((prev) => {
-          if (prev < progressSteps.length - 1) {
-            return prev + 1;
-          }
-          clearInterval(interval);
-          return prev;
-        });
-      }, 1500);
-
-      return () => clearInterval(interval);
+  const renderStepIcon = (stepStatus: 'pending' | 'current' | 'completed' | 'failed') => {
+    switch (stepStatus) {
+      case 'completed':
+        return <Text className="text-green-600 text-lg">✓</Text>
+      case 'failed': 
+        return <Text className="text-destructive text-lg">✗</Text>
+      case 'current':
+        return <LoadingSpinner size="small" />
+      default:
+        return <View className="w-4 h-4 rounded-full bg-muted-foreground/30" />
     }
-  }, [isAuthenticating]);
+  }
 
   return (
     <View className="flex-1 bg-white">
@@ -60,47 +60,68 @@ export default function ConnectingScreen() {
 
       {/* Content Area */}
       <View className="flex-1 items-center justify-center px-8">
-        {/* Show loading spinner only when not in error state */}
-        {!authError && <LoadingSpinner size="large" className="mb-8" />}
+        {/* Show main status icon */}
+        <View className="mb-8 items-center">
+          {authError ? (
+            <>
+              <View className="w-16 h-16 bg-destructive/10 rounded-full items-center justify-center mb-2">
+                <Text className="text-2xl">⚠️</Text>
+              </View>
+              <Text className="text-destructive font-medium text-lg">Authentication Failed</Text>
+            </>
+          ) : isComplete ? (
+            <>
+              <View className="w-16 h-16 bg-green-100 rounded-full items-center justify-center mb-2">
+                <Text className="text-2xl">✅</Text>
+              </View>
+              <Text className="text-green-600 font-medium text-lg">Authentication Complete</Text>
+            </>
+          ) : (
+            <>
+              <LoadingSpinner size="large" className="mb-4" />
+              <Text className="text-foreground font-medium text-lg">Authenticating...</Text>
+            </>
+          )}
+        </View>
         
-        {/* Show error icon when there's an error */}
-        {authError && (
-          <View className="mb-8 items-center">
-            <View className="w-16 h-16 bg-destructive/10 rounded-full items-center justify-center mb-2">
-              <Text className="text-2xl">⚠️</Text>
-            </View>
-            <Text className="text-destructive font-medium text-lg">Connection Failed</Text>
-          </View>
-        )}
-        
-        {/* Progress Steps - Left Aligned */}
-        <View className="w-full">
-          {progressSteps.map((step, index) => (
-            <View key={index} className="flex-row items-center mb-3">
-              <View 
-                className={`w-2 h-2 rounded-full mr-3 ${
-                  authError && index === currentStep 
-                    ? 'bg-destructive' // Red dot for failed step
-                    : index <= currentStep 
-                      ? 'bg-primary' 
-                      : 'bg-muted-foreground/30'
-                }`} 
-              />
-              <Text 
-                className={`text-base ${
-                  authError && index === currentStep
-                    ? 'text-destructive font-medium' // Red text for failed step
-                    : index === currentStep 
-                      ? 'text-primary font-medium' 
-                      : index < currentStep 
-                        ? 'text-muted-foreground' 
-                        : 'text-muted-foreground/50'
-                }`}
-              >
-                {step}
-              </Text>
-            </View>
-          ))}
+        {/* 6-Step Progress */}
+        <View className="w-full max-w-sm">
+          {getAllSteps().map((stepInfo) => {
+            const status = getStepStatus(stepInfo.step)
+            return (
+              <View key={stepInfo.step} className="flex-row items-center mb-4">
+                <View className="w-8 items-center mr-3">
+                  {renderStepIcon(status)}
+                </View>
+                <View className="flex-1">
+                  <Text 
+                    className={`text-sm font-medium ${
+                      status === 'failed'
+                        ? 'text-destructive'
+                        : status === 'current' 
+                          ? 'text-primary' 
+                          : status === 'completed'
+                            ? 'text-muted-foreground'
+                            : 'text-muted-foreground/50'
+                    }`}
+                  >
+                    {stepInfo.title}
+                  </Text>
+                  <Text 
+                    className={`text-xs ${
+                      status === 'failed'
+                        ? 'text-destructive/70'
+                        : status === 'current'
+                          ? 'text-primary/70'
+                          : 'text-muted-foreground/70'
+                    }`}
+                  >
+                    {stepInfo.description}
+                  </Text>
+                </View>
+              </View>
+            )
+          })}
         </View>
       </View>
 
@@ -109,11 +130,15 @@ export default function ConnectingScreen() {
         <View className="bg-muted/10 p-4 rounded-xl border border-muted/20">
           {authError ? (
             <Text className="text-destructive text-center text-sm font-medium">
-              Authentication failed: {authError.userFriendlyMessage}
+              {error || authError.userFriendlyMessage}
+            </Text>
+          ) : currentStep === 'request-signature' ? (
+            <Text className="text-muted-foreground text-center text-sm">
+              Please check your wallet app and sign the authentication message.
             </Text>
           ) : (
             <Text className="text-muted-foreground text-center text-sm">
-              Please check your wallet app for signature requests.
+              Authenticating your wallet connection...
             </Text>
           )}
         </View>

@@ -137,7 +137,7 @@ export class RegularWalletSigner {
         const timeoutPromise = new Promise<never>((_, reject) => {
           timeoutId = setTimeout(() => {
             reject(new Error(`EIP-712 signature request timed out after ${timeoutMs / 1000} seconds`))
-          }, timeoutMs)
+          }, timeoutMs) as any
         })
 
         const signature = await Promise.race([signaturePromise, timeoutPromise])
@@ -164,7 +164,7 @@ export class RegularWalletSigner {
         const timeoutPromise = new Promise<never>((_, reject) => {
           timeoutId = setTimeout(() => {
             reject(new Error(`Personal sign request timed out after ${timeoutMs / 1000} seconds`))
-          }, timeoutMs)
+          }, timeoutMs) as any
         })
 
         const signature = await Promise.race([signaturePromise, timeoutPromise])
@@ -206,7 +206,44 @@ export class RegularWalletSigner {
 }
 
 export class SignatureService {
+  /**
+   * Validates signature request parameters before processing
+   */
+  private static validateSignatureRequest(request: SignatureRequest): void {
+    if (!request.message || request.message.trim() === '') {
+      throw new Error('Signature request missing message data')
+    }
+    
+    if (!request.nonce || request.nonce.trim() === '') {
+      throw new Error('Signature request missing nonce')
+    }
+    
+    if (!request.walletAddress || request.walletAddress.trim() === '') {
+      throw new Error('Signature request missing wallet address')
+    }
+    
+    if (!request.timestamp || request.timestamp <= 0) {
+      throw new Error('Signature request missing valid timestamp')
+    }
+    
+    // Validate wallet address format
+    if (!/^0x[a-fA-F0-9]{40}$/.test(request.walletAddress)) {
+      throw new Error(`Invalid wallet address format: ${request.walletAddress}`)
+    }
+    
+    console.log('✅ Signature request validation passed:', {
+      messageLength: request.message.length,
+      nonce: request.nonce,
+      walletAddress: request.walletAddress.substring(0, 6) + '...' + request.walletAddress.slice(-4),
+      timestamp: request.timestamp,
+      chainId: request.chainId,
+    })
+  }
+
   static async requestSignature(request: SignatureRequest, functions: SignatureFunctions, connector?: Connector): Promise<SignatureResult> {
+    // Validate request parameters first
+    this.validateSignatureRequest(request)
+    
     const isSafeWallet = WalletTypeDetector.detectSafeWallet(connector)
 
     console.log('🔍 Wallet type detection:', {
@@ -227,6 +264,12 @@ export class SignatureService {
     if (!RegularWalletSigner.validateSignatureFormat(result.signature)) {
       throw new Error(`Invalid signature received: ${JSON.stringify(result.signature)}`)
     }
+
+    console.log('✅ Signature request completed:', {
+      signatureType: result.signatureType,
+      signatureLength: result.signature.length,
+      signaturePreview: result.signature.substring(0, 20) + '...',
+    })
 
     return result
   }
