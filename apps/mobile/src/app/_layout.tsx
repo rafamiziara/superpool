@@ -55,7 +55,7 @@ createAppKit({
 });
 
 function AppContent() {
-  useWalletToasts() // Global wallet toast notifications
+  useWalletToasts({ showConnectionToasts: false, showDisconnectionToasts: true }) // Global wallet toast notifications
   useGlobalLogoutState() // Global logout state management
   
   // Debug session state on app start (no aggressive cleanup)
