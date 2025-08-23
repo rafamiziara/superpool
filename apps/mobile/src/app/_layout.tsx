@@ -80,6 +80,8 @@ function AppContent() {
     <>
       <Stack screenOptions={{ headerShown: false }}>
         <Stack.Screen name="index" />
+        <Stack.Screen name="onboarding" />
+        <Stack.Screen name="connecting" />
         <Stack.Screen name="dashboard" />
       </Stack>
       <AppKit />
