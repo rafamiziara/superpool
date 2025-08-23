@@ -1,10 +1,29 @@
 import { expect } from '@jest/globals'
+import { jest } from '@jest/globals'
 import { 
   validatePoolCreationParams, 
   sanitizePoolParams,
   ValidationResult 
 } from './validation'
 import { CreatePoolRequest } from '../functions/pools/createPool'
+
+// Mock ethers module
+jest.mock('ethers', () => ({
+  ethers: {
+    isAddress: jest.fn((address: string) => {
+      // Mock valid Ethereum address pattern
+      if (typeof address !== 'string') return false
+      if (address === 'invalid-address') return false
+      return /^0x[a-fA-F0-9]{40}$/.test(address)
+    }),
+    parseEther: jest.fn((value: string) => {
+      const numValue = parseFloat(value)
+      if (isNaN(numValue)) throw new Error('Invalid number')
+      // Allow negative parsing, validation logic will handle the check
+      return BigInt(Math.floor(numValue * 1e18))
+    })
+  }
+}))
 
 describe('validation utilities', () => {
   describe('validatePoolCreationParams', () => {
@@ -225,12 +244,12 @@ describe('validation utilities', () => {
       })
 
       it('should accept valid names and descriptions', () => {
-        const validParams = {
+        const validTestParams = {
           ...validParams,
           name: 'Valid Pool Name',
           description: 'This is a valid pool description that provides useful information about the lending pool.'
         }
-        const result = validatePoolCreationParams(validParams)
+        const result = validatePoolCreationParams(validTestParams)
         
         expect(result.isValid).toBe(true)
       })

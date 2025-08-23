@@ -15,5 +15,13 @@ export {
   createPoolSafe,
   signSafeTransaction,
   executeSafeTransaction,
-  listSafeTransactions
+  listSafeTransactions,
+  proposeTransaction,
+  proposeContractCall,
+  proposeBatch,
+  addSignature,
+  executeTransaction,
+  getTransactionStatus,
+  listTransactions,
+  emergencyPause
 } from './functions'
