@@ -40,6 +40,8 @@ export function validatePoolCreationParams(params: CreatePoolRequest): Validatio
   // Validate interest rate (basis points)
   if (params.interestRate === undefined || params.interestRate === null) {
     errors.push('Interest rate is required')
+  } else if (typeof params.interestRate !== 'number' || isNaN(params.interestRate)) {
+    errors.push('Interest rate is required')
   } else if (params.interestRate < 0) {
     errors.push('Interest rate cannot be negative')
   } else if (params.interestRate > 10000) {
@@ -48,6 +50,8 @@ export function validatePoolCreationParams(params: CreatePoolRequest): Validatio
 
   // Validate loan duration (seconds)
   if (!params.loanDuration) {
+    errors.push('Loan duration is required')
+  } else if (typeof params.loanDuration !== 'number' || isNaN(params.loanDuration)) {
     errors.push('Loan duration is required')
   } else if (params.loanDuration < 3600) {
     errors.push('Loan duration must be at least 1 hour (3600 seconds)')
