@@ -11,6 +11,37 @@ export interface FirebaseAuthState {
 type Listener = (state: FirebaseAuthState) => void
 
 /**
+ * Validates that a string is a valid Ethereum wallet address
+ */
+function isValidWalletAddress(address: string): boolean {
+  // Must start with 0x and be exactly 42 characters (20 bytes in hex)
+  if (!address.startsWith('0x') || address.length !== 42) {
+    return false
+  }
+  
+  // Must contain only valid hex characters
+  const hexRegex = /^0x[a-fA-F0-9]{40}$/
+  return hexRegex.test(address)
+}
+
+/**
+ * Safely extracts wallet address from Firebase user UID with validation
+ */
+function extractWalletAddress(user: User | null): string | null {
+  if (!user?.uid) {
+    return null
+  }
+  
+  // Validate that the UID is actually a valid wallet address
+  if (!isValidWalletAddress(user.uid)) {
+    console.warn('🚨 Security: Firebase UID does not match valid wallet address format')
+    return null
+  }
+  
+  return user.uid
+}
+
+/**
  * Singleton Firebase authentication manager
  * Ensures only one Firebase auth listener exists globally
  */
@@ -45,7 +76,7 @@ class FirebaseAuthManager {
         user,
         isLoading: false,
         isAuthenticated: !!user,
-        walletAddress: user?.uid.startsWith('0x') ? user.uid : null,
+        walletAddress: extractWalletAddress(user),
       }
 
       // Notify all listeners

@@ -14,7 +14,51 @@ interface SessionDebugInfo {
 }
 
 export class SessionManager {
+  private static isCleanupInProgress = false
+  private static cleanupQueue: Array<() => void> = []
+
+  /**
+   * Ensures only one cleanup operation runs at a time
+   */
+  private static async withCleanupLock<T>(operation: () => Promise<T>): Promise<T> {
+    if (this.isCleanupInProgress) {
+      console.log('🔒 Session cleanup already in progress, queuing operation...')
+      return new Promise((resolve, reject) => {
+        this.cleanupQueue.push(async () => {
+          try {
+            const result = await operation()
+            resolve(result)
+          } catch (error) {
+            reject(error)
+          }
+        })
+      })
+    }
+
+    this.isCleanupInProgress = true
+    try {
+      const result = await operation()
+      
+      // Process queued operations
+      while (this.cleanupQueue.length > 0) {
+        const queuedOperation = this.cleanupQueue.shift()
+        if (queuedOperation) {
+          try {
+            await queuedOperation()
+          } catch (error) {
+            console.warn('⚠️ Queued session cleanup operation failed:', error)
+          }
+        }
+      }
+      
+      return result
+    } finally {
+      this.isCleanupInProgress = false
+    }
+  }
+
   static async clearAllWalletConnectSessions(): Promise<void> {
+    return this.withCleanupLock(async () => {
     try {
       console.log('🧹 Starting comprehensive WalletConnect session cleanup...')
 
@@ -106,6 +150,7 @@ export class SessionManager {
       console.error('❌ Failed to clear WalletConnect sessions:', error)
       throw error
     }
+    })
   }
 
   static async getSessionDebugInfo(): Promise<SessionDebugInfo> {
@@ -152,20 +197,22 @@ export class SessionManager {
   }
 
   static async clearSpecificSession(sessionId: string): Promise<void> {
-    try {
-      console.log(`Clearing specific session: ${sessionId}`)
+    return this.withCleanupLock(async () => {
+      try {
+        console.log(`Clearing specific session: ${sessionId}`)
 
-      const allKeys = await AsyncStorage.getAllKeys()
-      const sessionKeys = allKeys.filter((key) => key.includes(sessionId))
+        const allKeys = await AsyncStorage.getAllKeys()
+        const sessionKeys = allKeys.filter((key) => key.includes(sessionId))
 
-      if (sessionKeys.length > 0) {
-        await AsyncStorage.multiRemove(sessionKeys)
-        console.log(`Cleared ${sessionKeys.length} keys for session ${sessionId}`)
+        if (sessionKeys.length > 0) {
+          await AsyncStorage.multiRemove(sessionKeys)
+          console.log(`Cleared ${sessionKeys.length} keys for session ${sessionId}`)
+        }
+      } catch (error) {
+        console.error(`Failed to clear session ${sessionId}:`, error)
+        throw error
       }
-    } catch (error) {
-      console.error(`Failed to clear session ${sessionId}:`, error)
-      throw error
-    }
+    })
   }
 
   static async hasValidSession(): Promise<boolean> {
@@ -222,28 +269,31 @@ export class SessionManager {
   }
 
   static async clearSessionByErrorId(sessionId: string): Promise<void> {
-    try {
-      console.log(`🎯 Clearing sessions containing ID: ${sessionId}`)
+    return this.withCleanupLock(async () => {
+      try {
+        console.log(`🎯 Clearing sessions containing ID: ${sessionId}`)
 
-      const allKeys = await AsyncStorage.getAllKeys()
-      const sessionKeys = allKeys.filter((key) => key.includes(sessionId))
+        const allKeys = await AsyncStorage.getAllKeys()
+        const sessionKeys = allKeys.filter((key) => key.includes(sessionId))
 
-      if (sessionKeys.length > 0) {
-        console.log(`Found ${sessionKeys.length} keys with session ID:`, sessionKeys)
-        await AsyncStorage.multiRemove(sessionKeys)
-        console.log(`✅ Cleared ${sessionKeys.length} keys for session ${sessionId}`)
-      } else {
-        console.log('No keys found with that session ID')
+        if (sessionKeys.length > 0) {
+          console.log(`Found ${sessionKeys.length} keys with session ID:`, sessionKeys)
+          await AsyncStorage.multiRemove(sessionKeys)
+          console.log(`✅ Cleared ${sessionKeys.length} keys for session ${sessionId}`)
+        } else {
+          console.log('No keys found with that session ID')
+        }
+      } catch (error) {
+        console.error(`Failed to clear session ${sessionId}:`, error)
+        throw error
       }
-    } catch (error) {
-      console.error(`Failed to clear session ${sessionId}:`, error)
-      throw error
-    }
+    })
   }
 
   static async preventiveSessionCleanup(): Promise<void> {
-    try {
-      console.log('🛡️ Running preventive session cleanup before connection...')
+    return this.withCleanupLock(async () => {
+      try {
+        console.log('🛡️ Running preventive session cleanup before connection...')
 
       // More conservative cleanup - only target problematic keys, not all connections
       const allKeys = await AsyncStorage.getAllKeys()
@@ -280,6 +330,7 @@ export class SessionManager {
       console.error('❌ Preventive session cleanup failed:', error)
       throw error
     }
+    })
   }
 
   static async handleSessionCorruption(sessionError: string): Promise<void> {
