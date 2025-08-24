@@ -13,13 +13,13 @@ export const useWalletConnectionTrigger = ({ onNewConnection, onDisconnection }:
     address: undefined,
     chainId: undefined,
   })
-  
+
   // Track pending timeouts for cleanup
-  const pendingTimeoutRef = useRef<NodeJS.Timeout | null>(null)
-  
+  const pendingTimeoutRef = useRef<number | null>(null)
+
   // Stable callback refs to avoid effect re-runs
-  const stableOnNewConnection = useCallback(onNewConnection, [])
-  const stableOnDisconnection = useCallback(onDisconnection, [])
+  const stableOnNewConnection = useCallback(onNewConnection, [onNewConnection])
+  const stableOnDisconnection = useCallback(onDisconnection, [onDisconnection])
 
   // Reset previous connection state on mount to ensure clean detection
   useEffect(() => {
@@ -69,7 +69,7 @@ export const useWalletConnectionTrigger = ({ onNewConnection, onDisconnection }:
         console.log('🚀 Triggering authentication for new connection')
         stableOnNewConnection(address, chain?.id)
         pendingTimeoutRef.current = null
-      }, 500) as any // Increased delay for better stability
+      }, 500) // Increased delay for better stability
     }
     // Handle network changes for already connected wallets (don't re-authenticate)
     else if (prev.isConnected && isConnected && address && prev.chainId !== chain?.id) {
@@ -78,7 +78,8 @@ export const useWalletConnectionTrigger = ({ onNewConnection, onDisconnection }:
         to: chain?.id,
         address,
       })
-      // Just update the state without triggering authentication
+      // Just update the state without triggering authentication - this is crucial!
+      // Network changes should NOT trigger new authentication flows
     }
 
     // Detect disconnection (was connected before, now isn't)

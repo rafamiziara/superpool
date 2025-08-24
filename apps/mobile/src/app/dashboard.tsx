@@ -3,44 +3,36 @@ import { router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { signOut } from 'firebase/auth';
 import { useEffect } from 'react';
-import { Alert, Text, TouchableOpacity, View } from 'react-native';
-import { useAccount, useDisconnect } from 'wagmi';
+import { Text, View } from 'react-native';
+import { useAccount } from 'wagmi';
 import { FIREBASE_AUTH } from '../firebase.config';
 import { getGlobalLogoutState } from '../hooks/useLogoutState';
 
 export default function DashboardScreen() {
   const { address, chain, isConnected } = useAccount();
-  const { disconnect } = useDisconnect();
 
   useEffect(() => {
     if (!isConnected) {
-      signOut(FIREBASE_AUTH).catch(console.error);
-      router.replace('/');
+      // Use proper logout state management for automatic signout
+      const { startLogout, finishLogout } = getGlobalLogoutState()
+      
+      const handleAutoLogout = async () => {
+        try {
+          console.log('🔌 Wallet disconnected, automatically signing out from Firebase...')
+          startLogout()
+          await signOut(FIREBASE_AUTH)
+          router.replace('/')
+        } catch (error) {
+          console.error('Auto logout error:', error)
+        } finally {
+          finishLogout()
+        }
+      }
+      
+      handleAutoLogout()
     }
   }, [isConnected]);
 
-  const handleLogout = async () => {
-    const { startLogout, finishLogout } = getGlobalLogoutState()
-    
-    try {
-      // Set logout state to prevent authentication hook from processing
-      startLogout()
-      
-      // Disconnect wallet first
-      disconnect();
-      
-      // Then sign out of Firebase
-      await signOut(FIREBASE_AUTH);
-      
-      router.replace('/');
-    } catch (error) {
-      console.error('Logout error:', error);
-      Alert.alert('Error', 'Failed to logout. Please try again.');
-    } finally {
-      // Always clear logout state
-      finishLogout()
-    }
-  };
 
   if (!isConnected) {
     return null;
@@ -65,10 +57,6 @@ export default function DashboardScreen() {
 
       <View className="items-center gap-4 mb-8 w-full">
         <AppKitButton balance='show' />
-        
-        <TouchableOpacity className="bg-destructive px-6 py-3 rounded-lg self-stretch items-center" onPress={handleLogout}>
-          <Text className="text-destructive-foreground text-base font-semibold">Logout</Text>
-        </TouchableOpacity>
       </View>
 
       <View className="bg-yellow-50 p-4 rounded-lg border border-yellow-200">

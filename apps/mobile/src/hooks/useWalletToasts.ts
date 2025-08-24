@@ -8,11 +8,11 @@ interface WalletToastOptions {
 }
 
 export const useWalletToasts = (options: WalletToastOptions = {}) => {
-  const { 
-    showConnectionToasts = false,  // Changed: default to false - only show when explicitly needed
-    showDisconnectionToasts = true  // Keep disconnection toasts as they're always relevant
+  const {
+    showConnectionToasts = false, // Changed: default to false - only show when explicitly needed
+    showDisconnectionToasts = true, // Keep disconnection toasts as they're always relevant
   } = options
-  
+
   const { isConnected, connector } = useAccount()
   const previouslyConnected = useRef(false)
 

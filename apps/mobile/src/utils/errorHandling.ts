@@ -42,13 +42,18 @@ export function categorizeError(error: unknown): AppError {
   const errorMessage = error instanceof Error ? error.message : String(error)
   const lowerMessage = errorMessage.toLowerCase()
 
+  // Handle session corruption errors specifically
+  if (
+    lowerMessage.includes('missing or invalid. record was recently deleted') ||
+    lowerMessage.includes('session:') ||
+    lowerMessage.includes('no matching key')
+  ) {
+    return createAppError(ErrorType.WALLET_CONNECTION, 'Wallet session corrupted. Please reconnect your wallet.', error)
+  }
+
   // Categorize based on error message content
   if (lowerMessage.includes('user rejected') || lowerMessage.includes('user denied')) {
     return createAppError(ErrorType.SIGNATURE_REJECTED, errorMessage, error)
-  }
-
-  if (lowerMessage.includes('no matching key') || lowerMessage.includes('session')) {
-    return createAppError(ErrorType.WALLET_CONNECTION, 'Wallet session expired. Please reconnect your wallet.', error)
   }
 
   if (lowerMessage.includes('chainid not found') || (lowerMessage.includes('chain') && lowerMessage.includes('not found'))) {

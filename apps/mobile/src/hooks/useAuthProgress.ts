@@ -1,12 +1,6 @@
 import { useCallback, useState } from 'react'
 
-export type AuthStep = 
-  | 'connect-wallet'
-  | 'acquire-lock' 
-  | 'generate-message'
-  | 'request-signature'
-  | 'verify-signature'
-  | 'firebase-auth'
+export type AuthStep = 'connect-wallet' | 'acquire-lock' | 'generate-message' | 'request-signature' | 'verify-signature' | 'firebase-auth'
 
 export interface AuthStepInfo {
   step: AuthStep
@@ -26,33 +20,33 @@ const AUTH_STEPS: Record<AuthStep, AuthStepInfo> = {
   'connect-wallet': {
     step: 'connect-wallet',
     title: 'Connect Wallet',
-    description: 'Wallet connection established'
+    description: 'Wallet connection established',
   },
   'acquire-lock': {
-    step: 'acquire-lock', 
+    step: 'acquire-lock',
     title: 'Acquire Lock & Validate State',
-    description: 'Securing authentication process'
+    description: 'Securing authentication process',
   },
   'generate-message': {
     step: 'generate-message',
-    title: 'Generate Auth Message', 
-    description: 'Creating authentication challenge'
+    title: 'Generate Auth Message',
+    description: 'Creating authentication challenge',
   },
   'request-signature': {
     step: 'request-signature',
     title: 'Request Signature',
-    description: 'Sign message in your wallet app'
+    description: 'Sign message in your wallet app',
   },
   'verify-signature': {
     step: 'verify-signature',
     title: 'Verify Signature',
-    description: 'Validating your signature'
+    description: 'Validating your signature',
   },
   'firebase-auth': {
     step: 'firebase-auth',
     title: 'Firebase Authentication',
-    description: 'Completing authentication'
-  }
+    description: 'Completing authentication',
+  },
 }
 
 export const useAuthProgress = () => {
@@ -61,41 +55,41 @@ export const useAuthProgress = () => {
     completedSteps: new Set(),
     failedStep: null,
     isComplete: false,
-    error: null
+    error: null,
   })
 
   const startStep = useCallback((step: AuthStep) => {
-    setState(prev => ({
+    setState((prev) => ({
       ...prev,
       currentStep: step,
       failedStep: null,
-      error: null
+      error: null,
     }))
   }, [])
 
   const completeStep = useCallback((step: AuthStep) => {
-    setState(prev => {
+    setState((prev) => {
       const newCompletedSteps = new Set(prev.completedSteps)
       newCompletedSteps.add(step)
-      
+
       return {
         ...prev,
         completedSteps: newCompletedSteps,
         currentStep: step === 'firebase-auth' ? null : prev.currentStep,
         isComplete: step === 'firebase-auth',
         failedStep: null,
-        error: null
+        error: null,
       }
     })
   }, [])
 
   const failStep = useCallback((step: AuthStep, error: string) => {
-    setState(prev => ({
+    setState((prev) => ({
       ...prev,
       currentStep: null,
       failedStep: step,
       error,
-      isComplete: false
+      isComplete: false,
     }))
   }, [])
 
@@ -105,16 +99,19 @@ export const useAuthProgress = () => {
       completedSteps: new Set(['connect-wallet']), // Wallet is already connected when we start
       failedStep: null,
       isComplete: false,
-      error: null
+      error: null,
     })
   }, [])
 
-  const getStepStatus = useCallback((step: AuthStep) => {
-    if (state.failedStep === step) return 'failed'
-    if (state.completedSteps.has(step)) return 'completed'
-    if (state.currentStep === step) return 'current'
-    return 'pending'
-  }, [state.currentStep, state.completedSteps, state.failedStep])
+  const getStepStatus = useCallback(
+    (step: AuthStep) => {
+      if (state.failedStep === step) return 'failed'
+      if (state.completedSteps.has(step)) return 'completed'
+      if (state.currentStep === step) return 'current'
+      return 'pending'
+    },
+    [state.currentStep, state.completedSteps, state.failedStep]
+  )
 
   const getStepInfo = useCallback((step: AuthStep) => AUTH_STEPS[step], [])
 
@@ -128,6 +125,6 @@ export const useAuthProgress = () => {
     resetProgress,
     getStepStatus,
     getStepInfo,
-    getAllSteps
+    getAllSteps,
   }
 }

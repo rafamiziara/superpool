@@ -1,28 +1,52 @@
-import { useCallback } from 'react'
+import { useCallback, useEffect, useMemo } from 'react'
 import { useAccount, useDisconnect, useSignMessage, useSignTypedData } from 'wagmi'
 import { AuthenticationContext, AuthenticationOrchestrator } from '../services/authenticationOrchestrator'
 import { createAppError, ErrorType } from '../utils/errorHandling'
 import { useAuthenticationState } from './useAuthenticationState'
+import { useAuthProgress } from './useAuthProgress'
+import { useFirebaseAuth } from './useFirebaseAuth'
+import { getGlobalLogoutState } from './useLogoutState'
 import { useWalletConnectionTrigger } from './useWalletConnectionTrigger'
 
 export const useAuthentication = () => {
-  const { chain, connector } = useAccount()
+  const { isConnected, address, chain, connector } = useAccount()
   const { signTypedDataAsync } = useSignTypedData()
   const { signMessageAsync } = useSignMessage()
   const { disconnect } = useDisconnect()
 
+  // Use Firebase auth state for persistence across app refreshes
+  const firebaseAuth = useFirebaseAuth()
   // Use the new modular state management
   const authState = useAuthenticationState()
+  const authProgress = useAuthProgress()
 
-  // Create the authentication orchestrator
-  const orchestrator = new AuthenticationOrchestrator(authState.getAuthLock())
+  // Create the authentication orchestrator (memoized to prevent recreation)
+  const orchestrator = useMemo(() => new AuthenticationOrchestrator(authState.getAuthLock()), [authState])
 
   const handleAuthentication = useCallback(
     async (walletAddress: string) => {
-      // Clear any previous errors
-      authState.setAuthError(null)
+      // Check if we're in the middle of a logout process
+      try {
+        const { isLoggingOut } = getGlobalLogoutState()
+        if (isLoggingOut) {
+          console.log('⏸️ Skipping authentication: logout in progress')
+          return
+        }
+      } catch (error) {
+        // Global logout state not initialized, continue...
+      }
 
-      // Create the authentication context
+      // Check if user is already authenticated with Firebase before starting authentication
+      if (firebaseAuth.isAuthenticated && firebaseAuth.walletAddress === walletAddress) {
+        console.log('✅ User already Firebase authenticated for this wallet, skipping authentication:', walletAddress)
+        return
+      }
+
+      // Clear any previous errors and reset progress
+      authState.setAuthError(null)
+      authProgress.resetProgress()
+
+      // Create the authentication context with progress callbacks
       const context: AuthenticationContext = {
         walletAddress,
         connector,
@@ -32,6 +56,11 @@ export const useAuthentication = () => {
           signMessageAsync,
         },
         disconnect,
+        progressCallbacks: {
+          onStepStart: authProgress.startStep,
+          onStepComplete: authProgress.completeStep,
+          onStepFail: authProgress.failStep,
+        },
       }
 
       try {
@@ -45,13 +74,25 @@ export const useAuthentication = () => {
         }
       }
     },
-    [authState, orchestrator, connector, chain?.id, signTypedDataAsync, signMessageAsync, disconnect]
+    [
+      authState,
+      authProgress,
+      orchestrator,
+      connector,
+      chain?.id,
+      signTypedDataAsync,
+      signMessageAsync,
+      disconnect,
+      firebaseAuth.isAuthenticated,
+      firebaseAuth.walletAddress,
+    ]
   )
 
   const handleDisconnection = useCallback(() => {
     authState.setAuthError(null)
+    authProgress.resetProgress()
     orchestrator.cleanup()
-  }, [authState, orchestrator])
+  }, [authState, authProgress, orchestrator])
 
   // Use the connection trigger to only authenticate on new connections
   useWalletConnectionTrigger({
@@ -59,9 +100,56 @@ export const useAuthentication = () => {
     onDisconnection: handleDisconnection,
   })
 
-  return {
-    authError: authState.authError,
-    isAuthenticating: authState.isAuthenticating,
-    authWalletAddress: authState.authWalletAddress,
-  }
+  // Start authentication immediately if wallet is already connected BUT not already authenticated
+  useEffect(() => {
+    // Check if we're in a logout process
+    try {
+      const { isLoggingOut } = getGlobalLogoutState()
+      if (isLoggingOut) {
+        console.log('⏸️ Skipping immediate authentication: logout in progress')
+        return
+      }
+    } catch (error) {
+      // Global logout state not initialized, continue...
+    }
+
+    if (isConnected && address && !authState.isAuthenticating && !authState.authWalletAddress && !firebaseAuth.isAuthenticated) {
+      console.log('🚀 Wallet already connected, starting authentication immediately:', address)
+      handleAuthentication(address)
+    } else if (authState.authWalletAddress || firebaseAuth.isAuthenticated) {
+      console.log('✅ Wallet already authenticated, skipping re-authentication:', authState.authWalletAddress || firebaseAuth.walletAddress)
+    }
+  }, [
+    isConnected,
+    address,
+    authState.isAuthenticating,
+    authState.authWalletAddress,
+    firebaseAuth.isAuthenticated,
+    firebaseAuth.walletAddress,
+    handleAuthentication,
+  ])
+
+  return useMemo(
+    () => ({
+      // Authentication state
+      authError: authState.authError,
+      isAuthenticating: authState.isAuthenticating || firebaseAuth.isLoading,
+      // Use Firebase wallet address if available (persistent), otherwise fall back to auth lock address
+      authWalletAddress: firebaseAuth.walletAddress || authState.authWalletAddress,
+      // Expose Firebase auth state for navigation logic
+      isFirebaseAuthenticated: firebaseAuth.isAuthenticated,
+      isFirebaseLoading: firebaseAuth.isLoading,
+      // Progress state
+      ...authProgress,
+    }),
+    [
+      authState.authError,
+      authState.isAuthenticating,
+      authState.authWalletAddress,
+      firebaseAuth.isLoading,
+      firebaseAuth.walletAddress,
+      firebaseAuth.isAuthenticated,
+      authProgress,
+    ]
+  )
 }
