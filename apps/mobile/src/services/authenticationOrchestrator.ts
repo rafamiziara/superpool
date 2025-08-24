@@ -6,6 +6,7 @@ import { FIREBASE_AUTH, FIREBASE_FUNCTIONS } from '../firebase.config'
 import { AuthStep } from '../hooks/useAuthProgress'
 import { getGlobalLogoutState } from '../hooks/useLogoutState'
 import { AtomicConnectionState, ConnectionStateManager } from '../utils/connectionStateManager'
+import { devOnly } from '../utils/secureLogger'
 import { SessionManager } from '../utils/sessionManager'
 import { authToasts } from '../utils/toast'
 import { AuthErrorRecoveryService } from './authErrorRecoveryService'
@@ -198,12 +199,8 @@ export class AuthenticationOrchestrator {
     console.log('✅ Backend verification successful')
     const { firebaseToken } = signatureResponse.data as { firebaseToken: string }
 
-    console.log('📋 Firebase token received:', typeof firebaseToken, firebaseToken ? 'present' : 'missing')
-    console.log('🔍 Token comparison:', {
-      length: firebaseToken?.length,
-      prefix: firebaseToken?.substring(0, 50),
-      signatureType,
-    })
+    devOnly('📋 Firebase token received:', typeof firebaseToken, firebaseToken ? 'present' : 'missing')
+    // Never log actual token content, even in development
 
     return firebaseToken
   }
@@ -226,10 +223,11 @@ export class AuthenticationOrchestrator {
       console.log('✅ Firebase authentication successful')
     } catch (firebaseError) {
       console.error('❌ Firebase authentication failed:', firebaseError)
-      console.error('📋 Token details:', {
+      // Never log token details for security reasons
+      devOnly('📋 Token details:', {
         tokenType: typeof firebaseToken,
+        tokenPresent: !!firebaseToken,
         tokenLength: firebaseToken?.length,
-        tokenStart: firebaseToken?.substring(0, 20) + '...',
       })
 
       // For Safe wallets, try multiple retries with increasing delays

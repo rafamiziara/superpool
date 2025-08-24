@@ -1,4 +1,5 @@
 import type { Connector } from 'wagmi'
+import { devOnly, warn } from '../utils/secureLogger'
 
 export type SignatureType = 'typed-data' | 'personal-sign' | 'safe-wallet'
 
@@ -91,7 +92,7 @@ export class SafeWalletSigner {
         throw new Error(`Safe connector signing failed: ${JSON.stringify(signature)}`)
       }
 
-      console.log('✅ Safe wallet direct signing successful:', typeof signature, signature?.substring?.(0, 20) + '...')
+      devOnly('✅ Safe wallet direct signing successful:', typeof signature, signature?.substring?.(0, 10) + '...')
       return {
         signature,
         signatureType: 'personal-sign',
@@ -150,7 +151,7 @@ export class RegularWalletSigner {
       }
 
       if (timeoutId) clearTimeout(timeoutId)
-      console.log('✅ Personal message signature successful:', typeof signature, signature?.substring?.(0, 20) + '...')
+      devOnly('✅ Personal message signature successful:', typeof signature, signature?.substring?.(0, 10) + '...')
       return {
         signature,
         signatureType: 'personal-sign',
@@ -226,7 +227,7 @@ export class RegularWalletSigner {
         }
 
         if (timeoutId) clearTimeout(timeoutId)
-        console.log('✅ EIP-712 signature successful:', typeof signature, signature?.substring?.(0, 20) + '...')
+        devOnly('✅ EIP-712 signature successful:', typeof signature, signature?.substring?.(0, 10) + '...')
         return {
           signature,
           signatureType: 'typed-data',
@@ -287,7 +288,7 @@ export class SignatureService {
       throw new Error(`Invalid wallet address format: ${request.walletAddress}`)
     }
 
-    console.log('✅ Signature request validation passed:', {
+    devOnly('✅ Signature request validation passed:', {
       messageLength: request.message.length,
       nonce: request.nonce,
       walletAddress: request.walletAddress.substring(0, 6) + '...' + request.walletAddress.slice(-4),
@@ -337,10 +338,10 @@ export class SignatureService {
       throw new Error(`Invalid signature received: ${JSON.stringify(result.signature)}`)
     }
 
-    console.log('✅ Signature request completed:', {
+    devOnly('✅ Signature request completed:', {
       signatureType: result.signatureType,
       signatureLength: result.signature.length,
-      signaturePreview: result.signature.substring(0, 20) + '...',
+      signaturePreview: result.signature.substring(0, 10) + '...',
     })
 
     return result
