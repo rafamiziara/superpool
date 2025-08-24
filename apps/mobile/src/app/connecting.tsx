@@ -1,13 +1,14 @@
 import { router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import React, { useEffect } from 'react';
-import { Text, View } from 'react-native';
-import { useAccount } from 'wagmi';
+import { Text, TouchableOpacity, View } from 'react-native';
+import { useAccount, useDisconnect } from 'wagmi';
 import { LoadingSpinner } from '../components/LoadingSpinner';
-import { useAuthenticationWithProgress } from '../hooks/useAuthenticationWithProgress';
+import { useAuthentication } from '../hooks/useAuthentication';
 
 export default function ConnectingScreen() {
   const { isConnected } = useAccount();
+  const { disconnect } = useDisconnect();
   const {
     authError,
     isAuthenticating,
@@ -18,9 +19,23 @@ export default function ConnectingScreen() {
     isComplete,
     error,
     getStepStatus,
-    getStepInfo,
     getAllSteps,
-  } = useAuthenticationWithProgress();
+    resetProgress,
+  } = useAuthentication();
+
+  // Debug logging
+  useEffect(() => {
+    console.log('🔍 Connecting screen state:', {
+      isConnected,
+      isAuthenticating,
+      authWalletAddress,
+      currentStep,
+      completedSteps: Array.from(completedSteps),
+      failedStep,
+      isComplete,
+      error: error || authError?.message
+    })
+  }, [isConnected, isAuthenticating, authWalletAddress, currentStep, completedSteps, failedStep, isComplete, error, authError]);
 
   // Redirect based on connection state
   useEffect(() => {
@@ -125,9 +140,9 @@ export default function ConnectingScreen() {
         </View>
       </View>
 
-      {/* Status Message in Card */}
-      <View className="px-8 pb-16 mb-8">
-        <View className="bg-muted/10 p-4 rounded-xl border border-muted/20">
+      {/* Status Message and Actions */}
+      <View className="px-8 pb-8 mb-8">
+        <View className="bg-muted/10 p-4 rounded-xl border border-muted/20 mb-4">
           {authError ? (
             <Text className="text-destructive text-center text-sm font-medium">
               {error || authError.userFriendlyMessage}
@@ -141,6 +156,32 @@ export default function ConnectingScreen() {
               Authenticating your wallet connection...
             </Text>
           )}
+        </View>
+
+        {/* Action Buttons */}
+        <View className="flex-row justify-center space-x-4">
+          {authError && (
+            <TouchableOpacity
+              onPress={() => {
+                console.log('🔄 Retrying authentication...')
+                resetProgress()
+              }}
+              className="bg-primary px-4 py-2 rounded-lg"
+            >
+              <Text className="text-primary-foreground text-sm font-medium">Retry</Text>
+            </TouchableOpacity>
+          )}
+          
+          <TouchableOpacity
+            onPress={() => {
+              console.log('🚪 Disconnecting wallet...')
+              disconnect()
+              router.replace('/onboarding')
+            }}
+            className="bg-muted px-4 py-2 rounded-lg"
+          >
+            <Text className="text-muted-foreground text-sm font-medium">Disconnect</Text>
+          </TouchableOpacity>
         </View>
       </View>
 

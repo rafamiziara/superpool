@@ -14,11 +14,11 @@ import {
 } from 'react-native';
 import { useAccount } from 'wagmi';
 import { ProgressIndicator } from '../components/ProgressIndicator';
-import { useAuthentication } from '../hooks/useAuthentication';
+import { useAuthenticationStateReadonly } from '../hooks/useAuthenticationStateReadonly';
 
 interface OnboardingSlide {
   id: number;
-  image: any;
+  image: number;
   title: string;
   description: string;
 }
@@ -56,22 +56,59 @@ export default function OnboardingScreen() {
   const [currentIndex, setCurrentIndex] = useState(0);
   const flatListRef = useRef<FlatList>(null);
   const { isConnected } = useAccount();
-  const { authError, authWalletAddress } = useAuthentication();
+  const { 
+    authError, 
+    authWalletAddress, 
+    isFirebaseAuthenticated,
+    isFirebaseLoading 
+  } = useAuthenticationStateReadonly();
 
   // Handle navigation based on authentication state
   React.useEffect(() => {
-    if (isConnected && authWalletAddress && !authError) {
-      // Fully authenticated - go to dashboard
-      router.replace('/dashboard');
-    } else if (isConnected && !authWalletAddress) {
-      // Wallet connected but not authenticated - go to connecting screen
-      router.replace('/connecting');
-    } else if (isConnected && authError) {
-      // Authentication error - go to connecting screen to handle error
-      router.replace('/connecting');
+    // Don't navigate until Firebase auth state is determined
+    if (isFirebaseLoading) {
+      console.log('🔄 Waiting for Firebase auth state to load...')
+      return
     }
-    // If not connected, stay on onboarding screen
-  }, [isConnected, authWalletAddress, authError]);
+
+    console.log('🚦 Navigation decision:', {
+      isConnected,
+      authWalletAddress,
+      isFirebaseAuthenticated,
+      hasAuthError: !!authError
+    })
+
+    if (isConnected && isFirebaseAuthenticated && authWalletAddress) {
+      // Fully authenticated - go to dashboard
+      console.log('✅ User is fully authenticated, navigating to dashboard')
+      router.replace('/dashboard');
+      return
+    } 
+    
+    if (isFirebaseAuthenticated && authWalletAddress && !isConnected) {
+      // Firebase authenticated but wallet disconnected - go to connecting screen to reconnect
+      console.log('🔄 User authenticated but wallet disconnected, navigating to connecting screen')
+      router.replace('/connecting');
+      return
+    } 
+    
+    if (isConnected && !isFirebaseAuthenticated) {
+      // Wallet connected but not authenticated - go to connecting screen
+      console.log('🔐 Wallet connected but not authenticated, navigating to connecting screen')
+      router.replace('/connecting');
+      return
+    } 
+    
+    if (isConnected && authError) {
+      // Authentication error - go to connecting screen to handle error
+      console.log('❌ Authentication error, navigating to connecting screen')
+      router.replace('/connecting');
+      return
+    }
+
+    // If not connected and not authenticated, stay on onboarding screen
+    console.log('📱 Staying on onboarding - wallet not connected')
+  }, [isConnected, authWalletAddress, isFirebaseAuthenticated, isFirebaseLoading, !!authError]);
 
   const handleScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
     const contentOffsetX = event.nativeEvent.contentOffset.x;
@@ -101,6 +138,16 @@ export default function OnboardingScreen() {
       </View>
     </View>
   );
+
+  // Show loading indicator while determining Firebase auth state
+  if (isFirebaseLoading) {
+    return (
+      <View className="flex-1 bg-white items-center justify-center">
+        <Text className="text-3xl font-extrabold text-primary mb-4">SuperPool</Text>
+        <Text className="text-base text-muted-foreground">Loading...</Text>
+      </View>
+    )
+  }
 
   return (
     <View className="flex-1 bg-white">

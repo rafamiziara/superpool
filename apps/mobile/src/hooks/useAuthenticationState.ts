@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react'
-import { AppError } from '../utils/errorHandling'
 import { AuthenticationLock } from '../services/authenticationOrchestrator'
+import { AppError } from '../utils/errorHandling'
 
 export interface AuthenticationState {
   authError: AppError | null
@@ -21,7 +21,7 @@ export interface AuthenticationStateActions {
 export const useAuthenticationState = () => {
   // Authentication error state
   const [authError, setAuthError] = useState<AppError | null>(null)
-  
+
   // Authentication lock to prevent concurrent attempts
   const authLock = useRef<AuthenticationLock>({
     isLocked: false,
@@ -37,14 +37,14 @@ export const useAuthenticationState = () => {
     if (authLock.current.abortController) {
       authLock.current.abortController.abort('Authentication completed')
     }
-    
+
     authLock.current = {
       isLocked: false,
       startTime: 0,
       walletAddress: null,
       abortController: null,
     }
-    
+
     console.log('🔓 Authentication lock released')
   }
 

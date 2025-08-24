@@ -245,17 +245,75 @@ export class SessionManager {
     try {
       console.log('🛡️ Running preventive session cleanup before connection...')
 
-      // Multiple cleanup approaches
-      await this.clearAllWalletConnectSessions()
-      await this.clearQueryCache()
+      // More conservative cleanup - only target problematic keys, not all connections
+      const allKeys = await AsyncStorage.getAllKeys()
+      const walletConnectKeys = allKeys.filter((key) => key.includes('wc@2:') || key.includes('WalletConnect'))
 
-      // Wait a moment for cleanup to settle
-      await new Promise((resolve) => setTimeout(resolve, 500))
+      console.log(`Found ${walletConnectKeys.length} WalletConnect-related keys: ${JSON.stringify(walletConnectKeys.slice(0, 10))}`)
+
+      // Only clear keys that are likely to cause "No matching key" errors
+      const problematicPatterns = [
+        'wc@2:core:0.3//expirer', // Expired sessions
+        'wc@2:core:0.3//messages', // Stale messages
+        'wc@2:core:0.3//history', // Old history
+      ]
+
+      const keysToRemove = walletConnectKeys.filter((key) => problematicPatterns.some((pattern) => key.includes(pattern)))
+
+      if (keysToRemove.length > 0) {
+        console.log(`🎯 Removing ${keysToRemove.length} potentially problematic keys...`)
+        await AsyncStorage.multiRemove(keysToRemove)
+        console.log(`✅ Cleared ${keysToRemove.length} problematic keys`)
+      } else {
+        console.log('✅ No problematic keys found, skipping cleanup')
+      }
+
+      // Light query cache cleanup only
+      const queryCacheKeys = allKeys.filter((key) => key.includes('react-query') && key.includes('stale'))
+      if (queryCacheKeys.length > 0) {
+        await AsyncStorage.multiRemove(queryCacheKeys)
+        console.log(`Cleared ${queryCacheKeys.length} stale query cache keys`)
+      }
 
       console.log('✅ Preventive session cleanup completed')
     } catch (error) {
       console.error('❌ Preventive session cleanup failed:', error)
       throw error
     }
+  }
+
+  static async handleSessionCorruption(sessionError: string): Promise<void> {
+    try {
+      console.log('🚨 Handling session corruption error...')
+
+      // Extract session ID from error message if possible
+      const sessionIdMatch = sessionError.match(/session: ([a-f0-9]{64})/)
+      if (sessionIdMatch) {
+        const corruptedSessionId = sessionIdMatch[1]
+        console.log(`🎯 Found corrupted session ID: ${corruptedSessionId}`)
+        await this.clearSessionByErrorId(corruptedSessionId)
+      }
+
+      // Full session cleanup
+      await this.forceResetAllConnections()
+
+      console.log('✅ Session corruption handled')
+    } catch (error) {
+      console.error('❌ Failed to handle session corruption:', error)
+    }
+  }
+
+  static detectSessionCorruption(error: string): boolean {
+    if (!error || typeof error !== 'string') {
+      return false
+    }
+
+    return (
+      error.includes('Missing or invalid. Record was recently deleted') ||
+      error.includes('session:') ||
+      error.includes('WalletConnect session') ||
+      error.includes('No matching key') ||
+      error.includes('pairing')
+    )
   }
 }

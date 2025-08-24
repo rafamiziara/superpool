@@ -16,6 +16,7 @@ import { useEffect } from 'react';
 import Toast from 'react-native-toast-message';
 import { WagmiProvider } from 'wagmi';
 import { localhost } from '../config/chains';
+import { useGlobalErrorHandler } from '../hooks/useGlobalErrorHandler';
 import { useGlobalLogoutState } from '../hooks/useLogoutState';
 import { useWalletToasts } from '../hooks/useWalletToasts';
 import { SessionManager } from '../utils/sessionManager';
@@ -43,9 +44,6 @@ const chains = [mainnet, polygon, polygonAmoy, arbitrum, base, bsc, ...(__DEV__ 
 
 const wagmiConfig = defaultWagmiConfig({ chains, projectId, metadata });
 
-// Clear stale sessions before AppKit initialization to prevent "No matching key" errors
-SessionManager.preventiveSessionCleanup().catch(console.warn);
-
 createAppKit({
   projectId,
   metadata,
@@ -57,6 +55,7 @@ createAppKit({
 function AppContent() {
   useWalletToasts({ showConnectionToasts: false, showDisconnectionToasts: true }) // Global wallet toast notifications
   useGlobalLogoutState() // Global logout state management
+  useGlobalErrorHandler() // Global session corruption error handler
   
   // Debug session state on app start (no aggressive cleanup)
   useEffect(() => {
