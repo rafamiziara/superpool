@@ -6,6 +6,7 @@ import { useAuthenticationState } from './useAuthenticationState'
 import { useAuthProgress } from './useAuthProgress'
 import { useFirebaseAuth } from './useFirebaseAuth'
 import { getGlobalLogoutState } from './useLogoutState'
+import { useWalletConnectionBridge } from './useWalletConnectionBridge'
 import { useWalletConnectionTrigger } from './useWalletConnectionTrigger'
 
 export const useAuthentication = () => {
@@ -19,9 +20,14 @@ export const useAuthentication = () => {
   // Use the new modular state management
   const authState = useAuthenticationState()
   const authProgress = useAuthProgress()
+  // Use wallet connection bridge for reactive state management
+  const walletConnectionBridge = useWalletConnectionBridge()
 
   // Create the authentication orchestrator (memoized to prevent recreation)
-  const orchestrator = useMemo(() => new AuthenticationOrchestrator(authState.getAuthLock()), [authState])
+  const orchestrator = useMemo(
+    () => new AuthenticationOrchestrator(authState.getAuthLock(), walletConnectionBridge.bridge),
+    [authState, walletConnectionBridge.bridge]
+  )
 
   const handleAuthentication = useCallback(
     async (walletAddress: string) => {
@@ -48,12 +54,12 @@ export const useAuthentication = () => {
 
       // Create adapter functions that wrap wagmi hooks to match our SignatureFunctions interface
       const adaptedSignatureFunctions = {
-        signTypedDataAsync: async (data: { 
-          domain?: any; 
-          types: Record<string, any[]>; 
-          primaryType: string; 
-          message: Record<string, unknown>;
-          account: `0x${string}`;
+        signTypedDataAsync: async (data: {
+          domain?: any
+          types: Record<string, any[]>
+          primaryType: string
+          message: Record<string, unknown>
+          account: `0x${string}`
         }) => {
           // Wagmi requires the parameters to be wrapped in a variables object
           const signature = await signTypedDataAsync({
@@ -62,11 +68,7 @@ export const useAuthentication = () => {
           })
           return signature
         },
-        signMessageAsync: async (params: { 
-          message: string; 
-          account: `0x${string}`; 
-          connector?: any 
-        }) => {
+        signMessageAsync: async (params: { message: string; account: `0x${string}`; connector?: any }) => {
           // Wagmi requires the parameters to be wrapped in a variables object
           const signature = await signMessageAsync({
             message: params.message,

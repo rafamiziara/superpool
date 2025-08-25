@@ -3,6 +3,7 @@ import { useAuthentication } from './useAuthentication'
 import { useAuthenticationBridge } from './useAuthenticationBridge'
 import { useAuthProgress } from './useAuthProgress'
 import { useFirebaseAuth } from './useFirebaseAuth'
+import { useWalletConnectionBridge } from './useWalletConnectionBridge'
 
 /**
  * Full authentication bridge that provides complete useAuthentication functionality
@@ -23,6 +24,7 @@ export const useAuthenticationFullBridge = () => {
   const authBridge = useAuthenticationBridge()
   const authProgress = useAuthProgress()
   const firebaseAuth = useFirebaseAuth()
+  const walletConnectionBridge = useWalletConnectionBridge()
   const originalAuth = useAuthentication() // Keep for comparison
 
   return useMemo(
@@ -55,6 +57,7 @@ export const useAuthenticationFullBridge = () => {
       // Debug info for migration comparison
       _debug: {
         authBridge: authBridge._debug,
+        walletConnection: walletConnectionBridge._debug,
         originalValues: {
           authError: originalAuth.authError,
           isAuthenticating: originalAuth.isAuthenticating,
@@ -83,6 +86,7 @@ export const useAuthenticationFullBridge = () => {
       firebaseAuth.isLoading,
       firebaseAuth.walletAddress,
       firebaseAuth.isAuthenticated,
+      walletConnectionBridge,
       originalAuth, // Include for debugging
     ]
   )

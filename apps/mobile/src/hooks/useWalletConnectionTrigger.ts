@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef } from 'react'
 import { useAccount } from 'wagmi'
+import { useWalletConnectionBridge } from './useWalletConnectionBridge'
 
 interface ConnectionTriggerCallbacks {
   onNewConnection: (address: string, chainId?: number) => void
@@ -8,6 +9,7 @@ interface ConnectionTriggerCallbacks {
 
 export const useWalletConnectionTrigger = ({ onNewConnection, onDisconnection }: ConnectionTriggerCallbacks) => {
   const { isConnected, address, chain } = useAccount()
+  const walletConnectionBridge = useWalletConnectionBridge()
   const previousConnection = useRef<{ isConnected: boolean; address?: string; chainId?: number }>({
     isConnected: false,
     address: undefined,
@@ -49,6 +51,19 @@ export const useWalletConnectionTrigger = ({ onNewConnection, onDisconnection }:
       },
       wallet: chain?.name || 'unknown',
     })
+
+    // Sync wallet connection state with MobX store whenever Wagmi state changes
+    // This ensures the store is always up-to-date with the actual wallet connection
+    try {
+      walletConnectionBridge.captureState(isConnected, address, chain?.id)
+      console.log('🔄 Synced wallet state with MobX store:', {
+        isConnected,
+        address: address || 'undefined',
+        chainId: chain?.id || 'undefined',
+      })
+    } catch (error) {
+      console.warn('⚠️ Failed to sync wallet state with MobX store:', error)
+    }
 
     // Clear any pending timeout from previous state changes
     if (pendingTimeoutRef.current) {
@@ -94,5 +109,5 @@ export const useWalletConnectionTrigger = ({ onNewConnection, onDisconnection }:
       address,
       chainId: chain?.id,
     }
-  }, [isConnected, address, chain?.id, stableOnNewConnection, stableOnDisconnection])
+  }, [isConnected, address, chain?.id, stableOnNewConnection, stableOnDisconnection, walletConnectionBridge])
 }

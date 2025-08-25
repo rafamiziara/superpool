@@ -5,12 +5,13 @@ import type { Connector } from 'wagmi'
 import { FIREBASE_AUTH, FIREBASE_FUNCTIONS } from '../firebase.config'
 import { AuthStep } from '../hooks/useAuthProgress'
 import { getGlobalLogoutState } from '../hooks/useLogoutState'
-import { AtomicConnectionState, ConnectionStateManager } from '../utils/connectionStateManager'
+import { AtomicConnectionState } from '../utils/connectionStateManager'
 import { devOnly } from '../utils/secureLogger'
 import { SessionManager } from '../utils/sessionManager'
 import { authToasts } from '../utils/toast'
 import { AuthErrorRecoveryService } from './authErrorRecoveryService'
 import { SignatureFunctions, SignatureService } from './signatureService'
+import { WalletConnectionBridge } from './walletConnectionBridge'
 
 const verifySignatureAndLogin = httpsCallable(FIREBASE_FUNCTIONS, 'verifySignatureAndLogin')
 const generateAuthMessage = httpsCallable(FIREBASE_FUNCTIONS, 'generateAuthMessage')
@@ -38,9 +39,7 @@ export interface AuthenticationLock {
 }
 
 export class AuthenticationOrchestrator {
-  private connectionStateManager = new ConnectionStateManager()
-
-  constructor(private authLock: React.MutableRefObject<AuthenticationLock>) {}
+  constructor(private authLock: React.MutableRefObject<AuthenticationLock>, private walletConnectionBridge: WalletConnectionBridge) {}
 
   /**
    * Acquires authentication lock to prevent concurrent attempts
@@ -102,7 +101,7 @@ export class AuthenticationOrchestrator {
   /**
    * Validates that authentication should proceed
    */
-  private async validatePreConditions(context: AuthenticationContext, lockedState: AtomicConnectionState): Promise<boolean> {
+  private async validatePreConditions(context: AuthenticationContext): Promise<boolean> {
     // Check if we're in the middle of a logout process
     try {
       const { isLoggingOut } = getGlobalLogoutState()
@@ -115,7 +114,7 @@ export class AuthenticationOrchestrator {
     }
 
     // Validate initial connection state
-    const validation = this.connectionStateManager.validateInitialState(lockedState, context.walletAddress)
+    const validation = this.walletConnectionBridge.validateInitialState(context.walletAddress)
 
     if (!validation.isValid) {
       console.warn('❌ Invalid initial connection state:', validation.error)
@@ -279,13 +278,9 @@ export class AuthenticationOrchestrator {
    * Validates state consistency at various checkpoints
    */
   private validateStateConsistency(lockedState: AtomicConnectionState, checkpoint: string): boolean {
-    const currentState = this.connectionStateManager.captureState(
-      lockedState.isConnected, // We pass the locked values since we don't have direct access to live state
-      lockedState.address,
-      lockedState.chainId
-    )
+    const currentState = this.walletConnectionBridge.getCurrentState()
 
-    const isValid = this.connectionStateManager.validateState(lockedState, currentState, checkpoint)
+    const isValid = this.walletConnectionBridge.validateState(lockedState, currentState, checkpoint)
 
     if (!isValid) {
       console.log(`❌ Aborting authentication due to connection state change at ${checkpoint}`)
@@ -374,7 +369,7 @@ export class AuthenticationOrchestrator {
       })
 
       // Capture atomic connection state snapshot at the start
-      const lockedConnectionState = this.connectionStateManager.captureState(
+      const lockedConnectionState = this.walletConnectionBridge.captureState(
         true, // We assume connected since this is called from a connected context
         context.walletAddress,
         context.chainId
