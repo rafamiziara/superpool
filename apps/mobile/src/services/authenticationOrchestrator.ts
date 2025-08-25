@@ -5,13 +5,13 @@ import type { Connector } from 'wagmi'
 import { FIREBASE_AUTH, FIREBASE_FUNCTIONS } from '../firebase.config'
 import { AuthStep } from '../hooks/useAuthProgress'
 import { getGlobalLogoutState } from '../hooks/useLogoutState'
-import { AtomicConnectionState } from '../utils/connectionStateManager'
+import { AuthenticationStore } from '../stores/AuthenticationStore'
+import { AtomicConnectionState, WalletConnectionStore } from '../stores/WalletConnectionStore'
 import { devOnly } from '../utils/secureLogger'
 import { SessionManager } from '../utils/sessionManager'
 import { authToasts } from '../utils/toast'
 import { AuthErrorRecoveryService } from './authErrorRecoveryService'
 import { SignatureFunctions, SignatureService } from './signatureService'
-import { WalletConnectionBridge } from './walletConnectionBridge'
 
 const verifySignatureAndLogin = httpsCallable(FIREBASE_FUNCTIONS, 'verifySignatureAndLogin')
 const generateAuthMessage = httpsCallable(FIREBASE_FUNCTIONS, 'generateAuthMessage')
@@ -39,63 +39,52 @@ export interface AuthenticationLock {
 }
 
 export class AuthenticationOrchestrator {
-  constructor(private authLock: React.MutableRefObject<AuthenticationLock>, private walletConnectionBridge: WalletConnectionBridge) {}
+  constructor(private authStore: AuthenticationStore, private walletStore: WalletConnectionStore) {}
 
   /**
    * Acquires authentication lock to prevent concurrent attempts
+   * Now uses MobX AuthenticationStore instead of ref
    */
   private acquireAuthLock(walletAddress: string): boolean {
-    const current = this.authLock.current
-
-    if (current.isLocked) {
-      const timeSinceLock = Date.now() - current.startTime
+    // Check if already locked
+    if (this.authStore.isAuthenticating) {
+      const timeSinceLock = Date.now() - this.authStore.authLock.startTime
 
       // If authentication has been running for more than 2 minutes, force release
       if (timeSinceLock > 120000) {
         console.warn(`🕐 Authentication lock expired (${timeSinceLock}ms), force releasing...`)
-        this.releaseAuthLock()
+        this.authStore.releaseAuthLock()
       } else {
-        console.log(`⚠️ Authentication already in progress for ${current.walletAddress} (${timeSinceLock}ms ago)`)
+        console.log(`⚠️ Authentication already in progress for ${this.authStore.authWalletAddress} (${timeSinceLock}ms ago)`)
 
         // If it's the same wallet address, this is likely a duplicate request
-        if (current.walletAddress === walletAddress) {
+        if (this.authStore.authWalletAddress === walletAddress) {
           console.log('🚫 Duplicate authentication attempt for same wallet, ignoring')
           return false
         }
 
         // Different wallet - abort current and proceed with new one
         console.log('🔄 Different wallet detected, aborting current authentication')
-        this.releaseAuthLock()
+        this.authStore.releaseAuthLock()
       }
     }
 
-    this.authLock.current = {
-      isLocked: true,
-      startTime: Date.now(),
-      walletAddress,
-      abortController: new AbortController(),
+    // Use store method to acquire lock
+    const acquired = this.authStore.acquireAuthLock(walletAddress)
+    if (!acquired) {
+      console.log('❌ Failed to acquire authentication lock')
+      return false
     }
 
-    console.log('🔒 Authentication lock acquired for:', walletAddress)
     return true
   }
 
   /**
    * Releases authentication lock
+   * Now delegates to MobX AuthenticationStore
    */
   private releaseAuthLock(): void {
-    if (this.authLock.current.abortController) {
-      this.authLock.current.abortController.abort('Authentication completed')
-    }
-
-    this.authLock.current = {
-      isLocked: false,
-      startTime: 0,
-      walletAddress: null,
-      abortController: null,
-    }
-
-    console.log('🔓 Authentication lock released')
+    this.authStore.releaseAuthLock()
   }
 
   /**
@@ -113,8 +102,8 @@ export class AuthenticationOrchestrator {
       console.log('ℹ️ Global logout state not initialized, continuing...')
     }
 
-    // Validate initial connection state
-    const validation = this.walletConnectionBridge.validateInitialState(context.walletAddress)
+    // Validate initial connection state using store
+    const validation = this.walletStore.validateInitialState(context.walletAddress)
 
     if (!validation.isValid) {
       console.warn('❌ Invalid initial connection state:', validation.error)
@@ -276,11 +265,12 @@ export class AuthenticationOrchestrator {
 
   /**
    * Validates state consistency at various checkpoints
+   * Now uses MobX WalletConnectionStore directly
    */
   private validateStateConsistency(lockedState: AtomicConnectionState, checkpoint: string): boolean {
-    const currentState = this.walletConnectionBridge.getCurrentState()
+    const currentState = this.walletStore.captureState()
 
-    const isValid = this.walletConnectionBridge.validateState(lockedState, currentState, checkpoint)
+    const isValid = this.walletStore.validateState(lockedState, currentState, checkpoint)
 
     if (!isValid) {
       console.log(`❌ Aborting authentication due to connection state change at ${checkpoint}`)
@@ -292,9 +282,10 @@ export class AuthenticationOrchestrator {
 
   /**
    * Checks if authentication was aborted by timeout or user action
+   * Now uses MobX AuthenticationStore
    */
   private checkAuthenticationAborted(): boolean {
-    if (this.authLock.current.abortController?.signal.aborted) {
+    if (this.authStore.authLock.abortController?.signal.aborted) {
       console.log('❌ Authentication aborted by user or timeout')
       return true
     }
@@ -368,12 +359,8 @@ export class AuthenticationOrchestrator {
         connectorName: context.connector?.name,
       })
 
-      // Capture atomic connection state snapshot at the start
-      const lockedConnectionState = this.walletConnectionBridge.captureState(
-        true, // We assume connected since this is called from a connected context
-        context.walletAddress,
-        context.chainId
-      )
+      // Capture atomic connection state snapshot at the start using store
+      const lockedConnectionState = this.walletStore.captureState()
       console.log('🔐 Locked connection state:', lockedConnectionState)
 
       // Log session debug information
@@ -384,7 +371,7 @@ export class AuthenticationOrchestrator {
       context.progressCallbacks?.onStepStart?.('acquire-lock')
       // Longer delay for Step 2 to ensure UI renders the step progress
       await new Promise((resolve) => setTimeout(resolve, 600))
-      await this.validatePreConditions(context, lockedConnectionState)
+      await this.validatePreConditions(context)
       context.progressCallbacks?.onStepComplete?.('acquire-lock')
       // Brief delay after completion to show completed state
       await new Promise((resolve) => setTimeout(resolve, 200))
@@ -480,18 +467,20 @@ export class AuthenticationOrchestrator {
 
   /**
    * Gets current authentication status
+   * Now uses MobX AuthenticationStore
    */
   getAuthenticationStatus() {
     return {
-      isAuthenticating: this.authLock.current.isLocked,
-      authWalletAddress: this.authLock.current.walletAddress,
+      isAuthenticating: this.authStore.isAuthenticating,
+      authWalletAddress: this.authStore.authWalletAddress,
     }
   }
 
   /**
    * Releases authentication lock (for cleanup on disconnection)
+   * Now delegates to MobX AuthenticationStore
    */
   cleanup() {
-    this.releaseAuthLock()
+    this.authStore.reset()
   }
 }

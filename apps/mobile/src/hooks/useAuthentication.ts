@@ -1,16 +1,17 @@
+import { autorun } from 'mobx'
 import { useCallback, useEffect, useMemo } from 'react'
 import { useAccount, useDisconnect, useSignMessage, useSignTypedData } from 'wagmi'
 import { AuthenticationContext, AuthenticationOrchestrator } from '../services/authenticationOrchestrator'
+import { useAuthenticationStore, useWalletConnectionStore } from '../stores'
 import { createAppError, ErrorType } from '../utils/errorHandling'
 import { useAuthenticationState } from './useAuthenticationState'
 import { useAuthProgress } from './useAuthProgress'
 import { useFirebaseAuth } from './useFirebaseAuth'
 import { getGlobalLogoutState } from './useLogoutState'
-import { useWalletConnectionBridge } from './useWalletConnectionBridge'
 import { useWalletConnectionTrigger } from './useWalletConnectionTrigger'
 
 export const useAuthentication = () => {
-  const { isConnected, address, chain, connector } = useAccount()
+  const { chain, connector } = useAccount()
   const { signTypedDataAsync } = useSignTypedData()
   const { signMessageAsync } = useSignMessage()
   const { disconnect } = useDisconnect()
@@ -20,14 +21,13 @@ export const useAuthentication = () => {
   // Use the new modular state management
   const authState = useAuthenticationState()
   const authProgress = useAuthProgress()
-  // Use wallet connection bridge for reactive state management
-  const walletConnectionBridge = useWalletConnectionBridge()
 
-  // Create the authentication orchestrator (memoized to prevent recreation)
-  const orchestrator = useMemo(
-    () => new AuthenticationOrchestrator(authState.getAuthLock(), walletConnectionBridge.bridge),
-    [authState, walletConnectionBridge.bridge]
-  )
+  // Use MobX stores directly for enhanced reactivity
+  const authStore = useAuthenticationStore()
+  const walletStore = useWalletConnectionStore()
+
+  // Create the authentication orchestrator with MobX stores (memoized to prevent recreation)
+  const orchestrator = useMemo(() => new AuthenticationOrchestrator(authStore, walletStore), [authStore, walletStore])
 
   const handleAuthentication = useCallback(
     async (walletAddress: string) => {
@@ -130,56 +130,69 @@ export const useAuthentication = () => {
     onDisconnection: handleDisconnection,
   })
 
-  // Start authentication immediately if wallet is already connected BUT not already authenticated
+  // MobX autorun: Start authentication immediately if wallet is already connected BUT not already authenticated
+  // This replaces the complex useEffect with 8+ dependencies with automatic MobX reactivity
   useEffect(() => {
-    // Check if we're in a logout process
-    try {
-      const { isLoggingOut } = getGlobalLogoutState()
-      if (isLoggingOut) {
-        console.log('⏸️ Skipping immediate authentication: logout in progress')
-        return
+    const disposer = autorun(() => {
+      // Check if we're in a logout process
+      try {
+        const { isLoggingOut } = getGlobalLogoutState()
+        if (isLoggingOut) {
+          console.log('⏸️ Skipping immediate authentication: logout in progress')
+          return
+        }
+      } catch (error) {
+        // Global logout state not initialized, continue...
       }
-    } catch (error) {
-      // Global logout state not initialized, continue...
-    }
 
-    if (isConnected && address && !authState.isAuthenticating && !authState.authWalletAddress && !firebaseAuth.isAuthenticated) {
-      console.log('🚀 Wallet already connected, starting authentication immediately:', address)
-      handleAuthentication(address)
-    } else if (authState.authWalletAddress || firebaseAuth.isAuthenticated) {
-      console.log('✅ Wallet already authenticated, skipping re-authentication:', authState.authWalletAddress || firebaseAuth.walletAddress)
-    }
-  }, [
-    isConnected,
-    address,
-    authState.isAuthenticating,
-    authState.authWalletAddress,
-    firebaseAuth.isAuthenticated,
-    firebaseAuth.walletAddress,
-    handleAuthentication,
-  ])
+      // Use reactive MobX state - automatically tracks dependencies!
+      const { isConnected: storeConnected, address: storeAddress } = walletStore
+      const { isAuthenticating: storeAuthenticating, authWalletAddress: storeAuthWallet } = authStore
+
+      // Use MobX store values for reactivity, but prefer Wagmi for the actual address to authenticate
+      if (storeConnected && storeAddress && !storeAuthenticating && !storeAuthWallet && !firebaseAuth.isAuthenticated) {
+        console.log('🚀 Wallet already connected, starting authentication immediately:', storeAddress)
+        handleAuthentication(storeAddress)
+      } else if (storeAuthWallet || firebaseAuth.isAuthenticated) {
+        console.log('✅ Wallet already authenticated, skipping re-authentication:', storeAuthWallet || firebaseAuth.walletAddress)
+      }
+    })
+
+    // Cleanup autorun when component unmounts
+    return disposer
+  }, []) // No dependencies needed! MobX tracks everything automatically
 
   return useMemo(
     () => ({
-      // Authentication state
-      authError: authState.authError,
-      isAuthenticating: authState.isAuthenticating || firebaseAuth.isLoading,
-      // Use Firebase wallet address if available (persistent), otherwise fall back to auth lock address
-      authWalletAddress: firebaseAuth.walletAddress || authState.authWalletAddress,
+      // Authentication state - now includes MobX reactive state
+      authError: authState.authError || authStore.authError,
+      isAuthenticating: authState.isAuthenticating || authStore.isAuthenticating || firebaseAuth.isLoading,
+      // Use Firebase wallet address if available (persistent), otherwise fall back to store or auth lock address
+      authWalletAddress: firebaseAuth.walletAddress || authStore.authWalletAddress || authState.authWalletAddress,
       // Expose Firebase auth state for navigation logic
       isFirebaseAuthenticated: firebaseAuth.isAuthenticated,
       isFirebaseLoading: firebaseAuth.isLoading,
       // Progress state
       ...authProgress,
+      // Expose MobX stores for advanced usage
+      _mobx: {
+        authStore: authStore,
+        walletStore: walletStore,
+      },
     }),
     [
       authState.authError,
       authState.isAuthenticating,
       authState.authWalletAddress,
+      authStore.authError,
+      authStore.isAuthenticating,
+      authStore.authWalletAddress,
       firebaseAuth.isLoading,
       firebaseAuth.walletAddress,
       firebaseAuth.isAuthenticated,
       authProgress,
+      authStore,
+      walletStore,
     ]
   )
 }
