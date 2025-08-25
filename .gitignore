@@ -24,6 +24,9 @@ CLAUDE.md
 **/CLAUDE.md
 .claude/
 
+# Personal documentation files
+.dev
+
 # SuperDesign files
 .superdesign/
 

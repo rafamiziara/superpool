@@ -26,6 +26,8 @@
     "expo-secure-store": "~14.2.4",
     "expo-status-bar": "~2.2.3",
     "firebase": "^12.1.0",
+    "mobx": "^6.13.7",
+    "mobx-react-lite": "^4.1.0",
     "nativewind": "^4.1.23",
     "react": "19.0.0",
     "react-dom": "19.1.0",

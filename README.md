@@ -19,7 +19,8 @@ This project serves as a comprehensive portfolio piece demonstrating expertise a
 - **📱 Cross-Platform Mobile App:** React Native/Expo application with comprehensive user onboarding flow.
 - **🛡️ Robust Error Handling:** Advanced error categorization, user-friendly feedback, and graceful failure recovery.
 - **🔔 Toast Notification System:** Real-time user feedback for connection states, authentication progress, and error scenarios.
-- **⚙️ Global State Management:** Sophisticated wallet connection and logout state management with race condition prevention.
+- **⚙️ Reactive State Management:** MobX-powered reactive state management with centralized stores for authentication, wallet connection, and pool management.
+- **🔄 Advanced State Architecture:** Sophisticated wallet connection and logout state management with race condition prevention.
 
 #### 🚧 **Planned Features:**
 
@@ -50,6 +51,7 @@ This project serves as a comprehensive portfolio piece demonstrating expertise a
 
 **Mobile Application (React Native/Expo):**
 - **React Native / Expo:** Cross-platform framework for iOS and Android.
+- **MobX:** Reactive state management with automatic UI updates and centralized stores.
 - **NativeWind:** Tailwind CSS for React Native with design system compatibility.
 - **TypeScript:** Type-safe JavaScript with shared interfaces.
 - **Wagmi:** React Hooks for Ethereum blockchain interactions.
@@ -516,11 +518,12 @@ The SuperPool app features a production-ready wallet authentication system that 
 
 ### 🔧 Technical Implementation Highlights
 
-- **Global State Management:** Centralized wallet connection and authentication state management
+- **Reactive State Management:** MobX-powered centralized stores with automatic UI updates and fine-grained reactivity
+- **Advanced State Architecture:** Eliminates complex useState/useEffect patterns with observable stores for authentication, wallet connection, and pool management
 - **Connection Trigger Logic:** Precise detection of wallet connection vs. disconnection events
 - **Multi-Layer Error Handling:** Defensive programming with error boundaries at multiple levels
-- **TypeScript Integration:** Full type safety across wallet interactions and error handling
-- **Modular Architecture:** Reusable hooks and components for wallet integration
+- **TypeScript Integration:** Full type safety across wallet interactions, state management, and error handling
+- **Modular Architecture:** Reusable hooks, stores, and components for scalable development
 
 ## 🛡️ Security Disclaimer
 
