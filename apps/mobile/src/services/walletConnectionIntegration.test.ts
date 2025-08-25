@@ -46,6 +46,7 @@ jest.mock('../utils/toast', () => ({
 
 jest.mock('./authErrorRecoveryService', () => ({
   AuthErrorRecoveryService: {
+    initialize: jest.fn(),
     clearRecoveryData: jest.fn(),
   },
 }))
