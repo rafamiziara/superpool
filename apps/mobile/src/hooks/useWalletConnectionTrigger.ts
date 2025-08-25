@@ -69,7 +69,7 @@ export const useWalletConnectionTrigger = ({ onNewConnection, onDisconnection }:
         console.log('🚀 Triggering authentication for new connection')
         stableOnNewConnection(address, chain?.id)
         pendingTimeoutRef.current = null
-      }, 500) // Increased delay for better stability
+      }, 500) as unknown as number // Increased delay for better stability
     }
     // Handle network changes for already connected wallets (don't re-authenticate)
     else if (prev.isConnected && isConnected && address && prev.chainId !== chain?.id) {

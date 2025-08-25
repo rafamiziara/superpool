@@ -46,15 +46,43 @@ export const useAuthentication = () => {
       authState.setAuthError(null)
       authProgress.resetProgress()
 
+      // Create adapter functions that wrap wagmi hooks to match our SignatureFunctions interface
+      const adaptedSignatureFunctions = {
+        signTypedDataAsync: async (data: { 
+          domain?: any; 
+          types: Record<string, any[]>; 
+          primaryType: string; 
+          message: Record<string, unknown>;
+          account: `0x${string}`;
+        }) => {
+          // Wagmi requires the parameters to be wrapped in a variables object
+          const signature = await signTypedDataAsync({
+            ...data,
+            account: data.account, // account is now required
+          })
+          return signature
+        },
+        signMessageAsync: async (params: { 
+          message: string; 
+          account: `0x${string}`; 
+          connector?: any 
+        }) => {
+          // Wagmi requires the parameters to be wrapped in a variables object
+          const signature = await signMessageAsync({
+            message: params.message,
+            account: params.account, // account is now required
+            connector: params.connector,
+          })
+          return signature
+        },
+      }
+
       // Create the authentication context with progress callbacks
       const context: AuthenticationContext = {
         walletAddress,
         connector,
         chainId: chain?.id,
-        signatureFunctions: {
-          signTypedDataAsync,
-          signMessageAsync,
-        },
+        signatureFunctions: adaptedSignatureFunctions,
         disconnect,
         progressCallbacks: {
           onStepStart: authProgress.startStep,
