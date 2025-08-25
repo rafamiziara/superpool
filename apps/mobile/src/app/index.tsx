@@ -1,9 +1,11 @@
 import { Redirect } from 'expo-router';
-import { useAccount } from 'wagmi';
+import { observer } from 'mobx-react-lite';
 import { useAuthenticationStateReadonly } from '../hooks/useAuthenticationStateReadonly';
+import { useStores } from '../stores';
 
-export default function IndexScreen() {
-  const { isConnected } = useAccount();
+const IndexScreen = observer(function IndexScreen() {
+  const { walletConnectionStore } = useStores();
+  const { isConnected } = walletConnectionStore; // Use MobX store for reactive connection state
   const { 
     authWalletAddress, 
     authError,
@@ -30,5 +32,7 @@ export default function IndexScreen() {
   
   // Default to onboarding screen for wallet connection
   return <Redirect href="/onboarding" />;
-}
+});
+
+export default IndexScreen;
 

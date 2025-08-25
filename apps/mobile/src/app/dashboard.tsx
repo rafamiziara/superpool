@@ -2,14 +2,18 @@ import { AppKitButton } from '@reown/appkit-wagmi-react-native';
 import { router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { signOut } from 'firebase/auth';
+import { observer } from 'mobx-react-lite';
 import { useEffect } from 'react';
 import { Text, View } from 'react-native';
 import { useAccount } from 'wagmi';
 import { FIREBASE_AUTH } from '../firebase.config';
 import { getGlobalLogoutState } from '../hooks/useLogoutState';
+import { useStores } from '../stores';
 
-export default function DashboardScreen() {
-  const { address, chain, isConnected } = useAccount();
+const DashboardScreen = observer(function DashboardScreen() {
+  const { walletConnectionStore } = useStores();
+  const { chain } = useAccount(); // Keep for chain info since store doesn't track this yet
+  const { address, isConnected } = walletConnectionStore; // Use MobX store for core connection state
 
   useEffect(() => {
     if (!isConnected) {
@@ -68,5 +72,7 @@ export default function DashboardScreen() {
       <StatusBar style="auto" />
     </View>
   );
-}
+});
+
+export default DashboardScreen;
 
