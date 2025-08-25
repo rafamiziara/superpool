@@ -1,6 +1,7 @@
 import { AppKitButton } from '@reown/appkit-wagmi-react-native';
 import { router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
+import { observer } from 'mobx-react-lite';
 import React, { useRef, useState } from 'react';
 import {
   Dimensions,
@@ -14,7 +15,7 @@ import {
 } from 'react-native';
 import { useAccount } from 'wagmi';
 import { ProgressIndicator } from '../components/ProgressIndicator';
-import { useAuthenticationStateReadonly } from '../hooks/useAuthenticationStateReadonly';
+import { useAuthenticationStateReadonlyBridge } from '../hooks/useAuthenticationStateReadonlyBridge';
 
 interface OnboardingSlide {
   id: number;
@@ -52,7 +53,7 @@ const slides: OnboardingSlide[] = [
 
 const { width: screenWidth } = Dimensions.get('window');
 
-export default function OnboardingScreen() {
+const OnboardingScreen = observer(function OnboardingScreen() {
   const [currentIndex, setCurrentIndex] = useState(0);
   const flatListRef = useRef<FlatList>(null);
   const { isConnected } = useAccount();
@@ -60,8 +61,9 @@ export default function OnboardingScreen() {
     authError, 
     authWalletAddress, 
     isFirebaseAuthenticated,
-    isFirebaseLoading 
-  } = useAuthenticationStateReadonly();
+    isFirebaseLoading,
+    _debug
+  } = useAuthenticationStateReadonlyBridge();
 
   // Handle navigation based on authentication state
   React.useEffect(() => {
@@ -75,7 +77,13 @@ export default function OnboardingScreen() {
       isConnected,
       authWalletAddress,
       isFirebaseAuthenticated,
-      hasAuthError: !!authError
+      hasAuthError: !!authError,
+      // Debug info for migration verification
+      mobxBridge: _debug ? {
+        mobx: _debug.mobxValues,
+        original: _debug.originalValues,
+        firebase: _debug.firebaseValues
+      } : 'no debug info'
     })
 
     if (isConnected && isFirebaseAuthenticated && authWalletAddress) {
@@ -195,4 +203,6 @@ export default function OnboardingScreen() {
       <StatusBar style="auto" />
     </View>
   );
-}
+});
+
+export default OnboardingScreen;

@@ -1,12 +1,13 @@
 import { router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
+import { observer } from 'mobx-react-lite';
 import React, { useEffect } from 'react';
 import { Text, TouchableOpacity, View } from 'react-native';
 import { useAccount, useDisconnect } from 'wagmi';
 import { LoadingSpinner } from '../components/LoadingSpinner';
-import { useAuthentication } from '../hooks/useAuthentication';
+import { useAuthenticationFullBridge } from '../hooks/useAuthenticationFullBridge';
 
-export default function ConnectingScreen() {
+const ConnectingScreen = observer(function ConnectingScreen() {
   const { isConnected } = useAccount();
   const { disconnect } = useDisconnect();
   const {
@@ -21,7 +22,8 @@ export default function ConnectingScreen() {
     getStepStatus,
     getAllSteps,
     resetProgress,
-  } = useAuthentication();
+    _debug
+  } = useAuthenticationFullBridge();
 
   // Debug logging
   useEffect(() => {
@@ -33,9 +35,15 @@ export default function ConnectingScreen() {
       completedSteps: Array.from(completedSteps),
       failedStep,
       isComplete,
-      error: error || authError?.message
+      error: error || authError?.message,
+      // Debug migration info
+      mobxBridge: _debug ? {
+        original: _debug.originalValues,
+        bridge: _debug.bridgeValues,
+        authBridge: _debug.authBridge
+      } : 'no debug info'
     })
-  }, [isConnected, isAuthenticating, authWalletAddress, currentStep, completedSteps, failedStep, isComplete, error, authError]);
+  }, [isConnected, isAuthenticating, authWalletAddress, currentStep, completedSteps, failedStep, isComplete, error, authError, _debug]);
 
   // Redirect based on connection state
   useEffect(() => {
@@ -188,4 +196,6 @@ export default function ConnectingScreen() {
       <StatusBar style="auto" />
     </View>
   );
-}
+});
+
+export default ConnectingScreen;
