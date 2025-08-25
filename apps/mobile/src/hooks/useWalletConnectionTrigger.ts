@@ -1,6 +1,7 @@
+import { autorun } from 'mobx'
 import { useCallback, useEffect, useRef } from 'react'
 import { useAccount } from 'wagmi'
-import { useWalletConnectionBridge } from './useWalletConnectionBridge'
+import { useWalletConnectionStore } from '../stores'
 
 interface ConnectionTriggerCallbacks {
   onNewConnection: (address: string, chainId?: number) => void
@@ -8,8 +9,8 @@ interface ConnectionTriggerCallbacks {
 }
 
 export const useWalletConnectionTrigger = ({ onNewConnection, onDisconnection }: ConnectionTriggerCallbacks) => {
-  const { isConnected, address, chain } = useAccount()
-  const walletConnectionBridge = useWalletConnectionBridge()
+  const { address, chain } = useAccount() // Keep for address and chain info
+  const walletStore = useWalletConnectionStore()
   const previousConnection = useRef<{ isConnected: boolean; address?: string; chainId?: number }>({
     isConnected: false,
     address: undefined,
@@ -38,76 +39,83 @@ export const useWalletConnectionTrigger = ({ onNewConnection, onDisconnection }:
     }
   }, [])
 
+  // MobX autorun: Automatically react to wallet connection state changes
+  // This replaces the complex useEffect with 6+ dependencies
   useEffect(() => {
-    const prev = previousConnection.current
+    const disposer = autorun(() => {
+      const prev = previousConnection.current
+      // Use MobX reactive state - automatically tracks dependencies!
+      const { isConnected } = walletStore
 
-    console.log('🔄 Connection state change detected:', {
-      previous: { isConnected: prev.isConnected, address: prev.address, chainId: prev.chainId },
-      current: { isConnected, address, chainId: chain?.id },
-      triggerConditions: {
-        newConnectionCondition: !prev.isConnected && isConnected && address,
-        disconnectionCondition: prev.isConnected && !isConnected,
-        chainChangeCondition: prev.chainId !== chain?.id && isConnected && address,
-      },
-      wallet: chain?.name || 'unknown',
-    })
-
-    // Sync wallet connection state with MobX store whenever Wagmi state changes
-    // This ensures the store is always up-to-date with the actual wallet connection
-    try {
-      walletConnectionBridge.captureState(isConnected, address, chain?.id)
-      console.log('🔄 Synced wallet state with MobX store:', {
-        isConnected,
-        address: address || 'undefined',
-        chainId: chain?.id || 'undefined',
+      console.log('🔄 Connection state change detected:', {
+        previous: { isConnected: prev.isConnected, address: prev.address, chainId: prev.chainId },
+        current: { isConnected, address, chainId: chain?.id },
+        triggerConditions: {
+          newConnectionCondition: !prev.isConnected && isConnected && address,
+          disconnectionCondition: prev.isConnected && !isConnected,
+          chainChangeCondition: prev.chainId !== chain?.id && isConnected && address,
+        },
+        wallet: chain?.name || 'unknown',
       })
-    } catch (error) {
-      console.warn('⚠️ Failed to sync wallet state with MobX store:', error)
-    }
 
-    // Clear any pending timeout from previous state changes
-    if (pendingTimeoutRef.current) {
-      clearTimeout(pendingTimeoutRef.current)
-      pendingTimeoutRef.current = null
-    }
+      // Sync wallet connection state with MobX store whenever state changes
+      try {
+        walletStore.updateConnectionState(isConnected, address, chain?.id)
+        console.log('🔄 Synced wallet state with MobX store:', {
+          isConnected,
+          address: address || 'undefined',
+          chainId: chain?.id || 'undefined',
+        })
+      } catch (error) {
+        console.warn('⚠️ Failed to sync wallet state with MobX store:', error)
+      }
 
-    // Detect new connection (wasn't connected before, now is connected with address)
-    if (!prev.isConnected && isConnected && address) {
-      console.log('🎉 New wallet connection detected:', {
+      // Clear any pending timeout from previous state changes
+      if (pendingTimeoutRef.current) {
+        clearTimeout(pendingTimeoutRef.current)
+        pendingTimeoutRef.current = null
+      }
+
+      // Detect new connection (wasn't connected before, now is connected with address)
+      if (!prev.isConnected && isConnected && address) {
+        console.log('🎉 New wallet connection detected:', {
+          address,
+          chainId: chain?.id,
+          chainName: chain?.name,
+        })
+
+        // Debounced authentication trigger with cleanup tracking
+        pendingTimeoutRef.current = setTimeout(() => {
+          console.log('🚀 Triggering authentication for new connection')
+          stableOnNewConnection(address, chain?.id)
+          pendingTimeoutRef.current = null
+        }, 500) as unknown as number
+      }
+      // Handle network changes for already connected wallets (don't re-authenticate)
+      else if (prev.isConnected && isConnected && address && prev.chainId !== chain?.id) {
+        console.log('🔄 Network change detected, no re-authentication needed:', {
+          from: prev.chainId,
+          to: chain?.id,
+          address,
+        })
+        // Network changes should NOT trigger new authentication flows
+      }
+
+      // Detect disconnection (was connected before, now isn't)
+      if (prev.isConnected && !isConnected) {
+        console.log('👋 Wallet disconnection detected')
+        stableOnDisconnection()
+      }
+
+      // Update previous state to include chainId
+      previousConnection.current = {
+        isConnected,
         address,
         chainId: chain?.id,
-        chainName: chain?.name,
-      })
+      }
+    })
 
-      // Debounced authentication trigger with cleanup tracking
-      pendingTimeoutRef.current = setTimeout(() => {
-        console.log('🚀 Triggering authentication for new connection')
-        stableOnNewConnection(address, chain?.id)
-        pendingTimeoutRef.current = null
-      }, 500) as unknown as number // Increased delay for better stability
-    }
-    // Handle network changes for already connected wallets (don't re-authenticate)
-    else if (prev.isConnected && isConnected && address && prev.chainId !== chain?.id) {
-      console.log('🔄 Network change detected, no re-authentication needed:', {
-        from: prev.chainId,
-        to: chain?.id,
-        address,
-      })
-      // Just update the state without triggering authentication - this is crucial!
-      // Network changes should NOT trigger new authentication flows
-    }
-
-    // Detect disconnection (was connected before, now isn't)
-    if (prev.isConnected && !isConnected) {
-      console.log('👋 Wallet disconnection detected')
-      stableOnDisconnection()
-    }
-
-    // Update previous state to include chainId
-    previousConnection.current = {
-      isConnected,
-      address,
-      chainId: chain?.id,
-    }
-  }, [isConnected, address, chain?.id, stableOnNewConnection, stableOnDisconnection, walletConnectionBridge])
+    // Cleanup autorun when component unmounts
+    return disposer
+  }, []) // No dependencies needed! MobX tracks everything automatically
 }

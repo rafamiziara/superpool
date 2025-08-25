@@ -36,12 +36,8 @@ const ConnectingScreen = observer(function ConnectingScreen() {
       failedStep,
       isComplete,
       error: error || authError?.message,
-      // Debug migration info
-      mobxBridge: _debug ? {
-        original: _debug.originalValues,
-        bridge: _debug.bridgeValues,
-        authBridge: _debug.authBridge
-      } : 'no debug info'
+      // Simplified debug info
+      mobxBridge: _debug || 'no debug info'
     })
   }, [isConnected, isAuthenticating, authWalletAddress, currentStep, completedSteps, failedStep, isComplete, error, authError, _debug]);
 

@@ -29,100 +29,82 @@ export const useAuthentication = () => {
   // Create the authentication orchestrator with MobX stores (memoized to prevent recreation)
   const orchestrator = useMemo(() => new AuthenticationOrchestrator(authStore, walletStore), [authStore, walletStore])
 
-  const handleAuthentication = useCallback(
-    async (walletAddress: string) => {
-      // Check if we're in the middle of a logout process
-      try {
-        const { isLoggingOut } = getGlobalLogoutState()
-        if (isLoggingOut) {
-          console.log('⏸️ Skipping authentication: logout in progress')
-          return
-        }
-      } catch (error) {
-        // Global logout state not initialized, continue...
-      }
-
-      // Check if user is already authenticated with Firebase before starting authentication
-      if (firebaseAuth.isAuthenticated && firebaseAuth.walletAddress === walletAddress) {
-        console.log('✅ User already Firebase authenticated for this wallet, skipping authentication:', walletAddress)
+  // Simplified authentication handler - no complex dependency array needed
+  // MobX stores handle reactivity, and the function captures current values when called
+  const handleAuthentication = useCallback(async (walletAddress: string) => {
+    // Check if we're in the middle of a logout process
+    try {
+      const { isLoggingOut } = getGlobalLogoutState()
+      if (isLoggingOut) {
+        console.log('⏸️ Skipping authentication: logout in progress')
         return
       }
+    } catch (error) {
+      // Global logout state not initialized, continue...
+    }
 
-      // Clear any previous errors and reset progress
-      authState.setAuthError(null)
-      authProgress.resetProgress()
+    // Check if user is already authenticated with Firebase before starting authentication
+    if (firebaseAuth.isAuthenticated && firebaseAuth.walletAddress === walletAddress) {
+      console.log('✅ User already Firebase authenticated for this wallet, skipping authentication:', walletAddress)
+      return
+    }
 
-      // Create adapter functions that wrap wagmi hooks to match our SignatureFunctions interface
-      const adaptedSignatureFunctions = {
-        signTypedDataAsync: async (data: {
-          domain?: any
-          types: Record<string, any[]>
-          primaryType: string
-          message: Record<string, unknown>
-          account: `0x${string}`
-        }) => {
-          // Wagmi requires the parameters to be wrapped in a variables object
-          const signature = await signTypedDataAsync({
-            ...data,
-            account: data.account, // account is now required
-          })
-          return signature
-        },
-        signMessageAsync: async (params: { message: string; account: `0x${string}`; connector?: any }) => {
-          // Wagmi requires the parameters to be wrapped in a variables object
-          const signature = await signMessageAsync({
-            message: params.message,
-            account: params.account, // account is now required
-            connector: params.connector,
-          })
-          return signature
-        },
-      }
+    // Clear any previous errors and reset progress
+    authState.setAuthError(null)
+    authProgress.resetProgress()
 
-      // Create the authentication context with progress callbacks
-      const context: AuthenticationContext = {
-        walletAddress,
-        connector,
-        chainId: chain?.id,
-        signatureFunctions: adaptedSignatureFunctions,
-        disconnect,
-        progressCallbacks: {
-          onStepStart: authProgress.startStep,
-          onStepComplete: authProgress.completeStep,
-          onStepFail: authProgress.failStep,
-        },
-      }
+    // Create adapter functions that wrap wagmi hooks to match our SignatureFunctions interface
+    const adaptedSignatureFunctions = {
+      signTypedDataAsync: async (data: {
+        domain?: any
+        types: Record<string, any[]>
+        primaryType: string
+        message: Record<string, unknown>
+        account: `0x${string}`
+      }) => {
+        const signature = await signTypedDataAsync({ ...data, account: data.account })
+        return signature
+      },
+      signMessageAsync: async (params: { message: string; account: `0x${string}`; connector?: any }) => {
+        const signature = await signMessageAsync({
+          message: params.message,
+          account: params.account,
+          connector: params.connector,
+        })
+        return signature
+      },
+    }
 
-      try {
-        // Delegate to the orchestrator
-        await orchestrator.authenticate(context)
-      } catch (error) {
-        // Error handling is already done by the orchestrator and recovery service
-        // Just set the error state for the UI
-        if (error instanceof Error) {
-          authState.setAuthError(createAppError(ErrorType.UNKNOWN_ERROR, error.message, error))
-        }
-      }
-    },
-    [
-      authState,
-      authProgress,
-      orchestrator,
+    // Create the authentication context with progress callbacks
+    const context: AuthenticationContext = {
+      walletAddress,
       connector,
-      chain?.id,
-      signTypedDataAsync,
-      signMessageAsync,
+      chainId: chain?.id,
+      signatureFunctions: adaptedSignatureFunctions,
       disconnect,
-      firebaseAuth.isAuthenticated,
-      firebaseAuth.walletAddress,
-    ]
-  )
+      progressCallbacks: {
+        onStepStart: authProgress.startStep,
+        onStepComplete: authProgress.completeStep,
+        onStepFail: authProgress.failStep,
+      },
+    }
+
+    try {
+      // Delegate to the orchestrator
+      await orchestrator.authenticate(context)
+    } catch (error) {
+      // Error handling is already done by the orchestrator and recovery service
+      if (error instanceof Error) {
+        authState.setAuthError(createAppError(ErrorType.UNKNOWN_ERROR, error.message, error))
+      }
+    }
+  }, []) // Empty dependencies - function captures current values when called
 
   const handleDisconnection = useCallback(() => {
     authState.setAuthError(null)
     authProgress.resetProgress()
     orchestrator.cleanup()
-  }, [authState, authProgress, orchestrator])
+  }, []) // Empty dependencies - function captures current values when called
 
   // Use the connection trigger to only authenticate on new connections
   useWalletConnectionTrigger({
@@ -162,37 +144,23 @@ export const useAuthentication = () => {
     return disposer
   }, []) // No dependencies needed! MobX tracks everything automatically
 
-  return useMemo(
-    () => ({
-      // Authentication state - now includes MobX reactive state
-      authError: authState.authError || authStore.authError,
-      isAuthenticating: authState.isAuthenticating || authStore.isAuthenticating || firebaseAuth.isLoading,
-      // Use Firebase wallet address if available (persistent), otherwise fall back to store or auth lock address
-      authWalletAddress: firebaseAuth.walletAddress || authStore.authWalletAddress || authState.authWalletAddress,
-      // Expose Firebase auth state for navigation logic
-      isFirebaseAuthenticated: firebaseAuth.isAuthenticated,
-      isFirebaseLoading: firebaseAuth.isLoading,
-      // Progress state
-      ...authProgress,
-      // Expose MobX stores for advanced usage
-      _mobx: {
-        authStore: authStore,
-        walletStore: walletStore,
-      },
-    }),
-    [
-      authState.authError,
-      authState.isAuthenticating,
-      authState.authWalletAddress,
-      authStore.authError,
-      authStore.isAuthenticating,
-      authStore.authWalletAddress,
-      firebaseAuth.isLoading,
-      firebaseAuth.walletAddress,
-      firebaseAuth.isAuthenticated,
-      authProgress,
+  // Direct return - no complex useMemo needed!
+  // MobX observer components automatically re-render when stores change
+  return {
+    // Authentication state - combines MobX reactive state with traditional hooks
+    authError: authState.authError || authStore.authError,
+    isAuthenticating: authState.isAuthenticating || authStore.isAuthenticating || firebaseAuth.isLoading,
+    // Use Firebase wallet address if available (persistent), otherwise fall back to store or auth state
+    authWalletAddress: firebaseAuth.walletAddress || authStore.authWalletAddress || authState.authWalletAddress,
+    // Firebase auth state for navigation logic
+    isFirebaseAuthenticated: firebaseAuth.isAuthenticated,
+    isFirebaseLoading: firebaseAuth.isLoading,
+    // Progress state
+    ...authProgress,
+    // MobX stores for advanced usage
+    _mobx: {
       authStore,
       walletStore,
-    ]
-  )
+    },
+  }
 }

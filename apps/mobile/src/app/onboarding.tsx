@@ -78,12 +78,8 @@ const OnboardingScreen = observer(function OnboardingScreen() {
       authWalletAddress,
       isFirebaseAuthenticated,
       hasAuthError: !!authError,
-      // Debug info for migration verification
-      mobxBridge: _debug ? {
-        mobx: _debug.mobxValues,
-        original: _debug.originalValues,
-        firebase: _debug.firebaseValues
-      } : 'no debug info'
+      // Simplified debug info
+      mobxBridge: _debug || 'no debug info'
     })
 
     if (isConnected && isFirebaseAuthenticated && authWalletAddress) {
