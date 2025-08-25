@@ -41,12 +41,10 @@ describe('useAuthenticationStateReadonlyBridge', () => {
     })
   })
 
-  it('should provide debug information', () => {
+  it('should provide minimal debug information', () => {
     const { result } = renderHook(() => useAuthenticationStateReadonlyBridge())
 
+    // Debug info is minimal now - just indicates if wallet address exists  
     expect(result.current._debug).toBeDefined()
-    expect(result.current._debug?.originalValues).toBeDefined()
-    expect(result.current._debug?.mobxValues).toBeDefined()
-    expect(result.current._debug?.firebaseValues).toBeDefined()
   })
 })
