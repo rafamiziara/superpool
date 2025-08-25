@@ -56,12 +56,12 @@ Enable designated pool creators/admins to successfully deploy new lending pools 
 ## 🎨 Foundation & Enhancement
 
 ### [#39 - Implement design system, branding, and NativeWind integration](https://github.com/rafamiziara/superpool/issues/39)
-**Status**: 🔄 Open  
+**Status**: ✅ CLOSED  
 **Scope**: Design system, branding, and styling framework  
 **Priority**: High (Foundation for UI development)
 
 ### [#36 - Enhance authentication flow UI/UX](https://github.com/rafamiziara/superpool/issues/36)
-**Status**: 🔄 Open  
+**Status**: ✅ CLOSED  
 **Scope**: Polish authentication user experience  
 **Priority**: Medium (UX improvement)
 
@@ -71,9 +71,14 @@ Enable designated pool creators/admins to successfully deploy new lending pools 
 **Priority**: Medium (Code quality)
 
 ### [#41 - Refactor: Organize root directory structure for better maintainability](https://github.com/rafamiziara/superpool/issues/41)
-**Status**: 🔄 Open  
+**Status**: ✅ CLOSED  
 **Scope**: Directory reorganization for professional monorepo structure  
 **Priority**: Medium (Improves maintainability)
+
+### [#42 - Implement MobX reactive state management for mobile app](https://github.com/rafamiziara/superpool/issues/42)
+**Status**: 🔄 Open  
+**Scope**: Replace complex hook-based state with MobX reactive stores  
+**Priority**: High (Foundation for pool management features)
 
 ---
 
@@ -161,7 +166,7 @@ Enable designated pool creators/admins to successfully deploy new lending pools 
 
 ## 📊 Progress Tracking
 
-### Overall Sprint 1 Progress: 23/28 issues completed (82%)
+### Overall Sprint 1 Progress: 26/29 issues completed (90%)
 
 **By Feature:**
 - ✅ **User Onboarding & Wallet Connection**: 14/14 issues (100%) ✅ COMPLETED
@@ -169,17 +174,17 @@ Enable designated pool creators/admins to successfully deploy new lending pools 
   - Backend Authentication: 5/5 issues ✅
   - Mobile App Integration: 5/5 issues ✅
   - Quality Assurance: 3/3 issues ✅ COMPLETED
-- 🔄 **Create a New Lending Pool**: 6/14 issues (43%) 🔄 IN PROGRESS
-  - 🎨 Foundation & Enhancement: 0/4 issues (0%)
+- 🔄 **Create a New Lending Pool**: 12/15 issues (80%) 🔄 IN PROGRESS
+  - 🎨 Foundation & Enhancement: 3/5 issues (60%) 🔄 IN PROGRESS
   - ✅ Smart Contracts: 6/6 issues (100%) ✅ COMPLETED
-  - ⚡ Backend: 0/3 issues (0%)  
+  - ✅ Backend: 3/3 issues (100%) ✅ COMPLETED  
   - 📱 Mobile App: 0/3 issues (0%) (Frontend)
 
 ### Critical Path
-1. **Foundation Phase**: **#39** (Design system) → **#36, #38, #41** (UX, Testing, Structure) - Foundation for all UI work
+1. **Foundation Phase**: ✅ **#39, #36, #41** completed! → **#42** (MobX) + **#38** (Testing) - State management foundation for UI
 2. ✅ **Smart Contract Phase**: **#22-27** All completed! ✅ Ready for backend integration
-3. **Backend Phase**: **#28** (Cloud Function) can now start → **#29, #30** (Safe integration, Events)
-4. **Frontend Phase**: **#31** (UI) depends on Foundation + Backend → **#32** (Integration) → **#33** (Validation)
+3. ✅ **Backend Phase**: **#28-30** All completed! ✅ Ready for frontend integration
+4. **Frontend Phase**: **#31** (UI) depends on Foundation (MobX #42) → **#32** (Integration) → **#33** (Validation)
 
 ---
 
@@ -192,7 +197,9 @@ Enable designated pool creators/admins to successfully deploy new lending pools 
 - [ ] **Pool creator can deploy new lending pool via dApp** 🔄 IN PROGRESS
 - [x] **PoolFactory contract verified on Polygonscan** ✅ COMPLETED  
 - [x] **PoolFactory ownership transferred to multi-sig Safe** ✅ COMPLETED
-- [ ] **End-to-end pool creation flow functional** ⏳ PENDING (Backend + Frontend needed)
+- [x] **Backend services handle pool creation** ✅ COMPLETED
+- [ ] **MobX state management implemented** 🔄 IN PROGRESS (#42)
+- [ ] **End-to-end pool creation flow functional** ⏳ PENDING (Frontend UI needed)
 
 ---
 

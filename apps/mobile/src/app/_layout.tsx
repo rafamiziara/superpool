@@ -19,6 +19,7 @@ import { localhost } from '../config/chains';
 import { useGlobalErrorHandler } from '../hooks/useGlobalErrorHandler';
 import { useGlobalLogoutState } from '../hooks/useLogoutState';
 import { useWalletToasts } from '../hooks/useWalletToasts';
+import { StoreProvider } from '../stores';
 import { SessionManager } from '../utils/sessionManager';
 
 const queryClient = new QueryClient();
@@ -91,10 +92,12 @@ function AppContent() {
 
 export default function RootLayout() {
   return (
-    <WagmiProvider config={wagmiConfig}>
-      <QueryClientProvider client={queryClient}>
-        <AppContent />
-      </QueryClientProvider>
-    </WagmiProvider>
+    <StoreProvider>
+      <WagmiProvider config={wagmiConfig}>
+        <QueryClientProvider client={queryClient}>
+          <AppContent />
+        </QueryClientProvider>
+      </WagmiProvider>
+    </StoreProvider>
   );
 }
