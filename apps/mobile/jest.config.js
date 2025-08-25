@@ -17,7 +17,7 @@ module.exports = {
     '^.+\\.(ts|tsx)$': ['ts-jest', {
       tsconfig: 'tsconfig.json',
     }],
-    '^.+\\.(js|jsx)$': ['babel-jest', { configFile: './jest.babel.config.js' }],
+    // '^.+\\.(js|jsx)$': ['babel-jest', { configFile: './jest.babel.config.js' }],
   },
   
   // File extensions

@@ -34,12 +34,12 @@ interface TypedData {
   types: Record<string, TypedDataParameter[]>
   primaryType: string
   message: Record<string, unknown>
-  account?: `0x${string}`
+  account: `0x${string}` // Required to match wagmi v2
 }
 
 export interface SignatureFunctions {
   signTypedDataAsync: (data: TypedData) => Promise<string>
-  signMessageAsync: (params: { message: string; connector?: Connector }) => Promise<string>
+  signMessageAsync: (params: { message: string; account: `0x${string}`; connector?: Connector }) => Promise<string>
 }
 
 export class WalletTypeDetector {
@@ -76,6 +76,7 @@ export class SafeWalletSigner {
       // Try direct connector signing first
       const signaturePromise = functions.signMessageAsync({
         message: request.message,
+        account: request.walletAddress as `0x${string}`,
         connector,
       })
 
@@ -122,11 +123,14 @@ export class RegularWalletSigner {
     try {
       console.log('📱 Trying personal message signing first for better UX...')
 
-      const signaturePromise = functions.signMessageAsync({ message: request.message })
+      const signaturePromise = functions.signMessageAsync({ 
+        message: request.message,
+        account: request.walletAddress as `0x${string}`
+      })
       const timeoutPromise = new Promise<never>((_, reject) => {
         timeoutId = setTimeout(() => {
           reject(new Error(`Personal sign request timed out after ${timeoutMs / 1000} seconds`))
-        }, timeoutMs)
+        }, timeoutMs) as unknown as number
       })
 
       const signature = await Promise.race([signaturePromise, timeoutPromise])
@@ -200,11 +204,14 @@ export class RegularWalletSigner {
           },
         }
 
-        const signaturePromise = functions.signTypedDataAsync(typedData)
+        const signaturePromise = functions.signTypedDataAsync({
+          ...typedData,
+          account: request.walletAddress as `0x${string}`,
+        })
         const timeoutPromise = new Promise<never>((_, reject) => {
           timeoutId = setTimeout(() => {
             reject(new Error(`EIP-712 signature request timed out after ${timeoutMs / 1000} seconds`))
-          }, timeoutMs)
+          }, timeoutMs) as unknown as number
         })
 
         const signature = await Promise.race([signaturePromise, timeoutPromise])

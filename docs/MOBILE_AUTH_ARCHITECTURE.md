@@ -20,22 +20,24 @@ The authentication system is built on a **4-layer architecture**:
                           │
 ┌─────────────────────────▼───────────────────────────────────┐
 │                     HOOKS LAYER                             │
-│  useAuthentication → useAuthenticationState                 │
-│  useWalletConnectionTrigger → useWalletToasts               │
-│  useLogoutState                                             │
+│  useAuthentication (with progress) → useAuthenticationState │
+│  useAuthenticationStateReadonly → useFirebaseAuth           │
+│  useGlobalErrorHandler → useWalletConnectionTrigger         │
+│  useWalletToasts → useLogoutState → useAuthProgress         │
 └─────────────────────────┬───────────────────────────────────┘
                           │
 ┌─────────────────────────▼───────────────────────────────────┐
 │                   SERVICES LAYER                            │
-│  AuthenticationOrchestrator                                 │
+│  AuthenticationOrchestrator (with progress callbacks)       │
 │  AuthErrorRecoveryService                                   │
-│  SignatureService                                           │
+│  SignatureService (enhanced security)                       │
 └─────────────────────────┬───────────────────────────────────┘
                           │
 ┌─────────────────────────▼───────────────────────────────────┐
 │                    UTILS LAYER                              │
-│  ConnectionStateManager → SessionManager                    │
-│  ErrorHandling → Toast → AppCheckProvider                   │
+│  ConnectionStateManager → SessionManager (with cleanup locks)│
+│  FirebaseAuthManager → SecureLogger → ErrorHandling         │
+│  Toast → AppCheckProvider                                   │
 └─────────────────────────────────────────────────────────────┘
 ```
 
@@ -94,14 +96,49 @@ The authentication system is built on a **4-layer architecture**:
 
 ### useAuthentication
 
-**Purpose**: Main authentication hook that provides auth state to components
-**File**: `useAuthentication.ts:8`
+**Purpose**: Main authentication hook with progress tracking for active authentication flows
+**File**: `useAuthentication.ts:11`
 
 **Key Features:**
-- **Orchestrator Integration**: Creates and manages `AuthenticationOrchestrator` instance
+- **Progress Integration**: Integrates with `useAuthProgress` for 6-step visual feedback
+- **Firebase State**: Uses `useFirebaseAuth` for persistent authentication state
+- **Orchestrator Integration**: Creates and manages `AuthenticationOrchestrator` instance with progress callbacks
 - **Connection Triggering**: Uses `useWalletConnectionTrigger` for automatic auth on new connections
-- **Error State**: Provides authentication errors to UI components
-- **Cleanup Handling**: Properly cleans up on wallet disconnection
+- **Smart Skip Logic**: Avoids re-authentication if user already Firebase authenticated
+- **Logout Protection**: Checks global logout state to prevent race conditions
+
+### useAuthenticationStateReadonly
+
+**Purpose**: Lightweight readonly authentication state for routing screens
+**File**: `useAuthenticationStateReadonly.ts:12`
+
+**Key Features:**
+- **Read-Only Access**: Provides authentication state without triggering flows
+- **Firebase Integration**: Combines Firebase auth state with authentication lock state
+- **Routing Optimization**: Designed for screens that only need state for navigation decisions
+- **Persistent State**: Uses Firebase wallet address as primary source of truth
+
+### useFirebaseAuth
+
+**Purpose**: Singleton Firebase authentication state management
+**File**: `useFirebaseAuth.ts:8`
+
+**Key Features:**
+- **Singleton Pattern**: Uses `firebaseAuthManager` to prevent multiple Firebase listeners
+- **State Persistence**: Maintains authentication state across app refreshes
+- **Wallet Validation**: Validates Firebase UID matches valid wallet address format
+- **Real-time Updates**: Provides live Firebase auth state changes
+
+### useGlobalErrorHandler
+
+**Purpose**: Global session corruption detection and recovery
+**File**: `useGlobalErrorHandler.ts:10`
+
+**Key Features:**
+- **Session Corruption Detection**: Monitors console errors for session corruption patterns
+- **Automatic Recovery**: Triggers session cleanup for corrupted sessions
+- **Rate Limiting**: Prevents handling the same error multiple times
+- **Console Interception**: Safely intercepts console.error for session error detection
 
 ### useAuthenticationState
 
@@ -178,6 +215,40 @@ The authentication system is built on a **4-layer architecture**:
 - **Extended Durations**: Longer durations for wallet app switching scenarios
 - **Error-Specific Messaging**: Different toast styles based on error type
 
+### FirebaseAuthManager
+
+**Purpose**: Singleton Firebase authentication state manager with security validation
+**File**: `firebaseAuthManager.ts:48`
+
+**Key Features:**
+- **Singleton Pattern**: Ensures only one Firebase auth listener globally
+- **Wallet Address Validation**: Validates Firebase UID is a valid Ethereum address
+- **State Persistence**: Maintains authentication state across app refreshes
+- **Security Guards**: Prevents authentication bypass through UID manipulation
+- **Listener Management**: Supports multiple components subscribing to auth state
+
+**Critical Methods:**
+- `addListener()`: Subscribe to Firebase auth state changes (`firebaseAuthManager.ts:94`)
+- `getCurrentState()`: Get current auth state synchronously (`firebaseAuthManager.ts:114`)
+- `extractWalletAddress()`: Safely extract and validate wallet address from user (`firebaseAuthManager.ts:30`)
+
+### SecureLogger
+
+**Purpose**: Production-safe logging utility with sensitive data protection
+**File**: `secureLogger.ts:20`
+
+**Key Features:**
+- **Data Sanitization**: Automatically masks wallet addresses, signatures, and tokens
+- **Environment-Aware**: Full logging in development, restricted in production
+- **Sensitive Key Detection**: Recognizes and redacts sensitive object properties
+- **Log Level Management**: Configurable logging levels (DEBUG, INFO, WARN, ERROR)
+
+**Security Protection:**
+- Masks wallet addresses (shows first 6 and last 4 characters)
+- Redacts signature data and private keys
+- Truncates long hex strings with length indicators
+- Development-only detailed logging
+
 ### AppCheckProvider
 
 **Purpose**: Firebase App Check token provider for device verification
@@ -188,58 +259,99 @@ The authentication system is built on a **4-layer architecture**:
 - **Custom Token Provider**: Integrates with backend App Check system
 - **Fallback Tokens**: Provides dummy tokens when device not approved
 
+## 6-Step Authentication Progress System
+
+The authentication system now provides real-time progress feedback through 6 distinct steps:
+
+1. **Connect Wallet** ✓ (completed before authentication starts)
+2. **Acquire Lock & Validate State** - Prevents concurrent auth attempts
+3. **Generate Auth Message** - Backend creates signed message with nonce
+4. **Request Signature** - User signs message in wallet app
+5. **Verify Signature** - Backend validates signature authenticity
+6. **Firebase Authentication** - Complete Firebase login process
+
+**Progress Integration:**
+- `useAuthProgress.ts` manages step state and visual indicators
+- `AuthenticationOrchestrator` emits progress callbacks for each step
+- UI components display step-by-step progress with checkmarks and spinners
+- Failed steps show with error indicators and specific error messages
+
 ## Authentication Flow Sequence
 
-### Complete Authentication Flow
+### Complete Authentication Flow (with Progress Tracking)
 
 ```mermaid
 sequenceDiagram
     participant UI as UI Component
     participant Hook as useAuthentication
+    participant Progress as useAuthProgress
+    participant Firebase as useFirebaseAuth
     participant Orch as AuthenticationOrchestrator
     participant Sig as SignatureService
     participant Backend as Firebase Functions
     participant Session as SessionManager
     participant Error as ErrorRecoveryService
+    participant SecLog as SecureLogger
 
     UI->>Hook: Wallet connects
-    Hook->>Orch: authenticate(context)
+    Hook->>Firebase: Check existing auth state
+    Firebase-->>Hook: Authentication status
     
-    Note over Orch: Step 1: Acquire lock & validate state
-    Orch->>Orch: acquireAuthLock()
-    Orch->>Orch: validatePreConditions()
-    
-    Note over Orch: Step 2: Generate auth message
-    Orch->>Backend: generateAuthMessage()
-    Backend-->>Orch: {message, nonce, timestamp}
-    
-    Note over Orch: Step 3: Request signature
-    Orch->>Sig: requestSignature()
-    Sig->>Sig: detectWalletType()
-    
-    alt Safe Wallet
-        Sig->>Sig: SafeWalletSigner.sign()
-    else Regular Wallet
-        Sig->>Sig: RegularWalletSigner.sign()
-    end
-    
-    Sig-->>Orch: {signature, signatureType}
-    
-    Note over Orch: Step 4: Verify signature
-    Orch->>Backend: verifySignatureAndLogin()
-    Backend-->>Orch: {firebaseToken}
-    
-    Note over Orch: Step 5: Firebase authentication
-    Orch->>Orch: signInWithFirebase()
-    
-    alt Success
-        Orch-->>Hook: Success
-        Hook-->>UI: Authentication complete
-    else Error
-        Orch->>Error: handleAuthenticationError()
-        Error->>Session: clearAllWalletConnectSessions()
-        Error-->>Hook: Categorized error
-        Hook-->>UI: Show error state
+    alt Already Authenticated
+        Hook-->>UI: Skip authentication (already logged in)
+    else Need Authentication
+        Hook->>Progress: resetProgress()
+        Hook->>Orch: authenticate(context with progress callbacks)
+        
+        Note over Orch: Step 2: Acquire lock & validate state
+        Orch->>Progress: updateStep(2, 'in-progress')
+        Orch->>Orch: acquireAuthLock()
+        Orch->>Orch: validatePreConditions()
+        Orch->>Progress: updateStep(2, 'completed')
+        
+        Note over Orch: Step 3: Generate auth message
+        Orch->>Progress: updateStep(3, 'in-progress')
+        Orch->>Backend: generateAuthMessage()
+        Backend-->>Orch: {message, nonce, timestamp}
+        Orch->>Progress: updateStep(3, 'completed')
+        
+        Note over Orch: Step 4: Request signature
+        Orch->>Progress: updateStep(4, 'in-progress')
+        Orch->>Sig: requestSignature()
+        Sig->>SecLog: Secure signature logging
+        Sig->>Sig: detectWalletType()
+        
+        alt Safe Wallet
+            Sig->>Sig: SafeWalletSigner.sign()
+        else Regular Wallet
+            Sig->>Sig: RegularWalletSigner.sign()
+        end
+        
+        Sig-->>Orch: {signature, signatureType}
+        Orch->>Progress: updateStep(4, 'completed')
+        
+        Note over Orch: Step 5: Verify signature
+        Orch->>Progress: updateStep(5, 'in-progress')
+        Orch->>Backend: verifySignatureAndLogin()
+        Backend-->>Orch: {firebaseToken}
+        Orch->>Progress: updateStep(5, 'completed')
+        
+        Note over Orch: Step 6: Firebase authentication
+        Orch->>Progress: updateStep(6, 'in-progress')
+        Orch->>Firebase: signInWithFirebase()
+        Firebase->>Firebase: Validate wallet address format
+        
+        alt Success
+            Orch->>Progress: updateStep(6, 'completed')
+            Orch-->>Hook: Success
+            Hook-->>UI: Authentication complete
+        else Error
+            Orch->>Progress: updateStep(current, 'failed')
+            Orch->>Error: handleAuthenticationError()
+            Error->>Session: clearAllWalletConnectSessions() (with cleanup lock)
+            Error-->>Hook: Categorized error
+            Hook-->>UI: Show error state with failed step
+        end
     end
 ```
 
@@ -301,20 +413,54 @@ For other authentication errors:
 
 ## Testing Considerations
 
-The authentication system includes several testing utilities:
+The authentication system includes comprehensive testing utilities:
 
+### Hook Testing
 1. **State Management Tests**: `useAuthenticationState.test.ts`
-2. **Error Recovery Tests**: `authErrorRecoveryService.simple.test.ts`
-3. **Signature Service Tests**: `signatureService.test.ts`
-4. **Connection State Tests**: `connectionStateManager.test.ts`
+2. **Firebase Auth Tests**: Tests needed for `useFirebaseAuth.ts`
+3. **Global Error Handler Tests**: Tests needed for `useGlobalErrorHandler.ts`
+4. **Readonly State Tests**: Tests needed for `useAuthenticationStateReadonly.ts`
+5. **Authentication Progress Tests**: Tests needed for enhanced `useAuthentication.ts`
+
+### Service Testing
+6. **Error Recovery Tests**: `authErrorRecoveryService.simple.test.ts`
+7. **Signature Service Tests**: `signatureService.test.ts`
+
+### Utility Testing
+8. **Connection State Tests**: `connectionStateManager.test.ts`
+9. **Session Manager Tests**: `sessionManager.test.ts`
+10. **Security Validation Tests**: Tests needed for `firebaseAuthManager.ts` validation
+11. **Secure Logging Tests**: Tests needed for `secureLogger.ts`
 
 ## Security Features
 
-1. **Firebase App Check**: Device verification before authentication
-2. **Atomic State Management**: Prevents race conditions and state inconsistencies
-3. **Session Isolation**: Complete session cleanup prevents cross-authentication contamination
-4. **Error Categorization**: Prevents sensitive error information leakage
-5. **Signature Validation**: Multiple signature verification strategies
+### Phase 1 Security Fixes (Latest)
+
+1. **Wallet Address Validation**: Critical security fix preventing authentication bypass
+   - Validates Firebase UID matches valid Ethereum address format (0x + 40 hex chars)
+   - Prevents UID manipulation attacks in `firebaseAuthManager.ts:16`
+   - Blocks authentication if UID doesn't match wallet address pattern
+
+2. **Session Cleanup Race Condition Protection**: Atomic session cleanup operations
+   - Added `withCleanupLock()` mechanism to prevent concurrent session operations
+   - Protected methods: `clearAllWalletConnectSessions`, `clearSpecificSession`, `clearSessionByErrorId`
+   - Ensures atomic session cleanup in `sessionManager.ts`
+
+3. **Production Logging Security**: Secure logging with sensitive data protection
+   - Created `secureLogger.ts` utility with automatic data sanitization
+   - Masks wallet addresses, signatures, and Firebase tokens in production
+   - Replaced 157+ console.log statements with secure logging
+   - Development-only detailed logging for debugging
+
+### Core Security Architecture
+
+4. **Firebase App Check**: Device verification before authentication
+5. **Atomic State Management**: Prevents race conditions and state inconsistencies
+6. **Session Isolation**: Complete session cleanup prevents cross-authentication contamination
+7. **Error Categorization**: Prevents sensitive error information leakage
+8. **Signature Validation**: Multiple signature verification strategies
+9. **Input Validation**: Comprehensive validation of wallet addresses, signatures, and UIDs
+10. **Concurrency Safety**: Authentication locks and cleanup operation queuing
 
 ---
 

@@ -39,3 +39,8 @@ export const useGlobalLogoutState = (): LogoutState => {
   globalLogoutState = logoutState
   return logoutState
 }
+
+// Test-only function to reset global state
+export const __resetGlobalLogoutStateForTesting = (): void => {
+  globalLogoutState = null
+}
