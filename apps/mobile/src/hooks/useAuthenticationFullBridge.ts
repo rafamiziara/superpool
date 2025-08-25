@@ -1,30 +1,24 @@
-import { useAuthenticationBridge } from './useAuthenticationBridge'
+import { useAuthenticationStore } from '../stores'
 import { useAuthProgress } from './useAuthProgress'
 import { useFirebaseAuth } from './useFirebaseAuth'
 
 /**
- * Simplified authentication bridge with MobX reactivity
+ * Clean authentication hook with MobX stores and progress tracking
  *
- * Combines authentication state from MobX stores with progress tracking.
- * No complex useMemo dependencies - MobX handles reactivity automatically.
- *
- * Key simplifications:
- * - Removed debug comparison code (migration is complete)
- * - Eliminated complex dependency arrays
- * - Direct property access instead of memoized object
+ * Directly uses MobX stores - no bridge pattern needed!
+ * Combines authentication state with progress management for connecting screen.
  */
 export const useAuthenticationFullBridge = () => {
-  const authBridge = useAuthenticationBridge()
+  const authStore = useAuthenticationStore()
   const authProgress = useAuthProgress()
   const firebaseAuth = useFirebaseAuth()
 
-  // Direct return - no complex useMemo needed!
-  // MobX handles reactivity automatically through observer components
+  // Clean direct return - MobX handles reactivity automatically
   return {
-    // Authentication state from MobX bridge (reactive)
-    authError: authBridge.authError,
-    isAuthenticating: authBridge.isAuthenticating || firebaseAuth.isLoading,
-    authWalletAddress: firebaseAuth.walletAddress || authBridge.authWalletAddress,
+    // Authentication state from MobX store (reactive)
+    authError: authStore.authError,
+    isAuthenticating: authStore.isAuthenticating || firebaseAuth.isLoading,
+    authWalletAddress: firebaseAuth.walletAddress || authStore.authWalletAddress,
 
     // Firebase auth state
     isFirebaseAuthenticated: firebaseAuth.isAuthenticated,
@@ -46,8 +40,14 @@ export const useAuthenticationFullBridge = () => {
     getStepInfo: authProgress.getStepInfo,
     getAllSteps: authProgress.getAllSteps,
 
-    // Simplified debug info (removed complex comparison)
-    _debug: authBridge._debug,
+    // Clean debug info
+    _debug: {
+      authStore: {
+        authError: authStore.authError,
+        isAuthenticating: authStore.isAuthenticating,
+        authWalletAddress: authStore.authWalletAddress,
+      },
+    },
   }
 }
 
