@@ -1,6 +1,13 @@
+import { AuthenticationStore } from '../stores/AuthenticationStore'
 import { WalletConnectionStore } from '../stores/WalletConnectionStore'
 import { AuthenticationOrchestrator } from './authenticationOrchestrator'
-import { WalletConnectionBridge } from './walletConnectionBridge'
+
+// Mock expo-router
+jest.mock('expo-router', () => ({
+  router: {
+    replace: jest.fn(),
+  },
+}))
 
 // Mock Firebase and other dependencies
 jest.mock('../firebase.config', () => ({
@@ -51,27 +58,16 @@ jest.mock('./signatureService', () => ({
 }))
 
 describe('Wallet Connection Integration', () => {
+  let authStore: AuthenticationStore
   let walletStore: WalletConnectionStore
-  let bridge: WalletConnectionBridge
-  let authLock: React.MutableRefObject<any>
   let orchestrator: AuthenticationOrchestrator
 
   beforeEach(() => {
     jest.clearAllMocks()
 
+    authStore = new AuthenticationStore()
     walletStore = new WalletConnectionStore()
-    bridge = new WalletConnectionBridge(walletStore)
-
-    authLock = {
-      current: {
-        isLocked: false,
-        startTime: 0,
-        walletAddress: null,
-        abortController: null,
-      },
-    }
-
-    orchestrator = new AuthenticationOrchestrator(authLock, bridge)
+    orchestrator = new AuthenticationOrchestrator(authStore, walletStore)
   })
 
   describe('Atomic State Validation', () => {
@@ -79,8 +75,8 @@ describe('Wallet Connection Integration', () => {
       // Connect wallet
       walletStore.connect('0x123', 1)
 
-      // Capture atomic state
-      const lockedState = bridge.captureState(true, '0x123', 1)
+      // Capture atomic state using wallet store
+      const lockedState = walletStore.captureState()
 
       expect(lockedState).toEqual({
         isConnected: true,
@@ -90,17 +86,18 @@ describe('Wallet Connection Integration', () => {
         sequenceNumber: expect.any(Number),
       })
 
-      // Validate initial state
-      const validation = bridge.validateInitialState('0x123')
+      // Validate initial state using wallet store
+      const validation = walletStore.validateInitialState('0x123')
       expect(validation.isValid).toBe(true)
     })
 
     it('should detect state changes through sequence numbers', () => {
       // Capture initial state
-      const initialState = bridge.captureState(true, '0x123', 1)
+      const initialState = walletStore.captureState()
 
       // Change wallet state (simulating network switch)
-      const newState = bridge.captureState(true, '0x123', 137)
+      walletStore.updateConnectionState(true, '0x123', 137)
+      const newState = walletStore.captureState()
 
       // Sequence number should be different
       expect(newState.sequenceNumber).toBeGreaterThan(initialState.sequenceNumber)
@@ -108,23 +105,25 @@ describe('Wallet Connection Integration', () => {
     })
 
     it('should validate state consistency correctly', () => {
-      const lockedState = bridge.captureState(true, '0x123', 1)
+      const lockedState = walletStore.captureState()
 
       // Same state should validate successfully
-      const currentState = bridge.getCurrentState()
-      const isValid = bridge.validateState(lockedState, currentState, 'test-checkpoint')
+      const currentState = walletStore.captureState()
+      const isValid = walletStore.validateState(lockedState, currentState, 'test-checkpoint')
 
       expect(isValid).toBe(true)
     })
 
     it('should reject validation when state changes', () => {
-      const lockedState = bridge.captureState(true, '0x123', 1)
+      // First connect the wallet
+      walletStore.connect('0x123', 1)
+      const lockedState = walletStore.captureState()
 
       // Simulate wallet disconnection
       walletStore.disconnect()
 
-      const currentState = bridge.getCurrentState()
-      const isValid = bridge.validateState(lockedState, currentState, 'disconnect-test')
+      const currentState = walletStore.captureState()
+      const isValid = walletStore.validateState(lockedState, currentState, 'disconnect-test')
 
       expect(isValid).toBe(false)
     })
@@ -132,7 +131,7 @@ describe('Wallet Connection Integration', () => {
     it('should reject mismatched wallet addresses', () => {
       walletStore.connect('0x123', 1)
 
-      const validation = bridge.validateInitialState('0x456')
+      const validation = walletStore.validateInitialState('0x456')
       expect(validation.isValid).toBe(false)
       expect(validation.error).toBe('Wallet address mismatch')
     })
@@ -140,7 +139,7 @@ describe('Wallet Connection Integration', () => {
     it('should reject disconnected wallet validation', () => {
       walletStore.disconnect()
 
-      const validation = bridge.validateInitialState('0x123')
+      const validation = walletStore.validateInitialState('0x123')
       expect(validation.isValid).toBe(false)
       expect(validation.error).toBe('Wallet connection state invalid')
     })
@@ -153,31 +152,29 @@ describe('Wallet Connection Integration', () => {
         chainId: undefined,
       })
 
-      const validation = bridge.validateInitialState('0x123')
+      const validation = walletStore.validateInitialState('0x123')
       expect(validation.isValid).toBe(false)
       expect(validation.error).toBe('ChainId not found')
     })
   })
 
-  describe('Bridge State Synchronization', () => {
-    it('should maintain store and singleton sync', () => {
-      // Capture state through bridge
-      bridge.captureState(true, '0x123', 1)
+  describe('Store State Management', () => {
+    it('should maintain store state correctly', () => {
+      // Connect wallet through store
+      walletStore.connect('0x123', 1)
 
-      // Check debug sync
-      const debug = bridge.debugStateSync()
-      expect(debug.inSync).toBe(true)
-      expect(debug.store.isConnected).toBe(true)
-      expect(debug.store.address).toBe('0x123')
-      expect(debug.store.chainId).toBe(1)
+      // Check store state
+      expect(walletStore.isConnected).toBe(true)
+      expect(walletStore.address).toBe('0x123')
+      expect(walletStore.chainId).toBe(1)
     })
 
-    it('should reset both systems correctly', () => {
+    it('should reset store correctly', () => {
       // Set up connected state
       walletStore.connect('0x123', 1)
 
-      // Reset through bridge
-      bridge.reset()
+      // Reset through store
+      walletStore.reset()
 
       // Verify store is reset
       expect(walletStore.isConnected).toBe(false)
