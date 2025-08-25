@@ -1,5 +1,7 @@
 import { signOut } from 'firebase/auth'
 import { FIREBASE_AUTH } from '../firebase.config'
+import { AuthenticationStore } from '../stores/AuthenticationStore'
+import { WalletConnectionStore } from '../stores/WalletConnectionStore'
 import { AppError, categorizeError, isUserInitiatedError } from '../utils/errorHandling'
 import { SessionManager } from '../utils/sessionManager'
 import { authToasts, showErrorFromAppError } from '../utils/toast'
@@ -18,6 +20,34 @@ export interface SessionErrorContext {
 }
 
 export class AuthErrorRecoveryService {
+  // Store references for reactive state management
+  private static authStore?: AuthenticationStore
+  private static walletStore?: WalletConnectionStore
+
+  /**
+   * Initialize the service with MobX stores
+   * Call this once during app initialization
+   */
+  static initialize(authStore: AuthenticationStore, walletStore: WalletConnectionStore): void {
+    this.authStore = authStore
+    this.walletStore = walletStore
+    console.log('🔧 AuthErrorRecoveryService initialized with MobX stores')
+  }
+
+  /**
+   * Get the disconnect function from the wallet store
+   * This replaces the callback parameter pattern
+   */
+  private static getDisconnectFunction(): (() => void) | null {
+    if (!this.walletStore) {
+      console.warn('⚠️ WalletStore not initialized in AuthErrorRecoveryService')
+      return null
+    }
+    return () => {
+      console.log('🔌 Disconnecting wallet via MobX store...')
+      this.walletStore?.disconnect()
+    }
+  }
   /**
    * Analyzes error and determines if it's a WalletConnect session error
    */
@@ -44,8 +74,19 @@ export class AuthErrorRecoveryService {
 
   /**
    * Handles WalletConnect session errors with comprehensive cleanup
+   * Now uses MobX stores instead of callback parameter
    */
-  static async handleSessionError(sessionContext: SessionErrorContext, disconnect: () => void): Promise<ErrorRecoveryResult> {
+  static async handleSessionError(sessionContext: SessionErrorContext): Promise<ErrorRecoveryResult> {
+    const disconnect = this.getDisconnectFunction()
+    if (!disconnect) {
+      console.error('❌ Cannot handle session error: wallet store not initialized')
+      return {
+        shouldDisconnect: false,
+        shouldShowError: true,
+        errorDelay: 1500,
+        cleanupPerformed: false,
+      }
+    }
     console.log('🚨 Detected WalletConnect session error:', sessionContext.errorMessage)
 
     let cleanupSuccessful = false
@@ -96,8 +137,19 @@ export class AuthErrorRecoveryService {
 
   /**
    * Handles timeout errors with wallet disconnection
+   * Now uses MobX stores instead of callback parameter
    */
-  static handleTimeoutError(error: AppError, disconnect: () => void): ErrorRecoveryResult {
+  static handleTimeoutError(): ErrorRecoveryResult {
+    const disconnect = this.getDisconnectFunction()
+    if (!disconnect) {
+      console.error('❌ Cannot handle timeout error: wallet store not initialized')
+      return {
+        shouldDisconnect: false,
+        shouldShowError: true,
+        errorDelay: 1500,
+        cleanupPerformed: false,
+      }
+    }
     console.log('⏰ Signature request timed out')
 
     // Disconnect wallet on timeout
@@ -137,8 +189,10 @@ export class AuthErrorRecoveryService {
 
   /**
    * Handles generic authentication errors with appropriate disconnect logic
+   * Now uses MobX wallet store to determine connection status
    */
-  static handleGenericError(error: unknown, isConnected: boolean): ErrorRecoveryResult {
+  static handleGenericError(error: unknown): ErrorRecoveryResult {
+    const isConnected = this.walletStore?.isConnected ?? false
     const appError = categorizeError(error)
     const isUserInitiated = isUserInitiatedError(appError)
 
@@ -156,8 +210,8 @@ export class AuthErrorRecoveryService {
     const errorDelay = shouldDisconnect
       ? 2000 // For technical failures that cause disconnect, show error after disconnect toast
       : isUserInitiated
-        ? 1500
-        : 0 // For user cancellations, brief delay; immediate for other errors
+      ? 1500
+      : 0 // For user cancellations, brief delay; immediate for other errors
 
     console.log(
       shouldDisconnect
@@ -175,19 +229,31 @@ export class AuthErrorRecoveryService {
 
   /**
    * Comprehensive error handling for authentication failures
+   * Now uses MobX stores instead of callback parameters
    */
-  static async handleAuthenticationError(
-    error: unknown,
-    isConnected: boolean,
-    disconnect: () => void
-  ): Promise<{ appError: AppError; recoveryResult: ErrorRecoveryResult }> {
+  static async handleAuthenticationError(error: unknown): Promise<{ appError: AppError; recoveryResult: ErrorRecoveryResult }> {
+    const disconnect = this.getDisconnectFunction()
+
+    if (!disconnect) {
+      console.error('❌ Cannot handle authentication error: stores not initialized')
+      const appError = categorizeError(error)
+      return {
+        appError,
+        recoveryResult: {
+          shouldDisconnect: false,
+          shouldShowError: true,
+          errorDelay: 1500,
+          cleanupPerformed: false,
+        },
+      }
+    }
     console.error('Authentication failed:', error)
 
     // Step 1: Analyze if this is a session error
     const sessionContext = this.analyzeSessionError(error)
 
     if (sessionContext.isSessionError) {
-      const recoveryResult = await this.handleSessionError(sessionContext, disconnect)
+      const recoveryResult = await this.handleSessionError(sessionContext)
       // For session errors, we create a generic app error since we handle display differently
       const appError = categorizeError(new Error('WalletConnect session error'))
       return { appError, recoveryResult }
@@ -197,7 +263,7 @@ export class AuthErrorRecoveryService {
     const errorMessage = sessionContext.errorMessage
     if (errorMessage.includes('timed out')) {
       const appError = categorizeError(new Error('Signature request timed out. Please try connecting again.'))
-      const recoveryResult = this.handleTimeoutError(appError, disconnect)
+      const recoveryResult = this.handleTimeoutError()
       return { appError, recoveryResult }
     }
 
@@ -211,7 +277,7 @@ export class AuthErrorRecoveryService {
 
     // Step 4: Handle as generic error
     const appError = categorizeError(error)
-    const recoveryResult = this.handleGenericError(error, isConnected)
+    const recoveryResult = this.handleGenericError(error)
 
     // Perform disconnect if needed
     if (recoveryResult.shouldDisconnect) {

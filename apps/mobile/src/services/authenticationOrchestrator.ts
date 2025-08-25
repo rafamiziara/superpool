@@ -39,7 +39,10 @@ export interface AuthenticationLock {
 }
 
 export class AuthenticationOrchestrator {
-  constructor(private authStore: AuthenticationStore, private walletStore: WalletConnectionStore) {}
+  constructor(private authStore: AuthenticationStore, private walletStore: WalletConnectionStore) {
+    // Initialize AuthErrorRecoveryService with MobX stores
+    AuthErrorRecoveryService.initialize(authStore, walletStore)
+  }
 
   /**
    * Acquires authentication lock to prevent concurrent attempts
@@ -448,11 +451,7 @@ export class AuthenticationOrchestrator {
       }
 
       // Handle all authentication errors through the recovery service
-      const { appError, recoveryResult } = await AuthErrorRecoveryService.handleAuthenticationError(
-        error,
-        true, // Assume connected since this method is called from a connected context
-        context.disconnect
-      )
+      const { appError, recoveryResult } = await AuthErrorRecoveryService.handleAuthenticationError(error)
 
       // Show error feedback with appropriate timing
       AuthErrorRecoveryService.showErrorFeedback(appError, recoveryResult)
