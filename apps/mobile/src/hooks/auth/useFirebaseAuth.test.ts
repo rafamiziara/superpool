@@ -1,7 +1,8 @@
 import { renderHook } from '@testing-library/react-hooks'
 import { User } from 'firebase/auth'
-import { firebaseAuthManager } from '../utils/firebaseAuthManager'
-import { FirebaseAuthState, useFirebaseAuth } from './useFirebaseAuth'
+import { FirebaseAuthState } from '@superpool/types'
+import { firebaseAuthManager } from '../../utils/firebaseAuthManager'
+import { useFirebaseAuth } from './useFirebaseAuth'
 
 // The firebaseAuthManager is already mocked in setupTests.ts
 const mockManager = firebaseAuthManager as jest.Mocked<typeof firebaseAuthManager>

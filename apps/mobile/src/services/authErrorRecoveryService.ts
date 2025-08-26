@@ -1,7 +1,7 @@
 import { signOut } from 'firebase/auth'
 import { FIREBASE_AUTH } from '../firebase.config'
 import { AuthenticationStore } from '../stores/AuthenticationStore'
-import { WalletConnectionStore } from '../stores/WalletConnectionStore'
+import { WalletStore } from '../stores/WalletStore'
 import { AppError, categorizeError, isUserInitiatedError } from '../utils/errorHandling'
 import { SessionManager } from '../utils/sessionManager'
 import { authToasts, showErrorFromAppError } from '../utils/toast'
@@ -22,13 +22,13 @@ export interface SessionErrorContext {
 export class AuthErrorRecoveryService {
   // Store references for reactive state management
   private static authStore?: AuthenticationStore
-  private static walletStore?: WalletConnectionStore
+  private static walletStore?: WalletStore
 
   /**
    * Initialize the service with MobX stores
    * Call this once during app initialization
    */
-  static initialize(authStore: AuthenticationStore, walletStore: WalletConnectionStore): void {
+  static initialize(authStore: AuthenticationStore, walletStore: WalletStore): void {
     this.authStore = authStore
     this.walletStore = walletStore
     console.log('🔧 AuthErrorRecoveryService initialized with MobX stores')

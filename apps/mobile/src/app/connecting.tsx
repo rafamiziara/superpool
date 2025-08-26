@@ -5,7 +5,7 @@ import React, { useEffect } from 'react';
 import { Text, TouchableOpacity, View } from 'react-native';
 import { useAccount, useDisconnect } from 'wagmi';
 import { LoadingSpinner } from '../components/LoadingSpinner';
-import { useAuthenticationFullBridge } from '../hooks/useAuthenticationFullBridge';
+import { useAuthentication } from '../hooks/auth/useAuthentication';
 
 const ConnectingScreen = observer(function ConnectingScreen() {
   const { isConnected } = useAccount();
@@ -23,7 +23,7 @@ const ConnectingScreen = observer(function ConnectingScreen() {
     getAllSteps,
     resetProgress,
     _debug
-  } = useAuthenticationFullBridge();
+  } = useAuthentication();
 
   // Debug logging
   useEffect(() => {

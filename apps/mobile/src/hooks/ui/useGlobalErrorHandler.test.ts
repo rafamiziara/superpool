@@ -1,9 +1,9 @@
 import { renderHook } from '@testing-library/react-hooks'
-import { SessionManager } from '../utils/sessionManager'
+import { SessionManager } from '../../utils/sessionManager'
 import { useGlobalErrorHandler } from './useGlobalErrorHandler'
 
 // Mock SessionManager
-jest.mock('../utils/sessionManager', () => ({
+jest.mock('../../utils/sessionManager', () => ({
   SessionManager: {
     detectSessionCorruption: jest.fn(),
     handleSessionCorruption: jest.fn(),

@@ -1,12 +1,6 @@
+import { FirebaseAuthState } from '@superpool/types'
 import { User, onAuthStateChanged } from 'firebase/auth'
 import { FIREBASE_AUTH } from '../firebase.config'
-
-export interface FirebaseAuthState {
-  user: User | null
-  isLoading: boolean
-  isAuthenticated: boolean
-  walletAddress: string | null
-}
 
 type Listener = (state: FirebaseAuthState) => void
 

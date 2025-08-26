@@ -1,5 +1,6 @@
 import { renderHook, act } from '@testing-library/react-hooks'
-import { AuthStep, useAuthProgress } from './useAuthProgress'
+import { AuthStep } from '@superpool/types'
+import { useAuthProgress } from './useAuthProgress'
 
 describe('useAuthProgress', () => {
   it('should initialize with correct default state', () => {

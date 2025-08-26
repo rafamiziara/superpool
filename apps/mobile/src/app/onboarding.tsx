@@ -15,7 +15,7 @@ import {
 } from 'react-native';
 import { useAccount } from 'wagmi';
 import { ProgressIndicator } from '../components/ProgressIndicator';
-import { useAuthenticationStateReadonlyBridge } from '../hooks/useAuthenticationStateReadonlyBridge';
+import { useAuthenticationStateReadonly } from '../hooks/auth/useAuthenticationStateReadonly';
 
 interface OnboardingSlide {
   id: number;
@@ -63,7 +63,7 @@ const OnboardingScreen = observer(function OnboardingScreen() {
     isFirebaseAuthenticated,
     isFirebaseLoading,
     _debug
-  } = useAuthenticationStateReadonlyBridge();
+  } = useAuthenticationStateReadonly();
 
   // Handle navigation based on authentication state
   React.useEffect(() => {

@@ -1,7 +1,7 @@
 import { autorun } from 'mobx'
 import { useCallback, useEffect, useRef } from 'react'
 import { useAccount } from 'wagmi'
-import { useWalletConnectionStore } from '../stores'
+import { useWalletStore } from '../../stores'
 
 interface ConnectionTriggerCallbacks {
   onNewConnection: (address: string, chainId?: number) => void
@@ -10,7 +10,7 @@ interface ConnectionTriggerCallbacks {
 
 export const useWalletConnectionTrigger = ({ onNewConnection, onDisconnection }: ConnectionTriggerCallbacks) => {
   const { address, chain } = useAccount() // Keep for address and chain info
-  const walletStore = useWalletConnectionStore()
+  const walletStore = useWalletStore()
   const previousConnection = useRef<{ isConnected: boolean; address?: string; chainId?: number }>({
     isConnected: false,
     address: undefined,

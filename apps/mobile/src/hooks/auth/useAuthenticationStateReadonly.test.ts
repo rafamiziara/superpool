@@ -1,5 +1,5 @@
 import { renderHook } from '@testing-library/react-hooks'
-import { useAuthenticationStateReadonlyBridge } from './useAuthenticationStateReadonlyBridge'
+import { useAuthenticationStateReadonly } from './useAuthenticationStateReadonly'
 
 // Mock the dependencies
 jest.mock('./useAuthenticationStateReadonly', () => ({
@@ -28,9 +28,9 @@ jest.mock('../stores', () => ({
   }),
 }))
 
-describe('useAuthenticationStateReadonlyBridge', () => {
+describe('useAuthenticationStateReadonly', () => {
   it('should return authentication state from MobX store', () => {
-    const { result } = renderHook(() => useAuthenticationStateReadonlyBridge())
+    const { result } = renderHook(() => useAuthenticationStateReadonly())
 
     expect(result.current).toMatchObject({
       authError: null,
@@ -42,7 +42,7 @@ describe('useAuthenticationStateReadonlyBridge', () => {
   })
 
   it('should provide minimal debug information', () => {
-    const { result } = renderHook(() => useAuthenticationStateReadonlyBridge())
+    const { result } = renderHook(() => useAuthenticationStateReadonly())
 
     // Debug info is minimal now - just indicates if wallet address exists  
     expect(result.current._debug).toBeDefined()

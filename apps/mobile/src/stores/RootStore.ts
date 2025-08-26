@@ -1,6 +1,6 @@
 import { AuthenticationStore } from './AuthenticationStore'
 import { PoolManagementStore } from './PoolManagementStore'
-import { WalletConnectionStore } from './WalletConnectionStore'
+import { WalletStore } from './WalletStore'
 
 /**
  * Root store that contains all MobX stores
@@ -8,19 +8,19 @@ import { WalletConnectionStore } from './WalletConnectionStore'
  */
 export class RootStore {
   public authenticationStore: AuthenticationStore
-  public walletConnectionStore: WalletConnectionStore
+  public walletStore: WalletStore
   public poolManagementStore: PoolManagementStore
 
   constructor() {
     this.authenticationStore = new AuthenticationStore()
-    this.walletConnectionStore = new WalletConnectionStore()
+    this.walletStore = new WalletStore()
     this.poolManagementStore = new PoolManagementStore()
   }
 
   // Global reset method for clearing all store state
   reset = (): void => {
     this.authenticationStore.reset()
-    this.walletConnectionStore.reset()
+    this.walletStore.reset()
     this.poolManagementStore.reset()
   }
 
@@ -29,7 +29,7 @@ export class RootStore {
     this.poolManagementStore.setUserAddress(address)
 
     // Sync wallet connection state if needed
-    if (address && !this.walletConnectionStore.isConnected) {
+    if (address && !this.walletStore.isConnected) {
       // Note: This would typically be handled by wallet connection hooks
       console.log('User address set but wallet not connected:', address)
     }
@@ -37,21 +37,21 @@ export class RootStore {
 
   // Get current user address from any connected source
   get currentUserAddress(): string | null {
-    return this.walletConnectionStore.address || null
+    return this.walletStore.address || null
   }
 
   // Global loading state check
   get isLoading(): boolean {
     return (
       this.authenticationStore.isAuthenticating ||
-      this.walletConnectionStore.isConnecting ||
+      this.walletStore.isConnecting ||
       Object.values(this.poolManagementStore.loading).some((loading) => loading)
     )
   }
 
   // Global error state check
   get hasErrors(): boolean {
-    return !!(this.authenticationStore.authError || this.walletConnectionStore.connectionError || this.poolManagementStore.error)
+    return !!(this.authenticationStore.authError || this.walletStore.connectionError || this.poolManagementStore.error)
   }
 
   // Get all current errors
@@ -62,8 +62,8 @@ export class RootStore {
       errors.push(this.authenticationStore.authError.message)
     }
 
-    if (this.walletConnectionStore.connectionError) {
-      errors.push(this.walletConnectionStore.connectionError)
+    if (this.walletStore.connectionError) {
+      errors.push(this.walletStore.connectionError)
     }
 
     if (this.poolManagementStore.error) {

@@ -44,8 +44,8 @@ export const useAuthenticationStore = () => {
   return useStore().authenticationStore
 }
 
-export const useWalletConnectionStore = () => {
-  return useStore().walletConnectionStore
+export const useWalletStore = () => {
+  return useStore().walletStore
 }
 
 export const usePoolManagementStore = () => {
@@ -60,7 +60,7 @@ export const useStores = () => {
   
   return {
     authenticationStore: rootStore.authenticationStore,
-    walletConnectionStore: rootStore.walletConnectionStore,
+    walletStore: rootStore.walletStore,
     poolManagementStore: rootStore.poolManagementStore,
     rootStore,
   }

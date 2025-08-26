@@ -1,14 +1,14 @@
-import { useAuthenticationStore } from '../stores'
+import { useAuthenticationStore } from '../../stores'
 import { useAuthProgress } from './useAuthProgress'
 import { useFirebaseAuth } from './useFirebaseAuth'
 
 /**
- * Clean authentication hook with MobX stores and progress tracking
+ * Main authentication hook with MobX stores and progress tracking
  *
- * Directly uses MobX stores - no bridge pattern needed!
- * Combines authentication state with progress management for connecting screen.
+ * Combines authentication state with progress management.
+ * Perfect for screens that need full authentication functionality like connecting.tsx.
  */
-export const useAuthenticationFullBridge = () => {
+export const useAuthentication = () => {
   const authStore = useAuthenticationStore()
   const authProgress = useAuthProgress()
   const firebaseAuth = useFirebaseAuth()
@@ -52,6 +52,6 @@ export const useAuthenticationFullBridge = () => {
 }
 
 /**
- * Type definition matching the full authentication hook
+ * Type definition for the main authentication hook
  */
-export type AuthenticationFullBridge = ReturnType<typeof useAuthenticationFullBridge>
+export type Authentication = ReturnType<typeof useAuthentication>

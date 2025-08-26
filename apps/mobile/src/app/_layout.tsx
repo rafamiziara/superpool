@@ -16,9 +16,9 @@ import { useEffect } from 'react';
 import Toast from 'react-native-toast-message';
 import { WagmiProvider } from 'wagmi';
 import { localhost } from '../config/chains';
-import { useGlobalErrorHandler } from '../hooks/useGlobalErrorHandler';
-import { useGlobalLogoutState } from '../hooks/useLogoutState';
-import { useWalletToasts } from '../hooks/useWalletToasts';
+import { useGlobalErrorHandler } from '../hooks/ui/useGlobalErrorHandler';
+import { useGlobalLogoutState } from '../hooks/auth/useLogoutState';
+import { useWalletToasts } from '../hooks/wallet/useWalletToasts';
 import { StoreProvider } from '../stores';
 import { SessionManager } from '../utils/sessionManager';
 

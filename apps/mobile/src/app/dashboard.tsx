@@ -7,13 +7,13 @@ import { useEffect } from 'react';
 import { Text, View } from 'react-native';
 import { useAccount } from 'wagmi';
 import { FIREBASE_AUTH } from '../firebase.config';
-import { getGlobalLogoutState } from '../hooks/useLogoutState';
+import { getGlobalLogoutState } from '../hooks/auth/useLogoutState';
 import { useStores } from '../stores';
 
 const DashboardScreen = observer(function DashboardScreen() {
-  const { walletConnectionStore } = useStores();
+  const { walletStore } = useStores();
   const { chain } = useAccount(); // Keep for chain info since store doesn't track this yet
-  const { address, isConnected } = walletConnectionStore; // Use MobX store for core connection state
+  const { address, isConnected } = walletStore; // Use MobX store for core connection state
 
   useEffect(() => {
     if (!isConnected) {
