@@ -38,7 +38,7 @@ export class SessionManager {
     this.isCleanupInProgress = true
     try {
       const result = await operation()
-      
+
       // Process queued operations
       while (this.cleanupQueue.length > 0) {
         const queuedOperation = this.cleanupQueue.shift()
@@ -50,7 +50,7 @@ export class SessionManager {
           }
         }
       }
-      
+
       return result
     } finally {
       this.isCleanupInProgress = false
@@ -59,97 +59,97 @@ export class SessionManager {
 
   static async clearAllWalletConnectSessions(): Promise<void> {
     return this.withCleanupLock(async () => {
-    try {
-      console.log('🧹 Starting comprehensive WalletConnect session cleanup...')
+      try {
+        console.log('🧹 Starting comprehensive WalletConnect session cleanup...')
 
-      // Get all AsyncStorage keys
-      const allKeys = await AsyncStorage.getAllKeys()
+        // Get all AsyncStorage keys
+        const allKeys = await AsyncStorage.getAllKeys()
 
-      // More comprehensive filter for WalletConnect/Reown related keys
-      const walletConnectKeys = allKeys.filter((key) => {
-        const lowerKey = key.toLowerCase()
-        return (
-          // Standard WalletConnect patterns
-          lowerKey.includes('walletconnect') ||
-          lowerKey.includes('wc@2') ||
-          lowerKey.includes('reown') ||
-          lowerKey.includes('appkit') ||
-          lowerKey.includes('walletconnect') ||
-          lowerKey.includes('wc_') ||
-          lowerKey.startsWith('@walletconnect') ||
-          lowerKey.startsWith('@reown') ||
-          // Session-specific patterns
-          lowerKey.includes('session') ||
-          lowerKey.includes('pairing') ||
-          lowerKey.includes('client') ||
-          // Protocol patterns
-          lowerKey.includes('wc:') ||
-          lowerKey.includes('relay') ||
-          // Storage patterns
-          lowerKey.includes('wagmi') ||
-          lowerKey.includes('viem') ||
-          // AppKit specific
-          lowerKey.includes('w3m') ||
-          lowerKey.includes('modal')
-        )
-      })
+        // More comprehensive filter for WalletConnect/Reown related keys
+        const walletConnectKeys = allKeys.filter((key) => {
+          const lowerKey = key.toLowerCase()
+          return (
+            // Standard WalletConnect patterns
+            lowerKey.includes('walletconnect') ||
+            lowerKey.includes('wc@2') ||
+            lowerKey.includes('reown') ||
+            lowerKey.includes('appkit') ||
+            lowerKey.includes('walletconnect') ||
+            lowerKey.includes('wc_') ||
+            lowerKey.startsWith('@walletconnect') ||
+            lowerKey.startsWith('@reown') ||
+            // Session-specific patterns
+            lowerKey.includes('session') ||
+            lowerKey.includes('pairing') ||
+            lowerKey.includes('client') ||
+            // Protocol patterns
+            lowerKey.includes('wc:') ||
+            lowerKey.includes('relay') ||
+            // Storage patterns
+            lowerKey.includes('wagmi') ||
+            lowerKey.includes('viem') ||
+            // AppKit specific
+            lowerKey.includes('w3m') ||
+            lowerKey.includes('modal')
+          )
+        })
 
-      console.log(`Found ${walletConnectKeys.length} WalletConnect-related keys:`, walletConnectKeys.slice(0, 10))
+        console.log(`Found ${walletConnectKeys.length} WalletConnect-related keys:`, walletConnectKeys.slice(0, 10))
 
-      // Clear all WalletConnect related keys in batches
-      if (walletConnectKeys.length > 0) {
-        const batchSize = 20
-        for (let i = 0; i < walletConnectKeys.length; i += batchSize) {
-          const batch = walletConnectKeys.slice(i, i + batchSize)
-          await AsyncStorage.multiRemove(batch)
-          console.log(`Cleared batch ${Math.floor(i / batchSize) + 1}: ${batch.length} keys`)
+        // Clear all WalletConnect related keys in batches
+        if (walletConnectKeys.length > 0) {
+          const batchSize = 20
+          for (let i = 0; i < walletConnectKeys.length; i += batchSize) {
+            const batch = walletConnectKeys.slice(i, i + batchSize)
+            await AsyncStorage.multiRemove(batch)
+            console.log(`Cleared batch ${Math.floor(i / batchSize) + 1}: ${batch.length} keys`)
+          }
+          console.log(`✅ Cleared ${walletConnectKeys.length} WalletConnect session keys`)
         }
-        console.log(`✅ Cleared ${walletConnectKeys.length} WalletConnect session keys`)
-      }
 
-      // Clear specific known problematic keys
-      const specificKeys = [
-        WALLETCONNECT_SESSION_KEY,
-        REOWN_APPKIT_SESSION_KEY,
-        'wagmi.store',
-        'wagmi.cache',
-        'wagmi.injected.shimConnected',
-        'wagmi.wallet',
-        'wagmi.connected',
-        'reown.sessions',
-        'wc.pairing',
-        'wc.session',
-        'wc.client',
-        'w3m.wallet',
-        'w3m.session',
-        '@w3m/wallet_id',
-        '@w3m/connected_wallet_image_url',
-        '@walletconnect/universal_provider',
-        '@walletconnect/ethereum_provider',
-      ]
+        // Clear specific known problematic keys
+        const specificKeys = [
+          WALLETCONNECT_SESSION_KEY,
+          REOWN_APPKIT_SESSION_KEY,
+          'wagmi.store',
+          'wagmi.cache',
+          'wagmi.injected.shimConnected',
+          'wagmi.wallet',
+          'wagmi.connected',
+          'reown.sessions',
+          'wc.pairing',
+          'wc.session',
+          'wc.client',
+          'w3m.wallet',
+          'w3m.session',
+          '@w3m/wallet_id',
+          '@w3m/connected_wallet_image_url',
+          '@walletconnect/universal_provider',
+          '@walletconnect/ethereum_provider',
+        ]
 
-      console.log('🎯 Clearing specific known keys...')
-      for (const key of specificKeys) {
-        try {
-          await AsyncStorage.removeItem(key)
-        } catch (error) {
-          // Ignore errors for non-existent keys
+        console.log('🎯 Clearing specific known keys...')
+        for (const key of specificKeys) {
+          try {
+            await AsyncStorage.removeItem(key)
+          } catch (error) {
+            // Ignore errors for non-existent keys
+          }
         }
-      }
 
-      // Clear any keys containing the specific session ID from the error
-      const sessionIdPattern = /[a-f0-9]{64}/g
-      const keysWithSessionIds = allKeys.filter((key) => sessionIdPattern.test(key))
-      if (keysWithSessionIds.length > 0) {
-        console.log(`🔍 Found ${keysWithSessionIds.length} keys with session IDs, clearing...`)
-        await AsyncStorage.multiRemove(keysWithSessionIds)
-      }
+        // Clear any keys containing the specific session ID from the error
+        const sessionIdPattern = /[a-f0-9]{64}/g
+        const keysWithSessionIds = allKeys.filter((key) => sessionIdPattern.test(key))
+        if (keysWithSessionIds.length > 0) {
+          console.log(`🔍 Found ${keysWithSessionIds.length} keys with session IDs, clearing...`)
+          await AsyncStorage.multiRemove(keysWithSessionIds)
+        }
 
-      console.log('✅ Successfully completed comprehensive WalletConnect session cleanup')
-    } catch (error) {
-      console.error('❌ Failed to clear WalletConnect sessions:', error)
-      throw error
-    }
+        console.log('✅ Successfully completed comprehensive WalletConnect session cleanup')
+      } catch (error) {
+        console.error('❌ Failed to clear WalletConnect sessions:', error)
+        throw error
+      }
     })
   }
 
@@ -295,41 +295,41 @@ export class SessionManager {
       try {
         console.log('🛡️ Running preventive session cleanup before connection...')
 
-      // More conservative cleanup - only target problematic keys, not all connections
-      const allKeys = await AsyncStorage.getAllKeys()
-      const walletConnectKeys = allKeys.filter((key) => key.includes('wc@2:') || key.includes('WalletConnect'))
+        // More conservative cleanup - only target problematic keys, not all connections
+        const allKeys = await AsyncStorage.getAllKeys()
+        const walletConnectKeys = allKeys.filter((key) => key.includes('wc@2:') || key.includes('WalletConnect'))
 
-      console.log(`Found ${walletConnectKeys.length} WalletConnect-related keys: ${JSON.stringify(walletConnectKeys.slice(0, 10))}`)
+        console.log(`Found ${walletConnectKeys.length} WalletConnect-related keys: ${JSON.stringify(walletConnectKeys.slice(0, 10))}`)
 
-      // Only clear keys that are likely to cause "No matching key" errors
-      const problematicPatterns = [
-        'wc@2:core:0.3//expirer', // Expired sessions
-        'wc@2:core:0.3//messages', // Stale messages
-        'wc@2:core:0.3//history', // Old history
-      ]
+        // Only clear keys that are likely to cause "No matching key" errors
+        const problematicPatterns = [
+          'wc@2:core:0.3//expirer', // Expired sessions
+          'wc@2:core:0.3//messages', // Stale messages
+          'wc@2:core:0.3//history', // Old history
+        ]
 
-      const keysToRemove = walletConnectKeys.filter((key) => problematicPatterns.some((pattern) => key.includes(pattern)))
+        const keysToRemove = walletConnectKeys.filter((key) => problematicPatterns.some((pattern) => key.includes(pattern)))
 
-      if (keysToRemove.length > 0) {
-        console.log(`🎯 Removing ${keysToRemove.length} potentially problematic keys...`)
-        await AsyncStorage.multiRemove(keysToRemove)
-        console.log(`✅ Cleared ${keysToRemove.length} problematic keys`)
-      } else {
-        console.log('✅ No problematic keys found, skipping cleanup')
+        if (keysToRemove.length > 0) {
+          console.log(`🎯 Removing ${keysToRemove.length} potentially problematic keys...`)
+          await AsyncStorage.multiRemove(keysToRemove)
+          console.log(`✅ Cleared ${keysToRemove.length} problematic keys`)
+        } else {
+          console.log('✅ No problematic keys found, skipping cleanup')
+        }
+
+        // Light query cache cleanup only
+        const queryCacheKeys = allKeys.filter((key) => key.includes('react-query') && key.includes('stale'))
+        if (queryCacheKeys.length > 0) {
+          await AsyncStorage.multiRemove(queryCacheKeys)
+          console.log(`Cleared ${queryCacheKeys.length} stale query cache keys`)
+        }
+
+        console.log('✅ Preventive session cleanup completed')
+      } catch (error) {
+        console.error('❌ Preventive session cleanup failed:', error)
+        throw error
       }
-
-      // Light query cache cleanup only
-      const queryCacheKeys = allKeys.filter((key) => key.includes('react-query') && key.includes('stale'))
-      if (queryCacheKeys.length > 0) {
-        await AsyncStorage.multiRemove(queryCacheKeys)
-        console.log(`Cleared ${queryCacheKeys.length} stale query cache keys`)
-      }
-
-      console.log('✅ Preventive session cleanup completed')
-    } catch (error) {
-      console.error('❌ Preventive session cleanup failed:', error)
-      throw error
-    }
     })
   }
 
