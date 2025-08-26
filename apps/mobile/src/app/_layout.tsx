@@ -17,7 +17,11 @@ import Toast from 'react-native-toast-message';
 import { WagmiProvider } from 'wagmi';
 import { localhost } from '../config/chains';
 import { useGlobalErrorHandler } from '../hooks/ui/useGlobalErrorHandler';
+import { useAuthenticationIntegration } from '../hooks/auth/useAuthenticationIntegration';
+import { useAuthStateSynchronization } from '../hooks/auth/useAuthStateSynchronization';
+import { useAuthSessionRecovery } from '../hooks/auth/useAuthSessionRecovery';
 import { useGlobalLogoutState } from '../hooks/auth/useLogoutState';
+import { useWalletConnectionTrigger } from '../hooks/wallet/useWalletConnectionTrigger';
 import { useWalletToasts } from '../hooks/wallet/useWalletToasts';
 import { StoreProvider } from '../stores';
 import { SessionManager } from '../utils/sessionManager';
@@ -54,9 +58,25 @@ createAppKit({
 });
 
 function AppContent() {
+  // Global hooks for app-wide functionality
   useWalletToasts({ showConnectionToasts: false, showDisconnectionToasts: true }) // Global wallet toast notifications
   useGlobalLogoutState() // Global logout state management
   useGlobalErrorHandler() // Global session corruption error handler
+  
+  // Authentication integration - connects wallet events to authentication
+  const authIntegration = useAuthenticationIntegration()
+  
+  // Wallet connection trigger - detects wallet connect/disconnect events
+  useWalletConnectionTrigger({
+    onNewConnection: authIntegration.onNewConnection,
+    onDisconnection: authIntegration.onDisconnection,
+  })
+  
+  // Auth state synchronization - keeps Firebase and wallet state in sync
+  useAuthStateSynchronization()
+  
+  // Session recovery - validates and recovers authentication on app startup
+  useAuthSessionRecovery()
   
   // Debug session state on app start (no aggressive cleanup)
   useEffect(() => {
