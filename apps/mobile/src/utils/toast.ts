@@ -107,7 +107,7 @@ export const authToasts = {
     showInfoToast({
       title: 'Sign Message',
       message:
-        'Check your wallet app to sign the authentication message. If you don\'t see a signature request, try switching back and forth between apps.',
+        "Check your wallet app to sign the authentication message. If you don't see a signature request, try switching back and forth between apps.",
       duration: 15000, // Extended for wallet app switching scenarios
     }),
 

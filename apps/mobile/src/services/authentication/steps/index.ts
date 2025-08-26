@@ -1,0 +1,10 @@
+// Authentication step modules for clean separation of concerns
+export { AuthenticationStepExecutor } from './AuthenticationStepExecutor'
+export { MessageGenerator } from './MessageGenerator'
+export type { GeneratedAuthMessage } from './MessageGenerator'
+export { SignatureHandler } from './SignatureHandler'
+export type { SignatureContext } from './SignatureHandler'
+export { FirebaseAuthenticator } from './FirebaseAuthenticator'
+export type { SignatureVerificationContext } from './FirebaseAuthenticator'
+export { AuthenticationValidator } from './AuthenticationValidator'
+export type { ValidationContext } from './AuthenticationValidator'

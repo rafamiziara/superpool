@@ -77,3 +77,53 @@ export interface FirebaseAuthState {
   isAuthenticated: boolean
   walletAddress: string | null
 }
+
+// Signature and wallet interaction types
+export type SignatureType = 'typed-data' | 'personal-sign' | 'safe-wallet'
+
+export interface SignatureRequest extends AuthMessage {
+  walletAddress: string
+  chainId?: number
+}
+
+export interface SignatureResult {
+  signature: string
+  signatureType: SignatureType
+}
+
+export interface SignatureFunctions {
+  signTypedDataAsync: (data: any) => Promise<string>
+  signMessageAsync: (params: { message: string; account: `0x${string}`; connector?: any }) => Promise<string>
+}
+
+// Authentication flow progress types
+export interface AuthProgressCallbacks {
+  onStepStart?: (step: AuthStep) => void
+  onStepComplete?: (step: AuthStep) => void
+  onStepFail?: (step: AuthStep, error: string) => void
+}
+
+export interface AuthenticationContext {
+  walletAddress: string
+  connector?: any
+  chainId?: number
+  signatureFunctions: SignatureFunctions
+  disconnect: () => void
+  progressCallbacks?: AuthProgressCallbacks
+}
+
+// Error recovery types
+export type ErrorType = 'session' | 'timeout' | 'connector' | 'generic'
+
+export interface ErrorRecoveryResult {
+  shouldDisconnect: boolean
+  shouldShowError: boolean
+  errorDelay: number
+  cleanupPerformed: boolean
+}
+
+export interface SessionErrorContext {
+  errorMessage: string
+  sessionId?: string
+  isSessionError: boolean
+}
