@@ -1,6 +1,6 @@
 import { AuthenticationStore } from '../../stores/AuthenticationStore'
 import { WalletStore } from '../../stores/WalletStore'
-import { AppError } from '../../utils/errorHandling'
+import { AppError } from '../../utils'
 import { ErrorRecoveryResult, ErrorRecoveryService, SessionErrorContext } from './handlers'
 
 // Re-export interfaces and types for backward compatibility

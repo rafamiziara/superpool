@@ -1,6 +1,6 @@
 import { AuthenticationStore } from '../../../stores/AuthenticationStore'
 import { WalletStore } from '../../../stores/WalletStore'
-import { AppError } from '../../../utils/errorHandling'
+import { AppError } from '../../../utils'
 import { ErrorRecoveryResult } from '@superpool/types'
 import { ConnectorErrorHandler } from './ConnectorErrorHandler'
 import { ErrorAnalyzer } from './ErrorAnalyzer'
