@@ -2,7 +2,7 @@ import { signInWithCustomToken } from 'firebase/auth'
 import { httpsCallable } from 'firebase/functions'
 import type { SignatureResult } from '@superpool/types'
 import { FIREBASE_AUTH, FIREBASE_FUNCTIONS } from '../../../firebase.config'
-import { devOnly } from '../../../utils/secureLogger'
+import { devOnly } from '../../../utils'
 
 const verifySignatureAndLogin = httpsCallable(FIREBASE_FUNCTIONS, 'verifySignatureAndLogin')
 

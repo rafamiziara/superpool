@@ -1,4 +1,4 @@
-import { AppError, categorizeError } from '../../../utils/errorHandling'
+import { AppError, categorizeError } from '../../../utils'
 import { ErrorType, SessionErrorContext } from '@superpool/types'
 
 /**

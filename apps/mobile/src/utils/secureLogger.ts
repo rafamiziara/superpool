@@ -1,21 +1,9 @@
+import { LOG_LEVELS, LOGGING_CONFIG, type LogLevel } from './constants'
+
 /**
  * Secure logging utility that prevents sensitive data exposure in production
  * and provides conditional logging based on environment
  */
-
-interface LogLevel {
-  DEBUG: 0
-  INFO: 1
-  WARN: 2
-  ERROR: 3
-}
-
-const LOG_LEVELS: LogLevel = {
-  DEBUG: 0,
-  INFO: 1,
-  WARN: 2,
-  ERROR: 3,
-}
 
 class SecureLogger {
   private isDevelopment = __DEV__
@@ -140,10 +128,144 @@ class SecureLogger {
       console.log('[DEV]', ...sanitizedArgs)
     }
   }
+
+  /**
+   * Service-specific logging methods for enhanced security and context
+   */
+
+  /**
+   * Safely logs wallet address with truncation for privacy
+   */
+  logWalletAddress(address: string, context: string = ''): string {
+    if (!address || address.length < 10) {
+      return 'invalid-address'
+    }
+    const truncated = `${address.substring(0, 6)}...${address.slice(-4)}`
+    return context ? `${context}: ${truncated}` : truncated
+  }
+
+  /**
+   * Safely logs signature preview without exposing full signature content
+   */
+  logSignaturePreview(signature: string, type: string = ''): void {
+    if (!signature) {
+      console.log(`❌ ${type} signature: empty or invalid`)
+      return
+    }
+
+    if (signature.startsWith('safe-wallet:')) {
+      console.log(`✅ ${type} signature: Safe wallet token (${signature.length} chars)`)
+    } else {
+      const preview = signature.substring(0, 10) + '...'
+      console.log(`✅ ${type} signature: ${typeof signature} ${preview} (${signature.length} chars)`)
+    }
+  }
+
+  /**
+   * Logs authentication step with timing information
+   */
+  logAuthStep(
+    step: string,
+    status: 'start' | 'complete' | 'fail',
+    details?: Record<string, any>
+  ): void {
+    const timestamp = new Date().toISOString()
+    const emoji = status === 'complete' ? '✅' : status === 'fail' ? '❌' : '🔄'
+    const safeDetails = details ? this.sanitizeData(details) : ''
+    
+    if (this.minLogLevel <= LOG_LEVELS.INFO) {
+      console.log(`${emoji} Auth ${step} ${status} [${timestamp}]`, safeDetails)
+    }
+  }
+
+  /**
+   * Logs service operation with context
+   */
+  logServiceOperation(
+    service: string,
+    operation: string,
+    status: 'start' | 'success' | 'error',
+    details?: Record<string, any>
+  ): void {
+    const emoji = status === 'success' ? '✅' : status === 'error' ? '❌' : '🔄'
+    const safeDetails = details ? this.sanitizeData(details) : {}
+    
+    const logLevel = status === 'error' ? LOG_LEVELS.ERROR : LOG_LEVELS.INFO
+    if (this.minLogLevel <= logLevel) {
+      const logMethod = status === 'error' ? console.error : console.log
+      logMethod(`${emoji} [${service}] ${operation} ${status}`, safeDetails)
+    }
+  }
+
+  /**
+   * Logs error with service context but sanitizes sensitive information
+   */
+  logServiceError(
+    service: string,
+    operation: string,
+    error: unknown,
+    context?: Record<string, any>
+  ): void {
+    if (this.minLogLevel <= LOG_LEVELS.ERROR) {
+      const errorMessage = error instanceof Error ? error.message : String(error)
+      const safeContext = context ? this.sanitizeData(context) : {}
+      
+      console.error(`❌ [${service}] ${operation} failed:`, {
+        error: errorMessage,
+        context: safeContext,
+        timestamp: new Date().toISOString(),
+      })
+    }
+  }
+
+  /**
+   * Logs recovery action with result
+   */
+  logRecoveryAction(
+    action: string,
+    result: Record<string, any>,
+    context?: string
+  ): void {
+    if (this.minLogLevel <= LOG_LEVELS.INFO) {
+      const prefix = context ? `🔄 [${context}] Recovery:` : '🔄 Recovery:'
+      const safeResult = this.sanitizeData(result)
+      console.log(`${prefix} ${action}`, safeResult)
+    }
+  }
+
+  /**
+   * Creates a consistent log context for service operations
+   */
+  createServiceContext(
+    service: string,
+    operation: string,
+    additionalContext?: Record<string, any>
+  ): string {
+    const timestamp = new Date().toISOString()
+    const base = `[${service}:${operation}] ${timestamp}`
+    
+    if (additionalContext) {
+      const safeContext = this.sanitizeData(additionalContext)
+      return `${base} ${JSON.stringify(safeContext)}`
+    }
+    
+    return base
+  }
 }
 
 // Export singleton instance
 export const secureLogger = new SecureLogger()
 
-// Export convenience functions
+// Export convenience functions (existing)
 export const { debug, info, warn, error, devOnly } = secureLogger
+
+// Export service-specific logging functions
+export const {
+  logWalletAddress,
+  logSignaturePreview,
+  logAuthStep,
+  logServiceOperation,
+  logServiceError,
+  logRecoveryAction,
+  createServiceContext
+} = secureLogger

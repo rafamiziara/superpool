@@ -1,3 +1,11 @@
+import { 
+  AUTH_VALIDATION, 
+  SUPPORTED_CHAIN_IDS, 
+  SIGNATURE_FORMATS,
+  WALLET_ADDRESS_FORMAT,
+  type SupportedChainId 
+} from './constants'
+
 /**
  * Common validation utilities for service layer operations
  * Centralizes validation logic used across authentication and signature services
@@ -10,7 +18,7 @@ export class ValidationUtils {
     if (!address || typeof address !== 'string') {
       return false
     }
-    return /^0x[a-fA-F0-9]{40}$/.test(address)
+    return WALLET_ADDRESS_FORMAT.PATTERN.test(address)
   }
 
   /**
@@ -20,13 +28,13 @@ export class ValidationUtils {
     if (!nonce || typeof nonce !== 'string') {
       return false
     }
-    return nonce.trim().length > 0 && nonce.length <= 100
+    return nonce.trim().length > 0 && nonce.length <= AUTH_VALIDATION.MAX_NONCE_LENGTH
   }
 
   /**
    * Validates timestamp is within reasonable bounds
    */
-  static isValidTimestamp(timestamp: number, maxAgeMs: number = 600000): boolean {
+  static isValidTimestamp(timestamp: number, maxAgeMs: number = AUTH_VALIDATION.MAX_TIMESTAMP_AGE): boolean {
     if (!timestamp || typeof timestamp !== 'number' || timestamp <= 0) {
       return false
     }
@@ -47,13 +55,13 @@ export class ValidationUtils {
     }
     
     const trimmed = message.trim()
-    return trimmed.length > 0 && trimmed.length <= 2000
+    return trimmed.length > 0 && trimmed.length <= AUTH_VALIDATION.MAX_MESSAGE_LENGTH
   }
 
   /**
    * Validates chain ID is a supported network
    */
-  static isValidChainId(chainId: number, supportedChains: number[] = [1, 137, 80002, 31337]): boolean {
+  static isValidChainId(chainId: number, supportedChains: readonly number[] = SUPPORTED_CHAIN_IDS): boolean {
     if (!chainId || typeof chainId !== 'number') {
       return false
     }
@@ -69,12 +77,12 @@ export class ValidationUtils {
     }
 
     // Safe wallet authentication token format
-    if (signature.startsWith('safe-wallet:')) {
-      return signature.split(':').length === 4 // safe-wallet:address:nonce:timestamp
+    if (signature.startsWith(SIGNATURE_FORMATS.SAFE_WALLET_PREFIX)) {
+      return signature.split(':').length === SIGNATURE_FORMATS.SAFE_TOKEN_PARTS // safe-wallet:address:nonce:timestamp
     }
 
     // Standard hex signature format
-    return signature.startsWith('0x') && signature.length >= 10
+    return signature.startsWith(SIGNATURE_FORMATS.HEX_PREFIX) && signature.length >= AUTH_VALIDATION.MIN_SIGNATURE_LENGTH
   }
 
   /**

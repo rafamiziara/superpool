@@ -1,4 +1,4 @@
-import { AppError, isUserInitiatedError } from '../../../utils/errorHandling'
+import { AppError, isUserInitiatedError } from '../../../utils'
 import { ErrorRecoveryResult } from '@superpool/types'
 import type { ErrorHandler } from './ErrorHandler'
 import { RecoveryActions } from './ErrorHandler'

@@ -1,6 +1,6 @@
 import { SignatureType, SignatureRequest, SignatureResult, SignatureFunctions } from '@superpool/types'
 import type { Connector } from 'wagmi'
-import { devOnly } from '../../utils/secureLogger'
+import { devOnly } from '../../utils'
 import { SignatureStrategyFactory, SignatureUtils } from './strategies'
 
 interface TypedDataParameter {
