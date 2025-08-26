@@ -1,5 +1,6 @@
+import { FirebaseAuthState } from '@superpool/types'
 import { useEffect, useState } from 'react'
-import { firebaseAuthManager, FirebaseAuthState } from '../utils/firebaseAuthManager'
+import { firebaseAuthManager } from '../../utils/firebaseAuthManager'
 
 /**
  * Hook to manage Firebase authentication state with proper persistence
@@ -21,5 +22,3 @@ export const useFirebaseAuth = (): FirebaseAuthState => {
   return state
 }
 
-// Re-export the interface for convenience
-export type { FirebaseAuthState }

@@ -1,7 +1,7 @@
 import { renderHook } from '@testing-library/react-hooks'
 import { EventEmitter } from 'events'
 import { useAccount } from 'wagmi'
-import { appToasts } from '../utils/toast'
+import { appToasts } from '../../utils/toast'
 import { useWalletToasts } from './useWalletToasts'
 
 // wagmi and toast utils are already mocked in setupTests.ts

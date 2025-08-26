@@ -46,3 +46,34 @@ export interface SignatureVerification {
   message: string
   walletAddress: string
 }
+
+// Mobile app authentication workflow types
+export type AuthStep = 
+  | 'connect-wallet' 
+  | 'acquire-lock' 
+  | 'generate-message' 
+  | 'request-signature' 
+  | 'verify-signature' 
+  | 'firebase-auth'
+
+export interface AuthStepInfo {
+  step: AuthStep
+  title: string
+  description: string
+}
+
+export interface AuthProgressState {
+  currentStep: AuthStep | null
+  completedSteps: Set<AuthStep>
+  failedStep: AuthStep | null
+  isComplete: boolean
+  error: string | null
+}
+
+// Firebase authentication state for mobile apps
+export interface FirebaseAuthState {
+  user: any | null // Firebase User object
+  isLoading: boolean
+  isAuthenticated: boolean
+  walletAddress: string | null
+}

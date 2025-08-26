@@ -3,10 +3,10 @@ import { signInWithCustomToken } from 'firebase/auth'
 import { httpsCallable } from 'firebase/functions'
 import type { Connector } from 'wagmi'
 import { FIREBASE_AUTH, FIREBASE_FUNCTIONS } from '../firebase.config'
-import { AuthStep } from '../hooks/useAuthProgress'
-import { getGlobalLogoutState } from '../hooks/useLogoutState'
+import { AuthStep } from '@superpool/types'
+import { getGlobalLogoutState } from '../hooks/auth/useLogoutState'
 import { AuthenticationStore } from '../stores/AuthenticationStore'
-import { AtomicConnectionState, WalletConnectionStore } from '../stores/WalletConnectionStore'
+import { AtomicConnectionState, WalletStore } from '../stores/WalletStore'
 import { devOnly } from '../utils/secureLogger'
 import { SessionManager } from '../utils/sessionManager'
 import { authToasts } from '../utils/toast'
@@ -39,7 +39,7 @@ export interface AuthenticationLock {
 }
 
 export class AuthenticationOrchestrator {
-  constructor(private authStore: AuthenticationStore, private walletStore: WalletConnectionStore) {
+  constructor(private authStore: AuthenticationStore, private walletStore: WalletStore) {
     // Initialize AuthErrorRecoveryService with MobX stores
     AuthErrorRecoveryService.initialize(authStore, walletStore)
   }

@@ -8,7 +8,7 @@ export interface AtomicConnectionState {
   sequenceNumber: number
 }
 
-export interface WalletConnectionState {
+export interface WalletState {
   isConnected: boolean
   address: string | undefined
   chainId: number | undefined
@@ -17,10 +17,10 @@ export interface WalletConnectionState {
 }
 
 /**
- * MobX store for managing wallet connection state
- * Replaces ConnectionStateManager with reactive store pattern
+ * MobX store for managing wallet state
+ * Reactive store pattern for wallet connection, address, and chain tracking
  */
-export class WalletConnectionStore {
+export class WalletStore {
   // Observable state
   isConnected = false
   address: string | undefined = undefined
@@ -40,7 +40,7 @@ export class WalletConnectionStore {
     return this.isConnected && !!this.address
   }
 
-  get currentState(): WalletConnectionState {
+  get currentState(): WalletState {
     return {
       isConnected: this.isConnected,
       address: this.address,
@@ -51,7 +51,7 @@ export class WalletConnectionStore {
   }
 
   // Actions
-  setConnectionState = (state: Partial<WalletConnectionState>): void => {
+  setConnectionState = (state: Partial<WalletState>): void => {
     if (state.isConnected !== undefined) this.isConnected = state.isConnected
     if (state.address !== undefined) this.address = state.address
     if (state.chainId !== undefined) this.chainId = state.chainId

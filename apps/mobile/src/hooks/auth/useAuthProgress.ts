@@ -1,20 +1,5 @@
+import { AuthStep, AuthStepInfo, AuthProgressState } from '@superpool/types'
 import { useCallback, useState } from 'react'
-
-export type AuthStep = 'connect-wallet' | 'acquire-lock' | 'generate-message' | 'request-signature' | 'verify-signature' | 'firebase-auth'
-
-export interface AuthStepInfo {
-  step: AuthStep
-  title: string
-  description: string
-}
-
-export interface AuthProgressState {
-  currentStep: AuthStep | null
-  completedSteps: Set<AuthStep>
-  failedStep: AuthStep | null
-  isComplete: boolean
-  error: string | null
-}
 
 const AUTH_STEPS: Record<AuthStep, AuthStepInfo> = {
   'connect-wallet': {

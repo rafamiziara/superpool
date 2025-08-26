@@ -1,8 +1,8 @@
 import { autorun } from 'mobx'
 import { useEffect, useRef } from 'react'
 import { useAccount } from 'wagmi'
-import { useWalletConnectionStore } from '../stores'
-import { appToasts } from '../utils/toast'
+import { useWalletStore } from '../../stores'
+import { appToasts } from '../../utils/toast'
 
 interface WalletToastOptions {
   showConnectionToasts?: boolean
@@ -16,7 +16,7 @@ export const useWalletToasts = (options: WalletToastOptions = {}) => {
   } = options
 
   const { connector } = useAccount() // Keep for wallet name
-  const walletStore = useWalletConnectionStore()
+  const walletStore = useWalletStore()
   const previouslyConnected = useRef(false)
 
   // MobX autorun: Automatically react to wallet connection state changes

@@ -1,12 +1,10 @@
+import { AuthMessage, SignatureVerification } from '@superpool/types'
 import type { Connector } from 'wagmi'
 import { devOnly, warn } from '../utils/secureLogger'
 
 export type SignatureType = 'typed-data' | 'personal-sign' | 'safe-wallet'
 
-export interface SignatureRequest {
-  message: string
-  nonce: string
-  timestamp: number
+export interface SignatureRequest extends AuthMessage {
   walletAddress: string
   chainId?: number
 }

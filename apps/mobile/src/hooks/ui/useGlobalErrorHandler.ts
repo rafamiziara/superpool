@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react'
-import { SessionManager } from '../utils/sessionManager'
+import { SessionManager } from '../../utils/sessionManager'
 
 interface GlobalErrorHandler {
   isHandling: boolean

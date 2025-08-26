@@ -1,5 +1,5 @@
 import { AuthenticationStore } from '../stores/AuthenticationStore'
-import { WalletConnectionStore } from '../stores/WalletConnectionStore'
+import { WalletStore } from '../stores/WalletStore'
 import { AuthenticationOrchestrator } from './authenticationOrchestrator'
 
 // Mock expo-router
@@ -60,14 +60,14 @@ jest.mock('./signatureService', () => ({
 
 describe('Wallet Connection Integration', () => {
   let authStore: AuthenticationStore
-  let walletStore: WalletConnectionStore
+  let walletStore: WalletStore
   let orchestrator: AuthenticationOrchestrator
 
   beforeEach(() => {
     jest.clearAllMocks()
 
     authStore = new AuthenticationStore()
-    walletStore = new WalletConnectionStore()
+    walletStore = new WalletStore()
     orchestrator = new AuthenticationOrchestrator(authStore, walletStore)
   })
 

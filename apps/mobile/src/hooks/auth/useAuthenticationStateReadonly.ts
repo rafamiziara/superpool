@@ -1,13 +1,15 @@
-import { useAuthenticationStore } from '../stores'
+import { useAuthenticationStore } from '../../stores'
 import { useFirebaseAuth } from './useFirebaseAuth'
 
 /**
- * Clean readonly authentication state hook with MobX
+ * Lightweight readonly authentication state hook with MobX
  *
- * Directly uses MobX stores for readonly authentication state.
- * Perfect for navigation screens that don't need active authentication.
+ * Provides ONLY authentication state for routing decisions.
+ * Does NOT trigger authentication flows or connection monitoring.
+ *
+ * Perfect for navigation screens (index.tsx, onboarding.tsx) that only need to read state.
  */
-export const useAuthenticationStateReadonlyBridge = () => {
+export const useAuthenticationStateReadonly = () => {
   const authStore = useAuthenticationStore()
   const firebaseAuth = useFirebaseAuth()
 
@@ -30,6 +32,6 @@ export const useAuthenticationStateReadonlyBridge = () => {
 }
 
 /**
- * Type definition for the hook
+ * Type definition for the readonly authentication state hook
  */
-export type AuthenticationStateReadonlyBridge = ReturnType<typeof useAuthenticationStateReadonlyBridge>
+export type AuthenticationStateReadonly = ReturnType<typeof useAuthenticationStateReadonly>

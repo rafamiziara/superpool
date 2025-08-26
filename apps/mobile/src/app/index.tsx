@@ -1,11 +1,11 @@
 import { Redirect } from 'expo-router';
 import { observer } from 'mobx-react-lite';
-import { useAuthenticationStateReadonly } from '../hooks/useAuthenticationStateReadonly';
+import { useAuthenticationStateReadonly } from '../hooks/auth/useAuthenticationStateReadonly';
 import { useStores } from '../stores';
 
 const IndexScreen = observer(function IndexScreen() {
-  const { walletConnectionStore } = useStores();
-  const { isConnected } = walletConnectionStore; // Use MobX store for reactive connection state
+  const { walletStore } = useStores();
+  const { isConnected } = walletStore; // Use MobX store for reactive connection state
   const { 
     authWalletAddress, 
     authError,
