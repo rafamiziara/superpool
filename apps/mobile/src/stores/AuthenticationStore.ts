@@ -1,5 +1,5 @@
 import { makeAutoObservable } from 'mobx'
-import { AuthenticationLock } from '../services/authenticationOrchestrator'
+import { AuthenticationLock } from '../services/authentication/AuthenticationOrchestrator'
 import { AppError } from '../utils/errorHandling'
 
 /**

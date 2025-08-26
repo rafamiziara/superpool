@@ -10,3 +10,11 @@ export { useAuthProgress } from './useAuthProgress'
 export { useFirebaseAuth } from './useFirebaseAuth'
 
 export { useGlobalLogoutState, getGlobalLogoutState } from './useLogoutState'
+
+export { useAuthenticationIntegration } from './useAuthenticationIntegration'
+export type { AuthenticationIntegration } from './useAuthenticationIntegration'
+
+export { useAuthStateSynchronization, useAuthStateValidation } from './useAuthStateSynchronization'
+
+export { useAuthSessionRecovery } from './useAuthSessionRecovery'
+export type { AuthSessionRecovery } from './useAuthSessionRecovery'
