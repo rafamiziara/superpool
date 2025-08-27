@@ -23,6 +23,7 @@ export class AuthenticationStepExecutor {
 
     // Start step progress
     if (!skipProgressCallbacks) {
+      console.log(`🔄 Starting step: ${step}`)
       this.progressCallbacks?.onStepStart?.(step)
     }
 
@@ -37,6 +38,7 @@ export class AuthenticationStepExecutor {
 
       // Mark step as complete
       if (!skipProgressCallbacks) {
+        console.log(`✅ Completing step: ${step}`)
         this.progressCallbacks?.onStepComplete?.(step)
       }
 

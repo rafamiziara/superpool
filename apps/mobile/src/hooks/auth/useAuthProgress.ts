@@ -44,6 +44,7 @@ export const useAuthProgress = () => {
   })
 
   const startStep = useCallback((step: AuthStep) => {
+    console.log(`📍 useAuthProgress.startStep called: ${step}`)
     setState((prev) => ({
       ...prev,
       currentStep: step,
@@ -53,6 +54,7 @@ export const useAuthProgress = () => {
   }, [])
 
   const completeStep = useCallback((step: AuthStep) => {
+    console.log(`✅ useAuthProgress.completeStep called: ${step}`)
     setState((prev) => {
       const newCompletedSteps = new Set(prev.completedSteps)
       newCompletedSteps.add(step)

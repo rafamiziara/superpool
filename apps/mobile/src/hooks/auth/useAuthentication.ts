@@ -1,5 +1,4 @@
 import { useAuthenticationStore } from '../../stores'
-import { useAuthProgress } from './useAuthProgress'
 import { useFirebaseAuth } from './useFirebaseAuth'
 
 /**
@@ -10,7 +9,6 @@ import { useFirebaseAuth } from './useFirebaseAuth'
  */
 export const useAuthentication = () => {
   const authStore = useAuthenticationStore()
-  const authProgress = useAuthProgress()
   const firebaseAuth = useFirebaseAuth()
 
   // Clean direct return - MobX handles reactivity automatically
@@ -24,21 +22,21 @@ export const useAuthentication = () => {
     isFirebaseAuthenticated: firebaseAuth.isAuthenticated,
     isFirebaseLoading: firebaseAuth.isLoading,
 
-    // Progress state from useAuthProgress
-    currentStep: authProgress.currentStep,
-    completedSteps: authProgress.completedSteps,
-    failedStep: authProgress.failedStep,
-    isComplete: authProgress.isComplete,
-    error: authProgress.error,
+    // Progress state from MobX store (reactive)
+    currentStep: authStore.currentStep,
+    completedSteps: authStore.completedSteps,
+    failedStep: authStore.failedStep,
+    isComplete: authStore.isProgressComplete,
+    error: authStore.progressError,
 
-    // Progress management functions
-    startStep: authProgress.startStep,
-    completeStep: authProgress.completeStep,
-    failStep: authProgress.failStep,
-    resetProgress: authProgress.resetProgress,
-    getStepStatus: authProgress.getStepStatus,
-    getStepInfo: authProgress.getStepInfo,
-    getAllSteps: authProgress.getAllSteps,
+    // Progress management functions from MobX store
+    startStep: authStore.startStep,
+    completeStep: authStore.completeStep,
+    failStep: authStore.failStep,
+    resetProgress: authStore.resetProgress,
+    getStepStatus: authStore.getStepStatus,
+    getStepInfo: authStore.getStepInfo,
+    getAllSteps: authStore.getAllSteps,
 
     // Clean debug info
     _debug: {
@@ -46,6 +44,9 @@ export const useAuthentication = () => {
         authError: authStore.authError,
         isAuthenticating: authStore.isAuthenticating,
         authWalletAddress: authStore.authWalletAddress,
+        currentStep: authStore.currentStep,
+        completedSteps: Array.from(authStore.completedSteps),
+        failedStep: authStore.failedStep,
       },
     },
   }

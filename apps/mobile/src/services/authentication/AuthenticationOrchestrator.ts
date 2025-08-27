@@ -12,6 +12,7 @@ export interface AuthenticationLock {
   startTime: number
   walletAddress: string | null
   abortController: AbortController | null
+  requestId: string | null
 }
 
 export class AuthenticationOrchestrator {
@@ -20,6 +21,9 @@ export class AuthenticationOrchestrator {
   private signatureHandler: SignatureHandler
   private firebaseAuthenticator: FirebaseAuthenticator
   private validator: AuthenticationValidator
+  
+  // Request tracking for deduplication
+  private static activeRequests = new Map<string, string>() // walletAddress -> requestId
 
   constructor(private authStore: AuthenticationStore, private walletStore: WalletStore) {
     // Initialize AuthErrorRecoveryService with MobX stores
@@ -40,10 +44,44 @@ export class AuthenticationOrchestrator {
   }
 
   /**
+   * Generate unique request ID for authentication attempt
+   */
+  private generateRequestId(): string {
+    return `auth_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+  }
+
+  /**
+   * Check for duplicate authentication requests
+   */
+  private isDuplicateRequest(walletAddress: string, requestId: string): boolean {
+    const activeRequestId = AuthenticationOrchestrator.activeRequests.get(walletAddress.toLowerCase())
+    if (activeRequestId && activeRequestId !== requestId) {
+      console.log(`🚫 Duplicate authentication request detected for wallet ${walletAddress}`)
+      console.log(`   Active: ${activeRequestId}, New: ${requestId}`)
+      return true
+    }
+    return false
+  }
+
+  /**
+   * Track active authentication request
+   */
+  private trackRequest(walletAddress: string, requestId: string): void {
+    AuthenticationOrchestrator.activeRequests.set(walletAddress.toLowerCase(), requestId)
+  }
+
+  /**
+   * Clean up request tracking
+   */
+  private cleanupRequest(walletAddress: string): void {
+    AuthenticationOrchestrator.activeRequests.delete(walletAddress.toLowerCase())
+  }
+
+  /**
    * Acquires authentication lock to prevent concurrent attempts
    * Now uses MobX AuthenticationStore instead of ref
    */
-  private acquireAuthLock(walletAddress: string): boolean {
+  private acquireAuthLock(walletAddress: string, requestId?: string): boolean {
     // Check if already locked
     if (this.authStore.isAuthenticating) {
       const timeSinceLock = Date.now() - this.authStore.authLock.startTime
@@ -68,7 +106,7 @@ export class AuthenticationOrchestrator {
     }
 
     // Use store method to acquire lock
-    const acquired = this.authStore.acquireAuthLock(walletAddress)
+    const acquired = this.authStore.acquireAuthLock(walletAddress, requestId)
     if (!acquired) {
       console.log('❌ Failed to acquire authentication lock')
       return false
@@ -133,15 +171,29 @@ export class AuthenticationOrchestrator {
   async authenticate(context: AuthenticationContext): Promise<void> {
     console.log('🔐 Starting authentication flow for address:', context.walletAddress)
 
+    // Generate unique request ID for this authentication attempt
+    const requestId = this.generateRequestId()
+    console.log('🆔 Generated request ID:', requestId)
+
+    // Check for duplicate requests
+    if (this.isDuplicateRequest(context.walletAddress, requestId)) {
+      console.log('❌ Skipping duplicate authentication request')
+      return
+    }
+
     // Check if user is already authenticated with Firebase
     if (FIREBASE_AUTH.currentUser) {
       console.log('✅ User already authenticated with Firebase, skipping re-authentication:', FIREBASE_AUTH.currentUser.uid)
       return
     }
 
+    // Track this request to prevent duplicates
+    this.trackRequest(context.walletAddress, requestId)
+
     // Acquire authentication lock to prevent concurrent attempts
-    if (!this.acquireAuthLock(context.walletAddress)) {
+    if (!this.acquireAuthLock(context.walletAddress, requestId)) {
       console.log('❌ Skipping authentication: another attempt in progress')
+      this.cleanupRequest(context.walletAddress)
       return
     }
 
@@ -149,6 +201,9 @@ export class AuthenticationOrchestrator {
     this.initializeStepExecutor(context.progressCallbacks)
 
     try {
+      // Mark wallet connection as complete immediately (wallet is already connected)
+      context.progressCallbacks?.onStepComplete?.('connect-wallet')
+
       // Log initial state
       console.log('Wallet connector:', {
         connectorId: context.connector?.id,
@@ -239,8 +294,10 @@ export class AuthenticationOrchestrator {
 
       throw appError
     } finally {
-      // Always release authentication lock
+      // Always release authentication lock and cleanup request tracking
       this.releaseAuthLock()
+      this.cleanupRequest(context.walletAddress)
+      console.log('🧹 Authentication request cleanup completed for:', context.walletAddress)
     }
   }
 
