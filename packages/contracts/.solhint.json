@@ -6,6 +6,8 @@
     "max-line-length": ["error", 100],
     "not-rely-on-block-hash": "off",
     "not-rely-on-time": "off",
-    "reason-string": ["warn", { "maxLength": 50 }]
+    "reason-string": ["warn", { "maxLength": 50 }],
+    "function-max-lines": ["warn", 75],
+    "no-inline-assembly": "warn"
   }
 }

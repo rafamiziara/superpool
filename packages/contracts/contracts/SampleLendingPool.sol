@@ -1,15 +1,23 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.22;
 
-import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
-import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
-import "@openzeppelin/contracts/utils/math/Math.sol";
+import {
+    OwnableUpgradeable
+} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import {
+    PausableUpgradeable
+} from "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
+import {
+    ReentrancyGuardUpgradeable
+} from "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
+import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
+import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
 /**
  * @title SampleLendingPool
+ * @notice A sample upgradeable lending pool contract for SuperPool platform
+ * @author SuperPool Team
  * @dev A sample upgradeable lending pool contract for SuperPool platform
  * This contract demonstrates the basic structure for a lending pool with:
  * - Upgradeable patterns using OpenZeppelin
@@ -32,14 +40,14 @@ contract SampleLendingPool is
         bool isActive;
     }
 
-    /// @dev Loan information
+    /// @dev Loan information - optimized for gas efficiency
     struct Loan {
-        address borrower;
-        uint256 amount;
-        uint256 interestRate;
-        uint256 startTime;
-        uint256 duration;
-        bool isRepaid;
+        address borrower;         // 20 bytes
+        bool isRepaid;           // 1 byte - fits in same slot (21 bytes total)
+        uint256 amount;          // 32 bytes - new slot
+        uint256 interestRate;    // 32 bytes - new slot
+        uint256 startTime;       // 32 bytes - new slot
+        uint256 duration;        // 32 bytes - new slot
     }
 
     /// @notice Pool configuration
@@ -55,21 +63,44 @@ contract SampleLendingPool is
     uint256 public nextLoanId;
 
     /// @notice Events
+    /**
+     * @notice Emitted when the pool configuration is updated
+     * @param maxLoanAmount Maximum loan amount allowed in the pool
+     * @param interestRate Interest rate for loans (in basis points)
+     * @param loanDuration Duration of loans in seconds
+     */
     event PoolConfigured(
-        uint256 maxLoanAmount,
-        uint256 interestRate,
-        uint256 loanDuration
+        uint256 indexed maxLoanAmount,
+        uint256 indexed interestRate,
+        uint256 indexed loanDuration
     );
-    event FundsDeposited(address indexed depositor, uint256 amount);
+    /**
+     * @notice Emitted when funds are deposited into the pool
+     * @param depositor Address of the account that deposited funds
+     * @param amount Amount of funds deposited
+     */
+    event FundsDeposited(address indexed depositor, uint256 indexed amount);
+    /**
+     * @notice Emitted when a new loan is created
+     * @param loanId Unique identifier of the created loan
+     * @param borrower Address of the borrower
+     * @param amount Amount of the loan
+     */
     event LoanCreated(
         uint256 indexed loanId,
         address indexed borrower,
-        uint256 amount
+        uint256 indexed amount
     );
+    /**
+     * @notice Emitted when a loan is repaid
+     * @param loanId Unique identifier of the repaid loan
+     * @param borrower Address of the borrower who repaid the loan
+     * @param amount Total amount repaid (principal + interest)
+     */
     event LoanRepaid(
         uint256 indexed loanId,
         address indexed borrower,
-        uint256 amount
+        uint256 indexed amount
     );
 
     /// @notice Errors
@@ -77,8 +108,15 @@ contract SampleLendingPool is
     error LoanAlreadyRepaid();
     error UnauthorizedBorrower();
     error ExceedsMaxLoanAmount();
+    error InvalidAmount();
+    error PoolNotActive();
+    error InsufficientRepaymentAmount();
+    error TransferFailed();
+    error RefundFailed();
+    error InvalidImplementation();
 
     /**
+     * @notice Initialize the contract (replaces constructor for upgradeable contracts)
      * @dev Initialize the contract (replaces constructor for upgradeable contracts)
      * @param _owner Initial owner of the contract
      * @param _maxLoanAmount Maximum loan amount allowed
@@ -109,19 +147,25 @@ contract SampleLendingPool is
     }
 
     /**
+     * @notice Authorize contract upgrades (only owner)
      * @dev Required by UUPSUpgradeable to authorize upgrades
+     * @param newImplementation Address of the new implementation contract
      */
     function _authorizeUpgrade(
         address newImplementation
     ) internal override onlyOwner {
         // Only owner can authorize upgrades
+        // Additional upgrade logic can be added here if needed
+        // For now, the onlyOwner modifier provides sufficient access control
+        // Validation of newImplementation address could be added here
+        if (newImplementation == address(0)) revert InvalidImplementation();
     }
 
     /**
      * @notice Deposit funds into the pool
      */
     function depositFunds() external payable whenNotPaused {
-        require(msg.value > 0, "Amount must be greater than 0");
+        if (msg.value == 0) revert InvalidAmount();
         totalFunds += msg.value;
         emit FundsDeposited(msg.sender, msg.value);
     }
@@ -134,7 +178,7 @@ contract SampleLendingPool is
     function createLoan(
         uint256 _amount
     ) external whenNotPaused nonReentrant returns (uint256) {
-        require(poolConfig.isActive, "Pool is not active");
+        if (!poolConfig.isActive) revert PoolNotActive();
 
         if (_amount > poolConfig.maxLoanAmount) {
             revert ExceedsMaxLoanAmount();
@@ -144,7 +188,7 @@ contract SampleLendingPool is
             revert InsufficientFunds();
         }
 
-        uint256 loanId = nextLoanId++;
+        uint256 loanId = ++nextLoanId;
 
         // Complete all state changes before external call (CEI pattern)
         loans[loanId] = Loan({
@@ -163,7 +207,7 @@ contract SampleLendingPool is
 
         // Transfer funds to borrower (external call moved to end)
         (bool success, ) = payable(msg.sender).call{value: _amount}("");
-        require(success, "Transfer failed");
+        if (!success) revert TransferFailed();
 
         return loanId;
     }
@@ -188,7 +232,7 @@ contract SampleLendingPool is
         uint256 interest = Math.mulDiv(loan.amount, loan.interestRate, 10000);
         uint256 totalRepayment = loan.amount + interest;
 
-        require(msg.value >= totalRepayment, "Insufficient repayment amount");
+        if (msg.value < totalRepayment) revert InsufficientRepaymentAmount();
 
         // Complete all state changes before external call (CEI pattern)
         loan.isRepaid = true;
@@ -203,7 +247,7 @@ contract SampleLendingPool is
         // Refund any excess payment (external call moved to end)
         if (refundAmount > 0) {
             (bool success, ) = payable(msg.sender).call{value: refundAmount}("");
-            require(success, "Refund failed");
+            if (!success) revert RefundFailed();
         }
     }
 
@@ -272,6 +316,7 @@ contract SampleLendingPool is
 
     /**
      * @notice Get contract version for upgrades
+     * @return version Version string of the contract
      */
     function version() external pure returns (string memory) {
         return "1.0.0";
