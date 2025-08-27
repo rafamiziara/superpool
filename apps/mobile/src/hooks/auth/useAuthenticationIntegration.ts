@@ -3,7 +3,6 @@ import { useCallback, useRef } from 'react'
 import { useAccount, useDisconnect, useSignMessage, useSignTypedData } from 'wagmi'
 import { AuthenticationOrchestrator } from '../../services/authentication'
 import { useStores } from '../../stores'
-import { devOnly } from '../../utils'
 import { FIREBASE_AUTH } from '../../firebase.config'
 
 /**

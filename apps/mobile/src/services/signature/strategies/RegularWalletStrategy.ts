@@ -1,6 +1,5 @@
 import type { Connector } from 'wagmi'
 import type { SignatureRequest, SignatureResult, SignatureFunctions } from '@superpool/types'
-import { devOnly } from '../../../utils'
 import type { SignatureStrategy } from './SignatureStrategy'
 import { SignatureUtils } from './SignatureUtils'
 
@@ -26,7 +25,7 @@ export class RegularWalletStrategy implements SignatureStrategy {
     return 'regular-wallet'
   }
 
-  async sign(request: SignatureRequest, functions: SignatureFunctions, connector?: Connector): Promise<SignatureResult> {
+  async sign(request: SignatureRequest, functions: SignatureFunctions, _connector?: Connector): Promise<SignatureResult> {
     // First try personal message signing for better UX
     try {
       console.log('📱 Trying personal message signing first for better UX...')

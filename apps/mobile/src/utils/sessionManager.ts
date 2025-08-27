@@ -137,7 +137,7 @@ export class SessionManager {
         for (const key of specificKeys) {
           try {
             await AsyncStorage.removeItem(key)
-          } catch (error) {
+          } catch {
             // Ignore errors for non-existent keys
           }
         }
@@ -181,7 +181,7 @@ export class SessionManager {
         try {
           const data = await AsyncStorage.getItem(key)
           sessionData[key] = data ? JSON.parse(data) : null
-        } catch (error) {
+        } catch {
           sessionData[key] = 'Failed to parse'
         }
       }

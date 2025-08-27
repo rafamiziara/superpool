@@ -53,7 +53,6 @@ export class PoolManagementStore {
 
   get userPools(): LendingPool[] {
     if (!this.userAddress) return []
-    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
     return this.allPools.filter((pool) => pool.members.includes(this.userAddress!) || pool.admins.includes(this.userAddress!))
   }
 
@@ -61,7 +60,6 @@ export class PoolManagementStore {
     if (!this.userAddress) return []
     return (
       Array.from(this.loans.values())
-        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
         .filter((loan) => loan.borrower.toLowerCase() === this.userAddress!.toLowerCase())
         .sort((a, b) => new Date(b.requestedAt).getTime() - new Date(a.requestedAt).getTime())
     )
@@ -192,12 +190,10 @@ export class PoolManagementStore {
     }
 
     if (filters.isUserMember && this.userAddress) {
-      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
       filtered = filtered.filter((pool) => pool.members.includes(this.userAddress!) || pool.admins.includes(this.userAddress!))
     }
 
     if (filters.minLiquidity) {
-      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
       filtered = filtered.filter((pool) => pool.availableLiquidity >= filters.minLiquidity!)
     }
 
