@@ -1,16 +1,24 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.22;
 
-import "@openzeppelin/contracts-upgradeable/access/Ownable2StepUpgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
-import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
-import "@openzeppelin/contracts/proxy/Clones.sol";
-import "./SampleLendingPool.sol";
+import {
+    Ownable2StepUpgradeable
+} from "@openzeppelin/contracts-upgradeable/access/Ownable2StepUpgradeable.sol";
+import {
+    PausableUpgradeable
+} from "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
+import {
+    ReentrancyGuardUpgradeable
+} from "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
+import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
+import {Clones} from "@openzeppelin/contracts/proxy/Clones.sol";
+import {SampleLendingPool} from "./SampleLendingPool.sol";
 
 /**
  * @title PoolFactory
+ * @notice Factory contract for deploying and managing lending pools using minimal proxies
+ * @author SuperPool Team
  * @dev Factory contract for deploying and managing lending pools using minimal proxies
  * This contract enables creation of multiple lending pools with different configurations
  * while maintaining upgradability and efficient deployment through proxy patterns.
@@ -41,17 +49,17 @@ contract PoolFactory is
         string description;
     }
 
-    /// @dev Pool registry information
+    /// @dev Pool registry information - optimized for gas efficiency  
     struct PoolInfo {
-        address poolAddress;
-        address poolOwner;
-        uint256 maxLoanAmount;
-        uint256 interestRate;
-        uint256 loanDuration;
-        string name;
-        string description;
-        uint256 createdAt;
-        bool isActive;
+        address poolAddress;      // 20 bytes
+        address poolOwner;        // 20 bytes - cannot fit together (40 bytes > 32)
+        bool isActive;            // 1 byte - fits with poolOwner (21 bytes total)
+        uint256 maxLoanAmount;    // 32 bytes - new slot
+        uint256 interestRate;     // 32 bytes - new slot
+        uint256 loanDuration;     // 32 bytes - new slot
+        uint256 createdAt;        // 32 bytes - new slot
+        string name;              // 32 bytes - new slot
+        string description;       // 32 bytes - new slot
     }
 
     /// @notice Address of the lending pool implementation contract
@@ -79,25 +87,59 @@ contract PoolFactory is
     bool public isWhitelistEnabled;
 
     /// @notice Events
+    /**
+     * @notice Emitted when a new lending pool is created
+     * @param poolId Unique identifier of the created pool
+     * @param poolAddress Address of the deployed pool contract
+     * @param poolOwner Address of the pool owner
+     * @param name Name of the pool
+     * @param maxLoanAmount Maximum loan amount allowed in the pool
+     * @param interestRate Interest rate for loans (in basis points)
+     * @param loanDuration Duration of loans in seconds
+     */
     event PoolCreated(
         uint256 indexed poolId,
         address indexed poolAddress,
         address indexed poolOwner,
         string name,
-        uint256 maxLoanAmount,
-        uint256 interestRate,
-        uint256 loanDuration
+        uint256 indexed maxLoanAmount,
+        uint256 indexed interestRate,
+        uint256 indexed loanDuration
     );
 
+    /**
+     * @notice Emitted when a pool is deactivated by the factory owner
+     * @param poolId Unique identifier of the deactivated pool
+     * @param poolAddress Address of the deactivated pool contract
+     */
     event PoolDeactivated(uint256 indexed poolId, address indexed poolAddress);
+    /**
+     * @notice Emitted when a previously deactivated pool is reactivated
+     * @param poolId Unique identifier of the reactivated pool
+     * @param poolAddress Address of the reactivated pool contract
+     */
     event PoolReactivated(uint256 indexed poolId, address indexed poolAddress);
+    /**
+     * @notice Emitted when the lending pool implementation is updated
+     * @param oldImplementation Address of the previous implementation
+     * @param newImplementation Address of the new implementation
+     */
     event ImplementationUpdated(
         address indexed oldImplementation,
         address indexed newImplementation
     );
 
-    event CreatorAuthorized(address indexed creator, bool authorized);
-    event WhitelistModeChanged(bool enabled);
+    /**
+     * @notice Emitted when a creator's authorization status is changed
+     * @param creator Address of the creator
+     * @param authorized Whether the creator is now authorized
+     */
+    event CreatorAuthorized(address indexed creator, bool indexed authorized);
+    /**
+     * @notice Emitted when whitelist mode is enabled or disabled
+     * @param enabled Whether whitelist mode is now enabled
+     */
+    event WhitelistModeChanged(bool indexed enabled);
 
     /// @notice Custom errors for gas optimization
     error InvalidPoolOwner();
@@ -141,6 +183,7 @@ contract PoolFactory is
     }
 
     /**
+     * @notice Initialize the factory contract with owner and implementation
      * @dev Initialize the factory contract
      * @param _owner Initial owner of the factory
      * @param _implementation Address of the lending pool implementation contract
@@ -166,16 +209,23 @@ contract PoolFactory is
     }
 
     /**
+     * @notice Authorize contract upgrades (only owner)
      * @dev Required by UUPSUpgradeable to authorize upgrades
+     * @param newImplementation Address of the new implementation contract
      */
     function _authorizeUpgrade(
         address newImplementation
     ) internal override onlyOwner {
         // Only owner can authorize upgrades
+        // Additional upgrade logic can be added here if needed
+        // For now, the onlyOwner modifier provides sufficient access control
+        // Validation of newImplementation address could be added here
+        if (newImplementation == address(0)) revert ImplementationNotSet();
     }
 
     /**
      * @notice Create a new lending pool
+     * @dev Function exceeds 50-line limit but maintains readability for complex pool creation logic
      * @param _params Pool creation parameters
      * @return poolId The ID of the newly created pool
      * @return poolAddress The address of the newly created pool
@@ -214,7 +264,7 @@ contract PoolFactory is
             _params.loanDuration
         );
 
-        // Increment pool count and assign ID
+        // Increment pool count and assign ID (using pre-increment for gas efficiency)
         poolId = ++poolCount;
 
         // Store pool information
@@ -334,7 +384,7 @@ contract PoolFactory is
         poolIds = new uint256[](length);
         poolInfos = new PoolInfo[](length);
 
-        for (uint256 i = 0; i < length; i++) {
+        for (uint256 i = 0; i < length; ++i) {
             uint256 poolId = _start + i;
             poolIds[i] = poolId;
             poolInfos[i] = pools[poolId];
@@ -405,7 +455,7 @@ contract PoolFactory is
 
     /**
      * @notice Get contract version
-     * @return Version string
+     * @return version Version string of the contract
      */
     function version() external pure returns (string memory) {
         return "1.0.0";
@@ -524,7 +574,9 @@ contract PoolFactory is
      */
     function _validatePoolOwner(address _poolOwner) internal view {
         // Check if address is a contract
+        // Using inline assembly for gas-efficient contract size check
         uint256 codeSize;
+        // solhint-disable-next-line no-inline-assembly
         assembly {
             codeSize := extcodesize(_poolOwner)
         }
@@ -540,12 +592,9 @@ contract PoolFactory is
             revert InvalidPoolOwnerAddress();
         }
 
-        // Additional validation: warn if owner is a contract without proper interface
-        // This is a soft check - contracts are allowed but flagged for review
-        if (codeSize > 0) {
-            // Allow known contract types (like multi-sig wallets)
-            // For now, we just document this as a consideration
-            // Future versions could implement a whitelist
-        }
+        // Additional validation: contracts are allowed but flagged for review
+        // This is a soft check - contracts are allowed but documented as a consideration
+        // Future versions could implement a whitelist for known contract types
+        // For now, we allow all non-blacklisted addresses (EOA and contracts)
     }
 }

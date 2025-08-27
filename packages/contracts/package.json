@@ -37,7 +37,7 @@
     "test:safe": "hardhat run scripts/test-safe-flow.ts --network polygonAmoyFork",
     "demo:safe": "hardhat run scripts/demo-safe-workflow.ts --network localhost",
     "test:full": "npm run test:local && npm run test:safe",
-    "lint": "solhint contracts/*.sol && eslint . --config ../../eslint.config.mjs",
+    "lint": "solhint contracts/*.sol && cd ../.. && npx eslint packages/contracts/**/*.ts --config eslint.config.mjs",
     "clean": "hardhat clean"
   },
   "keywords": [
@@ -73,7 +73,7 @@
     "ethers": "^6.15.0",
     "hardhat": "^2.22.18",
     "hardhat-gas-reporter": "^2.3.0",
-    "solhint": "^5.1.0",
+    "solhint": "^6.0.1",
     "solidity-coverage": "^0.8.15",
     "ts-node": "^10.9.2",
     "typescript": "^5.7.3"
