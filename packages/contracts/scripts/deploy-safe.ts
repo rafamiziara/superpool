@@ -255,7 +255,7 @@ function getDefaultSafeConfig(environment: 'local' | 'testnet' | 'mainnet'): Saf
         threshold: 2,
         saltNonce: '0x1234567890abcdef',
       }
-    case 'testnet':
+    case 'testnet': {
       // For testnet, use environment variables
       const testnetOwners = process.env.SAFE_OWNERS?.split(',') || []
       const testnetThreshold = parseInt(process.env.SAFE_THRESHOLD || '2')
@@ -269,7 +269,8 @@ function getDefaultSafeConfig(environment: 'local' | 'testnet' | 'mainnet'): Saf
         threshold: testnetThreshold,
         saltNonce: process.env.SAFE_SALT_NONCE,
       }
-    case 'mainnet':
+    }
+    case 'mainnet': {
       // For mainnet, use environment variables with strict validation
       const mainnetOwners = process.env.SAFE_OWNERS?.split(',') || []
       const mainnetThreshold = parseInt(process.env.SAFE_THRESHOLD || '3')
@@ -286,6 +287,7 @@ function getDefaultSafeConfig(environment: 'local' | 'testnet' | 'mainnet'): Saf
         threshold: mainnetThreshold,
         saltNonce: process.env.SAFE_SALT_NONCE,
       }
+    }
     default:
       throw new Error(`Unknown environment: ${environment}`)
   }

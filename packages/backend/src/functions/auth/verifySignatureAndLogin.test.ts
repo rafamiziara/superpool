@@ -2,10 +2,16 @@ import { jest } from '@jest/globals'
 import { isAddress, verifyMessage } from 'ethers'
 import { AUTH_NONCES_COLLECTION, USERS_COLLECTION } from '../../constants'
 
+// Type definitions for Firebase Firestore mock functions
+type DeleteFunction = () => Promise<void>
+type UpdateFunction = () => Promise<void>
+type SetFunction = () => Promise<void>
+type CreateCustomTokenFunction = () => Promise<string>
+
 // Mock the delete method specifically for the nonce document
-const mockDelete = jest.fn<DeleteFunctionFirestore>()
-const mockUpdate = jest.fn<UpdateFunctionFirestore>()
-const mockSet = jest.fn<SetFunctionFirestore>()
+const mockDelete = jest.fn<DeleteFunction>()
+const mockUpdate = jest.fn<UpdateFunction>()
+const mockSet = jest.fn<SetFunction>()
 
 const mockNonceDoc = {
   get: jest.fn(() =>

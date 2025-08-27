@@ -182,7 +182,7 @@ export class AuthUtils {
   /**
    * Formats authentication context for logging
    */
-  static formatAuthContext(request: SignatureRequest): Record<string, any> {
+  static formatAuthContext(request: SignatureRequest): Record<string, string | number> {
     return {
       walletPreview: request.walletAddress.substring(0, 6) + '...' + request.walletAddress.slice(-4),
       messageLength: request.message.length,

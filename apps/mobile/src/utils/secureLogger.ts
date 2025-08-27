@@ -159,7 +159,7 @@ class SecureLogger {
   /**
    * Logs authentication step with timing information
    */
-  logAuthStep(step: string, status: 'start' | 'complete' | 'fail', details?: Record<string, any>): void {
+  logAuthStep(step: string, status: 'start' | 'complete' | 'fail', details?: Record<string, string | number | boolean>): void {
     const timestamp = new Date().toISOString()
     const emoji = status === 'complete' ? '✅' : status === 'fail' ? '❌' : '🔄'
     const safeDetails = details ? this.sanitizeData(details) : ''
@@ -172,7 +172,7 @@ class SecureLogger {
   /**
    * Logs service operation with context
    */
-  logServiceOperation(service: string, operation: string, status: 'start' | 'success' | 'error', details?: Record<string, any>): void {
+  logServiceOperation(service: string, operation: string, status: 'start' | 'success' | 'error', details?: Record<string, string | number | boolean>): void {
     const emoji = status === 'success' ? '✅' : status === 'error' ? '❌' : '🔄'
     const safeDetails = details ? this.sanitizeData(details) : {}
 
@@ -186,7 +186,7 @@ class SecureLogger {
   /**
    * Logs error with service context but sanitizes sensitive information
    */
-  logServiceError(service: string, operation: string, error: unknown, context?: Record<string, any>): void {
+  logServiceError(service: string, operation: string, error: unknown, context?: Record<string, string | number | boolean>): void {
     if (this.minLogLevel <= LOG_LEVELS.ERROR) {
       const errorMessage = error instanceof Error ? error.message : String(error)
       const safeContext = context ? this.sanitizeData(context) : {}
@@ -202,7 +202,7 @@ class SecureLogger {
   /**
    * Logs recovery action with result
    */
-  logRecoveryAction(action: string, result: Record<string, any>, context?: string): void {
+  logRecoveryAction(action: string, result: Record<string, string | number | boolean>, context?: string): void {
     if (this.minLogLevel <= LOG_LEVELS.INFO) {
       const prefix = context ? `🔄 [${context}] Recovery:` : '🔄 Recovery:'
       const safeResult = this.sanitizeData(result)
@@ -213,7 +213,7 @@ class SecureLogger {
   /**
    * Creates a consistent log context for service operations
    */
-  createServiceContext(service: string, operation: string, additionalContext?: Record<string, any>): string {
+  createServiceContext(service: string, operation: string, additionalContext?: Record<string, string | number | boolean>): string {
     const timestamp = new Date().toISOString()
     const base = `[${service}:${operation}] ${timestamp}`
 
