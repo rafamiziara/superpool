@@ -60,7 +60,7 @@ export class ErrorRecoveryService {
     try {
       // Route to appropriate handler based on error type
       switch (analysisResult.errorType) {
-        case 'session':
+        case 'session': {
           if (!analysisResult.sessionContext) {
             throw new Error('Session context missing for session error')
           }
@@ -68,21 +68,24 @@ export class ErrorRecoveryService {
           recoveryResult = await sessionHandler.handle(analysisResult.sessionContext)
           FeedbackManager.logRecoveryResult(sessionHandler.getHandlerName(), recoveryResult)
           break
+        }
 
-        case 'timeout':
+        case 'timeout': {
           const timeoutHandler = new TimeoutErrorHandler(disconnectFunction)
           recoveryResult = timeoutHandler.handle()
           FeedbackManager.logRecoveryResult(timeoutHandler.getHandlerName(), recoveryResult)
           break
+        }
 
-        case 'connector':
+        case 'connector': {
           const connectorHandler = new ConnectorErrorHandler()
           recoveryResult = connectorHandler.handle()
           FeedbackManager.logRecoveryResult(connectorHandler.getHandlerName(), recoveryResult)
           break
+        }
 
         case 'generic':
-        default:
+        default: {
           const genericHandler = new GenericErrorHandler(disconnectFunction)
           const isConnected = this.walletStore?.isConnected ?? false
           recoveryResult = genericHandler.handle({
@@ -92,6 +95,7 @@ export class ErrorRecoveryService {
           })
           FeedbackManager.logRecoveryResult(genericHandler.getHandlerName(), recoveryResult)
           break
+        }
       }
     } catch (handlerError) {
       console.error('❌ Error handler failed:', handlerError)

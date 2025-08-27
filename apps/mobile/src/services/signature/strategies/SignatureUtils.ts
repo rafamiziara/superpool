@@ -1,4 +1,4 @@
-import type { SignatureRequest, SignatureResult } from '@superpool/types'
+import type { SignatureRequest } from '@superpool/types'
 
 /**
  * Utility functions for signature operations

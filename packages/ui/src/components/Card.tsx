@@ -17,7 +17,7 @@ export const Card = React.forwardRef<HTMLDivElement, CardProps>(({ className, va
 
 Card.displayName = 'Card'
 
-export interface CardHeaderProps extends React.HTMLAttributes<HTMLDivElement> {}
+export type CardHeaderProps = React.HTMLAttributes<HTMLDivElement>
 
 export const CardHeader = React.forwardRef<HTMLDivElement, CardHeaderProps>(({ className, ...props }, ref) => {
   return <div ref={ref} className={cn('pb-4', className)} {...props} />
@@ -25,7 +25,7 @@ export const CardHeader = React.forwardRef<HTMLDivElement, CardHeaderProps>(({ c
 
 CardHeader.displayName = 'CardHeader'
 
-export interface CardContentProps extends React.HTMLAttributes<HTMLDivElement> {}
+export type CardContentProps = React.HTMLAttributes<HTMLDivElement>
 
 export const CardContent = React.forwardRef<HTMLDivElement, CardContentProps>(({ className, ...props }, ref) => {
   return <div ref={ref} className={cn('', className)} {...props} />
@@ -33,7 +33,7 @@ export const CardContent = React.forwardRef<HTMLDivElement, CardContentProps>(({
 
 CardContent.displayName = 'CardContent'
 
-export interface CardFooterProps extends React.HTMLAttributes<HTMLDivElement> {}
+export type CardFooterProps = React.HTMLAttributes<HTMLDivElement>
 
 export const CardFooter = React.forwardRef<HTMLDivElement, CardFooterProps>(({ className, ...props }, ref) => {
   return <div ref={ref} className={cn('pt-4 flex items-center', className)} {...props} />

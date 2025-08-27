@@ -1,4 +1,4 @@
-import { SignatureType, SignatureRequest, SignatureResult, SignatureFunctions } from '@superpool/types'
+import { SignatureRequest, SignatureResult, SignatureFunctions } from '@superpool/types'
 import type { Connector } from 'wagmi'
 import { devOnly } from '../../utils'
 import { SignatureStrategyFactory, SignatureUtils } from './strategies'
@@ -16,7 +16,7 @@ interface TypedDataDomain {
   salt?: `0x${string}`
 }
 
-interface TypedData {
+interface _TypedData {
   domain?: TypedDataDomain
   types: Record<string, TypedDataParameter[]>
   primaryType: string

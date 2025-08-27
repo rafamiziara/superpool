@@ -37,7 +37,7 @@
     "test:safe": "hardhat run scripts/test-safe-flow.ts --network polygonAmoyFork",
     "demo:safe": "hardhat run scripts/demo-safe-workflow.ts --network localhost",
     "test:full": "npm run test:local && npm run test:safe",
-    "lint": "solhint 'contracts/**/*.sol' && eslint . --config ../../eslint.config.mjs",
+    "lint": "solhint contracts/*.sol && eslint . --config ../../eslint.config.mjs",
     "clean": "hardhat clean"
   },
   "keywords": [
