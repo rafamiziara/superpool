@@ -1,6 +1,7 @@
 import type { SignatureResult } from '@superpool/types'
 import { signInWithCustomToken } from 'firebase/auth'
 import { httpsCallable } from 'firebase/functions'
+import { Platform } from 'react-native'
 import { FIREBASE_AUTH, FIREBASE_FUNCTIONS } from '../../../firebase.config'
 import { devOnly } from '../../../utils'
 
@@ -22,14 +23,37 @@ export class FirebaseAuthenticator {
   async verifySignatureAndGetToken(context: SignatureVerificationContext, signatureResult: SignatureResult): Promise<string> {
     console.log('🔍 Verifying signature with backend...')
 
-    // For Safe wallets, provide device info for proper App Check validation
-    const deviceInfo =
-      signatureResult.signatureType === 'safe-wallet'
-        ? {
-            deviceId: 'safe-wallet-device',
-            platform: 'web' as const,
-          }
-        : {}
+    // Get device info for proper App Check validation
+    let deviceInfo = {}
+    
+    if (signatureResult.signatureType === 'safe-wallet') {
+      deviceInfo = {
+        deviceId: 'safe-wallet-device',
+        platform: 'web' as const,
+      }
+    } else {
+      try {
+        // Get device ID from platform-specific sources
+        const platform = Platform.OS as 'ios' | 'android'
+        
+        // Use a combination of app instance and platform for device ID
+        const deviceId = `mobile-${platform}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+        
+        deviceInfo = {
+          deviceId,
+          platform,
+        }
+        
+        console.log('📱 Generated device info:', { deviceId, platform })
+      } catch (error) {
+        console.warn('⚠️ Failed to get device info:', error)
+        // Fallback for web or other platforms
+        deviceInfo = {
+          deviceId: `fallback-device-${Date.now()}`,
+          platform: 'ios' as const,
+        }
+      }
+    }
 
     const signatureResponse = await verifySignatureAndLogin({
       walletAddress: context.walletAddress,

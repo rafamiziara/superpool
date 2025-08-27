@@ -1,5 +1,5 @@
-import { autorun } from 'mobx'
-import { useEffect } from 'react'
+import { autorun, runInAction } from 'mobx'
+import { useEffect, useRef } from 'react'
 import { useAccount } from 'wagmi'
 import { FIREBASE_AUTH } from '../../firebase.config'
 import { useStores } from '../../stores'
@@ -14,10 +14,17 @@ export const useAuthStateSynchronization = () => {
   const { authenticationStore, walletStore } = useStores()
   const firebaseAuth = useFirebaseAuth()
   const { isConnected, address } = useAccount()
+  
+  // Ref to track if sync is in progress to prevent loops
+  const isSyncInProgressRef = useRef(false)
 
   // Synchronization logic using MobX autorun for reactive state management
   useEffect(() => {
     const disposer = autorun(() => {
+      // Skip if reset is in progress to prevent infinite loops
+      if ((authenticationStore as any).isResetting || isSyncInProgressRef.current) {
+        return
+      }
       const { isAuthenticated: isFirebaseAuth, walletAddress: firebaseWalletAddress, isLoading: isFirebaseLoading } = firebaseAuth
 
       const { isConnected: walletConnected, address: walletAddress } = walletStore.currentState
@@ -38,13 +45,21 @@ export const useAuthStateSynchronization = () => {
       if (isFirebaseAuth && firebaseWalletAddress && !walletConnected) {
         devOnly('⚠️  Firebase authenticated but wallet disconnected - clearing Firebase auth')
 
+        isSyncInProgressRef.current = true
+        
         // Clear Firebase authentication to maintain consistency
         FIREBASE_AUTH.signOut()
-          .then(() => devOnly('✅ Firebase auth cleared due to wallet disconnection'))
-          .catch((error) => console.warn('❌ Failed to clear Firebase auth:', error))
-
-        // Clear authentication store state
-        authenticationStore.reset()
+          .then(() => {
+            devOnly('✅ Firebase auth cleared due to wallet disconnection')
+            runInAction(() => {
+              authenticationStore.reset()
+              isSyncInProgressRef.current = false
+            })
+          })
+          .catch((error) => {
+            console.warn('❌ Failed to clear Firebase auth:', error)
+            isSyncInProgressRef.current = false
+          })
         return
       }
 
@@ -56,13 +71,21 @@ export const useAuthStateSynchronization = () => {
         if (walletAddressLower !== firebaseAddressLower) {
           devOnly('⚠️  Wallet address mismatch with Firebase auth - clearing Firebase auth')
 
+          isSyncInProgressRef.current = true
+
           // Clear Firebase authentication to maintain consistency
           FIREBASE_AUTH.signOut()
-            .then(() => devOnly('✅ Firebase auth cleared due to address mismatch'))
-            .catch((error) => console.warn('❌ Failed to clear Firebase auth:', error))
-
-          // Clear authentication store state
-          authenticationStore.reset()
+            .then(() => {
+              devOnly('✅ Firebase auth cleared due to address mismatch')
+              runInAction(() => {
+                authenticationStore.reset()
+                isSyncInProgressRef.current = false
+              })
+            })
+            .catch((error) => {
+              console.warn('❌ Failed to clear Firebase auth:', error)
+              isSyncInProgressRef.current = false
+            })
           return
         }
       }

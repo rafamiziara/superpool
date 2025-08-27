@@ -4,7 +4,7 @@ import { useAccount, useDisconnect, useSignMessage, useSignTypedData } from 'wag
 import { AuthenticationOrchestrator } from '../../services/authentication'
 import { useStores } from '../../stores'
 import { devOnly } from '../../utils'
-import { useAuthProgress } from './useAuthProgress'
+import { FIREBASE_AUTH } from '../../firebase.config'
 
 /**
  * Integration hook that connects wallet events to authentication orchestrator
@@ -16,7 +16,6 @@ export const useAuthenticationIntegration = () => {
   const { signMessageAsync } = useSignMessage()
   const { signTypedDataAsync } = useSignTypedData()
   const { disconnect } = useDisconnect()
-  const authProgress = useAuthProgress()
   
   // Store wagmi functions in refs to prevent dependency changes
   const signMessageAsyncRef = useRef(signMessageAsync)
@@ -52,7 +51,7 @@ export const useAuthenticationIntegration = () => {
         walletStore.connect(walletAddress, chainId || chain?.id || 1)
 
         // Reset any previous authentication progress
-        authProgress.resetProgress()
+        authenticationStore.resetProgress()
 
         // Create authentication context
         const authContext: AuthenticationContext = {
@@ -66,9 +65,9 @@ export const useAuthenticationIntegration = () => {
           },
           disconnect: disconnectRef.current,
           progressCallbacks: {
-            onStepStart: authProgress.startStep,
-            onStepComplete: authProgress.completeStep,
-            onStepFail: authProgress.failStep,
+            onStepStart: authenticationStore.startStep,
+            onStepComplete: authenticationStore.completeStep,
+            onStepFail: authenticationStore.failStep,
           },
         }
 
@@ -82,11 +81,11 @@ export const useAuthenticationIntegration = () => {
 
         // Update authentication progress with error
         if (error instanceof Error) {
-          authProgress.failStep(authProgress.currentStep || 'connect-wallet', error.message)
+          authenticationStore.failStep(authenticationStore.currentStep || 'connect-wallet', error.message)
         }
       }
     },
-    [walletStore, chain?.id, authProgress, getOrchestrator]
+    [walletStore, chain?.id, authenticationStore, getOrchestrator]
   )
 
   /**
@@ -95,15 +94,12 @@ export const useAuthenticationIntegration = () => {
   const handleDisconnection = useCallback(() => {
     console.log('👋 Handling wallet disconnection')
 
-    // Reset authentication progress
-    authProgress.resetProgress()
-
-    // Clear authentication state in stores
+    // Clear authentication state in stores (includes progress reset)
     authenticationStore.reset()
     walletStore.disconnect()
 
     console.log('🧹 Authentication state cleared on disconnection')
-  }, [authProgress, authenticationStore, walletStore])
+  }, [authenticationStore, walletStore])
 
   /**
    * Manual authentication trigger (for retry scenarios)
@@ -119,10 +115,35 @@ export const useAuthenticationIntegration = () => {
 
   /**
    * Check if authentication is needed
+   * Enhanced to prevent auto-trigger loops on app refresh
    */
   const needsAuthentication = useCallback((): boolean => {
-    return isConnected && !!address && !authenticationStore.authWalletAddress
-  }, [isConnected, address, authenticationStore.authWalletAddress])
+    // Basic wallet connection check
+    if (!isConnected || !address) {
+      return false
+    }
+    
+    // Check if already authenticated with Firebase
+    if (FIREBASE_AUTH.currentUser) {
+      console.log('🔍 Firebase user already authenticated, no authentication needed:', FIREBASE_AUTH.currentUser.uid)
+      return false
+    }
+    
+    // Check if MobX store shows authenticated
+    if (authenticationStore.authWalletAddress) {
+      console.log('🔍 MobX store shows authenticated wallet, no authentication needed')
+      return false
+    }
+    
+    // Check if authentication is currently in progress
+    if (authenticationStore.isAuthenticating) {
+      console.log('🔍 Authentication already in progress, skipping')
+      return false
+    }
+    
+    console.log('🔍 Authentication needed: wallet connected but not authenticated')
+    return true
+  }, [isConnected, address, authenticationStore.authWalletAddress, authenticationStore.isAuthenticating])
 
   return {
     // Connection event handlers for useWalletConnectionTrigger
