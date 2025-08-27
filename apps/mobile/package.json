@@ -30,7 +30,7 @@
     "mobx-react-lite": "^4.1.0",
     "nativewind": "^4.1.23",
     "react": "19.0.0",
-    "react-dom": "19.1.0",
+    "react-dom": "19.0.0",
     "react-native": "0.79.5",
     "react-native-get-random-values": "^1.11.0",
     "react-native-modal": "14.0.0-rc.1",

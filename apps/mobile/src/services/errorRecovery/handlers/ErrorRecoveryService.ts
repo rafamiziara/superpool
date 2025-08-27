@@ -1,7 +1,7 @@
+import { ErrorRecoveryResult } from '@superpool/types'
 import { AuthenticationStore } from '../../../stores/AuthenticationStore'
 import { WalletStore } from '../../../stores/WalletStore'
 import { AppError } from '../../../utils'
-import { ErrorRecoveryResult } from '@superpool/types'
 import { ConnectorErrorHandler } from './ConnectorErrorHandler'
 import { ErrorAnalyzer } from './ErrorAnalyzer'
 import { FeedbackManager } from './FeedbackManager'
@@ -77,7 +77,7 @@ export class ErrorRecoveryService {
 
         case 'connector':
           const connectorHandler = new ConnectorErrorHandler()
-          recoveryResult = connectorHandler.handle(analysisResult.appError.originalError as string)
+          recoveryResult = connectorHandler.handle()
           FeedbackManager.logRecoveryResult(connectorHandler.getHandlerName(), recoveryResult)
           break
 
@@ -104,9 +104,9 @@ export class ErrorRecoveryService {
       }
     }
 
-    return { 
-      appError: analysisResult.appError, 
-      recoveryResult 
+    return {
+      appError: analysisResult.appError,
+      recoveryResult,
     }
   }
 

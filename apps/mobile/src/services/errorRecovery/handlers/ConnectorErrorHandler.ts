@@ -11,7 +11,7 @@ export class ConnectorErrorHandler implements ErrorHandler<string> {
     return 'connector-error'
   }
 
-  handle(errorMessage: string): ErrorRecoveryResult {
+  handle(): ErrorRecoveryResult {
     console.log('📱 Wallet disconnected during signing, treating as user cancellation')
 
     // Connector errors are treated as user-initiated actions

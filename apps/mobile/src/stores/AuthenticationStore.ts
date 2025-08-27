@@ -1,4 +1,4 @@
-import { makeAutoObservable } from 'mobx'
+import { makeAutoObservable, action } from 'mobx'
 import { AuthenticationLock } from '../services/authentication/AuthenticationOrchestrator'
 import { AppError } from '../utils/errorHandling'
 
@@ -17,7 +17,14 @@ export class AuthenticationStore {
   }
 
   constructor() {
-    makeAutoObservable(this)
+    makeAutoObservable(this, {
+      // Explicitly mark actions
+      setAuthError: action,
+      setAuthLock: action,
+      acquireAuthLock: action,
+      releaseAuthLock: action,
+      reset: action,
+    })
   }
 
   // Computed getters

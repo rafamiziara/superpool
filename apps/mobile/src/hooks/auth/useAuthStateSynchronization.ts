@@ -18,12 +18,8 @@ export const useAuthStateSynchronization = () => {
   // Synchronization logic using MobX autorun for reactive state management
   useEffect(() => {
     const disposer = autorun(() => {
-      const {
-        isAuthenticated: isFirebaseAuth,
-        walletAddress: firebaseWalletAddress,
-        isLoading: isFirebaseLoading,
-      } = firebaseAuth
-      
+      const { isAuthenticated: isFirebaseAuth, walletAddress: firebaseWalletAddress, isLoading: isFirebaseLoading } = firebaseAuth
+
       const { isConnected: walletConnected, address: walletAddress } = walletStore.currentState
       const { authWalletAddress: authStoreAddress, authError } = authenticationStore
 
@@ -41,12 +37,12 @@ export const useAuthStateSynchronization = () => {
       // Case 1: Firebase authenticated but wallet disconnected
       if (isFirebaseAuth && firebaseWalletAddress && !walletConnected) {
         devOnly('⚠️  Firebase authenticated but wallet disconnected - clearing Firebase auth')
-        
+
         // Clear Firebase authentication to maintain consistency
         FIREBASE_AUTH.signOut()
           .then(() => devOnly('✅ Firebase auth cleared due to wallet disconnection'))
           .catch((error) => console.warn('❌ Failed to clear Firebase auth:', error))
-        
+
         // Clear authentication store state
         authenticationStore.reset()
         return
@@ -56,15 +52,15 @@ export const useAuthStateSynchronization = () => {
       if (walletConnected && walletAddress && isFirebaseAuth && firebaseWalletAddress) {
         const walletAddressLower = walletAddress.toLowerCase()
         const firebaseAddressLower = firebaseWalletAddress.toLowerCase()
-        
+
         if (walletAddressLower !== firebaseAddressLower) {
           devOnly('⚠️  Wallet address mismatch with Firebase auth - clearing Firebase auth')
-          
+
           // Clear Firebase authentication to maintain consistency
           FIREBASE_AUTH.signOut()
             .then(() => devOnly('✅ Firebase auth cleared due to address mismatch'))
             .catch((error) => console.warn('❌ Failed to clear Firebase auth:', error))
-          
+
           // Clear authentication store state
           authenticationStore.reset()
           return
@@ -75,10 +71,10 @@ export const useAuthStateSynchronization = () => {
       if (isFirebaseAuth && firebaseWalletAddress && walletConnected && walletAddress) {
         const walletAddressLower = walletAddress.toLowerCase()
         const firebaseAddressLower = firebaseWalletAddress.toLowerCase()
-        
+
         if (walletAddressLower === firebaseAddressLower && !authStoreAddress) {
           devOnly('✅ Syncing authentication store with Firebase auth')
-          
+
           // Update authentication store to reflect successful authentication
           authenticationStore.setAuthLock({
             isLocked: false,
@@ -86,7 +82,7 @@ export const useAuthStateSynchronization = () => {
             walletAddress: firebaseWalletAddress,
             abortController: null,
           })
-          
+
           // Clear any auth errors since we have successful authentication
           authenticationStore.setAuthError(null)
         }
@@ -114,7 +110,7 @@ export const useAuthStateSynchronization = () => {
  * Returns validation results for debugging or error handling
  */
 export const useAuthStateValidation = () => {
-  const { authenticationStore, walletStore } = useStores()
+  const { authenticationStore } = useStores()
   const firebaseAuth = useFirebaseAuth()
   const { isConnected, address } = useAccount()
 
@@ -130,17 +126,17 @@ export const useAuthStateValidation = () => {
       authStoreState: { authenticating: boolean; address: string | null; hasError: boolean }
     } => {
       const issues: string[] = []
-      
+
       const walletState = {
         connected: isConnected,
         address: address,
       }
-      
+
       const firebaseState = {
         authenticated: firebaseAuth.isAuthenticated,
         address: firebaseAuth.walletAddress,
       }
-      
+
       const authStoreState = {
         authenticating: authenticationStore.isAuthenticating,
         address: authenticationStore.authWalletAddress,

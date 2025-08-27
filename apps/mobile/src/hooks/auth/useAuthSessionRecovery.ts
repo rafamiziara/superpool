@@ -20,7 +20,7 @@ export const useAuthSessionRecovery = () => {
   const { authenticationStore, walletStore } = useStores()
   const firebaseAuth = useFirebaseAuth()
   const { isConnected, address, chain } = useAccount()
-  
+
   const [recoveryState, setRecoveryState] = useState<SessionRecoveryState>({
     isRecovering: false,
     recoveryAttempted: false,
@@ -92,12 +92,12 @@ export const useAuthSessionRecovery = () => {
   }> => {
     try {
       devOnly('🔄 Attempting session recovery...')
-      
+
       const validation = validateSession()
-      
+
       if (validation.isValid) {
         devOnly('✅ Session is already valid, no recovery needed')
-        
+
         // Ensure stores are synchronized with valid session
         if (validation.walletAddress && validation.firebaseAddress) {
           walletStore.updateConnectionState(true, validation.walletAddress, chain?.id)
@@ -109,7 +109,7 @@ export const useAuthSessionRecovery = () => {
           })
           authenticationStore.setAuthError(null)
         }
-        
+
         return { success: true, action: 'validated_existing_session' }
       }
 
@@ -121,20 +121,20 @@ export const useAuthSessionRecovery = () => {
       // Case 1: Firebase auth exists but wallet not connected
       if (issues.includes('No wallet connection') && !issues.includes('No Firebase authentication')) {
         devOnly('🔄 Firebase auth exists but wallet not connected - waiting for wallet')
-        return { 
-          success: false, 
+        return {
+          success: false,
           error: 'Wallet connection required',
-          action: 'await_wallet_connection'
+          action: 'await_wallet_connection',
         }
       }
 
       // Case 2: Wallet connected but no Firebase auth
       if (issues.includes('No Firebase authentication') && !issues.includes('No wallet connection')) {
         devOnly('🔄 Wallet connected but no Firebase auth - authentication required')
-        return { 
-          success: false, 
+        return {
+          success: false,
           error: 'Authentication required',
-          action: 'authentication_required'
+          action: 'authentication_required',
         }
       }
 
@@ -143,33 +143,32 @@ export const useAuthSessionRecovery = () => {
         devOnly('🧹 Clearing Firebase auth due to address mismatch')
         await FIREBASE_AUTH.signOut()
         authenticationStore.reset()
-        return { 
-          success: false, 
+        return {
+          success: false,
           error: 'Address mismatch resolved - authentication required',
-          action: 'cleared_mismatched_auth'
+          action: 'cleared_mismatched_auth',
         }
       }
 
       // Case 4: Invalid address formats - clear everything
-      if (issues.some(issue => issue.includes('Invalid') && issue.includes('address'))) {
+      if (issues.some((issue) => issue.includes('Invalid') && issue.includes('address'))) {
         devOnly('🧹 Clearing invalid authentication data')
         await FIREBASE_AUTH.signOut()
         authenticationStore.reset()
         walletStore.disconnect()
-        return { 
-          success: false, 
+        return {
+          success: false,
           error: 'Invalid authentication data cleared',
-          action: 'cleared_invalid_data'
+          action: 'cleared_invalid_data',
         }
       }
 
       // Default case - no authentication available
-      return { 
-        success: false, 
+      return {
+        success: false,
         error: 'No valid authentication session found',
-        action: 'no_session'
+        action: 'no_session',
       }
-
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error)
       console.error('❌ Session recovery failed:', errorMessage)
@@ -185,7 +184,7 @@ export const useAuthSessionRecovery = () => {
       return
     }
 
-    setRecoveryState(prev => ({
+    setRecoveryState((prev) => ({
       ...prev,
       isRecovering: true,
       recoveryError: null,
@@ -193,8 +192,8 @@ export const useAuthSessionRecovery = () => {
 
     try {
       const result = await attemptSessionRecovery()
-      
-      setRecoveryState(prev => ({
+
+      setRecoveryState((prev) => ({
         ...prev,
         isRecovering: false,
         recoveryAttempted: true,
@@ -203,12 +202,12 @@ export const useAuthSessionRecovery = () => {
       }))
 
       devOnly('📊 Session recovery result:', result)
-      
+
       return result
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error)
-      
-      setRecoveryState(prev => ({
+
+      setRecoveryState((prev) => ({
         ...prev,
         isRecovering: false,
         recoveryAttempted: true,
@@ -240,16 +239,19 @@ export const useAuthSessionRecovery = () => {
   return {
     // Recovery state
     ...recoveryState,
-    
+
     // Manual recovery actions
     triggerRecovery,
     validateSession,
-    
+
     // Helper methods
     isSessionValid: () => validateSession().isValid,
-    hasValidSession: firebaseAuth.isAuthenticated && isConnected && 
-                     address && firebaseAuth.walletAddress &&
-                     address.toLowerCase() === firebaseAuth.walletAddress.toLowerCase(),
+    hasValidSession:
+      firebaseAuth.isAuthenticated &&
+      isConnected &&
+      address &&
+      firebaseAuth.walletAddress &&
+      address.toLowerCase() === firebaseAuth.walletAddress.toLowerCase(),
   }
 }
 

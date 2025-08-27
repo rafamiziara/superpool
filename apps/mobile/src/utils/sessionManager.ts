@@ -1,10 +1,11 @@
 import AsyncStorage from '@react-native-async-storage/async-storage'
-import { 
-  SESSION_STORAGE_KEYS, 
-  SESSION_TIMEOUTS, 
-  SESSION_ERROR_INDICATORS,
+import {
   RELAYER_ERROR_INDICATORS,
-  SESSION_ID_PATTERNS 
+  REOWN_APPKIT_SESSION_KEY,
+  SESSION_ERROR_INDICATORS,
+  SESSION_ID_PATTERNS,
+  SESSION_TIMEOUTS,
+  WALLETCONNECT_SESSION_KEY,
 } from './constants'
 
 // Type definitions for session data
@@ -380,7 +381,7 @@ export class SessionManager {
   /**
    * Extracts session ID from error message using regex patterns
    */
-  static extractSessionId(errorMessage: string): string | null {
+  static extractSessionId(errorMessage: string): string | undefined {
     // Try different session ID patterns
     for (const pattern of SESSION_ID_PATTERNS) {
       const match = errorMessage.match(pattern)
@@ -389,7 +390,7 @@ export class SessionManager {
       }
     }
 
-    return null
+    return undefined
   }
 
   /**
@@ -397,9 +398,7 @@ export class SessionManager {
    */
   static isSessionError(errorMessage: string): boolean {
     const lowerMessage = errorMessage.toLowerCase()
-    return SESSION_ERROR_INDICATORS.some(indicator => 
-      lowerMessage.includes(indicator.toLowerCase())
-    )
+    return SESSION_ERROR_INDICATORS.some((indicator) => lowerMessage.includes(indicator.toLowerCase()))
   }
 
   /**
@@ -407,9 +406,7 @@ export class SessionManager {
    */
   static isRelayerError(errorMessage: string): boolean {
     const lowerMessage = errorMessage.toLowerCase()
-    return RELAYER_ERROR_INDICATORS.some(indicator =>
-      lowerMessage.includes(indicator.toLowerCase())
-    )
+    return RELAYER_ERROR_INDICATORS.some((indicator) => lowerMessage.includes(indicator.toLowerCase()))
   }
 
   /**
@@ -452,7 +449,7 @@ export class SessionManager {
 
     // Check for required WalletConnect session properties
     const requiredProps = ['topic', 'peer', 'namespaces']
-    return requiredProps.every(prop => prop in session)
+    return requiredProps.every((prop) => prop in session)
   }
 
   /**
@@ -485,9 +482,9 @@ export class SessionManager {
 
     const now = Date.now()
     const expiry = session.expiry ? session.expiry * 1000 : null // Convert to ms
-    
+
     if (expiry) {
-      const ageMs = now - (expiry - (7 * 24 * 60 * 60 * 1000)) // Assume 7 day sessions
+      const ageMs = now - (expiry - 7 * 24 * 60 * 60 * 1000) // Assume 7 day sessions
       return {
         ageMs: Math.max(0, ageMs),
         isExpired: now > expiry,
@@ -501,13 +498,14 @@ export class SessionManager {
   /**
    * Checks if session cleanup is needed based on age and activity
    */
-  static shouldCleanupSession(session: any, maxAgeMs: number = SESSION_TIMEOUTS.DEFAULT_MAX_AGE): boolean { // 24 hours default
+  static shouldCleanupSession(session: any, maxAgeMs: number = SESSION_TIMEOUTS.DEFAULT_MAX_AGE): boolean {
+    // 24 hours default
     if (!this.isValidSession(session)) {
       return true
     }
 
     const { ageMs, isExpired } = this.getSessionAge(session)
-    
+
     return isExpired || ageMs > maxAgeMs
   }
 
@@ -532,11 +530,7 @@ export class SessionManager {
   /**
    * Creates session cleanup context for logging
    */
-  static createCleanupContext(
-    operation: string,
-    sessionCount: number,
-    errors: string[] = []
-  ): Record<string, any> {
+  static createCleanupContext(operation: string, sessionCount: number, errors: string[] = []): Record<string, any> {
     return {
       operation,
       sessionCount,
@@ -553,13 +547,16 @@ export class SessionManager {
   static formatSessionDebugInfo(sessions: any[], totalKeys: number): string {
     const sessionCount = sessions.length
     const hasActiveSessions = sessionCount > 0
-    
+
     return [
-      `Session Debug Info:`,
+      'Session Debug Info:',
       `- Total keys: ${totalKeys}`,
       `- Active sessions: ${sessionCount}`,
       `- Has active connections: ${hasActiveSessions}`,
-      `- Session preview: ${sessions.slice(0, 2).map(s => s?.topic?.substring(0, 8) || 'unknown').join(', ')}`,
+      `- Session preview: ${sessions
+        .slice(0, 2)
+        .map((s) => s?.topic?.substring(0, 8) || 'unknown')
+        .join(', ')}`,
     ].join('\n')
   }
 }

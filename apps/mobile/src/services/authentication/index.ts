@@ -1,5 +1,5 @@
 // Authentication service exports
-export { AuthenticationOrchestrator, AuthenticationLock } from './AuthenticationOrchestrator'
+export { AuthenticationLock, AuthenticationOrchestrator } from './AuthenticationOrchestrator'
 
 // Authentication step modules
 export * from './steps'

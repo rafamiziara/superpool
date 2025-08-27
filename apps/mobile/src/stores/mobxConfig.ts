@@ -1,8 +1,8 @@
 import { configure } from 'mobx'
 import { Platform } from 'react-native'
 
-// Import MobX React Native batching
-import 'mobx-react-lite/batchingForReactNative'
+// Note: batchingForReactNative is no longer needed in newer versions of mobx-react-lite
+// import 'mobx-react-lite/batchingForReactNative'
 
 /**
  * Configure MobX for React Native environment
@@ -13,17 +13,18 @@ export const configureMobX = () => {
     // Enforce that state changes are made through actions
     enforceActions: 'always',
 
-    // Warn about state changes not through actions in development
-    computedRequiresReaction: __DEV__,
+    // Less noisy development warnings
+    computedRequiresReaction: false,
+    
+    // Don't warn when observables are accessed outside reactive contexts
+    // This is common in React Native and not always problematic
+    reactionRequiresObservable: false,
+    
+    // Don't warn about observable access outside reactive contexts
+    // This reduces noise while still enforcing actions
+    observableRequiresReaction: false,
 
-    // Warn when observables are accessed outside of reactive contexts in development
-    reactionRequiresObservable: __DEV__,
-
-    // Warn when observable objects are modified outside of actions in development
-    observableRequiresReaction: __DEV__,
-
-    // Disable warning about computed values being accessed outside of reactive contexts
-    // in development (can be noisy in React Native)
+    // Keep error boundaries enabled
     disableErrorBoundaries: false,
   })
 

@@ -23,12 +23,7 @@ export class RecoveryActions {
   /**
    * Creates a standard recovery result
    */
-  static createResult(
-    shouldDisconnect: boolean,
-    shouldShowError: boolean,
-    errorDelay: number = 0,
-    cleanupPerformed: boolean = false
-  ): ErrorRecoveryResult {
+  static createResult(shouldDisconnect: boolean, shouldShowError: boolean, errorDelay = 0, cleanupPerformed = false): ErrorRecoveryResult {
     return {
       shouldDisconnect,
       shouldShowError,
@@ -40,14 +35,14 @@ export class RecoveryActions {
   /**
    * Standard recovery result for user-initiated actions (cancellations, rejections)
    */
-  static userInitiated(errorDelay: number = 1500): ErrorRecoveryResult {
+  static userInitiated(errorDelay = 1500): ErrorRecoveryResult {
     return this.createResult(false, true, errorDelay, false)
   }
 
   /**
    * Standard recovery result for technical failures requiring disconnect
    */
-  static technicalFailure(errorDelay: number = 2000): ErrorRecoveryResult {
+  static technicalFailure(errorDelay = 2000): ErrorRecoveryResult {
     return this.createResult(true, true, errorDelay, false)
   }
 

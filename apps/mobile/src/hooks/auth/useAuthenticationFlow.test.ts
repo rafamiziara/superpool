@@ -1,17 +1,16 @@
 /**
  * Comprehensive Authentication Flow Testing Scenarios
- * 
+ *
  * These test scenarios validate the complete authentication flow after MobX migration
  * and ensure all components work together properly.
  */
 
 import { renderHook, waitFor } from '@testing-library/react-native'
 import { act } from 'react-test-renderer'
-import { FIREBASE_AUTH } from '../../firebase.config'
+import { useAuthentication } from './useAuthentication'
 import { useAuthenticationIntegration } from './useAuthenticationIntegration'
 import { useAuthSessionRecovery } from './useAuthSessionRecovery'
 import { useAuthStateSynchronization } from './useAuthStateSynchronization'
-import { useAuthentication } from './useAuthentication'
 
 // Mock dependencies
 jest.mock('../../firebase.config', () => ({
@@ -24,9 +23,7 @@ jest.mock('../../firebase.config', () => ({
 jest.mock('../../utils', () => ({
   devOnly: jest.fn(),
   ValidationUtils: {
-    isValidWalletAddress: jest.fn((address: string) => 
-      /^0x[a-fA-F0-9]{40}$/.test(address)
-    ),
+    isValidWalletAddress: jest.fn((address: string) => /^0x[a-fA-F0-9]{40}$/.test(address)),
   },
 }))
 
@@ -42,7 +39,7 @@ jest.mock('wagmi', () => ({
 const mockAuthStore = {
   authError: null,
   isAuthenticating: false,
-  authWalletAddress: null,
+  authWalletAddress: null as string | null,
   setAuthError: jest.fn(),
   setAuthLock: jest.fn(),
   acquireAuthLock: jest.fn(() => true),
@@ -52,9 +49,9 @@ const mockAuthStore = {
 
 const mockWalletStore = {
   isConnected: false,
-  address: undefined,
-  chainId: undefined,
-  currentState: { isConnected: false, address: undefined, chainId: undefined },
+  address: undefined as string | undefined,
+  chainId: undefined as number | undefined,
+  currentState: { isConnected: false, address: undefined as string | undefined, chainId: undefined as number | undefined },
   connect: jest.fn(),
   disconnect: jest.fn(),
   updateConnectionState: jest.fn(),
@@ -71,7 +68,7 @@ jest.mock('../../stores', () => ({
 const mockFirebaseAuth = {
   isAuthenticated: false,
   isLoading: false,
-  walletAddress: null,
+  walletAddress: null as string | null,
   user: null,
 }
 
@@ -102,51 +99,60 @@ jest.mock('./useAuthProgress', () => ({
 describe('Authentication Flow Integration Tests', () => {
   beforeEach(() => {
     jest.clearAllMocks()
-    
+
     // Reset mock states
-    mockAuthStore.authError = null
-    mockAuthStore.isAuthenticating = false
-    mockAuthStore.authWalletAddress = null
-    mockWalletStore.isConnected = false
-    mockWalletStore.address = undefined
-    mockFirebaseAuth.isAuthenticated = false
-    mockFirebaseAuth.isLoading = false
-    mockFirebaseAuth.walletAddress = null
+    Object.assign(mockAuthStore, {
+      authError: null,
+      isAuthenticating: false,
+      authWalletAddress: null as string | null,
+    })
+    Object.assign(mockWalletStore, {
+      isConnected: false,
+      address: undefined as string | undefined,
+    })
+    Object.assign(mockFirebaseAuth, {
+      isAuthenticated: false,
+      isLoading: false,
+      walletAddress: null as string | null,
+    })
   })
 
   describe('Scenario 1: Fresh Wallet Connection → Authentication → Dashboard Access', () => {
     it('should trigger authentication when new wallet connects', async () => {
       const { result: authIntegration } = renderHook(() => useAuthenticationIntegration())
-      
+
       const testWalletAddress = '0x1234567890123456789012345678901234567890'
       const testChainId = 1
-      
+
       await act(async () => {
         await authIntegration.current.onNewConnection(testWalletAddress, testChainId)
       })
-      
+
       // Verify wallet store is updated
       expect(mockWalletStore.connect).toHaveBeenCalledWith(testWalletAddress, testChainId)
-      
+
       // Verify authentication progress is reset
       expect(mockAuthProgress.resetProgress).toHaveBeenCalled()
     })
 
     it('should handle authentication errors gracefully', async () => {
       const { result: authIntegration } = renderHook(() => useAuthenticationIntegration())
-      
+
       // Mock orchestrator to throw error
       const mockError = new Error('Authentication failed')
-      jest.spyOn(authIntegration.current, 'getOrchestrator').mockImplementation(() => ({
-        authenticate: jest.fn().mockRejectedValue(mockError),
-      } as any))
-      
+      jest.spyOn(authIntegration.current, 'getOrchestrator').mockImplementation(
+        () =>
+          ({
+            authenticate: jest.fn().mockRejectedValue(mockError),
+          } as any)
+      )
+
       const testWalletAddress = '0x1234567890123456789012345678901234567890'
-      
+
       await act(async () => {
         await authIntegration.current.onNewConnection(testWalletAddress)
       })
-      
+
       // Verify error is handled in progress
       expect(mockAuthProgress.failStep).toHaveBeenCalled()
     })
@@ -155,23 +161,26 @@ describe('Authentication Flow Integration Tests', () => {
   describe('Scenario 2: Session Restoration After App Restart', () => {
     it('should validate existing valid session', async () => {
       // Setup valid session state
-      mockFirebaseAuth.isAuthenticated = true
-      mockFirebaseAuth.walletAddress = '0x1234567890123456789012345678901234567890'
-      mockWalletStore.isConnected = true
-      mockWalletStore.address = '0x1234567890123456789012345678901234567890'
-      
+      Object.assign(mockFirebaseAuth, {
+        isAuthenticated: true,
+        walletAddress: '0x1234567890123456789012345678901234567890' as string | null,
+      })
+      Object.assign(mockWalletStore, {
+        isConnected: true,
+        address: '0x1234567890123456789012345678901234567890' as string | undefined,
+      })
       ;(require('wagmi').useAccount as jest.Mock).mockReturnValue({
         isConnected: true,
         address: '0x1234567890123456789012345678901234567890',
         chain: { id: 1, name: 'Ethereum' },
       })
-      
+
       const { result } = renderHook(() => useAuthSessionRecovery())
-      
+
       await waitFor(() => {
         expect(result.current.hasValidSession).toBe(true)
       })
-      
+
       const validation = result.current.validateSession()
       expect(validation.isValid).toBe(true)
       expect(validation.issues).toHaveLength(0)
@@ -179,19 +188,22 @@ describe('Authentication Flow Integration Tests', () => {
 
     it('should detect address mismatch and clear Firebase auth', async () => {
       // Setup mismatched addresses
-      mockFirebaseAuth.isAuthenticated = true
-      mockFirebaseAuth.walletAddress = '0x1111111111111111111111111111111111111111'
-      mockWalletStore.isConnected = true
-      mockWalletStore.address = '0x2222222222222222222222222222222222222222'
-      
+      Object.assign(mockFirebaseAuth, {
+        isAuthenticated: true,
+        walletAddress: '0x1111111111111111111111111111111111111111' as string | null,
+      })
+      Object.assign(mockWalletStore, {
+        isConnected: true,
+        address: '0x2222222222222222222222222222222222222222' as string | undefined,
+      })
       ;(require('wagmi').useAccount as jest.Mock).mockReturnValue({
         isConnected: true,
         address: '0x2222222222222222222222222222222222222222',
         chain: { id: 1, name: 'Ethereum' },
       })
-      
+
       const { result } = renderHook(() => useAuthSessionRecovery())
-      
+
       const validation = result.current.validateSession()
       expect(validation.isValid).toBe(false)
       expect(validation.issues).toContain('Wallet address mismatch with Firebase auth')
@@ -199,19 +211,22 @@ describe('Authentication Flow Integration Tests', () => {
 
     it('should handle missing wallet connection', async () => {
       // Setup Firebase auth without wallet
-      mockFirebaseAuth.isAuthenticated = true
-      mockFirebaseAuth.walletAddress = '0x1234567890123456789012345678901234567890'
-      mockWalletStore.isConnected = false
-      mockWalletStore.address = undefined
-      
+      Object.assign(mockFirebaseAuth, {
+        isAuthenticated: true,
+        walletAddress: '0x1234567890123456789012345678901234567890' as string | null,
+      })
+      Object.assign(mockWalletStore, {
+        isConnected: false,
+        address: undefined as string | undefined,
+      })
       ;(require('wagmi').useAccount as jest.Mock).mockReturnValue({
         isConnected: false,
         address: undefined,
         chain: { id: 1, name: 'Ethereum' },
       })
-      
+
       const { result } = renderHook(() => useAuthSessionRecovery())
-      
+
       const validation = result.current.validateSession()
       expect(validation.isValid).toBe(false)
       expect(validation.issues).toContain('No wallet connection')
@@ -222,23 +237,26 @@ describe('Authentication Flow Integration Tests', () => {
     it('should handle network changes without re-authentication', () => {
       // This is handled by the wallet connection trigger hook
       // Network changes should NOT trigger new authentication flows
-      
+
       const { result: authIntegration } = renderHook(() => useAuthenticationIntegration())
-      
+
       // Verify that network changes don't trigger authentication
       expect(authIntegration.current.needsAuthentication).toBeDefined()
-      
+
       // Test that authentication is only needed when wallet is connected but not authenticated
-      mockWalletStore.isConnected = true
-      mockWalletStore.address = '0x1234567890123456789012345678901234567890'
-      mockAuthStore.authWalletAddress = null
-      
+      Object.assign(mockWalletStore, {
+        isConnected: true,
+        address: '0x1234567890123456789012345678901234567890' as string | undefined,
+      })
+      Object.assign(mockAuthStore, {
+        authWalletAddress: null as string | null,
+      })
       ;(require('wagmi').useAccount as jest.Mock).mockReturnValue({
         isConnected: true,
         address: '0x1234567890123456789012345678901234567890',
         chain: { id: 1, name: 'Ethereum' },
       })
-      
+
       expect(authIntegration.current.needsAuthentication()).toBe(true)
     })
   })
@@ -246,11 +264,11 @@ describe('Authentication Flow Integration Tests', () => {
   describe('Scenario 4: Authentication Failure and Recovery', () => {
     it('should reset authentication state on disconnection', async () => {
       const { result: authIntegration } = renderHook(() => useAuthenticationIntegration())
-      
+
       await act(async () => {
         authIntegration.current.onDisconnection()
       })
-      
+
       // Verify cleanup actions
       expect(mockAuthProgress.resetProgress).toHaveBeenCalled()
       expect(mockAuthStore.reset).toHaveBeenCalled()
@@ -264,13 +282,13 @@ describe('Authentication Flow Integration Tests', () => {
         address: '0x1234567890123456789012345678901234567890',
         chain: { id: 1, name: 'Ethereum' },
       })
-      
+
       const { result: authIntegration } = renderHook(() => useAuthenticationIntegration())
-      
+
       await act(async () => {
         await authIntegration.current.triggerAuthentication()
       })
-      
+
       // Verify authentication is triggered
       expect(mockWalletStore.connect).toHaveBeenCalled()
       expect(mockAuthProgress.resetProgress).toHaveBeenCalled()
@@ -280,7 +298,7 @@ describe('Authentication Flow Integration Tests', () => {
   describe('Scenario 5: State Synchronization', () => {
     it('should synchronize Firebase auth and wallet state', () => {
       const { result } = renderHook(() => useAuthStateSynchronization())
-      
+
       // The hook uses MobX autorun, so we just verify it renders without errors
       expect(result.current).toBeUndefined() // Hook doesn't return anything
     })
@@ -289,12 +307,12 @@ describe('Authentication Flow Integration Tests', () => {
   describe('Scenario 6: Logout and Cleanup Validation', () => {
     it('should clear all authentication state on logout', async () => {
       const { result: sessionRecovery } = renderHook(() => useAuthSessionRecovery())
-      
+
       await act(async () => {
         const result = await sessionRecovery.current.triggerRecovery()
         console.log('Recovery result:', result)
       })
-      
+
       // Verify recovery was attempted
       expect(sessionRecovery.current.recoveryAttempted).toBe(true)
     })
@@ -306,12 +324,12 @@ describe('Authentication Flow Integration Tests', () => {
       const { result: authIntegration } = renderHook(() => useAuthenticationIntegration())
       const { result: sessionRecovery } = renderHook(() => useAuthSessionRecovery())
       const { result: authentication } = renderHook(() => useAuthentication())
-      
+
       // Verify all hooks render successfully
       expect(authIntegration.current).toBeDefined()
       expect(sessionRecovery.current).toBeDefined()
       expect(authentication.current).toBeDefined()
-      
+
       // Verify key integration points exist
       expect(authIntegration.current.onNewConnection).toBeDefined()
       expect(authIntegration.current.onDisconnection).toBeDefined()
@@ -323,7 +341,7 @@ describe('Authentication Flow Integration Tests', () => {
 
 /**
  * Manual Testing Scenarios
- * 
+ *
  * These scenarios should be tested manually in the app:
  */
 

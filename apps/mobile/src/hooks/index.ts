@@ -4,7 +4,7 @@
 // Authentication hooks
 export * from './auth'
 
-// Wallet hooks  
+// Wallet hooks
 export * from './wallet'
 
 // UI/UX hooks

@@ -4,9 +4,7 @@ import { FIREBASE_FUNCTIONS } from '../../../firebase.config'
 
 const generateAuthMessage = httpsCallable(FIREBASE_FUNCTIONS, 'generateAuthMessage')
 
-export interface GeneratedAuthMessage extends AuthMessage {
-  // AuthMessage already has message, nonce, timestamp
-}
+export type GeneratedAuthMessage = AuthMessage
 
 /**
  * Handles authentication message generation from backend
@@ -42,9 +40,7 @@ export class MessageGenerator {
    * Validates and parses timestamp from backend response
    */
   private validateAndParseTimestamp(rawTimestamp: unknown): number {
-    const timestamp = typeof rawTimestamp === 'number' 
-      ? rawTimestamp 
-      : parseInt(String(rawTimestamp), 10)
+    const timestamp = typeof rawTimestamp === 'number' ? rawTimestamp : parseInt(String(rawTimestamp), 10)
 
     if (isNaN(timestamp)) {
       throw new Error('Invalid timestamp received from authentication message')

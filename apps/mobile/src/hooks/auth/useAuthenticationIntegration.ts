@@ -1,6 +1,6 @@
 import { AuthenticationContext } from '@superpool/types'
 import { useCallback, useRef } from 'react'
-import { useAccount } from 'wagmi'
+import { useAccount, useDisconnect, useSignMessage, useSignTypedData } from 'wagmi'
 import { AuthenticationOrchestrator } from '../../services/authentication'
 import { useStores } from '../../stores'
 import { devOnly } from '../../utils'
@@ -13,7 +13,20 @@ import { useAuthProgress } from './useAuthProgress'
 export const useAuthenticationIntegration = () => {
   const { authenticationStore, walletStore } = useStores()
   const { isConnected, address, chain } = useAccount()
+  const { signMessageAsync } = useSignMessage()
+  const { signTypedDataAsync } = useSignTypedData()
+  const { disconnect } = useDisconnect()
   const authProgress = useAuthProgress()
+  
+  // Store wagmi functions in refs to prevent dependency changes
+  const signMessageAsyncRef = useRef(signMessageAsync)
+  const signTypedDataAsyncRef = useRef(signTypedDataAsync)
+  const disconnectRef = useRef(disconnect)
+  
+  // Update refs when functions change
+  signMessageAsyncRef.current = signMessageAsync
+  signTypedDataAsyncRef.current = signTypedDataAsync
+  disconnectRef.current = disconnect
 
   // Create orchestrator instance with MobX stores
   const orchestratorRef = useRef<AuthenticationOrchestrator | null>(null)
@@ -22,7 +35,7 @@ export const useAuthenticationIntegration = () => {
   const getOrchestrator = useCallback((): AuthenticationOrchestrator => {
     if (!orchestratorRef.current) {
       orchestratorRef.current = new AuthenticationOrchestrator(authenticationStore, walletStore)
-      devOnly('🎭 Authentication orchestrator initialized')
+      console.log('🎭 Authentication orchestrator initialized')
     }
     return orchestratorRef.current
   }, [authenticationStore, walletStore])
@@ -33,7 +46,7 @@ export const useAuthenticationIntegration = () => {
   const handleNewConnection = useCallback(
     async (walletAddress: string, chainId?: number) => {
       try {
-        devOnly('🚀 Handling new wallet connection:', { walletAddress, chainId })
+        console.log('🚀 Handling new wallet connection:', { walletAddress, chainId })
 
         // Ensure wallet state is properly updated
         walletStore.connect(walletAddress, chainId || chain?.id || 1)
@@ -46,6 +59,12 @@ export const useAuthenticationIntegration = () => {
           walletAddress,
           chainId: chainId || chain?.id || 1,
           connector: 'appkit', // We're using AppKit for wallet connections
+          signatureFunctions: {
+            signTypedDataAsync: signTypedDataAsyncRef.current,
+            signMessageAsync: (params: { message: string; account: `0x${string}`; connector?: any }) =>
+              signMessageAsyncRef.current({ message: params.message, account: params.account }),
+          },
+          disconnect: disconnectRef.current,
           progressCallbacks: {
             onStepStart: authProgress.startStep,
             onStepComplete: authProgress.completeStep,
@@ -57,7 +76,7 @@ export const useAuthenticationIntegration = () => {
         const orchestrator = getOrchestrator()
         await orchestrator.authenticate(authContext)
 
-        devOnly('✅ Authentication completed successfully')
+        console.log('✅ Authentication completed successfully')
       } catch (error) {
         console.error('❌ Authentication failed:', error)
 
@@ -74,7 +93,7 @@ export const useAuthenticationIntegration = () => {
    * Handle wallet disconnection - cleanup authentication state
    */
   const handleDisconnection = useCallback(() => {
-    devOnly('👋 Handling wallet disconnection')
+    console.log('👋 Handling wallet disconnection')
 
     // Reset authentication progress
     authProgress.resetProgress()
@@ -83,7 +102,7 @@ export const useAuthenticationIntegration = () => {
     authenticationStore.reset()
     walletStore.disconnect()
 
-    devOnly('🧹 Authentication state cleared on disconnection')
+    console.log('🧹 Authentication state cleared on disconnection')
   }, [authProgress, authenticationStore, walletStore])
 
   /**

@@ -1,5 +1,5 @@
-import { renderHook, act } from '@testing-library/react-hooks'
 import { AuthStep } from '@superpool/types'
+import { act, renderHook } from '@testing-library/react-hooks'
 import { useAuthProgress } from './useAuthProgress'
 
 describe('useAuthProgress', () => {
@@ -171,8 +171,8 @@ describe('useAuthProgress', () => {
 
     const allSteps = result.current.getAllSteps()
     expect(allSteps).toHaveLength(6)
-    
-    const stepTitles = allSteps.map(step => step.title)
+
+    const stepTitles = allSteps.map((step) => step.title)
     expect(stepTitles).toContain('Connect Wallet')
     expect(stepTitles).toContain('Acquire Lock & Validate State')
     expect(stepTitles).toContain('Generate Auth Message')

@@ -1,5 +1,5 @@
-import { AppError, isUserInitiatedError } from '../../../utils'
 import { ErrorRecoveryResult } from '@superpool/types'
+import { AppError, isUserInitiatedError } from '../../../utils'
 import type { ErrorHandler } from './ErrorHandler'
 import { RecoveryActions } from './ErrorHandler'
 
@@ -69,11 +69,11 @@ export class GenericErrorHandler implements ErrorHandler<GenericErrorContext> {
     if (shouldDisconnect) {
       return 2000 // Show error after disconnect toast
     }
-    
+
     if (isUserInitiated) {
       return 1500 // Brief delay for user cancellations
     }
-    
+
     return 0 // Immediate for other errors
   }
 }

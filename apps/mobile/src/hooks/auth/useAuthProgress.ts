@@ -1,4 +1,4 @@
-import { AuthStep, AuthStepInfo, AuthProgressState } from '@superpool/types'
+import { AuthProgressState, AuthStep, AuthStepInfo } from '@superpool/types'
 import { useCallback, useState } from 'react'
 
 const AUTH_STEPS: Record<AuthStep, AuthStepInfo> = {

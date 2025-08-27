@@ -11,10 +11,7 @@ export interface ValidationContext {
  * Separates validation concerns from orchestration
  */
 export class AuthenticationValidator {
-  constructor(
-    private authStore: AuthenticationStore,
-    private walletStore: WalletStore
-  ) {}
+  constructor(private authStore: AuthenticationStore, private walletStore: WalletStore) {}
 
   /**
    * Validates that authentication should proceed by checking pre-conditions

@@ -1,5 +1,5 @@
-import { AppError, showErrorFromAppError } from '../../../utils'
 import { ErrorRecoveryResult } from '@superpool/types'
+import { AppError, showErrorFromAppError } from '../../../utils'
 
 /**
  * Manages error feedback display with appropriate timing
