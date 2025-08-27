@@ -6,7 +6,12 @@ dotenv.config()
 /**
  * Verify a contract with retry logic (skips on localhost)
  */
-async function verifyContract(contractName: string, address: string, constructorArgs: unknown[] = [], maxRetries: number = 3): Promise<void> {
+async function verifyContract(
+  contractName: string,
+  address: string,
+  constructorArgs: unknown[] = [],
+  maxRetries: number = 3
+): Promise<void> {
   // Skip verification for local networks
   if (network.name === 'localhost' || network.name === 'hardhat' || network.name === 'hardhatFork') {
     console.log(`   ⏭️ Skipping verification for ${contractName} on local network`)

@@ -172,7 +172,12 @@ class SecureLogger {
   /**
    * Logs service operation with context
    */
-  logServiceOperation(service: string, operation: string, status: 'start' | 'success' | 'error', details?: Record<string, string | number | boolean>): void {
+  logServiceOperation(
+    service: string,
+    operation: string,
+    status: 'start' | 'success' | 'error',
+    details?: Record<string, string | number | boolean>
+  ): void {
     const emoji = status === 'success' ? '✅' : status === 'error' ? '❌' : '🔄'
     const safeDetails = details ? this.sanitizeData(details) : {}
 

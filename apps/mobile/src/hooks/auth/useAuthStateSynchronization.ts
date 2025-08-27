@@ -22,7 +22,7 @@ export const useAuthStateSynchronization = () => {
   useEffect(() => {
     const disposer = autorun(() => {
       // Skip if reset is in progress to prevent infinite loops
-      if ('isResetting' in authenticationStore && authenticationStore.isResetting || isSyncInProgressRef.current) {
+      if (('isResetting' in authenticationStore && authenticationStore.isResetting) || isSyncInProgressRef.current) {
         return
       }
       const { isAuthenticated: isFirebaseAuth, walletAddress: firebaseWalletAddress, isLoading: isFirebaseLoading } = firebaseAuth

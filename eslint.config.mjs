@@ -15,29 +15,29 @@ export default [
       '**/build/**',
       '**/.next/**',
       '**/.expo/**',
-      
+
       // Generated files
       '**/typechain-types/**',
       '**/artifacts/**',
       '**/cache/**',
-      
+
       // Coverage reports
       '**/coverage/**',
       '**/lcov-report/**',
-      
+
       // Config files that don't need linting
       '**/scripts/dev-start.js',
       '**/merge-coverage.js',
       '**/.prettierrc.mjs',
       'scripts/generateKey.ts',
       'scripts/signMessage.ts',
-      
+
       // Build configs outside of TypeScript projects
       '**/tsup.config.ts',
       '**/tailwind.config.js',
       '**/jest.config.ts',
       '**/jest.config.js',
-      
+
       // Packages without TypeScript files
       'packages/assets/**',
       'packages/design/**',

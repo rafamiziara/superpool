@@ -109,7 +109,7 @@ async function verifyContract(contractInfo: ContractInfo, maxRetries: number = 3
       return // Success
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error'
-      
+
       if (errorMessage.toLowerCase().includes('already verified')) {
         console.log(`   ✅ ${contractInfo.name} is already verified`)
         return
@@ -161,8 +161,6 @@ async function getContractsToVerify(): Promise<ContractInfo[]> {
 
   return contracts
 }
-
-
 
 // Handle errors
 main()

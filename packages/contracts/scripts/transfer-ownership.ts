@@ -261,7 +261,10 @@ async function completeOwnershipTransfer(config: OwnershipTransferConfig): Promi
         // Wait for confirmation
         console.log('⏳ Waiting for transaction confirmation...')
         let receipt
-        if (executeTxResponse.transactionResponse && typeof (executeTxResponse.transactionResponse as { wait?: () => Promise<unknown> }).wait === 'function') {
+        if (
+          executeTxResponse.transactionResponse &&
+          typeof (executeTxResponse.transactionResponse as { wait?: () => Promise<unknown> }).wait === 'function'
+        ) {
           receipt = await (executeTxResponse.transactionResponse as { wait: () => Promise<unknown> }).wait()
         }
         console.log('✅ Transaction confirmed in block:', receipt?.blockNumber)

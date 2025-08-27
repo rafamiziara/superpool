@@ -20,10 +20,7 @@ type GetFunctionFirestore = () => Promise<DocumentSnapshot>
  * It simulates the function signature, expecting data to update
  * and returning a Promise that resolves with a WriteResult.
  */
-type UpdateFunctionFirestore = (
-  data: Record<string, unknown>,
-  precondition?: Precondition
-) => Promise<WriteResult>
+type UpdateFunctionFirestore = (data: Record<string, unknown>, precondition?: Precondition) => Promise<WriteResult>
 
 /**
  * A mock type for the Firestore `delete` method.
