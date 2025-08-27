@@ -66,10 +66,24 @@ export interface AuthProgressState {
 
 // Firebase authentication state for mobile apps
 export interface FirebaseAuthState {
-  user: any | null // Firebase User object
+  user: FirebaseUser | null
   isLoading: boolean
   isAuthenticated: boolean
   walletAddress: string | null
+}
+
+// Firebase user interface - matches firebase/auth User type
+export interface FirebaseUser {
+  uid: string
+  email?: string | null
+  displayName?: string | null
+  photoURL?: string | null
+  emailVerified?: boolean
+  isAnonymous?: boolean
+  metadata?: {
+    creationTime?: string
+    lastSignInTime?: string
+  }
 }
 
 // Signature and wallet interaction types
@@ -86,8 +100,29 @@ export interface SignatureResult {
 }
 
 export interface SignatureFunctions {
-  signTypedDataAsync: (data: any) => Promise<string>
-  signMessageAsync: (params: { message: string; account: `0x${string}`; connector?: any }) => Promise<string>
+  signTypedDataAsync: (data: TypedDataParameter) => Promise<string>
+  signMessageAsync: (params: { message: string; account: `0x${string}`; connector?: WagmiConnector }) => Promise<string>
+}
+
+// Type for typed data parameters used in signing
+export interface TypedDataParameter {
+  domain?: {
+    name?: string
+    version?: string
+    chainId?: number
+    verifyingContract?: string
+    salt?: string
+  }
+  types?: Record<string, Array<{ name: string; type: string }>>
+  primaryType?: string
+  message?: Record<string, string | number | boolean>
+}
+
+// Minimal Wagmi Connector interface for our use case
+export interface WagmiConnector {
+  id: string
+  name: string
+  type: string
 }
 
 // Authentication flow progress types
@@ -99,7 +134,7 @@ export interface AuthProgressCallbacks {
 
 export interface AuthenticationContext {
   walletAddress: string
-  connector?: any
+  connector?: WagmiConnector | string
   chainId?: number
   signatureFunctions: SignatureFunctions
   disconnect: () => void

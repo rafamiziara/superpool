@@ -1,4 +1,4 @@
-import { AuthenticationContext } from '@superpool/types'
+import { AuthenticationContext, WagmiConnector } from '@superpool/types'
 import { useCallback, useRef } from 'react'
 import { useAccount, useDisconnect, useSignMessage, useSignTypedData } from 'wagmi'
 import { AuthenticationOrchestrator } from '../../services/authentication'
@@ -59,7 +59,7 @@ export const useAuthenticationIntegration = () => {
           connector: 'appkit', // We're using AppKit for wallet connections
           signatureFunctions: {
             signTypedDataAsync: signTypedDataAsyncRef.current,
-            signMessageAsync: (params: { message: string; account: `0x${string}`; connector?: any }) =>
+            signMessageAsync: (params: { message: string; account: `0x${string}`; connector?: WagmiConnector }) =>
               signMessageAsyncRef.current({ message: params.message, account: params.account }),
           },
           disconnect: disconnectRef.current,

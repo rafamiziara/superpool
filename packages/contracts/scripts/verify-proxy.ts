@@ -51,7 +51,7 @@ async function main() {
     try {
       const adminAddress = await upgrades.erc1967.getAdminAddress(proxyAddress)
       console.log(`   Admin: ${adminAddress}`)
-    } catch (error) {
+    } catch {
       console.log(`   Admin: N/A (UUPS proxy - self-managed)`)
     }
 
@@ -60,11 +60,12 @@ async function main() {
     try {
       await verifyImplementation(implementationAddress)
       console.log('   ✅ Implementation contract verified successfully')
-    } catch (error: any) {
-      if (error.message.toLowerCase().includes('already verified')) {
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+      if (errorMessage.toLowerCase().includes('already verified')) {
         console.log('   ✅ Implementation contract is already verified')
       } else {
-        console.log(`   ⚠️ Implementation verification failed: ${error.message}`)
+        console.log(`   ⚠️ Implementation verification failed: ${errorMessage}`)
         console.log(`   🔧 Manual verification command:`)
         console.log(`      pnpm hardhat verify --network ${network.name} ${implementationAddress}`)
       }
@@ -75,11 +76,12 @@ async function main() {
     try {
       await verifyProxy(proxyAddress, implementationAddress)
       console.log('   ✅ Proxy contract verified successfully')
-    } catch (error: any) {
-      if (error.message.toLowerCase().includes('already verified')) {
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+      if (errorMessage.toLowerCase().includes('already verified')) {
         console.log('   ✅ Proxy contract is already verified')
       } else {
-        console.log(`   ⚠️ Proxy verification failed: ${error.message}`)
+        console.log(`   ⚠️ Proxy verification failed: ${errorMessage}`)
         console.log(`   💡 This is common with proxy contracts. The implementation verification is more important.`)
       }
     }
@@ -89,7 +91,7 @@ async function main() {
     try {
       await run('verify:sourcify', { address: proxyAddress })
       console.log('   ✅ Sourcify verification completed')
-    } catch (error: any) {
+    } catch {
       console.log(`   ⚠️ Sourcify verification not available or failed`)
     }
 
@@ -101,9 +103,10 @@ async function main() {
     console.log(
       `   🔗 View on Polygonscan: https://${network.name === 'polygonAmoy' ? 'amoy.' : ''}polygonscan.com/address/${proxyAddress}`
     )
-  } catch (error: any) {
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error'
     console.error('❌ Proxy verification failed:')
-    console.error(error.message)
+    console.error(errorMessage)
 
     console.log('\n🔧 Manual verification commands:')
     console.log(`   # Verify as regular contract:`)
@@ -131,7 +134,7 @@ async function verifyImplementation(implementationAddress: string): Promise<void
 /**
  * Verify proxy contract with implementation reference
  */
-async function verifyProxy(proxyAddress: string, implementationAddress: string): Promise<void> {
+async function verifyProxy(proxyAddress: string, _implementationAddress: string): Promise<void> {
   // Proxy contracts are typically deployed with the implementation address
   // and initialization data as constructor arguments
   await run('verify:verify', {
@@ -143,18 +146,18 @@ async function verifyProxy(proxyAddress: string, implementationAddress: string):
 /**
  * Get proxy information for debugging
  */
-async function getProxyInfo(proxyAddress: string) {
-  const info: any = {}
+async function _getProxyInfo(proxyAddress: string) {
+  const info: Record<string, string | boolean> = {}
 
   try {
     info.implementation = await upgrades.erc1967.getImplementationAddress(proxyAddress)
-  } catch (error) {
+  } catch {
     info.implementation = 'Unable to fetch'
   }
 
   try {
     info.admin = await upgrades.erc1967.getAdminAddress(proxyAddress)
-  } catch (error) {
+  } catch {
     info.admin = 'N/A (UUPS proxy)'
   }
 
@@ -162,7 +165,7 @@ async function getProxyInfo(proxyAddress: string) {
     // Try to get the contract name by looking at the implementation
     const implementationCode = await ethers.provider.getCode(info.implementation)
     info.hasImplementation = implementationCode !== '0x'
-  } catch (error) {
+  } catch {
     info.hasImplementation = false
   }
 
@@ -172,11 +175,11 @@ async function getProxyInfo(proxyAddress: string) {
 /**
  * Helper to check if address is a proxy
  */
-async function isProxy(address: string): Promise<boolean> {
+async function _isProxy(address: string): Promise<boolean> {
   try {
     await upgrades.erc1967.getImplementationAddress(address)
     return true
-  } catch (error) {
+  } catch {
     return false
   }
 }

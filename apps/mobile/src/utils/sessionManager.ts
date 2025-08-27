@@ -18,6 +18,23 @@ interface SessionDebugInfo {
   sessionData: SessionData
 }
 
+// WalletConnect session interface
+interface WalletConnectSession {
+  topic?: string
+  peer?: {
+    metadata?: {
+      name?: string
+      url?: string
+      icons?: string[]
+    }
+  }
+  namespaces?: Record<string, unknown>
+  expiry?: number
+  acknowledged?: boolean
+  active?: boolean
+  [key: string]: unknown
+}
+
 export class SessionManager {
   private static isCleanupInProgress = false
   private static cleanupQueue: Array<() => void> = []
@@ -442,7 +459,7 @@ export class SessionManager {
   /**
    * Validates session object structure
    */
-  static isValidSession(session: any): boolean {
+  static isValidSession(session: WalletConnectSession): boolean {
     if (!session || typeof session !== 'object') {
       return false
     }
@@ -455,7 +472,7 @@ export class SessionManager {
   /**
    * Extracts peer information from session
    */
-  static extractPeerInfo(session: any): { name?: string; url?: string; icons?: string[] } {
+  static extractPeerInfo(session: WalletConnectSession): { name?: string; url?: string; icons?: string[] } {
     if (!this.isValidSession(session) || !session.peer) {
       return {}
     }
@@ -475,7 +492,7 @@ export class SessionManager {
   /**
    * Calculates session age and expiry status
    */
-  static getSessionAge(session: any): { ageMs: number; isExpired: boolean; expiryMs?: number } {
+  static getSessionAge(session: WalletConnectSession): { ageMs: number; isExpired: boolean; expiryMs?: number } {
     if (!this.isValidSession(session)) {
       return { ageMs: 0, isExpired: true }
     }
@@ -498,7 +515,7 @@ export class SessionManager {
   /**
    * Checks if session cleanup is needed based on age and activity
    */
-  static shouldCleanupSession(session: any, maxAgeMs: number = SESSION_TIMEOUTS.DEFAULT_MAX_AGE): boolean {
+  static shouldCleanupSession(session: WalletConnectSession, maxAgeMs: number = SESSION_TIMEOUTS.DEFAULT_MAX_AGE): boolean {
     // 24 hours default
     if (!this.isValidSession(session)) {
       return true
@@ -512,7 +529,7 @@ export class SessionManager {
   /**
    * Sanitizes session data for logging (removes sensitive information)
    */
-  static sanitizeSessionForLogging(session: any): Record<string, any> {
+  static sanitizeSessionForLogging(session: WalletConnectSession): Record<string, string | number | boolean> {
     if (!this.isValidSession(session)) {
       return { invalid: true }
     }
@@ -530,7 +547,7 @@ export class SessionManager {
   /**
    * Creates session cleanup context for logging
    */
-  static createCleanupContext(operation: string, sessionCount: number, errors: string[] = []): Record<string, any> {
+  static createCleanupContext(operation: string, sessionCount: number, errors: string[] = []): Record<string, string | number | boolean> {
     return {
       operation,
       sessionCount,
@@ -544,7 +561,7 @@ export class SessionManager {
   /**
    * Generates enhanced session debug information string
    */
-  static formatSessionDebugInfo(sessions: any[], totalKeys: number): string {
+  static formatSessionDebugInfo(sessions: WalletConnectSession[], totalKeys: number): string {
     const sessionCount = sessions.length
     const hasActiveSessions = sessionCount > 0
 

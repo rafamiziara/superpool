@@ -37,8 +37,25 @@ export interface WalletConnection {
 
 export interface ContractConfig {
   address: string
-  abi: any[]
+  abi: ContractAbi[]
   deployedAt?: number
+}
+
+// ABI entry types
+export interface ContractAbi {
+  type: 'function' | 'event' | 'constructor' | 'fallback' | 'receive' | 'error'
+  name?: string
+  inputs?: AbiParameter[]
+  outputs?: AbiParameter[]
+  stateMutability?: 'pure' | 'view' | 'nonpayable' | 'payable'
+  anonymous?: boolean
+}
+
+export interface AbiParameter {
+  name: string
+  type: string
+  indexed?: boolean
+  components?: AbiParameter[]
 }
 
 export interface NetworkConfig {
