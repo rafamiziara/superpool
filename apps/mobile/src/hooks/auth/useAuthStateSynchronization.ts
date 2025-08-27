@@ -21,8 +21,8 @@ export const useAuthStateSynchronization = () => {
   // Synchronization logic using MobX autorun for reactive state management
   useEffect(() => {
     const disposer = autorun(() => {
-      // Skip if reset is in progress to prevent infinite loops
-      if (('isResetting' in authenticationStore && authenticationStore.isResetting) || isSyncInProgressRef.current) {
+      // Skip if sync is in progress to prevent infinite loops
+      if (isSyncInProgressRef.current) {
         return
       }
       const { isAuthenticated: isFirebaseAuth, walletAddress: firebaseWalletAddress, isLoading: isFirebaseLoading } = firebaseAuth

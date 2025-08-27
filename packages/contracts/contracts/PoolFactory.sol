@@ -102,9 +102,9 @@ contract PoolFactory is
         address indexed poolAddress,
         address indexed poolOwner,
         string name,
-        uint256 indexed maxLoanAmount,
-        uint256 indexed interestRate,
-        uint256 indexed loanDuration
+        uint256 maxLoanAmount,
+        uint256 interestRate,
+        uint256 loanDuration
     );
 
     /**

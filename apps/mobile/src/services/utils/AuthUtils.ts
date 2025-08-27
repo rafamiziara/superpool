@@ -183,14 +183,15 @@ export class AuthUtils {
    * Formats authentication context for logging
    */
   static formatAuthContext(request: SignatureRequest): Record<string, string | number> {
+    const age = this.getAuthAge(request.timestamp)
     return {
       walletPreview: request.walletAddress.substring(0, 6) + '...' + request.walletAddress.slice(-4),
       messageLength: request.message.length,
       messagePreview: request.message.substring(0, 50) + '...',
-      chainId: request.chainId,
+      chainId: request.chainId || 1,
       nonceLength: request.nonce.length,
       timestamp: request.timestamp,
-      age: this.getAuthAge(request.timestamp),
+      ageSeconds: age.ageSeconds,
     }
   }
 }
