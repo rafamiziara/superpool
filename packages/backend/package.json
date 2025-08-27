@@ -1,7 +1,7 @@
 {
   "name": "backend",
   "scripts": {
-    "lint": "eslint --ext .js,.ts .",
+    "lint": "eslint . --config ../../eslint.config.mjs",
     "build": "tsc",
     "build:watch": "tsc --watch",
     "serve": "npm run build && firebase emulators:start --only functions --config-dir ../../config",

@@ -17,17 +17,27 @@
     "coverage:merge": "node scripts/merge-coverage.js",
     "coverage:report": "nyc report --reporter=html --reporter=text-summary",
     "coverage:open": "start coverage/merged/index.html",
-    "coverage:clean": "rimraf coverage"
+    "coverage:clean": "rimraf coverage",
+    "lint": "pnpm run lint:ts && pnpm run lint:sol",
+    "lint:ts": "eslint . --config eslint.config.mjs",
+    "lint:sol": "pnpm --filter contracts solhint 'contracts/**/*.sol'",
+    "lint:fix": "pnpm run lint:ts -- --fix && pnpm run lint:sol",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "packageManager": "pnpm@10.12.4",
   "devDependencies": {
-    "@typescript-eslint/eslint-plugin": "^5.62.0",
-    "@typescript-eslint/parser": "^5.62.0",
-    "eslint": "^8.57.1",
+    "@eslint/js": "^9.15.0",
+    "@typescript-eslint/eslint-plugin": "^8.15.0",
+    "@typescript-eslint/parser": "^8.15.0",
+    "eslint": "^9.15.0",
+    "eslint-config-prettier": "^9.1.0",
+    "globals": "^15.12.0",
     "nyc": "^17.1.0",
+    "prettier": "^3.3.3",
     "rimraf": "^6.0.1"
   }
 }
