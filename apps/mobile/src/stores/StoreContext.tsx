@@ -52,6 +52,10 @@ export const usePoolManagementStore = () => {
   return useStore().poolManagementStore
 }
 
+export const useUIStore = () => {
+  return useStore().uiStore
+}
+
 /**
  * Hook for accessing multiple stores at once
  */
@@ -62,6 +66,7 @@ export const useStores = () => {
     authenticationStore: rootStore.authenticationStore,
     walletStore: rootStore.walletStore,
     poolManagementStore: rootStore.poolManagementStore,
+    uiStore: rootStore.uiStore,
     rootStore,
   }
 }

@@ -58,6 +58,15 @@ export class AuthenticationStore {
   isProgressComplete = false
   progressError: string | null = null
 
+  // Retry logic state (reactive)
+  retryCount: number = 0
+  isRetryDelayActive: boolean = false
+  isAppRefreshGracePeriod: boolean = true
+  maxRetries: number = 3
+
+  // Logout state (reactive)
+  isLoggingOut: boolean = false
+
   constructor() {
     makeAutoObservable(this, {
       // Explicitly mark actions
@@ -71,6 +80,14 @@ export class AuthenticationStore {
       completeStep: action,
       failStep: action,
       resetProgress: action,
+      // Retry logic actions
+      setRetryCount: action,
+      setRetryDelayActive: action,
+      endGracePeriod: action,
+      resetRetryState: action,
+      // Logout actions
+      startLogout: action,
+      finishLogout: action,
     })
   }
 
@@ -147,6 +164,8 @@ export class AuthenticationStore {
       this.releaseAuthLock()
       this.authError = null
       this.resetProgress()
+      this.resetRetryState()
+      this.finishLogout() // Reset logout state
     } finally {
       this.isResetting = false
     }
@@ -196,6 +215,50 @@ export class AuthenticationStore {
     } finally {
       this.isResettingProgress = false
     }
+  }
+
+  // Retry Logic Management Actions
+  setRetryCount = (count: number): void => {
+    console.log(`🔄 AuthenticationStore.setRetryCount: ${count}`)
+    this.retryCount = Math.max(0, Math.min(count, this.maxRetries))
+  }
+
+  setRetryDelayActive = (active: boolean): void => {
+    console.log(`⏰ AuthenticationStore.setRetryDelayActive: ${active}`)
+    this.isRetryDelayActive = active
+  }
+
+  endGracePeriod = (): void => {
+    console.log('🕐 AuthenticationStore.endGracePeriod: auto-trigger enabled')
+    this.isAppRefreshGracePeriod = false
+  }
+
+  resetRetryState = (): void => {
+    console.log('🔄 AuthenticationStore.resetRetryState called')
+    this.retryCount = 0
+    this.isRetryDelayActive = false
+    this.isAppRefreshGracePeriod = true
+  }
+
+  // Computed getters for retry logic
+  get canRetry(): boolean {
+    return this.retryCount < this.maxRetries
+  }
+
+  get nextRetryDelay(): number {
+    const BASE_DELAY = 2000 // 2 seconds
+    return BASE_DELAY * Math.pow(2, this.retryCount - 1)
+  }
+
+  // Logout Management Actions
+  startLogout = (): void => {
+    console.log('🚪 AuthenticationStore.startLogout called')
+    this.isLoggingOut = true
+  }
+
+  finishLogout = (): void => {
+    console.log('✅ AuthenticationStore.finishLogout called')
+    this.isLoggingOut = false
   }
 
   // Progress helper methods

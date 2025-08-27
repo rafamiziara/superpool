@@ -1,4 +1,3 @@
-import { getGlobalLogoutState } from '../../../hooks/auth/useLogoutState'
 import type { AuthenticationStore } from '../../../stores/AuthenticationStore'
 import type { AtomicConnectionState, WalletStore } from '../../../stores/WalletStore'
 
@@ -68,19 +67,9 @@ export class AuthenticationValidator {
    * Check if logout process is in progress
    */
   private async checkLogoutState(): Promise<void> {
-    try {
-      const { isLoggingOut } = getGlobalLogoutState()
-      if (isLoggingOut) {
-        console.log('⏸️ Skipping authentication: logout in progress')
-        throw new Error('Authentication cancelled: logout in progress')
-      }
-    } catch (error) {
-      // If error is about logout in progress, re-throw it
-      if (error instanceof Error && error.message.includes('logout in progress')) {
-        throw error
-      }
-      // Otherwise, this is likely initialization error - continue
-      console.log('ℹ️ Global logout state not initialized, continuing...')
+    if (this.authStore.isLoggingOut) {
+      console.log('⏸️ Skipping authentication: logout in progress')
+      throw new Error('Authentication cancelled: logout in progress')
     }
   }
 

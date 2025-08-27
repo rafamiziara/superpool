@@ -2,7 +2,7 @@ import { AppKitButton } from '@reown/appkit-wagmi-react-native';
 import { router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { observer } from 'mobx-react-lite';
-import React, { useRef, useState } from 'react';
+import React, { useRef } from 'react';
 import {
   Dimensions,
   FlatList,
@@ -16,6 +16,7 @@ import {
 import { useAccount } from 'wagmi';
 import { ProgressIndicator } from '../components/ProgressIndicator';
 import { useAuthenticationStateReadonly } from '../hooks/auth/useAuthenticationStateReadonly';
+import { useUIStore } from '../stores';
 
 interface OnboardingSlide {
   id: number;
@@ -54,7 +55,7 @@ const slides: OnboardingSlide[] = [
 const { width: screenWidth } = Dimensions.get('window');
 
 const OnboardingScreen = observer(function OnboardingScreen() {
-  const [currentIndex, setCurrentIndex] = useState(0);
+  const uiStore = useUIStore();
   const flatListRef = useRef<FlatList>(null);
   const { isConnected } = useAccount();
   const { 
@@ -117,7 +118,7 @@ const OnboardingScreen = observer(function OnboardingScreen() {
   const handleScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
     const contentOffsetX = event.nativeEvent.contentOffset.x;
     const index = Math.round(contentOffsetX / screenWidth);
-    setCurrentIndex(index);
+    uiStore.setOnboardingIndex(index);
   };
 
   const renderSlide: ListRenderItem<OnboardingSlide> = ({ item }) => (
@@ -179,7 +180,7 @@ const OnboardingScreen = observer(function OnboardingScreen() {
       <View className="pt-2 pb-32">
         <ProgressIndicator 
           totalSteps={slides.length} 
-          currentStep={currentIndex}
+          currentStep={uiStore.currentOnboardingSlide}
         />
       </View>
       

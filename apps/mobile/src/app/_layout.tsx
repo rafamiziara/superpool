@@ -19,7 +19,6 @@ import { localhost } from '../config/chains';
 import { useAuthenticationIntegration } from '../hooks/auth/useAuthenticationIntegration';
 import { useAuthSessionRecovery } from '../hooks/auth/useAuthSessionRecovery';
 import { useAuthStateSynchronization } from '../hooks/auth/useAuthStateSynchronization';
-import { useGlobalLogoutState } from '../hooks/auth/useLogoutState';
 import { useGlobalErrorHandler } from '../hooks/ui/useGlobalErrorHandler';
 import { useWalletConnectionTrigger } from '../hooks/wallet/useWalletConnectionTrigger';
 import { useWalletToasts } from '../hooks/wallet/useWalletToasts';
@@ -60,7 +59,6 @@ createAppKit({
 function AppContent() {
   // Global hooks for app-wide functionality
   useWalletToasts({ showConnectionToasts: false, showDisconnectionToasts: true }) // Global wallet toast notifications
-  useGlobalLogoutState() // Global logout state management
   useGlobalErrorHandler() // Global session corruption error handler
   
   // Authentication integration - connects wallet events to authentication
