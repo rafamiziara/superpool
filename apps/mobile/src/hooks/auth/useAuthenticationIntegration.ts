@@ -58,7 +58,15 @@ export const useAuthenticationIntegration = () => {
           chainId: chainId || chain?.id || 1,
           connector: 'appkit', // We're using AppKit for wallet connections
           signatureFunctions: {
-            signTypedDataAsync: signTypedDataAsyncRef.current,
+            signTypedDataAsync: async (data) => {
+              // Convert our TypedDataParameter to wagmi's expected format
+              return signTypedDataAsyncRef.current({
+                domain: data.domain || {},
+                types: data.types || {},
+                primaryType: data.primaryType || 'Message',
+                message: data.message || {},
+              })
+            },
             signMessageAsync: (params: { message: string; account: `0x${string}`; connector?: WagmiConnector }) =>
               signMessageAsyncRef.current({ message: params.message, account: params.account }),
           },

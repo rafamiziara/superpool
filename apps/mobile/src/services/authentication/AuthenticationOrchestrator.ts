@@ -1,5 +1,6 @@
 import { AuthProgressCallbacks, AuthStep, AuthenticationContext } from '@superpool/types'
 import { router } from 'expo-router'
+import type { Connector } from 'wagmi'
 import { FIREBASE_AUTH } from '../../firebase.config'
 import { AuthenticationStore } from '../../stores/AuthenticationStore'
 import { WalletStore } from '../../stores/WalletStore'
@@ -51,6 +52,20 @@ export class AuthenticationOrchestrator {
    */
   private generateRequestId(): string {
     return `auth_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+  }
+
+  /**
+   * Type guard to check if the connector is a proper Wagmi Connector
+   */
+  private isWagmiConnector(connector: unknown): connector is Connector {
+    return (
+      typeof connector === 'object' && 
+      connector !== null &&
+      'id' in connector &&
+      'name' in connector &&
+      'connect' in connector &&
+      'disconnect' in connector
+    )
   }
 
   /**
@@ -209,8 +224,8 @@ export class AuthenticationOrchestrator {
 
       // Log initial state
       console.log('Wallet connector:', {
-        connectorId: context.connector?.id,
-        connectorName: context.connector?.name,
+        connectorId: this.isWagmiConnector(context.connector) ? context.connector.id : context.connector,
+        connectorName: this.isWagmiConnector(context.connector) ? context.connector.name : context.connector,
       })
 
       // Capture atomic connection state snapshot and log session debug info
@@ -238,7 +253,7 @@ export class AuthenticationOrchestrator {
             walletAddress: context.walletAddress,
             chainId: context.chainId,
             signatureFunctions: context.signatureFunctions,
-            connector: context.connector,
+            connector: this.isWagmiConnector(context.connector) ? context.connector : undefined,
           },
           authMessage
         )

@@ -85,10 +85,7 @@ export class RegularWalletStrategy implements SignatureStrategy {
 
       const typedData = this.createTypedData(request)
       const signature = await SignatureUtils.withTimeout(
-        functions.signTypedDataAsync({
-          ...typedData,
-          account: request.walletAddress as `0x${string}`,
-        }),
+        functions.signTypedDataAsync(typedData),
         RegularWalletStrategy.TIMEOUT_MS,
         'EIP-712 signature request'
       )

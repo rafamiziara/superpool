@@ -43,8 +43,7 @@ export const mobxUtils = {
   /**
    * Platform-specific logging
    */
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  log: (message: string, ...args: any[]) => {
+  log: (message: string, ...args: unknown[]) => {
     if (__DEV__) {
       console.log(`🏪 [MobX] ${message}`, ...args)
     }

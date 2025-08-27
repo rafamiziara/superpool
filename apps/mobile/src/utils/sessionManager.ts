@@ -535,11 +535,11 @@ export class SessionManager {
     }
 
     return {
-      topic: session.topic?.substring(0, 16) + '...',
+      topic: session.topic?.substring(0, 16) + '...' || 'unknown',
       peerName: session.peer?.metadata?.name || 'unknown',
-      expiry: session.expiry,
-      acknowledged: session.acknowledged,
-      active: session.active,
+      expiry: session.expiry ?? 0,
+      acknowledged: session.acknowledged ?? false,
+      active: session.active ?? false,
       namespaceCount: Object.keys(session.namespaces || {}).length,
     }
   }
@@ -553,7 +553,7 @@ export class SessionManager {
       sessionCount,
       hasErrors: errors.length > 0,
       errorCount: errors.length,
-      errors: errors.slice(0, 3), // Limit error logging
+      errorSample: errors.slice(0, 3).join(', '), // Limit error logging
       timestamp: new Date().toISOString(),
     }
   }
