@@ -19,10 +19,8 @@ firestore-debug.log
 # Ngrok config (contains personal authtoken)
 ngrok.yml
 
-# Claude Code files
-CLAUDE.md
-**/CLAUDE.md
-.claude/
+# Claude Code files - keep *.local.json ignored
+.claude/*.local.json
 
 # Personal documentation files
 .dev
