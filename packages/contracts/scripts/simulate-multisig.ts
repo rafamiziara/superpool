@@ -161,7 +161,10 @@ async function simulateMultiSigApproval(config: MultiSigSimulationConfig): Promi
     // Wait for confirmation
     console.log('⏳ Waiting for confirmation...')
     let receipt
-    if (executeTxResponse.transactionResponse && typeof (executeTxResponse.transactionResponse as { wait?: () => Promise<unknown> }).wait === 'function') {
+    if (
+      executeTxResponse.transactionResponse &&
+      typeof (executeTxResponse.transactionResponse as { wait?: () => Promise<unknown> }).wait === 'function'
+    ) {
       receipt = await (executeTxResponse.transactionResponse as { wait: () => Promise<unknown> }).wait()
     }
 

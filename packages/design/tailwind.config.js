@@ -109,6 +109,7 @@ module.exports = {
         112: '28rem',     // 448px
         128: '32rem',     // 512px
       },
+      /* prettier-ignore */
       borderRadius: {
         none: '0',
         sm: '0.375rem',   // 6px

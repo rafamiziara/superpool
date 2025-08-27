@@ -58,11 +58,9 @@ export class PoolManagementStore {
 
   get userLoans(): Loan[] {
     if (!this.userAddress) return []
-    return (
-      Array.from(this.loans.values())
-        .filter((loan) => loan.borrower.toLowerCase() === this.userAddress!.toLowerCase())
-        .sort((a, b) => new Date(b.requestedAt).getTime() - new Date(a.requestedAt).getTime())
-    )
+    return Array.from(this.loans.values())
+      .filter((loan) => loan.borrower.toLowerCase() === this.userAddress!.toLowerCase())
+      .sort((a, b) => new Date(b.requestedAt).getTime() - new Date(a.requestedAt).getTime())
   }
 
   get activeLoans(): Loan[] {
