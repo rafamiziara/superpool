@@ -215,7 +215,7 @@ contract PoolFactory is
      */
     function _authorizeUpgrade(
         address newImplementation
-    ) internal override onlyOwner {
+    ) internal view override onlyOwner {
         // Only owner can authorize upgrades
         // Additional upgrade logic can be added here if needed
         // For now, the onlyOwner modifier provides sufficient access control
