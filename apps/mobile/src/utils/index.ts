@@ -8,56 +8,50 @@
 // ==========================================
 
 // Validation utilities
+export type { SupportedChainId } from './constants'
 export { ValidationUtils } from './ValidationUtils'
-export type { SupportedChainId } from './ValidationUtils'
 
 // Session management
 export { SessionManager } from './sessionManager'
 
-// Firebase utilities  
-export { firebaseAuthManager } from './firebaseAuthManager'
+// Firebase utilities
 export { customAppCheckProviderFactory } from './appCheckProvider'
+export { firebaseAuthManager } from './firebaseAuthManager'
 
 // ==========================================
 // LOGGING & ERROR HANDLING
 // ==========================================
 
 // Secure logging
-export { secureLogger } from './secureLogger'
-export { 
-  debug, 
-  info, 
-  warn, 
-  error, 
+export {
+  createServiceContext,
+  debug,
   devOnly,
-  logWalletAddress,
-  logSignaturePreview,
+  error,
+  info,
   logAuthStep,
-  logServiceOperation,
-  logServiceError,
   logRecoveryAction,
-  createServiceContext
+  logServiceError,
+  logServiceOperation,
+  logSignaturePreview,
+  logWalletAddress,
+  secureLogger,
+  warn,
 } from './secureLogger'
 
 // Error handling
-export { 
-  ErrorType, 
-  ERROR_MESSAGES, 
-  createAppError, 
-  categorizeError,
-  type AppError 
-} from './errorHandling'
+export { categorizeError, createAppError, ERROR_MESSAGES, ErrorType, isUserInitiatedError, type AppError } from './errorHandling'
 
 // Toast notifications
 export {
-  showSuccessToast,
+  appToasts,
+  authToasts,
+  showErrorFromAppError,
   showErrorToast,
   showInfoToast,
+  showSuccessToast,
   showWarningToast,
-  showErrorFromAppError,
-  authToasts,
-  appToasts,
-  type ToastType
+  type ToastType,
 } from './toast'
 
 // ==========================================
@@ -65,41 +59,36 @@ export {
 // ==========================================
 
 export {
-  // Session constants
-  SESSION_STORAGE_KEYS,
-  SESSION_TIMEOUTS,
-  SESSION_ERROR_INDICATORS,
-  RELAYER_ERROR_INDICATORS,
-  SESSION_ID_PATTERNS,
-  
-  // Authentication constants  
+  // Authentication constants
   AUTH_TIMEOUTS,
   AUTH_VALIDATION,
-  SUPPORTED_CHAIN_IDS,
-  
-  // UI constants
-  TOAST_DURATIONS,
-  TOAST_POSITIONS,
-  
+  // Error handling constants
+  ERROR_RETRY_CONFIG,
+  // Firebase constants
+  FIREBASE_CONFIG,
   // Logging constants
   LOG_LEVELS,
   LOGGING_CONFIG,
-  
-  // Firebase constants
-  FIREBASE_CONFIG,
-  
+  RELAYER_ERROR_INDICATORS,
+  REOWN_APPKIT_SESSION_KEY,
+  SESSION_ERROR_INDICATORS,
+  SESSION_ID_PATTERNS,
+  // Session constants
+  SESSION_STORAGE_KEYS,
+  SESSION_TIMEOUTS,
   // Signature constants
   SIGNATURE_FORMATS,
+  SUPPORTED_CHAIN_IDS,
+
+  // UI constants
+  TOAST_DURATIONS,
+  TOAST_POSITIONS,
   WALLET_ADDRESS_FORMAT,
-  
-  // Error handling constants
-  ERROR_RETRY_CONFIG,
-  
+  WALLETCONNECT_SESSION_KEY,
+  type AuthTimeout,
+  type LogLevel,
   // Validation patterns
-  
   // Type exports
   type ToastDuration,
   type ToastPosition,
-  type LogLevel,
-  type AuthTimeout
 } from './constants'

@@ -87,7 +87,12 @@ export const useWalletConnectionTrigger = ({ onNewConnection, onDisconnection }:
         // Debounced authentication trigger with cleanup tracking
         pendingTimeoutRef.current = setTimeout(() => {
           console.log('🚀 Triggering authentication for new connection')
-          stableOnNewConnection(address, chain?.id)
+          try {
+            stableOnNewConnection(address, chain?.id)
+            console.log('✅ Authentication callback executed successfully')
+          } catch (error) {
+            console.error('❌ Authentication callback failed:', error)
+          }
           pendingTimeoutRef.current = null
         }, 500) as unknown as number
       }

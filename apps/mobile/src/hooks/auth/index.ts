@@ -9,7 +9,7 @@ export { useAuthProgress } from './useAuthProgress'
 
 export { useFirebaseAuth } from './useFirebaseAuth'
 
-export { useGlobalLogoutState, getGlobalLogoutState } from './useLogoutState'
+export { getGlobalLogoutState, useGlobalLogoutState } from './useLogoutState'
 
 export { useAuthenticationIntegration } from './useAuthenticationIntegration'
 export type { AuthenticationIntegration } from './useAuthenticationIntegration'

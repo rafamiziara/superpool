@@ -1,4 +1,4 @@
-import { LOG_LEVELS, LOGGING_CONFIG, type LogLevel } from './constants'
+import { LOG_LEVELS } from './constants'
 
 /**
  * Secure logging utility that prevents sensitive data exposure in production
@@ -16,11 +16,11 @@ class SecureLogger {
     if (typeof data === 'string') {
       return this.sanitizeString(data)
     }
-    
+
     if (typeof data === 'object' && data !== null) {
       return this.sanitizeObject(data as Record<string, unknown>)
     }
-    
+
     return data
   }
 
@@ -32,28 +32,23 @@ class SecureLogger {
     if (str.length > 50 && /^0x[a-fA-F0-9]+$/.test(str)) {
       return `${str.substring(0, 10)}...[${str.length - 20} chars]...${str.substring(str.length - 10)}`
     }
-    
+
     // Mask wallet addresses in text
-    return str.replace(/0x[a-fA-F0-9]{40}/g, (match) => 
-      `${match.substring(0, 6)}...${match.substring(match.length - 4)}`
-    )
+    return str.replace(/0x[a-fA-F0-9]{40}/g, (match) => `${match.substring(0, 6)}...${match.substring(match.length - 4)}`)
   }
 
   /**
    * Sanitizes objects recursively, masking sensitive keys
    */
   private sanitizeObject(obj: Record<string, unknown>): Record<string, unknown> {
-    const sensitiveKeys = [
-      'signature', 'privateKey', 'mnemonic', 'seed', 'token', 'jwt', 
-      'password', 'secret', 'key', 'auth', 'credential'
-    ]
-    
+    const sensitiveKeys = ['signature', 'privateKey', 'mnemonic', 'seed', 'token', 'jwt', 'password', 'secret', 'key', 'auth', 'credential']
+
     const sanitized: Record<string, unknown> = {}
-    
+
     for (const [key, value] of Object.entries(obj)) {
       const keyLower = key.toLowerCase()
-      const isSensitive = sensitiveKeys.some(sensitiveKey => keyLower.includes(sensitiveKey))
-      
+      const isSensitive = sensitiveKeys.some((sensitiveKey) => keyLower.includes(sensitiveKey))
+
       if (isSensitive) {
         sanitized[key] = '[REDACTED]'
       } else if (typeof value === 'string' && value.startsWith('0x') && value.length > 20) {
@@ -65,7 +60,7 @@ class SecureLogger {
         sanitized[key] = value
       }
     }
-    
+
     return sanitized
   }
 
@@ -74,7 +69,7 @@ class SecureLogger {
    */
   private formatArgs(args: unknown[]): unknown[] {
     if (!this.isDevelopment) {
-      return args.map(arg => this.sanitizeData(arg))
+      return args.map((arg) => this.sanitizeData(arg))
     }
     return args
   }
@@ -136,7 +131,7 @@ class SecureLogger {
   /**
    * Safely logs wallet address with truncation for privacy
    */
-  logWalletAddress(address: string, context: string = ''): string {
+  logWalletAddress(address: string, context = ''): string {
     if (!address || address.length < 10) {
       return 'invalid-address'
     }
@@ -147,7 +142,7 @@ class SecureLogger {
   /**
    * Safely logs signature preview without exposing full signature content
    */
-  logSignaturePreview(signature: string, type: string = ''): void {
+  logSignaturePreview(signature: string, type = ''): void {
     if (!signature) {
       console.log(`❌ ${type} signature: empty or invalid`)
       return
@@ -164,15 +159,11 @@ class SecureLogger {
   /**
    * Logs authentication step with timing information
    */
-  logAuthStep(
-    step: string,
-    status: 'start' | 'complete' | 'fail',
-    details?: Record<string, any>
-  ): void {
+  logAuthStep(step: string, status: 'start' | 'complete' | 'fail', details?: Record<string, any>): void {
     const timestamp = new Date().toISOString()
     const emoji = status === 'complete' ? '✅' : status === 'fail' ? '❌' : '🔄'
     const safeDetails = details ? this.sanitizeData(details) : ''
-    
+
     if (this.minLogLevel <= LOG_LEVELS.INFO) {
       console.log(`${emoji} Auth ${step} ${status} [${timestamp}]`, safeDetails)
     }
@@ -181,15 +172,10 @@ class SecureLogger {
   /**
    * Logs service operation with context
    */
-  logServiceOperation(
-    service: string,
-    operation: string,
-    status: 'start' | 'success' | 'error',
-    details?: Record<string, any>
-  ): void {
+  logServiceOperation(service: string, operation: string, status: 'start' | 'success' | 'error', details?: Record<string, any>): void {
     const emoji = status === 'success' ? '✅' : status === 'error' ? '❌' : '🔄'
     const safeDetails = details ? this.sanitizeData(details) : {}
-    
+
     const logLevel = status === 'error' ? LOG_LEVELS.ERROR : LOG_LEVELS.INFO
     if (this.minLogLevel <= logLevel) {
       const logMethod = status === 'error' ? console.error : console.log
@@ -200,16 +186,11 @@ class SecureLogger {
   /**
    * Logs error with service context but sanitizes sensitive information
    */
-  logServiceError(
-    service: string,
-    operation: string,
-    error: unknown,
-    context?: Record<string, any>
-  ): void {
+  logServiceError(service: string, operation: string, error: unknown, context?: Record<string, any>): void {
     if (this.minLogLevel <= LOG_LEVELS.ERROR) {
       const errorMessage = error instanceof Error ? error.message : String(error)
       const safeContext = context ? this.sanitizeData(context) : {}
-      
+
       console.error(`❌ [${service}] ${operation} failed:`, {
         error: errorMessage,
         context: safeContext,
@@ -221,11 +202,7 @@ class SecureLogger {
   /**
    * Logs recovery action with result
    */
-  logRecoveryAction(
-    action: string,
-    result: Record<string, any>,
-    context?: string
-  ): void {
+  logRecoveryAction(action: string, result: Record<string, any>, context?: string): void {
     if (this.minLogLevel <= LOG_LEVELS.INFO) {
       const prefix = context ? `🔄 [${context}] Recovery:` : '🔄 Recovery:'
       const safeResult = this.sanitizeData(result)
@@ -236,19 +213,15 @@ class SecureLogger {
   /**
    * Creates a consistent log context for service operations
    */
-  createServiceContext(
-    service: string,
-    operation: string,
-    additionalContext?: Record<string, any>
-  ): string {
+  createServiceContext(service: string, operation: string, additionalContext?: Record<string, any>): string {
     const timestamp = new Date().toISOString()
     const base = `[${service}:${operation}] ${timestamp}`
-    
+
     if (additionalContext) {
       const safeContext = this.sanitizeData(additionalContext)
       return `${base} ${JSON.stringify(safeContext)}`
     }
-    
+
     return base
   }
 }
@@ -267,5 +240,5 @@ export const {
   logServiceOperation,
   logServiceError,
   logRecoveryAction,
-  createServiceContext
+  createServiceContext,
 } = secureLogger

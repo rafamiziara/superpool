@@ -1,5 +1,5 @@
-import { AppError, categorizeError } from '../../../utils'
 import { ErrorType, SessionErrorContext } from '@superpool/types'
+import { AppError, categorizeError } from '../../../utils'
 
 /**
  * Result of error analysis with routing information
@@ -88,9 +88,6 @@ export class ErrorAnalyzer {
    * Checks if error is a connector-related error (treated as user cancellation)
    */
   private static isConnectorError(errorMessage: string): boolean {
-    return (
-      errorMessage.includes('ConnectorNotConnectedError') ||
-      errorMessage.includes('Connector not connected')
-    )
+    return errorMessage.includes('ConnectorNotConnectedError') || errorMessage.includes('Connector not connected')
   }
 }

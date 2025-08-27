@@ -1,10 +1,4 @@
-import { 
-  AUTH_VALIDATION, 
-  SUPPORTED_CHAIN_IDS, 
-  SIGNATURE_FORMATS,
-  WALLET_ADDRESS_FORMAT,
-  type SupportedChainId 
-} from './constants'
+import { AUTH_VALIDATION, SIGNATURE_FORMATS, SUPPORTED_CHAIN_IDS, WALLET_ADDRESS_FORMAT } from './constants'
 
 /**
  * Common validation utilities for service layer operations
@@ -38,10 +32,10 @@ export class ValidationUtils {
     if (!timestamp || typeof timestamp !== 'number' || timestamp <= 0) {
       return false
     }
-    
+
     const now = Date.now()
     const age = now - timestamp
-    
+
     // Timestamp cannot be more than maxAgeMs old or in the future
     return age >= 0 && age <= maxAgeMs
   }
@@ -53,7 +47,7 @@ export class ValidationUtils {
     if (!message || typeof message !== 'string') {
       return false
     }
-    
+
     const trimmed = message.trim()
     return trimmed.length > 0 && trimmed.length <= AUTH_VALIDATION.MAX_MESSAGE_LENGTH
   }
@@ -88,13 +82,10 @@ export class ValidationUtils {
   /**
    * Validates authentication request parameters
    */
-  static validateAuthRequest(params: {
-    message?: string
-    nonce?: string
-    walletAddress?: string
-    timestamp?: number
-    chainId?: number
-  }): { isValid: boolean; errors: string[] } {
+  static validateAuthRequest(params: { message?: string; nonce?: string; walletAddress?: string; timestamp?: number; chainId?: number }): {
+    isValid: boolean
+    errors: string[]
+  } {
     const errors: string[] = []
 
     if (!this.isValidAuthMessage(params.message || '')) {

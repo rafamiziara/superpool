@@ -1,4 +1,4 @@
-import { makeAutoObservable } from 'mobx'
+import { makeAutoObservable, action } from 'mobx'
 
 export interface AtomicConnectionState {
   isConnected: boolean
@@ -32,7 +32,17 @@ export class WalletStore {
   private sequenceCounter = 0
 
   constructor() {
-    makeAutoObservable(this)
+    makeAutoObservable(this, {
+      // Explicitly mark actions
+      setConnectionState: action,
+      setConnecting: action,
+      setConnectionError: action,
+      connect: action,
+      disconnect: action,
+      updateConnectionState: action,
+      resetSequence: action,
+      reset: action,
+    })
   }
 
   // Computed getters

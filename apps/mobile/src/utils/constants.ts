@@ -12,6 +12,10 @@ export const SESSION_STORAGE_KEYS = {
   REOWN_APPKIT: '@reown/appkit',
 } as const
 
+// Legacy constants for backward compatibility
+export const WALLETCONNECT_SESSION_KEY = SESSION_STORAGE_KEYS.WALLETCONNECT
+export const REOWN_APPKIT_SESSION_KEY = SESSION_STORAGE_KEYS.REOWN_APPKIT
+
 export const SESSION_TIMEOUTS = {
   DEFAULT_MAX_AGE: 86400000, // 24 hours in ms
   CLEANUP_BATCH_SIZE: 10,
@@ -62,14 +66,7 @@ export const TOAST_POSITIONS = {
 // LOGGING CONSTANTS
 // ==========================================
 
-export interface LogLevel {
-  DEBUG: 0
-  INFO: 1
-  WARN: 2
-  ERROR: 3
-}
-
-export const LOG_LEVELS: LogLevel = {
+export const LOG_LEVELS = {
   DEBUG: 0,
   INFO: 1,
   WARN: 2,
@@ -130,32 +127,25 @@ export const SESSION_ERROR_INDICATORS = [
   'session timeout',
 ] as const
 
-export const RELAYER_ERROR_INDICATORS = [
-  'relayer',
-  'websocket',
-  'connection failed',
-  'network error',
-  'timeout',
-  'disconnected',
-] as const
+export const RELAYER_ERROR_INDICATORS = ['relayer', 'websocket', 'connection failed', 'network error', 'timeout', 'disconnected'] as const
 
 // ==========================================
 // VALIDATION PATTERNS
 // ==========================================
 
 export const SESSION_ID_PATTERNS = [
-  /session:\s*([a-f0-9]{64})/i,           // session: followed by 64 hex chars
-  /session_([a-f0-9]{64})/i,              // session_ followed by 64 hex chars  
-  /"session":\s*"([a-f0-9]{64})"/i,       // JSON format with session key
-  /sessionId[=:]\s*([a-f0-9]{64})/i,      // sessionId= or sessionId: format
+  /session:\s*([a-f0-9]{64})/i, // session: followed by 64 hex chars
+  /session_([a-f0-9]{64})/i, // session_ followed by 64 hex chars
+  /"session":\s*"([a-f0-9]{64})"/i, // JSON format with session key
+  /sessionId[=:]\s*([a-f0-9]{64})/i, // sessionId= or sessionId: format
 ] as const
 
 // ==========================================
 // TYPE EXPORTS
 // ==========================================
 
-export type SupportedChainId = typeof SUPPORTED_CHAIN_IDS[number]
-export type ToastDuration = typeof TOAST_DURATIONS[keyof typeof TOAST_DURATIONS]
-export type ToastPosition = typeof TOAST_POSITIONS[keyof typeof TOAST_POSITIONS]
-export type LogLevel = typeof LOG_LEVELS[keyof typeof LOG_LEVELS]
-export type AuthTimeout = typeof AUTH_TIMEOUTS[keyof typeof AUTH_TIMEOUTS]
+export type SupportedChainId = (typeof SUPPORTED_CHAIN_IDS)[number]
+export type ToastDuration = (typeof TOAST_DURATIONS)[keyof typeof TOAST_DURATIONS]
+export type ToastPosition = (typeof TOAST_POSITIONS)[keyof typeof TOAST_POSITIONS]
+export type LogLevel = (typeof LOG_LEVELS)[keyof typeof LOG_LEVELS]
+export type AuthTimeout = (typeof AUTH_TIMEOUTS)[keyof typeof AUTH_TIMEOUTS]

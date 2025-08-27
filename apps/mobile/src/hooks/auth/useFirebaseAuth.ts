@@ -21,4 +21,3 @@ export const useFirebaseAuth = (): FirebaseAuthState => {
 
   return state
 }
-

@@ -44,7 +44,7 @@ describe('useAuthenticationStateReadonly', () => {
   it('should provide minimal debug information', () => {
     const { result } = renderHook(() => useAuthenticationStateReadonly())
 
-    // Debug info is minimal now - just indicates if wallet address exists  
+    // Debug info is minimal now - just indicates if wallet address exists
     expect(result.current._debug).toBeDefined()
   })
 })

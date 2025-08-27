@@ -1,5 +1,5 @@
 import { act, renderHook } from '@testing-library/react-hooks'
-import { getGlobalLogoutState, useGlobalLogoutState, useLogoutState, __resetGlobalLogoutStateForTesting } from './useLogoutState'
+import { __resetGlobalLogoutStateForTesting, getGlobalLogoutState, useGlobalLogoutState, useLogoutState } from './useLogoutState'
 
 describe('useLogoutState', () => {
   it('should initialize with correct default state', () => {

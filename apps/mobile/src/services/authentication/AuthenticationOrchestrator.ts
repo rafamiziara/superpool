@@ -4,8 +4,8 @@ import { FIREBASE_AUTH } from '../../firebase.config'
 import { AuthenticationStore } from '../../stores/AuthenticationStore'
 import { WalletStore } from '../../stores/WalletStore'
 import { SessionManager, authToasts } from '../../utils'
-import { AuthenticationStepExecutor, AuthenticationValidator, FirebaseAuthenticator, MessageGenerator, SignatureHandler } from './steps'
 import { AuthErrorRecoveryService } from '../errorRecovery'
+import { AuthenticationStepExecutor, AuthenticationValidator, FirebaseAuthenticator, MessageGenerator, SignatureHandler } from './steps'
 
 export interface AuthenticationLock {
   isLocked: boolean

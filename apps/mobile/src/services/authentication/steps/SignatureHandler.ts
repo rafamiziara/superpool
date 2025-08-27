@@ -1,5 +1,5 @@
+import { SignatureFunctions, SignatureRequest, SignatureResult } from '@superpool/types'
 import type { Connector } from 'wagmi'
-import { SignatureFunctions, SignatureResult, SignatureRequest } from '@superpool/types'
 import { SignatureService } from '../../signature'
 import type { GeneratedAuthMessage } from './MessageGenerator'
 
@@ -18,10 +18,7 @@ export class SignatureHandler {
   /**
    * Request signature from wallet using generated auth message
    */
-  async requestWalletSignature(
-    context: SignatureContext,
-    authMessage: GeneratedAuthMessage
-  ): Promise<SignatureResult> {
+  async requestWalletSignature(context: SignatureContext, authMessage: GeneratedAuthMessage): Promise<SignatureResult> {
     console.log('✍️ Requesting wallet signature...')
 
     const signatureRequest: SignatureRequest = {
@@ -39,10 +36,6 @@ export class SignatureHandler {
       connectorId: context.connector?.id,
     })
 
-    return await SignatureService.requestSignature(
-      signatureRequest, 
-      context.signatureFunctions, 
-      context.connector
-    )
+    return await SignatureService.requestSignature(signatureRequest, context.signatureFunctions, context.connector)
   }
 }

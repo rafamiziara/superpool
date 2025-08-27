@@ -192,7 +192,7 @@ describe('useGlobalErrorHandler', () => {
 
   it('should trigger async handling on session corruption error', () => {
     const logSpy = jest.spyOn(console, 'log').mockImplementation()
-    
+
     renderHook(() => useGlobalErrorHandler())
 
     // Simulate session corruption error
@@ -200,13 +200,13 @@ describe('useGlobalErrorHandler', () => {
 
     // Should detect and start handling
     expect(mockSessionManager.detectSessionCorruption).toHaveBeenCalledWith('Session corruption detected')
-    
+
     logSpy.mockRestore()
   })
 
   it('should handle successful async flow (line coverage focus)', async () => {
     const logSpy = jest.spyOn(console, 'log').mockImplementation()
-    
+
     renderHook(() => useGlobalErrorHandler())
 
     // Create a successful promise
@@ -216,49 +216,49 @@ describe('useGlobalErrorHandler', () => {
     console.error('WalletConnect session error: No matching key')
 
     // Allow async operations to complete
-    await new Promise(resolve => setTimeout(resolve, 50))
+    await new Promise((resolve) => setTimeout(resolve, 50))
 
     // Verify detection was called
     expect(mockSessionManager.detectSessionCorruption).toHaveBeenCalledWith('WalletConnect session error: No matching key')
-    
+
     logSpy.mockRestore()
   })
 
   it('should handle async error recovery failure (line coverage focus)', async () => {
     const logSpy = jest.spyOn(console, 'log').mockImplementation()
-    
+
     // Mock handleSessionCorruption to fail
     const recoveryError = new Error('Recovery failed')
     mockSessionManager.handleSessionCorruption.mockRejectedValue(recoveryError)
-    
+
     renderHook(() => useGlobalErrorHandler())
 
     // Simulate session corruption error
     console.error('Session corruption detected')
 
     // Allow async operations to complete
-    await new Promise(resolve => setTimeout(resolve, 50))
+    await new Promise((resolve) => setTimeout(resolve, 50))
 
     // Verify detection was called
     expect(mockSessionManager.detectSessionCorruption).toHaveBeenCalledWith('Session corruption detected')
-    
+
     // The error should be logged by the catch block (this tests line 45)
     // We can't directly test console.error call since it's overridden, but the function should run
-    
+
     logSpy.mockRestore()
   })
 
   it('should handle timeout cleanup (line coverage focus)', () => {
     jest.useFakeTimers()
-    
+
     renderHook(() => useGlobalErrorHandler())
 
     // Trigger session error to start async handling
     console.error('Session error')
-    
+
     // Fast forward to trigger setTimeout cleanup (line 48-50)
     jest.advanceTimersByTime(3000)
-    
+
     jest.useRealTimers()
   })
 })

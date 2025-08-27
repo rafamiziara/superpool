@@ -1,6 +1,6 @@
+import type { SignatureResult } from '@superpool/types'
 import { signInWithCustomToken } from 'firebase/auth'
 import { httpsCallable } from 'firebase/functions'
-import type { SignatureResult } from '@superpool/types'
 import { FIREBASE_AUTH, FIREBASE_FUNCTIONS } from '../../../firebase.config'
 import { devOnly } from '../../../utils'
 
@@ -19,19 +19,17 @@ export class FirebaseAuthenticator {
   /**
    * Verifies signature with backend and gets Firebase token
    */
-  async verifySignatureAndGetToken(
-    context: SignatureVerificationContext, 
-    signatureResult: SignatureResult
-  ): Promise<string> {
+  async verifySignatureAndGetToken(context: SignatureVerificationContext, signatureResult: SignatureResult): Promise<string> {
     console.log('🔍 Verifying signature with backend...')
 
     // For Safe wallets, provide device info for proper App Check validation
-    const deviceInfo = signatureResult.signatureType === 'safe-wallet'
-      ? {
-          deviceId: 'safe-wallet-device',
-          platform: 'web' as const,
-        }
-      : {}
+    const deviceInfo =
+      signatureResult.signatureType === 'safe-wallet'
+        ? {
+            deviceId: 'safe-wallet-device',
+            platform: 'web' as const,
+          }
+        : {}
 
     const signatureResponse = await verifySignatureAndLogin({
       walletAddress: context.walletAddress,
@@ -57,7 +55,7 @@ export class FirebaseAuthenticator {
     console.log('🔑 Signing in with Firebase...')
 
     const isSafeWallet = signatureType === 'safe-wallet'
-    
+
     // Add stabilization delay for Safe wallets
     if (isSafeWallet) {
       console.log('⏳ Adding delay for Safe wallet connection stabilization...')

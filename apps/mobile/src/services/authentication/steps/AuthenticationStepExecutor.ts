@@ -1,5 +1,4 @@
-import { AuthStep } from '@superpool/types'
-import type { AuthProgressCallbacks } from '../authenticationOrchestrator'
+import { AuthProgressCallbacks, AuthStep } from '@superpool/types'
 
 /**
  * Handles the orchestration and timing of authentication steps

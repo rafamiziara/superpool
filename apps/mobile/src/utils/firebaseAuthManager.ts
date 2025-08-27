@@ -12,13 +12,13 @@ function extractWalletAddress(user: User | null): string | null {
   if (!user?.uid) {
     return null
   }
-  
+
   // Validate that the UID is actually a valid wallet address
   if (!ValidationUtils.isValidWalletAddress(user.uid)) {
     console.warn('🚨 Security: Firebase UID does not match valid wallet address format')
     return null
   }
-  
+
   return user.uid
 }
 

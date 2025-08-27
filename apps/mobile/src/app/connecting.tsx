@@ -6,9 +6,10 @@ import { Text, TouchableOpacity, View } from 'react-native';
 import { useAccount, useDisconnect } from 'wagmi';
 import { LoadingSpinner } from '../components/LoadingSpinner';
 import { useAuthentication } from '../hooks/auth/useAuthentication';
+import { useAuthenticationIntegration } from '../hooks/auth/useAuthenticationIntegration';
 
 const ConnectingScreen = observer(function ConnectingScreen() {
-  const { isConnected } = useAccount();
+  const { isConnected, address } = useAccount();
   const { disconnect } = useDisconnect();
   const {
     authError,
@@ -24,6 +25,7 @@ const ConnectingScreen = observer(function ConnectingScreen() {
     resetProgress,
     _debug
   } = useAuthentication();
+  const { triggerAuthentication, needsAuthentication } = useAuthenticationIntegration();
 
   // Debug logging
   useEffect(() => {
@@ -56,6 +58,16 @@ const ConnectingScreen = observer(function ConnectingScreen() {
       router.replace('/dashboard');
     }
   }, [isConnected, authWalletAddress, authError, isAuthenticating]);
+
+  // Automatically trigger authentication if it hasn't started yet
+  useEffect(() => {
+    if (isConnected && address && needsAuthentication() && !isAuthenticating && !currentStep) {
+      console.log('🔄 Auto-triggering authentication on connecting screen');
+      triggerAuthentication().catch(error => {
+        console.error('❌ Auto-trigger authentication failed:', error);
+      });
+    }
+  }, [isConnected, address, needsAuthentication, isAuthenticating, currentStep, triggerAuthentication]);
 
   const renderStepIcon = (stepStatus: 'pending' | 'current' | 'completed' | 'failed') => {
     switch (stepStatus) {
@@ -164,15 +176,22 @@ const ConnectingScreen = observer(function ConnectingScreen() {
 
         {/* Action Buttons */}
         <View className="flex-row justify-center space-x-4">
-          {authError && (
+          {(authError || (!isAuthenticating && !currentStep && needsAuthentication())) && (
             <TouchableOpacity
-              onPress={() => {
-                console.log('🔄 Retrying authentication...')
+              onPress={async () => {
+                console.log('🔄 Manually triggering authentication...')
                 resetProgress()
+                try {
+                  await triggerAuthentication()
+                } catch (error) {
+                  console.error('❌ Manual authentication trigger failed:', error)
+                }
               }}
               className="bg-primary px-4 py-2 rounded-lg"
             >
-              <Text className="text-primary-foreground text-sm font-medium">Retry</Text>
+              <Text className="text-primary-foreground text-sm font-medium">
+                {authError ? 'Retry' : 'Start Authentication'}
+              </Text>
             </TouchableOpacity>
           )}
           

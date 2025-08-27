@@ -1,4 +1,4 @@
-import { SessionErrorContext, ErrorRecoveryResult } from '@superpool/types'
+import { ErrorRecoveryResult, SessionErrorContext } from '@superpool/types'
 import { SessionManager, authToasts } from '../../../utils'
 import type { ErrorHandler } from './ErrorHandler'
 import { RecoveryActions } from './ErrorHandler'
@@ -27,7 +27,7 @@ export class SessionErrorHandler implements ErrorHandler<SessionErrorContext> {
     console.log('🚨 Detected WalletConnect session error:', sessionContext.errorMessage)
 
     const cleanupPerformed = await this.performSessionCleanup(sessionContext)
-    
+
     // Always disconnect after session error handling
     console.log('🔌 Disconnecting wallet after session error handling...')
     this.disconnectFunction()
