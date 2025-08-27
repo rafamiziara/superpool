@@ -40,11 +40,26 @@ const mockAuthStore = {
   authError: null,
   isAuthenticating: false,
   authWalletAddress: null as string | null,
+  // Auth progress state (now part of AuthenticationStore)
+  currentStep: null,
+  completedSteps: new Set(),
+  failedStep: null,
+  isProgressComplete: false,
+  progressError: null,
+  // Auth methods
   setAuthError: jest.fn(),
   setAuthLock: jest.fn(),
   acquireAuthLock: jest.fn(() => true),
   releaseAuthLock: jest.fn(),
   reset: jest.fn(),
+  // Progress methods
+  startStep: jest.fn(),
+  completeStep: jest.fn(),
+  failStep: jest.fn(),
+  resetProgress: jest.fn(),
+  getStepStatus: jest.fn(),
+  getStepInfo: jest.fn(),
+  getAllSteps: jest.fn(() => []),
 }
 
 const mockWalletStore = {
@@ -76,25 +91,7 @@ jest.mock('./useFirebaseAuth', () => ({
   useFirebaseAuth: () => mockFirebaseAuth,
 }))
 
-// Mock auth progress
-const mockAuthProgress = {
-  currentStep: null,
-  completedSteps: new Set(),
-  failedStep: null,
-  isComplete: false,
-  error: null,
-  startStep: jest.fn(),
-  completeStep: jest.fn(),
-  failStep: jest.fn(),
-  resetProgress: jest.fn(),
-  getStepStatus: jest.fn(),
-  getStepInfo: jest.fn(),
-  getAllSteps: jest.fn(() => []),
-}
-
-jest.mock('./useAuthProgress', () => ({
-  useAuthProgress: () => mockAuthProgress,
-}))
+// Auth progress is now handled directly by AuthenticationStore (no separate hook needed)
 
 describe('Authentication Flow Integration Tests', () => {
   beforeEach(() => {
@@ -105,7 +102,12 @@ describe('Authentication Flow Integration Tests', () => {
       authError: null,
       isAuthenticating: false,
       authWalletAddress: null as string | null,
+      currentStep: null,
+      failedStep: null,
+      isProgressComplete: false,
+      progressError: null,
     })
+    mockAuthStore.completedSteps.clear()
     Object.assign(mockWalletStore, {
       isConnected: false,
       address: undefined as string | undefined,
@@ -132,7 +134,7 @@ describe('Authentication Flow Integration Tests', () => {
       expect(mockWalletStore.connect).toHaveBeenCalledWith(testWalletAddress, testChainId)
 
       // Verify authentication progress is reset
-      expect(mockAuthProgress.resetProgress).toHaveBeenCalled()
+      expect(mockAuthStore.resetProgress).toHaveBeenCalled()
     })
 
     it('should handle authentication errors gracefully', async () => {
@@ -154,7 +156,7 @@ describe('Authentication Flow Integration Tests', () => {
       })
 
       // Verify error is handled in progress
-      expect(mockAuthProgress.failStep).toHaveBeenCalled()
+      expect(mockAuthStore.failStep).toHaveBeenCalled()
     })
   })
 
@@ -270,7 +272,6 @@ describe('Authentication Flow Integration Tests', () => {
       })
 
       // Verify cleanup actions
-      expect(mockAuthProgress.resetProgress).toHaveBeenCalled()
       expect(mockAuthStore.reset).toHaveBeenCalled()
       expect(mockWalletStore.disconnect).toHaveBeenCalled()
     })
@@ -291,7 +292,7 @@ describe('Authentication Flow Integration Tests', () => {
 
       // Verify authentication is triggered
       expect(mockWalletStore.connect).toHaveBeenCalled()
-      expect(mockAuthProgress.resetProgress).toHaveBeenCalled()
+      expect(mockAuthStore.resetProgress).toHaveBeenCalled()
     })
   })
 

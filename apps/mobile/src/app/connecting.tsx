@@ -1,16 +1,18 @@
 import { router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { observer } from 'mobx-react-lite';
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { Text, TouchableOpacity, View } from 'react-native';
 import { useAccount, useDisconnect } from 'wagmi';
 import { LoadingSpinner } from '../components/LoadingSpinner';
 import { useAuthentication } from '../hooks/auth/useAuthentication';
 import { useAuthenticationIntegration } from '../hooks/auth/useAuthenticationIntegration';
+import { useAuthenticationStore } from '../stores';
 
 const ConnectingScreen = observer(function ConnectingScreen() {
   const { isConnected, address } = useAccount();
   const { disconnect } = useDisconnect();
+  const authStore = useAuthenticationStore();
   const {
     authError,
     isAuthenticating,
@@ -28,23 +30,15 @@ const ConnectingScreen = observer(function ConnectingScreen() {
   } = useAuthentication();
   const { triggerAuthentication, needsAuthentication } = useAuthenticationIntegration();
 
-  // Retry logic state
-  const [retryCount, setRetryCount] = useState(0);
-  const [isRetryDelayActive, setIsRetryDelayActive] = useState(false);
+  // Timeout refs for React Native cleanup (MobX store handles the state)
   const retryTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const MAX_RETRIES = 3;
-  const BASE_DELAY = 2000; // 2 seconds
-  
-  // App refresh protection - prevent immediate auto-trigger
-  const [isAppRefreshGracePeriod, setIsAppRefreshGracePeriod] = useState(true);
   const appRefreshTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Cleanup timeouts on unmount and set app refresh grace period
   useEffect(() => {
     // Give Firebase auth 2 seconds to load on app refresh
     appRefreshTimeoutRef.current = setTimeout(() => {
-      setIsAppRefreshGracePeriod(false);
-      console.log('🕐 App refresh grace period ended, auto-trigger enabled');
+      authStore.endGracePeriod();
     }, 2000);
     
     return () => {
@@ -62,20 +56,20 @@ const ConnectingScreen = observer(function ConnectingScreen() {
   // Reset retry count when successfully authenticated
   useEffect(() => {
     if (authWalletAddress && !authError && !isAuthenticating) {
-      setRetryCount(0);
-      setIsRetryDelayActive(false);
+      authStore.setRetryCount(0);
+      authStore.setRetryDelayActive(false);
       if (retryTimeoutRef.current) {
         clearTimeout(retryTimeoutRef.current);
         retryTimeoutRef.current = null;
       }
     }
-  }, [authWalletAddress, authError, isAuthenticating]);
+  }, [authWalletAddress, authError, isAuthenticating, authStore]);
 
   // Authentication retry function with exponential backoff
   const attemptAuthentication = async (isRetry = false) => {
     try {
       if (isRetry) {
-        console.log(`🔄 Retrying authentication (attempt ${retryCount + 1}/${MAX_RETRIES})`);
+        console.log(`🔄 Retrying authentication (attempt ${authStore.retryCount + 1}/${authStore.maxRetries})`);
       } else {
         console.log('🔄 Auto-triggering authentication on connecting screen');
       }
@@ -83,28 +77,28 @@ const ConnectingScreen = observer(function ConnectingScreen() {
       await triggerAuthentication();
       
       // Reset retry count on success
-      setRetryCount(0);
-      setIsRetryDelayActive(false);
+      authStore.setRetryCount(0);
+      authStore.setRetryDelayActive(false);
       
     } catch (error) {
       console.error('❌ Authentication attempt failed:', error);
       
-      if (retryCount < MAX_RETRIES - 1) {
-        const nextRetryCount = retryCount + 1;
-        const delay = BASE_DELAY * Math.pow(2, nextRetryCount - 1); // Exponential backoff
+      if (authStore.canRetry) {
+        const nextRetryCount = authStore.retryCount + 1;
+        const delay = authStore.nextRetryDelay;
         
-        console.log(`⏰ Scheduling retry ${nextRetryCount}/${MAX_RETRIES} in ${delay}ms`);
+        console.log(`⏰ Scheduling retry ${nextRetryCount}/${authStore.maxRetries} in ${delay}ms`);
         
-        setRetryCount(nextRetryCount);
-        setIsRetryDelayActive(true);
+        authStore.setRetryCount(nextRetryCount);
+        authStore.setRetryDelayActive(true);
         
         retryTimeoutRef.current = setTimeout(() => {
-          setIsRetryDelayActive(false);
+          authStore.setRetryDelayActive(false);
           attemptAuthentication(true);
         }, delay);
       } else {
         console.error('❌ Max authentication retries reached');
-        setIsRetryDelayActive(false);
+        authStore.setRetryDelayActive(false);
       }
     }
   };
@@ -157,15 +151,15 @@ const ConnectingScreen = observer(function ConnectingScreen() {
       needsAuthentication() && 
       !isAuthenticating && 
       !currentStep && 
-      !isRetryDelayActive &&
-      !isAppRefreshGracePeriod // Don't auto-trigger during grace period
+      !authStore.isRetryDelayActive &&
+      !authStore.isAppRefreshGracePeriod // Don't auto-trigger during grace period
     ) {
       console.log('🔄 Auto-trigger conditions met, starting authentication');
       attemptAuthentication();
-    } else if (isAppRefreshGracePeriod) {
+    } else if (authStore.isAppRefreshGracePeriod) {
       console.log('🕐 Skipping auto-trigger during app refresh grace period');
     }
-  }, [isConnected, address, needsAuthentication, isAuthenticating, currentStep, isRetryDelayActive, isAppRefreshGracePeriod]);
+  }, [isConnected, address, needsAuthentication, isAuthenticating, currentStep, authStore.isRetryDelayActive, authStore.isAppRefreshGracePeriod, authStore]);
 
   const renderStepIcon = (stepStatus: 'pending' | 'current' | 'completed' | 'failed') => {
     switch (stepStatus) {
@@ -260,13 +254,13 @@ const ConnectingScreen = observer(function ConnectingScreen() {
           {authError ? (
             <Text className="text-destructive text-center text-sm font-medium">
               {error || authError.userFriendlyMessage}
-              {retryCount < MAX_RETRIES - 1 && (
-                <Text className="text-muted-foreground"> (Retry {retryCount + 1}/{MAX_RETRIES})</Text>
+              {authStore.canRetry && (
+                <Text className="text-muted-foreground"> (Retry {authStore.retryCount + 1}/{authStore.maxRetries})</Text>
               )}
             </Text>
-          ) : isRetryDelayActive ? (
+          ) : authStore.isRetryDelayActive ? (
             <Text className="text-muted-foreground text-center text-sm">
-              Waiting before retry... ({Math.ceil(BASE_DELAY * Math.pow(2, retryCount - 1) / 1000)}s remaining)
+              Waiting before retry... ({Math.ceil(authStore.nextRetryDelay / 1000)}s remaining)
             </Text>
           ) : currentStep === 'request-signature' ? (
             <Text className="text-muted-foreground text-center text-sm">
@@ -301,14 +295,14 @@ const ConnectingScreen = observer(function ConnectingScreen() {
 
         {/* Action Buttons */}
         <View className="flex-row justify-center space-x-4">
-          {(authError || (!isAuthenticating && !currentStep && needsAuthentication())) && !isRetryDelayActive && (
+          {(authError || (!isAuthenticating && !currentStep && needsAuthentication())) && !authStore.isRetryDelayActive && (
             <TouchableOpacity
               onPress={async () => {
                 console.log('🔄 Manually triggering authentication...')
                 resetProgress()
                 // Reset retry count for manual attempts
-                setRetryCount(0)
-                setIsRetryDelayActive(false)
+                authStore.setRetryCount(0)
+                authStore.setRetryDelayActive(false)
                 if (retryTimeoutRef.current) {
                   clearTimeout(retryTimeoutRef.current)
                   retryTimeoutRef.current = null
@@ -324,10 +318,10 @@ const ConnectingScreen = observer(function ConnectingScreen() {
           )}
 
           {/* Show retry delay indicator */}
-          {isRetryDelayActive && (
+          {authStore.isRetryDelayActive && (
             <View className="bg-muted px-4 py-2 rounded-lg">
               <Text className="text-muted-foreground text-sm font-medium">
-                Retrying in {Math.ceil(BASE_DELAY * Math.pow(2, retryCount - 1) / 1000)}s...
+                Retrying in {Math.ceil(authStore.nextRetryDelay / 1000)}s...
               </Text>
             </View>
           )}

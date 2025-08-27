@@ -5,11 +5,7 @@ export type { Authentication } from './useAuthentication'
 export { useAuthenticationStateReadonly } from './useAuthenticationStateReadonly'
 export type { AuthenticationStateReadonly } from './useAuthenticationStateReadonly'
 
-export { useAuthProgress } from './useAuthProgress'
-
 export { useFirebaseAuth } from './useFirebaseAuth'
-
-export { getGlobalLogoutState, useGlobalLogoutState } from './useLogoutState'
 
 export { useAuthenticationIntegration } from './useAuthenticationIntegration'
 export type { AuthenticationIntegration } from './useAuthenticationIntegration'

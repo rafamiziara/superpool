@@ -1,5 +1,6 @@
 import { AuthenticationStore } from './AuthenticationStore'
 import { PoolManagementStore } from './PoolManagementStore'
+import { UIStore } from './UIStore'
 import { WalletStore } from './WalletStore'
 
 /**
@@ -10,11 +11,13 @@ export class RootStore {
   public authenticationStore: AuthenticationStore
   public walletStore: WalletStore
   public poolManagementStore: PoolManagementStore
+  public uiStore: UIStore
 
   constructor() {
     this.authenticationStore = new AuthenticationStore()
     this.walletStore = new WalletStore()
     this.poolManagementStore = new PoolManagementStore()
+    this.uiStore = new UIStore()
   }
 
   // Global reset method for clearing all store state
@@ -22,6 +25,7 @@ export class RootStore {
     this.authenticationStore.reset()
     this.walletStore.reset()
     this.poolManagementStore.reset()
+    this.uiStore.resetOnboardingState()
   }
 
   // Convenience method to set user context across relevant stores

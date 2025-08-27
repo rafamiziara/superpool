@@ -7,35 +7,31 @@ import { useEffect } from 'react';
 import { Text, View } from 'react-native';
 import { useAccount } from 'wagmi';
 import { FIREBASE_AUTH } from '../firebase.config';
-import { getGlobalLogoutState } from '../hooks/auth/useLogoutState';
 import { useStores } from '../stores';
 
 const DashboardScreen = observer(function DashboardScreen() {
-  const { walletStore } = useStores();
+  const { walletStore, authenticationStore } = useStores();
   const { chain } = useAccount(); // Keep for chain info since store doesn't track this yet
   const { address, isConnected } = walletStore; // Use MobX store for core connection state
 
   useEffect(() => {
     if (!isConnected) {
-      // Use proper logout state management for automatic signout
-      const { startLogout, finishLogout } = getGlobalLogoutState()
-      
       const handleAutoLogout = async () => {
         try {
           console.log('🔌 Wallet disconnected, automatically signing out from Firebase...')
-          startLogout()
+          authenticationStore.startLogout()
           await signOut(FIREBASE_AUTH)
           router.replace('/')
         } catch (error) {
           console.error('Auto logout error:', error)
         } finally {
-          finishLogout()
+          authenticationStore.finishLogout()
         }
       }
       
       handleAutoLogout()
     }
-  }, [isConnected]);
+  }, [isConnected, authenticationStore]);
 
 
   if (!isConnected) {
