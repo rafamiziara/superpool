@@ -59,7 +59,7 @@ export class AuthenticationOrchestrator {
    */
   private isWagmiConnector(connector: unknown): connector is Connector {
     return (
-      typeof connector === 'object' && 
+      typeof connector === 'object' &&
       connector !== null &&
       'id' in connector &&
       'name' in connector &&
