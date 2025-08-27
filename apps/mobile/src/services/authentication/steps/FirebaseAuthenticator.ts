@@ -25,7 +25,7 @@ export class FirebaseAuthenticator {
 
     // Get device info for proper App Check validation
     let deviceInfo = {}
-    
+
     if (signatureResult.signatureType === 'safe-wallet') {
       deviceInfo = {
         deviceId: 'safe-wallet-device',
@@ -35,15 +35,15 @@ export class FirebaseAuthenticator {
       try {
         // Get device ID from platform-specific sources
         const platform = Platform.OS as 'ios' | 'android'
-        
+
         // Use a combination of app instance and platform for device ID
         const deviceId = `mobile-${platform}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
-        
+
         deviceInfo = {
           deviceId,
           platform,
         }
-        
+
         console.log('📱 Generated device info:', { deviceId, platform })
       } catch (error) {
         console.warn('⚠️ Failed to get device info:', error)

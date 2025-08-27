@@ -38,7 +38,7 @@ superpool/
 
 - **`.github/`** - GitHub workflows and templates
 - **`.vscode/`** - VS Code settings and extensions configuration
-- **`.claude/`** - Claude Code specific configuration (tracked except *.local.json)
+- **`.claude/`** - Claude Code specific configuration (tracked except \*.local.json)
 
 ## Applications (`apps/`)
 
@@ -60,12 +60,14 @@ apps/landing/
 ```
 
 **Key Technologies**:
+
 - Next.js 15.5.0 with App Router
 - React 19 support
 - Tailwind CSS v4 with shared design system
 - TypeScript with strict mode
 
 **Dependencies**:
+
 - `@superpool/ui` - Shared components
 - `@superpool/design` - Design tokens
 - `@superpool/assets` - Brand assets
@@ -91,6 +93,7 @@ apps/mobile/
 ```
 
 **Key Technologies**:
+
 - React Native with Expo Router
 - MobX for state management (mobx-react-lite)
 - Reown AppKit for wallet connections
@@ -98,12 +101,14 @@ apps/mobile/
 - FontAwesome icons via @expo/vector-icons
 
 **State Management Architecture**:
+
 - `AuthenticationStore` - User auth and wallet connection
 - `WalletConnectionStore` - Blockchain interactions
 - `PoolManagementStore` - Lending pool operations
 - `RootStore` - Store composition and context provider
 
 **Dependencies**:
+
 - `@superpool/ui` - Shared components (adapted for mobile)
 - `@superpool/design` - Design tokens
 - `@superpool/assets` - Brand assets and onboarding illustrations
@@ -130,12 +135,14 @@ packages/contracts/
 ```
 
 **Key Features**:
+
 - Upgradeable proxy pattern
 - Multi-sig Safe integration
 - Emergency pause mechanisms
 - Comprehensive test coverage
 
 **Development Commands**:
+
 - Local: `pnpm node:local`, `pnpm deploy:local`
 - Forked: `pnpm node:fork`, `pnpm deploy:fork`
 - Testing: `pnpm test`, `pnpm test:gas`, `pnpm coverage`
@@ -160,12 +167,14 @@ packages/backend/
 ```
 
 **Core Functions**:
+
 - `generateAuthMessage` - Wallet authentication challenges
 - `verifySignatureAndLogin` - Signature verification and user creation
 - `mintAppCheckToken` - Device verification tokens
 - Event listeners for pool creation, loans, and member management
 
 **Security Architecture**:
+
 - Device approval system
 - Nonce-based authentication (10min expiry)
 - App Check integration for request validation
@@ -184,20 +193,22 @@ packages/design/
 ```
 
 **Design Tokens**:
+
 - **Colors**: DeFi Blue palette (#2563eb primary, #06b6d4 accent, #0f172a secondary)
 - **Typography**: Plus Jakarta Sans (primary), Space Mono (monospace), Geist (accent)
 - **Spacing**: Consistent scale for margins, padding, and layouts
 - **Breakpoints**: Responsive design breakpoints
 
 **Usage Pattern**:
+
 ```javascript
 // In consuming packages
-import '@superpool/design/tokens.css';
+import '@superpool/design/tokens.css'
 // Extend tailwind config
 module.exports = {
   presets: [require('@superpool/design/tailwind.config.js')],
   // Additional configuration
-};
+}
 ```
 
 ### Shared Assets (`packages/assets/`)
@@ -216,17 +227,19 @@ packages/assets/
 ```
 
 **Asset Categories**:
+
 - **Onboarding**: 4 illustrations showcasing core SuperPool features
 - **Branding**: Logos, wordmarks, and brand elements
 - **Icons**: Functional icons for UI components
 - **Illustrations**: Feature explanations and empty states
 
 **Usage Pattern**:
+
 ```javascript
 // Direct imports
-import heroImage from '@superpool/assets/images/illustrations/hero.png';
+import heroImage from '@superpool/assets/images/illustrations/hero.png'
 // Or via path reference
-<img src="@superpool/assets/images/onboarding/step1.png" />
+;<img src="@superpool/assets/images/onboarding/step1.png" />
 ```
 
 ### UI Components (`packages/ui/`)
@@ -249,11 +262,13 @@ packages/ui/
 ```
 
 **Component Library**:
+
 - **Button**: Multiple variants (primary, secondary, ghost), sizes, loading states
 - **Card**: Container with header, content, footer sub-components
 - **Input**: Form inputs with validation states and addon support
 
 **Build System**:
+
 - TypeScript compilation with declaration files
 - CSS processing for component styles
 - Watch mode for development (`pnpm dev`)
@@ -275,6 +290,7 @@ packages/types/
 ```
 
 **Type Categories**:
+
 - **Authentication**: User, AuthNonce, ApprovedDevice, SignatureVerification
 - **Lending**: LendingPool, Loan, Transaction, Member with status enums
 - **Blockchain**: Chain configs, ContractConfig, WalletConnection, event types
@@ -333,12 +349,7 @@ Coordinated builds and type checking across packages:
 
 ```json
 {
-  "references": [
-    {"path": "./packages/types"},
-    {"path": "./packages/ui"},
-    {"path": "./apps/landing"},
-    {"path": "./apps/mobile"}
-  ]
+  "references": [{ "path": "./packages/types" }, { "path": "./packages/ui" }, { "path": "./apps/landing" }, { "path": "./apps/mobile" }]
 }
 ```
 

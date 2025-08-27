@@ -8,10 +8,7 @@ import { RegularWalletStrategy } from './RegularWalletStrategy'
  * Centralizes strategy selection logic and provides strategy management
  */
 export class SignatureStrategyFactory {
-  private static readonly strategies: SignatureStrategy[] = [
-    new SafeWalletStrategy(),
-    new RegularWalletStrategy(),
-  ]
+  private static readonly strategies: SignatureStrategy[] = [new SafeWalletStrategy(), new RegularWalletStrategy()]
 
   /**
    * Gets the appropriate signature strategy for the given connector
@@ -37,13 +34,13 @@ export class SignatureStrategyFactory {
    * Gets all available strategy names (for debugging/logging)
    */
   static getAvailableStrategies(): string[] {
-    return this.strategies.map(strategy => strategy.getStrategyName())
+    return this.strategies.map((strategy) => strategy.getStrategyName())
   }
 
   /**
    * Validates if a connector is supported by any strategy
    */
   static isConnectorSupported(connector?: Connector): boolean {
-    return this.strategies.some(strategy => strategy.canHandle(connector))
+    return this.strategies.some((strategy) => strategy.canHandle(connector))
   }
 }

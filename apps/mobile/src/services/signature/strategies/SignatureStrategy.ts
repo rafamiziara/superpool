@@ -9,11 +9,7 @@ export interface SignatureStrategy {
   /**
    * Executes the signature request using the specific strategy
    */
-  sign(
-    request: SignatureRequest,
-    functions: SignatureFunctions,
-    connector?: Connector
-  ): Promise<SignatureResult>
+  sign(request: SignatureRequest, functions: SignatureFunctions, connector?: Connector): Promise<SignatureResult>
 
   /**
    * Validates if this strategy can handle the given wallet/connector

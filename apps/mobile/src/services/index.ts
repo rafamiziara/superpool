@@ -3,7 +3,7 @@
 // Authentication services
 export * from './authentication'
 
-// Signature services  
+// Signature services
 export * from './signature'
 
 // Error recovery services

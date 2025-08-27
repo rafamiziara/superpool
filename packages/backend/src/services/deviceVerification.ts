@@ -12,10 +12,7 @@ export class DeviceVerificationService {
    */
   static async isDeviceApproved(deviceId: string): Promise<boolean> {
     try {
-      const deviceDoc = await firestore
-        .collection(APPROVED_DEVICES_COLLECTION)
-        .doc(deviceId)
-        .get()
+      const deviceDoc = await firestore.collection(APPROVED_DEVICES_COLLECTION).doc(deviceId).get()
 
       if (!deviceDoc.exists) {
         logger.info('Device not found in approved devices', { deviceId })
@@ -24,7 +21,7 @@ export class DeviceVerificationService {
 
       // Update last used timestamp
       await deviceDoc.ref.update({ lastUsed: new Date().getTime() })
-      
+
       logger.info('Device verified successfully', { deviceId })
       return true
     } catch (error) {
@@ -36,11 +33,7 @@ export class DeviceVerificationService {
   /**
    * Approve a device for a specific wallet address
    */
-  static async approveDevice(
-    deviceId: string,
-    walletAddress: string,
-    platform: 'android' | 'ios' | 'web'
-  ): Promise<void> {
+  static async approveDevice(deviceId: string, walletAddress: string, platform: 'android' | 'ios' | 'web'): Promise<void> {
     try {
       const approvedDevice: ApprovedDevice = {
         deviceId,
@@ -50,10 +43,7 @@ export class DeviceVerificationService {
         lastUsed: new Date().getTime(),
       }
 
-      await firestore
-        .collection(APPROVED_DEVICES_COLLECTION)
-        .doc(deviceId)
-        .set(approvedDevice)
+      await firestore.collection(APPROVED_DEVICES_COLLECTION).doc(deviceId).set(approvedDevice)
 
       logger.info('Device approved successfully', { deviceId, walletAddress, platform })
     } catch (error) {
@@ -67,10 +57,7 @@ export class DeviceVerificationService {
    */
   static async getApprovedDevice(deviceId: string): Promise<ApprovedDevice | null> {
     try {
-      const deviceDoc = await firestore
-        .collection(APPROVED_DEVICES_COLLECTION)
-        .doc(deviceId)
-        .get()
+      const deviceDoc = await firestore.collection(APPROVED_DEVICES_COLLECTION).doc(deviceId).get()
 
       if (!deviceDoc.exists) {
         return null
@@ -88,10 +75,7 @@ export class DeviceVerificationService {
    */
   static async revokeDeviceApproval(deviceId: string): Promise<void> {
     try {
-      await firestore
-        .collection(APPROVED_DEVICES_COLLECTION)
-        .doc(deviceId)
-        .delete()
+      await firestore.collection(APPROVED_DEVICES_COLLECTION).doc(deviceId).delete()
 
       logger.info('Device approval revoked', { deviceId })
     } catch (error) {

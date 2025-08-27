@@ -21,11 +21,14 @@ export class AuthenticationOrchestrator {
   private signatureHandler: SignatureHandler
   private firebaseAuthenticator: FirebaseAuthenticator
   private validator: AuthenticationValidator
-  
+
   // Request tracking for deduplication
   private static activeRequests = new Map<string, string>() // walletAddress -> requestId
 
-  constructor(private authStore: AuthenticationStore, private walletStore: WalletStore) {
+  constructor(
+    private authStore: AuthenticationStore,
+    private walletStore: WalletStore
+  ) {
     // Initialize AuthErrorRecoveryService with MobX stores
     AuthErrorRecoveryService.initialize(authStore, walletStore)
 

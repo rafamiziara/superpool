@@ -146,7 +146,7 @@ describe('Authentication Flow Integration Tests', () => {
         () =>
           ({
             authenticate: jest.fn().mockRejectedValue(mockError),
-          } as any)
+          }) as any
       )
 
       const testWalletAddress = '0x1234567890123456789012345678901234567890'

@@ -13,23 +13,15 @@ export class SafeWalletStrategy implements SignatureStrategy {
 
   canHandle(connector?: Connector): boolean {
     if (!connector) return false
-    
-    return (
-      connector.id === 'safe' || 
-      connector.name?.toLowerCase().includes('safe') || 
-      connector.id?.toLowerCase().includes('safe')
-    )
+
+    return connector.id === 'safe' || connector.name?.toLowerCase().includes('safe') || connector.id?.toLowerCase().includes('safe')
   }
 
   getStrategyName(): string {
     return 'safe-wallet'
   }
 
-  async sign(
-    request: SignatureRequest,
-    functions: SignatureFunctions,
-    connector?: Connector
-  ): Promise<SignatureResult> {
+  async sign(request: SignatureRequest, functions: SignatureFunctions, connector?: Connector): Promise<SignatureResult> {
     console.log('🔐 Safe wallet detected, trying direct connector signing...')
 
     try {
@@ -65,7 +57,7 @@ export class SafeWalletStrategy implements SignatureStrategy {
    */
   private createFallbackSignature(request: SignatureRequest): SignatureResult {
     console.log('🔐 Using Safe wallet authentication (ownership verification)')
-    
+
     const fallbackSignature = SignatureUtils.createSafeAuthToken(request)
     console.log('🔐 Safe wallet authentication token generated')
 

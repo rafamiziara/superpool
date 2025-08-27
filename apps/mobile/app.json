@@ -36,10 +36,7 @@
       "favicon": "./assets/favicon.png",
       "bundler": "metro"
     },
-    "plugins": [
-      "expo-secure-store",
-      "expo-router"
-    ],
+    "plugins": ["expo-secure-store", "expo-router"],
     "scheme": "superpool"
   }
 }

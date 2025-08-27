@@ -16,12 +16,12 @@ export const useAuthenticationIntegration = () => {
   const { signMessageAsync } = useSignMessage()
   const { signTypedDataAsync } = useSignTypedData()
   const { disconnect } = useDisconnect()
-  
+
   // Store wagmi functions in refs to prevent dependency changes
   const signMessageAsyncRef = useRef(signMessageAsync)
   const signTypedDataAsyncRef = useRef(signTypedDataAsync)
   const disconnectRef = useRef(disconnect)
-  
+
   // Update refs when functions change
   signMessageAsyncRef.current = signMessageAsync
   signTypedDataAsyncRef.current = signTypedDataAsync
@@ -122,25 +122,25 @@ export const useAuthenticationIntegration = () => {
     if (!isConnected || !address) {
       return false
     }
-    
+
     // Check if already authenticated with Firebase
     if (FIREBASE_AUTH.currentUser) {
       console.log('🔍 Firebase user already authenticated, no authentication needed:', FIREBASE_AUTH.currentUser.uid)
       return false
     }
-    
+
     // Check if MobX store shows authenticated
     if (authenticationStore.authWalletAddress) {
       console.log('🔍 MobX store shows authenticated wallet, no authentication needed')
       return false
     }
-    
+
     // Check if authentication is currently in progress
     if (authenticationStore.isAuthenticating) {
       console.log('🔍 Authentication already in progress, skipping')
       return false
     }
-    
+
     console.log('🔍 Authentication needed: wallet connected but not authenticated')
     return true
   }, [isConnected, address, authenticationStore.authWalletAddress, authenticationStore.isAuthenticating])

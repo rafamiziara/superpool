@@ -16,13 +16,9 @@ export class RegularWalletStrategy implements SignatureStrategy {
   canHandle(connector?: Connector): boolean {
     // Regular wallet strategy handles all non-Safe wallets
     if (!connector) return true
-    
+
     // Explicitly reject Safe wallets
-    const isSafe = (
-      connector.id === 'safe' || 
-      connector.name?.toLowerCase().includes('safe') || 
-      connector.id?.toLowerCase().includes('safe')
-    )
+    const isSafe = connector.id === 'safe' || connector.name?.toLowerCase().includes('safe') || connector.id?.toLowerCase().includes('safe')
     return !isSafe
   }
 
@@ -30,11 +26,7 @@ export class RegularWalletStrategy implements SignatureStrategy {
     return 'regular-wallet'
   }
 
-  async sign(
-    request: SignatureRequest,
-    functions: SignatureFunctions,
-    connector?: Connector
-  ): Promise<SignatureResult> {
+  async sign(request: SignatureRequest, functions: SignatureFunctions, connector?: Connector): Promise<SignatureResult> {
     // First try personal message signing for better UX
     try {
       console.log('📱 Trying personal message signing first for better UX...')
@@ -56,10 +48,7 @@ export class RegularWalletStrategy implements SignatureStrategy {
   /**
    * Attempts personal message signing
    */
-  private async tryPersonalSign(
-    request: SignatureRequest,
-    functions: SignatureFunctions
-  ): Promise<SignatureResult> {
+  private async tryPersonalSign(request: SignatureRequest, functions: SignatureFunctions): Promise<SignatureResult> {
     const signature = await SignatureUtils.withTimeout(
       functions.signMessageAsync({
         message: request.message,
@@ -91,10 +80,7 @@ export class RegularWalletStrategy implements SignatureStrategy {
   /**
    * Attempts EIP-712 typed data signing
    */
-  private async tryEip712Sign(
-    request: SignatureRequest,
-    functions: SignatureFunctions
-  ): Promise<SignatureResult> {
+  private async tryEip712Sign(request: SignatureRequest, functions: SignatureFunctions): Promise<SignatureResult> {
     try {
       console.log('📱 Trying EIP-712 typed data signing as fallback...')
 
@@ -170,7 +156,7 @@ export class RegularWalletStrategy implements SignatureStrategy {
   private handleSafeWalletDetection(request: SignatureRequest, context: string): SignatureResult {
     const safeSignature = SignatureUtils.createSafeAuthToken(request)
     console.log(`🔐 Safe wallet authentication token generated (${context} detection)`)
-    
+
     return {
       signature: safeSignature,
       signatureType: 'safe-wallet',

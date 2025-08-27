@@ -19,22 +19,12 @@ const buttonVariants = {
 
 const buttonSizes = {
   sm: 'px-6 py-3 text-sm',
-  md: 'px-8 py-4 text-base', 
+  md: 'px-8 py-4 text-base',
   lg: 'px-10 py-5 text-lg',
 }
 
 export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
-  ({ 
-    className, 
-    variant = 'primary', 
-    size = 'md', 
-    isLoading = false,
-    leftIcon,
-    rightIcon,
-    children, 
-    disabled,
-    ...props 
-  }, ref) => {
+  ({ className, variant = 'primary', size = 'md', isLoading = false, leftIcon, rightIcon, children, disabled, ...props }, ref) => {
     return (
       <button
         className={cn(
@@ -57,12 +47,10 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
         ) : leftIcon ? (
           <span className="mr-2">{leftIcon}</span>
         ) : null}
-        
+
         {children}
-        
-        {rightIcon && !isLoading && (
-          <span className="ml-2">{rightIcon}</span>
-        )}
+
+        {rightIcon && !isLoading && <span className="ml-2">{rightIcon}</span>}
       </button>
     )
   }

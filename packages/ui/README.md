@@ -42,7 +42,6 @@ Container component for grouped content.
 
 ```tsx
 import { Card, CardHeader, CardContent, CardFooter } from '@superpool/ui'
-
 ;<Card variant="elevated">
   <CardHeader>
     <h3>Lending Pool</h3>
@@ -66,7 +65,6 @@ Form input component with validation states.
 
 ```tsx
 import { Input } from '@superpool/ui'
-
 ;<Input variant="default" size="md" placeholder="Enter amount" leftAddon="$" error={hasError} />
 ```
 
@@ -115,7 +113,6 @@ All components accept a `className` prop for custom styling. Use the `cn()` util
 
 ```tsx
 import { Button, cn } from '@superpool/ui'
-
 ;<Button className={cn('my-custom-class', isActive && 'active-state')}>Custom Button</Button>
 ```
 

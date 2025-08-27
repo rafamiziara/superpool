@@ -22,7 +22,7 @@ const createMockAccountState = (overrides = {}) =>
     isDisconnected: true,
     status: 'disconnected' as const,
     ...overrides,
-  } as ReturnType<typeof useAccount>)
+  }) as ReturnType<typeof useAccount>
 
 const createMockConnector = (name: string) =>
   ({
@@ -51,7 +51,7 @@ const createMockConnector = (name: string) =>
     onDisconnect: jest.fn(),
     onMessage: jest.fn(),
     switchChain: jest.fn(),
-  } as const)
+  }) as const
 
 const createMockChain = (id: number, name: string) =>
   ({
@@ -67,7 +67,7 @@ const createMockChain = (id: number, name: string) =>
         http: [id === 1 ? 'https://mainnet.infura.io' : 'https://polygon-rpc.com'],
       },
     },
-  } as const)
+  }) as const
 
 describe('useWalletToasts', () => {
   beforeEach(() => {

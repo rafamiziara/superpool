@@ -1,18 +1,18 @@
-import { router } from 'expo-router';
-import { StatusBar } from 'expo-status-bar';
-import { observer } from 'mobx-react-lite';
-import React, { useEffect, useRef } from 'react';
-import { Text, TouchableOpacity, View } from 'react-native';
-import { useAccount, useDisconnect } from 'wagmi';
-import { LoadingSpinner } from '../components/LoadingSpinner';
-import { useAuthentication } from '../hooks/auth/useAuthentication';
-import { useAuthenticationIntegration } from '../hooks/auth/useAuthenticationIntegration';
-import { useAuthenticationStore } from '../stores';
+import { router } from 'expo-router'
+import { StatusBar } from 'expo-status-bar'
+import { observer } from 'mobx-react-lite'
+import React, { useEffect, useRef } from 'react'
+import { Text, TouchableOpacity, View } from 'react-native'
+import { useAccount, useDisconnect } from 'wagmi'
+import { LoadingSpinner } from '../components/LoadingSpinner'
+import { useAuthentication } from '../hooks/auth/useAuthentication'
+import { useAuthenticationIntegration } from '../hooks/auth/useAuthenticationIntegration'
+import { useAuthenticationStore } from '../stores'
 
 const ConnectingScreen = observer(function ConnectingScreen() {
-  const { isConnected, address } = useAccount();
-  const { disconnect } = useDisconnect();
-  const authStore = useAuthenticationStore();
+  const { isConnected, address } = useAccount()
+  const { disconnect } = useDisconnect()
+  const authStore = useAuthenticationStore()
   const {
     authError,
     isAuthenticating,
@@ -26,82 +26,81 @@ const ConnectingScreen = observer(function ConnectingScreen() {
     getAllSteps,
     resetProgress,
     isFirebaseAuthenticated,
-    _debug
-  } = useAuthentication();
-  const { triggerAuthentication, needsAuthentication } = useAuthenticationIntegration();
+    _debug,
+  } = useAuthentication()
+  const { triggerAuthentication, needsAuthentication } = useAuthenticationIntegration()
 
   // Timeout refs for React Native cleanup (MobX store handles the state)
-  const retryTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const appRefreshTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const retryTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const appRefreshTimeoutRef = useRef<NodeJS.Timeout | null>(null)
 
   // Cleanup timeouts on unmount and set app refresh grace period
   useEffect(() => {
     // Give Firebase auth 2 seconds to load on app refresh
     appRefreshTimeoutRef.current = setTimeout(() => {
-      authStore.endGracePeriod();
-    }, 2000);
-    
+      authStore.endGracePeriod()
+    }, 2000)
+
     return () => {
       if (retryTimeoutRef.current) {
-        clearTimeout(retryTimeoutRef.current);
-        retryTimeoutRef.current = null;
+        clearTimeout(retryTimeoutRef.current)
+        retryTimeoutRef.current = null
       }
       if (appRefreshTimeoutRef.current) {
-        clearTimeout(appRefreshTimeoutRef.current);
-        appRefreshTimeoutRef.current = null;
+        clearTimeout(appRefreshTimeoutRef.current)
+        appRefreshTimeoutRef.current = null
       }
-    };
-  }, []);
+    }
+  }, [])
 
   // Reset retry count when successfully authenticated
   useEffect(() => {
     if (authWalletAddress && !authError && !isAuthenticating) {
-      authStore.setRetryCount(0);
-      authStore.setRetryDelayActive(false);
+      authStore.setRetryCount(0)
+      authStore.setRetryDelayActive(false)
       if (retryTimeoutRef.current) {
-        clearTimeout(retryTimeoutRef.current);
-        retryTimeoutRef.current = null;
+        clearTimeout(retryTimeoutRef.current)
+        retryTimeoutRef.current = null
       }
     }
-  }, [authWalletAddress, authError, isAuthenticating, authStore]);
+  }, [authWalletAddress, authError, isAuthenticating, authStore])
 
   // Authentication retry function with exponential backoff
   const attemptAuthentication = async (isRetry = false) => {
     try {
       if (isRetry) {
-        console.log(`🔄 Retrying authentication (attempt ${authStore.retryCount + 1}/${authStore.maxRetries})`);
+        console.log(`🔄 Retrying authentication (attempt ${authStore.retryCount + 1}/${authStore.maxRetries})`)
       } else {
-        console.log('🔄 Auto-triggering authentication on connecting screen');
+        console.log('🔄 Auto-triggering authentication on connecting screen')
       }
-      
-      await triggerAuthentication();
-      
+
+      await triggerAuthentication()
+
       // Reset retry count on success
-      authStore.setRetryCount(0);
-      authStore.setRetryDelayActive(false);
-      
+      authStore.setRetryCount(0)
+      authStore.setRetryDelayActive(false)
     } catch (error) {
-      console.error('❌ Authentication attempt failed:', error);
-      
+      console.error('❌ Authentication attempt failed:', error)
+
       if (authStore.canRetry) {
-        const nextRetryCount = authStore.retryCount + 1;
-        const delay = authStore.nextRetryDelay;
-        
-        console.log(`⏰ Scheduling retry ${nextRetryCount}/${authStore.maxRetries} in ${delay}ms`);
-        
-        authStore.setRetryCount(nextRetryCount);
-        authStore.setRetryDelayActive(true);
-        
+        const nextRetryCount = authStore.retryCount + 1
+        const delay = authStore.nextRetryDelay
+
+        console.log(`⏰ Scheduling retry ${nextRetryCount}/${authStore.maxRetries} in ${delay}ms`)
+
+        authStore.setRetryCount(nextRetryCount)
+        authStore.setRetryDelayActive(true)
+
         retryTimeoutRef.current = setTimeout(() => {
-          authStore.setRetryDelayActive(false);
-          attemptAuthentication(true);
-        }, delay);
+          authStore.setRetryDelayActive(false)
+          attemptAuthentication(true)
+        }, delay)
       } else {
-        console.error('❌ Max authentication retries reached');
-        authStore.setRetryDelayActive(false);
+        console.error('❌ Max authentication retries reached')
+        authStore.setRetryDelayActive(false)
       }
     }
-  };
+  }
 
   // Debug logging
   useEffect(() => {
@@ -115,17 +114,17 @@ const ConnectingScreen = observer(function ConnectingScreen() {
       isComplete,
       error: error || authError?.message,
       // Simplified debug info
-      mobxBridge: _debug || 'no debug info'
+      mobxBridge: _debug || 'no debug info',
     })
-  }, [isConnected, isAuthenticating, authWalletAddress, currentStep, completedSteps, failedStep, isComplete, error, authError, _debug]);
+  }, [isConnected, isAuthenticating, authWalletAddress, currentStep, completedSteps, failedStep, isComplete, error, authError, _debug])
 
   // Redirect based on connection state
   useEffect(() => {
     if (!isConnected) {
       // Wallet disconnected - back to onboarding
-      router.replace('/onboarding');
+      router.replace('/onboarding')
     }
-  }, [isConnected]);
+  }, [isConnected])
 
   // Redirect to dashboard when authenticated
   useEffect(() => {
@@ -136,36 +135,45 @@ const ConnectingScreen = observer(function ConnectingScreen() {
         hasError: !!authError,
         isAuthenticating,
         isComplete,
-        isFirebaseAuthenticated
-      });
+        isFirebaseAuthenticated,
+      })
       // Successfully authenticated - go to dashboard
-      router.replace('/dashboard');
+      router.replace('/dashboard')
     }
-  }, [isConnected, authWalletAddress, authError, isAuthenticating, isComplete, isFirebaseAuthenticated]);
+  }, [isConnected, authWalletAddress, authError, isAuthenticating, isComplete, isFirebaseAuthenticated])
 
   // Automatically trigger authentication with retry logic and app refresh protection
   useEffect(() => {
     if (
-      isConnected && 
-      address && 
-      needsAuthentication() && 
-      !isAuthenticating && 
-      !currentStep && 
+      isConnected &&
+      address &&
+      needsAuthentication() &&
+      !isAuthenticating &&
+      !currentStep &&
       !authStore.isRetryDelayActive &&
       !authStore.isAppRefreshGracePeriod // Don't auto-trigger during grace period
     ) {
-      console.log('🔄 Auto-trigger conditions met, starting authentication');
-      attemptAuthentication();
+      console.log('🔄 Auto-trigger conditions met, starting authentication')
+      attemptAuthentication()
     } else if (authStore.isAppRefreshGracePeriod) {
-      console.log('🕐 Skipping auto-trigger during app refresh grace period');
+      console.log('🕐 Skipping auto-trigger during app refresh grace period')
     }
-  }, [isConnected, address, needsAuthentication, isAuthenticating, currentStep, authStore.isRetryDelayActive, authStore.isAppRefreshGracePeriod, authStore]);
+  }, [
+    isConnected,
+    address,
+    needsAuthentication,
+    isAuthenticating,
+    currentStep,
+    authStore.isRetryDelayActive,
+    authStore.isAppRefreshGracePeriod,
+    authStore,
+  ])
 
   const renderStepIcon = (stepStatus: 'pending' | 'current' | 'completed' | 'failed') => {
     switch (stepStatus) {
       case 'completed':
         return <Text className="text-green-600 text-lg">✓</Text>
-      case 'failed': 
+      case 'failed':
         return <Text className="text-destructive text-lg">✗</Text>
       case 'current':
         return <LoadingSpinner size="small" />
@@ -206,23 +214,21 @@ const ConnectingScreen = observer(function ConnectingScreen() {
             </>
           )}
         </View>
-        
+
         {/* 6-Step Progress */}
         <View className="w-full max-w-sm">
           {getAllSteps().map((stepInfo) => {
             const status = getStepStatus(stepInfo.step)
             return (
               <View key={stepInfo.step} className="flex-row items-center mb-4">
-                <View className="w-8 items-center mr-3">
-                  {renderStepIcon(status)}
-                </View>
+                <View className="w-8 items-center mr-3">{renderStepIcon(status)}</View>
                 <View className="flex-1">
-                  <Text 
+                  <Text
                     className={`text-sm font-medium ${
                       status === 'failed'
                         ? 'text-destructive'
-                        : status === 'current' 
-                          ? 'text-primary' 
+                        : status === 'current'
+                          ? 'text-primary'
                           : status === 'completed'
                             ? 'text-muted-foreground'
                             : 'text-muted-foreground/50'
@@ -230,13 +236,9 @@ const ConnectingScreen = observer(function ConnectingScreen() {
                   >
                     {stepInfo.title}
                   </Text>
-                  <Text 
+                  <Text
                     className={`text-xs ${
-                      status === 'failed'
-                        ? 'text-destructive/70'
-                        : status === 'current'
-                          ? 'text-primary/70'
-                          : 'text-muted-foreground/70'
+                      status === 'failed' ? 'text-destructive/70' : status === 'current' ? 'text-primary/70' : 'text-muted-foreground/70'
                     }`}
                   >
                     {stepInfo.description}
@@ -255,7 +257,10 @@ const ConnectingScreen = observer(function ConnectingScreen() {
             <Text className="text-destructive text-center text-sm font-medium">
               {error || authError.userFriendlyMessage}
               {authStore.canRetry && (
-                <Text className="text-muted-foreground"> (Retry {authStore.retryCount + 1}/{authStore.maxRetries})</Text>
+                <Text className="text-muted-foreground">
+                  {' '}
+                  (Retry {authStore.retryCount + 1}/{authStore.maxRetries})
+                </Text>
               )}
             </Text>
           ) : authStore.isRetryDelayActive ? (
@@ -267,29 +272,17 @@ const ConnectingScreen = observer(function ConnectingScreen() {
               Please check your wallet app and sign the authentication message.
             </Text>
           ) : currentStep === 'generate-message' ? (
-            <Text className="text-muted-foreground text-center text-sm">
-              Generating authentication challenge...
-            </Text>
+            <Text className="text-muted-foreground text-center text-sm">Generating authentication challenge...</Text>
           ) : currentStep === 'verify-signature' ? (
-            <Text className="text-muted-foreground text-center text-sm">
-              Verifying your signature with the server...
-            </Text>
+            <Text className="text-muted-foreground text-center text-sm">Verifying your signature with the server...</Text>
           ) : currentStep === 'firebase-auth' ? (
-            <Text className="text-muted-foreground text-center text-sm">
-              Completing authentication process...
-            </Text>
+            <Text className="text-muted-foreground text-center text-sm">Completing authentication process...</Text>
           ) : currentStep === 'acquire-lock' ? (
-            <Text className="text-muted-foreground text-center text-sm">
-              Starting authentication process...
-            </Text>
+            <Text className="text-muted-foreground text-center text-sm">Starting authentication process...</Text>
           ) : isAuthenticating || currentStep ? (
-            <Text className="text-muted-foreground text-center text-sm">
-              Authenticating your wallet connection...
-            </Text>
+            <Text className="text-muted-foreground text-center text-sm">Authenticating your wallet connection...</Text>
           ) : (
-            <Text className="text-muted-foreground text-center text-sm">
-              Ready to authenticate your wallet...
-            </Text>
+            <Text className="text-muted-foreground text-center text-sm">Ready to authenticate your wallet...</Text>
           )}
         </View>
 
@@ -311,9 +304,7 @@ const ConnectingScreen = observer(function ConnectingScreen() {
               }}
               className="bg-primary px-4 py-2 rounded-lg"
             >
-              <Text className="text-primary-foreground text-sm font-medium">
-                {authError ? 'Retry' : 'Start Authentication'}
-              </Text>
+              <Text className="text-primary-foreground text-sm font-medium">{authError ? 'Retry' : 'Start Authentication'}</Text>
             </TouchableOpacity>
           )}
 
@@ -325,7 +316,7 @@ const ConnectingScreen = observer(function ConnectingScreen() {
               </Text>
             </View>
           )}
-          
+
           <TouchableOpacity
             onPress={() => {
               console.log('🚪 Disconnecting wallet...')
@@ -341,7 +332,7 @@ const ConnectingScreen = observer(function ConnectingScreen() {
 
       <StatusBar style="auto" />
     </View>
-  );
-});
+  )
+})
 
-export default ConnectingScreen;
+export default ConnectingScreen

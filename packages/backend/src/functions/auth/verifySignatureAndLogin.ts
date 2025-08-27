@@ -163,12 +163,10 @@ export const verifySignatureAndLoginHandler = async (request: CallableRequest<Ve
   if (deviceId && platform) {
     try {
       logger.info('Approving device', { deviceId, walletAddress, platform, signatureType })
-      
+
       // For Safe wallets, use a stable device identifier based on wallet address
-      const finalDeviceId = signatureType === 'safe-wallet' ? 
-        `safe-wallet-${walletAddress.toLowerCase()}` : 
-        deviceId
-      
+      const finalDeviceId = signatureType === 'safe-wallet' ? `safe-wallet-${walletAddress.toLowerCase()}` : deviceId
+
       await DeviceVerificationService.approveDevice(finalDeviceId, walletAddress, platform)
       logger.info('Device approved successfully', { deviceId: finalDeviceId, walletAddress, signatureType })
     } catch (error) {
@@ -176,11 +174,11 @@ export const verifySignatureAndLoginHandler = async (request: CallableRequest<Ve
       logger.error('Failed to approve device', { error, deviceId, walletAddress, signatureType })
     }
   } else {
-    logger.info('Skipping device approval - no deviceId or platform provided', { 
-      deviceId, 
-      platform, 
+    logger.info('Skipping device approval - no deviceId or platform provided', {
+      deviceId,
+      platform,
       signatureType,
-      walletAddress 
+      walletAddress,
     })
   }
 

@@ -4,7 +4,7 @@ import rootConfig from '../../eslint.config.mjs'
 export default [
   // Extend root configuration
   ...rootConfig,
-  
+
   // Mobile app specific configuration
   {
     files: ['**/*.{js,ts,tsx}'],
@@ -14,35 +14,32 @@ export default [
         ...globals.es2022,
         __DEV__: 'readonly',
         React: 'readonly',
-        NodeJS: 'readonly'
-      }
+        NodeJS: 'readonly',
+      },
     },
     rules: {
       // TypeScript specific rules
-      '@typescript-eslint/no-unused-vars': ['error', { 
-        argsIgnorePattern: '^_',
-        varsIgnorePattern: '^_'
-      }],
-      '@typescript-eslint/no-explicit-any': 'warn'
-    }
+      '@typescript-eslint/no-unused-vars': [
+        'error',
+        {
+          argsIgnorePattern: '^_',
+          varsIgnorePattern: '^_',
+        },
+      ],
+      '@typescript-eslint/no-explicit-any': 'warn',
+    },
   },
 
   // Jest configuration for test files
   {
-    files: [
-      '**/__tests__/**/*',
-      '**/*.test.*',
-      '**/*.spec.*',
-      '**/__mocks__/**/*',
-      '**/setupTests.*'
-    ],
+    files: ['**/__tests__/**/*', '**/*.test.*', '**/*.spec.*', '**/__mocks__/**/*', '**/setupTests.*'],
     languageOptions: {
       globals: {
         ...globals.jest,
         ...globals.node,
-        jest: 'readonly'
-      }
-    }
+        jest: 'readonly',
+      },
+    },
   },
 
   // TypeScript files specific rules
@@ -50,19 +47,22 @@ export default [
     files: ['**/*.{ts,tsx}'],
     rules: {
       '@typescript-eslint/no-explicit-any': 'warn',
-      '@typescript-eslint/no-unused-vars': ['error', { 
-        argsIgnorePattern: '^_',
-        varsIgnorePattern: '^_'
-      }]
-    }
+      '@typescript-eslint/no-unused-vars': [
+        'error',
+        {
+          argsIgnorePattern: '^_',
+          varsIgnorePattern: '^_',
+        },
+      ],
+    },
   },
 
   // Specific overrides for certain files
   {
     files: ['**/errorHandling.ts'],
     rules: {
-      '@typescript-eslint/no-unused-vars': 'off'
-    }
+      '@typescript-eslint/no-unused-vars': 'off',
+    },
   },
 
   // Configuration files need CommonJS require() syntax
@@ -74,24 +74,18 @@ export default [
       'metro.config.cjs',
       'tailwind.config.cjs',
       'jest.config.cjs',
-      'jest.babel.config.cjs'
+      'jest.babel.config.cjs',
     ],
     languageOptions: {
-      sourceType: 'commonjs'
+      sourceType: 'commonjs',
     },
     rules: {
-      '@typescript-eslint/no-var-requires': 'off'
-    }
+      '@typescript-eslint/no-var-requires': 'off',
+    },
   },
 
   // Additional ignores for mobile app
   {
-    ignores: [
-      'dist/**',
-      'node_modules/**',
-      'lib/**',
-      '.expo/**',
-      'coverage/**'
-    ]
-  }
+    ignores: ['dist/**', 'node_modules/**', 'lib/**', '.expo/**', 'coverage/**'],
+  },
 ]
