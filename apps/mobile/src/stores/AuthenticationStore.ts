@@ -158,7 +158,7 @@ export class AuthenticationStore {
       console.log('🔄 Reset already in progress, skipping to prevent infinite loop')
       return
     }
-    
+
     this.isResetting = true
     try {
       this.releaseAuthLock()
@@ -202,7 +202,7 @@ export class AuthenticationStore {
       console.log('🔄 Progress reset already in progress, skipping to prevent infinite loop')
       return
     }
-    
+
     this.isResettingProgress = true
     try {
       console.log('🔄 AuthenticationStore.resetProgress called')

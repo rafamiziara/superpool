@@ -48,13 +48,7 @@ export interface SignatureVerification {
 }
 
 // Mobile app authentication workflow types
-export type AuthStep = 
-  | 'connect-wallet' 
-  | 'acquire-lock' 
-  | 'generate-message' 
-  | 'request-signature' 
-  | 'verify-signature' 
-  | 'firebase-auth'
+export type AuthStep = 'connect-wallet' | 'acquire-lock' | 'generate-message' | 'request-signature' | 'verify-signature' | 'firebase-auth'
 
 export interface AuthStepInfo {
   step: AuthStep

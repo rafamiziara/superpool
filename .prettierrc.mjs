@@ -5,5 +5,5 @@ export default {
   trailingComma: 'es5',
   arrowParens: 'always',
   semi: false,
-  endOfLine: 'auto'
+  endOfLine: 'auto',
 }

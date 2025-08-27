@@ -24,7 +24,6 @@ interface TypedData {
   account: `0x${string}` // Required to match wagmi v2
 }
 
-
 export class SignatureService {
   /**
    * Validates signature request parameters before processing

@@ -44,12 +44,14 @@ This project serves as a comprehensive portfolio piece demonstrating expertise a
 **Frontend Applications:**
 
 **Landing Page (Next.js 15.5.0):**
+
 - **Next.js 15.5.0:** Modern React framework with App Router and React 19 support.
 - **Tailwind CSS v4:** Utility-first styling with SuperPool design system integration.
 - **TypeScript:** Full type safety across all components and pages.
 - **Shared Components:** Reusable UI components from `@superpool/ui` package.
 
 **Mobile Application (React Native/Expo):**
+
 - **React Native / Expo:** Cross-platform framework for iOS and Android.
 - **MobX:** Reactive state management with automatic UI updates and centralized stores.
 - **NativeWind:** Tailwind CSS for React Native with design system compatibility.
@@ -118,8 +120,9 @@ The monorepo now features a comprehensive shared package system for consistent b
 4.  **Backend (Cloud Functions):** Acts as a bridge between applications and smart contracts, handling wallet-based authentication, off-chain data storage, and multi-sig interactions
 
 **Cross-Platform Benefits:**
+
 - ✅ **Brand Consistency:** Single design system across web and mobile
-- ✅ **Type Safety:** Shared TypeScript interfaces eliminate integration bugs  
+- ✅ **Type Safety:** Shared TypeScript interfaces eliminate integration bugs
 - ✅ **Developer Experience:** Reusable components reduce code duplication
 - ✅ **Maintainability:** Update design tokens once, applies everywhere
 
@@ -296,18 +299,15 @@ The mobile app automatically supports localhost development:
 To run the backend functions locally, you need to provide the Firebase Admin SDK with credentials via a service account key.
 
 1.  **Generate a Service Account Key:**
-
     - Navigate to your Firebase Console.
     - Go to **Project settings > Service accounts**.
     - Click the **Generate new private key** button and download the JSON file.
 
 2.  **Add the Key to the Project:**
-
     - Rename the downloaded JSON file to `service-account-key.json`.
     - Place this file in the **`packages/backend/`** directory.
 
 3.  **Secure the Key:**
-
     - **Crucially**, add `service-account-key.json` to the `.gitignore` file in your `packages/backend` directory. This prevents sensitive credentials from being committed to the repository.
 
     ```
@@ -381,12 +381,10 @@ Here is the complete workflow to test your authentication functions:
 Before running the mobile app, you need to set up wallet connection capabilities:
 
 1. **Create a Reown Cloud Account:**
-
    - Visit [cloud.reown.com](https://cloud.reown.com) and create an account.
    - Create a new project and note your **Project ID**.
 
 2. **Update Environment Variables:**
-
    - Add your Reown Project ID to `apps/mobile/.env`:
 
    ```

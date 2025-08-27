@@ -14,7 +14,7 @@ export const useAuthStateSynchronization = () => {
   const { authenticationStore, walletStore } = useStores()
   const firebaseAuth = useFirebaseAuth()
   const { isConnected, address } = useAccount()
-  
+
   // Ref to track if sync is in progress to prevent loops
   const isSyncInProgressRef = useRef(false)
 
@@ -46,7 +46,7 @@ export const useAuthStateSynchronization = () => {
         devOnly('⚠️  Firebase authenticated but wallet disconnected - clearing Firebase auth')
 
         isSyncInProgressRef.current = true
-        
+
         // Clear Firebase authentication to maintain consistency
         FIREBASE_AUTH.signOut()
           .then(() => {

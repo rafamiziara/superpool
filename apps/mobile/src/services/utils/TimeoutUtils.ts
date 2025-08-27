@@ -6,11 +6,7 @@ export class TimeoutUtils {
   /**
    * Wraps a promise with a timeout that rejects after specified milliseconds
    */
-  static withTimeout<T>(
-    promise: Promise<T>,
-    timeoutMs: number,
-    operation: string = 'Operation'
-  ): Promise<T> {
+  static withTimeout<T>(promise: Promise<T>, timeoutMs: number, operation: string = 'Operation'): Promise<T> {
     const timeoutPromise = new Promise<never>((_, reject) => {
       setTimeout(() => {
         reject(new Error(`${operation} timed out after ${timeoutMs / 1000} seconds`))
@@ -78,23 +74,23 @@ export class TimeoutUtils {
    */
   static readonly TIMEOUTS = {
     // Signature timeouts
-    PERSONAL_SIGN: 15000,        // 15s for regular wallets
-    TYPED_DATA_SIGN: 15000,      // 15s for EIP-712 signing  
-    SAFE_WALLET_SIGN: 20000,     // 20s for Safe wallets
+    PERSONAL_SIGN: 15000, // 15s for regular wallets
+    TYPED_DATA_SIGN: 15000, // 15s for EIP-712 signing
+    SAFE_WALLET_SIGN: 20000, // 20s for Safe wallets
 
     // Network timeouts
-    FIREBASE_CALL: 10000,        // 10s for Firebase function calls
-    SESSION_CLEANUP: 15000,      // 15s for session cleanup operations
-    
+    FIREBASE_CALL: 10000, // 10s for Firebase function calls
+    SESSION_CLEANUP: 15000, // 15s for session cleanup operations
+
     // UI feedback timeouts
-    SUCCESS_TOAST: 3000,         // 3s for success messages
-    ERROR_TOAST_IMMEDIATE: 0,    // Immediate error display
+    SUCCESS_TOAST: 3000, // 3s for success messages
+    ERROR_TOAST_IMMEDIATE: 0, // Immediate error display
     ERROR_TOAST_AFTER_DISCONNECT: 2000, // 2s delay after disconnect
     ERROR_TOAST_USER_ACTION: 1500, // 1.5s delay for user actions
 
     // Connection timeouts
-    WALLET_CONNECT: 30000,       // 30s for wallet connection
-    AUTHENTICATION: 120000,      // 2 minutes for full auth flow
+    WALLET_CONNECT: 30000, // 30s for wallet connection
+    AUTHENTICATION: 120000, // 2 minutes for full auth flow
   } as const
 
   /**

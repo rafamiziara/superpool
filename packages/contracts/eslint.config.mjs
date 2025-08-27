@@ -4,25 +4,25 @@ import rootConfig from '../../eslint.config.mjs'
 export default [
   // Extend root configuration
   ...rootConfig,
-  
+
   // Contracts specific configuration
   {
     files: ['**/*.{js,ts}'],
     languageOptions: {
       globals: {
         ...globals.node,
-        ...globals.mocha
+        ...globals.mocha,
       },
       parserOptions: {
         ecmaVersion: 2020,
-        sourceType: 'module'
-      }
+        sourceType: 'module',
+      },
     },
     rules: {
       // Contracts specific rules
       '@typescript-eslint/no-unused-vars': 'error',
       '@typescript-eslint/no-explicit-any': 'warn',
-      'prefer-const': 'error'
-    }
-  }
+      'prefer-const': 'error',
+    },
+  },
 ]

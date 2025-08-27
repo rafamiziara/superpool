@@ -16,11 +16,7 @@ interface StoreProviderProps {
 }
 
 export const StoreProvider: React.FC<StoreProviderProps> = ({ children }) => {
-  return (
-    <StoreContext.Provider value={rootStore}>
-      {children}
-    </StoreContext.Provider>
-  )
+  return <StoreContext.Provider value={rootStore}>{children}</StoreContext.Provider>
 }
 
 /**
@@ -29,11 +25,11 @@ export const StoreProvider: React.FC<StoreProviderProps> = ({ children }) => {
  */
 export const useStore = (): RootStore => {
   const store = useContext(StoreContext)
-  
+
   if (!store) {
     throw new Error('useStore must be used within a StoreProvider')
   }
-  
+
   return store
 }
 
@@ -61,7 +57,7 @@ export const useUIStore = () => {
  */
 export const useStores = () => {
   const rootStore = useStore()
-  
+
   return {
     authenticationStore: rootStore.authenticationStore,
     walletStore: rootStore.walletStore,

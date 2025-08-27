@@ -22,15 +22,7 @@ const inputSizes = {
 }
 
 export const Input = React.forwardRef<HTMLInputElement, InputProps>(
-  ({ 
-    className, 
-    variant = 'default',
-    inputSize = 'md',
-    error = false,
-    leftAddon,
-    rightAddon,
-    ...props 
-  }, ref) => {
+  ({ className, variant = 'default', inputSize = 'md', error = false, leftAddon, rightAddon, ...props }, ref) => {
     const inputElement = (
       <input
         className={cn(

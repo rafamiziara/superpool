@@ -1,117 +1,147 @@
 #!/usr/bin/env node
 
 /* eslint-disable @typescript-eslint/no-var-requires */
-const fs = require('fs');
-const path = require('path');
-const { execSync } = require('child_process');
+const fs = require('fs')
+const path = require('path')
+const { execSync } = require('child_process')
 
 // Paths
-const rootDir = process.cwd();
-const coverageDir = path.join(rootDir, 'coverage');
-const mergedDir = path.join(coverageDir, 'merged');
-const tempDir = path.join(coverageDir, '.nyc_output');
+const rootDir = process.cwd()
+const coverageDir = path.join(rootDir, 'coverage')
+const mergedDir = path.join(coverageDir, 'merged')
+const tempDir = path.join(coverageDir, '.nyc_output')
 
 // Create directories
 if (!fs.existsSync(mergedDir)) {
-  fs.mkdirSync(mergedDir, { recursive: true });
+  fs.mkdirSync(mergedDir, { recursive: true })
 }
 if (!fs.existsSync(tempDir)) {
-  fs.mkdirSync(tempDir, { recursive: true });
+  fs.mkdirSync(tempDir, { recursive: true })
 }
 
-console.log('📊 Merging coverage reports...');
+console.log('📊 Merging coverage reports...')
 
 // Find all lcov.info files (excluding merged directory to avoid recursion)
-const lcovFiles = [];
+const lcovFiles = []
 const findLcovFiles = (dir) => {
-  const items = fs.readdirSync(dir, { withFileTypes: true });
+  const items = fs.readdirSync(dir, { withFileTypes: true })
   for (const item of items) {
     if (item.isDirectory() && item.name !== 'merged' && item.name !== '.nyc_output') {
-      findLcovFiles(path.join(dir, item.name));
+      findLcovFiles(path.join(dir, item.name))
     } else if (item.name === 'lcov.info') {
-      lcovFiles.push(path.join(dir, item.name));
+      lcovFiles.push(path.join(dir, item.name))
     }
   }
-};
+}
 
-findLcovFiles(coverageDir);
+findLcovFiles(coverageDir)
 
-console.log(`📁 Found ${lcovFiles.length} LCOV files:`);
-lcovFiles.forEach(file => {
-  console.log(`   - ${path.relative(rootDir, file)}`);
-});
+console.log(`📁 Found ${lcovFiles.length} LCOV files:`)
+lcovFiles.forEach((file) => {
+  console.log(`   - ${path.relative(rootDir, file)}`)
+})
 
 if (lcovFiles.length === 0) {
-  console.log('❌ No LCOV files found. Run coverage tests first.');
-  process.exit(1);
+  console.log('❌ No LCOV files found. Run coverage tests first.')
+  process.exit(1)
 }
 
 // Merge LCOV files using lcov-result-merger if available, otherwise manual merge
 try {
   // Try to use genhtml from lcov package if available
   try {
-    const lcovMerged = path.join(mergedDir, 'lcov.info');
-    
+    const lcovMerged = path.join(mergedDir, 'lcov.info')
+
     // Simple concatenation for LCOV files (works for most cases)
-    let mergedContent = '';
-    lcovFiles.forEach(file => {
-      const content = fs.readFileSync(file, 'utf8');
-      mergedContent += content + '\n';
-    });
-    
-    fs.writeFileSync(lcovMerged, mergedContent);
-    
+    let mergedContent = ''
+    lcovFiles.forEach((file) => {
+      const content = fs.readFileSync(file, 'utf8')
+      mergedContent += content + '\n'
+    })
+
+    fs.writeFileSync(lcovMerged, mergedContent)
+
     // Generate HTML report using genhtml if available
     try {
-      execSync(`genhtml --output-directory "${mergedDir}" --title "SuperPool Coverage Report" "${lcovMerged}"`, { stdio: 'inherit' });
-      console.log('✅ HTML coverage report generated using genhtml');
+      execSync(`genhtml --output-directory "${mergedDir}" --title "SuperPool Coverage Report" "${lcovMerged}"`, { stdio: 'inherit' })
+      console.log('✅ HTML coverage report generated using genhtml')
     } catch (error) {
-      console.log('⚠️  genhtml not available, using basic merge');
-      
+      console.log('⚠️  genhtml not available, using basic merge')
+
       // Parse LCOV files to get coverage metrics
       const parseLcovFile = (filePath) => {
         try {
-          const content = fs.readFileSync(filePath, 'utf8');
-          let totalLines = 0, coveredLines = 0, totalFunctions = 0, coveredFunctions = 0, totalBranches = 0, coveredBranches = 0;
-          
-          const lines = content.split('\n');
+          const content = fs.readFileSync(filePath, 'utf8')
+          let totalLines = 0,
+            coveredLines = 0,
+            totalFunctions = 0,
+            coveredFunctions = 0,
+            totalBranches = 0,
+            coveredBranches = 0
+
+          const lines = content.split('\n')
           for (const line of lines) {
-            if (line.startsWith('LF:')) totalLines += parseInt(line.split(':')[1]);
-            if (line.startsWith('LH:')) coveredLines += parseInt(line.split(':')[1]);
-            if (line.startsWith('FNF:')) totalFunctions += parseInt(line.split(':')[1]);
-            if (line.startsWith('FNH:')) coveredFunctions += parseInt(line.split(':')[1]);
-            if (line.startsWith('BRF:')) totalBranches += parseInt(line.split(':')[1]);
-            if (line.startsWith('BRH:')) coveredBranches += parseInt(line.split(':')[1]);
+            if (line.startsWith('LF:')) totalLines += parseInt(line.split(':')[1])
+            if (line.startsWith('LH:')) coveredLines += parseInt(line.split(':')[1])
+            if (line.startsWith('FNF:')) totalFunctions += parseInt(line.split(':')[1])
+            if (line.startsWith('FNH:')) coveredFunctions += parseInt(line.split(':')[1])
+            if (line.startsWith('BRF:')) totalBranches += parseInt(line.split(':')[1])
+            if (line.startsWith('BRH:')) coveredBranches += parseInt(line.split(':')[1])
           }
-          
+
           return {
-            lines: { total: totalLines, covered: coveredLines, percent: totalLines ? (coveredLines / totalLines * 100).toFixed(1) : 0 },
-            functions: { total: totalFunctions, covered: coveredFunctions, percent: totalFunctions ? (coveredFunctions / totalFunctions * 100).toFixed(1) : 0 },
-            branches: { total: totalBranches, covered: coveredBranches, percent: totalBranches ? (coveredBranches / totalBranches * 100).toFixed(1) : 0 }
-          };
+            lines: { total: totalLines, covered: coveredLines, percent: totalLines ? ((coveredLines / totalLines) * 100).toFixed(1) : 0 },
+            functions: {
+              total: totalFunctions,
+              covered: coveredFunctions,
+              percent: totalFunctions ? ((coveredFunctions / totalFunctions) * 100).toFixed(1) : 0,
+            },
+            branches: {
+              total: totalBranches,
+              covered: coveredBranches,
+              percent: totalBranches ? ((coveredBranches / totalBranches) * 100).toFixed(1) : 0,
+            },
+          }
         } catch (error) {
-          return { lines: { total: 0, covered: 0, percent: 0 }, functions: { total: 0, covered: 0, percent: 0 }, branches: { total: 0, covered: 0, percent: 0 } };
+          return {
+            lines: { total: 0, covered: 0, percent: 0 },
+            functions: { total: 0, covered: 0, percent: 0 },
+            branches: { total: 0, covered: 0, percent: 0 },
+          }
         }
-      };
+      }
 
       // Get coverage metrics for each package
-      const backendCoverage = parseLcovFile(path.join(coverageDir, 'backend', 'lcov.info'));
-      const mobileCoverage = parseLcovFile(path.join(coverageDir, 'mobile', 'lcov.info'));
-      const contractsCoverage = parseLcovFile(path.join(coverageDir, 'contracts', 'lcov.info'));
-      
+      const backendCoverage = parseLcovFile(path.join(coverageDir, 'backend', 'lcov.info'))
+      const mobileCoverage = parseLcovFile(path.join(coverageDir, 'mobile', 'lcov.info'))
+      const contractsCoverage = parseLcovFile(path.join(coverageDir, 'contracts', 'lcov.info'))
+
       // Calculate overall metrics
-      const totalLines = backendCoverage.lines.total + mobileCoverage.lines.total + contractsCoverage.lines.total;
-      const totalCoveredLines = backendCoverage.lines.covered + mobileCoverage.lines.covered + contractsCoverage.lines.covered;
-      const totalFunctions = backendCoverage.functions.total + mobileCoverage.functions.total + contractsCoverage.functions.total;
-      const totalCoveredFunctions = backendCoverage.functions.covered + mobileCoverage.functions.covered + contractsCoverage.functions.covered;
-      const totalBranches = backendCoverage.branches.total + mobileCoverage.branches.total + contractsCoverage.branches.total;
-      const totalCoveredBranches = backendCoverage.branches.covered + mobileCoverage.branches.covered + contractsCoverage.branches.covered;
-      
+      const totalLines = backendCoverage.lines.total + mobileCoverage.lines.total + contractsCoverage.lines.total
+      const totalCoveredLines = backendCoverage.lines.covered + mobileCoverage.lines.covered + contractsCoverage.lines.covered
+      const totalFunctions = backendCoverage.functions.total + mobileCoverage.functions.total + contractsCoverage.functions.total
+      const totalCoveredFunctions =
+        backendCoverage.functions.covered + mobileCoverage.functions.covered + contractsCoverage.functions.covered
+      const totalBranches = backendCoverage.branches.total + mobileCoverage.branches.total + contractsCoverage.branches.total
+      const totalCoveredBranches = backendCoverage.branches.covered + mobileCoverage.branches.covered + contractsCoverage.branches.covered
+
       const overallCoverage = {
-        lines: { total: totalLines, covered: totalCoveredLines, percent: totalLines ? (totalCoveredLines / totalLines * 100).toFixed(1) : 0 },
-        functions: { total: totalFunctions, covered: totalCoveredFunctions, percent: totalFunctions ? (totalCoveredFunctions / totalFunctions * 100).toFixed(1) : 0 },
-        branches: { total: totalBranches, covered: totalCoveredBranches, percent: totalBranches ? (totalCoveredBranches / totalBranches * 100).toFixed(1) : 0 }
-      };
+        lines: {
+          total: totalLines,
+          covered: totalCoveredLines,
+          percent: totalLines ? ((totalCoveredLines / totalLines) * 100).toFixed(1) : 0,
+        },
+        functions: {
+          total: totalFunctions,
+          covered: totalCoveredFunctions,
+          percent: totalFunctions ? ((totalCoveredFunctions / totalFunctions) * 100).toFixed(1) : 0,
+        },
+        branches: {
+          total: totalBranches,
+          covered: totalCoveredBranches,
+          percent: totalBranches ? ((totalCoveredBranches / totalBranches) * 100).toFixed(1) : 0,
+        },
+      }
 
       // Create enhanced dashboard with metrics and progress bars
       const indexHtml = `
@@ -298,7 +328,9 @@ try {
                     <h3 class="package-title">🔗 Smart Contracts</h3>
                 </div>
                 <div class="package-content">
-                    ${contractsCoverage.lines.total > 0 ? `
+                    ${
+                      contractsCoverage.lines.total > 0
+                        ? `
                     <div class="metric-row">
                         <span class="metric-label">Lines Coverage</span>
                         <span class="metric-value">${contractsCoverage.lines.percent}%</span>
@@ -325,13 +357,15 @@ try {
                         <div class="progress-fill progress-${contractsCoverage.branches.percent >= 90 ? 'excellent' : contractsCoverage.branches.percent >= 70 ? 'good' : contractsCoverage.branches.percent >= 50 ? 'fair' : 'poor'}" 
                              style="width: ${contractsCoverage.branches.percent}%"></div>
                     </div>
-                    ` : `
+                    `
+                        : `
                     <p style="color: #64748b; margin: 15px 0;">Contract coverage will be displayed after running tests.</p>
                     <div style="background: #fef3c7; border: 1px solid #fbbf24; border-radius: 6px; padding: 12px; margin: 15px 0;">
                         <strong>💡 To generate contract coverage:</strong><br>
                         <code style="background: #fff; padding: 2px 6px; border-radius: 3px;">pnpm test:contracts:coverage</code>
                     </div>
-                    `}
+                    `
+                    }
                     
                     <div class="links">
                         <a href="../contracts/index.html" class="btn">📊 View Contract Report</a>
@@ -346,60 +380,58 @@ try {
         </div>
     </div>
 </body>
-</html>`;
-      
-      fs.writeFileSync(path.join(mergedDir, 'index.html'), indexHtml);
-      console.log('✅ Basic merged coverage dashboard created');
-      
+</html>`
+
+      fs.writeFileSync(path.join(mergedDir, 'index.html'), indexHtml)
+      console.log('✅ Basic merged coverage dashboard created')
+
       // Add "Go Home" buttons to individual package reports
-      addGoHomeButtons();
+      addGoHomeButtons()
     }
-    
   } catch (error) {
-    console.error('❌ Error generating merged coverage:', error.message);
-    process.exit(1);
+    console.error('❌ Error generating merged coverage:', error.message)
+    process.exit(1)
   }
-  
 } catch (error) {
-  console.error('❌ Error merging coverage:', error.message);
-  process.exit(1);
+  console.error('❌ Error merging coverage:', error.message)
+  process.exit(1)
 }
 
 // Function to add "Go Home" buttons to individual coverage reports
 function addGoHomeButtons() {
-  const packages = ['backend', 'mobile', 'contracts'];
-  
-  packages.forEach(packageName => {
-    const packageCoverageDir = path.join(coverageDir, packageName);
-    let baseDir;
-    
+  const packages = ['backend', 'mobile', 'contracts']
+
+  packages.forEach((packageName) => {
+    const packageCoverageDir = path.join(coverageDir, packageName)
+    let baseDir
+
     // Determine the correct base directory for each package
     if (packageName === 'contracts') {
-      baseDir = packageCoverageDir;
+      baseDir = packageCoverageDir
     } else {
-      baseDir = path.join(packageCoverageDir, 'lcov-report');
+      baseDir = path.join(packageCoverageDir, 'lcov-report')
     }
-    
+
     if (fs.existsSync(baseDir)) {
       // Recursively process all HTML files in the coverage directory
-      processHTMLFiles(baseDir, packageName);
+      processHTMLFiles(baseDir, packageName)
     }
-  });
+  })
 }
 
 // Recursive function to process all HTML files in a directory
 function processHTMLFiles(dir, packageName) {
-  const items = fs.readdirSync(dir, { withFileTypes: true });
-  
+  const items = fs.readdirSync(dir, { withFileTypes: true })
+
   for (const item of items) {
-    const fullPath = path.join(dir, item.name);
-    
+    const fullPath = path.join(dir, item.name)
+
     if (item.isDirectory()) {
       // Recursively process subdirectories
-      processHTMLFiles(fullPath, packageName);
+      processHTMLFiles(fullPath, packageName)
     } else if (item.name.endsWith('.html')) {
       // Process HTML file
-      processHTMLFile(fullPath, packageName, dir);
+      processHTMLFile(fullPath, packageName, dir)
     }
   }
 }
@@ -407,28 +439,27 @@ function processHTMLFiles(dir, packageName) {
 // Function to process a single HTML file
 function processHTMLFile(htmlPath, packageName) {
   try {
-    let htmlContent = fs.readFileSync(htmlPath, 'utf8');
-    
+    let htmlContent = fs.readFileSync(htmlPath, 'utf8')
+
     // Skip if already processed
     if (htmlContent.includes('superpool-home-btn')) {
       // Remove existing CSS block
-      htmlContent = htmlContent.replace(/<style>[\s\S]*?superpool[\s\S]*?<\/style>/g, '');
+      htmlContent = htmlContent.replace(/<style>[\s\S]*?superpool[\s\S]*?<\/style>/g, '')
       // Remove existing button
-      htmlContent = htmlContent.replace(/<a[^>]*superpool-home-btn[^>]*>[\s\S]*?<\/a>/g, '');
+      htmlContent = htmlContent.replace(/<a[^>]*superpool-home-btn[^>]*>[\s\S]*?<\/a>/g, '')
       // Remove existing header
-      htmlContent = htmlContent.replace(/<div[^>]*superpool-header[^>]*>[\s\S]*?<\/div>/g, '');
+      htmlContent = htmlContent.replace(/<div[^>]*superpool-header[^>]*>[\s\S]*?<\/div>/g, '')
     }
-    
+
     // Calculate relative path back to merged dashboard
-    const relativePath = calculateRelativePath(htmlPath, packageName);
-    const packageTitle = packageName.charAt(0).toUpperCase() + packageName.slice(1);
-    const isContractsPage = packageName === 'contracts';
-    
+    const relativePath = calculateRelativePath(htmlPath, packageName)
+    const packageTitle = packageName.charAt(0).toUpperCase() + packageName.slice(1)
+    const isContractsPage = packageName === 'contracts'
+
     // Determine page title based on file path
-    const fileName = path.basename(htmlPath, '.html');
-    const pageTitle = fileName === 'index' ? `${packageTitle} Coverage Report` : 
-      `${packageTitle}: ${fileName.replace(/[_-]/g, ' ')}`;
-        
+    const fileName = path.basename(htmlPath, '.html')
+    const pageTitle = fileName === 'index' ? `${packageTitle} Coverage Report` : `${packageTitle}: ${fileName.replace(/[_-]/g, ' ')}`
+
     const buttonCSS = `
 <style>
 .superpool-header {
@@ -505,7 +536,7 @@ h1, h2 {
   padding: 20px !important;
   text-align: center !important;
 }
-</style>`;
+</style>`
 
     // Home button HTML with calculated relative path and proper header structure
     const headerHTML = `
@@ -514,66 +545,65 @@ h1, h2 {
   <a href="${relativePath}" class="superpool-home-btn">
     🏊‍♂️ SuperPool Dashboard
   </a>
-</div>`;
-    
+</div>`
+
     // Insert CSS before </head>
-    htmlContent = htmlContent.replace('</head>', buttonCSS + '\n</head>');
-    
+    htmlContent = htmlContent.replace('</head>', buttonCSS + '\n</head>')
+
     // Insert header structure inside the appropriate container for alignment
     if (isContractsPage) {
       // For contracts (solcover), insert inside the wrapper/bar container
-      const wrapperMatch = htmlContent.match(/<div class=['"]wrapper['"]>\s*<div class=['"]pad1['"]>/);
+      const wrapperMatch = htmlContent.match(/<div class=['"]wrapper['"]>\s*<div class=['"]pad1['"]>/)
       if (wrapperMatch) {
-        htmlContent = htmlContent.replace(wrapperMatch[0], wrapperMatch[0] + '\n' + headerHTML);
+        htmlContent = htmlContent.replace(wrapperMatch[0], wrapperMatch[0] + '\n' + headerHTML)
       } else {
         // Fallback: insert after body tag
         if (htmlContent.includes('<body>')) {
-          htmlContent = htmlContent.replace('<body>', '<body>' + headerHTML);
+          htmlContent = htmlContent.replace('<body>', '<body>' + headerHTML)
         }
       }
     } else {
       // For Jest reports, insert inside the wrapper container after pad1 div opens
-      const wrapperMatch = htmlContent.match(/<div class=['"]wrapper['"]>\s*<div class=['"]pad1['"]>/);
+      const wrapperMatch = htmlContent.match(/<div class=['"]wrapper['"]>\s*<div class=['"]pad1['"]>/)
       if (wrapperMatch) {
-        htmlContent = htmlContent.replace(wrapperMatch[0], wrapperMatch[0] + '\n' + headerHTML);
-        
+        htmlContent = htmlContent.replace(wrapperMatch[0], wrapperMatch[0] + '\n' + headerHTML)
+
         // Remove any existing h1 that might conflict
-        const h1Match = htmlContent.match(/<h1[^>]*>.*?<\/h1>/);
+        const h1Match = htmlContent.match(/<h1[^>]*>.*?<\/h1>/)
         if (h1Match) {
-          htmlContent = htmlContent.replace(h1Match[0], '');
+          htmlContent = htmlContent.replace(h1Match[0], '')
         }
       } else {
         // Fallback: replace h1 or insert after body
-        const h1Match = htmlContent.match(/<h1[^>]*>.*?<\/h1>/);
+        const h1Match = htmlContent.match(/<h1[^>]*>.*?<\/h1>/)
         if (h1Match) {
-          htmlContent = htmlContent.replace(h1Match[0], headerHTML);
+          htmlContent = htmlContent.replace(h1Match[0], headerHTML)
         } else {
           if (htmlContent.includes('<body>')) {
-            htmlContent = htmlContent.replace('<body>', '<body>' + headerHTML);
+            htmlContent = htmlContent.replace('<body>', '<body>' + headerHTML)
           }
         }
       }
     }
-    
-    fs.writeFileSync(htmlPath, htmlContent);
-    
+
+    fs.writeFileSync(htmlPath, htmlContent)
   } catch (error) {
-    console.log(`⚠️  Could not process ${htmlPath}: ${error.message}`);
+    console.log(`⚠️  Could not process ${htmlPath}: ${error.message}`)
   }
 }
 
 // Helper function to calculate relative path back to merged dashboard
 function calculateRelativePath(htmlPath) {
   // Calculate relative path from HTML file to the coverage/merged/index.html
-  const mergedPath = path.join(coverageDir, 'merged', 'index.html');
-  const relativePath = path.relative(path.dirname(htmlPath), path.dirname(mergedPath));
-  
+  const mergedPath = path.join(coverageDir, 'merged', 'index.html')
+  const relativePath = path.relative(path.dirname(htmlPath), path.dirname(mergedPath))
+
   // Normalize path separators for web URLs
-  const webPath = relativePath.replace(/\\/g, '/');
-  
+  const webPath = relativePath.replace(/\\/g, '/')
+
   // Add the final file name
-  return webPath + '/index.html';
+  return webPath + '/index.html'
 }
 
-console.log(`📈 Merged coverage report available at: ${path.relative(rootDir, path.join(mergedDir, 'index.html'))}`);
-console.log('📊 Run \'pnpm run coverage:open\' to view in browser');
+console.log(`📈 Merged coverage report available at: ${path.relative(rootDir, path.join(mergedDir, 'index.html'))}`)
+console.log("📊 Run 'pnpm run coverage:open' to view in browser")

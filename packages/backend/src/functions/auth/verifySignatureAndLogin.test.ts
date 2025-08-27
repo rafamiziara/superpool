@@ -339,12 +339,15 @@ describe('verifySignatureAndLoginHandler', () => {
 
     // Assert
     expect(mockApproveDevice).toHaveBeenCalledWith(deviceId, walletAddress, platform)
-    expect(loggerSpy).toHaveBeenCalledWith('Failed to approve device', expect.objectContaining({
-      error: expect.any(Error),
-      deviceId,
-      walletAddress,
-      signatureType: 'personal-sign'
-    }))
+    expect(loggerSpy).toHaveBeenCalledWith(
+      'Failed to approve device',
+      expect.objectContaining({
+        error: expect.any(Error),
+        deviceId,
+        walletAddress,
+        signatureType: 'personal-sign',
+      })
+    )
     expect(result).toEqual({ firebaseToken })
 
     loggerSpy.mockRestore()
@@ -550,7 +553,7 @@ describe('verifySignatureAndLoginHandler', () => {
     // Arrange
     const request = { data: { walletAddress, signature } }
     const nonErrorObject = { code: 'CUSTOM_ERROR', details: 'Some custom error' }
-    
+
     jest.mocked(verifyMessage).mockImplementation(() => {
       throw nonErrorObject // Throw non-Error object
     })
@@ -565,7 +568,7 @@ describe('verifySignatureAndLoginHandler', () => {
     // Arrange
     const request = { data: { walletAddress, signature } }
     const stringError = 'Custom string error'
-    
+
     jest.mocked(verifyMessage).mockImplementation(() => {
       throw stringError // Throw string
     })
@@ -579,7 +582,7 @@ describe('verifySignatureAndLoginHandler', () => {
   it('should handle null thrown during signature verification', async () => {
     // Arrange
     const request = { data: { walletAddress, signature } }
-    
+
     jest.mocked(verifyMessage).mockImplementation(() => {
       throw null // Throw null
     })

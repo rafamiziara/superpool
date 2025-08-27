@@ -11,11 +11,11 @@ export class AuthUtils {
   static generateNonce(length: number = 32): string {
     const charset = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789'
     let result = ''
-    
+
     for (let i = 0; i < length; i++) {
       result += charset.charAt(Math.floor(Math.random() * charset.length))
     }
-    
+
     return result
   }
 
@@ -153,11 +153,7 @@ export class AuthUtils {
   /**
    * Creates authentication request object
    */
-  static createAuthRequest(
-    walletAddress: string,
-    chainId?: number,
-    customNonce?: string
-  ): SignatureRequest {
+  static createAuthRequest(walletAddress: string, chainId?: number, customNonce?: string): SignatureRequest {
     const nonce = customNonce || this.generateNonce()
     const timestamp = Date.now()
     const message = this.createAuthMessage(walletAddress, nonce, timestamp)
@@ -179,7 +175,7 @@ export class AuthUtils {
     const ageMs = now - timestamp
     const ageSeconds = Math.floor(ageMs / 1000)
     const isExpired = ageMs > 600000 // 10 minutes
-    
+
     return { ageMs, ageSeconds, isExpired }
   }
 

@@ -19,12 +19,5 @@
     "sourceMap": true,
     "jsx": "react-jsx"
   },
-  "exclude": [
-    "node_modules",
-    "dist",
-    "build", 
-    "coverage",
-    "**/*.test.*",
-    "**/*.spec.*"
-  ]
+  "exclude": ["node_modules", "dist", "build", "coverage", "**/*.test.*", "**/*.spec.*"]
 }

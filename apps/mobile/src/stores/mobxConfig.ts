@@ -15,11 +15,11 @@ export const configureMobX = () => {
 
     // Less noisy development warnings
     computedRequiresReaction: false,
-    
+
     // Don't warn when observables are accessed outside reactive contexts
     // This is common in React Native and not always problematic
     reactionRequiresObservable: false,
-    
+
     // Don't warn about observable access outside reactive contexts
     // This reduces noise while still enforcing actions
     observableRequiresReaction: false,

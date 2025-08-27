@@ -19,11 +19,7 @@ export class SignatureUtils {
   /**
    * Wraps a signature promise with timeout handling
    */
-  static async withTimeout<T>(
-    signaturePromise: Promise<T>,
-    timeoutMs: number,
-    operation: string
-  ): Promise<T> {
+  static async withTimeout<T>(signaturePromise: Promise<T>, timeoutMs: number, operation: string): Promise<T> {
     const timeoutPromise = this.createTimeoutPromise(timeoutMs, operation)
     return await Promise.race([signaturePromise, timeoutPromise])
   }

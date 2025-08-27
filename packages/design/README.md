@@ -10,6 +10,7 @@ Our primary color palette emphasizes trust, professionalism, and financial stabi
 
 ```css
 /* Primary Colors */
+/* prettier-ignore */
 --primary: #2563eb        /* blue-600 - Primary actions, CTAs */
 --secondary: #0f172a      /* slate-900 - Text, headers */
 --accent: #06b6d4         /* cyan-500 - Highlights, links */
@@ -30,6 +31,7 @@ A modern, readable font combination optimized for fintech applications:
 
 ```css
 /* Primary Font - Content & UI */
+/* prettier-ignore */
 --font-primary: 'Plus Jakarta Sans', system-ui, sans-serif
 
 /* Secondary Font - Technical Data */
@@ -49,6 +51,7 @@ A modern, readable font combination optimized for fintech applications:
 
 ```css
 /* Base spacing unit: 4px */
+/* prettier-ignore */
 --spacing-xs: 0.25rem    /* 4px */
 --spacing-sm: 0.5rem     /* 8px */
 --spacing-md: 1rem       /* 16px */
@@ -72,6 +75,7 @@ A modern, readable font combination optimized for fintech applications:
 Subtle shadows for depth and layering:
 
 ```css
+/* prettier-ignore */
 --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05)
 --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1)
 --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1)
@@ -93,6 +97,7 @@ import { FontAwesome } from '@expo/vector-icons'
 ```
 
 **Recommended Icons by Context:**
+
 - **Wallet/Finance**: `wallet`, `credit-card`, `dollar-sign`, `arrow-up`, `arrow-down`
 - **Pools/Community**: `users`, `handshake`, `home`, `plus`
 - **Security**: `shield`, `lock`, `key`, `check-circle`

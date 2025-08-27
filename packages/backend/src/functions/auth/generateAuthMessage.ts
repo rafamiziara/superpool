@@ -42,13 +42,13 @@ export const generateAuthMessageHandler = async (request: CallableRequest<AuthMe
   // Construct the message to be signed
   const message = createAuthMessage(walletAddress, nonce, timestamp)
 
-  logger.info('Generated auth message data', { 
-    message: message.substring(0, 50) + '...', 
-    nonce, 
+  logger.info('Generated auth message data', {
+    message: message.substring(0, 50) + '...',
+    nonce,
     timestamp,
-    walletAddress 
+    walletAddress,
   })
-  
+
   return { message, nonce, timestamp }
 }
 

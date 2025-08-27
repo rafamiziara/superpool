@@ -2,7 +2,7 @@ module.exports = {
   preset: 'ts-jest',
   testEnvironment: 'jsdom',
   setupFilesAfterEnv: ['<rootDir>/src/setupTests.ts'],
-  
+
   // File patterns
   testPathIgnorePatterns: [
     '/node_modules/',
@@ -11,18 +11,21 @@ module.exports = {
     '/.expo/',
     '/src/app/', // Exclude Expo Router app directory
   ],
-  
+
   // TypeScript transformation
   transform: {
-    '^.+\\.(ts|tsx)$': ['ts-jest', {
-      tsconfig: 'tsconfig.json',
-    }],
+    '^.+\\.(ts|tsx)$': [
+      'ts-jest',
+      {
+        tsconfig: 'tsconfig.json',
+      },
+    ],
     // '^.+\\.(js|jsx)$': ['babel-jest', { configFile: './jest.babel.config.js' }],
   },
-  
+
   // File extensions
   moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx', 'json', 'node'],
-  
+
   // Coverage settings - exclude problematic files
   collectCoverageFrom: [
     'src/**/*.{ts,tsx}',
@@ -37,14 +40,12 @@ module.exports = {
   ],
   coverageDirectory: '<rootDir>/../../coverage/mobile',
   coverageReporters: ['lcov', 'text'],
-  
+
   // Module mapping for mocks
   moduleNameMapper: {
     '^@/(.*)$': '<rootDir>/src/$1',
   },
-  
+
   // Ignore transform for certain files
-  transformIgnorePatterns: [
-    'node_modules/(?!(expo|@expo|expo-router|@react-native|react-native|@react-navigation)/)',
-  ],
-};
+  transformIgnorePatterns: ['node_modules/(?!(expo|@expo|expo-router|@react-native|react-native|@react-navigation)/)'],
+}

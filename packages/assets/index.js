@@ -13,10 +13,10 @@ export const illustrations = {
 export const imagePaths = {
   illustrations: {
     walletAuth: '/images/illustrations/feature_1.png',
-    lendingPools: '/images/illustrations/feature_2.png', 
+    lendingPools: '/images/illustrations/feature_2.png',
     borrowing: '/images/illustrations/feature_3.png',
     multiSig: '/images/illustrations/feature_4.png',
-  }
+  },
 }
 
 // Legacy export for backward compatibility

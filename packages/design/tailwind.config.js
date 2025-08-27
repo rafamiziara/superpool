@@ -95,66 +95,56 @@ module.exports = {
           'Cantarell',
           'sans-serif',
         ],
-        secondary: [
-          'Space Mono',
-          'Fira Code',
-          'Courier New',
-          'monospace',
-        ],
-        accent: [
-          'Geist',
-          'system-ui',
-          '-apple-system',
-          'BlinkMacSystemFont',
-          'sans-serif',
-        ],
+        secondary: ['Space Mono', 'Fira Code', 'Courier New', 'monospace'],
+        accent: ['Geist', 'system-ui', '-apple-system', 'BlinkMacSystemFont', 'sans-serif'],
       },
+      /* prettier-ignore */
       spacing: {
-        '0.5': '0.125rem',  // 2px
-        '18': '4.5rem',     // 72px
-        '88': '22rem',      // 352px
-        '92': '23rem',      // 368px
-        '96': '24rem',      // 384px
-        '104': '26rem',     // 416px
-        '112': '28rem',     // 448px
-        '128': '32rem',     // 512px
+        0.5: '0.125rem',  // 2px
+        18: '4.5rem',     // 72px
+        88: '22rem',      // 352px
+        92: '23rem',      // 368px
+        96: '24rem',      // 384px
+        104: '26rem',     // 416px
+        112: '28rem',     // 448px
+        128: '32rem',     // 512px
       },
       borderRadius: {
-        'none': '0',
-        'sm': '0.375rem',   // 6px
-        'md': '0.5rem',     // 8px
-        'lg': '0.75rem',    // 12px
-        'xl': '1rem',       // 16px
-        '2xl': '1.5rem',    // 24px
-        'full': '9999px',
+        none: '0',
+        sm: '0.375rem',   // 6px
+        md: '0.5rem',     // 8px
+        lg: '0.75rem',    // 12px
+        xl: '1rem',       // 16px
+        '2xl': '1.5rem',  // 24px
+        full: '9999px',
       },
       boxShadow: {
-        'xs': '0 1px 2px 0 rgb(0 0 0 / 0.05)',
-        'sm': '0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1)',
-        'md': '0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1)',
-        'lg': '0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1)',
-        'xl': '0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1)',
+        xs: '0 1px 2px 0 rgb(0 0 0 / 0.05)',
+        sm: '0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1)',
+        md: '0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1)',
+        lg: '0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1)',
+        xl: '0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1)',
         '2xl': '0 25px 50px -12px rgb(0 0 0 / 0.25)',
       },
       transitionDuration: {
-        '75': '75ms',
-        '100': '100ms',
-        '150': '150ms',
-        '200': '200ms',
-        '300': '300ms',
-        '500': '500ms',
-        '700': '700ms',
-        '1000': '1000ms',
+        75: '75ms',
+        100: '100ms',
+        150: '150ms',
+        200: '200ms',
+        300: '300ms',
+        500: '500ms',
+        700: '700ms',
+        1000: '1000ms',
       },
       zIndex: {
-        'dropdown': '1000',
-        'sticky': '1020',
-        'fixed': '1030',
+        dropdown: '1000',
+        sticky: '1020',
+        fixed: '1030',
         'modal-backdrop': '1040',
-        'modal': '1050',
-        'popover': '1060',
-        'tooltip': '1070',
-      }
+        modal: '1050',
+        popover: '1060',
+        tooltip: '1070',
+      },
     },
   },
   plugins: [],
