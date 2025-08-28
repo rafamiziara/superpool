@@ -120,13 +120,13 @@ describe('useAuthentication', () => {
         mockStore.authenticationStore.authLock = {
           ...mockStore.authenticationStore.authLock,
           isLocked: true,
-          walletAddress: '0x1234567890123456789012345678901234567890'
+          walletAddress: '0x1234567890123456789012345678901234567890',
         }
         mockStore.authenticationStore.authError = {
           name: 'AppError',
           message: 'Test auth error',
           type: ErrorType.AUTHENTICATION_FAILED,
-          userFriendlyMessage: 'Test auth error'
+          userFriendlyMessage: 'Test auth error',
         } as AppError
       })
 
@@ -147,7 +147,7 @@ describe('useAuthentication', () => {
       runInAction(() => {
         mockStore.authenticationStore.authLock = {
           ...mockStore.authenticationStore.authLock,
-          isLocked: true
+          isLocked: true,
         }
       })
       rerender({})
@@ -158,7 +158,7 @@ describe('useAuthentication', () => {
       runInAction(() => {
         mockStore.authenticationStore.authLock = {
           ...mockStore.authenticationStore.authLock,
-          isLocked: false
+          isLocked: false,
         }
       })
       mockFirebaseAuth.isLoading = true
@@ -180,7 +180,7 @@ describe('useAuthentication', () => {
       runInAction(() => {
         mockStore.authenticationStore.authLock = {
           ...mockStore.authenticationStore.authLock,
-          walletAddress: '0x1111111111111111111111111111111111111111'
+          walletAddress: '0x1111111111111111111111111111111111111111',
         }
       })
       mockFirebaseAuth.walletAddress = '0x2222222222222222222222222222222222222222'
@@ -196,7 +196,7 @@ describe('useAuthentication', () => {
       runInAction(() => {
         mockStore.authenticationStore.authLock = {
           ...mockStore.authenticationStore.authLock,
-          walletAddress: '0x1111111111111111111111111111111111111111'
+          walletAddress: '0x1111111111111111111111111111111111111111',
         }
       })
       rerender({})
@@ -351,15 +351,15 @@ describe('useAuthentication', () => {
           name: 'AppError',
           message: 'Debug error',
           type: ErrorType.AUTHENTICATION_FAILED,
-          userFriendlyMessage: 'Debug error'
+          userFriendlyMessage: 'Debug error',
         } as AppError
         mockStore.authenticationStore.authLock = {
           ...mockStore.authenticationStore.authLock,
-          isLocked: true
+          isLocked: true,
         }
         mockStore.authenticationStore.authLock = {
           ...mockStore.authenticationStore.authLock,
-          walletAddress: '0x1234567890123456789012345678901234567890'
+          walletAddress: '0x1234567890123456789012345678901234567890',
         }
         mockStore.authenticationStore.currentStep = 'verify-signature'
         mockStore.authenticationStore.completedSteps.add('generate-message')
@@ -373,7 +373,7 @@ describe('useAuthentication', () => {
           name: 'AppError',
           message: 'Debug error',
           type: ErrorType.AUTHENTICATION_FAILED,
-          userFriendlyMessage: 'Debug error'
+          userFriendlyMessage: 'Debug error',
         },
         isAuthenticating: true,
         authWalletAddress: '0x1234567890123456789012345678901234567890',
@@ -416,7 +416,7 @@ describe('useAuthentication', () => {
       runInAction(() => {
         mockStore.authenticationStore.authLock = {
           ...mockStore.authenticationStore.authLock,
-          isLocked: true
+          isLocked: true,
         }
         mockStore.authenticationStore.currentStep = 'generate-message'
       })
@@ -439,7 +439,7 @@ describe('useAuthentication', () => {
       runInAction(() => {
         mockStore.authenticationStore.authLock = {
           ...mockStore.authenticationStore.authLock,
-          isLocked: false
+          isLocked: false,
         }
         mockStore.authenticationStore.currentStep = null
         mockStore.authenticationStore.completedSteps.add('request-signature')
@@ -476,7 +476,7 @@ describe('useAuthentication', () => {
         mockStore.authenticationStore.currentStep = null
         mockStore.authenticationStore.authLock = {
           ...mockStore.authenticationStore.authLock,
-          isLocked: false
+          isLocked: false,
         }
       })
       mockFirebaseAuth.isAuthenticated = true

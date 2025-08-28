@@ -45,15 +45,11 @@ export * from '@testing-library/react-native'
  */
 export { renderWithStore as render }
 
-
 /**
  * Custom renderHook function that wraps hooks with TestStoreProvider
  * This is the recommended way to test hooks that use MobX stores
  */
-export const renderHookWithStore = <TResult,>(
-  hook: () => TResult,
-  options: { store?: RootStore } = {}
-) => {
+export const renderHookWithStore = <TResult,>(hook: () => TResult, options: { store?: RootStore } = {}) => {
   const { store = createMockRootStore() } = options
 
   const Wrapper: React.FC<{ children: React.ReactNode }> = ({ children }) => {

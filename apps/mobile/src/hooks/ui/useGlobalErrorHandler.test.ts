@@ -27,10 +27,12 @@ describe('useGlobalErrorHandler', () => {
   const mockSessionManager = SessionManager as jest.Mocked<typeof SessionManager>
   let originalConsoleError: typeof console.error
   let consoleErrorSpy: jest.SpyInstance
+  let activeUnmountFunctions: (() => void)[] = []
 
   beforeEach(() => {
     jest.clearAllMocks()
     originalConsoleError = console.error
+    activeUnmountFunctions = []
 
     // Create spy for console.error to track calls
     consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation()
@@ -41,9 +43,26 @@ describe('useGlobalErrorHandler', () => {
   })
 
   afterEach(() => {
+    // Unmount all active hooks to prevent state leakage
+    activeUnmountFunctions.forEach((unmount) => {
+      try {
+        unmount()
+      } catch (e) {
+        // Ignore cleanup errors
+      }
+    })
+    activeUnmountFunctions = []
+
     console.error = originalConsoleError
     consoleErrorSpy.mockRestore()
   })
+
+  // Helper function to track unmount functions
+  const renderHookWithCleanup = (callback: () => any) => {
+    const result = renderHook(callback)
+    activeUnmountFunctions.push(result.unmount)
+    return result
+  }
 
   it('should initialize global error handler correctly', () => {
     const originalError = console.error
@@ -274,20 +293,20 @@ describe('useGlobalErrorHandler', () => {
     it('should prevent handling same error multiple times within 5 seconds', async () => {
       const logSpy = jest.spyOn(console, 'log').mockImplementation()
 
-      renderHook(() => useGlobalErrorHandler())
+      const { unmount } = renderHook(() => useGlobalErrorHandler())
 
       const errorMessage = 'WalletConnect session error: duplicate test'
 
       // First error should be handled
       console.error(errorMessage)
       await act(async () => {
-        await new Promise(resolve => setTimeout(resolve, 10))
+        await new Promise((resolve) => setTimeout(resolve, 10))
       })
 
       // Second identical error within 5 seconds should be ignored
       console.error(errorMessage)
       await act(async () => {
-        await new Promise(resolve => setTimeout(resolve, 10))
+        await new Promise((resolve) => setTimeout(resolve, 10))
       })
 
       // Should only detect once, but handleSessionCorruption should only be called once due to throttling
@@ -300,14 +319,14 @@ describe('useGlobalErrorHandler', () => {
     it('should allow handling same error after 5 second cooldown', async () => {
       const logSpy = jest.spyOn(console, 'log').mockImplementation()
 
-      renderHook(() => useGlobalErrorHandler())
+      renderHookWithCleanup(() => useGlobalErrorHandler())
 
       const errorMessage = 'WalletConnect session error: cooldown test'
 
       // First error
       console.error(errorMessage)
       await act(async () => {
-        await new Promise(resolve => setTimeout(resolve, 10))
+        await new Promise((resolve) => setTimeout(resolve, 10))
       })
 
       // Advance time by 6 seconds (past 5 second cooldown)
@@ -316,7 +335,7 @@ describe('useGlobalErrorHandler', () => {
       // Second identical error after cooldown should be handled
       console.error(errorMessage)
       await act(async () => {
-        await new Promise(resolve => setTimeout(resolve, 10))
+        await new Promise((resolve) => setTimeout(resolve, 10))
       })
 
       expect(mockSessionManager.detectSessionCorruption).toHaveBeenCalledTimes(2)
@@ -329,22 +348,20 @@ describe('useGlobalErrorHandler', () => {
       const logSpy = jest.spyOn(console, 'log').mockImplementation()
 
       // Make handleSessionCorruption slow to test concurrent handling prevention
-      mockSessionManager.handleSessionCorruption.mockImplementation(() => 
-        new Promise(resolve => setTimeout(resolve, 1000))
-      )
+      mockSessionManager.handleSessionCorruption.mockImplementation(() => new Promise((resolve) => setTimeout(resolve, 1000)))
 
       renderHook(() => useGlobalErrorHandler())
 
       // First error starts handling
       console.error('WalletConnect session error: concurrent test 1')
       await act(async () => {
-        await new Promise(resolve => setTimeout(resolve, 10))
+        await new Promise((resolve) => setTimeout(resolve, 10))
       })
 
       // Second different error should be ignored because first is still handling
       console.error('WalletConnect session error: concurrent test 2')
       await act(async () => {
-        await new Promise(resolve => setTimeout(resolve, 10))
+        await new Promise((resolve) => setTimeout(resolve, 10))
       })
 
       // Should detect both but only handle the first
@@ -362,7 +379,7 @@ describe('useGlobalErrorHandler', () => {
       // Trigger error handling
       console.error('WalletConnect session error: timeout reset test')
       await act(async () => {
-        await new Promise(resolve => setTimeout(resolve, 10))
+        await new Promise((resolve) => setTimeout(resolve, 10))
       })
 
       // Advance time by 3 seconds to trigger timeout reset
@@ -373,7 +390,7 @@ describe('useGlobalErrorHandler', () => {
       // Now a new error should be handled (different message to avoid lastHandledError check)
       console.error('WalletConnect session error: new error after reset')
       await act(async () => {
-        await new Promise(resolve => setTimeout(resolve, 10))
+        await new Promise((resolve) => setTimeout(resolve, 10))
       })
 
       expect(mockSessionManager.handleSessionCorruption).toHaveBeenCalledTimes(2)
@@ -393,15 +410,11 @@ describe('useGlobalErrorHandler', () => {
       console.error('WalletConnect session error: Error object test')
 
       await act(async () => {
-        await new Promise(resolve => setTimeout(resolve, 10))
+        await new Promise((resolve) => setTimeout(resolve, 10))
       })
 
-      expect(mockSessionManager.detectSessionCorruption).toHaveBeenCalledWith(
-        'WalletConnect session error: Error object test'
-      )
-      expect(mockSessionManager.handleSessionCorruption).toHaveBeenCalledWith(
-        'WalletConnect session error: Error object test'
-      )
+      expect(mockSessionManager.detectSessionCorruption).toHaveBeenCalledWith('WalletConnect session error: Error object test')
+      expect(mockSessionManager.handleSessionCorruption).toHaveBeenCalledWith('WalletConnect session error: Error object test')
 
       logSpy.mockRestore()
     })
@@ -415,12 +428,10 @@ describe('useGlobalErrorHandler', () => {
       console.error('Session corruption detected')
 
       await act(async () => {
-        await new Promise(resolve => setTimeout(resolve, 10))
+        await new Promise((resolve) => setTimeout(resolve, 10))
       })
 
-      expect(mockSessionManager.detectSessionCorruption).toHaveBeenCalledWith(
-        'Session corruption detected'
-      )
+      expect(mockSessionManager.detectSessionCorruption).toHaveBeenCalledWith('Session corruption detected')
 
       logSpy.mockRestore()
     })
@@ -457,9 +468,7 @@ describe('useGlobalErrorHandler', () => {
       // Test various primitive types
       console.error(42, true, false, 'session error')
 
-      expect(mockSessionManager.detectSessionCorruption).toHaveBeenCalledWith(
-        '42 true false session error'
-      )
+      expect(mockSessionManager.detectSessionCorruption).toHaveBeenCalledWith('42 true false session error')
     })
   })
 
@@ -473,7 +482,7 @@ describe('useGlobalErrorHandler', () => {
       console.error(exactMessage)
 
       await act(async () => {
-        await new Promise(resolve => setTimeout(resolve, 10))
+        await new Promise((resolve) => setTimeout(resolve, 10))
       })
 
       expect(mockSessionManager.detectSessionCorruption).toHaveBeenCalledWith(exactMessage)
@@ -489,16 +498,14 @@ describe('useGlobalErrorHandler', () => {
 
       // We need to spy on the actual error calls made by the finally block
       // Since console.error is overridden by the hook, we'll track the original calls
-      mockSessionManager.handleSessionCorruption.mockRejectedValue(
-        new Error('SessionManager failure')
-      )
+      mockSessionManager.handleSessionCorruption.mockRejectedValue(new Error('SessionManager failure'))
 
       renderHook(() => useGlobalErrorHandler())
 
       console.error('WalletConnect session error: rejection test')
 
       await act(async () => {
-        await new Promise(resolve => setTimeout(resolve, 50))
+        await new Promise((resolve) => setTimeout(resolve, 50))
       })
 
       // The error should be caught and logged
@@ -519,7 +526,7 @@ describe('useGlobalErrorHandler', () => {
       console.error(longMessage)
 
       await act(async () => {
-        await new Promise(resolve => setTimeout(resolve, 10))
+        await new Promise((resolve) => setTimeout(resolve, 10))
       })
 
       expect(mockSessionManager.detectSessionCorruption).toHaveBeenCalledWith(longMessage)
@@ -538,7 +545,7 @@ describe('useGlobalErrorHandler', () => {
       }
 
       await act(async () => {
-        await new Promise(resolve => setTimeout(resolve, 10))
+        await new Promise((resolve) => setTimeout(resolve, 10))
       })
 
       // Should detect all, but only handle the first due to isHandling flag
@@ -552,16 +559,14 @@ describe('useGlobalErrorHandler', () => {
       const originalError = console.error
 
       // Mount first instance
-      const { unmount: unmount1 } = renderHook(() => useGlobalErrorHandler())
-      
+      const { unmount: unmount1 } = renderHookWithCleanup(() => useGlobalErrorHandler())
+
       // Mount second instance (should replace first)
-      const { unmount: unmount2 } = renderHook(() => useGlobalErrorHandler())
+      const { unmount: unmount2 } = renderHookWithCleanup(() => useGlobalErrorHandler())
 
       console.error('WalletConnect session error: multiple instances')
 
-      expect(mockSessionManager.detectSessionCorruption).toHaveBeenCalledWith(
-        'WalletConnect session error: multiple instances'
-      )
+      expect(mockSessionManager.detectSessionCorruption).toHaveBeenCalledWith('WalletConnect session error: multiple instances')
 
       // Cleanup
       unmount2()
@@ -584,22 +589,20 @@ describe('useGlobalErrorHandler', () => {
       const logSpy = jest.spyOn(console, 'log').mockImplementation()
 
       // Mock slow handling to test state tracking
-      mockSessionManager.handleSessionCorruption.mockImplementation(
-        () => new Promise(resolve => setTimeout(resolve, 1000))
-      )
+      mockSessionManager.handleSessionCorruption.mockImplementation(() => new Promise((resolve) => setTimeout(resolve, 1000)))
 
-      renderHook(() => useGlobalErrorHandler())
+      renderHookWithCleanup(() => useGlobalErrorHandler())
 
       // First error should start handling
       console.error('WalletConnect session error: state test 1')
       await act(async () => {
-        await new Promise(resolve => setTimeout(resolve, 10))
+        await new Promise((resolve) => setTimeout(resolve, 10))
       })
 
       // Second error should be blocked
       console.error('WalletConnect session error: state test 2')
       await act(async () => {
-        await new Promise(resolve => setTimeout(resolve, 10))
+        await new Promise((resolve) => setTimeout(resolve, 10))
       })
 
       expect(mockSessionManager.handleSessionCorruption).toHaveBeenCalledTimes(1)
@@ -617,7 +620,7 @@ describe('useGlobalErrorHandler', () => {
       // Now new error should be handled
       console.error('WalletConnect session error: state test 3')
       await act(async () => {
-        await new Promise(resolve => setTimeout(resolve, 10))
+        await new Promise((resolve) => setTimeout(resolve, 10))
       })
 
       expect(mockSessionManager.handleSessionCorruption).toHaveBeenCalledTimes(2)
@@ -628,7 +631,7 @@ describe('useGlobalErrorHandler', () => {
     it('should update lastHandledError and lastHandledTime correctly', async () => {
       const logSpy = jest.spyOn(console, 'log').mockImplementation()
 
-      renderHook(() => useGlobalErrorHandler())
+      renderHookWithCleanup(() => useGlobalErrorHandler())
 
       const error1 = 'WalletConnect session error: tracking test 1'
       const error2 = 'WalletConnect session error: tracking test 2'
@@ -636,19 +639,19 @@ describe('useGlobalErrorHandler', () => {
       // Handle first error
       console.error(error1)
       await act(async () => {
-        await new Promise(resolve => setTimeout(resolve, 10))
+        await new Promise((resolve) => setTimeout(resolve, 10))
       })
 
       // Same error within 5 seconds should be blocked
       console.error(error1)
       await act(async () => {
-        await new Promise(resolve => setTimeout(resolve, 10))
+        await new Promise((resolve) => setTimeout(resolve, 10))
       })
 
       // Different error should be blocked due to isHandling
       console.error(error2)
       await act(async () => {
-        await new Promise(resolve => setTimeout(resolve, 10))
+        await new Promise((resolve) => setTimeout(resolve, 10))
       })
 
       expect(mockSessionManager.handleSessionCorruption).toHaveBeenCalledTimes(1)

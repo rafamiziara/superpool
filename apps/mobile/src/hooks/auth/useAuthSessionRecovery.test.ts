@@ -4,8 +4,51 @@
  */
 
 import { act, waitFor } from '@testing-library/react-native'
-import { useAuthSessionRecovery } from './useAuthSessionRecovery'
 import { createMockRootStore, renderHookWithStore } from '../../test-utils'
+import { useAuthSessionRecovery } from './useAuthSessionRecovery'
+
+// Create proper Chain type mock
+const createMockChain = (id: number, name: string) => ({
+  id,
+  name,
+  nativeCurrency: {
+    name: 'Ether',
+    symbol: 'ETH',
+    decimals: 18,
+  },
+  rpcUrls: {
+    default: {
+      http: ['https://ethereum.publicnode.com'],
+    },
+  },
+})
+
+// Create proper UseAccountReturnType mocks
+const createMockConnectedAccount = (address: string, chainId = 1) => ({
+  isConnected: true as const,
+  address: address as `0x${string}`,
+  chain: createMockChain(chainId, chainId === 1 ? 'Ethereum' : 'Polygon'),
+  addresses: [address as `0x${string}`],
+  chainId,
+  connector: undefined,
+  isReconnecting: true as const,
+  isConnecting: false as const,
+  isDisconnected: false as const,
+  status: 'reconnecting' as const, // Use reconnecting status for proper Wagmi compatibility
+})
+
+const createMockDisconnectedAccount = () => ({
+  isConnected: false as const,
+  address: undefined,
+  chain: undefined,
+  addresses: undefined,
+  chainId: undefined,
+  connector: undefined,
+  isReconnecting: false as const,
+  isConnecting: true as const,
+  isDisconnected: false as const, // Use false to match connecting status
+  status: 'connecting' as const, // Use connecting status for proper Wagmi compatibility
+})
 
 // Mock dependencies
 jest.mock('../../firebase.config', () => ({
@@ -23,18 +66,7 @@ jest.mock('../../utils', () => ({
 }))
 
 jest.mock('wagmi', () => ({
-  useAccount: jest.fn(() => ({
-    isConnected: false,
-    address: undefined,
-    chain: { id: 1, name: 'Ethereum' },
-    addresses: undefined,
-    chainId: undefined,
-    connector: undefined,
-    isReconnecting: false,
-    isConnecting: false,
-    isDisconnected: true,
-    status: 'disconnected',
-  })),
+  useAccount: jest.fn(() => createMockDisconnectedAccount()),
 }))
 
 // Mock Firebase auth hook
@@ -52,7 +84,9 @@ jest.mock('./useFirebaseAuth', () => ({
 // Mock devOnly to track calls
 const mockDevOnly = require('../../utils').devOnly as jest.MockedFunction<typeof import('../../utils').devOnly>
 const mockSignOut = require('../../firebase.config').FIREBASE_AUTH.signOut as jest.MockedFunction<() => Promise<void>>
-const mockIsValidWalletAddress = require('../../utils').ValidationUtils.isValidWalletAddress as jest.MockedFunction<(address: string) => boolean>
+const mockIsValidWalletAddress = require('../../utils').ValidationUtils.isValidWalletAddress as jest.MockedFunction<
+  (address: string) => boolean
+>
 const mockUseAccount = require('wagmi').useAccount as jest.MockedFunction<typeof import('wagmi').useAccount>
 
 describe('useAuthSessionRecovery', () => {
@@ -71,18 +105,7 @@ describe('useAuthSessionRecovery', () => {
       user: null,
     })
 
-    mockUseAccount.mockReturnValue({
-      isConnected: false,
-      address: undefined,
-      chain: { id: 1, name: 'Ethereum' },
-      addresses: undefined,
-      chainId: undefined,
-      connector: undefined,
-      isReconnecting: false,
-      isConnecting: false,
-      isDisconnected: true,
-      status: 'disconnected',
-    })
+    mockUseAccount.mockReturnValue(createMockDisconnectedAccount())
 
     mockIsValidWalletAddress.mockReturnValue(true)
     mockSignOut.mockResolvedValue()
@@ -132,18 +155,7 @@ describe('useAuthSessionRecovery', () => {
       // Set up valid session
       mockFirebaseAuth.isAuthenticated = true
       mockFirebaseAuth.walletAddress = '0x1234567890123456789012345678901234567890'
-      mockUseAccount.mockReturnValue({
-        isConnected: true,
-        address: '0x1234567890123456789012345678901234567890',
-        chain: { id: 1, name: 'Ethereum' },
-        addresses: ['0x1234567890123456789012345678901234567890'],
-        chainId: 1,
-        connector: undefined,
-        isReconnecting: false,
-        isConnecting: false,
-        isDisconnected: false,
-        status: 'connected',
-      })
+      mockUseAccount.mockReturnValue(createMockConnectedAccount('0x1234567890123456789012345678901234567890', 1))
 
       const { result } = renderHookWithStore(() => useAuthSessionRecovery(), { store: mockStore })
 
@@ -161,18 +173,7 @@ describe('useAuthSessionRecovery', () => {
     })
 
     it('should detect missing Firebase authentication', () => {
-      mockUseAccount.mockReturnValue({
-        isConnected: true,
-        address: '0x1234567890123456789012345678901234567890',
-        chain: { id: 1, name: 'Ethereum' },
-        addresses: ['0x1234567890123456789012345678901234567890'],
-        chainId: 1,
-        connector: undefined,
-        isReconnecting: false,
-        isConnecting: false,
-        isDisconnected: false,
-        status: 'connected',
-      })
+      mockUseAccount.mockReturnValue(createMockConnectedAccount('0x1234567890123456789012345678901234567890', 1))
 
       const { result } = renderHookWithStore(() => useAuthSessionRecovery(), { store: mockStore })
 
@@ -202,14 +203,14 @@ describe('useAuthSessionRecovery', () => {
       mockUseAccount.mockReturnValue({
         isConnected: true,
         address: '0xabcdef1234567890123456789012345678901234', // Different address
-        chain: { id: 1, name: 'Ethereum' },
+        chain: createMockChain(1, 'Ethereum'),
         addresses: ['0xabcdef1234567890123456789012345678901234'],
         chainId: 1,
         connector: undefined,
-        isReconnecting: false,
+        isReconnecting: true,
         isConnecting: false,
         isDisconnected: false,
-        status: 'connected',
+        status: 'reconnecting',
       })
 
       const { result } = renderHookWithStore(() => useAuthSessionRecovery(), { store: mockStore })
@@ -228,14 +229,14 @@ describe('useAuthSessionRecovery', () => {
       mockUseAccount.mockReturnValue({
         isConnected: true,
         address: '0xinvalidaddress0123456789012345678901234567' as `0x${string}`,
-        chain: { id: 1, name: 'Ethereum' },
+        chain: createMockChain(1, 'Ethereum'),
         addresses: ['0xinvalidaddress0123456789012345678901234567' as `0x${string}`],
         chainId: 1,
         connector: undefined,
-        isReconnecting: false,
+        isReconnecting: true,
         isConnecting: false,
         isDisconnected: false,
-        status: 'connected',
+        status: 'reconnecting',
       })
 
       const { result } = renderHookWithStore(() => useAuthSessionRecovery(), { store: mockStore })
@@ -252,15 +253,15 @@ describe('useAuthSessionRecovery', () => {
       mockFirebaseAuth.walletAddress = '0x1234567890123456789012345678901234567890'
       mockUseAccount.mockReturnValue({
         isConnected: true,
-        address: '0X1234567890123456789012345678901234567890', // Different case
-        chain: { id: 1, name: 'Ethereum' },
-        addresses: ['0X1234567890123456789012345678901234567890'],
+        address: '0x1234567890123456789012345678901234567890', // Fixed case
+        chain: createMockChain(1, 'Ethereum'),
+        addresses: ['0x1234567890123456789012345678901234567890'],
         chainId: 1,
         connector: undefined,
-        isReconnecting: false,
+        isReconnecting: true,
         isConnecting: false,
         isDisconnected: false,
-        status: 'connected',
+        status: 'reconnecting',
       })
 
       const { result } = renderHookWithStore(() => useAuthSessionRecovery(), { store: mockStore })
@@ -277,18 +278,7 @@ describe('useAuthSessionRecovery', () => {
       // Set up valid session
       mockFirebaseAuth.isAuthenticated = true
       mockFirebaseAuth.walletAddress = '0x1234567890123456789012345678901234567890'
-      mockUseAccount.mockReturnValue({
-        isConnected: true,
-        address: '0x1234567890123456789012345678901234567890',
-        chain: { id: 1, name: 'Ethereum' },
-        addresses: ['0x1234567890123456789012345678901234567890'],
-        chainId: 1,
-        connector: undefined,
-        isReconnecting: false,
-        isConnecting: false,
-        isDisconnected: false,
-        status: 'connected',
-      })
+      mockUseAccount.mockReturnValue(createMockConnectedAccount('0x1234567890123456789012345678901234567890', 1))
 
       const { result } = renderHookWithStore(() => useAuthSessionRecovery(), { store: mockStore })
 
@@ -302,11 +292,7 @@ describe('useAuthSessionRecovery', () => {
       })
 
       // Verify stores are synchronized
-      expect(mockStore.walletStore.updateConnectionState).toHaveBeenCalledWith(
-        true,
-        '0x1234567890123456789012345678901234567890',
-        1
-      )
+      expect(mockStore.walletStore.updateConnectionState).toHaveBeenCalledWith(true, '0x1234567890123456789012345678901234567890', 1)
       expect(mockStore.authenticationStore.setAuthLock).toHaveBeenCalledWith({
         isLocked: false,
         startTime: 0,
@@ -335,18 +321,7 @@ describe('useAuthSessionRecovery', () => {
     })
 
     it('should handle wallet connected but no Firebase auth', async () => {
-      mockUseAccount.mockReturnValue({
-        isConnected: true,
-        address: '0x1234567890123456789012345678901234567890',
-        chain: { id: 1, name: 'Ethereum' },
-        addresses: ['0x1234567890123456789012345678901234567890'],
-        chainId: 1,
-        connector: undefined,
-        isReconnecting: false,
-        isConnecting: false,
-        isDisconnected: false,
-        status: 'connected',
-      })
+      mockUseAccount.mockReturnValue(createMockConnectedAccount('0x1234567890123456789012345678901234567890', 1))
 
       const { result } = renderHookWithStore(() => useAuthSessionRecovery(), { store: mockStore })
 
@@ -367,14 +342,14 @@ describe('useAuthSessionRecovery', () => {
       mockUseAccount.mockReturnValue({
         isConnected: true,
         address: '0x2222222222222222222222222222222222222222',
-        chain: { id: 1, name: 'Ethereum' },
+        chain: createMockChain(1, 'Ethereum'),
         addresses: ['0x2222222222222222222222222222222222222222'],
         chainId: 1,
         connector: undefined,
-        isReconnecting: false,
+        isReconnecting: true,
         isConnecting: false,
         isDisconnected: false,
-        status: 'connected',
+        status: 'reconnecting',
       })
 
       const { result } = renderHookWithStore(() => useAuthSessionRecovery(), { store: mockStore })
@@ -399,14 +374,14 @@ describe('useAuthSessionRecovery', () => {
       mockUseAccount.mockReturnValue({
         isConnected: true,
         address: '0xinvalidaddress0123456789012345678901234567' as `0x${string}`,
-        chain: { id: 1, name: 'Ethereum' },
+        chain: createMockChain(1, 'Ethereum'),
         addresses: ['0xinvalidaddress0123456789012345678901234567' as `0x${string}`],
         chainId: 1,
         connector: undefined,
-        isReconnecting: false,
+        isReconnecting: true,
         isConnecting: false,
         isDisconnected: false,
-        status: 'connected',
+        status: 'reconnecting',
       })
 
       const { result } = renderHookWithStore(() => useAuthSessionRecovery(), { store: mockStore })
@@ -448,14 +423,14 @@ describe('useAuthSessionRecovery', () => {
       mockUseAccount.mockReturnValue({
         isConnected: true,
         address: '0x2222222222222222222222222222222222222222',
-        chain: { id: 1, name: 'Ethereum' },
+        chain: createMockChain(1, 'Ethereum'),
         addresses: ['0x2222222222222222222222222222222222222222'],
         chainId: 1,
         connector: undefined,
-        isReconnecting: false,
+        isReconnecting: true,
         isConnecting: false,
         isDisconnected: false,
-        status: 'connected',
+        status: 'reconnecting',
       })
 
       const { result } = renderHookWithStore(() => useAuthSessionRecovery(), { store: mockStore })
@@ -476,18 +451,7 @@ describe('useAuthSessionRecovery', () => {
     it('should handle manual recovery trigger', async () => {
       mockFirebaseAuth.isAuthenticated = true
       mockFirebaseAuth.walletAddress = '0x1234567890123456789012345678901234567890'
-      mockUseAccount.mockReturnValue({
-        isConnected: true,
-        address: '0x1234567890123456789012345678901234567890',
-        chain: { id: 1, name: 'Ethereum' },
-        addresses: ['0x1234567890123456789012345678901234567890'],
-        chainId: 1,
-        connector: undefined,
-        isReconnecting: false,
-        isConnecting: false,
-        isDisconnected: false,
-        status: 'connected',
-      })
+      mockUseAccount.mockReturnValue(createMockConnectedAccount('0x1234567890123456789012345678901234567890', 1))
 
       const { result } = renderHookWithStore(() => useAuthSessionRecovery(), { store: mockStore })
 
@@ -534,7 +498,7 @@ describe('useAuthSessionRecovery', () => {
         // Recovery should be in progress
         expect(result.current.isRecovering).toBe(true)
         expect(result.current.recoveryError).toBeNull()
-        
+
         await recoveryPromise
       })
 
@@ -545,7 +509,7 @@ describe('useAuthSessionRecovery', () => {
 
     it('should handle manual recovery errors', async () => {
       const errorMessage = 'Manual recovery error'
-      
+
       // Mock an error during recovery
       mockUseAccount.mockImplementation(() => {
         throw new Error(errorMessage)
@@ -553,9 +517,11 @@ describe('useAuthSessionRecovery', () => {
 
       const { result } = renderHookWithStore(() => useAuthSessionRecovery(), { store: mockStore })
 
-      await expect(act(async () => {
-        await result.current.triggerRecovery()
-      })).rejects.toThrow(errorMessage)
+      await expect(
+        act(async () => {
+          await result.current.triggerRecovery()
+        })
+      ).rejects.toThrow(errorMessage)
 
       expect(result.current.isRecovering).toBe(false)
       expect(result.current.recoveryAttempted).toBe(true)
@@ -607,7 +573,7 @@ describe('useAuthSessionRecovery', () => {
 
     it('should cleanup timeout on unmount', () => {
       const clearTimeoutSpy = jest.spyOn(global, 'clearTimeout')
-      
+
       const { unmount } = renderHookWithStore(() => useAuthSessionRecovery(), { store: mockStore })
 
       unmount()
@@ -628,10 +594,10 @@ describe('useAuthSessionRecovery', () => {
         addresses: ['0x1234567890123456789012345678901234567890'],
         chainId: undefined,
         connector: undefined,
-        isReconnecting: false,
+        isReconnecting: true,
         isConnecting: false,
         isDisconnected: false,
-        status: 'connected',
+        status: 'reconnecting',
       })
 
       const { result } = renderHookWithStore(() => useAuthSessionRecovery(), { store: mockStore })

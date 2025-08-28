@@ -295,10 +295,8 @@ describe('AuthenticationStore', () => {
       store.reset() // This should be ignored if called during reset
 
       // Check if protection message was logged (may not always trigger in synchronous tests)
-      const protectionCalled = consoleSpy.mock.calls.some(call => 
-        call[0]?.includes('Reset already in progress')
-      )
-      
+      const protectionCalled = consoleSpy.mock.calls.some((call) => call[0]?.includes('Reset already in progress'))
+
       // Either protection was triggered OR both resets completed successfully
       expect(protectionCalled || consoleSpy.mock.calls.length >= 2).toBe(true)
       consoleSpy.mockRestore()
