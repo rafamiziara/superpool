@@ -11,6 +11,44 @@ import { ErrorType } from '../utils/errorHandling'
 
 export const createMockAuthenticationStore = (overrides: Partial<AuthenticationStore> = {}): AuthenticationStore => {
   const store = new AuthenticationStore()
+  
+  // Reset the store to clean state first
+  store.completedSteps.clear()
+  store.completedSteps.add('connect-wallet') // resetProgress adds this
+  
+  // Create a mocked version by wrapping the original methods
+  const originalStartStep = store.startStep.bind(store)
+  const originalCompleteStep = store.completeStep.bind(store) 
+  const originalFailStep = store.failStep.bind(store)
+  const originalResetProgress = store.resetProgress.bind(store)
+  const originalGetStepStatus = store.getStepStatus.bind(store)
+  const originalGetStepInfo = store.getStepInfo.bind(store)
+  const originalGetAllSteps = store.getAllSteps.bind(store)
+
+  // Create spies that wrap the original functionality
+  const mockStartStep = jest.fn().mockImplementation(originalStartStep)
+  const mockCompleteStep = jest.fn().mockImplementation(originalCompleteStep)
+  const mockFailStep = jest.fn().mockImplementation(originalFailStep)
+  const mockResetProgress = jest.fn().mockImplementation(originalResetProgress)
+  const mockGetStepStatus = jest.fn().mockImplementation(originalGetStepStatus)
+  const mockGetStepInfo = jest.fn().mockImplementation(originalGetStepInfo)
+  const mockGetAllSteps = jest.fn().mockImplementation(originalGetAllSteps)
+
+  // Replace methods on the store with mocks
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  ;(store as any).startStep = mockStartStep
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  ;(store as any).completeStep = mockCompleteStep
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  ;(store as any).failStep = mockFailStep
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  ;(store as any).resetProgress = mockResetProgress
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  ;(store as any).getStepStatus = mockGetStepStatus
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  ;(store as any).getStepInfo = mockGetStepInfo
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  ;(store as any).getAllSteps = mockGetAllSteps
 
   // Apply overrides
   Object.assign(store, overrides)
@@ -55,10 +93,8 @@ export const createMockRootStore = (
 ): RootStore => {
   const rootStore = new RootStore()
 
-  // Replace stores with mocked versions
-  if (storeOverrides.authenticationStore) {
-    rootStore.authenticationStore = createMockAuthenticationStore(storeOverrides.authenticationStore)
-  }
+  // Always replace authenticationStore with mocked version for tests
+  rootStore.authenticationStore = createMockAuthenticationStore(storeOverrides.authenticationStore || {})
 
   if (storeOverrides.walletStore) {
     rootStore.walletStore = createMockWalletStore(storeOverrides.walletStore)
