@@ -1,4 +1,4 @@
-import { renderHook } from '@testing-library/react-native'
+import { renderHookWithStore } from '../../test-utils'
 import { EventEmitter } from 'events'
 import { useAccount } from 'wagmi'
 import { appToasts } from '../../utils/toast'
@@ -78,7 +78,7 @@ describe('useWalletToasts', () => {
   })
 
   it('should not show connection toast by default when wallet connects', () => {
-    const { rerender } = renderHook(() => useWalletToasts())
+    const { rerender } = renderHookWithStore(() => useWalletToasts())
 
     // Simulate wallet connection
     mockUseAccount.mockReturnValue(
@@ -101,7 +101,7 @@ describe('useWalletToasts', () => {
   })
 
   it('should show connection toast when explicitly enabled', () => {
-    const { rerender } = renderHook(() => useWalletToasts({ showConnectionToasts: true }))
+    const { rerender } = renderHookWithStore(() => useWalletToasts({ showConnectionToasts: true }))
 
     // Simulate wallet connection
     mockUseAccount.mockReturnValue(
@@ -138,7 +138,7 @@ describe('useWalletToasts', () => {
       })
     )
 
-    const { rerender } = renderHook(() => useWalletToasts())
+    const { rerender } = renderHookWithStore(() => useWalletToasts())
 
     // Simulate wallet disconnection
     mockUseAccount.mockReturnValue(createMockAccountState())
@@ -164,7 +164,7 @@ describe('useWalletToasts', () => {
       })
     )
 
-    const { rerender } = renderHook(() => useWalletToasts({ showDisconnectionToasts: false }))
+    const { rerender } = renderHookWithStore(() => useWalletToasts({ showDisconnectionToasts: false }))
 
     // Simulate wallet disconnection
     mockUseAccount.mockReturnValue(createMockAccountState())
@@ -175,7 +175,7 @@ describe('useWalletToasts', () => {
   })
 
   it('should handle multiple connection/disconnection cycles', () => {
-    const { rerender } = renderHook(() =>
+    const { rerender } = renderHookWithStore(() =>
       useWalletToasts({
         showConnectionToasts: true,
         showDisconnectionToasts: true,
@@ -225,7 +225,7 @@ describe('useWalletToasts', () => {
   })
 
   it('should handle connection without connector name', () => {
-    const { rerender } = renderHook(() => useWalletToasts({ showConnectionToasts: true }))
+    const { rerender } = renderHookWithStore(() => useWalletToasts({ showConnectionToasts: true }))
 
     // Simulate wallet connection without connector name
     mockUseAccount.mockReturnValue(
@@ -261,7 +261,7 @@ describe('useWalletToasts', () => {
       })
     )
 
-    renderHook(() => useWalletToasts({ showConnectionToasts: true }))
+    renderHookWithStore(() => useWalletToasts({ showConnectionToasts: true }))
 
     // Should trigger connection toast because previouslyConnected starts as false
     expect(mockAppToasts.walletConnected).toHaveBeenCalledWith('MetaMask')
