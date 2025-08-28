@@ -9,7 +9,8 @@ configure({
   computedRequiresReaction: false,
   reactionRequiresObservable: false,
   observableRequiresReaction: false,
-  disableErrorBoundaries: true,
+  disableErrorBoundaries: false, // Keep error boundaries enabled for testing
+  isolateGlobalState: true, // Isolate test state
 })
 
 // Mock Firebase modules (minimal essential mocks only)

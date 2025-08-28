@@ -5,9 +5,9 @@
 
 import { act, waitFor } from '@testing-library/react-native'
 import { runInAction } from 'mobx'
-import { useAuthStateSynchronization, useAuthStateValidation } from './useAuthStateSynchronization'
 import { createMockRootStore, renderHookWithStore } from '../../test-utils'
 import { AppError, ErrorType } from '../../utils/errorHandling'
+import { useAuthStateSynchronization, useAuthStateValidation } from './useAuthStateSynchronization'
 
 // Create proper Chain type mock
 const createMockChain = (id: number, name: string) => ({
@@ -25,6 +25,33 @@ const createMockChain = (id: number, name: string) => ({
   },
 })
 
+// Create proper UseAccountReturnType mocks
+const createMockConnectedAccount = (address: string, chainId = 1) => ({
+  isConnected: true as const,
+  address: address as `0x${string}`,
+  chain: createMockChain(chainId, chainId === 1 ? 'Ethereum' : 'Polygon'),
+  addresses: [address as `0x${string}`],
+  chainId,
+  connector: undefined,
+  isReconnecting: true as const,
+  isConnecting: false as const,
+  isDisconnected: false as const,
+  status: 'reconnecting' as const, // Use reconnecting status for proper Wagmi compatibility
+})
+
+const createMockDisconnectedAccount = () => ({
+  isConnected: false as const,
+  address: undefined,
+  chain: undefined,
+  addresses: undefined,
+  chainId: undefined,
+  connector: undefined,
+  isReconnecting: false as const,
+  isConnecting: true as const,
+  isDisconnected: false as const, // Use false to match connecting status
+  status: 'connecting' as const, // Use connecting status for proper Wagmi compatibility
+})
+
 // Mock dependencies
 const mockSignOut = jest.fn(() => Promise.resolve())
 jest.mock('../../firebase.config', () => ({
@@ -38,18 +65,7 @@ jest.mock('../../utils', () => ({
 }))
 
 jest.mock('wagmi', () => ({
-  useAccount: jest.fn(() => ({
-    isConnected: false,
-    address: undefined,
-    chain: createMockChain(1, 'Ethereum'),
-    addresses: undefined,
-    chainId: undefined,
-    connector: undefined,
-    isReconnecting: false,
-    isConnecting: false,
-    isDisconnected: true,
-    status: 'disconnected',
-  })),
+  useAccount: jest.fn(() => createMockDisconnectedAccount()),
 }))
 
 // Mock Firebase auth hook
@@ -83,18 +99,7 @@ describe('useAuthStateSynchronization', () => {
       user: null,
     })
 
-    mockUseAccount.mockReturnValue({
-      isConnected: false,
-      address: undefined,
-      chain: createMockChain(1, 'Ethereum'),
-      addresses: undefined,
-      chainId: undefined,
-      connector: undefined,
-      isReconnecting: false,
-      isConnecting: false,
-      isDisconnected: true,
-      status: 'disconnected',
-    })
+    mockUseAccount.mockReturnValue(createMockDisconnectedAccount())
 
     mockSignOut.mockResolvedValue()
   })
@@ -106,7 +111,7 @@ describe('useAuthStateSynchronization', () => {
   describe('Initialization', () => {
     it('should initialize without errors', () => {
       const { unmount } = renderHookWithStore(() => useAuthStateSynchronization(), { store: mockStore })
-      
+
       expect(() => unmount()).not.toThrow()
     })
 
@@ -116,15 +121,12 @@ describe('useAuthStateSynchronization', () => {
       renderHookWithStore(() => useAuthStateSynchronization(), { store: mockStore })
 
       // Should not log any sync checks when loading
-      expect(mockDevOnly).not.toHaveBeenCalledWith(
-        '🔄 Auth state sync check:',
-        expect.any(Object)
-      )
+      expect(mockDevOnly).not.toHaveBeenCalledWith('🔄 Auth state sync check:', expect.any(Object))
     })
 
     it('should properly dispose autorun on unmount', () => {
       const { unmount } = renderHookWithStore(() => useAuthStateSynchronization(), { store: mockStore })
-      
+
       // Should not throw and should cleanup properly
       expect(() => unmount()).not.toThrow()
     })
@@ -146,9 +148,7 @@ describe('useAuthStateSynchronization', () => {
       renderHookWithStore(() => useAuthStateSynchronization(), { store: mockStore })
 
       await waitFor(() => {
-        expect(mockDevOnly).toHaveBeenCalledWith(
-          '⚠️  Firebase authenticated but wallet disconnected - clearing Firebase auth'
-        )
+        expect(mockDevOnly).toHaveBeenCalledWith('⚠️  Firebase authenticated but wallet disconnected - clearing Firebase auth')
       })
 
       await waitFor(() => {
@@ -163,7 +163,7 @@ describe('useAuthStateSynchronization', () => {
     it('should handle Firebase signOut errors gracefully', async () => {
       const error = new Error('Firebase signOut failed')
       mockSignOut.mockRejectedValue(error)
-      
+
       const consoleSpy = jest.spyOn(console, 'warn').mockImplementation()
 
       renderHookWithStore(() => useAuthStateSynchronization(), { store: mockStore })
@@ -195,9 +195,7 @@ describe('useAuthStateSynchronization', () => {
       renderHookWithStore(() => useAuthStateSynchronization(), { store: mockStore })
 
       await waitFor(() => {
-        expect(mockDevOnly).toHaveBeenCalledWith(
-          '⚠️  Wallet address mismatch with Firebase auth - clearing Firebase auth'
-        )
+        expect(mockDevOnly).toHaveBeenCalledWith('⚠️  Wallet address mismatch with Firebase auth - clearing Firebase auth')
       })
 
       await waitFor(() => {
@@ -218,19 +216,17 @@ describe('useAuthStateSynchronization', () => {
 
       // Should NOT trigger mismatch clearing
       await act(async () => {
-        await new Promise(resolve => setTimeout(resolve, 100))
+        await new Promise((resolve) => setTimeout(resolve, 100))
       })
 
-      expect(mockDevOnly).not.toHaveBeenCalledWith(
-        expect.stringContaining('mismatch')
-      )
+      expect(mockDevOnly).not.toHaveBeenCalledWith(expect.stringContaining('mismatch'))
       expect(mockSignOut).not.toHaveBeenCalled()
     })
 
     it('should handle address mismatch signOut errors', async () => {
       const error = new Error('SignOut failed during mismatch')
       mockSignOut.mockRejectedValue(error)
-      
+
       const consoleSpy = jest.spyOn(console, 'warn').mockImplementation()
 
       renderHookWithStore(() => useAuthStateSynchronization(), { store: mockStore })
@@ -256,11 +252,11 @@ describe('useAuthStateSynchronization', () => {
 
       mockStore.walletStore.currentState.isConnected = true
       mockStore.walletStore.currentState.address = '0x1234567890123456789012345678901234567890'
-      
+
       // Auth store doesn't have wallet address yet
       mockStore.authenticationStore.authLock = {
         ...mockStore.authenticationStore.authLock,
-        walletAddress: null
+        walletAddress: null,
       }
     })
 
@@ -289,14 +285,14 @@ describe('useAuthStateSynchronization', () => {
       // Auth store already has wallet address
       mockStore.authenticationStore.authLock = {
         ...mockStore.authenticationStore.authLock,
-        walletAddress: '0x1234567890123456789012345678901234567890'
+        walletAddress: '0x1234567890123456789012345678901234567890',
       }
 
       renderHookWithStore(() => useAuthStateSynchronization(), { store: mockStore })
 
       // Give some time for potential sync
       await act(async () => {
-        await new Promise(resolve => setTimeout(resolve, 100))
+        await new Promise((resolve) => setTimeout(resolve, 100))
       })
 
       expect(mockDevOnly).not.toHaveBeenCalledWith('✅ Syncing authentication store with Firebase auth')
@@ -312,10 +308,10 @@ describe('useAuthStateSynchronization', () => {
 
       mockStore.walletStore.currentState.isConnected = true
       mockStore.walletStore.currentState.address = '0x1234567890123456789012345678901234567890'
-      
+
       mockStore.authenticationStore.authLock = {
         ...mockStore.authenticationStore.authLock,
-        isLocked: false
+        isLocked: false,
       }
       mockStore.authenticationStore.authError = null
     })
@@ -324,27 +320,23 @@ describe('useAuthStateSynchronization', () => {
       renderHookWithStore(() => useAuthStateSynchronization(), { store: mockStore })
 
       await waitFor(() => {
-        expect(mockDevOnly).toHaveBeenCalledWith(
-          'ℹ️  Wallet connected but not Firebase authenticated - authentication may be needed'
-        )
+        expect(mockDevOnly).toHaveBeenCalledWith('ℹ️  Wallet connected but not Firebase authenticated - authentication may be needed')
       })
     })
 
     it('should not log when authentication is in progress', async () => {
       mockStore.authenticationStore.authLock = {
         ...mockStore.authenticationStore.authLock,
-        isLocked: true
+        isLocked: true,
       }
 
       renderHookWithStore(() => useAuthStateSynchronization(), { store: mockStore })
 
       await act(async () => {
-        await new Promise(resolve => setTimeout(resolve, 100))
+        await new Promise((resolve) => setTimeout(resolve, 100))
       })
 
-      expect(mockDevOnly).not.toHaveBeenCalledWith(
-        expect.stringContaining('authentication may be needed')
-      )
+      expect(mockDevOnly).not.toHaveBeenCalledWith(expect.stringContaining('authentication may be needed'))
     })
 
     it('should not log when there is an auth error', async () => {
@@ -352,18 +344,16 @@ describe('useAuthStateSynchronization', () => {
         name: 'AppError',
         message: 'Some auth error',
         type: ErrorType.AUTHENTICATION_FAILED,
-        userFriendlyMessage: 'Some auth error'
+        userFriendlyMessage: 'Some auth error',
       } as AppError
 
       renderHookWithStore(() => useAuthStateSynchronization(), { store: mockStore })
 
       await act(async () => {
-        await new Promise(resolve => setTimeout(resolve, 100))
+        await new Promise((resolve) => setTimeout(resolve, 100))
       })
 
-      expect(mockDevOnly).not.toHaveBeenCalledWith(
-        expect.stringContaining('authentication may be needed')
-      )
+      expect(mockDevOnly).not.toHaveBeenCalledWith(expect.stringContaining('authentication may be needed'))
     })
   })
 
@@ -376,27 +366,14 @@ describe('useAuthStateSynchronization', () => {
 
       // Both wallet store and wagmi show no connection
       mockStore.walletStore.currentState.isConnected = false
-      mockUseAccount.mockReturnValue({
-        isConnected: false,
-        address: undefined,
-        chain: createMockChain(1, 'Ethereum'),
-        addresses: undefined,
-        chainId: undefined,
-        connector: undefined,
-        isReconnecting: false,
-        isConnecting: false,
-        isDisconnected: true,
-        status: 'disconnected',
-      })
+      mockUseAccount.mockReturnValue(createMockDisconnectedAccount())
     })
 
     it('should log Firebase authenticated but no wallet connection', async () => {
       renderHookWithStore(() => useAuthStateSynchronization(), { store: mockStore })
 
       await waitFor(() => {
-        expect(mockDevOnly).toHaveBeenCalledWith(
-          '⚠️  Firebase authenticated but no wallet connection detected'
-        )
+        expect(mockDevOnly).toHaveBeenCalledWith('⚠️  Firebase authenticated but no wallet connection detected')
       })
     })
   })
@@ -409,7 +386,7 @@ describe('useAuthStateSynchronization', () => {
       expect(mockDevOnly).toHaveBeenCalledWith(
         '🔄 Auth state sync check:',
         expect.objectContaining({
-          firebase: { isAuth: false, address: null }
+          firebase: { isAuth: false, address: null },
         })
       )
 
@@ -425,7 +402,7 @@ describe('useAuthStateSynchronization', () => {
         expect(mockDevOnly).toHaveBeenCalledWith(
           '🔄 Auth state sync check:',
           expect.objectContaining({
-            firebase: { isAuth: true, address: '0x1234567890123456789012345678901234567890' }
+            firebase: { isAuth: true, address: '0x1234567890123456789012345678901234567890' },
           })
         )
       })
@@ -438,7 +415,7 @@ describe('useAuthStateSynchronization', () => {
       expect(mockDevOnly).toHaveBeenCalledWith(
         '🔄 Auth state sync check:',
         expect.objectContaining({
-          wallet: { connected: false, address: undefined }
+          wallet: { connected: false, address: undefined },
         })
       )
 
@@ -454,7 +431,7 @@ describe('useAuthStateSynchronization', () => {
         expect(mockDevOnly).toHaveBeenCalledWith(
           '🔄 Auth state sync check:',
           expect.objectContaining({
-            wallet: { connected: true, address: '0x1234567890123456789012345678901234567890' }
+            wallet: { connected: true, address: '0x1234567890123456789012345678901234567890' },
           })
         )
       })
@@ -467,18 +444,18 @@ describe('useAuthStateSynchronization', () => {
       expect(mockDevOnly).toHaveBeenCalledWith(
         '🔄 Auth state sync check:',
         expect.objectContaining({
-          authStore: { address: null, hasError: false }
+          authStore: { address: null, hasError: false },
         })
       )
 
       // Change auth store state
       runInAction(() => {
         mockStore.authenticationStore.authError = {
-        name: 'AppError',
-        message: 'Test error',
-        type: ErrorType.AUTHENTICATION_FAILED,
-        userFriendlyMessage: 'Test error'
-      } as AppError
+          name: 'AppError',
+          message: 'Test error',
+          type: ErrorType.AUTHENTICATION_FAILED,
+          userFriendlyMessage: 'Test error',
+        } as AppError
       })
 
       rerender({})
@@ -487,7 +464,7 @@ describe('useAuthStateSynchronization', () => {
         expect(mockDevOnly).toHaveBeenCalledWith(
           '🔄 Auth state sync check:',
           expect.objectContaining({
-            authStore: expect.objectContaining({ hasError: true })
+            authStore: expect.objectContaining({ hasError: true }),
           })
         )
       })
@@ -515,7 +492,7 @@ describe('useAuthStateSynchronization', () => {
 
       // Give time for potential additional calls
       await act(async () => {
-        await new Promise(resolve => setTimeout(resolve, 100))
+        await new Promise((resolve) => setTimeout(resolve, 100))
       })
 
       // Should still only be called once
@@ -539,18 +516,7 @@ describe('useAuthStateValidation', () => {
       user: null,
     })
 
-    mockUseAccount.mockReturnValue({
-      isConnected: false,
-      address: undefined,
-      chain: createMockChain(1, 'Ethereum'),
-      addresses: undefined,
-      chainId: undefined,
-      connector: undefined,
-      isReconnecting: false,
-      isConnecting: false,
-      isDisconnected: true,
-      status: 'disconnected',
-    })
+    mockUseAccount.mockReturnValue(createMockDisconnectedAccount())
   })
 
   describe('Consistency Validation', () => {
@@ -558,23 +524,12 @@ describe('useAuthStateValidation', () => {
       // Set up consistent state
       mockFirebaseAuth.isAuthenticated = true
       mockFirebaseAuth.walletAddress = '0x1234567890123456789012345678901234567890'
-      
-      mockUseAccount.mockReturnValue({
-        isConnected: true,
-        address: '0x1234567890123456789012345678901234567890',
-        chain: createMockChain(1, 'Ethereum'),
-        addresses: ['0x1234567890123456789012345678901234567890'],
-        chainId: 1,
-        connector: undefined,
-        isReconnecting: false,
-        isConnecting: false,
-        isDisconnected: false,
-        status: 'connected',
-      })
+
+      mockUseAccount.mockReturnValue(createMockConnectedAccount('0x1234567890123456789012345678901234567890', 1))
 
       mockStore.authenticationStore.authLock = {
         ...mockStore.authenticationStore.authLock,
-        isLocked: false
+        isLocked: false,
       }
 
       const { result } = renderHookWithStore(() => useAuthStateValidation(), { store: mockStore })
@@ -615,19 +570,8 @@ describe('useAuthStateValidation', () => {
     it('should detect wallet address mismatch', () => {
       mockFirebaseAuth.isAuthenticated = true
       mockFirebaseAuth.walletAddress = '0x1111111111111111111111111111111111111111'
-      
-      mockUseAccount.mockReturnValue({
-        isConnected: true,
-        address: '0x2222222222222222222222222222222222222222',
-        chain: createMockChain(1, 'Ethereum'),
-        addresses: ['0x2222222222222222222222222222222222222222'],
-        chainId: 1,
-        connector: undefined,
-        isReconnecting: false,
-        isConnecting: false,
-        isDisconnected: false,
-        status: 'connected',
-      })
+
+      mockUseAccount.mockReturnValue(createMockConnectedAccount('0x2222222222222222222222222222222222222222', 1))
 
       const { result } = renderHookWithStore(() => useAuthStateValidation(), { store: mockStore })
 
@@ -640,10 +584,10 @@ describe('useAuthStateValidation', () => {
     it('should detect authentication in progress but already authenticated', () => {
       mockFirebaseAuth.isAuthenticated = true
       mockFirebaseAuth.walletAddress = '0x1234567890123456789012345678901234567890'
-      
+
       mockStore.authenticationStore.authLock = {
         ...mockStore.authenticationStore.authLock,
-        isLocked: true
+        isLocked: true,
       }
 
       const { result } = renderHookWithStore(() => useAuthStateValidation(), { store: mockStore })
@@ -657,19 +601,8 @@ describe('useAuthStateValidation', () => {
     it('should handle case-insensitive address validation', () => {
       mockFirebaseAuth.isAuthenticated = true
       mockFirebaseAuth.walletAddress = '0x1234567890123456789012345678901234567890'
-      
-      mockUseAccount.mockReturnValue({
-        isConnected: true,
-        address: '0x1234567890123456789012345678901234567890', // Different case
-        chain: createMockChain(1, 'Ethereum'),
-        addresses: ['0x1234567890123456789012345678901234567890'],
-        chainId: 1,
-        connector: undefined,
-        isReconnecting: false,
-        isConnecting: false,
-        isDisconnected: false,
-        status: 'connected',
-      })
+
+      mockUseAccount.mockReturnValue(createMockConnectedAccount('0x1234567890123456789012345678901234567890', 1))
 
       const { result } = renderHookWithStore(() => useAuthStateValidation(), { store: mockStore })
 
@@ -684,7 +617,7 @@ describe('useAuthStateValidation', () => {
         name: 'AppError',
         message: 'Test error',
         type: ErrorType.AUTHENTICATION_FAILED,
-        userFriendlyMessage: 'Test error'
+        userFriendlyMessage: 'Test error',
       } as AppError
 
       const { result } = renderHookWithStore(() => useAuthStateValidation(), { store: mockStore })

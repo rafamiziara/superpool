@@ -71,11 +71,11 @@ describe('useAuthenticationStateReadonly', () => {
 
       runInAction(() => {
         mockStore.authenticationStore.authError = {
-        name: 'AppError',
-        message: 'Authentication failed',
-        type: ErrorType.AUTHENTICATION_FAILED,
-        userFriendlyMessage: 'Authentication failed'
-      } as AppError
+          name: 'AppError',
+          message: 'Authentication failed',
+          type: ErrorType.AUTHENTICATION_FAILED,
+          userFriendlyMessage: 'Authentication failed',
+        } as AppError
       })
       rerender({})
 
@@ -88,11 +88,11 @@ describe('useAuthenticationStateReadonly', () => {
       // Set initial error
       runInAction(() => {
         mockStore.authenticationStore.authError = {
-        name: 'AppError',
-        message: 'Network error',
-        type: ErrorType.NETWORK_ERROR,
-        userFriendlyMessage: 'Network error'
-      } as AppError
+          name: 'AppError',
+          message: 'Network error',
+          type: ErrorType.NETWORK_ERROR,
+          userFriendlyMessage: 'Network error',
+        } as AppError
       })
       rerender({})
 
@@ -101,11 +101,11 @@ describe('useAuthenticationStateReadonly', () => {
       // Change error
       runInAction(() => {
         mockStore.authenticationStore.authError = {
-        name: 'AppError',
-        message: 'Signature rejected',
-        type: ErrorType.SIGNATURE_REJECTED,
-        userFriendlyMessage: 'Signature rejected'
-      } as AppError
+          name: 'AppError',
+          message: 'Signature rejected',
+          type: ErrorType.SIGNATURE_REJECTED,
+          userFriendlyMessage: 'Signature rejected',
+        } as AppError
       })
       rerender({})
 
@@ -130,7 +130,7 @@ describe('useAuthenticationStateReadonly', () => {
       runInAction(() => {
         mockStore.authenticationStore.authLock = {
           ...mockStore.authenticationStore.authLock,
-          isLocked: true
+          isLocked: true,
         }
       })
       rerender({})
@@ -148,7 +148,7 @@ describe('useAuthenticationStateReadonly', () => {
       runInAction(() => {
         mockStore.authenticationStore.authLock = {
           ...mockStore.authenticationStore.authLock,
-          isLocked: true
+          isLocked: true,
         }
       })
       rerender({})
@@ -159,7 +159,7 @@ describe('useAuthenticationStateReadonly', () => {
       runInAction(() => {
         mockStore.authenticationStore.authLock = {
           ...mockStore.authenticationStore.authLock,
-          isLocked: false
+          isLocked: false,
         }
       })
       mockFirebaseAuth.isLoading = true
@@ -185,7 +185,7 @@ describe('useAuthenticationStateReadonly', () => {
       runInAction(() => {
         mockStore.authenticationStore.authLock = {
           ...mockStore.authenticationStore.authLock,
-          walletAddress
+          walletAddress,
         }
       })
       rerender({})
@@ -203,7 +203,7 @@ describe('useAuthenticationStateReadonly', () => {
       runInAction(() => {
         mockStore.authenticationStore.authLock = {
           ...mockStore.authenticationStore.authLock,
-          walletAddress: storeAddress
+          walletAddress: storeAddress,
         }
       })
       rerender({})
@@ -225,7 +225,7 @@ describe('useAuthenticationStateReadonly', () => {
       runInAction(() => {
         mockStore.authenticationStore.authLock = {
           ...mockStore.authenticationStore.authLock,
-          walletAddress: storeAddress
+          walletAddress: storeAddress,
         }
       })
       mockFirebaseAuth.walletAddress = null
@@ -268,7 +268,7 @@ describe('useAuthenticationStateReadonly', () => {
       runInAction(() => {
         mockStore.authenticationStore.authLock = {
           ...mockStore.authenticationStore.authLock,
-          walletAddress: '0x1234567890123456789012345678901234567890'
+          walletAddress: '0x1234567890123456789012345678901234567890',
         }
       })
       rerender({})
@@ -283,7 +283,7 @@ describe('useAuthenticationStateReadonly', () => {
       runInAction(() => {
         mockStore.authenticationStore.authLock = {
           ...mockStore.authenticationStore.authLock,
-          walletAddress: '0x1234567890123456789012345678901234567890'
+          walletAddress: '0x1234567890123456789012345678901234567890',
         }
       })
       rerender({})
@@ -294,7 +294,7 @@ describe('useAuthenticationStateReadonly', () => {
       runInAction(() => {
         mockStore.authenticationStore.authLock = {
           ...mockStore.authenticationStore.authLock,
-          walletAddress: null
+          walletAddress: null,
         }
       })
       rerender({})
@@ -316,14 +316,14 @@ describe('useAuthenticationStateReadonly', () => {
       runInAction(() => {
         mockStore.authenticationStore.authLock = {
           ...mockStore.authenticationStore.authLock,
-          isLocked: true
+          isLocked: true,
         }
         mockStore.authenticationStore.authError = {
-        name: 'AppError',
-        message: 'Network error',
-        type: ErrorType.NETWORK_ERROR,
-        userFriendlyMessage: 'Network error'
-      } as AppError
+          name: 'AppError',
+          message: 'Network error',
+          type: ErrorType.NETWORK_ERROR,
+          userFriendlyMessage: 'Network error',
+        } as AppError
       })
       rerender({})
 
@@ -334,7 +334,7 @@ describe('useAuthenticationStateReadonly', () => {
       runInAction(() => {
         mockStore.authenticationStore.authLock = {
           ...mockStore.authenticationStore.authLock,
-          walletAddress: '0x1234567890123456789012345678901234567890'
+          walletAddress: '0x1234567890123456789012345678901234567890',
         }
         mockStore.authenticationStore.authError = null
       })
@@ -353,14 +353,31 @@ describe('useAuthenticationStateReadonly', () => {
         runInAction(() => {
           mockStore.authenticationStore.authLock = {
             ...mockStore.authenticationStore.authLock,
-            isLocked: i % 2 === 0
+            isLocked: i % 2 === 0,
           }
-          mockStore.authenticationStore.authError = i % 2 === 0 ? `Error ${i}` : null
+          mockStore.authenticationStore.authError =
+            i % 2 === 0
+              ? ({
+                  name: 'AppError',
+                  message: `Error ${i}`,
+                  type: ErrorType.AUTHENTICATION_FAILED,
+                  userFriendlyMessage: `Error ${i}`,
+                } as AppError)
+              : null
         })
         rerender({})
 
         expect(result.current.isAuthenticating).toBe(i % 2 === 0)
-        expect(result.current.authError).toBe(i % 2 === 0 ? `Error ${i}` : null)
+        expect(result.current.authError).toEqual(
+          i % 2 === 0
+            ? {
+                name: 'AppError',
+                message: `Error ${i}`,
+                type: ErrorType.AUTHENTICATION_FAILED,
+                userFriendlyMessage: `Error ${i}`,
+              }
+            : null
+        )
       }
     })
   })
@@ -371,7 +388,7 @@ describe('useAuthenticationStateReadonly', () => {
 
       // Should not have any methods - only state properties
       const keys = Object.keys(result.current)
-      const methods = keys.filter(key => typeof result.current[key as keyof typeof result.current] === 'function')
+      const methods = keys.filter((key) => typeof result.current[key as keyof typeof result.current] === 'function')
 
       expect(methods).toHaveLength(0)
     })
@@ -379,14 +396,7 @@ describe('useAuthenticationStateReadonly', () => {
     it('should only expose readonly state properties', () => {
       const { result } = renderHookWithStore(() => useAuthenticationStateReadonly(), { store: mockStore })
 
-      const expectedKeys = [
-        'authError',
-        'isAuthenticating',
-        'authWalletAddress',
-        'isFirebaseAuthenticated',
-        'isFirebaseLoading',
-        '_debug'
-      ]
+      const expectedKeys = ['authError', 'isAuthenticating', 'authWalletAddress', 'isFirebaseAuthenticated', 'isFirebaseLoading', '_debug']
 
       expect(Object.keys(result.current).sort()).toEqual(expectedKeys.sort())
     })
@@ -400,7 +410,7 @@ describe('useAuthenticationStateReadonly', () => {
       runInAction(() => {
         mockStore.authenticationStore.authLock = {
           ...mockStore.authenticationStore.authLock,
-          isLocked: true
+          isLocked: true,
         }
         mockStore.authenticationStore.authError = null
       })
@@ -413,11 +423,11 @@ describe('useAuthenticationStateReadonly', () => {
       runInAction(() => {
         mockStore.authenticationStore.authLock = {
           ...mockStore.authenticationStore.authLock,
-          isLocked: false
+          isLocked: false,
         }
         mockStore.authenticationStore.authLock = {
           ...mockStore.authenticationStore.authLock,
-          walletAddress: '0x1234567890123456789012345678901234567890'
+          walletAddress: '0x1234567890123456789012345678901234567890',
         }
       })
       mockFirebaseAuth.isAuthenticated = true
@@ -438,7 +448,7 @@ describe('useAuthenticationStateReadonly', () => {
       runInAction(() => {
         mockStore.authenticationStore.authLock = {
           ...mockStore.authenticationStore.authLock,
-          walletAddress: '0x1234567890123456789012345678901234567890'
+          walletAddress: '0x1234567890123456789012345678901234567890',
         }
       })
       mockFirebaseAuth.isAuthenticated = true
@@ -453,7 +463,7 @@ describe('useAuthenticationStateReadonly', () => {
       runInAction(() => {
         mockStore.authenticationStore.authLock = {
           ...mockStore.authenticationStore.authLock,
-          walletAddress: null
+          walletAddress: null,
         }
         mockStore.authenticationStore.authError = null
       })
@@ -478,7 +488,7 @@ describe('useAuthenticationStateReadonly', () => {
         mockStore.authenticationStore.authError = undefined as any
         mockStore.authenticationStore.authLock = {
           ...mockStore.authenticationStore.authLock,
-          walletAddress: undefined as any
+          walletAddress: undefined as any,
         }
       })
       mockFirebaseAuth.walletAddress = undefined as any
@@ -494,7 +504,7 @@ describe('useAuthenticationStateReadonly', () => {
       runInAction(() => {
         mockStore.authenticationStore.authLock = {
           ...mockStore.authenticationStore.authLock,
-          walletAddress: ''
+          walletAddress: '',
         }
       })
       rerender({})
@@ -509,7 +519,7 @@ describe('useAuthenticationStateReadonly', () => {
       runInAction(() => {
         mockStore.authenticationStore.authLock = {
           ...mockStore.authenticationStore.authLock,
-          walletAddress: ''
+          walletAddress: '',
         }
       })
       mockFirebaseAuth.walletAddress = '0x1234567890123456789012345678901234567890'
