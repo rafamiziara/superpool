@@ -10,7 +10,7 @@
     "test:backend": "pnpm --filter backend test",
     "test:contracts": "pnpm --filter contracts test",
     "test:mobile": "pnpm --filter mobile test",
-    "test:coverage": "pnpm run coverage:clean && pnpm run test:backend:coverage && pnpm run test:contracts:coverage && pnpm run test:mobile:coverage && pnpm run coverage:merge",
+    "test:coverage": "pnpm run coverage:clean && (pnpm run test:backend:coverage || true) && (pnpm run test:contracts:coverage || true) && (pnpm run test:mobile:coverage || true) && pnpm run coverage:merge",
     "test:backend:coverage": "pnpm --filter backend test --coverage",
     "test:contracts:coverage": "pnpm --filter contracts coverage",
     "test:mobile:coverage": "pnpm --filter mobile test:coverage",

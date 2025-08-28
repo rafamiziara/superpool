@@ -16,4 +16,6 @@ module.exports = {
     '!src/firebase.config.ts',
     '!src/utils/appCheckProvider.ts',
   ],
+  coverageDirectory: '<rootDir>/../../coverage/mobile',
+  coverageReporters: ['lcov', 'text'],
 }
