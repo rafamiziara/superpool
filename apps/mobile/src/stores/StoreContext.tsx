@@ -4,6 +4,9 @@ import { RootStore } from './RootStore'
 // Create the store context
 const StoreContext = createContext<RootStore | null>(null)
 
+// Export StoreContext for testing
+export { StoreContext }
+
 // Create a single instance of the root store
 const rootStore = new RootStore()
 
