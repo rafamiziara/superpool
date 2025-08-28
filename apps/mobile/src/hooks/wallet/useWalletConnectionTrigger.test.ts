@@ -1,4 +1,4 @@
-import { renderHook } from '@testing-library/react-hooks'
+import { renderHook } from '@testing-library/react-native'
 import { useAccount } from 'wagmi'
 import { useWalletConnectionTrigger } from './useWalletConnectionTrigger'
 
