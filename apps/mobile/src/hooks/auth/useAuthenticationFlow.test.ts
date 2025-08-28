@@ -109,6 +109,8 @@ jest.mock('../../stores', () => ({
     authenticationStore: mockAuthStore,
     walletStore: mockWalletStore,
   }),
+  useAuthenticationStore: () => mockAuthStore,
+  useWalletStore: () => mockWalletStore,
 }))
 
 // Mock Firebase auth hook
@@ -269,21 +271,15 @@ describe('Authentication Flow Integration Tests', () => {
 
   describe('Scenario 3: Network Change During Authentication', () => {
     it('should handle network changes without re-authentication', () => {
-      // This is handled by the wallet connection trigger hook
-      // Network changes should NOT trigger new authentication flows
-
-      const { result: authIntegration } = renderHook(() => useAuthenticationIntegration())
-
-      // Verify that network changes don't trigger authentication
-      expect(authIntegration.current.needsAuthentication).toBeDefined()
-
       // Test that authentication is only needed when wallet is connected but not authenticated
+      // Set up connected wallet state BEFORE hook initialization
       Object.assign(mockWalletStore, {
         isConnected: true,
         address: '0x1234567890123456789012345678901234567890' as string | undefined,
       })
       Object.assign(mockAuthStore, {
         authWalletAddress: null as string | null,
+        isAuthenticating: false,
       })
       ;(require('wagmi').useAccount as jest.Mock).mockReturnValue({
         isConnected: true,
@@ -291,6 +287,12 @@ describe('Authentication Flow Integration Tests', () => {
         chain: { id: 1, name: 'Ethereum' },
       })
 
+      const { result: authIntegration } = renderHook(() => useAuthenticationIntegration())
+
+      // Verify that needsAuthentication function exists
+      expect(authIntegration.current.needsAuthentication).toBeDefined()
+
+      // Should need authentication: wallet connected but not authenticated
       expect(authIntegration.current.needsAuthentication()).toBe(true)
     })
   })

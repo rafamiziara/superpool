@@ -44,7 +44,7 @@ export const useWalletToasts = (options: WalletToastOptions = {}) => {
 
     // Cleanup autorun when component unmounts or options change
     return disposer
-  }, [showConnectionToasts, showDisconnectionToasts]) // Only options as dependencies
+  }, [showConnectionToasts, showDisconnectionToasts, connector]) // Include connector to recreate autorun when it changes
 
   // Note: No return value needed - this is a side-effect hook
 }
