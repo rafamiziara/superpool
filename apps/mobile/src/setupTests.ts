@@ -1,37 +1,18 @@
-// Comprehensive Jest setup for testing hooks and services
+// Clean Jest setup for testing hooks, services, and MobX stores
 
-// Mock React Native modules
-jest.mock('react-native', () => ({
-  Platform: { OS: 'ios' },
-  Dimensions: { get: jest.fn(() => ({ width: 375, height: 812 })) },
-}))
+import '@testing-library/jest-dom'
+import { configure } from 'mobx'
 
-// Mock Wagmi hooks
-jest.mock('wagmi', () => ({
-  useAccount: jest.fn(() => ({
-    address: undefined,
-    addresses: undefined,
-    chain: undefined,
-    chainId: undefined,
-    connector: undefined,
-    isConnected: false,
-    isReconnecting: false,
-    isConnecting: false,
-    isDisconnected: true,
-    status: 'disconnected',
-  })),
-  useConnect: jest.fn(() => ({
-    connect: jest.fn(),
-    connectors: [],
-    isLoading: false,
-    error: null,
-  })),
-  useDisconnect: jest.fn(() => ({
-    disconnect: jest.fn(),
-  })),
-}))
+// Configure MobX for testing environment
+configure({
+  enforceActions: 'never', // Relax for testing
+  computedRequiresReaction: false,
+  reactionRequiresObservable: false,
+  observableRequiresReaction: false,
+  disableErrorBoundaries: true,
+})
 
-// Mock Firebase modules
+// Mock Firebase modules (minimal essential mocks only)
 jest.mock('firebase/auth', () => ({
   signInWithCustomToken: jest.fn(),
   signOut: jest.fn(),
@@ -50,7 +31,7 @@ jest.mock('firebase/app', () => ({
   getApp: jest.fn(),
 }))
 
-// Mock React Native modules
+// Mock React Native AsyncStorage
 jest.mock('@react-native-async-storage/async-storage', () => ({
   getItem: jest.fn(),
   setItem: jest.fn(),
@@ -58,12 +39,7 @@ jest.mock('@react-native-async-storage/async-storage', () => ({
   clear: jest.fn(),
 }))
 
-jest.mock('react-native-toast-message', () => ({
-  show: jest.fn(),
-  hide: jest.fn(),
-}))
-
-// Mock Expo modules
+// Mock Expo SecureStore
 jest.mock('expo-secure-store', () => ({
   getItemAsync: jest.fn(),
   setItemAsync: jest.fn(),
