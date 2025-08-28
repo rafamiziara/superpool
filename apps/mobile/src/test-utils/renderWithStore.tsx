@@ -1,5 +1,5 @@
 import React, { ReactElement } from 'react'
-import { render, RenderOptions, RenderResult } from '@testing-library/react-native'
+import { render, RenderOptions, RenderResult, renderHook, RenderHookOptions, RenderHookResult } from '@testing-library/react-native'
 import { TestStoreProvider } from './testProviders'
 import { RootStore } from '../stores/RootStore'
 import { createMockRootStore } from './mockStores'
@@ -44,6 +44,39 @@ export * from '@testing-library/react-native'
  * This ensures all components are rendered with a mock store context
  */
 export { renderWithStore as render }
+
+/**
+ * Custom render hook options that includes store configuration
+ */
+interface CustomRenderHookOptions<TProps> extends Omit<RenderHookOptions<TProps>, 'wrapper'> {
+  store?: RootStore
+  wrapper?: React.ComponentType<{ children: React.ReactNode }>
+}
+
+/**
+ * Custom renderHook function that wraps hooks with TestStoreProvider
+ * This is the recommended way to test hooks that use MobX stores
+ */
+export const renderHookWithStore = <TResult, TProps>(
+  hook: (props: TProps) => TResult,
+  options: CustomRenderHookOptions<TProps> = {}
+): RenderHookResult<TResult, TProps> => {
+  const { store = createMockRootStore(), wrapper: CustomWrapper, ...renderOptions } = options
+
+  const Wrapper: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+    if (CustomWrapper) {
+      return (
+        <TestStoreProvider store={store}>
+          <CustomWrapper>{children}</CustomWrapper>
+        </TestStoreProvider>
+      )
+    }
+
+    return <TestStoreProvider store={store}>{children}</TestStoreProvider>
+  }
+
+  return renderHook(hook, { wrapper: Wrapper, ...renderOptions })
+}
 
 /**
  * Utility function to create a minimal render for non-store components

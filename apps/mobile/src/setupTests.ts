@@ -61,8 +61,8 @@ jest.mock('wagmi', () => ({
     status: 'disconnected',
   })),
   useSignMessage: jest.fn(() => ({
-    signMessage: jest.fn(),
-    signMessageAsync: jest.fn(),
+    signMessage: jest.fn().mockResolvedValue('0xmockedsignature'),
+    signMessageAsync: jest.fn().mockResolvedValue('0xmockedsignature'),
     data: undefined,
     error: null,
     isLoading: false,
@@ -70,8 +70,8 @@ jest.mock('wagmi', () => ({
     isSuccess: false,
   })),
   useSignTypedData: jest.fn(() => ({
-    signTypedData: jest.fn(),
-    signTypedDataAsync: jest.fn(),
+    signTypedData: jest.fn().mockResolvedValue('0xmockedsignature'),
+    signTypedDataAsync: jest.fn().mockResolvedValue('0xmockedsignature'),
     data: undefined,
     error: null,
     isLoading: false,
@@ -79,8 +79,8 @@ jest.mock('wagmi', () => ({
     isSuccess: false,
   })),
   useDisconnect: jest.fn(() => ({
-    disconnect: jest.fn(),
-    disconnectAsync: jest.fn(),
+    disconnect: jest.fn().mockResolvedValue(undefined),
+    disconnectAsync: jest.fn().mockResolvedValue(undefined),
     error: null,
     isLoading: false,
     isError: false,

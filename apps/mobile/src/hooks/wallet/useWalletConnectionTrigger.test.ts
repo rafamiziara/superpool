@@ -1,4 +1,4 @@
-import { renderHook } from '@testing-library/react-native'
+import { renderHookWithStore } from '../../test-utils'
 import { useAccount } from 'wagmi'
 import { useWalletConnectionTrigger } from './useWalletConnectionTrigger'
 
@@ -55,7 +55,7 @@ describe('useWalletConnectionTrigger', () => {
 
   it('should handle new wallet connection', () => {
     // Start with disconnected state
-    const { rerender } = renderHook(() =>
+    const { rerender } = renderHookWithStore(() =>
       useWalletConnectionTrigger({
         onNewConnection: mockOnNewConnection,
         onDisconnection: mockOnDisconnection,
@@ -103,7 +103,7 @@ describe('useWalletConnectionTrigger', () => {
       })
     )
 
-    const { rerender } = renderHook(() =>
+    const { rerender } = renderHookWithStore(() =>
       useWalletConnectionTrigger({
         onNewConnection: mockOnNewConnection,
         onDisconnection: mockOnDisconnection,
@@ -133,7 +133,7 @@ describe('useWalletConnectionTrigger', () => {
       })
     )
 
-    const { rerender } = renderHook(() =>
+    const { rerender } = renderHookWithStore(() =>
       useWalletConnectionTrigger({
         onNewConnection: mockOnNewConnection,
         onDisconnection: mockOnDisconnection,
@@ -162,7 +162,7 @@ describe('useWalletConnectionTrigger', () => {
   })
 
   it('should debounce multiple rapid connection changes', () => {
-    const { rerender } = renderHook(() =>
+    const { rerender } = renderHookWithStore(() =>
       useWalletConnectionTrigger({
         onNewConnection: mockOnNewConnection,
         onDisconnection: mockOnDisconnection,
@@ -220,7 +220,7 @@ describe('useWalletConnectionTrigger', () => {
       })
     )
 
-    const { unmount } = renderHook(() =>
+    const { unmount } = renderHookWithStore(() =>
       useWalletConnectionTrigger({
         onNewConnection: mockOnNewConnection,
         onDisconnection: mockOnDisconnection,
@@ -245,7 +245,7 @@ describe('useWalletConnectionTrigger', () => {
       })
     )
 
-    renderHook(() =>
+    renderHookWithStore(() =>
       useWalletConnectionTrigger({
         onNewConnection: mockOnNewConnection,
         onDisconnection: mockOnDisconnection,
