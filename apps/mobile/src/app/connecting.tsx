@@ -112,7 +112,7 @@ const ConnectingScreen = observer(function ConnectingScreen() {
       completedSteps: Array.from(completedSteps),
       failedStep,
       isComplete,
-      error: error || authError?.message,
+      error: error || authError,
       // Simplified debug info
       mobxBridge: _debug || 'no debug info',
     })
@@ -255,7 +255,7 @@ const ConnectingScreen = observer(function ConnectingScreen() {
         <View className="bg-muted/10 p-4 rounded-xl border border-muted/20 mb-4">
           {authError ? (
             <Text className="text-destructive text-center text-sm font-medium">
-              {error || authError.userFriendlyMessage}
+              {error || authError}
               {authStore.canRetry && (
                 <Text className="text-muted-foreground">
                   {' '}

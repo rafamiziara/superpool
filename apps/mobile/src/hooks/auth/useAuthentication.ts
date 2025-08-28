@@ -14,7 +14,7 @@ export const useAuthentication = () => {
   // Clean direct return - MobX handles reactivity automatically
   return {
     // Authentication state from MobX store (reactive)
-    authError: authStore.authError,
+    authError: authStore.authError?.userFriendlyMessage || null,
     isAuthenticating: authStore.isAuthenticating || firebaseAuth.isLoading,
     authWalletAddress: firebaseAuth.walletAddress || authStore.authWalletAddress,
 
