@@ -1,5 +1,5 @@
 import { FirebaseAuthState } from '@superpool/types'
-import { renderHook } from '@testing-library/react-hooks'
+import { renderHook } from '@testing-library/react-native'
 import { User } from 'firebase/auth'
 import { firebaseAuthManager } from '../../utils/firebaseAuthManager'
 import { useFirebaseAuth } from './useFirebaseAuth'

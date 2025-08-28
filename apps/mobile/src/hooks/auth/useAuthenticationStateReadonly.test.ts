@@ -1,4 +1,4 @@
-import { renderHook } from '@testing-library/react-hooks'
+import { renderHook } from '@testing-library/react-native'
 import { useAuthenticationStateReadonly } from './useAuthenticationStateReadonly'
 
 // Mock the dependencies
@@ -9,6 +9,7 @@ jest.mock('./useAuthenticationStateReadonly', () => ({
     authWalletAddress: null,
     isFirebaseAuthenticated: false,
     isFirebaseLoading: false,
+    _debug: { hasWalletAddress: false },
   }),
 }))
 
@@ -20,7 +21,7 @@ jest.mock('./useFirebaseAuth', () => ({
   }),
 }))
 
-jest.mock('../stores', () => ({
+jest.mock('../../stores', () => ({
   useAuthenticationStore: () => ({
     authError: null,
     isAuthenticating: false,

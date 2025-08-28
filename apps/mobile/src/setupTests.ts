@@ -46,6 +46,48 @@ jest.mock('expo-secure-store', () => ({
   deleteItemAsync: jest.fn(),
 }))
 
+// Mock wagmi hooks
+jest.mock('wagmi', () => ({
+  useAccount: jest.fn(() => ({
+    address: undefined,
+    addresses: undefined,
+    chain: undefined,
+    chainId: undefined,
+    connector: undefined,
+    isConnected: false,
+    isReconnecting: false,
+    isConnecting: false,
+    isDisconnected: true,
+    status: 'disconnected',
+  })),
+  useSignMessage: jest.fn(() => ({
+    signMessage: jest.fn(),
+    signMessageAsync: jest.fn(),
+    data: undefined,
+    error: null,
+    isLoading: false,
+    isError: false,
+    isSuccess: false,
+  })),
+  useSignTypedData: jest.fn(() => ({
+    signTypedData: jest.fn(),
+    signTypedDataAsync: jest.fn(),
+    data: undefined,
+    error: null,
+    isLoading: false,
+    isError: false,
+    isSuccess: false,
+  })),
+  useDisconnect: jest.fn(() => ({
+    disconnect: jest.fn(),
+    disconnectAsync: jest.fn(),
+    error: null,
+    isLoading: false,
+    isError: false,
+    isSuccess: false,
+  })),
+}))
+
 // Mock toast utilities
 jest.mock('./utils/toast', () => ({
   authToasts: {

@@ -1,4 +1,4 @@
-import { renderHook } from '@testing-library/react-hooks'
+import { renderHook } from '@testing-library/react-native'
 import { EventEmitter } from 'events'
 import { useAccount } from 'wagmi'
 import { appToasts } from '../../utils/toast'

@@ -187,7 +187,14 @@ describe('AuthProgressIndicator', () => {
       const mockStore = mockStorePresets.authenticating()
 
       // Complete all steps
-      const allSteps: AuthStep[] = ['connect-wallet', 'acquire-lock', 'generate-message', 'request-signature', 'verify-signature', 'firebase-auth']
+      const allSteps: AuthStep[] = [
+        'connect-wallet',
+        'acquire-lock',
+        'generate-message',
+        'request-signature',
+        'verify-signature',
+        'firebase-auth',
+      ]
       act(() => {
         allSteps.forEach((step) => mockStore.authenticationStore.completeStep(step))
       })
