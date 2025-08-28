@@ -1,0 +1,263 @@
+// Jest Snapshot v1, https://jestjs.io/docs/snapshot-testing
+
+exports[`AuthProgressIndicator Snapshot Testing should match snapshot with active step 1`] = `
+<View
+  className="space-y-4 "
+  testID="auth-progress-indicator"
+>
+  <View
+    className="flex-row justify-center items-center gap-2 "
+    testID="progress-indicator-container"
+  >
+    <View
+      accessibilityLabel="Step 1 of 6 (completed)"
+      className="w-2 h-2 rounded-full bg-muted-foreground/30"
+      testID="progress-step-0"
+    />
+    <View
+      accessibilityLabel="Step 2 of 6 (completed)"
+      className="w-2 h-2 rounded-full bg-muted-foreground/30"
+      testID="progress-step-1"
+    />
+    <View
+      accessibilityLabel="Step 3 of 6 (current)"
+      className="w-2 h-2 rounded-full bg-primary"
+      testID="progress-step-2"
+    />
+    <View
+      accessibilityLabel="Step 4 of 6 (pending)"
+      className="w-2 h-2 rounded-full bg-muted-foreground/30"
+      testID="progress-step-3"
+    />
+    <View
+      accessibilityLabel="Step 5 of 6 (pending)"
+      className="w-2 h-2 rounded-full bg-muted-foreground/30"
+      testID="progress-step-4"
+    />
+    <View
+      accessibilityLabel="Step 6 of 6 (pending)"
+      className="w-2 h-2 rounded-full bg-muted-foreground/30"
+      testID="progress-step-5"
+    />
+  </View>
+  <View
+    className="space-y-2"
+  >
+    <Text
+      className="text-center text-sm font-medium text-foreground"
+      testID="current-step-title"
+    >
+      Generate Auth Message
+    </Text>
+    <Text
+      className="text-center text-xs text-muted-foreground"
+      testID="current-step-description"
+    >
+      Creating authentication challenge
+    </Text>
+  </View>
+  <View
+    className="flex-row justify-center space-x-4"
+  >
+    <Text
+      className="text-xs text-muted-foreground"
+      testID="progress-stats"
+    >
+      0
+       of 
+      6
+       completed
+    </Text>
+  </View>
+</View>
+`;
+
+exports[`AuthProgressIndicator Snapshot Testing should match snapshot with completed state 1`] = `
+<View
+  className="space-y-4 "
+  testID="auth-progress-indicator"
+>
+  <View
+    className="flex-row justify-center items-center gap-2 "
+    testID="progress-indicator-container"
+  >
+    <View
+      accessibilityLabel="Step 1 of 6 (pending)"
+      className="w-2 h-2 rounded-full bg-muted-foreground/30"
+      testID="progress-step-0"
+    />
+    <View
+      accessibilityLabel="Step 2 of 6 (pending)"
+      className="w-2 h-2 rounded-full bg-muted-foreground/30"
+      testID="progress-step-1"
+    />
+    <View
+      accessibilityLabel="Step 3 of 6 (pending)"
+      className="w-2 h-2 rounded-full bg-muted-foreground/30"
+      testID="progress-step-2"
+    />
+    <View
+      accessibilityLabel="Step 4 of 6 (pending)"
+      className="w-2 h-2 rounded-full bg-muted-foreground/30"
+      testID="progress-step-3"
+    />
+    <View
+      accessibilityLabel="Step 5 of 6 (pending)"
+      className="w-2 h-2 rounded-full bg-muted-foreground/30"
+      testID="progress-step-4"
+    />
+    <View
+      accessibilityLabel="Step 6 of 6 (pending)"
+      className="w-2 h-2 rounded-full bg-muted-foreground/30"
+      testID="progress-step-5"
+    />
+  </View>
+  <View
+    className="space-y-2"
+  />
+  <View
+    className="flex-row justify-center space-x-4"
+  >
+    <Text
+      className="text-xs text-muted-foreground"
+      testID="progress-stats"
+    >
+      1
+       of 
+      6
+       completed
+    </Text>
+    <Text
+      className="text-xs text-green-600 font-medium"
+      testID="progress-complete"
+    >
+      ✓ Complete
+    </Text>
+  </View>
+</View>
+`;
+
+exports[`AuthProgressIndicator Snapshot Testing should match snapshot with default state 1`] = `
+<View
+  className="space-y-4 "
+  testID="auth-progress-indicator"
+>
+  <View
+    className="flex-row justify-center items-center gap-2 "
+    testID="progress-indicator-container"
+  >
+    <View
+      accessibilityLabel="Step 1 of 6 (pending)"
+      className="w-2 h-2 rounded-full bg-muted-foreground/30"
+      testID="progress-step-0"
+    />
+    <View
+      accessibilityLabel="Step 2 of 6 (pending)"
+      className="w-2 h-2 rounded-full bg-muted-foreground/30"
+      testID="progress-step-1"
+    />
+    <View
+      accessibilityLabel="Step 3 of 6 (pending)"
+      className="w-2 h-2 rounded-full bg-muted-foreground/30"
+      testID="progress-step-2"
+    />
+    <View
+      accessibilityLabel="Step 4 of 6 (pending)"
+      className="w-2 h-2 rounded-full bg-muted-foreground/30"
+      testID="progress-step-3"
+    />
+    <View
+      accessibilityLabel="Step 5 of 6 (pending)"
+      className="w-2 h-2 rounded-full bg-muted-foreground/30"
+      testID="progress-step-4"
+    />
+    <View
+      accessibilityLabel="Step 6 of 6 (pending)"
+      className="w-2 h-2 rounded-full bg-muted-foreground/30"
+      testID="progress-step-5"
+    />
+  </View>
+  <View
+    className="space-y-2"
+  />
+  <View
+    className="flex-row justify-center space-x-4"
+  >
+    <Text
+      className="text-xs text-muted-foreground"
+      testID="progress-stats"
+    >
+      0
+       of 
+      6
+       completed
+    </Text>
+  </View>
+</View>
+`;
+
+exports[`AuthProgressIndicator Snapshot Testing should match snapshot with error state 1`] = `
+<View
+  className="space-y-4 "
+  testID="auth-progress-indicator"
+>
+  <View
+    className="flex-row justify-center items-center gap-2 "
+    testID="progress-indicator-container"
+  >
+    <View
+      accessibilityLabel="Step 1 of 6 (pending)"
+      className="w-2 h-2 rounded-full bg-muted-foreground/30"
+      testID="progress-step-0"
+    />
+    <View
+      accessibilityLabel="Step 2 of 6 (pending)"
+      className="w-2 h-2 rounded-full bg-muted-foreground/30"
+      testID="progress-step-1"
+    />
+    <View
+      accessibilityLabel="Step 3 of 6 (pending)"
+      className="w-2 h-2 rounded-full bg-muted-foreground/30"
+      testID="progress-step-2"
+    />
+    <View
+      accessibilityLabel="Step 4 of 6 (pending)"
+      className="w-2 h-2 rounded-full bg-muted-foreground/30"
+      testID="progress-step-3"
+    />
+    <View
+      accessibilityLabel="Step 5 of 6 (pending)"
+      className="w-2 h-2 rounded-full bg-muted-foreground/30"
+      testID="progress-step-4"
+    />
+    <View
+      accessibilityLabel="Step 6 of 6 (pending)"
+      className="w-2 h-2 rounded-full bg-muted-foreground/30"
+      testID="progress-step-5"
+    />
+  </View>
+  <View
+    className="space-y-2"
+  >
+    <Text
+      className="text-center text-xs text-destructive"
+      testID="progress-error"
+    >
+      Authentication failed
+    </Text>
+  </View>
+  <View
+    className="flex-row justify-center space-x-4"
+  >
+    <Text
+      className="text-xs text-muted-foreground"
+      testID="progress-stats"
+    >
+      0
+       of 
+      6
+       completed
+    </Text>
+  </View>
+</View>
+`;

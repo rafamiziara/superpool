@@ -13,8 +13,8 @@ export function LoadingSpinner({
   color = '#2563eb', // Default to primary color
 }: LoadingSpinnerProps) {
   return (
-    <View className={`items-center justify-center ${className}`}>
-      <ActivityIndicator size={size} color={color} />
+    <View className={`items-center justify-center ${className}`} testID="loading-spinner-container">
+      <ActivityIndicator size={size} color={color} testID="activity-indicator" />
     </View>
   )
 }
