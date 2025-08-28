@@ -77,7 +77,7 @@ describe('useWalletConnectionTrigger', () => {
       })
     )
 
-    rerender()
+    rerender({})
 
     // Should schedule authentication trigger with debounce
     expect(mockOnNewConnection).not.toHaveBeenCalled() // Not called immediately
@@ -113,7 +113,7 @@ describe('useWalletConnectionTrigger', () => {
     // Simulate wallet disconnection
     mockUseAccount.mockReturnValue(createMockAccountState())
 
-    rerender()
+    rerender({})
 
     expect(mockOnDisconnection).toHaveBeenCalledTimes(1)
     expect(mockOnDisconnection).toHaveBeenCalledWith()
@@ -153,7 +153,7 @@ describe('useWalletConnectionTrigger', () => {
       })
     )
 
-    rerender()
+    rerender({})
 
     // Should NOT trigger new authentication for chain changes
     jest.runAllTimers()
@@ -181,11 +181,11 @@ describe('useWalletConnectionTrigger', () => {
         status: 'connected',
       })
     )
-    rerender()
+    rerender({})
 
     // Rapid disconnection
     mockUseAccount.mockReturnValue(createMockAccountState())
-    rerender()
+    rerender({})
 
     // Rapid reconnection before first timeout completes
     mockUseAccount.mockReturnValue(
@@ -199,7 +199,7 @@ describe('useWalletConnectionTrigger', () => {
         status: 'connected',
       })
     )
-    rerender()
+    rerender({})
 
     // Should trigger authentication for the new connection after debounce
     jest.runAllTimers()

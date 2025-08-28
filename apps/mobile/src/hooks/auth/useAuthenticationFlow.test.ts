@@ -5,8 +5,7 @@
  * and ensure all components work together properly.
  */
 
-import { renderHook, waitFor } from '@testing-library/react-native'
-import { act } from 'react-test-renderer'
+import { renderHook, waitFor, act } from '@testing-library/react-native'
 import { useAuthentication } from './useAuthentication'
 import { useAuthenticationIntegration } from './useAuthenticationIntegration'
 import { useAuthSessionRecovery } from './useAuthSessionRecovery'
