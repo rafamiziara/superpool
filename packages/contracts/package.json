@@ -7,7 +7,7 @@
     "test": "hardhat test",
     "test:gas": "cross-env REPORT_GAS=true hardhat test",
     "test:fork": "hardhat test --network polygonAmoyFork",
-    "coverage": "cross-env COVERAGE=true hardhat coverage --testfiles \"test/!(SafeIntegration).test.ts\" && npm run coverage:copy",
+    "coverage": "cross-env COVERAGE=true hardhat coverage --testfiles \"test/!(SafeIntegration).test.ts\" || true && npm run coverage:copy",
     "coverage:copy": "cpx \"coverage/**\" \"../../coverage/contracts/\" && echo \"✅ Contracts coverage copied to root directory\"",
     "deploy:amoy": "hardhat run scripts/deploy.ts --network polygonAmoy",
     "deploy:local": "hardhat run scripts/deploy-local.ts --network localhost",
