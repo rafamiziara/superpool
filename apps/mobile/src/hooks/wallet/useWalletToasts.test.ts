@@ -1,4 +1,4 @@
-import { renderHookWithStore } from '../../test-utils'
+import { renderHookWithStore, createMockRootStore } from '../../test-utils'
 import { EventEmitter } from 'events'
 import { useAccount } from 'wagmi'
 import { appToasts } from '../../utils/toast'
@@ -69,6 +69,18 @@ const createMockChain = (id: number, name: string) =>
     },
   }) as const
 
+// Helper to update both wagmi mock and wallet store
+const updateWalletState = (store: any, accountState: any) => {
+  mockUseAccount.mockReturnValue(accountState)
+  if (store && store.walletStore) {
+    store.walletStore.updateConnectionState({
+      isConnected: accountState.isConnected,
+      address: accountState.address,
+      chainId: accountState.chainId,
+    })
+  }
+}
+
 describe('useWalletToasts', () => {
   beforeEach(() => {
     jest.clearAllMocks()
@@ -94,30 +106,30 @@ describe('useWalletToasts', () => {
       })
     )
 
-    rerender()
+    rerender({})
 
     // Should not show toast because showConnectionToasts defaults to false
     expect(mockAppToasts.walletConnected).not.toHaveBeenCalled()
   })
 
   it('should show connection toast when explicitly enabled', () => {
-    const { rerender } = renderHookWithStore(() => useWalletToasts({ showConnectionToasts: true }))
+    const mockStore = createMockRootStore()
+    const { rerender } = renderHookWithStore(() => useWalletToasts({ showConnectionToasts: true }), { store: mockStore })
 
     // Simulate wallet connection
-    mockUseAccount.mockReturnValue(
-      createMockAccountState({
-        address: '0x1234567890123456789012345678901234567890',
-        addresses: ['0x1234567890123456789012345678901234567890'],
-        chain: createMockChain(1, 'Ethereum'),
-        chainId: 1,
-        connector: createMockConnector('MetaMask'),
-        isConnected: true,
-        isDisconnected: false,
-        status: 'connected',
-      })
-    )
-
-    rerender()
+    const connectedState = createMockAccountState({
+      address: '0x1234567890123456789012345678901234567890',
+      addresses: ['0x1234567890123456789012345678901234567890'],
+      chain: createMockChain(1, 'Ethereum'),
+      chainId: 1,
+      connector: createMockConnector('MetaMask'),
+      isConnected: true,
+      isDisconnected: false,
+      status: 'connected',
+    })
+    
+    updateWalletState(mockStore, connectedState)
+    rerender({})
 
     expect(mockAppToasts.walletConnected).toHaveBeenCalledWith('MetaMask')
     expect(mockAppToasts.walletConnected).toHaveBeenCalledTimes(1)
@@ -143,7 +155,7 @@ describe('useWalletToasts', () => {
     // Simulate wallet disconnection
     mockUseAccount.mockReturnValue(createMockAccountState())
 
-    rerender()
+    rerender({})
 
     expect(mockAppToasts.walletDisconnected).toHaveBeenCalledTimes(1)
     expect(mockAppToasts.walletDisconnected).toHaveBeenCalledWith()
@@ -169,7 +181,7 @@ describe('useWalletToasts', () => {
     // Simulate wallet disconnection
     mockUseAccount.mockReturnValue(createMockAccountState())
 
-    rerender()
+    rerender({})
 
     expect(mockAppToasts.walletDisconnected).not.toHaveBeenCalled()
   })
@@ -195,13 +207,13 @@ describe('useWalletToasts', () => {
         status: 'connected',
       })
     )
-    rerender()
+    rerender({})
 
     expect(mockAppToasts.walletConnected).toHaveBeenCalledWith('MetaMask')
 
     // Disconnection
     mockUseAccount.mockReturnValue(createMockAccountState())
-    rerender()
+    rerender({})
 
     expect(mockAppToasts.walletDisconnected).toHaveBeenCalledTimes(1)
 
@@ -218,7 +230,7 @@ describe('useWalletToasts', () => {
         status: 'connected',
       })
     )
-    rerender()
+    rerender({})
 
     expect(mockAppToasts.walletConnected).toHaveBeenCalledWith('WalletConnect')
     expect(mockAppToasts.walletConnected).toHaveBeenCalledTimes(2)
@@ -241,7 +253,7 @@ describe('useWalletToasts', () => {
       })
     )
 
-    rerender()
+    rerender({})
 
     expect(mockAppToasts.walletConnected).toHaveBeenCalledWith(undefined)
   })

@@ -51,7 +51,7 @@ describe('useGlobalErrorHandler', () => {
     const { result } = renderHook(() => useGlobalErrorHandler())
 
     // Hook should complete without errors
-    expect(result.error).toBeUndefined()
+    expect(result.current).toBeDefined()
 
     // Console.error should be replaced
     expect(console.error).not.toBe(originalError)
