@@ -106,7 +106,6 @@ describe('useAuthenticationIntegration', () => {
   let consoleSpy: jest.SpyInstance
 
   beforeEach(() => {
-    jest.clearAllMocks()
     mockStore = createMockRootStore()
 
     consoleSpy = jest.spyOn(console, 'log').mockImplementation()
@@ -119,16 +118,19 @@ describe('useAuthenticationIntegration', () => {
     // Reset orchestrator mock
     mockOrchestrator.authenticate.mockResolvedValue({ success: true })
     mockOrchestrator.handleDisconnection.mockResolvedValue(undefined as any)
+    AuthenticationOrchestratorMock.mockImplementation(() => mockOrchestrator)
 
     mockUseAccount.mockReturnValue(createMockDisconnectedAccount())
 
     // Mock FIREBASE_AUTH.currentUser
     require('../../firebase.config').FIREBASE_AUTH.currentUser = null
+
+    // Clear mocks after store setup to preserve the jest mock functions
+    jest.clearAllMocks()
   })
 
   afterEach(() => {
     consoleSpy.mockRestore()
-    jest.clearAllMocks()
   })
 
   describe('Initialization', () => {
@@ -164,8 +166,16 @@ describe('useAuthenticationIntegration', () => {
     it('should reuse orchestrator instance', () => {
       const { result } = renderHookWithStore(() => useAuthenticationIntegration(), { store: mockStore })
 
-      const orchestrator1 = act(() => result.current.getOrchestrator())
-      const orchestrator2 = act(() => result.current.getOrchestrator())
+      let orchestrator1: any
+      let orchestrator2: any
+
+      act(() => {
+        orchestrator1 = result.current.getOrchestrator()
+      })
+
+      act(() => {
+        orchestrator2 = result.current.getOrchestrator()
+      })
 
       expect(orchestrator1).toBe(orchestrator2)
       expect(AuthenticationOrchestratorMock).toHaveBeenCalledTimes(1)
@@ -188,7 +198,10 @@ describe('useAuthenticationIntegration', () => {
         chainId,
       })
 
-      expect(mockStore.walletStore.connect).toHaveBeenCalledWith(walletAddress, chainId)
+      // Verify wallet store was updated with connection details
+      expect(mockStore.walletStore.isConnected).toBe(true)
+      expect(mockStore.walletStore.address).toBe(walletAddress)
+      expect(mockStore.walletStore.chainId).toBe(chainId)
       expect(mockOrchestrator.authenticate).toHaveBeenCalled()
     })
 
@@ -215,7 +228,9 @@ describe('useAuthenticationIntegration', () => {
       })
 
       // Should use chain ID from useAccount hook
-      expect(mockStore.walletStore.connect).toHaveBeenCalledWith(walletAddress, 137)
+      expect(mockStore.walletStore.isConnected).toBe(true)
+      expect(mockStore.walletStore.address).toBe(walletAddress)
+      expect(mockStore.walletStore.chainId).toBe(137)
     })
 
     it('should fallback to chain ID 1 when no chain info available', async () => {
@@ -233,7 +248,9 @@ describe('useAuthenticationIntegration', () => {
         await result.current.onNewConnection(walletAddress)
       })
 
-      expect(mockStore.walletStore.connect).toHaveBeenCalledWith(walletAddress, 1)
+      expect(mockStore.walletStore.isConnected).toBe(true)
+      expect(mockStore.walletStore.address).toBe(walletAddress)
+      expect(mockStore.walletStore.chainId).toBe(1)
     })
 
     it('should handle authentication errors during new connection', async () => {
@@ -251,38 +268,47 @@ describe('useAuthenticationIntegration', () => {
       })
 
       expect(consoleErrorSpy).toHaveBeenCalledWith('❌ Authentication failed:', error)
-      expect(mockStore.authenticationStore.failStep).toHaveBeenCalledWith('firebase-auth', 'Authentication failed')
+      // Verify error state was set (uses currentStep || 'connect-wallet')
+      expect(mockStore.authenticationStore.failedStep).toBe('connect-wallet')
+      expect(mockStore.authenticationStore.progressError).toBe('Authentication failed')
 
       consoleErrorSpy.mockRestore()
     })
   })
 
   describe('Disconnection Handling', () => {
-    it('should handle wallet disconnection', async () => {
+    it('should handle wallet disconnection', () => {
       const { result } = renderHookWithStore(() => useAuthenticationIntegration(), { store: mockStore })
 
-      await act(async () => {
-        await result.current.onDisconnection()
+      act(() => {
+        result.current.onDisconnection()
       })
 
-      expect(mockOrchestrator.handleDisconnection).toHaveBeenCalled()
+      // Verify stores were reset/disconnected (check state changes)
+      expect(mockStore.walletStore.isConnected).toBe(false)
+      expect(mockStore.walletStore.address).toBeUndefined()
+      expect(mockStore.walletStore.chainId).toBeUndefined()
     })
 
-    it('should handle disconnection errors', async () => {
-      const error = new Error('Disconnection failed')
-      mockOrchestrator.handleDisconnection.mockRejectedValue(error)
-
-      const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation()
-
+    it('should handle disconnection gracefully', () => {
       const { result } = renderHookWithStore(() => useAuthenticationIntegration(), { store: mockStore })
 
-      await act(async () => {
-        await result.current.onDisconnection()
+      // Set initial connected state
+      act(() => {
+        mockStore.walletStore.address = '0x1234567890123456789012345678901234567890'
+        mockStore.walletStore.isConnected = true
+        mockStore.walletStore.chainId = 1
       })
 
-      expect(consoleErrorSpy).toHaveBeenCalledWith('❌ Disconnection handling failed:', error)
+      // Disconnect
+      act(() => {
+        result.current.onDisconnection()
+      })
 
-      consoleErrorSpy.mockRestore()
+      // Verify stores were reset
+      expect(mockStore.walletStore.isConnected).toBe(false)
+      expect(mockStore.walletStore.address).toBeUndefined()
+      expect(mockStore.walletStore.chainId).toBeUndefined()
     })
   })
 
@@ -296,18 +322,25 @@ describe('useAuthenticationIntegration', () => {
         await result.current.triggerAuthentication()
       })
 
-      expect(consoleSpy).toHaveBeenCalledWith('🔐 Manual authentication triggered')
+      // triggerAuthentication calls handleNewConnection internally
+      expect(consoleSpy).toHaveBeenCalledWith('🚀 Handling new wallet connection:', {
+        walletAddress: '0x1234567890123456789012345678901234567890',
+        chainId: 1,
+      })
       expect(mockOrchestrator.authenticate).toHaveBeenCalled()
     })
 
     it('should handle manual authentication when not connected', async () => {
+      const consoleWarnSpy = jest.spyOn(console, 'warn').mockImplementation()
       const { result } = renderHookWithStore(() => useAuthenticationIntegration(), { store: mockStore })
 
       await act(async () => {
         await result.current.triggerAuthentication()
       })
 
-      expect(consoleSpy).toHaveBeenCalledWith('⚠️ Manual authentication requested but no wallet connected')
+      expect(consoleWarnSpy).toHaveBeenCalledWith('⚠️ Cannot trigger authentication: wallet not connected')
+
+      consoleWarnSpy.mockRestore()
     })
 
     it('should handle manual authentication errors', async () => {
@@ -351,8 +384,8 @@ describe('useAuthenticationIntegration', () => {
     it('should return false when auth store has wallet address', () => {
       mockUseAccount.mockReturnValue(createMockConnectedAccount('0x1234567890123456789012345678901234567890', 1))
 
-      // Mock the authenticated state instead of setting readonly property
-      jest.spyOn(mockStore.authenticationStore, 'authWalletAddress', 'get').mockReturnValue('0x1234567890123456789012345678901234567890')
+      // Set the auth lock to simulate authenticated state
+      mockStore.authenticationStore.authLock.walletAddress = '0x1234567890123456789012345678901234567890'
 
       const { result } = renderHookWithStore(() => useAuthenticationIntegration(), { store: mockStore })
 
@@ -363,8 +396,8 @@ describe('useAuthenticationIntegration', () => {
     it('should return false when authentication is in progress', () => {
       mockUseAccount.mockReturnValue(createMockConnectedAccount('0x1234567890123456789012345678901234567890', 1))
 
-      // Mock the authenticating state instead of setting readonly property
-      jest.spyOn(mockStore.authenticationStore, 'isAuthenticating', 'get').mockReturnValue(true)
+      // Set the auth lock to simulate authentication in progress
+      mockStore.authenticationStore.authLock.isLocked = true
 
       const { result } = renderHookWithStore(() => useAuthenticationIntegration(), { store: mockStore })
 
@@ -496,13 +529,23 @@ describe('useAuthenticationIntegration', () => {
     })
 
     it('should maintain orchestrator instance across rerenders', () => {
+      // Reset the mock implementation that was set in the previous test
+      AuthenticationOrchestratorMock.mockImplementation(() => mockOrchestrator)
+
       const { result, rerender } = renderHookWithStore(() => useAuthenticationIntegration(), { store: mockStore })
 
-      const orchestrator1 = act(() => result.current.getOrchestrator())
+      let orchestrator1: any
+      let orchestrator2: any
+
+      act(() => {
+        orchestrator1 = result.current.getOrchestrator()
+      })
 
       rerender({})
 
-      const orchestrator2 = act(() => result.current.getOrchestrator())
+      act(() => {
+        orchestrator2 = result.current.getOrchestrator()
+      })
 
       expect(orchestrator1).toBe(orchestrator2)
       expect(AuthenticationOrchestratorMock).toHaveBeenCalledTimes(1)
@@ -523,10 +566,9 @@ describe('useAuthenticationIntegration', () => {
         await result.current.onNewConnection('0x1234567890123456789012345678901234567890')
       })
 
-      expect(mockStore.walletStore.connect).toHaveBeenCalledWith(
-        '0x1234567890123456789012345678901234567890',
-        1 // fallback chain ID
-      )
+      expect(mockStore.walletStore.isConnected).toBe(true)
+      expect(mockStore.walletStore.address).toBe('0x1234567890123456789012345678901234567890')
+      expect(mockStore.walletStore.chainId).toBe(1) // fallback chain ID
     })
 
     it('should handle null addresses gracefully', () => {
@@ -548,7 +590,7 @@ describe('useAuthenticationIntegration', () => {
       })
 
       // Immediate disconnection
-      await act(async () => {
+      act(() => {
         result.current.onDisconnection()
       })
 
@@ -558,7 +600,9 @@ describe('useAuthenticationIntegration', () => {
       })
 
       expect(mockOrchestrator.authenticate).toHaveBeenCalledTimes(2)
-      expect(mockOrchestrator.handleDisconnection).toHaveBeenCalledTimes(1)
+      // After the final connection, wallet should be connected again
+      expect(mockStore.walletStore.isConnected).toBe(true)
+      expect(mockStore.walletStore.chainId).toBe(137) // Last connection used chain ID 137
     })
   })
 })

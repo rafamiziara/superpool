@@ -21,6 +21,7 @@ export const createMockAuthenticationStore = (overrides: Partial<AuthenticationS
   const originalCompleteStep = store.completeStep.bind(store) 
   const originalFailStep = store.failStep.bind(store)
   const originalResetProgress = store.resetProgress.bind(store)
+  const originalReset = store.reset.bind(store)
   const originalGetStepStatus = store.getStepStatus.bind(store)
   const originalGetStepInfo = store.getStepInfo.bind(store)
   const originalGetAllSteps = store.getAllSteps.bind(store)
@@ -30,6 +31,7 @@ export const createMockAuthenticationStore = (overrides: Partial<AuthenticationS
   const mockCompleteStep = jest.fn().mockImplementation(originalCompleteStep)
   const mockFailStep = jest.fn().mockImplementation(originalFailStep)
   const mockResetProgress = jest.fn().mockImplementation(originalResetProgress)
+  const mockReset = jest.fn().mockImplementation(originalReset)
   const mockGetStepStatus = jest.fn().mockImplementation(originalGetStepStatus)
   const mockGetStepInfo = jest.fn().mockImplementation(originalGetStepInfo)
   const mockGetAllSteps = jest.fn().mockImplementation(originalGetAllSteps)
@@ -43,6 +45,8 @@ export const createMockAuthenticationStore = (overrides: Partial<AuthenticationS
   ;(store as any).failStep = mockFailStep
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   ;(store as any).resetProgress = mockResetProgress
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  ;(store as any).reset = mockReset
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   ;(store as any).getStepStatus = mockGetStepStatus
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -58,6 +62,19 @@ export const createMockAuthenticationStore = (overrides: Partial<AuthenticationS
 
 export const createMockWalletStore = (overrides: Partial<WalletStore> = {}): WalletStore => {
   const store = new WalletStore()
+
+  // Create mocks for the methods that tests expect to be spies
+  const originalConnect = store.connect.bind(store)
+  const originalDisconnect = store.disconnect.bind(store)
+  
+  const mockConnect = jest.fn().mockImplementation(originalConnect)
+  const mockDisconnect = jest.fn().mockImplementation(originalDisconnect)
+
+  // Replace methods on the store with mocks
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  ;(store as any).connect = mockConnect
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  ;(store as any).disconnect = mockDisconnect
 
   // Apply overrides
   Object.assign(store, overrides)
@@ -96,9 +113,8 @@ export const createMockRootStore = (
   // Always replace authenticationStore with mocked version for tests
   rootStore.authenticationStore = createMockAuthenticationStore(storeOverrides.authenticationStore || {})
 
-  if (storeOverrides.walletStore) {
-    rootStore.walletStore = createMockWalletStore(storeOverrides.walletStore)
-  }
+  // Always replace walletStore with mocked version for tests
+  rootStore.walletStore = createMockWalletStore(storeOverrides.walletStore || {})
 
   if (storeOverrides.poolManagementStore) {
     rootStore.poolManagementStore = createMockPoolManagementStore(storeOverrides.poolManagementStore)
