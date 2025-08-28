@@ -16,7 +16,7 @@ export const useAuthenticationStateReadonly = () => {
   // Clean direct return - MobX observer components handle reactivity automatically
   return {
     // Authentication state from MobX store (reactive)
-    authError: authStore.authError,
+    authError: authStore.authError?.userFriendlyMessage ?? authStore.authError,
     isAuthenticating: authStore.isAuthenticating || firebaseAuth.isLoading,
 
     // Use Firebase wallet address if available (persistent), otherwise fall back to MobX store

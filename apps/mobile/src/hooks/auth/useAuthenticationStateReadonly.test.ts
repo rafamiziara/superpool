@@ -369,14 +369,7 @@ describe('useAuthenticationStateReadonly', () => {
 
         expect(result.current.isAuthenticating).toBe(i % 2 === 0)
         expect(result.current.authError).toEqual(
-          i % 2 === 0
-            ? {
-                name: 'AppError',
-                message: `Error ${i}`,
-                type: ErrorType.AUTHENTICATION_FAILED,
-                userFriendlyMessage: `Error ${i}`,
-              }
-            : null
+          i % 2 === 0 ? `Error ${i}` : null
         )
       }
     })
