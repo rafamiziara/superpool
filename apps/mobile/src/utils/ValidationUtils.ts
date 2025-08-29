@@ -5,6 +5,9 @@ import { AUTH_VALIDATION, SIGNATURE_FORMATS, SUPPORTED_CHAIN_IDS, WALLET_ADDRESS
  * Centralizes validation logic used across authentication and signature services
  */
 export class ValidationUtils {
+  // Private constructor to prevent instantiation
+  private constructor() {}
+
   /**
    * Validates Ethereum wallet address format
    */
