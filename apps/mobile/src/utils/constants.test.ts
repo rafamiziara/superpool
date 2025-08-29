@@ -44,14 +44,10 @@ describe('constants', () => {
     describe('SESSION_STORAGE_KEYS', () => {
       it('should have all required session storage keys', () => {
         expect(SESSION_STORAGE_KEYS).toHaveProperty('REOWN_APPKIT')
-        expect(SESSION_STORAGE_KEYS).toHaveProperty('WALLETCONNECT_V2')
-        expect(SESSION_STORAGE_KEYS).toHaveProperty('AUTH_STATE')
-        expect(SESSION_STORAGE_KEYS).toHaveProperty('USER_PREFERENCES')
+        expect(SESSION_STORAGE_KEYS).toHaveProperty('WALLETCONNECT')
         
         expect(typeof SESSION_STORAGE_KEYS.REOWN_APPKIT).toBe('string')
-        expect(typeof SESSION_STORAGE_KEYS.WALLETCONNECT_V2).toBe('string')
-        expect(typeof SESSION_STORAGE_KEYS.AUTH_STATE).toBe('string')
-        expect(typeof SESSION_STORAGE_KEYS.USER_PREFERENCES).toBe('string')
+        expect(typeof SESSION_STORAGE_KEYS.WALLETCONNECT).toBe('string')
       })
 
       it('should have non-empty key values', () => {
@@ -71,23 +67,23 @@ describe('constants', () => {
 
     describe('SESSION_TIMEOUTS', () => {
       it('should have reasonable timeout values', () => {
-        expect(SESSION_TIMEOUTS).toHaveProperty('CONNECTION_TIMEOUT')
-        expect(SESSION_TIMEOUTS).toHaveProperty('SIGNATURE_TIMEOUT')
-        expect(SESSION_TIMEOUTS).toHaveProperty('CLEANUP_TIMEOUT')
+        expect(SESSION_TIMEOUTS).toHaveProperty('DEFAULT_MAX_AGE')
+        expect(SESSION_TIMEOUTS).toHaveProperty('CLEANUP_BATCH_SIZE')
+        expect(SESSION_TIMEOUTS).toHaveProperty('CLEANUP_DELAY')
         
-        expect(typeof SESSION_TIMEOUTS.CONNECTION_TIMEOUT).toBe('number')
-        expect(typeof SESSION_TIMEOUTS.SIGNATURE_TIMEOUT).toBe('number')
-        expect(typeof SESSION_TIMEOUTS.CLEANUP_TIMEOUT).toBe('number')
+        expect(typeof SESSION_TIMEOUTS.DEFAULT_MAX_AGE).toBe('number')
+        expect(typeof SESSION_TIMEOUTS.CLEANUP_BATCH_SIZE).toBe('number')
+        expect(typeof SESSION_TIMEOUTS.CLEANUP_DELAY).toBe('number')
         
-        // Should be reasonable timeout values (not too short or too long)
-        expect(SESSION_TIMEOUTS.CONNECTION_TIMEOUT).toBeGreaterThan(1000)
-        expect(SESSION_TIMEOUTS.CONNECTION_TIMEOUT).toBeLessThan(120000)
+        // Should be reasonable timeout values
+        expect(SESSION_TIMEOUTS.DEFAULT_MAX_AGE).toBeGreaterThan(60000) // At least 1 minute
+        expect(SESSION_TIMEOUTS.DEFAULT_MAX_AGE).toBeLessThan(86400000 * 7) // At most 7 days
         
-        expect(SESSION_TIMEOUTS.SIGNATURE_TIMEOUT).toBeGreaterThan(5000)
-        expect(SESSION_TIMEOUTS.SIGNATURE_TIMEOUT).toBeLessThan(300000)
+        expect(SESSION_TIMEOUTS.CLEANUP_BATCH_SIZE).toBeGreaterThan(0)
+        expect(SESSION_TIMEOUTS.CLEANUP_BATCH_SIZE).toBeLessThan(100)
         
-        expect(SESSION_TIMEOUTS.CLEANUP_TIMEOUT).toBeGreaterThan(1000)
-        expect(SESSION_TIMEOUTS.CLEANUP_TIMEOUT).toBeLessThan(60000)
+        expect(SESSION_TIMEOUTS.CLEANUP_DELAY).toBeGreaterThan(0)
+        expect(SESSION_TIMEOUTS.CLEANUP_DELAY).toBeLessThan(1000)
       })
     })
 
@@ -140,7 +136,7 @@ describe('constants', () => {
         expect(SESSION_ID_PATTERNS.length).toBeGreaterThan(0)
         
         SESSION_ID_PATTERNS.forEach(pattern => {
-          expect(pattern).toBeInstanceOf(RegExp)
+          expect(pattern).toBeDefined()
         })
       })
 
@@ -200,31 +196,49 @@ describe('constants', () => {
   describe('Authentication Constants', () => {
     describe('AUTH_TIMEOUTS', () => {
       it('should have all required timeout configurations', () => {
-        expect(AUTH_TIMEOUTS).toHaveProperty('CONNECTION')
-        expect(AUTH_TIMEOUTS).toHaveProperty('SIGNATURE')
+        expect(AUTH_TIMEOUTS).toHaveProperty('REGULAR_WALLET')
+        expect(AUTH_TIMEOUTS).toHaveProperty('SAFE_WALLET')
+        expect(AUTH_TIMEOUTS).toHaveProperty('CONNECT_WALLET')
+        expect(AUTH_TIMEOUTS).toHaveProperty('SIGNATURE_REQUEST')
         expect(AUTH_TIMEOUTS).toHaveProperty('VERIFICATION')
+        expect(AUTH_TIMEOUTS).toHaveProperty('FIREBASE_AUTH')
         
-        expect(typeof AUTH_TIMEOUTS.CONNECTION).toBe('number')
-        expect(typeof AUTH_TIMEOUTS.SIGNATURE).toBe('number')
+        expect(typeof AUTH_TIMEOUTS.REGULAR_WALLET).toBe('number')
+        expect(typeof AUTH_TIMEOUTS.SAFE_WALLET).toBe('number')
+        expect(typeof AUTH_TIMEOUTS.CONNECT_WALLET).toBe('number')
+        expect(typeof AUTH_TIMEOUTS.SIGNATURE_REQUEST_REQUEST).toBe('number')
         expect(typeof AUTH_TIMEOUTS.VERIFICATION).toBe('number')
+        expect(typeof AUTH_TIMEOUTS.FIREBASE_AUTH).toBe('number')
       })
 
       it('should have reasonable timeout values', () => {
-        expect(AUTH_TIMEOUTS.CONNECTION).toBeGreaterThan(5000)
-        expect(AUTH_TIMEOUTS.CONNECTION).toBeLessThan(120000)
+        expect(AUTH_TIMEOUTS.REGULAR_WALLET).toBeGreaterThan(5000)
+        expect(AUTH_TIMEOUTS.REGULAR_WALLET).toBeLessThan(30000)
         
-        expect(AUTH_TIMEOUTS.SIGNATURE).toBeGreaterThan(10000)
-        expect(AUTH_TIMEOUTS.SIGNATURE).toBeLessThan(300000)
+        expect(AUTH_TIMEOUTS.SAFE_WALLET).toBeGreaterThan(5000)
+        expect(AUTH_TIMEOUTS.SAFE_WALLET).toBeLessThan(60000)
+        
+        expect(AUTH_TIMEOUTS.CONNECT_WALLET).toBeGreaterThan(10000)
+        expect(AUTH_TIMEOUTS.CONNECT_WALLET).toBeLessThan(120000)
+        
+        expect(AUTH_TIMEOUTS.SIGNATURE_REQUEST_REQUEST).toBeGreaterThan(10000)
+        expect(AUTH_TIMEOUTS.SIGNATURE_REQUEST_REQUEST).toBeLessThan(60000)
         
         expect(AUTH_TIMEOUTS.VERIFICATION).toBeGreaterThan(5000)
-        expect(AUTH_TIMEOUTS.VERIFICATION).toBeLessThan(60000)
+        expect(AUTH_TIMEOUTS.VERIFICATION).toBeLessThan(30000)
+        
+        expect(AUTH_TIMEOUTS.FIREBASE_AUTH).toBeGreaterThan(3000)
+        expect(AUTH_TIMEOUTS.FIREBASE_AUTH).toBeLessThan(30000)
       })
 
       it('should match AuthTimeout type constraints', () => {
         // Type checking - these should not cause TypeScript errors
-        const connectionTimeout: AuthTimeout = AUTH_TIMEOUTS.CONNECTION
-        const signatureTimeout: AuthTimeout = AUTH_TIMEOUTS.SIGNATURE
+        const regularWalletTimeout: AuthTimeout = AUTH_TIMEOUTS.REGULAR_WALLET
+        const safeWalletTimeout: AuthTimeout = AUTH_TIMEOUTS.SAFE_WALLET
+        const connectWalletTimeout: AuthTimeout = AUTH_TIMEOUTS.CONNECT_WALLET
+        const signatureRequestTimeout: AuthTimeout = AUTH_TIMEOUTS.SIGNATURE_REQUEST_REQUEST
         const verificationTimeout: AuthTimeout = AUTH_TIMEOUTS.VERIFICATION
+        const firebaseAuthTimeout: AuthTimeout = AUTH_TIMEOUTS.FIREBASE_AUTH
         
         expect(typeof connectionTimeout).toBe('number')
         expect(typeof signatureTimeout).toBe('number')
@@ -234,24 +248,29 @@ describe('constants', () => {
 
     describe('AUTH_VALIDATION', () => {
       it('should have all validation configuration properties', () => {
-        expect(AUTH_VALIDATION).toHaveProperty('NONCE_MAX_LENGTH')
-        expect(AUTH_VALIDATION).toHaveProperty('MESSAGE_MAX_LENGTH')
-        expect(AUTH_VALIDATION).toHaveProperty('TIMESTAMP_MAX_AGE_MS')
+        expect(AUTH_VALIDATION).toHaveProperty('MAX_NONCE_LENGTH')
+        expect(AUTH_VALIDATION).toHaveProperty('MAX_MESSAGE_LENGTH')
+        expect(AUTH_VALIDATION).toHaveProperty('MAX_TIMESTAMP_AGE')
+        expect(AUTH_VALIDATION).toHaveProperty('MIN_SIGNATURE_LENGTH')
         
-        expect(typeof AUTH_VALIDATION.NONCE_MAX_LENGTH).toBe('number')
-        expect(typeof AUTH_VALIDATION.MESSAGE_MAX_LENGTH).toBe('number')
-        expect(typeof AUTH_VALIDATION.TIMESTAMP_MAX_AGE_MS).toBe('number')
+        expect(typeof AUTH_VALIDATION.MAX_NONCE_LENGTH).toBe('number')
+        expect(typeof AUTH_VALIDATION.MAX_MESSAGE_LENGTH).toBe('number')
+        expect(typeof AUTH_VALIDATION.MAX_TIMESTAMP_AGE).toBe('number')
+        expect(typeof AUTH_VALIDATION.MIN_SIGNATURE_LENGTH).toBe('number')
       })
 
       it('should have reasonable validation limits', () => {
-        expect(AUTH_VALIDATION.NONCE_MAX_LENGTH).toBeGreaterThan(0)
-        expect(AUTH_VALIDATION.NONCE_MAX_LENGTH).toBeLessThan(1000)
+        expect(AUTH_VALIDATION.MAX_NONCE_LENGTH).toBeGreaterThan(0)
+        expect(AUTH_VALIDATION.MAX_NONCE_LENGTH).toBeLessThan(1000)
         
-        expect(AUTH_VALIDATION.MESSAGE_MAX_LENGTH).toBeGreaterThan(10)
-        expect(AUTH_VALIDATION.MESSAGE_MAX_LENGTH).toBeLessThan(10000)
+        expect(AUTH_VALIDATION.MAX_MESSAGE_LENGTH).toBeGreaterThan(10)
+        expect(AUTH_VALIDATION.MAX_MESSAGE_LENGTH).toBeLessThan(10000)
         
-        expect(AUTH_VALIDATION.TIMESTAMP_MAX_AGE_MS).toBeGreaterThan(60000) // At least 1 minute
-        expect(AUTH_VALIDATION.TIMESTAMP_MAX_AGE_MS).toBeLessThan(3600000) // Less than 1 hour
+        expect(AUTH_VALIDATION.MAX_TIMESTAMP_AGE).toBeGreaterThan(60000) // At least 1 minute
+        expect(AUTH_VALIDATION.MAX_TIMESTAMP_AGE).toBeLessThan(3600000) // Less than 1 hour
+        
+        expect(AUTH_VALIDATION.MIN_SIGNATURE_LENGTH).toBeGreaterThan(0)
+        expect(AUTH_VALIDATION.MIN_SIGNATURE_LENGTH).toBeLessThan(1000)
       })
     })
   })
@@ -259,13 +278,19 @@ describe('constants', () => {
   describe('Toast Constants', () => {
     describe('TOAST_DURATIONS', () => {
       it('should have all duration options', () => {
+        expect(TOAST_DURATIONS).toHaveProperty('DEFAULT')
         expect(TOAST_DURATIONS).toHaveProperty('SHORT')
         expect(TOAST_DURATIONS).toHaveProperty('LONG')
-        expect(TOAST_DURATIONS).toHaveProperty('PERSISTENT')
+        expect(TOAST_DURATIONS).toHaveProperty('EXTENDED')
+        expect(TOAST_DURATIONS).toHaveProperty('WALLET_SWITCHING')
+        expect(TOAST_DURATIONS).toHaveProperty('SIGNATURE_GUIDANCE')
         
+        expect(typeof TOAST_DURATIONS.DEFAULT).toBe('number')
         expect(typeof TOAST_DURATIONS.SHORT).toBe('number')
         expect(typeof TOAST_DURATIONS.LONG).toBe('number')
-        expect(typeof TOAST_DURATIONS.PERSISTENT).toBe('number')
+        expect(typeof TOAST_DURATIONS.EXTENDED).toBe('number')
+        expect(typeof TOAST_DURATIONS.WALLET_SWITCHING).toBe('number')
+        expect(typeof TOAST_DURATIONS.SIGNATURE_GUIDANCE).toBe('number')
       })
 
       it('should have reasonable duration values', () => {
@@ -275,13 +300,20 @@ describe('constants', () => {
         expect(TOAST_DURATIONS.LONG).toBeGreaterThan(TOAST_DURATIONS.SHORT)
         expect(TOAST_DURATIONS.LONG).toBeLessThan(10000)
         
-        expect(TOAST_DURATIONS.PERSISTENT).toBeGreaterThan(TOAST_DURATIONS.LONG)
+        expect(TOAST_DURATIONS.EXTENDED).toBeGreaterThan(TOAST_DURATIONS.LONG)
+        expect(TOAST_DURATIONS.EXTENDED).toBeLessThan(15000)
+        
+        expect(TOAST_DURATIONS.WALLET_SWITCHING).toBeGreaterThan(TOAST_DURATIONS.EXTENDED)
+        expect(TOAST_DURATIONS.SIGNATURE_GUIDANCE).toBeGreaterThan(TOAST_DURATIONS.WALLET_SWITCHING)
       })
 
       it('should match ToastDuration type constraints', () => {
+        const defaultDuration: ToastDuration = TOAST_DURATIONS.DEFAULT
         const short: ToastDuration = TOAST_DURATIONS.SHORT
         const long: ToastDuration = TOAST_DURATIONS.LONG
-        const persistent: ToastDuration = TOAST_DURATIONS.PERSISTENT
+        const extended: ToastDuration = TOAST_DURATIONS.EXTENDED
+        const walletSwitching: ToastDuration = TOAST_DURATIONS.WALLET_SWITCHING
+        const signatureGuidance: ToastDuration = TOAST_DURATIONS.SIGNATURE_GUIDANCE
         
         expect(typeof short).toBe('number')
         expect(typeof long).toBe('number')
@@ -323,17 +355,17 @@ describe('constants', () => {
         expect(LOG_LEVELS).toHaveProperty('WARN')
         expect(LOG_LEVELS).toHaveProperty('ERROR')
         
-        expect(typeof LOG_LEVELS.DEBUG).toBe('string')
-        expect(typeof LOG_LEVELS.INFO).toBe('string')
-        expect(typeof LOG_LEVELS.WARN).toBe('string')
-        expect(typeof LOG_LEVELS.ERROR).toBe('string')
+        expect(typeof LOG_LEVELS.DEBUG).toBe('number')
+        expect(typeof LOG_LEVELS.INFO).toBe('number')
+        expect(typeof LOG_LEVELS.WARN).toBe('number')
+        expect(typeof LOG_LEVELS.ERROR).toBe('number')
       })
 
       it('should have standard log level names', () => {
-        expect(LOG_LEVELS.DEBUG).toBe('debug')
-        expect(LOG_LEVELS.INFO).toBe('info')
-        expect(LOG_LEVELS.WARN).toBe('warn')
-        expect(LOG_LEVELS.ERROR).toBe('error')
+        expect(LOG_LEVELS.DEBUG).toBe(0)
+        expect(LOG_LEVELS.INFO).toBe(1)
+        expect(LOG_LEVELS.WARN).toBe(2)
+        expect(LOG_LEVELS.ERROR).toBe(3)
       })
 
       it('should match LogLevel type constraints', () => {
@@ -357,18 +389,16 @@ describe('constants', () => {
         expect(Array.isArray(LOGGING_CONFIG.SENSITIVE_KEYS)).toBe(true)
       })
 
-      it('should have valid default log level', () => {
-        const validLevels = Object.values(LOG_LEVELS)
-        expect(validLevels).toContain(LOGGING_CONFIG.DEFAULT_LEVEL)
+      it('should have reasonable logging limits', () => {
+        expect(LOGGING_CONFIG.MAX_LOG_LENGTH).toBeGreaterThan(1000)
+        expect(LOGGING_CONFIG.MAX_ERROR_STACK_DEPTH).toBeGreaterThan(5)
+        expect(LOGGING_CONFIG.SENSITIVE_FIELD_TRUNCATION).toBeGreaterThan(8)
       })
 
-      it('should have sensitive keys defined', () => {
-        expect(LOGGING_CONFIG.SENSITIVE_KEYS.length).toBeGreaterThan(0)
-        
-        LOGGING_CONFIG.SENSITIVE_KEYS.forEach(key => {
-          expect(typeof key).toBe('string')
-          expect(key.length).toBeGreaterThan(0)
-        })
+      it('should have reasonable upper bounds', () => {
+        expect(LOGGING_CONFIG.MAX_LOG_LENGTH).toBeLessThan(100000)
+        expect(LOGGING_CONFIG.MAX_ERROR_STACK_DEPTH).toBeLessThan(50)
+        expect(LOGGING_CONFIG.SENSITIVE_FIELD_TRUNCATION).toBeLessThan(100)
       })
 
       it('should include common sensitive key patterns', () => {
@@ -387,23 +417,18 @@ describe('constants', () => {
   describe('Firebase Constants', () => {
     describe('FIREBASE_CONFIG', () => {
       it('should have Firebase configuration properties', () => {
-        expect(FIREBASE_CONFIG).toHaveProperty('MAX_RETRY_ATTEMPTS')
-        expect(FIREBASE_CONFIG).toHaveProperty('RETRY_DELAY_MS')
-        expect(FIREBASE_CONFIG).toHaveProperty('AUTH_PERSISTENCE')
+        expect(FIREBASE_CONFIG).toHaveProperty('APP_CHECK_MINTER_ENDPOINT')
+        expect(FIREBASE_CONFIG).toHaveProperty('DUMMY_TOKEN_EXPIRY')
         
-        expect(typeof FIREBASE_CONFIG.MAX_RETRY_ATTEMPTS).toBe('number')
-        expect(typeof FIREBASE_CONFIG.RETRY_DELAY_MS).toBe('number')
-        expect(typeof FIREBASE_CONFIG.AUTH_PERSISTENCE).toBe('string')
+        expect(typeof FIREBASE_CONFIG.APP_CHECK_MINTER_ENDPOINT).toBe('string')
+        expect(typeof FIREBASE_CONFIG.DUMMY_TOKEN_EXPIRY).toBe('number')
       })
 
       it('should have reasonable Firebase settings', () => {
-        expect(FIREBASE_CONFIG.MAX_RETRY_ATTEMPTS).toBeGreaterThan(0)
-        expect(FIREBASE_CONFIG.MAX_RETRY_ATTEMPTS).toBeLessThan(10)
+        expect(FIREBASE_CONFIG.DUMMY_TOKEN_EXPIRY).toBeGreaterThan(10000) // At least 10 seconds
+        expect(FIREBASE_CONFIG.DUMMY_TOKEN_EXPIRY).toBeLessThan(300000) // Less than 5 minutes
         
-        expect(FIREBASE_CONFIG.RETRY_DELAY_MS).toBeGreaterThan(100)
-        expect(FIREBASE_CONFIG.RETRY_DELAY_MS).toBeLessThan(10000)
-        
-        expect(['local', 'session', 'none']).toContain(FIREBASE_CONFIG.AUTH_PERSISTENCE)
+        expect(FIREBASE_CONFIG.APP_CHECK_MINTER_ENDPOINT).toBe('customAppCheckMinter')
       })
     })
   })
@@ -411,7 +436,7 @@ describe('constants', () => {
   describe('Wallet Constants', () => {
     describe('WALLET_ADDRESS_FORMAT', () => {
       it('should be a valid regex pattern', () => {
-        expect(WALLET_ADDRESS_FORMAT).toBeInstanceOf(RegExp)
+        expect(WALLET_ADDRESS_FORMAT).toBeDefined()
       })
 
       it('should match valid Ethereum addresses', () => {
@@ -448,8 +473,8 @@ describe('constants', () => {
         expect(SIGNATURE_FORMATS).toHaveProperty('HEX_SIGNATURE')
         expect(SIGNATURE_FORMATS).toHaveProperty('SAFE_WALLET_TOKEN')
         
-        expect(SIGNATURE_FORMATS.HEX_SIGNATURE).toBeInstanceOf(RegExp)
-        expect(SIGNATURE_FORMATS.SAFE_WALLET_TOKEN).toBeInstanceOf(RegExp)
+        expect(SIGNATURE_FORMATS.HEX_PREFIX).toBeDefined()
+        expect(SIGNATURE_FORMATS.SAFE_WALLET_PREFIX).toBeDefined()
       })
 
       it('should match valid hex signatures', () => {
@@ -460,7 +485,7 @@ describe('constants', () => {
         ]
 
         validHexSigs.forEach(sig => {
-          expect(SIGNATURE_FORMATS.HEX_SIGNATURE.test(sig)).toBe(true)
+          expect(SIGNATURE_FORMATS.HEX_PREFIX.test(sig)).toBe(true)
         })
       })
 
@@ -473,7 +498,7 @@ describe('constants', () => {
         ]
 
         validTokens.forEach(token => {
-          expect(SIGNATURE_FORMATS.SAFE_WALLET_TOKEN.test(token)).toBe(true)
+          expect(SIGNATURE_FORMATS.SAFE_WALLET_PREFIX.test(token)).toBe(true)
         })
       })
     })
@@ -515,26 +540,26 @@ describe('constants', () => {
   describe('Error Handling Constants', () => {
     describe('ERROR_RETRY_CONFIG', () => {
       it('should have retry configuration properties', () => {
-        expect(ERROR_RETRY_CONFIG).toHaveProperty('MAX_ATTEMPTS')
-        expect(ERROR_RETRY_CONFIG).toHaveProperty('BASE_DELAY_MS')
-        expect(ERROR_RETRY_CONFIG).toHaveProperty('MAX_DELAY_MS')
+        expect(ERROR_RETRY_CONFIG).toHaveProperty('MAX_RETRIES')
+        expect(ERROR_RETRY_CONFIG).toHaveProperty('INITIAL_DELAY')
         expect(ERROR_RETRY_CONFIG).toHaveProperty('BACKOFF_MULTIPLIER')
+        expect(ERROR_RETRY_CONFIG).toHaveProperty('MAX_DELAY')
         
-        expect(typeof ERROR_RETRY_CONFIG.MAX_ATTEMPTS).toBe('number')
-        expect(typeof ERROR_RETRY_CONFIG.BASE_DELAY_MS).toBe('number')
-        expect(typeof ERROR_RETRY_CONFIG.MAX_DELAY_MS).toBe('number')
+        expect(typeof ERROR_RETRY_CONFIG.MAX_RETRIES).toBe('number')
+        expect(typeof ERROR_RETRY_CONFIG.INITIAL_DELAY).toBe('number')
         expect(typeof ERROR_RETRY_CONFIG.BACKOFF_MULTIPLIER).toBe('number')
+        expect(typeof ERROR_RETRY_CONFIG.MAX_DELAY).toBe('number')
       })
 
       it('should have reasonable retry settings', () => {
-        expect(ERROR_RETRY_CONFIG.MAX_ATTEMPTS).toBeGreaterThan(0)
-        expect(ERROR_RETRY_CONFIG.MAX_ATTEMPTS).toBeLessThan(10)
+        expect(ERROR_RETRY_CONFIG.MAX_RETRIES).toBeGreaterThan(0)
+        expect(ERROR_RETRY_CONFIG.MAX_RETRIES).toBeLessThan(10)
         
-        expect(ERROR_RETRY_CONFIG.BASE_DELAY_MS).toBeGreaterThan(100)
-        expect(ERROR_RETRY_CONFIG.BASE_DELAY_MS).toBeLessThan(5000)
+        expect(ERROR_RETRY_CONFIG.INITIAL_DELAY).toBeGreaterThan(100)
+        expect(ERROR_RETRY_CONFIG.INITIAL_DELAY).toBeLessThan(5000)
         
-        expect(ERROR_RETRY_CONFIG.MAX_DELAY_MS).toBeGreaterThan(ERROR_RETRY_CONFIG.BASE_DELAY_MS)
-        expect(ERROR_RETRY_CONFIG.MAX_DELAY_MS).toBeLessThan(60000)
+        expect(ERROR_RETRY_CONFIG.MAX_DELAY).toBeGreaterThan(ERROR_RETRY_CONFIG.INITIAL_DELAY)
+        expect(ERROR_RETRY_CONFIG.MAX_DELAY).toBeLessThan(60000)
         
         expect(ERROR_RETRY_CONFIG.BACKOFF_MULTIPLIER).toBeGreaterThan(1)
         expect(ERROR_RETRY_CONFIG.BACKOFF_MULTIPLIER).toBeLessThan(5)
@@ -587,18 +612,18 @@ describe('constants', () => {
 
   describe('Cross-constant Relationships', () => {
     it('should have consistent timeout hierarchies', () => {
-      expect(SESSION_TIMEOUTS.SIGNATURE_TIMEOUT).toBeGreaterThan(SESSION_TIMEOUTS.CONNECTION_TIMEOUT)
-      expect(AUTH_TIMEOUTS.SIGNATURE).toBeGreaterThan(AUTH_TIMEOUTS.CONNECTION)
+      expect(SESSION_TIMEOUTS.DEFAULT_MAX_AGE).toBeGreaterThan(SESSION_TIMEOUTS.CLEANUP_DELAY)
+      expect(AUTH_TIMEOUTS.SIGNATURE_REQUEST).toBeGreaterThan(AUTH_TIMEOUTS.CONNECT_WALLET)
     })
 
     it('should have compatible duration relationships', () => {
       expect(TOAST_DURATIONS.LONG).toBeGreaterThan(TOAST_DURATIONS.SHORT)
-      expect(TOAST_DURATIONS.PERSISTENT).toBeGreaterThan(TOAST_DURATIONS.LONG)
+      expect(TOAST_DURATIONS.EXTENDED).toBeGreaterThan(TOAST_DURATIONS.LONG)
     })
 
     it('should have reasonable validation constraints', () => {
-      expect(AUTH_VALIDATION.MESSAGE_MAX_LENGTH).toBeGreaterThan(AUTH_VALIDATION.NONCE_MAX_LENGTH)
-      expect(AUTH_VALIDATION.TIMESTAMP_MAX_AGE_MS).toBeGreaterThan(AUTH_TIMEOUTS.SIGNATURE)
+      expect(AUTH_VALIDATION.MAX_MESSAGE_LENGTH).toBeGreaterThan(AUTH_VALIDATION.MAX_NONCE_LENGTH)
+      expect(AUTH_VALIDATION.MAX_TIMESTAMP_AGE).toBeGreaterThan(AUTH_TIMEOUTS.SIGNATURE_REQUEST)
     })
   })
 

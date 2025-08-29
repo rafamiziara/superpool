@@ -11,14 +11,11 @@ import {
 describe('errorHandling', () => {
   describe('ErrorType enum', () => {
     it('should have all required error types', () => {
+      expect(ErrorType.WALLET_CONNECTION).toBe('WALLET_CONNECTION')
       expect(ErrorType.AUTHENTICATION_FAILED).toBe('AUTHENTICATION_FAILED')
       expect(ErrorType.SIGNATURE_REJECTED).toBe('SIGNATURE_REJECTED')
-      expect(ErrorType.TRANSACTION_REJECTED).toBe('TRANSACTION_REJECTED')
       expect(ErrorType.NETWORK_ERROR).toBe('NETWORK_ERROR')
-      expect(ErrorType.CHAIN_MISMATCH).toBe('CHAIN_MISMATCH')
-      expect(ErrorType.INSUFFICIENT_FUNDS).toBe('INSUFFICIENT_FUNDS')
-      expect(ErrorType.SESSION_CORRUPTION).toBe('SESSION_CORRUPTION')
-      expect(ErrorType.TIMEOUT_ERROR).toBe('TIMEOUT_ERROR')
+      expect(ErrorType.BACKEND_ERROR).toBe('BACKEND_ERROR')
       expect(ErrorType.UNKNOWN_ERROR).toBe('UNKNOWN_ERROR')
     })
 
@@ -34,15 +31,12 @@ describe('errorHandling', () => {
 
   describe('ERROR_MESSAGES', () => {
     it('should have user-friendly messages for all error types', () => {
+      expect(ERROR_MESSAGES[ErrorType.WALLET_CONNECTION]).toBe('Failed to connect to wallet. Please try again.')
       expect(ERROR_MESSAGES[ErrorType.AUTHENTICATION_FAILED]).toBe('Authentication failed. Please try connecting your wallet again.')
-      expect(ERROR_MESSAGES[ErrorType.SIGNATURE_REJECTED]).toBe('Signature was rejected. Please try again.')
-      expect(ERROR_MESSAGES[ErrorType.TRANSACTION_REJECTED]).toBe('Transaction was rejected by the user.')
-      expect(ERROR_MESSAGES[ErrorType.NETWORK_ERROR]).toBe('Network connection failed. Please check your internet connection.')
-      expect(ERROR_MESSAGES[ErrorType.CHAIN_MISMATCH]).toBe('Please switch to the correct network in your wallet.')
-      expect(ERROR_MESSAGES[ErrorType.INSUFFICIENT_FUNDS]).toBe('Insufficient funds to complete this transaction.')
-      expect(ERROR_MESSAGES[ErrorType.SESSION_CORRUPTION]).toBe('Session has been corrupted. Please reconnect your wallet.')
-      expect(ERROR_MESSAGES[ErrorType.TIMEOUT_ERROR]).toBe('Request timed out. Please try again.')
-      expect(ERROR_MESSAGES[ErrorType.UNKNOWN_ERROR]).toBe('An unexpected error occurred. Please try again.')
+      expect(ERROR_MESSAGES[ErrorType.SIGNATURE_REJECTED]).toBe('Authentication was cancelled. You can try connecting again when ready.')
+      expect(ERROR_MESSAGES[ErrorType.NETWORK_ERROR]).toBe('Network error. Please check your connection and try again.')
+      expect(ERROR_MESSAGES[ErrorType.BACKEND_ERROR]).toBe('Server error. Please try again in a moment.')
+      expect(ERROR_MESSAGES[ErrorType.UNKNOWN_ERROR]).toBe('Something went wrong. Please try again.')
     })
 
     it('should have messages for all enum values', () => {

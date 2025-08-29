@@ -10,7 +10,18 @@ const mockAsyncStorage = {
   setItem: jest.fn(),
 }
 
-jest.mock('@react-native-async-storage/async-storage', () => mockAsyncStorage)
+jest.mock('@react-native-async-storage/async-storage', () => ({
+  __esModule: true,
+  default: mockAsyncStorage,
+}))
+
+// Mock console methods globally
+global.console = {
+  ...console,
+  log: jest.fn(),
+  error: jest.fn(),
+  warn: jest.fn(),
+}
 
 // Mock constants
 jest.mock('./constants', () => ({
@@ -44,7 +55,16 @@ jest.mock('./constants', () => ({
 
 describe('SessionManager', () => {
   beforeEach(() => {
+    // Reset all mocks before each test
     jest.clearAllMocks()
+    
+    // Setup default AsyncStorage mock responses
+    mockAsyncStorage.getAllKeys.mockResolvedValue([])
+    mockAsyncStorage.multiGet.mockResolvedValue([])
+    mockAsyncStorage.multiRemove.mockResolvedValue()
+    mockAsyncStorage.getItem.mockResolvedValue(null)
+    mockAsyncStorage.removeItem.mockResolvedValue()
+    mockAsyncStorage.setItem.mockResolvedValue()
     
     // Reset any potential locks
     ;(SessionManager as any).cleanupLock = false

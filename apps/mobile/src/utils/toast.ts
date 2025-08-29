@@ -25,34 +25,66 @@ function showToast(type: ToastType, { title, message, duration = 4000, position 
 }
 
 // Success toast for positive feedback
-export function showSuccessToast(options: ToastOptions) {
-  showToast('success', options)
+export function showSuccessToast(message: string, text2?: string, duration = 3000, position: 'top' | 'bottom' = 'bottom') {
+  Toast.show({
+    type: 'success',
+    text1: message,
+    text2,
+    position,
+    visibilityTime: duration,
+    autoHide: true,
+    topOffset: 60,
+    bottomOffset: 60,
+  })
 }
 
 // Error toast for error feedback
-export function showErrorToast(options: ToastOptions) {
-  showToast('error', options)
+export function showErrorToast(message: string, text2?: string, duration = 5000, position: 'top' | 'bottom' = 'bottom') {
+  Toast.show({
+    type: 'error',
+    text1: message,
+    text2,
+    position,
+    visibilityTime: duration,
+    autoHide: true,
+    topOffset: 60,
+    bottomOffset: 60,
+  })
 }
 
 // Info toast for general information
-export function showInfoToast(options: ToastOptions) {
-  showToast('info', options)
+export function showInfoToast(message: string, text2?: string, duration = 4000, position: 'top' | 'bottom' = 'bottom') {
+  Toast.show({
+    type: 'info',
+    text1: message,
+    text2,
+    position,
+    visibilityTime: duration,
+    autoHide: true,
+    topOffset: 60,
+    bottomOffset: 60,
+  })
 }
 
 // Warning toast for warnings
-export function showWarningToast(options: ToastOptions) {
-  showToast('warning', options)
+export function showWarningToast(message: string, text2?: string, duration = 4000, position: 'top' | 'bottom' = 'bottom') {
+  Toast.show({
+    type: 'warning',
+    text1: message,
+    text2,
+    position,
+    visibilityTime: duration,
+    autoHide: true,
+    topOffset: 60,
+    bottomOffset: 60,
+  })
 }
 
 // Specialized function to show error from AppError
 export function showErrorFromAppError(error: AppError) {
   const title = getErrorTitle(error.type)
 
-  showErrorToast({
-    title,
-    message: error.userFriendlyMessage,
-    duration: getErrorDuration(error.type),
-  })
+  showErrorToast(title, error.userFriendlyMessage, getErrorDuration(error.type))
 }
 
 // Get appropriate title for error type
@@ -68,6 +100,16 @@ function getErrorTitle(errorType: ErrorType): string {
       return 'Authentication Failed'
     case ErrorType.BACKEND_ERROR:
       return 'Server Error'
+    case ErrorType.TIMEOUT_ERROR:
+      return 'Request Timeout'
+    case ErrorType.TRANSACTION_REJECTED:
+      return 'Transaction Rejected'
+    case ErrorType.INSUFFICIENT_FUNDS:
+      return 'Insufficient Funds'
+    case ErrorType.SESSION_CORRUPTION:
+      return 'Session Error'
+    case ErrorType.CHAIN_MISMATCH:
+      return 'Wrong Network'
     case ErrorType.UNKNOWN_ERROR:
     default:
       return 'Error'
@@ -78,10 +120,16 @@ function getErrorTitle(errorType: ErrorType): string {
 function getErrorDuration(errorType: ErrorType): number {
   switch (errorType) {
     case ErrorType.SIGNATURE_REJECTED:
+    case ErrorType.TRANSACTION_REJECTED:
       return 3000 // Shorter for user-initiated actions
     case ErrorType.NETWORK_ERROR:
     case ErrorType.BACKEND_ERROR:
+    case ErrorType.TIMEOUT_ERROR:
       return 5000 // Longer for technical issues
+    case ErrorType.INSUFFICIENT_FUNDS:
+    case ErrorType.SESSION_CORRUPTION:
+    case ErrorType.CHAIN_MISMATCH:
+      return 6000 // Persistent duration for critical errors
     default:
       return 4000 // Standard duration
   }
@@ -90,64 +138,43 @@ function getErrorDuration(errorType: ErrorType): number {
 // Authentication-specific toast helpers with extended durations for wallet app switching
 export const authToasts = {
   connecting: () =>
-    showInfoToast({
-      title: 'Connecting',
-      message: 'Please sign the message to authenticate...',
-      duration: 12000, // Extended for wallet app switching
-    }),
+    showInfoToast('Connecting', 'Please sign the message to authenticate...', 12000), // Extended for wallet app switching
 
   success: () =>
-    showSuccessToast({
-      title: 'Welcome!',
-      message: 'Successfully authenticated and signed in.',
-      duration: 4000,
-    }),
+    showSuccessToast('Welcome!', 'Successfully authenticated and signed in.', 4000),
 
   signingMessage: () =>
-    showInfoToast({
-      title: 'Sign Message',
-      message:
-        "Check your wallet app to sign the authentication message. If you don't see a signature request, try switching back and forth between apps.",
-      duration: 15000, // Extended for wallet app switching scenarios
-    }),
+    showInfoToast(
+      'Sign Message',
+      "Check your wallet app to sign the authentication message. If you don't see a signature request, try switching back and forth between apps.",
+      15000 // Extended for wallet app switching scenarios
+    ),
 
   verifying: () =>
-    showInfoToast({
-      title: 'Verifying',
-      message: 'Verifying your signature...',
-      duration: 8000, // Extended for potential delays
-    }),
+    showInfoToast('Verifying', 'Verifying your signature...', 8000), // Extended for potential delays
 
   // New toast for wallet app guidance
   walletAppGuidance: () =>
-    showInfoToast({
-      title: 'Wallet App Required',
-      message: 'Authentication requires your wallet app. You may need to switch between apps to complete the process.',
-      duration: 10000,
-    }),
+    showInfoToast(
+      'Wallet App Required',
+      'Authentication requires your wallet app. You may need to switch between apps to complete the process.',
+      10000
+    ),
 
   // Session error toast for WalletConnect issues
   sessionError: () =>
-    showErrorToast({
-      title: 'Connection Issue',
-      message: 'Wallet session expired. Please reconnect your wallet to continue.',
-      duration: 5000,
-    }),
+    showErrorToast('Connection Issue', 'Wallet session expired. Please reconnect your wallet to continue.', 5000),
 }
 
 // General app toast helpers
 export const appToasts = {
   walletConnected: (walletName?: string) =>
-    showSuccessToast({
-      title: 'Wallet Connected',
-      message: walletName ? `Connected to ${walletName}` : 'Wallet connected successfully',
-      duration: 3000,
-    }),
+    showSuccessToast(
+      'Wallet Connected',
+      walletName ? `Connected to ${walletName}` : 'Wallet connected successfully',
+      3000
+    ),
 
   walletDisconnected: () =>
-    showInfoToast({
-      title: 'Wallet Disconnected',
-      message: 'Your wallet has been disconnected.',
-      duration: 3000,
-    }),
+    showInfoToast('Wallet Disconnected', 'Your wallet has been disconnected.', 3000),
 }
