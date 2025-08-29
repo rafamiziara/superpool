@@ -74,7 +74,7 @@ export class ErrorAnalyzer {
       errorMessage.includes('relayer')
 
     // Extract session ID from error message if present
-    const sessionIdMatch = errorMessage.match(/session:\\s*([a-f0-9]{64})/i)
+    const sessionIdMatch = errorMessage.match(/session:\s*([a-f0-9]{64})/i)
     const sessionId = sessionIdMatch ? sessionIdMatch[1] : undefined
 
     return {

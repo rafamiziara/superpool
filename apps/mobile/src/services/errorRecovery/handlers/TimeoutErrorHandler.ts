@@ -25,8 +25,19 @@ export class TimeoutErrorHandler implements ErrorHandler<void> {
 
     console.log('⏰ Signature request timed out')
 
-    // Disconnect wallet on timeout
-    this.disconnectFunction()
+    // Disconnect wallet on timeout - handle both sync and async disconnect functions
+    try {
+      const disconnectResult = this.disconnectFunction()
+      
+      // If disconnect function returns a Promise, catch any rejections
+      if (disconnectResult && typeof disconnectResult.catch === 'function') {
+        disconnectResult.catch(() => {
+          // Silently handle disconnect failures - timeout handling should continue
+        })
+      }
+    } catch (error) {
+      // Silently handle synchronous disconnect failures - timeout handling should continue
+    }
 
     // Return result with longer delay to show error after disconnect toast
     return RecoveryActions.technicalFailure(2000)

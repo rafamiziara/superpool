@@ -6,6 +6,10 @@ import { FIREBASE_AUTH } from '../../../firebase.config'
  * Handles sign-out operations triggered by authentication state changes
  */
 export class FirebaseCleanupManager {
+  private constructor() {
+    throw new Error('FirebaseCleanupManager is a utility class and cannot be instantiated')
+  }
+
   /**
    * Handles Firebase authentication cleanup on state changes
    */
@@ -24,7 +28,7 @@ export class FirebaseCleanupManager {
    * Checks if user is currently signed in to Firebase
    */
   static isUserSignedIn(): boolean {
-    return FIREBASE_AUTH.currentUser !== null
+    return FIREBASE_AUTH.currentUser != null
   }
 
   /**

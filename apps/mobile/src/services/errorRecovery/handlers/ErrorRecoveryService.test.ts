@@ -20,6 +20,13 @@ jest.mock('./TimeoutErrorHandler')
 jest.mock('./ConnectorErrorHandler')
 jest.mock('./GenericErrorHandler')
 
+// Mock Firebase config to prevent Firebase initialization
+jest.mock('../../../firebase.config', () => ({
+  FIREBASE_AUTH: { currentUser: null },
+  FIREBASE_APP: {},
+  FIREBASE_DB: {},
+}))
+
 describe('ErrorRecoveryService', () => {
   let mockAuthStore: jest.Mocked<AuthenticationStore>
   let mockWalletStore: jest.Mocked<WalletStore>

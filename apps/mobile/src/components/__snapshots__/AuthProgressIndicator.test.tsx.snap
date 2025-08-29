@@ -1,4 +1,4 @@
-// Jest Snapshot v1, https://jestjs.io/docs/snapshot-testing
+// Jest Snapshot v1, https://goo.gl/fbAQLP
 
 exports[`AuthProgressIndicator Snapshot Testing should match snapshot with active step 1`] = `
 <View
@@ -63,7 +63,7 @@ exports[`AuthProgressIndicator Snapshot Testing should match snapshot with activ
       className="text-xs text-muted-foreground"
       testID="progress-stats"
     >
-      0
+      1
        of 
       6
        completed
@@ -122,7 +122,7 @@ exports[`AuthProgressIndicator Snapshot Testing should match snapshot with compl
       className="text-xs text-muted-foreground"
       testID="progress-stats"
     >
-      1
+      2
        of 
       6
        completed
@@ -187,7 +187,7 @@ exports[`AuthProgressIndicator Snapshot Testing should match snapshot with defau
       className="text-xs text-muted-foreground"
       testID="progress-stats"
     >
-      0
+      1
        of 
       6
        completed
@@ -253,7 +253,7 @@ exports[`AuthProgressIndicator Snapshot Testing should match snapshot with error
       className="text-xs text-muted-foreground"
       testID="progress-stats"
     >
-      0
+      1
        of 
       6
        completed
