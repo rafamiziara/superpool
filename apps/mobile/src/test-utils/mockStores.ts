@@ -97,6 +97,59 @@ export const createMockWalletStore = (overrides: Partial<WalletStore> = {}): Wal
 export const createMockPoolManagementStore = (overrides: Partial<PoolManagementStore> = {}): PoolManagementStore => {
   const store = new PoolManagementStore()
 
+  // Create mocks for async methods that tests expect to be spies
+  const originalLoadPools = store.loadPools.bind(store)
+  const originalCreatePool = store.createPool.bind(store)
+  const originalJoinPool = store.joinPool.bind(store)
+  const originalAddPool = store.addPool.bind(store)
+  const originalUpdatePool = store.updatePool.bind(store)
+  const originalRemovePool = store.removePool.bind(store)
+  const originalAddLoan = store.addLoan.bind(store)
+  const originalUpdateLoan = store.updateLoan.bind(store)
+  const originalAddTransaction = store.addTransaction.bind(store)
+  const originalUpdateTransaction = store.updateTransaction.bind(store)
+  const originalSetLoading = store.setLoading.bind(store)
+  const originalSetError = store.setError.bind(store)
+
+  const mockLoadPools = jest.fn().mockImplementation(originalLoadPools)
+  const mockCreatePool = jest.fn().mockImplementation(originalCreatePool)
+  const mockJoinPool = jest.fn().mockImplementation(originalJoinPool)
+  const mockAddPool = jest.fn().mockImplementation(originalAddPool)
+  const mockUpdatePool = jest.fn().mockImplementation(originalUpdatePool)
+  const mockRemovePool = jest.fn().mockImplementation(originalRemovePool)
+  const mockAddLoan = jest.fn().mockImplementation(originalAddLoan)
+  const mockUpdateLoan = jest.fn().mockImplementation(originalUpdateLoan)
+  const mockAddTransaction = jest.fn().mockImplementation(originalAddTransaction)
+  const mockUpdateTransaction = jest.fn().mockImplementation(originalUpdateTransaction)
+  const mockSetLoading = jest.fn().mockImplementation(originalSetLoading)
+  const mockSetError = jest.fn().mockImplementation(originalSetError)
+
+  // Replace methods on the store with mocks
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  ;(store as any).loadPools = mockLoadPools
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  ;(store as any).createPool = mockCreatePool
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  ;(store as any).joinPool = mockJoinPool
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  ;(store as any).addPool = mockAddPool
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  ;(store as any).updatePool = mockUpdatePool
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  ;(store as any).removePool = mockRemovePool
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  ;(store as any).addLoan = mockAddLoan
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  ;(store as any).updateLoan = mockUpdateLoan
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  ;(store as any).addTransaction = mockAddTransaction
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  ;(store as any).updateTransaction = mockUpdateTransaction
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  ;(store as any).setLoading = mockSetLoading
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  ;(store as any).setError = mockSetError
+
   // Apply overrides
   Object.assign(store, overrides)
 
@@ -105,6 +158,19 @@ export const createMockPoolManagementStore = (overrides: Partial<PoolManagementS
 
 export const createMockUIStore = (overrides: Partial<UIStore> = {}): UIStore => {
   const store = new UIStore()
+
+  // Create mocks for methods that tests expect to be spies
+  const originalSetOnboardingIndex = store.setOnboardingIndex.bind(store)
+  const originalResetOnboardingState = store.resetOnboardingState.bind(store)
+
+  const mockSetOnboardingIndex = jest.fn().mockImplementation(originalSetOnboardingIndex)
+  const mockResetOnboardingState = jest.fn().mockImplementation(originalResetOnboardingState)
+
+  // Replace methods on the store with mocks
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  ;(store as any).setOnboardingIndex = mockSetOnboardingIndex
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  ;(store as any).resetOnboardingState = mockResetOnboardingState
 
   // Apply overrides
   Object.assign(store, overrides)
@@ -128,13 +194,11 @@ export const createMockRootStore = (
   // Always replace walletStore with mocked version for tests
   rootStore.walletStore = createMockWalletStore(storeOverrides.walletStore || {})
 
-  if (storeOverrides.poolManagementStore) {
-    rootStore.poolManagementStore = createMockPoolManagementStore(storeOverrides.poolManagementStore)
-  }
+  // Always replace poolManagementStore with mocked version for tests
+  rootStore.poolManagementStore = createMockPoolManagementStore(storeOverrides.poolManagementStore || {})
 
-  if (storeOverrides.uiStore) {
-    rootStore.uiStore = createMockUIStore(storeOverrides.uiStore)
-  }
+  // Always replace uiStore with mocked version for tests
+  rootStore.uiStore = createMockUIStore(storeOverrides.uiStore || {})
 
   return rootStore
 }
@@ -144,6 +208,98 @@ export const createMockRootStore = (
  */
 
 export const mockStorePresets = {
+  // Pool management store with test data
+  poolWithData: () => {
+    const mockPool = {
+      id: 'test-pool-1',
+      name: 'Test Pool',
+      description: 'A test pool for unit tests',
+      contractAddress: '0x1234567890123456789012345678901234567890',
+      creator: '0x1234567890123456789012345678901234567890',
+      admins: ['0x1234567890123456789012345678901234567890'],
+      members: ['0x1234567890123456789012345678901234567890'],
+      maxMembers: 10,
+      minimumContribution: BigInt(50),
+      interestRate: 500,
+      loanDuration: 2592000,
+      totalLiquidity: BigInt(1000),
+      availableLiquidity: BigInt(800),
+      totalBorrowed: BigInt(200),
+      isActive: true,
+      isPaused: false,
+      createdAt: new Date('2023-01-01'),
+      updatedAt: new Date('2023-01-02'),
+    }
+
+    const store = createMockRootStore({
+      walletStore: {
+        isConnected: true,
+        address: '0x1234567890123456789012345678901234567890',
+        chainId: 137,
+      },
+      poolManagementStore: {
+        userAddress: '0x1234567890123456789012345678901234567890',
+      },
+    })
+
+    // Add test pool data
+    store.poolManagementStore.addPool(mockPool)
+
+    return store
+  },
+
+  // Loading states for different stores
+  loadingPools: () =>
+    createMockRootStore({
+      poolManagementStore: {
+        loading: {
+          pools: true,
+          loans: false,
+          transactions: false,
+          memberActions: false,
+        },
+      },
+    }),
+
+  loadingMemberActions: () =>
+    createMockRootStore({
+      poolManagementStore: {
+        loading: {
+          pools: false,
+          loans: false,
+          transactions: false,
+          memberActions: true,
+        },
+      },
+    }),
+
+  // UI state presets
+  onboardingInProgress: () =>
+    createMockRootStore({
+      uiStore: {
+        onboardingCurrentIndex: 2,
+      },
+    }),
+
+  // Combined states
+  authenticatedWithPoolData: () => {
+    const store = mockStorePresets.poolWithData()
+    return store
+  },
+
+  // Error with specific store states
+  poolManagementError: () =>
+    createMockRootStore({
+      poolManagementStore: {
+        error: 'Failed to load pool data',
+        loading: {
+          pools: false,
+          loans: false,
+          transactions: false,
+          memberActions: false,
+        },
+      },
+    }),
   // Authenticated user with connected wallet
   authenticatedWithWallet: () =>
     createMockRootStore({
