@@ -6,19 +6,22 @@ import { LOG_LEVELS } from './constants'
  */
 
 class SecureLogger {
-  private isDevelopment = __DEV__
-  private minLogLevel = this.isDevelopment ? LOG_LEVELS.DEBUG : LOG_LEVELS.WARN
+  private static isDevelopment = __DEV__
+  private static minLogLevel = SecureLogger.isDevelopment ? LOG_LEVELS.DEBUG : LOG_LEVELS.WARN
+
+  // Prevent instantiation
+  private constructor() {}
 
   /**
    * Sanitizes potentially sensitive data for logging
    */
-  private sanitizeData(data: unknown): unknown {
+  private static sanitizeData(data: unknown): unknown {
     if (typeof data === 'string') {
-      return this.sanitizeString(data)
+      return SecureLogger.sanitizeString(data)
     }
 
     if (typeof data === 'object' && data !== null) {
-      return this.sanitizeObject(data as Record<string, unknown>)
+      return SecureLogger.sanitizeObject(data as Record<string, unknown>)
     }
 
     return data
@@ -27,7 +30,7 @@ class SecureLogger {
   /**
    * Sanitizes sensitive strings (wallet addresses, signatures, tokens)
    */
-  private sanitizeString(str: string): string {
+  private static sanitizeString(str: string): string {
     // Truncate long hex strings (signatures, tokens) but keep some for debugging
     if (str.length > 50 && /^0x[a-fA-F0-9]+$/.test(str)) {
       return `${str.substring(0, 10)}...[${str.length - 20} chars]...${str.substring(str.length - 10)}`
@@ -40,7 +43,7 @@ class SecureLogger {
   /**
    * Sanitizes objects recursively, masking sensitive keys
    */
-  private sanitizeObject(obj: Record<string, unknown>): Record<string, unknown> {
+  private static sanitizeObject(obj: Record<string, unknown>): Record<string, unknown> {
     const sensitiveKeys = ['signature', 'privateKey', 'mnemonic', 'seed', 'token', 'jwt', 'password', 'secret', 'key', 'auth', 'credential']
 
     const sanitized: Record<string, unknown> = {}
@@ -53,9 +56,9 @@ class SecureLogger {
         sanitized[key] = '[REDACTED]'
       } else if (typeof value === 'string' && value.startsWith('0x') && value.length > 20) {
         // Likely a wallet address or signature
-        sanitized[key] = this.sanitizeString(value)
+        sanitized[key] = SecureLogger.sanitizeString(value)
       } else if (typeof value === 'object' && value !== null) {
-        sanitized[key] = this.sanitizeObject(value as Record<string, unknown>)
+        sanitized[key] = SecureLogger.sanitizeObject(value as Record<string, unknown>)
       } else {
         sanitized[key] = value
       }
@@ -67,9 +70,9 @@ class SecureLogger {
   /**
    * Formats arguments for secure logging
    */
-  private formatArgs(args: unknown[]): unknown[] {
-    if (!this.isDevelopment) {
-      return args.map((arg) => this.sanitizeData(arg))
+  private static formatArgs(args: unknown[]): unknown[] {
+    if (!SecureLogger.isDevelopment) {
+      return args.map((arg) => SecureLogger.sanitizeData(arg))
     }
     return args
   }
@@ -77,50 +80,50 @@ class SecureLogger {
   /**
    * Debug logging (only in development)
    */
-  debug(...args: unknown[]): void {
-    if (this.minLogLevel <= LOG_LEVELS.DEBUG) {
-      const sanitizedArgs = this.formatArgs(args)
-      console.log('[DEBUG]', ...sanitizedArgs)
+  static debug(...args: unknown[]): void {
+    if (SecureLogger.minLogLevel <= LOG_LEVELS.DEBUG) {
+      const sanitizedArgs = SecureLogger.formatArgs(args)
+      console.log('🐛 [DEBUG]', ...sanitizedArgs)
     }
   }
 
   /**
    * Info logging
    */
-  info(...args: unknown[]): void {
-    if (this.minLogLevel <= LOG_LEVELS.INFO) {
-      const sanitizedArgs = this.formatArgs(args)
-      console.log('[INFO]', ...sanitizedArgs)
+  static info(...args: unknown[]): void {
+    if (SecureLogger.minLogLevel <= LOG_LEVELS.INFO) {
+      const sanitizedArgs = SecureLogger.formatArgs(args)
+      console.info('ℹ️ [INFO]', ...sanitizedArgs)
     }
   }
 
   /**
    * Warning logging
    */
-  warn(...args: unknown[]): void {
-    if (this.minLogLevel <= LOG_LEVELS.WARN) {
-      const sanitizedArgs = this.formatArgs(args)
-      console.warn('[WARN]', ...sanitizedArgs)
+  static warn(...args: unknown[]): void {
+    if (SecureLogger.minLogLevel <= LOG_LEVELS.WARN) {
+      const sanitizedArgs = SecureLogger.formatArgs(args)
+      console.warn('⚠️ [WARN]', ...sanitizedArgs)
     }
   }
 
   /**
    * Error logging
    */
-  error(...args: unknown[]): void {
-    if (this.minLogLevel <= LOG_LEVELS.ERROR) {
-      const sanitizedArgs = this.formatArgs(args)
-      console.error('[ERROR]', ...sanitizedArgs)
+  static error(...args: unknown[]): void {
+    if (SecureLogger.minLogLevel <= LOG_LEVELS.ERROR) {
+      const sanitizedArgs = SecureLogger.formatArgs(args)
+      console.error('❌ [ERROR]', ...sanitizedArgs)
     }
   }
 
   /**
    * Conditional logging based on development mode
    */
-  devOnly(...args: unknown[]): void {
-    if (this.isDevelopment) {
-      const sanitizedArgs = this.formatArgs(args)
-      console.log('[DEV]', ...sanitizedArgs)
+  static devOnly(...args: unknown[]): void {
+    if (SecureLogger.isDevelopment) {
+      const sanitizedArgs = SecureLogger.formatArgs(args)
+      console.log('🛠️ [DEV]', ...sanitizedArgs)
     }
   }
 
@@ -131,7 +134,7 @@ class SecureLogger {
   /**
    * Safely logs wallet address with truncation for privacy
    */
-  logWalletAddress(address: string, context = ''): string {
+  static logWalletAddress(address: string, context = ''): string {
     if (!address || address.length < 10) {
       return 'invalid-address'
     }
@@ -142,7 +145,7 @@ class SecureLogger {
   /**
    * Safely logs signature preview without exposing full signature content
    */
-  logSignaturePreview(signature: string, type = ''): void {
+  static logSignaturePreview(signature: string, type = ''): void {
     if (!signature) {
       console.log(`❌ ${type} signature: empty or invalid`)
       return
@@ -159,12 +162,12 @@ class SecureLogger {
   /**
    * Logs authentication step with timing information
    */
-  logAuthStep(step: string, status: 'start' | 'complete' | 'fail', details?: Record<string, string | number | boolean>): void {
+  static logAuthStep(step: string, status: 'start' | 'complete' | 'fail', details?: Record<string, string | number | boolean>): void {
     const timestamp = new Date().toISOString()
     const emoji = status === 'complete' ? '✅' : status === 'fail' ? '❌' : '🔄'
-    const safeDetails = details ? this.sanitizeData(details) : ''
+    const safeDetails = details ? SecureLogger.sanitizeData(details) : ''
 
-    if (this.minLogLevel <= LOG_LEVELS.INFO) {
+    if (SecureLogger.minLogLevel <= LOG_LEVELS.INFO) {
       console.log(`${emoji} Auth ${step} ${status} [${timestamp}]`, safeDetails)
     }
   }
@@ -172,17 +175,17 @@ class SecureLogger {
   /**
    * Logs service operation with context
    */
-  logServiceOperation(
+  static logServiceOperation(
     service: string,
     operation: string,
     status: 'start' | 'success' | 'error',
     details?: Record<string, string | number | boolean>
   ): void {
     const emoji = status === 'success' ? '✅' : status === 'error' ? '❌' : '🔄'
-    const safeDetails = details ? this.sanitizeData(details) : {}
+    const safeDetails = details ? SecureLogger.sanitizeData(details) : {}
 
     const logLevel = status === 'error' ? LOG_LEVELS.ERROR : LOG_LEVELS.INFO
-    if (this.minLogLevel <= logLevel) {
+    if (SecureLogger.minLogLevel <= logLevel) {
       const logMethod = status === 'error' ? console.error : console.log
       logMethod(`${emoji} [${service}] ${operation} ${status}`, safeDetails)
     }
@@ -191,10 +194,10 @@ class SecureLogger {
   /**
    * Logs error with service context but sanitizes sensitive information
    */
-  logServiceError(service: string, operation: string, error: unknown, context?: Record<string, string | number | boolean>): void {
-    if (this.minLogLevel <= LOG_LEVELS.ERROR) {
+  static logServiceError(service: string, operation: string, error: unknown, context?: Record<string, string | number | boolean>): void {
+    if (SecureLogger.minLogLevel <= LOG_LEVELS.ERROR) {
       const errorMessage = error instanceof Error ? error.message : String(error)
-      const safeContext = context ? this.sanitizeData(context) : {}
+      const safeContext = context ? SecureLogger.sanitizeData(context) : {}
 
       console.error(`❌ [${service}] ${operation} failed:`, {
         error: errorMessage,
@@ -207,10 +210,10 @@ class SecureLogger {
   /**
    * Logs recovery action with result
    */
-  logRecoveryAction(action: string, result: Record<string, string | number | boolean>, context?: string): void {
-    if (this.minLogLevel <= LOG_LEVELS.INFO) {
+  static logRecoveryAction(action: string, result: Record<string, string | number | boolean>, context?: string): void {
+    if (SecureLogger.minLogLevel <= LOG_LEVELS.INFO) {
       const prefix = context ? `🔄 [${context}] Recovery:` : '🔄 Recovery:'
-      const safeResult = this.sanitizeData(result)
+      const safeResult = SecureLogger.sanitizeData(result)
       console.log(`${prefix} ${action}`, safeResult)
     }
   }
@@ -218,12 +221,12 @@ class SecureLogger {
   /**
    * Creates a consistent log context for service operations
    */
-  createServiceContext(service: string, operation: string, additionalContext?: Record<string, string | number | boolean>): string {
+  static createServiceContext(service: string, operation: string, additionalContext?: Record<string, string | number | boolean>): string {
     const timestamp = new Date().toISOString()
     const base = `[${service}:${operation}] ${timestamp}`
 
     if (additionalContext) {
-      const safeContext = this.sanitizeData(additionalContext)
+      const safeContext = SecureLogger.sanitizeData(additionalContext)
       return `${base} ${JSON.stringify(safeContext)}`
     }
 
@@ -231,19 +234,24 @@ class SecureLogger {
   }
 }
 
-// Export singleton instance
-export const secureLogger = new SecureLogger()
+// Export the class for testing and as main interface
+export { SecureLogger }
 
-// Export convenience functions (existing)
-export const { debug, info, warn, error, devOnly } = secureLogger
+// Export convenience functions (aliases to static methods)
+export const debug = SecureLogger.debug
+export const info = SecureLogger.info
+export const warn = SecureLogger.warn
+export const error = SecureLogger.error
+export const devOnly = SecureLogger.devOnly
 
-// Export service-specific logging functions
-export const {
-  logWalletAddress,
-  logSignaturePreview,
-  logAuthStep,
-  logServiceOperation,
-  logServiceError,
-  logRecoveryAction,
-  createServiceContext,
-} = secureLogger
+// Export service-specific logging functions (aliases to static methods)
+export const logWalletAddress = SecureLogger.logWalletAddress
+export const logSignaturePreview = SecureLogger.logSignaturePreview
+export const logAuthStep = SecureLogger.logAuthStep
+export const logServiceOperation = SecureLogger.logServiceOperation
+export const logServiceError = SecureLogger.logServiceError
+export const logRecoveryAction = SecureLogger.logRecoveryAction
+export const createServiceContext = SecureLogger.createServiceContext
+
+// Export a secureLogger object for backwards compatibility
+export const secureLogger = SecureLogger
