@@ -1,8 +1,8 @@
 import { AuthenticationStore } from '../stores/AuthenticationStore'
-import { WalletStore } from '../stores/WalletStore'
 import { PoolManagementStore } from '../stores/PoolManagementStore'
-import { UIStore } from '../stores/UIStore'
 import { RootStore } from '../stores/RootStore'
+import { UIStore } from '../stores/UIStore'
+import { WalletStore } from '../stores/WalletStore'
 import { ErrorType } from '../utils/errorHandling'
 
 /**
@@ -11,20 +11,22 @@ import { ErrorType } from '../utils/errorHandling'
 
 export const createMockAuthenticationStore = (overrides: Partial<AuthenticationStore> = {}): AuthenticationStore => {
   const store = new AuthenticationStore()
-  
+
   // Reset the store to clean state first
   store.completedSteps.clear()
   store.completedSteps.add('connect-wallet') // resetProgress adds this
-  
+
   // Create a mocked version by wrapping the original methods
   const originalStartStep = store.startStep.bind(store)
-  const originalCompleteStep = store.completeStep.bind(store) 
+  const originalCompleteStep = store.completeStep.bind(store)
   const originalFailStep = store.failStep.bind(store)
   const originalResetProgress = store.resetProgress.bind(store)
   const originalReset = store.reset.bind(store)
   const originalGetStepStatus = store.getStepStatus.bind(store)
   const originalGetStepInfo = store.getStepInfo.bind(store)
   const originalGetAllSteps = store.getAllSteps.bind(store)
+  const originalSetAuthLock = store.setAuthLock.bind(store)
+  const originalSetAuthError = store.setAuthError.bind(store)
 
   // Create spies that wrap the original functionality
   const mockStartStep = jest.fn().mockImplementation(originalStartStep)
@@ -35,6 +37,8 @@ export const createMockAuthenticationStore = (overrides: Partial<AuthenticationS
   const mockGetStepStatus = jest.fn().mockImplementation(originalGetStepStatus)
   const mockGetStepInfo = jest.fn().mockImplementation(originalGetStepInfo)
   const mockGetAllSteps = jest.fn().mockImplementation(originalGetAllSteps)
+  const mockSetAuthLock = jest.fn().mockImplementation(originalSetAuthLock)
+  const mockSetAuthError = jest.fn().mockImplementation(originalSetAuthError)
 
   // Replace methods on the store with mocks
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -53,6 +57,10 @@ export const createMockAuthenticationStore = (overrides: Partial<AuthenticationS
   ;(store as any).getStepInfo = mockGetStepInfo
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   ;(store as any).getAllSteps = mockGetAllSteps
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  ;(store as any).setAuthLock = mockSetAuthLock
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  ;(store as any).setAuthError = mockSetAuthError
 
   // Apply overrides
   Object.assign(store, overrides)
@@ -66,15 +74,19 @@ export const createMockWalletStore = (overrides: Partial<WalletStore> = {}): Wal
   // Create mocks for the methods that tests expect to be spies
   const originalConnect = store.connect.bind(store)
   const originalDisconnect = store.disconnect.bind(store)
-  
+  const originalUpdateConnectionState = store.updateConnectionState.bind(store)
+
   const mockConnect = jest.fn().mockImplementation(originalConnect)
   const mockDisconnect = jest.fn().mockImplementation(originalDisconnect)
+  const mockUpdateConnectionState = jest.fn().mockImplementation(originalUpdateConnectionState)
 
   // Replace methods on the store with mocks
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   ;(store as any).connect = mockConnect
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   ;(store as any).disconnect = mockDisconnect
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  ;(store as any).updateConnectionState = mockUpdateConnectionState
 
   // Apply overrides
   Object.assign(store, overrides)
