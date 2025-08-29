@@ -8,7 +8,7 @@ import { v4 as uuidv4 } from 'uuid'
 const APP_CHECK_MINTER_URL = process.env.EXPO_PUBLIC_CLOUD_FUNCTIONS_BASE_URL + 'customAppCheckMinter'
 
 // A helper function to get a unique ID that is persistent across app updates
-const getUniqueDeviceId = async (): Promise<string | null> => {
+export const getUniqueDeviceId = async (): Promise<string | null> => {
   if (Platform.OS === 'android') {
     return Application.getAndroidId()
   }
