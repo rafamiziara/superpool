@@ -32,10 +32,10 @@ export class GenericErrorHandler implements ErrorHandler<GenericErrorContext> {
     const isUserInitiated = isUserInitiatedError(appError)
 
     console.log('Authentication error details:', {
-      errorType: appError.type,
+      errorType: appError?.type,
       isUserInitiated,
-      message: appError.userFriendlyMessage,
-      originalError: appError.originalError,
+      message: appError?.userFriendlyMessage,
+      originalError: appError?.originalError,
     })
 
     // Disconnect wallet on technical failures (but not user cancellations)
