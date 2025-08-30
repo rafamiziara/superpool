@@ -35,7 +35,7 @@ export class TimeoutErrorHandler implements ErrorHandler<void> {
           // Silently handle disconnect failures - timeout handling should continue
         })
       }
-    } catch (error) {
+    } catch {
       // Silently handle synchronous disconnect failures - timeout handling should continue
     }
 
