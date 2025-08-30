@@ -10,10 +10,10 @@ jest.mock('../../../firebase.config', () => ({
 }))
 
 const mockHttpsCallable = httpsCallable as jest.MockedFunction<typeof httpsCallable>
-const mockGenerateAuthMessageFnFn = jest.fn()
+const mockGenerateAuthMessageFn = jest.fn()
 
 // Set up the mock before module import
-mockHttpsCallable.mockReturnValue(mockGenerateAuthMessageFnFn)
+mockHttpsCallable.mockReturnValue(mockGenerateAuthMessageFn as any)
 
 describe('MessageGenerator', () => {
   let messageGenerator: MessageGenerator
@@ -23,7 +23,7 @@ describe('MessageGenerator', () => {
 
   beforeEach(() => {
     jest.clearAllMocks()
-    mockGenerateAuthMessageFnFn.mockClear()
+    mockGenerateAuthMessageFn.mockClear()
 
     messageGenerator = new MessageGenerator()
 
@@ -63,7 +63,7 @@ describe('MessageGenerator', () => {
             timestamp: 1641024000000,
           },
         }
-        mockGenerateAuthMessageFnFn.mockResolvedValue(mockResponse)
+        mockGenerateAuthMessageFn.mockResolvedValue(mockResponse)
 
         const result = await messageGenerator.generateAuthenticationMessage(validWalletAddress)
 
@@ -73,7 +73,7 @@ describe('MessageGenerator', () => {
           timestamp: 1641024000000,
         })
 
-        expect(mockGenerateAuthMessageFnFn).toHaveBeenCalledWith({ walletAddress: validWalletAddress })
+        expect(mockGenerateAuthMessageFn).toHaveBeenCalledWith({ walletAddress: validWalletAddress })
         expect(consoleLogSpy).toHaveBeenCalledWith('📝 Generating authentication message for address:', validWalletAddress)
         expect(consoleLogSpy).toHaveBeenCalledWith('✅ Authentication message generated:', 'Please sign this message to authenticate with Supe...')
       })
@@ -86,7 +86,7 @@ describe('MessageGenerator', () => {
             timestamp: '1641024000000', // String timestamp
           },
         }
-        mockGenerateAuthMessageFnFn.mockResolvedValue(mockResponse)
+        mockGenerateAuthMessageFn.mockResolvedValue(mockResponse)
 
         const result = await messageGenerator.generateAuthenticationMessage(validWalletAddress)
 
@@ -102,7 +102,7 @@ describe('MessageGenerator', () => {
             timestamp: 1641024000000, // Numeric timestamp
           },
         }
-        mockGenerateAuthMessageFnFn.mockResolvedValue(mockResponse)
+        mockGenerateAuthMessageFn.mockResolvedValue(mockResponse)
 
         const result = await messageGenerator.generateAuthenticationMessage(validWalletAddress)
 
@@ -118,7 +118,7 @@ describe('MessageGenerator', () => {
             timestamp: '1641024000000',
           },
         }
-        mockGenerateAuthMessageFnFn.mockResolvedValue(mockResponse)
+        mockGenerateAuthMessageFn.mockResolvedValue(mockResponse)
 
         await messageGenerator.generateAuthenticationMessage(validWalletAddress)
 
@@ -138,7 +138,7 @@ describe('MessageGenerator', () => {
             timestamp: 1641024000000,
           },
         }
-        mockGenerateAuthMessageFnFn.mockResolvedValue(mockResponse)
+        mockGenerateAuthMessageFn.mockResolvedValue(mockResponse)
 
         const result = await messageGenerator.generateAuthenticationMessage(validWalletAddress)
 
@@ -156,7 +156,7 @@ describe('MessageGenerator', () => {
             timestamp: 1641024000000,
           },
         }
-        mockGenerateAuthMessageFnFn.mockResolvedValue(mockResponse)
+        mockGenerateAuthMessageFn.mockResolvedValue(mockResponse)
 
         const result = await messageGenerator.generateAuthenticationMessage(validWalletAddress)
 
@@ -172,7 +172,7 @@ describe('MessageGenerator', () => {
             timestamp: 1641024000000,
           },
         }
-        mockGenerateAuthMessageFnFn.mockResolvedValue(mockResponse)
+        mockGenerateAuthMessageFn.mockResolvedValue(mockResponse)
 
         const result = await messageGenerator.generateAuthenticationMessage(validWalletAddress)
 
@@ -187,7 +187,7 @@ describe('MessageGenerator', () => {
             timestamp: 1641024000000,
           },
         }
-        mockGenerateAuthMessageFnFn.mockResolvedValue(mockResponse)
+        mockGenerateAuthMessageFn.mockResolvedValue(mockResponse)
 
         const result = await messageGenerator.generateAuthenticationMessage(validWalletAddress)
 
@@ -211,7 +211,7 @@ describe('MessageGenerator', () => {
         }
 
         for (const address of addresses) {
-          mockGenerateAuthMessageFnFn.mockResolvedValue(mockResponse)
+          mockGenerateAuthMessageFn.mockResolvedValue(mockResponse)
           
           const result = await messageGenerator.generateAuthenticationMessage(address)
 
@@ -230,7 +230,7 @@ describe('MessageGenerator', () => {
             timestamp: 'invalid-timestamp',
           },
         }
-        mockGenerateAuthMessageFnFn.mockResolvedValue(mockResponse)
+        mockGenerateAuthMessageFn.mockResolvedValue(mockResponse)
 
         await expect(messageGenerator.generateAuthenticationMessage(validWalletAddress))
           .rejects.toThrow('Invalid timestamp received from authentication message')
@@ -244,7 +244,7 @@ describe('MessageGenerator', () => {
             timestamp: null,
           },
         }
-        mockGenerateAuthMessageFnFn.mockResolvedValue(mockResponse)
+        mockGenerateAuthMessageFn.mockResolvedValue(mockResponse)
 
         await expect(messageGenerator.generateAuthenticationMessage(validWalletAddress))
           .rejects.toThrow('Invalid timestamp received from authentication message')
@@ -258,7 +258,7 @@ describe('MessageGenerator', () => {
             timestamp: undefined,
           },
         }
-        mockGenerateAuthMessageFnFn.mockResolvedValue(mockResponse)
+        mockGenerateAuthMessageFn.mockResolvedValue(mockResponse)
 
         await expect(messageGenerator.generateAuthenticationMessage(validWalletAddress))
           .rejects.toThrow('Invalid timestamp received from authentication message')
@@ -272,7 +272,7 @@ describe('MessageGenerator', () => {
             timestamp: 0,
           },
         }
-        mockGenerateAuthMessageFnFn.mockResolvedValue(mockResponse)
+        mockGenerateAuthMessageFn.mockResolvedValue(mockResponse)
 
         const result = await messageGenerator.generateAuthenticationMessage(validWalletAddress)
 
@@ -287,7 +287,7 @@ describe('MessageGenerator', () => {
             timestamp: -1,
           },
         }
-        mockGenerateAuthMessageFnFn.mockResolvedValue(mockResponse)
+        mockGenerateAuthMessageFn.mockResolvedValue(mockResponse)
 
         const result = await messageGenerator.generateAuthenticationMessage(validWalletAddress)
 
@@ -303,7 +303,7 @@ describe('MessageGenerator', () => {
             timestamp: largeTimestamp,
           },
         }
-        mockGenerateAuthMessageFnFn.mockResolvedValue(mockResponse)
+        mockGenerateAuthMessageFn.mockResolvedValue(mockResponse)
 
         const result = await messageGenerator.generateAuthenticationMessage(validWalletAddress)
 
@@ -319,7 +319,7 @@ describe('MessageGenerator', () => {
         await expect(messageGenerator.generateAuthenticationMessage(validWalletAddress))
           .rejects.toThrow('Firebase function failed')
 
-        expect(mockGenerateAuthMessageFnFn).toHaveBeenCalledWith({ walletAddress: validWalletAddress })
+        expect(mockGenerateAuthMessageFn).toHaveBeenCalledWith({ walletAddress: validWalletAddress })
       })
 
       it('should handle network timeouts', async () => {
@@ -334,7 +334,7 @@ describe('MessageGenerator', () => {
         const mockResponse = {
           data: 'invalid-data-format',
         }
-        mockGenerateAuthMessageFnFn.mockResolvedValue(mockResponse)
+        mockGenerateAuthMessageFn.mockResolvedValue(mockResponse)
 
         // This should throw when trying to destructure the response
         await expect(messageGenerator.generateAuthenticationMessage(validWalletAddress))
@@ -343,7 +343,7 @@ describe('MessageGenerator', () => {
 
       it('should handle missing data property in response', async () => {
         const mockResponse = {} // Missing data property
-        mockGenerateAuthMessageFnFn.mockResolvedValue(mockResponse)
+        mockGenerateAuthMessageFn.mockResolvedValue(mockResponse)
 
         await expect(messageGenerator.generateAuthenticationMessage(validWalletAddress))
           .rejects.toThrow()
@@ -356,7 +356,7 @@ describe('MessageGenerator', () => {
             // Missing nonce and timestamp
           },
         }
-        mockGenerateAuthMessageFnFn.mockResolvedValue(mockResponse)
+        mockGenerateAuthMessageFn.mockResolvedValue(mockResponse)
 
         await expect(messageGenerator.generateAuthenticationMessage(validWalletAddress))
           .rejects.toThrow('Invalid timestamp received from authentication message')
@@ -372,7 +372,7 @@ describe('MessageGenerator', () => {
             timestamp: 1641024000000,
           },
         }
-        mockGenerateAuthMessageFnFn.mockResolvedValue(mockResponse)
+        mockGenerateAuthMessageFn.mockResolvedValue(mockResponse)
 
         await messageGenerator.generateAuthenticationMessage(validWalletAddress)
 
@@ -388,7 +388,7 @@ describe('MessageGenerator', () => {
             timestamp: 1641024000000,
           },
         }
-        mockGenerateAuthMessageFnFn.mockResolvedValue(mockResponse)
+        mockGenerateAuthMessageFn.mockResolvedValue(mockResponse)
 
         await messageGenerator.generateAuthenticationMessage(validWalletAddress)
 
@@ -403,7 +403,7 @@ describe('MessageGenerator', () => {
             timestamp: 1641024000000,
           },
         }
-        mockGenerateAuthMessageFnFn.mockResolvedValue(mockResponse)
+        mockGenerateAuthMessageFn.mockResolvedValue(mockResponse)
 
         await messageGenerator.generateAuthenticationMessage(validWalletAddress)
 
@@ -426,7 +426,7 @@ describe('MessageGenerator', () => {
             timestamp: 1641024000000,
           },
         }
-        mockGenerateAuthMessageFnFn.mockResolvedValue(mockResponse)
+        mockGenerateAuthMessageFn.mockResolvedValue(mockResponse)
 
         const result = await messageGenerator.generateAuthenticationMessage(validWalletAddress)
         expect(result.timestamp).toBe(1641024000000)
@@ -440,7 +440,7 @@ describe('MessageGenerator', () => {
             timestamp: '1641024000000',
           },
         }
-        mockGenerateAuthMessageFnFn.mockResolvedValue(mockResponse)
+        mockGenerateAuthMessageFn.mockResolvedValue(mockResponse)
 
         const result = await messageGenerator.generateAuthenticationMessage(validWalletAddress)
         expect(result.timestamp).toBe(1641024000000)
@@ -454,7 +454,7 @@ describe('MessageGenerator', () => {
             timestamp: '0001641024000000',
           },
         }
-        mockGenerateAuthMessageFnFn.mockResolvedValue(mockResponse)
+        mockGenerateAuthMessageFn.mockResolvedValue(mockResponse)
 
         const result = await messageGenerator.generateAuthenticationMessage(validWalletAddress)
         expect(result.timestamp).toBe(1641024000000)
@@ -470,7 +470,7 @@ describe('MessageGenerator', () => {
             timestamp: 'not-a-number',
           },
         }
-        mockGenerateAuthMessageFnFn.mockResolvedValue(mockResponse)
+        mockGenerateAuthMessageFn.mockResolvedValue(mockResponse)
 
         await expect(messageGenerator.generateAuthenticationMessage(validWalletAddress))
           .rejects.toThrow('Invalid timestamp received from authentication message')
@@ -484,7 +484,7 @@ describe('MessageGenerator', () => {
             timestamp: true,
           },
         }
-        mockGenerateAuthMessageFnFn.mockResolvedValue(mockResponse)
+        mockGenerateAuthMessageFn.mockResolvedValue(mockResponse)
 
         await expect(messageGenerator.generateAuthenticationMessage(validWalletAddress))
           .rejects.toThrow('Invalid timestamp received from authentication message')
@@ -498,7 +498,7 @@ describe('MessageGenerator', () => {
             timestamp: [1641024000000],
           },
         }
-        mockGenerateAuthMessageFnFn.mockResolvedValue(mockResponse)
+        mockGenerateAuthMessageFn.mockResolvedValue(mockResponse)
 
         await expect(messageGenerator.generateAuthenticationMessage(validWalletAddress))
           .rejects.toThrow('Invalid timestamp received from authentication message')
@@ -512,7 +512,7 @@ describe('MessageGenerator', () => {
             timestamp: { value: 1641024000000 },
           },
         }
-        mockGenerateAuthMessageFnFn.mockResolvedValue(mockResponse)
+        mockGenerateAuthMessageFn.mockResolvedValue(mockResponse)
 
         await expect(messageGenerator.generateAuthenticationMessage(validWalletAddress))
           .rejects.toThrow('Invalid timestamp received from authentication message')

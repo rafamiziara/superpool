@@ -16,6 +16,7 @@ describe('FeedbackManager', () => {
       message: 'Test error',
       type: ErrorType.AUTHENTICATION_FAILED,
       userFriendlyMessage: 'Authentication failed. Please try connecting your wallet again.',
+      timestamp: new Date(),
     }
     jest.clearAllMocks()
     jest.useFakeTimers()

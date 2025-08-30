@@ -85,7 +85,7 @@ export class AuthUtils {
    * Extracts nonce from authentication message
    */
   static extractNonceFromMessage(message: string): string | null {
-    const nonceMatch = message.match(/Nonce:\\s*([a-zA-Z0-9]+)/)
+    const nonceMatch = message.match(/Nonce:\s*([a-zA-Z0-9_]+)/)
     return nonceMatch ? nonceMatch[1] : null
   }
 
@@ -93,7 +93,7 @@ export class AuthUtils {
    * Extracts timestamp from authentication message
    */
   static extractTimestampFromMessage(message: string): number | null {
-    const timestampMatch = message.match(/Timestamp:\\s*(\\d+)/)
+    const timestampMatch = message.match(/Timestamp:\s*(\d+)/)
     return timestampMatch ? parseInt(timestampMatch[1], 10) : null
   }
 
