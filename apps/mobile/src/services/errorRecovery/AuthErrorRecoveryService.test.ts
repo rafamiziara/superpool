@@ -406,15 +406,13 @@ describe('AuthErrorRecoveryService', () => {
     it('should re-export SessionErrorContext type', () => {
       // This test ensures the type export is working
       const testContext: SessionErrorContext = {
-        error: new Error('Test error'),
-        context: {
-          walletAddress: '0x742d35Cc6634C0532925a3b8D238a5D2DD8dC5b8',
-          chainId: 137,
-        },
-      } as any
+        errorMessage: 'Test session error',
+        sessionId: 'test-session-123',
+        isSessionError: true,
+      }
 
-      expect(testContext.context.walletAddress).toBe('0x742d35Cc6634C0532925a3b8D238a5D2DD8dC5b8')
-      expect(testContext.context.chainId).toBe(137)
+      expect(testContext.errorMessage).toBe('Test session error')
+      expect(testContext.sessionId).toBe('test-session-123')
     })
   })
 

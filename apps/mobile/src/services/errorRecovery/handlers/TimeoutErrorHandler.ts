@@ -30,8 +30,12 @@ export class TimeoutErrorHandler implements ErrorHandler<void> {
       const disconnectResult = this.disconnectFunction()
       
       // If disconnect function returns a Promise, catch any rejections
-      if (disconnectResult && typeof disconnectResult.catch === 'function') {
-        disconnectResult.catch(() => {
+      if (disconnectResult !== undefined && 
+          disconnectResult !== null && 
+          typeof disconnectResult === 'object' &&
+          'catch' in disconnectResult && 
+          typeof (disconnectResult as any).catch === 'function') {
+        (disconnectResult as any).catch(() => {
           // Silently handle disconnect failures - timeout handling should continue
         })
       }

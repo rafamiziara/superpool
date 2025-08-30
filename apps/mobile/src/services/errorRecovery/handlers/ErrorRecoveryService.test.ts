@@ -48,6 +48,7 @@ describe('ErrorRecoveryService', () => {
       message: 'Test error message',
       type: ErrorType.AUTHENTICATION_FAILED,
       userFriendlyMessage: 'Authentication failed. Please try connecting your wallet again.',
+      timestamp: new Date(),
     }
 
     // Reset all mocks
