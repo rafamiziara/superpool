@@ -1,14 +1,17 @@
 import { customAppCheckProviderFactory, getUniqueDeviceId } from './appCheckProvider'
 
-// Mock expo-application
-const mockExpoApplication = {
-  getAndroidId: jest.fn(),
-  getIosIdForVendorAsync: jest.fn(),
-}
+// Mock expo-application - must be hoisted before imports
+const mockGetAndroidId = jest.fn()
+const mockGetIosIdForVendorAsync = jest.fn()
 
 jest.mock('expo-application', () => ({
   __esModule: true,
-  ...mockExpoApplication
+  getAndroidId: mockGetAndroidId,
+  getIosIdForVendorAsync: mockGetIosIdForVendorAsync,
+  default: {
+    getAndroidId: mockGetAndroidId,
+    getIosIdForVendorAsync: mockGetIosIdForVendorAsync,
+  },
 }))
 
 // Mock expo-secure-store
@@ -17,10 +20,7 @@ const mockSecureStore = {
   setItemAsync: jest.fn(),
 }
 
-jest.mock('expo-secure-store', () => ({
-  __esModule: true,
-  ...mockSecureStore
-}))
+jest.mock('expo-secure-store', () => mockSecureStore)
 
 // Mock react-native Platform
 let mockPlatformOS = 'ios' // Default to iOS
@@ -46,7 +46,7 @@ global.fetch = mockFetch
 
 // Mock environment variable
 const originalEnv = process.env.EXPO_PUBLIC_CLOUD_FUNCTIONS_BASE_URL
-process.env.EXPO_PUBLIC_CLOUD_FUNCTIONS_BASE_URL = 'https://test-functions.firebase.com'
+process.env.EXPO_PUBLIC_CLOUD_FUNCTIONS_BASE_URL = 'https://test-functions.firebase.com/'
 
 describe('appCheckProvider', () => {
   let originalConsoleError: typeof console.error
@@ -77,16 +77,16 @@ describe('appCheckProvider', () => {
 
       it('should return Android ID for Android platform', async () => {
         const androidId = 'android_device_123456'
-        mockExpoApplication.getAndroidId.mockResolvedValue(androidId)
+        mockGetAndroidId.mockResolvedValue(androidId)
 
         const result = await getUniqueDeviceId()
 
-        expect(mockExpoApplication.getAndroidId).toHaveBeenCalled()
+        expect(mockGetAndroidId).toHaveBeenCalled()
         expect(result).toBe(androidId)
       })
 
       it('should handle Android ID retrieval failure', async () => {
-        mockExpoApplication.getAndroidId.mockRejectedValue(new Error('Permission denied'))
+        mockGetAndroidId.mockRejectedValue(new Error('Permission denied'))
         mockUuid.v4.mockReturnValue('fallback-uuid-android')
 
         const result = await getUniqueDeviceId()
@@ -96,7 +96,7 @@ describe('appCheckProvider', () => {
       })
 
       it('should handle null Android ID', async () => {
-        mockExpoApplication.getAndroidId.mockResolvedValue(null)
+        mockGetAndroidId.mockResolvedValue(null)
         mockUuid.v4.mockReturnValue('fallback-uuid-android-null')
 
         const result = await getUniqueDeviceId()
@@ -113,16 +113,16 @@ describe('appCheckProvider', () => {
 
       it('should return iOS ID for Vendor for iOS platform', async () => {
         const iosId = 'ios_vendor_id_abcdef123456'
-        mockExpoApplication.getIosIdForVendorAsync.mockResolvedValue(iosId)
+        mockGetIosIdForVendorAsync.mockResolvedValue(iosId)
 
         const result = await getUniqueDeviceId()
 
-        expect(mockExpoApplication.getIosIdForVendorAsync).toHaveBeenCalled()
+        expect(mockGetIosIdForVendorAsync).toHaveBeenCalled()
         expect(result).toBe(iosId)
       })
 
       it('should handle iOS ID retrieval failure', async () => {
-        mockExpoApplication.getIosIdForVendorAsync.mockRejectedValue(new Error('Not available'))
+        mockGetIosIdForVendorAsync.mockRejectedValue(new Error('Not available'))
         mockUuid.v4.mockReturnValue('fallback-uuid-ios')
 
         const result = await getUniqueDeviceId()
@@ -132,7 +132,7 @@ describe('appCheckProvider', () => {
       })
 
       it('should handle null iOS ID', async () => {
-        mockExpoApplication.getIosIdForVendorAsync.mockResolvedValue(null)
+        mockGetIosIdForVendorAsync.mockResolvedValue(null)
         mockUuid.v4.mockReturnValue('fallback-uuid-ios-null')
 
         const result = await getUniqueDeviceId()
@@ -153,7 +153,7 @@ describe('appCheckProvider', () => {
 
         const result = await getUniqueDeviceId()
 
-        expect(mockSecureStore.getItemAsync).toHaveBeenCalledWith('webDeviceId')
+        expect(mockSecureStore.getItemAsync).toHaveBeenCalledWith('web_device_id')
         expect(result).toBe(existingId)
       })
 
@@ -165,9 +165,9 @@ describe('appCheckProvider', () => {
 
         const result = await getUniqueDeviceId()
 
-        expect(mockSecureStore.getItemAsync).toHaveBeenCalledWith('webDeviceId')
+        expect(mockSecureStore.getItemAsync).toHaveBeenCalledWith('web_device_id')
         expect(mockUuid.v4).toHaveBeenCalled()
-        expect(mockSecureStore.setItemAsync).toHaveBeenCalledWith('webDeviceId', newUuid)
+        expect(mockSecureStore.setItemAsync).toHaveBeenCalledWith('web_device_id', newUuid)
         expect(result).toBe(newUuid)
       })
 
@@ -213,7 +213,7 @@ describe('appCheckProvider', () => {
       it('should return consistent results for multiple calls on same platform', async () => {
         mockPlatformOS = 'ios'
         const iosId = 'consistent_ios_id'
-        mockExpoApplication.getIosIdForVendorAsync.mockResolvedValue(iosId)
+        mockGetIosIdForVendorAsync.mockResolvedValue(iosId)
 
         const result1 = await getUniqueDeviceId()
         const result2 = await getUniqueDeviceId()
@@ -222,7 +222,7 @@ describe('appCheckProvider', () => {
         expect(result1).toBe(iosId)
         expect(result2).toBe(iosId)
         expect(result3).toBe(iosId)
-        expect(mockExpoApplication.getIosIdForVendorAsync).toHaveBeenCalledTimes(3)
+        expect(mockGetIosIdForVendorAsync).toHaveBeenCalledTimes(3)
       })
     })
   })
@@ -244,7 +244,7 @@ describe('appCheckProvider', () => {
           const deviceId = 'test_device_id'
           
           mockPlatformOS = 'ios'
-          mockExpoApplication.getIosIdForVendorAsync.mockResolvedValue(deviceId)
+          mockGetIosIdForVendorAsync.mockResolvedValue(deviceId)
           
           mockFetch.mockResolvedValue({
             ok: true,
@@ -260,7 +260,7 @@ describe('appCheckProvider', () => {
           })
 
           expect(mockFetch).toHaveBeenCalledWith(
-            'https://test-functions.firebase.com/mintCustomAppCheckToken',
+            'https://test-functions.firebase.com/customAppCheckMinter',
             expect.objectContaining({
               method: 'POST',
               headers: expect.objectContaining({
@@ -276,7 +276,7 @@ describe('appCheckProvider', () => {
           const deviceId = 'test_device_id_expiry'
           
           mockPlatformOS = 'android'
-          mockExpoApplication.getAndroidId.mockResolvedValue(deviceId)
+          mockGetAndroidId.mockResolvedValue(deviceId)
           
           mockFetch.mockResolvedValue({
             ok: true,
@@ -300,7 +300,7 @@ describe('appCheckProvider', () => {
       describe('Network Errors and Fallbacks', () => {
         it('should return dummy token on network failure', async () => {
           mockPlatformOS = 'ios'
-          mockExpoApplication.getIosIdForVendorAsync.mockResolvedValue('device_id')
+          mockGetIosIdForVendorAsync.mockResolvedValue('device_id')
           
           mockFetch.mockRejectedValue(new Error('Network error'))
 
@@ -313,7 +313,7 @@ describe('appCheckProvider', () => {
 
         it('should return dummy token on HTTP error response', async () => {
           mockPlatformOS = 'android'
-          mockExpoApplication.getAndroidId.mockResolvedValue('android_device')
+          mockGetAndroidId.mockResolvedValue('android_device')
           
           mockFetch.mockResolvedValue({
             ok: false,
@@ -344,7 +344,7 @@ describe('appCheckProvider', () => {
 
         it('should return dummy token on JSON parsing error', async () => {
           mockPlatformOS = 'ios'
-          mockExpoApplication.getIosIdForVendorAsync.mockResolvedValue('ios_device')
+          mockGetIosIdForVendorAsync.mockResolvedValue('ios_device')
           
           mockFetch.mockResolvedValue({
             ok: true,
@@ -367,7 +367,7 @@ describe('appCheckProvider', () => {
 
           // Test Android
           mockPlatformOS = 'android'
-          mockExpoApplication.getAndroidId.mockResolvedValue(androidId)
+          mockGetAndroidId.mockResolvedValue(androidId)
           mockFetch.mockResolvedValue({
             ok: true,
             json: async () => ({ token: 'android_token' }),
@@ -388,7 +388,7 @@ describe('appCheckProvider', () => {
 
           // Test iOS
           mockPlatformOS = 'ios'
-          mockExpoApplication.getIosIdForVendorAsync.mockResolvedValue(iosId)
+          mockGetIosIdForVendorAsync.mockResolvedValue(iosId)
           mockFetch.mockResolvedValue({
             ok: true,
             json: async () => ({ token: 'ios_token' }),
@@ -409,7 +409,7 @@ describe('appCheckProvider', () => {
       describe('Environment Configuration', () => {
         it('should use correct Cloud Functions URL from environment', async () => {
           mockPlatformOS = 'ios'
-          mockExpoApplication.getIosIdForVendorAsync.mockResolvedValue('test_device')
+          mockGetIosIdForVendorAsync.mockResolvedValue('test_device')
           mockFetch.mockResolvedValue({
             ok: true,
             json: async () => ({ token: 'env_test_token' }),
@@ -419,7 +419,7 @@ describe('appCheckProvider', () => {
           await provider.getToken()
 
           expect(mockFetch).toHaveBeenCalledWith(
-            'https://test-functions.firebase.com/mintCustomAppCheckToken',
+            'https://test-functions.firebase.com/customAppCheckMinter',
             expect.any(Object)
           )
         })
@@ -430,7 +430,7 @@ describe('appCheckProvider', () => {
           delete process.env.EXPO_PUBLIC_CLOUD_FUNCTIONS_BASE_URL
 
           mockPlatformOS = 'ios'
-          mockExpoApplication.getIosIdForVendorAsync.mockResolvedValue('test_device')
+          mockGetIosIdForVendorAsync.mockResolvedValue('test_device')
           
           const provider = customAppCheckProviderFactory()
           const result = await provider.getToken()
@@ -455,7 +455,7 @@ describe('appCheckProvider', () => {
 
       it('should work correctly with concurrent token requests', async () => {
         mockPlatformOS = 'ios'
-        mockExpoApplication.getIosIdForVendorAsync.mockResolvedValue('concurrent_device')
+        mockGetIosIdForVendorAsync.mockResolvedValue('concurrent_device')
         
         mockFetch.mockResolvedValue({
           ok: true,
@@ -483,7 +483,7 @@ describe('appCheckProvider', () => {
     describe('Device ID Errors', () => {
       it('should handle device ID retrieval errors gracefully in token fetch', async () => {
         mockPlatformOS = 'ios'
-        mockExpoApplication.getIosIdForVendorAsync.mockRejectedValue(new Error('Device ID unavailable'))
+        mockGetIosIdForVendorAsync.mockRejectedValue(new Error('Device ID unavailable'))
         mockUuid.v4.mockReturnValue('fallback_device_id')
         
         mockFetch.mockResolvedValue({
@@ -507,7 +507,7 @@ describe('appCheckProvider', () => {
     describe('Timeout and Long-Running Requests', () => {
       it('should handle slow network requests', async () => {
         mockPlatformOS = 'android'
-        mockExpoApplication.getAndroidId.mockResolvedValue('slow_device')
+        mockGetAndroidId.mockResolvedValue('slow_device')
         
         // Simulate slow response
         mockFetch.mockImplementation(() => 
@@ -545,7 +545,7 @@ describe('appCheckProvider', () => {
 
     it('should not leak memory with repeated token requests', async () => {
       mockPlatformOS = 'ios'
-      mockExpoApplication.getIosIdForVendorAsync.mockResolvedValue('memory_test_device')
+      mockGetIosIdForVendorAsync.mockResolvedValue('memory_test_device')
       
       mockFetch.mockResolvedValue({
         ok: true,
@@ -570,7 +570,7 @@ describe('appCheckProvider', () => {
     it('should integrate getUniqueDeviceId with token provider correctly', async () => {
       const deviceId = 'integration_test_device_id'
       mockPlatformOS = 'android'
-      mockExpoApplication.getAndroidId.mockResolvedValue(deviceId)
+      mockGetAndroidId.mockResolvedValue(deviceId)
       
       mockFetch.mockResolvedValue({
         ok: true,
@@ -597,7 +597,7 @@ describe('appCheckProvider', () => {
       // Start with iOS
       mockPlatformOS = 'ios'
       const iosId = 'ios_device_123'
-      mockExpoApplication.getIosIdForVendorAsync.mockResolvedValue(iosId)
+      mockGetIosIdForVendorAsync.mockResolvedValue(iosId)
       
       const iosDeviceId = await getUniqueDeviceId()
       expect(iosDeviceId).toBe(iosId)
@@ -605,7 +605,7 @@ describe('appCheckProvider', () => {
       // Switch to Android
       mockPlatformOS = 'android'
       const androidId = 'android_device_456'
-      mockExpoApplication.getAndroidId.mockResolvedValue(androidId)
+      mockGetAndroidId.mockResolvedValue(androidId)
       
       const androidDeviceId = await getUniqueDeviceId()
       expect(androidDeviceId).toBe(androidId)
