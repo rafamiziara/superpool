@@ -10,8 +10,8 @@ interface ToastOptions {
   position?: 'top' | 'bottom'
 }
 
-// Base toast function with custom styling
-function showToast(type: ToastType, { title, message, duration = 4000, position = 'top' }: ToastOptions) {
+// Base toast function with custom styling  
+function _showToast(type: ToastType, { title, message, duration = 4000, position = 'top' }: ToastOptions) {
   Toast.show({
     type,
     text1: title,
