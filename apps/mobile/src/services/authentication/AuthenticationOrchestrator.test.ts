@@ -200,7 +200,7 @@ describe('AuthenticationOrchestrator', () => {
   describe('Authentication Lock Management', () => {
     describe('Lock Acquisition', () => {
       it('should acquire lock successfully for new authentication', async () => {
-        mockAuthStore.isAuthenticating = false
+        mockAuthStore.authLock.isLocked = false
         mockAuthStore.acquireAuthLock.mockReturnValue(true)
 
         await orchestrator.authenticate(mockAuthContext)
@@ -221,7 +221,7 @@ describe('AuthenticationOrchestrator', () => {
       })
 
       it('should force release expired locks (>2 minutes)', async () => {
-        mockAuthStore.isAuthenticating = true
+        mockAuthStore.authLock.isLocked = true
         mockAuthStore.authLock.startTime = Date.now() - 130000 // 130 seconds ago
         mockAuthStore.acquireAuthLock.mockReturnValue(true)
 
@@ -234,8 +234,8 @@ describe('AuthenticationOrchestrator', () => {
       })
 
       it('should handle duplicate authentication attempts for same wallet', async () => {
-        mockAuthStore.isAuthenticating = true
-        mockAuthStore.authWalletAddress = mockAuthContext.walletAddress
+        mockAuthStore.authLock.isLocked = true
+        mockAuthStore.authLock.walletAddress = mockAuthContext.walletAddress
         mockAuthStore.authLock.startTime = Date.now() - 1000 // 1 second ago
 
         await orchestrator.authenticate(mockAuthContext)
@@ -246,8 +246,8 @@ describe('AuthenticationOrchestrator', () => {
       })
 
       it('should abort current authentication for different wallet', async () => {
-        mockAuthStore.isAuthenticating = true
-        mockAuthStore.authWalletAddress = '0xDifferentWallet'
+        mockAuthStore.authLock.isLocked = true
+        mockAuthStore.authLock.walletAddress = '0xDifferentWallet'
         mockAuthStore.authLock.startTime = Date.now() - 1000
         mockAuthStore.acquireAuthLock.mockReturnValue(true)
 
@@ -607,8 +607,8 @@ describe('AuthenticationOrchestrator', () => {
 
   describe('Authentication Status and Cleanup', () => {
     it('should return current authentication status', () => {
-      mockAuthStore.isAuthenticating = true
-      mockAuthStore.authWalletAddress = '0x123'
+      mockAuthStore.authLock.isLocked = true
+      mockAuthStore.authLock.walletAddress = '0x123'
 
       const status = orchestrator.getAuthenticationStatus()
 

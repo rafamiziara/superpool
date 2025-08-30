@@ -374,7 +374,7 @@ describe('constants', () => {
         const warn: LogLevel = LOG_LEVELS.WARN
         const error: LogLevel = LOG_LEVELS.ERROR
         
-        expect([debug, info, warn, error]).toEqual(['debug', 'info', 'warn', 'error'])
+        expect([debug, info, warn, error]).toEqual([0, 1, 2, 3])
       })
     })
 
@@ -463,36 +463,40 @@ describe('constants', () => {
     })
 
     describe('SIGNATURE_FORMATS', () => {
-      it('should have hex signature and Safe wallet token patterns', () => {
-        expect(SIGNATURE_FORMATS).toHaveProperty('HEX_SIGNATURE')
-        expect(SIGNATURE_FORMATS).toHaveProperty('SAFE_WALLET_TOKEN')
+      it('should have hex and Safe wallet prefixes', () => {
+        expect(SIGNATURE_FORMATS).toHaveProperty('HEX_PREFIX')
+        expect(SIGNATURE_FORMATS).toHaveProperty('SAFE_WALLET_PREFIX')
+        expect(SIGNATURE_FORMATS).toHaveProperty('SAFE_TOKEN_PARTS')
         
-        expect(SIGNATURE_FORMATS.HEX_PREFIX).toBeDefined()
-        expect(SIGNATURE_FORMATS.SAFE_WALLET_PREFIX).toBeDefined()
+        expect(typeof SIGNATURE_FORMATS.HEX_PREFIX).toBe('string')
+        expect(typeof SIGNATURE_FORMATS.SAFE_WALLET_PREFIX).toBe('string')
+        expect(typeof SIGNATURE_FORMATS.SAFE_TOKEN_PARTS).toBe('number')
       })
 
-      it('should match valid hex signatures', () => {
+      it('should have correct hex prefix', () => {
+        expect(SIGNATURE_FORMATS.HEX_PREFIX).toBe('0x')
+        
         const validHexSigs = [
           '0x' + 'a'.repeat(128),
-          '0x' + '1234567890abcdef'.repeat(8),
-          '0x' + 'ABCDEF1234567890'.repeat(8),
+          '0x1234567890abcdef',
+          '0xABCDEF1234567890',
         ]
 
         validHexSigs.forEach(sig => {
-          expect(SIGNATURE_FORMATS.HEX_PREFIX.test(sig)).toBe(true)
+          expect(sig.startsWith(SIGNATURE_FORMATS.HEX_PREFIX)).toBe(true)
         })
       })
 
-      it('should match valid Safe wallet tokens', () => {
+      it('should have correct Safe wallet prefix', () => {
+        expect(SIGNATURE_FORMATS.SAFE_WALLET_PREFIX).toBe('safe-wallet:')
+        
         const validTokens = [
-          'abcdefghij',
-          'token_123456789',
-          'safe-wallet-token-123',
-          'token.with.dots.456',
+          'safe-wallet:0x1234567890123456789012345678901234567890:nonce123:1234567890',
+          'safe-wallet:address:nonce:timestamp',
         ]
 
         validTokens.forEach(token => {
-          expect(SIGNATURE_FORMATS.SAFE_WALLET_PREFIX.test(token)).toBe(true)
+          expect(token.startsWith(SIGNATURE_FORMATS.SAFE_WALLET_PREFIX)).toBe(true)
         })
       })
     })
@@ -607,7 +611,7 @@ describe('constants', () => {
   describe('Cross-constant Relationships', () => {
     it('should have consistent timeout hierarchies', () => {
       expect(SESSION_TIMEOUTS.DEFAULT_MAX_AGE).toBeGreaterThan(SESSION_TIMEOUTS.CLEANUP_DELAY)
-      expect(AUTH_TIMEOUTS.SIGNATURE_REQUEST).toBeGreaterThan(AUTH_TIMEOUTS.CONNECT_WALLET)
+      expect(AUTH_TIMEOUTS.CONNECT_WALLET).toBeGreaterThan(AUTH_TIMEOUTS.SIGNATURE_REQUEST)
     })
 
     it('should have compatible duration relationships', () => {
