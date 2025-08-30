@@ -35,16 +35,16 @@ describe('FirebaseAuthenticator', () => {
   const mockFirebaseToken = 'mock-firebase-token'
 
   beforeAll(() => {
-    // Mock Firebase function call - this needs to be at module level
+    // Create mock function for dependency injection
     mockVerifySignatureAndLogin = jest.fn()
-    mockHttpsCallable.mockReturnValue(mockVerifySignatureAndLogin)
   })
 
   beforeEach(() => {
     jest.clearAllMocks()
     jest.useFakeTimers()
 
-    authenticator = new FirebaseAuthenticator()
+    // Use dependency injection to pass mock function
+    authenticator = new FirebaseAuthenticator(mockVerifySignatureAndLogin as any)
 
     mockContext = {
       walletAddress: '0x742d35Cc6634C0532925a3b8D238a5D2DD8dC5b8',
@@ -70,14 +70,13 @@ describe('FirebaseAuthenticator', () => {
   })
 
   describe('Constructor and Firebase Integration', () => {
-    it('should initialize correctly and set up Firebase function', () => {
-      expect(mockHttpsCallable).toHaveBeenCalledWith('mocked-functions', 'verifySignatureAndLogin')
+    it('should initialize correctly', () => {
       expect(authenticator).toBeInstanceOf(FirebaseAuthenticator)
     })
 
     it('should create multiple independent instances', () => {
-      const auth1 = new FirebaseAuthenticator()
-      const auth2 = new FirebaseAuthenticator()
+      const auth1 = new FirebaseAuthenticator(mockVerifySignatureAndLogin as any)
+      const auth2 = new FirebaseAuthenticator(mockVerifySignatureAndLogin as any)
 
       expect(auth1).toBeInstanceOf(FirebaseAuthenticator)
       expect(auth2).toBeInstanceOf(FirebaseAuthenticator)

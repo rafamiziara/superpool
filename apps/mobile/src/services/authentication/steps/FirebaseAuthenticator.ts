@@ -1,11 +1,9 @@
 import type { SignatureResult } from '@superpool/types'
 import { signInWithCustomToken } from 'firebase/auth'
-import { httpsCallable } from 'firebase/functions'
+import { httpsCallable, HttpsCallable } from 'firebase/functions'
 import { Platform } from 'react-native'
 import { FIREBASE_AUTH, FIREBASE_FUNCTIONS } from '../../../firebase.config'
 import { devOnly } from '../../../utils'
-
-const verifySignatureAndLogin = httpsCallable(FIREBASE_FUNCTIONS, 'verifySignatureAndLogin')
 
 export interface SignatureVerificationContext {
   walletAddress: string
@@ -17,6 +15,11 @@ export interface SignatureVerificationContext {
  * Separates Firebase auth concerns from orchestration
  */
 export class FirebaseAuthenticator {
+  private verifySignatureAndLogin: HttpsCallable
+
+  constructor(verifySignatureAndLoginFn?: HttpsCallable) {
+    this.verifySignatureAndLogin = verifySignatureAndLoginFn || httpsCallable(FIREBASE_FUNCTIONS, 'verifySignatureAndLogin')
+  }
   /**
    * Verifies signature with backend and gets Firebase token
    */
@@ -55,7 +58,7 @@ export class FirebaseAuthenticator {
       }
     }
 
-    const signatureResponse = await verifySignatureAndLogin({
+    const signatureResponse = await this.verifySignatureAndLogin({
       walletAddress: context.walletAddress,
       signature: signatureResult.signature,
       chainId: context.chainId,

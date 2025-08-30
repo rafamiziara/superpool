@@ -359,6 +359,7 @@ export const mockStorePresets = {
           message: 'Authentication failed',
           type: ErrorType.AUTHENTICATION_FAILED,
           userFriendlyMessage: 'Authentication failed',
+          timestamp: new Date(),
         },
       },
     }),
