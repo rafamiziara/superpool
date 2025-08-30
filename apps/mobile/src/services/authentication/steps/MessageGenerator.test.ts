@@ -1,19 +1,13 @@
-import { httpsCallable } from 'firebase/functions'
-import { MessageGenerator } from './MessageGenerator'
-
-// Mock Firebase functions
-jest.mock('firebase/functions', () => ({
-  httpsCallable: jest.fn(),
-}))
+// Mock Firebase config to prevent initialization errors
 jest.mock('../../../firebase.config', () => ({
   FIREBASE_FUNCTIONS: 'mocked-functions',
+  FIREBASE_APP: 'mocked-app',
 }))
 
-const mockHttpsCallable = httpsCallable as jest.MockedFunction<typeof httpsCallable>
-const mockGenerateAuthMessageFn = jest.fn()
+import { MessageGenerator } from './MessageGenerator'
 
-// Set up the mock before module import
-mockHttpsCallable.mockReturnValue(mockGenerateAuthMessageFn as any)
+// Create mock Firebase function
+const mockGenerateAuthMessageFn = jest.fn()
 
 describe('MessageGenerator', () => {
   let messageGenerator: MessageGenerator
@@ -25,7 +19,8 @@ describe('MessageGenerator', () => {
     jest.clearAllMocks()
     mockGenerateAuthMessageFn.mockClear()
 
-    messageGenerator = new MessageGenerator()
+    // Pass mock function to constructor for dependency injection
+    messageGenerator = new MessageGenerator(mockGenerateAuthMessageFn as any)
 
     // Spy on console methods
     consoleLogSpy = jest.spyOn(console, 'log').mockImplementation()
@@ -44,8 +39,8 @@ describe('MessageGenerator', () => {
     })
 
     it('should create multiple instances correctly', () => {
-      const generator1 = new MessageGenerator()
-      const generator2 = new MessageGenerator()
+      const generator1 = new MessageGenerator(mockGenerateAuthMessageFn as any)
+      const generator2 = new MessageGenerator(mockGenerateAuthMessageFn as any)
 
       expect(generator1).toBeInstanceOf(MessageGenerator)
       expect(generator2).toBeInstanceOf(MessageGenerator)

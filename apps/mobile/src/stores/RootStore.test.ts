@@ -206,6 +206,7 @@ describe('RootStore', () => {
         message: 'Auth error',
         type: ErrorType.AUTHENTICATION_FAILED,
         userFriendlyMessage: 'Authentication failed. Please try connecting your wallet again.',
+        timestamp: new Date(),
       }
       rootStore.authenticationStore.setAuthError(error)
       
@@ -256,6 +257,7 @@ describe('RootStore', () => {
         message: 'Auth failed',
         type: ErrorType.AUTHENTICATION_FAILED,
         userFriendlyMessage: 'Authentication failed. Please try connecting your wallet again.',
+        timestamp: new Date(),
       }
       rootStore.authenticationStore.setAuthError(error)
       
@@ -278,6 +280,7 @@ describe('RootStore', () => {
         message: 'Auth failed',
         type: ErrorType.AUTHENTICATION_FAILED,
         userFriendlyMessage: 'Authentication failed. Please try connecting your wallet again.',
+        timestamp: new Date(),
       }
       rootStore.authenticationStore.setAuthError(authError)
       rootStore.walletStore.setConnectionError('Connection failed')
@@ -322,6 +325,7 @@ describe('RootStore', () => {
         message: 'Auth error', 
         type: ErrorType.AUTHENTICATION_FAILED,
         userFriendlyMessage: 'Authentication failed. Please try connecting your wallet again.',
+        timestamp: new Date(),
       }
       rootStore.authenticationStore.setAuthError(authError)
       
@@ -485,6 +489,7 @@ describe('RootStore', () => {
         message: 'Authentication failed',
         type: ErrorType.AUTHENTICATION_FAILED, 
         userFriendlyMessage: 'Authentication failed. Please try connecting your wallet again.',
+        timestamp: new Date(),
       }
       rootStore.authenticationStore.setAuthError(authError)
       

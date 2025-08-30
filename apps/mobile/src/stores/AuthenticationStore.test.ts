@@ -79,6 +79,7 @@ describe('AuthenticationStore', () => {
         message: 'Authentication failed',
         type: ErrorType.AUTHENTICATION_FAILED,
         userFriendlyMessage: 'Authentication failed',
+        timestamp: new Date(),
       }
 
       store.setAuthError(error)
@@ -257,6 +258,7 @@ describe('AuthenticationStore', () => {
         message: 'Test error',
         type: ErrorType.AUTHENTICATION_FAILED,
         userFriendlyMessage: 'Test error',
+        timestamp: new Date(),
       }
 
       // Set up various state

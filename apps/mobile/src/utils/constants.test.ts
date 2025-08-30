@@ -206,7 +206,7 @@ describe('constants', () => {
         expect(typeof AUTH_TIMEOUTS.REGULAR_WALLET).toBe('number')
         expect(typeof AUTH_TIMEOUTS.SAFE_WALLET).toBe('number')
         expect(typeof AUTH_TIMEOUTS.CONNECT_WALLET).toBe('number')
-        expect(typeof AUTH_TIMEOUTS.SIGNATURE_REQUEST_REQUEST).toBe('number')
+        expect(typeof AUTH_TIMEOUTS.SIGNATURE_REQUEST).toBe('number')
         expect(typeof AUTH_TIMEOUTS.VERIFICATION).toBe('number')
         expect(typeof AUTH_TIMEOUTS.FIREBASE_AUTH).toBe('number')
       })
@@ -221,8 +221,8 @@ describe('constants', () => {
         expect(AUTH_TIMEOUTS.CONNECT_WALLET).toBeGreaterThan(10000)
         expect(AUTH_TIMEOUTS.CONNECT_WALLET).toBeLessThan(120000)
         
-        expect(AUTH_TIMEOUTS.SIGNATURE_REQUEST_REQUEST).toBeGreaterThan(10000)
-        expect(AUTH_TIMEOUTS.SIGNATURE_REQUEST_REQUEST).toBeLessThan(60000)
+        expect(AUTH_TIMEOUTS.SIGNATURE_REQUEST).toBeGreaterThan(10000)
+        expect(AUTH_TIMEOUTS.SIGNATURE_REQUEST).toBeLessThan(60000)
         
         expect(AUTH_TIMEOUTS.VERIFICATION).toBeGreaterThan(5000)
         expect(AUTH_TIMEOUTS.VERIFICATION).toBeLessThan(30000)
@@ -236,12 +236,12 @@ describe('constants', () => {
         const regularWalletTimeout: AuthTimeout = AUTH_TIMEOUTS.REGULAR_WALLET
         const safeWalletTimeout: AuthTimeout = AUTH_TIMEOUTS.SAFE_WALLET
         const connectWalletTimeout: AuthTimeout = AUTH_TIMEOUTS.CONNECT_WALLET
-        const signatureRequestTimeout: AuthTimeout = AUTH_TIMEOUTS.SIGNATURE_REQUEST_REQUEST
+        const signatureRequestTimeout: AuthTimeout = AUTH_TIMEOUTS.SIGNATURE_REQUEST
         const verificationTimeout: AuthTimeout = AUTH_TIMEOUTS.VERIFICATION
         const firebaseAuthTimeout: AuthTimeout = AUTH_TIMEOUTS.FIREBASE_AUTH
         
-        expect(typeof connectionTimeout).toBe('number')
-        expect(typeof signatureTimeout).toBe('number')
+        expect(typeof connectWalletTimeout).toBe('number')
+        expect(typeof signatureRequestTimeout).toBe('number')
         expect(typeof verificationTimeout).toBe('number')
       })
     })
@@ -317,7 +317,7 @@ describe('constants', () => {
         
         expect(typeof short).toBe('number')
         expect(typeof long).toBe('number')
-        expect(typeof persistent).toBe('number')
+        expect(typeof extended).toBe('number')
       })
     })
 
@@ -380,13 +380,13 @@ describe('constants', () => {
 
     describe('LOGGING_CONFIG', () => {
       it('should have logging configuration properties', () => {
-        expect(LOGGING_CONFIG).toHaveProperty('DEFAULT_LEVEL')
-        expect(LOGGING_CONFIG).toHaveProperty('ENABLE_CONSOLE')
-        expect(LOGGING_CONFIG).toHaveProperty('SENSITIVE_KEYS')
+        expect(LOGGING_CONFIG).toHaveProperty('MAX_LOG_LENGTH')
+        expect(LOGGING_CONFIG).toHaveProperty('MAX_ERROR_STACK_DEPTH')
+        expect(LOGGING_CONFIG).toHaveProperty('SENSITIVE_FIELD_TRUNCATION')
         
-        expect(typeof LOGGING_CONFIG.DEFAULT_LEVEL).toBe('string')
-        expect(typeof LOGGING_CONFIG.ENABLE_CONSOLE).toBe('boolean')
-        expect(Array.isArray(LOGGING_CONFIG.SENSITIVE_KEYS)).toBe(true)
+        expect(typeof LOGGING_CONFIG.MAX_LOG_LENGTH).toBe('number')
+        expect(typeof LOGGING_CONFIG.MAX_ERROR_STACK_DEPTH).toBe('number')
+        expect(typeof LOGGING_CONFIG.SENSITIVE_FIELD_TRUNCATION).toBe('number')
       })
 
       it('should have reasonable logging limits', () => {
@@ -401,15 +401,9 @@ describe('constants', () => {
         expect(LOGGING_CONFIG.SENSITIVE_FIELD_TRUNCATION).toBeLessThan(100)
       })
 
-      it('should include common sensitive key patterns', () => {
-        const expectedSensitiveKeys = ['private', 'secret', 'key', 'token', 'password']
-        
-        expectedSensitiveKeys.forEach(expectedKey => {
-          const found = LOGGING_CONFIG.SENSITIVE_KEYS.some(key => 
-            key.toLowerCase().includes(expectedKey)
-          )
-          expect(found).toBe(true)
-        })
+      it('should have valid truncation setting', () => {
+        expect(LOGGING_CONFIG.SENSITIVE_FIELD_TRUNCATION).toBeGreaterThan(0)
+        expect(typeof LOGGING_CONFIG.SENSITIVE_FIELD_TRUNCATION).toBe('number')
       })
     })
   })
@@ -448,7 +442,7 @@ describe('constants', () => {
         ]
 
         validAddresses.forEach(address => {
-          expect(WALLET_ADDRESS_FORMAT.test(address)).toBe(true)
+          expect(WALLET_ADDRESS_FORMAT.PATTERN.test(address)).toBe(true)
         })
       })
 
@@ -463,7 +457,7 @@ describe('constants', () => {
         ]
 
         invalidAddresses.forEach(address => {
-          expect(WALLET_ADDRESS_FORMAT.test(address)).toBe(false)
+          expect(WALLET_ADDRESS_FORMAT.PATTERN.test(address)).toBe(false)
         })
       })
     })
