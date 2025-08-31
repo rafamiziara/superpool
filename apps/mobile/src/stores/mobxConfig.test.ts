@@ -2,6 +2,9 @@ import { configure as mobxConfigure } from 'mobx'
 import { Platform } from 'react-native'
 import { configureMobX, mobxUtils } from './mobxConfig'
 
+// Type for globalThis with __DEV__
+type GlobalWithDev = typeof globalThis & { __DEV__: boolean }
+
 // Mock React Native Platform
 jest.mock('react-native', () => ({
   Platform: {
@@ -36,7 +39,7 @@ describe('mobxConfig', () => {
     console.timeEnd = jest.fn()
 
     // Store original __DEV__ value
-    originalDEV = global.__DEV__
+    originalDEV = (globalThis as GlobalWithDev).__DEV__
   })
 
   afterEach(() => {
@@ -46,7 +49,7 @@ describe('mobxConfig', () => {
     console.timeEnd = originalConsoleTimeEnd
 
     // Restore __DEV__
-    global.__DEV__ = originalDEV
+    ;(globalThis as GlobalWithDev).__DEV__ = originalDEV
   })
 
   describe('configureMobX', () => {
@@ -105,7 +108,7 @@ describe('mobxConfig', () => {
   describe('mobxUtils', () => {
     describe('isDevelopment', () => {
       it('should return true when __DEV__ is true', () => {
-        global.__DEV__ = true
+        (globalThis as GlobalWithDev).__DEV__ = true
 
         // Re-import to get fresh value
         jest.resetModules()
@@ -115,7 +118,7 @@ describe('mobxConfig', () => {
       })
 
       it('should return false when __DEV__ is false', () => {
-        global.__DEV__ = false
+        (globalThis as GlobalWithDev).__DEV__ = false
 
         // Re-import to get fresh value
         jest.resetModules()
@@ -127,7 +130,7 @@ describe('mobxConfig', () => {
 
     describe('log', () => {
       it('should log messages in development mode', () => {
-        global.__DEV__ = true
+        (globalThis as GlobalWithDev).__DEV__ = true
 
         mobxUtils.log('Test message', 'arg1', 42, { key: 'value' })
 
@@ -135,7 +138,7 @@ describe('mobxConfig', () => {
       })
 
       it('should not log messages in production mode', () => {
-        global.__DEV__ = false
+        (globalThis as GlobalWithDev).__DEV__ = false
 
         mobxUtils.log('Test message', 'should not appear')
 
@@ -143,7 +146,7 @@ describe('mobxConfig', () => {
       })
 
       it('should handle messages with no additional arguments', () => {
-        global.__DEV__ = true
+        (globalThis as GlobalWithDev).__DEV__ = true
 
         mobxUtils.log('Simple message')
 
@@ -151,7 +154,7 @@ describe('mobxConfig', () => {
       })
 
       it('should handle empty messages', () => {
-        global.__DEV__ = true
+        (globalThis as GlobalWithDev).__DEV__ = true
 
         mobxUtils.log('')
 
@@ -159,7 +162,7 @@ describe('mobxConfig', () => {
       })
 
       it('should handle complex object arguments', () => {
-        global.__DEV__ = true
+        (globalThis as GlobalWithDev).__DEV__ = true
         const complexObj = { nested: { array: [1, 2, 3], fn: () => {} } }
 
         mobxUtils.log('Complex object', complexObj)
@@ -170,7 +173,7 @@ describe('mobxConfig', () => {
 
     describe('time', () => {
       it('should start timing in development mode when console.time exists', () => {
-        global.__DEV__ = true
+        (globalThis as GlobalWithDev).__DEV__ = true
 
         mobxUtils.time('test-operation')
 
@@ -178,7 +181,7 @@ describe('mobxConfig', () => {
       })
 
       it('should not start timing in production mode', () => {
-        global.__DEV__ = false
+        (globalThis as GlobalWithDev).__DEV__ = false
 
         mobxUtils.time('test-operation')
 
@@ -186,14 +189,14 @@ describe('mobxConfig', () => {
       })
 
       it('should handle missing console.time gracefully', () => {
-        global.__DEV__ = true
+        (globalThis as GlobalWithDev).__DEV__ = true
         console.time = undefined as any
 
         expect(() => mobxUtils.time('test-operation')).not.toThrow()
       })
 
       it('should handle empty label', () => {
-        global.__DEV__ = true
+        (globalThis as GlobalWithDev).__DEV__ = true
 
         mobxUtils.time('')
 
@@ -201,7 +204,7 @@ describe('mobxConfig', () => {
       })
 
       it('should handle special characters in label', () => {
-        global.__DEV__ = true
+        (globalThis as GlobalWithDev).__DEV__ = true
 
         mobxUtils.time('test-operation:123/special-chars')
 
@@ -211,7 +214,7 @@ describe('mobxConfig', () => {
 
     describe('timeEnd', () => {
       it('should end timing in development mode when console.timeEnd exists', () => {
-        global.__DEV__ = true
+        (globalThis as GlobalWithDev).__DEV__ = true
 
         mobxUtils.timeEnd('test-operation')
 
@@ -219,7 +222,7 @@ describe('mobxConfig', () => {
       })
 
       it('should not end timing in production mode', () => {
-        global.__DEV__ = false
+        (globalThis as GlobalWithDev).__DEV__ = false
 
         mobxUtils.timeEnd('test-operation')
 
@@ -227,14 +230,14 @@ describe('mobxConfig', () => {
       })
 
       it('should handle missing console.timeEnd gracefully', () => {
-        global.__DEV__ = true
+        (globalThis as GlobalWithDev).__DEV__ = true
         console.timeEnd = undefined as any
 
         expect(() => mobxUtils.timeEnd('test-operation')).not.toThrow()
       })
 
       it('should match time() label format', () => {
-        global.__DEV__ = true
+        (globalThis as GlobalWithDev).__DEV__ = true
         const label = 'matching-operation'
 
         mobxUtils.time(label)
@@ -247,7 +250,7 @@ describe('mobxConfig', () => {
 
     describe('timing workflow', () => {
       it('should support complete time/timeEnd workflow', () => {
-        global.__DEV__ = true
+        (globalThis as GlobalWithDev).__DEV__ = true
         const operationLabel = 'store-initialization'
 
         mobxUtils.time(operationLabel)
@@ -261,7 +264,7 @@ describe('mobxConfig', () => {
       })
 
       it('should handle nested timing operations', () => {
-        global.__DEV__ = true
+        (globalThis as GlobalWithDev).__DEV__ = true
 
         mobxUtils.time('outer-operation')
         mobxUtils.time('inner-operation')
@@ -321,7 +324,7 @@ describe('mobxConfig', () => {
 
   describe('production vs development behavior', () => {
     it('should behave appropriately in production environment', () => {
-      global.__DEV__ = false
+      (globalThis as GlobalWithDev).__DEV__ = false
 
       mobxUtils.log('Should not appear')
       mobxUtils.time('Should not time')
@@ -333,7 +336,7 @@ describe('mobxConfig', () => {
     })
 
     it('should behave appropriately in development environment', () => {
-      global.__DEV__ = true
+      (globalThis as GlobalWithDev).__DEV__ = true
 
       mobxUtils.log('Should appear')
       mobxUtils.time('Should time')
@@ -361,7 +364,7 @@ describe('mobxConfig', () => {
     })
 
     it('should perform logging operations quickly', () => {
-      global.__DEV__ = true
+      (globalThis as GlobalWithDev).__DEV__ = true
       const start = performance.now()
 
       for (let i = 0; i < 1000; i++) {

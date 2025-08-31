@@ -2,7 +2,7 @@ import { autorun } from 'mobx'
 import { useEffect, useRef } from 'react'
 import { useAccount } from 'wagmi'
 import { useWalletStore } from '../../stores'
-import { appToasts } from '../../utils/toast'
+import { authToasts } from '../../utils/toast'
 
 interface WalletToastOptions {
   showConnectionToasts?: boolean
@@ -30,13 +30,13 @@ export const useWalletToasts = (options: WalletToastOptions = {}) => {
         // Wallet just connected - only show if explicitly enabled
         if (showConnectionToasts) {
           const walletName = connector?.name
-          appToasts.walletConnected(walletName)
+          authToasts.walletConnected(walletName)
         }
         previouslyConnected.current = true
       } else if (!isConnected && previouslyConnected.current) {
         // Wallet disconnected - show if enabled (default: true)
         if (showDisconnectionToasts) {
-          appToasts.walletDisconnected()
+          authToasts.walletDisconnected()
         }
         previouslyConnected.current = false
       }

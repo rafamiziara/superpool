@@ -9,7 +9,7 @@ import { RenderResult } from '@testing-library/react-native'
 import { renderWithStore, renderHookWithStore, renderWithoutStore } from './renderWithStore'
 import { createMockRootStore } from './mockStores'
 import { TestStoreProvider } from './testProviders'
-import { useRootStore } from '../stores/RootStore'
+import { useStores } from '../stores'
 
 // Mock the store and providers
 jest.mock('./mockStores')
@@ -17,8 +17,8 @@ jest.mock('./testProviders')
 jest.mock('../stores/RootStore')
 
 const mockCreateMockRootStore = createMockRootStore as jest.MockedFunction<typeof createMockRootStore>
-const MockedTestStoreProvider = TestStoreProvider as jest.MockedComponent<typeof TestStoreProvider>
-const mockUseRootStore = useRootStore as jest.MockedFunction<typeof useRootStore>
+const MockedTestStoreProvider = TestStoreProvider as jest.MockedFunction<typeof TestStoreProvider> & { lastProps?: { children: React.ReactNode; store: any } }
+const mockUseStores = useStores as jest.MockedFunction<typeof useStores>
 
 // Mock React Native Testing Library
 jest.mock('@testing-library/react-native', () => ({
@@ -77,12 +77,9 @@ describe('renderWithStore', () => {
       queryAllByLabelText: jest.fn(),
       findByLabelText: jest.fn(),
       findAllByLabelText: jest.fn(),
-      container: {} as any,
-      baseElement: {} as any,
       debug: jest.fn(),
       rerender: jest.fn(),
       unmount: jest.fn(),
-      asFragment: jest.fn(),
       toJSON: jest.fn(),
       update: jest.fn(),
       UNSAFE_getByType: jest.fn(),
@@ -90,7 +87,7 @@ describe('renderWithStore', () => {
       UNSAFE_queryByType: jest.fn(),
       UNSAFE_queryAllByType: jest.fn(),
       UNSAFE_root: {} as any,
-    }
+    } as unknown as RenderResult
 
     originalRender.mockReturnValue(mockRenderResult)
 
@@ -103,7 +100,7 @@ describe('renderWithStore', () => {
     })
 
     // Add a lastProps property to track calls
-    ;(MockedTestStoreProvider as any).lastProps = null
+    MockedTestStoreProvider.lastProps = undefined
   })
 
   describe('renderWithStore function', () => {
@@ -166,9 +163,7 @@ describe('renderWithStore', () => {
     })
 
     it('should pass through additional render options', () => {
-      const additionalOptions = {
-        includeHiddenElements: true,
-      }
+      const additionalOptions = {}
 
       renderWithStore(<TestComponent />, additionalOptions)
 
@@ -251,11 +246,11 @@ describe('renderWithStore', () => {
 
     it('should work with hooks that use store context', () => {
       const storeUsingHook = () => {
-        const store = useRootStore()
-        return store.authenticationStore.isAuthenticated
+        const store = useStores()
+        return store.authenticationStore.isAuthenticating
       }
 
-      mockUseRootStore.mockReturnValue(mockStore)
+      mockUseStores.mockReturnValue(mockStore)
 
       renderHookWithStore(storeUsingHook)
 

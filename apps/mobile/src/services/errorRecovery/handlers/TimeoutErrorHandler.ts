@@ -35,9 +35,9 @@ export class TimeoutErrorHandler implements ErrorHandler<void> {
         disconnectResult !== null &&
         typeof disconnectResult === 'object' &&
         'catch' in disconnectResult &&
-        typeof (disconnectResult as any).catch === 'function'
+        typeof (disconnectResult as Promise<unknown>).catch === 'function'
       ) {
-        ;(disconnectResult as any).catch(() => {
+        ;(disconnectResult as Promise<unknown>).catch(() => {
           // Silently handle disconnect failures - timeout handling should continue
         })
       }

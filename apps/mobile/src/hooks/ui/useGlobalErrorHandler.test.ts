@@ -245,7 +245,7 @@ describe('useGlobalErrorHandler', () => {
     const { unmount } = renderHook(() => useGlobalErrorHandler())
 
     // Create a successful promise
-    mockSessionManager.handleSessionCorruption.mockResolvedValue()
+    mockSessionManager.handleSessionCorruption.mockResolvedValue(undefined)
 
     // Simulate session corruption error that passes detection
     console.error('WalletConnect session error: No matching key')
@@ -894,7 +894,7 @@ describe('useGlobalErrorHandler', () => {
     it('should execute the core async handleGlobalError function', async () => {
       // Setup mocks to return true for session corruption detection
       mockSessionManager.detectSessionCorruption.mockReturnValue(true)
-      mockSessionManager.handleSessionCorruption.mockResolvedValue()
+      mockSessionManager.handleSessionCorruption.mockResolvedValue(undefined)
 
       const { unmount } = renderHook(() => useGlobalErrorHandler())
 
@@ -918,7 +918,7 @@ describe('useGlobalErrorHandler', () => {
 
     it('should test the throttling logic (lines 29-34)', async () => {
       mockSessionManager.detectSessionCorruption.mockReturnValue(true)
-      mockSessionManager.handleSessionCorruption.mockResolvedValue()
+      mockSessionManager.handleSessionCorruption.mockResolvedValue(undefined)
 
       const { unmount } = renderHook(() => useGlobalErrorHandler())
 
@@ -982,7 +982,7 @@ describe('useGlobalErrorHandler', () => {
 
     it('should test the finally block setTimeout cleanup (lines 46-51)', async () => {
       mockSessionManager.detectSessionCorruption.mockReturnValue(true)
-      mockSessionManager.handleSessionCorruption.mockResolvedValue()
+      mockSessionManager.handleSessionCorruption.mockResolvedValue(undefined)
 
       const { unmount } = renderHook(() => useGlobalErrorHandler())
 
@@ -1100,7 +1100,7 @@ describe('useGlobalErrorHandler', () => {
 
     it('should specifically test line 49 setTimeout callback execution', async () => {
       mockSessionManager.detectSessionCorruption.mockReturnValue(true)
-      mockSessionManager.handleSessionCorruption.mockResolvedValue()
+      mockSessionManager.handleSessionCorruption.mockResolvedValue(undefined)
 
       const { unmount } = renderHook(() => useGlobalErrorHandler())
 
@@ -1149,7 +1149,7 @@ describe('useGlobalErrorHandler', () => {
         }
         return false
       })
-      mockSessionManager.handleSessionCorruption.mockResolvedValue()
+      mockSessionManager.handleSessionCorruption.mockResolvedValue(undefined)
 
       const { unmount } = renderHook(() => useGlobalErrorHandler())
 

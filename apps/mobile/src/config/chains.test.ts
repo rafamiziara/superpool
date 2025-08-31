@@ -21,7 +21,7 @@ describe('chains configuration', () => {
     })
 
     it('should have correct block explorer configuration', () => {
-      expect(localhost.blockExplorers.default).toEqual({
+      expect(localhost.blockExplorers?.default).toEqual({
         name: 'Local Explorer',
         url: 'http://localhost:8545',
       })
@@ -152,7 +152,7 @@ describe('chains configuration', () => {
       expect(localhost.testnet).toBe(true)
       expect(typeof localhost.name).toBe('string')
       expect(localhost.name.length).toBeGreaterThan(0)
-      expect(localhost.blockExplorers.default.name).toContain('Local')
+      expect(localhost.blockExplorers?.default?.name).toContain('Local')
     })
   })
 

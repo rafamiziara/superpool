@@ -4,6 +4,9 @@ import { devOnly } from '../../utils'
 import { SignatureStrategyFactory, SignatureUtils } from './strategies'
 import { SignatureService } from './SignatureService'
 
+// Jest utilities
+declare const fail: (message?: string) => never
+
 // Mock dependencies
 jest.mock('../../utils', () => ({
   devOnly: jest.fn(),

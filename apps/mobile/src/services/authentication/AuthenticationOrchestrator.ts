@@ -294,7 +294,7 @@ export class AuthenticationOrchestrator {
 
       // Success!
       console.log('User successfully signed in with Firebase!')
-      authToasts.success()
+      authToasts.authSuccess()
       router.replace('/dashboard')
     } catch (error) {
       // Determine which step failed and notify progress callbacks

@@ -22,7 +22,7 @@ const mockAuthErrorRecoveryService = {
 }
 
 const mockFirebaseAuth = {
-  currentUser: null,
+  currentUser: null as { uid: string } | null,
 }
 
 // Mock constructor functions
@@ -139,7 +139,7 @@ jest.doMock('./steps', () => ({
 const { AuthenticationOrchestrator } = require('./AuthenticationOrchestrator')
 
 describe('AuthenticationOrchestrator', () => {
-  let orchestrator: AuthenticationOrchestrator
+  let orchestrator: typeof AuthenticationOrchestrator
   let mockAuthStore: any
   let mockWalletStoreInstance: any
   let mockStepExecutor: any

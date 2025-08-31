@@ -483,7 +483,7 @@ describe('SessionManager', () => {
         const sessionWithNullMetadata = {
           topic: 'test_topic',
           peer: {
-            metadata: null,
+            metadata: undefined,
           },
           namespaces: { eip155: {} },
         }
@@ -496,7 +496,7 @@ describe('SessionManager', () => {
 
     describe('Invalid or Missing Peer Information', () => {
       it('should return empty object for sessions without peer info', () => {
-        const sessionsWithoutPeer = [{}, { peer: {} }, { peer: { metadata: {} } }, { peer: { metadata: null } }, { peer: null }]
+        const sessionsWithoutPeer = [{}, { peer: {} }, { peer: { metadata: {} } }, { peer: { metadata: undefined } }, { peer: undefined }]
 
         sessionsWithoutPeer.forEach((session) => {
           expect(SessionManager.extractPeerInfo(session)).toEqual({})
