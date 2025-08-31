@@ -161,7 +161,7 @@ describe('appCheckProvider', () => {
         mockSecureStore.getItemAsync.mockResolvedValue(null)
         const newUuid = 'new_web_device_uuid'
         mockUuid.v4.mockReturnValue(newUuid)
-        mockSecureStore.setItemAsync.mockResolvedValue()
+        mockSecureStore.setItemAsync.mockResolvedValue(undefined)
 
         const result = await getUniqueDeviceId()
 
@@ -233,7 +233,7 @@ describe('appCheckProvider', () => {
         const provider = customAppCheckProviderFactory()
 
         expect(provider).toHaveProperty('getToken')
-        expect(typeof provider.getToken).toBe('function')
+        expect(typeof (provider as unknown as { getToken: () => Promise<{ token: string; expiry: number }> }).getToken).toBe('function')
       })
     })
 
@@ -252,7 +252,7 @@ describe('appCheckProvider', () => {
           })
 
           const provider = customAppCheckProviderFactory()
-          const result = await provider.getToken()
+          const result = await (provider as unknown as { getToken: () => Promise<{ token: string; expiry: number }> }).getToken()
 
           expect(result).toEqual({
             token: mockToken,
@@ -285,7 +285,7 @@ describe('appCheckProvider', () => {
 
           const beforeCall = Date.now()
           const provider = customAppCheckProviderFactory()
-          const result = await provider.getToken()
+          const result = await (provider as unknown as { getToken: () => Promise<{ token: string; expiry: number }> }).getToken()
           const afterCall = Date.now()
 
           // Token should expire approximately 1 hour from now
@@ -305,7 +305,7 @@ describe('appCheckProvider', () => {
           mockFetch.mockRejectedValue(new Error('Network error'))
 
           const provider = customAppCheckProviderFactory()
-          const result = await provider.getToken()
+          const result = await (provider as unknown as { getToken: () => Promise<{ token: string; expiry: number }> }).getToken()
 
           expect(result.token).toBe('dummy_token_for_development')
           expect(result.expiry).toBeGreaterThan(Date.now())
@@ -322,7 +322,7 @@ describe('appCheckProvider', () => {
           })
 
           const provider = customAppCheckProviderFactory()
-          const result = await provider.getToken()
+          const result = await (provider as unknown as { getToken: () => Promise<{ token: string; expiry: number }> }).getToken()
 
           expect(result.token).toBe('dummy_token_for_development')
         })
@@ -337,7 +337,7 @@ describe('appCheckProvider', () => {
           })
 
           const provider = customAppCheckProviderFactory()
-          const result = await provider.getToken()
+          const result = await (provider as unknown as { getToken: () => Promise<{ token: string; expiry: number }> }).getToken()
 
           expect(result.token).toBe('dummy_token_for_development')
         })
@@ -354,7 +354,7 @@ describe('appCheckProvider', () => {
           })
 
           const provider = customAppCheckProviderFactory()
-          const result = await provider.getToken()
+          const result = await (provider as unknown as { getToken: () => Promise<{ token: string; expiry: number }> }).getToken()
 
           expect(result.token).toBe('dummy_token_for_development')
         })
@@ -374,7 +374,7 @@ describe('appCheckProvider', () => {
           })
 
           const androidProvider = customAppCheckProviderFactory()
-          await androidProvider.getToken()
+          await (androidProvider as unknown as { getToken: () => Promise<{ token: string; expiry: number }> }).getToken()
 
           expect(mockFetch).toHaveBeenCalledWith(
             expect.any(String),
@@ -395,7 +395,7 @@ describe('appCheckProvider', () => {
           })
 
           const iosProvider = customAppCheckProviderFactory()
-          await iosProvider.getToken()
+          await (iosProvider as unknown as { getToken: () => Promise<{ token: string; expiry: number }> }).getToken()
 
           expect(mockFetch).toHaveBeenCalledWith(
             expect.any(String),
@@ -416,7 +416,7 @@ describe('appCheckProvider', () => {
           })
 
           const provider = customAppCheckProviderFactory()
-          await provider.getToken()
+          await (provider as unknown as { getToken: () => Promise<{ token: string; expiry: number }> }).getToken()
 
           expect(mockFetch).toHaveBeenCalledWith('https://test-functions.firebase.com/customAppCheckMinter', expect.any(Object))
         })
@@ -430,7 +430,7 @@ describe('appCheckProvider', () => {
           mockGetIosIdForVendorAsync.mockResolvedValue('test_device')
 
           const provider = customAppCheckProviderFactory()
-          const result = await provider.getToken()
+          const result = await (provider as unknown as { getToken: () => Promise<{ token: string; expiry: number }> }).getToken()
 
           // Should fall back to dummy token when URL is not configured
           expect(result.token).toBe('dummy_token_for_development')
@@ -447,7 +447,7 @@ describe('appCheckProvider', () => {
         const provider2 = customAppCheckProviderFactory()
 
         expect(provider1).not.toBe(provider2)
-        expect(provider1.getToken).not.toBe(provider2.getToken)
+        expect((provider1 as unknown as { getToken: () => Promise<{ token: string; expiry: number }> }).getToken).not.toBe((provider2 as unknown as { getToken: () => Promise<{ token: string; expiry: number }> }).getToken)
       })
 
       it('should work correctly with concurrent token requests', async () => {
@@ -462,7 +462,7 @@ describe('appCheckProvider', () => {
         const provider = customAppCheckProviderFactory()
 
         // Make concurrent requests
-        const promises = Array.from({ length: 5 }, () => provider.getToken())
+        const promises = Array.from({ length: 5 }, () => (provider as unknown as { getToken: () => Promise<{ token: string; expiry: number }> }).getToken())
         const results = await Promise.all(promises)
 
         // All should succeed and return valid tokens
@@ -489,7 +489,7 @@ describe('appCheckProvider', () => {
         })
 
         const provider = customAppCheckProviderFactory()
-        const result = await provider.getToken()
+        const result = await (provider as unknown as { getToken: () => Promise<{ token: string; expiry: number }> }).getToken()
 
         expect(result.token).toBe('fallback_token')
         expect(mockFetch).toHaveBeenCalledWith(
@@ -521,7 +521,7 @@ describe('appCheckProvider', () => {
 
         const provider = customAppCheckProviderFactory()
         const start = performance.now()
-        const result = await provider.getToken()
+        const result = await (provider as unknown as { getToken: () => Promise<{ token: string; expiry: number }> }).getToken()
         const end = performance.now()
 
         expect(result.token).toBe('slow_token')
@@ -554,7 +554,7 @@ describe('appCheckProvider', () => {
       const provider = customAppCheckProviderFactory()
 
       // Make many token requests
-      const promises = Array.from({ length: 50 }, () => provider.getToken())
+      const promises = Array.from({ length: 50 }, () => (provider as unknown as { getToken: () => Promise<{ token: string; expiry: number }> }).getToken())
       await Promise.all(promises)
 
       const finalMemory = process.memoryUsage().heapUsed
@@ -581,7 +581,7 @@ describe('appCheckProvider', () => {
 
       // Test device ID through provider
       const provider = customAppCheckProviderFactory()
-      await provider.getToken()
+      await (provider as unknown as { getToken: () => Promise<{ token: string; expiry: number }> }).getToken()
 
       expect(mockFetch).toHaveBeenCalledWith(
         expect.any(String),

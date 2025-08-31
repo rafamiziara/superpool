@@ -36,7 +36,7 @@ describe('testProviders', () => {
     mockCreateMockRootStore.mockReturnValue(mockStore)
 
     // Mock StoreContext.Provider
-    MockedStoreContext.Provider = jest.fn().mockImplementation(({ children }) => <>{children}</>)
+    MockedStoreContext.Provider = jest.fn().mockImplementation(({ children }) => <>{children}</>) as unknown as jest.MockInstance<React.ReactNode, [props: React.ProviderProps<RootStore | null>], unknown> & React.Provider<RootStore | null>
   })
 
   describe('TestStoreProvider', () => {
@@ -60,7 +60,7 @@ describe('testProviders', () => {
         walletStore: { isConnected: true },
         poolManagementStore: { pools: [] },
         uiStore: { onboardingCurrentIndex: 1 },
-      } as RootStore
+      } as unknown as RootStore
 
       const { getByTestId } = render(
         <TestStoreProvider store={customStore}>
@@ -76,7 +76,7 @@ describe('testProviders', () => {
     it('should pass store value to StoreContext.Provider', () => {
       const customStore = {
         authenticationStore: { isAuthenticated: true },
-      } as RootStore
+      } as unknown as RootStore
 
       render(
         <TestStoreProvider store={customStore}>
@@ -145,8 +145,8 @@ describe('testProviders', () => {
     })
 
     it('should work with nested providers', () => {
-      const outerStore = { authenticationStore: { isAuthenticated: false } } as RootStore
-      const innerStore = { authenticationStore: { isAuthenticated: true } } as RootStore
+      const outerStore = { authenticationStore: { isAuthenticated: false } } as unknown as RootStore
+      const innerStore = { authenticationStore: { isAuthenticated: true } } as unknown as RootStore
 
       const { getByTestId } = render(
         <TestStoreProvider store={outerStore}>
@@ -186,7 +186,7 @@ describe('testProviders', () => {
     it('should create wrapped component with provided store', () => {
       const customStore = {
         authenticationStore: { isAuthenticated: true },
-      } as RootStore
+      } as unknown as RootStore
 
       const WrappedComponent = withMockStore(TestComponent, customStore)
 

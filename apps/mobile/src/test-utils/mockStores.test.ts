@@ -115,9 +115,9 @@ describe('mockStores', () => {
       const store = createMockAuthenticationStore()
 
       // Mock should call original implementation
-      const result = store.startStep('test-step')
+      const result = store.startStep('connect-wallet')
       expect(result).toBe('original-result')
-      expect(store.startStep).toHaveBeenCalledWith('test-step')
+      expect(store.startStep).toHaveBeenCalledWith('connect-wallet')
     })
   })
 
@@ -544,22 +544,22 @@ describe('mockStores', () => {
       mockAuthStore.completedSteps.clear = jest.fn()
       mockAuthStore.completedSteps.add = jest.fn()
 
-      MockedAuthenticationStore.mockImplementation(() => mockAuthStore)
+      MockedAuthenticationStore.mockImplementation(() => mockAuthStore as unknown as AuthenticationStore)
 
       const store = createMockAuthenticationStore()
-      const result = store.startStep('test-step')
+      const result = store.startStep('connect-wallet')
 
       expect(result).toBe(originalReturn)
-      expect(store.startStep).toHaveBeenCalledWith('test-step')
+      expect(store.startStep).toHaveBeenCalledWith('connect-wallet')
     })
 
     it('should allow test-specific mock implementations', () => {
-      const store = createMockAuthenticationStore()
+      const store = createMockAuthenticationStore() as AuthenticationStore
 
       // Override mock implementation for specific test
-      store.startStep.mockImplementation(() => 'test-specific-result')
+      (store.startStep as jest.Mock).mockImplementation(() => 'test-specific-result')
 
-      const result = store.startStep('test')
+      const result = store.startStep('generate-message')
       expect(result).toBe('test-specific-result')
     })
   })
@@ -573,8 +573,8 @@ describe('mockStores', () => {
       const rootStore = createMockRootStore()
 
       // Should be able to call expected methods
-      expect(() => authStore.startStep('test')).not.toThrow()
-      expect(() => walletStore.connect()).not.toThrow()
+      expect(() => authStore.startStep('generate-message')).not.toThrow()
+      expect(() => walletStore.connect('0x1234567890123456789012345678901234567890', 1)).not.toThrow()
       expect(() => poolStore.loadPools()).not.toThrow()
       expect(() => uiStore.setOnboardingIndex(1)).not.toThrow()
 

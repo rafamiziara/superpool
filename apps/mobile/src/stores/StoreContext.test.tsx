@@ -23,7 +23,7 @@ import { RootStore } from './RootStore'
 jest.mock('./RootStore', () => ({
   RootStore: jest.fn().mockImplementation(() => ({
     authenticationStore: {
-      isAuthenticated: false,
+      isAuthenticating: false,
       startStep: jest.fn(),
       completeStep: jest.fn(),
     },
@@ -170,7 +170,7 @@ describe('StoreContext', () => {
     it('should throw error when used outside StoreProvider', () => {
       const { result } = renderHook(() => useStore())
 
-      expect(result.error).toEqual(new Error('useStore must be used within a StoreProvider'))
+      expect(() => result.current).toThrow('useStore must be used within a StoreProvider')
     })
 
     it('should throw error with exact message', () => {
@@ -210,7 +210,7 @@ describe('StoreContext', () => {
     it('should throw error when used outside StoreProvider', () => {
       const { result } = renderHook(() => useAuthenticationStore())
 
-      expect(result.error).toEqual(new Error('useStore must be used within a StoreProvider'))
+      expect(() => result.current).toThrow('useStore must be used within a StoreProvider')
     })
 
     it('should provide access to authentication store methods', () => {
@@ -220,7 +220,7 @@ describe('StoreContext', () => {
 
       expect(result.current.startStep).toBeDefined()
       expect(result.current.completeStep).toBeDefined()
-      expect(result.current.isAuthenticated).toBe(false)
+      expect(result.current.isAuthenticating).toBe(false)
     })
   })
 
@@ -236,7 +236,7 @@ describe('StoreContext', () => {
     it('should throw error when used outside StoreProvider', () => {
       const { result } = renderHook(() => useWalletStore())
 
-      expect(result.error).toEqual(new Error('useStore must be used within a StoreProvider'))
+      expect(() => result.current).toThrow('useStore must be used within a StoreProvider')
     })
 
     it('should provide access to wallet store properties', () => {
@@ -262,7 +262,7 @@ describe('StoreContext', () => {
     it('should throw error when used outside StoreProvider', () => {
       const { result } = renderHook(() => usePoolManagementStore())
 
-      expect(result.error).toEqual(new Error('useStore must be used within a StoreProvider'))
+      expect(() => result.current).toThrow('useStore must be used within a StoreProvider')
     })
 
     it('should provide access to pool management store properties', () => {
@@ -287,7 +287,7 @@ describe('StoreContext', () => {
     it('should throw error when used outside StoreProvider', () => {
       const { result } = renderHook(() => useUIStore())
 
-      expect(result.error).toEqual(new Error('useStore must be used within a StoreProvider'))
+      expect(() => result.current).toThrow('useStore must be used within a StoreProvider')
     })
 
     it('should provide access to UI store properties', () => {
@@ -318,7 +318,7 @@ describe('StoreContext', () => {
     it('should throw error when used outside StoreProvider', () => {
       const { result } = renderHook(() => useStores())
 
-      expect(result.error).toEqual(new Error('useStore must be used within a StoreProvider'))
+      expect(() => result.current).toThrow('useStore must be used within a StoreProvider')
     })
 
     it('should provide access to all individual stores', () => {
@@ -342,7 +342,7 @@ describe('StoreContext', () => {
 
       const initialStores = result.current
 
-      rerender()
+      rerender(undefined)
 
       expect(result.current.authenticationStore).toBe(initialStores.authenticationStore)
       expect(result.current.walletStore).toBe(initialStores.walletStore)
@@ -389,7 +389,7 @@ describe('StoreContext', () => {
     it('should allow multiple components to access different stores', () => {
       const AuthComponent = () => {
         const authStore = useAuthenticationStore()
-        return <Text testID="auth">{authStore.isAuthenticated ? 'authenticated' : 'not-authenticated'}</Text>
+        return <Text testID="auth">{authStore.isAuthenticating ? 'authenticated' : 'not-authenticated'}</Text>
       }
 
       const WalletComponent = () => {
@@ -413,7 +413,7 @@ describe('StoreContext', () => {
         const { authenticationStore, walletStore } = useStores()
         return (
           <Text testID="multi-store">
-            Auth: {authenticationStore.isAuthenticated ? 'yes' : 'no'}, Wallet: {walletStore.isConnected ? 'yes' : 'no'}
+            Auth: {authenticationStore.isAuthenticating ? 'yes' : 'no'}, Wallet: {walletStore.isConnected ? 'yes' : 'no'}
           </Text>
         )
       }
@@ -454,7 +454,7 @@ describe('StoreContext', () => {
       const ConditionalComponent = () => {
         const { authenticationStore } = useStores()
 
-        if (authenticationStore.isAuthenticated) {
+        if (authenticationStore.isAuthenticating) {
           return <Text testID="authenticated">Authenticated Content</Text>
         }
 
@@ -540,7 +540,7 @@ describe('StoreContext', () => {
 
         // Verify type-safe access
         expect(typeof store.authenticationStore).toBe('object')
-        expect(typeof authStore.isAuthenticated).toBe('boolean')
+        expect(typeof authStore.isAuthenticating).toBe('boolean')
         expect(typeof walletStore.isConnected).toBe('boolean')
         expect(Array.isArray(poolStore.pools)).toBe(true)
         expect(typeof uiStore.onboardingCurrentIndex).toBe('number')

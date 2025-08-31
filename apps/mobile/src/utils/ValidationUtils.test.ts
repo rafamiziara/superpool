@@ -582,8 +582,8 @@ describe('ValidationUtils', () => {
       expect(instance).toBeInstanceOf(ValidationUtils)
 
       // The key test is that all methods should be static (not on prototype)
-      expect(ValidationUtils.prototype.isValidWalletAddress).toBeUndefined()
-      expect(ValidationUtils.prototype.isValidNonce).toBeUndefined()
+      expect('isValidWalletAddress' in ValidationUtils.prototype).toBe(false)
+      expect('isValidNonce' in ValidationUtils.prototype).toBe(false)
     })
 
     it('should have methods with correct arities', () => {

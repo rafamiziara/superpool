@@ -436,7 +436,7 @@ describe('FirebaseAuthenticator', () => {
         let promiseError: any = null
 
         // Start the promise and handle it separately
-        signInPromise = authenticator.signInWithFirebase(mockFirebaseToken, 'safe-wallet').catch((error) => {
+        signInPromise = authenticator.signInWithFirebase(mockFirebaseToken, 'safe-wallet').catch((error: any) => {
           promiseError = error
           promiseResolved = true
           return Promise.reject(error)
@@ -712,6 +712,7 @@ describe('FirebaseAuthenticator', () => {
     it('should handle optional chainId in context', () => {
       const contextWithoutChainId = {
         walletAddress: '0x1234567890123456789012345678901234567890',
+        chainId: undefined,
       }
 
       expect(contextWithoutChainId.chainId).toBeUndefined()

@@ -82,7 +82,7 @@ export class SessionErrorHandler implements ErrorHandler<SessionErrorContext> {
    */
   private showSessionErrorFeedback(): void {
     setTimeout(() => {
-      authToasts.sessionError()
+      authToasts.sessionExpired()
     }, 1500)
   }
 }

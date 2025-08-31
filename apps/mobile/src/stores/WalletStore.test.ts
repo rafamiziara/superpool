@@ -251,7 +251,7 @@ describe('WalletStore', () => {
       expect(store.isConnecting).toBe(false) // Should be set to false when error occurs
 
       // Test that non-Error strings are handled as expected in error logic
-      const isErrorInstance = 'string error' instanceof Error
+      const isErrorInstance = ('string error' as any) instanceof Error
       const expectedMessage = isErrorInstance ? 'string error' : 'Connection failed'
       expect(expectedMessage).toBe('Connection failed')
     })
@@ -260,7 +260,7 @@ describe('WalletStore', () => {
       // Test the error handling logic without actually throwing errors
       // Test that non-Error exceptions are handled correctly in the error handling logic
 
-      const nonErrorException = 'String error'
+      const nonErrorException: unknown = 'String error'
       const errorMessage = nonErrorException instanceof Error ? nonErrorException.message : 'Connection failed'
 
       expect(errorMessage).toBe('Connection failed')
@@ -817,7 +817,7 @@ describe('WalletStore', () => {
   describe('Error Handling', () => {
     it('should handle string errors in connect', async () => {
       // Test string error handling logic by verifying the error message transformation
-      const stringError = 'String error'
+      const stringError: unknown = 'String error'
       const processedError = stringError instanceof Error ? stringError.message : 'Connection failed'
 
       expect(processedError).toBe('Connection failed')

@@ -67,7 +67,7 @@ describe('errorHandling', () => {
         expect(error.message).toBe('Custom message')
         expect(error.userFriendlyMessage).toBe(ERROR_MESSAGES[ErrorType.AUTHENTICATION_FAILED])
         expect(error.originalError).toBeInstanceOf(Error)
-        expect(error.originalError?.message).toBe('Original error')
+        expect((error.originalError as unknown as Error)?.message).toBe('Original error')
         expect(error.name).toBe('AppError')
         expect(error.timestamp).toBeInstanceOf(Date)
       })
@@ -98,8 +98,8 @@ describe('errorHandling', () => {
         const error = createAppError(ErrorType.NETWORK_ERROR, 'Network failed', originalError)
 
         expect(error.originalError).toBe(originalError)
-        expect(error.originalError?.message).toBe('Database connection failed')
-        expect(error.originalError?.stack).toBe('Stack trace here')
+        expect((error.originalError as unknown as Error)?.message).toBe('Database connection failed')
+        expect((error.originalError as unknown as Error)?.stack).toBe('Stack trace here')
       })
     })
 

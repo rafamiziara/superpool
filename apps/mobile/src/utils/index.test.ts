@@ -25,11 +25,10 @@ describe('utils index exports', () => {
       expect(typeof SessionManager.clearSessionByErrorId).toBe('function')
       expect(typeof SessionManager.forceResetAllConnections).toBe('function')
       expect(typeof SessionManager.preventiveSessionCleanup).toBe('function')
-      expect(typeof SessionManager.validateSessionStructure).toBe('function')
-      expect(typeof SessionManager.categorizeSessionError).toBe('function')
-      expect(typeof SessionManager.extractPeerInfo).toBe('function')
-      expect(typeof SessionManager.calculateSessionAge).toBe('function')
-      expect(typeof SessionManager.generateDebugInfo).toBe('function')
+      expect(typeof SessionManager.extractSessionId).toBe('function')
+      expect(typeof SessionManager.isSessionError).toBe('function')
+      expect(typeof SessionManager.isRelayerError).toBe('function')
+      expect(typeof SessionManager.detectSessionCorruption).toBe('function')
     })
 
     it('should export Firebase utilities', async () => {
@@ -39,7 +38,9 @@ describe('utils index exports', () => {
       expect(typeof customAppCheckProviderFactory).toBe('function')
 
       expect(firebaseAuthManager).toBeDefined()
-      expect(typeof firebaseAuthManager.getInstance).toBe('function')
+      expect(typeof firebaseAuthManager.addListener).toBe('function')
+      expect(typeof firebaseAuthManager.getCurrentState).toBe('function')
+      expect(typeof firebaseAuthManager.cleanup).toBe('function')
     })
   })
 
@@ -140,15 +141,15 @@ describe('utils index exports', () => {
 
       expect(AUTH_TIMEOUTS).toBeDefined()
       expect(typeof AUTH_TIMEOUTS).toBe('object')
-      expect(typeof AUTH_TIMEOUTS.CONNECTION).toBe('number')
-      expect(typeof AUTH_TIMEOUTS.SIGNATURE).toBe('number')
+      expect(typeof AUTH_TIMEOUTS.CONNECT_WALLET).toBe('number')
+      expect(typeof AUTH_TIMEOUTS.SIGNATURE_REQUEST).toBe('number')
       expect(typeof AUTH_TIMEOUTS.VERIFICATION).toBe('number')
 
       expect(AUTH_VALIDATION).toBeDefined()
       expect(typeof AUTH_VALIDATION).toBe('object')
-      expect(typeof AUTH_VALIDATION.NONCE_MAX_LENGTH).toBe('number')
-      expect(typeof AUTH_VALIDATION.MESSAGE_MAX_LENGTH).toBe('number')
-      expect(typeof AUTH_VALIDATION.TIMESTAMP_MAX_AGE_MS).toBe('number')
+      expect(typeof AUTH_VALIDATION.MAX_NONCE_LENGTH).toBe('number')
+      expect(typeof AUTH_VALIDATION.MAX_MESSAGE_LENGTH).toBe('number')
+      expect(typeof AUTH_VALIDATION.MAX_TIMESTAMP_AGE).toBe('number')
     })
 
     it('should export error handling constants', async () => {
@@ -156,9 +157,9 @@ describe('utils index exports', () => {
 
       expect(ERROR_RETRY_CONFIG).toBeDefined()
       expect(typeof ERROR_RETRY_CONFIG).toBe('object')
-      expect(typeof ERROR_RETRY_CONFIG.MAX_ATTEMPTS).toBe('number')
-      expect(typeof ERROR_RETRY_CONFIG.BASE_DELAY_MS).toBe('number')
-      expect(typeof ERROR_RETRY_CONFIG.MAX_DELAY_MS).toBe('number')
+      expect(typeof ERROR_RETRY_CONFIG.MAX_RETRIES).toBe('number')
+      expect(typeof ERROR_RETRY_CONFIG.INITIAL_DELAY).toBe('number')
+      expect(typeof ERROR_RETRY_CONFIG.MAX_DELAY).toBe('number')
       expect(typeof ERROR_RETRY_CONFIG.BACKOFF_MULTIPLIER).toBe('number')
     })
 
@@ -167,9 +168,9 @@ describe('utils index exports', () => {
 
       expect(FIREBASE_CONFIG).toBeDefined()
       expect(typeof FIREBASE_CONFIG).toBe('object')
-      expect(typeof FIREBASE_CONFIG.MAX_RETRY_ATTEMPTS).toBe('number')
-      expect(typeof FIREBASE_CONFIG.RETRY_DELAY_MS).toBe('number')
-      expect(typeof FIREBASE_CONFIG.AUTH_PERSISTENCE).toBe('string')
+      expect(typeof FIREBASE_CONFIG.DUMMY_TOKEN_EXPIRY).toBe('number')
+      expect(typeof FIREBASE_CONFIG.APP_CHECK_MINTER_ENDPOINT).toBe('string')
+      // Only two properties exist in FIREBASE_CONFIG
     })
 
     it('should export logging constants', async () => {
@@ -184,9 +185,9 @@ describe('utils index exports', () => {
 
       expect(LOGGING_CONFIG).toBeDefined()
       expect(typeof LOGGING_CONFIG).toBe('object')
-      expect(typeof LOGGING_CONFIG.DEFAULT_LEVEL).toBe('string')
-      expect(typeof LOGGING_CONFIG.ENABLE_CONSOLE).toBe('boolean')
-      expect(Array.isArray(LOGGING_CONFIG.SENSITIVE_KEYS)).toBe(true)
+      expect(typeof LOGGING_CONFIG.MAX_LOG_LENGTH).toBe('number')
+      expect(typeof LOGGING_CONFIG.MAX_ERROR_STACK_DEPTH).toBe('number')
+      expect(typeof LOGGING_CONFIG.SENSITIVE_FIELD_TRUNCATION).toBe('number')
     })
 
     it('should export session constants', async () => {
@@ -222,8 +223,8 @@ describe('utils index exports', () => {
 
       expect(SIGNATURE_FORMATS).toBeDefined()
       expect(typeof SIGNATURE_FORMATS).toBe('object')
-      expect(SIGNATURE_FORMATS.HEX_SIGNATURE).toBeInstanceOf(RegExp)
-      expect(SIGNATURE_FORMATS.SAFE_WALLET_TOKEN).toBeInstanceOf(RegExp)
+      expect(typeof SIGNATURE_FORMATS.HEX_PREFIX).toBe('string')
+      expect(typeof SIGNATURE_FORMATS.SAFE_WALLET_PREFIX).toBe('string')
     })
 
     it('should export UI constants', async () => {
@@ -233,7 +234,7 @@ describe('utils index exports', () => {
       expect(typeof TOAST_DURATIONS).toBe('object')
       expect(typeof TOAST_DURATIONS.SHORT).toBe('number')
       expect(typeof TOAST_DURATIONS.LONG).toBe('number')
-      expect(typeof TOAST_DURATIONS.PERSISTENT).toBe('number')
+      expect(typeof TOAST_DURATIONS.EXTENDED).toBe('number')
 
       expect(TOAST_POSITIONS).toBeDefined()
       expect(typeof TOAST_POSITIONS).toBe('object')

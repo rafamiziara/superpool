@@ -563,7 +563,7 @@ describe('constants', () => {
       // The actual type checking happens at compile time
 
       const authTimeout: AuthTimeout = 30000
-      const logLevel: LogLevel = 'info'
+      const logLevel: LogLevel = 1
       const toastDuration: ToastDuration = 3000
       const toastPosition: ToastPosition = 'top'
       const chainId: SupportedChainId = 1
