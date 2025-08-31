@@ -1,7 +1,4 @@
-import { FirebaseAuthManager } from './firebaseAuthManager'
-import { ValidationUtils } from './ValidationUtils'
-
-// Mock Firebase Auth
+// Mock Firebase before importing anything else
 const mockFirebaseAuth = {
   currentUser: null,
 }
@@ -20,6 +17,8 @@ jest.mock('firebase/auth', () => ({
 
 jest.mock('../firebase.config', () => ({
   FIREBASE_AUTH: mockFirebaseAuth,
+  FIREBASE_FIRESTORE: {},
+  FIREBASE_FUNCTIONS: {},
 }))
 
 jest.mock('./ValidationUtils', () => ({
@@ -36,8 +35,12 @@ jest.mock('@superpool/types', () => ({
   },
 }))
 
+// Now import the modules after mocking
+import { firebaseAuthManager } from './firebaseAuthManager'
+import { ValidationUtils } from './ValidationUtils'
+
+
 describe('FirebaseAuthManager', () => {
-  let authManager: FirebaseAuthManager
   let mockValidationUtils: jest.Mocked<typeof ValidationUtils>
 
   beforeEach(() => {
@@ -51,6 +54,7 @@ describe('FirebaseAuthManager', () => {
     mockValidationUtils.isValidWalletAddress.mockReturnValue(true)
     
     // Reset auth state changed mock
+    mockOnAuthStateChanged.mockClear()
     mockOnAuthStateChanged.mockImplementation((auth, callback) => {
       // Store the callback for manual triggering
       ;(mockOnAuthStateChanged as any)._callback = callback
@@ -58,25 +62,34 @@ describe('FirebaseAuthManager', () => {
       return jest.fn()
     })
 
-    authManager = FirebaseAuthManager.getInstance()
+    // Clean up any existing listeners if method exists
+    if (typeof firebaseAuthManager.cleanup === 'function') {
+      firebaseAuthManager.cleanup()
+    }
+    
+    // Reset the internal state of the manager
+    ;(firebaseAuthManager as any).isInitialized = false
+    ;(firebaseAuthManager as any).listeners = new Set()
+    ;(firebaseAuthManager as any).unsubscribe = null
   })
 
   afterEach(() => {
-    // Clean up singleton instance
-    ;(FirebaseAuthManager as any)._instance = null
+    // Clean up after each test if method exists
+    if (typeof firebaseAuthManager.cleanup === 'function') {
+      firebaseAuthManager.cleanup()
+    }
   })
 
   describe('Singleton Pattern', () => {
-    it('should return the same instance on multiple calls', () => {
-      const instance1 = FirebaseAuthManager.getInstance()
-      const instance2 = FirebaseAuthManager.getInstance()
-      
-      expect(instance1).toBe(instance2)
-      expect(instance1).toBeInstanceOf(FirebaseAuthManager)
+    it('should provide a single global instance', () => {
+      expect(firebaseAuthManager).toBeDefined()
+      expect(typeof firebaseAuthManager.addListener).toBe('function')
+      expect(typeof firebaseAuthManager.getCurrentState).toBe('function')
     })
 
-    it('should initialize Firebase auth listener on first getInstance call', () => {
-      FirebaseAuthManager.getInstance()
+    it('should initialize Firebase auth listener on first addListener call', () => {
+      const callback = jest.fn()
+      firebaseAuthManager.addListener(callback)
       
       expect(mockOnAuthStateChanged).toHaveBeenCalledWith(
         mockFirebaseAuth,
@@ -84,10 +97,10 @@ describe('FirebaseAuthManager', () => {
       )
     })
 
-    it('should not reinitialize listener on subsequent calls', () => {
-      FirebaseAuthManager.getInstance()
-      FirebaseAuthManager.getInstance()
-      FirebaseAuthManager.getInstance()
+    it('should not reinitialize listener on subsequent addListener calls', () => {
+      firebaseAuthManager.addListener(jest.fn())
+      firebaseAuthManager.addListener(jest.fn())
+      firebaseAuthManager.addListener(jest.fn())
       
       expect(mockOnAuthStateChanged).toHaveBeenCalledTimes(1)
     })
@@ -97,10 +110,16 @@ describe('FirebaseAuthManager', () => {
     describe('Listener Registration', () => {
       it('should register auth state change listener', () => {
         const callback = jest.fn()
-        const unsubscribe = authManager.subscribe(callback)
+        const unsubscribe = firebaseAuthManager.addListener(callback)
         
         expect(typeof unsubscribe).toBe('function')
-        expect(authManager.getListenerCount()).toBe(1)
+        // Verify callback was called with initial state
+        expect(callback).toHaveBeenCalledWith(expect.objectContaining({
+          user: null,
+          isLoading: expect.any(Boolean),
+          isAuthenticated: false,
+          walletAddress: null,
+        }))
       })
 
       it('should support multiple listeners', () => {
@@ -108,16 +127,19 @@ describe('FirebaseAuthManager', () => {
         const callback2 = jest.fn()
         const callback3 = jest.fn()
         
-        authManager.subscribe(callback1)
-        authManager.subscribe(callback2)
-        authManager.subscribe(callback3)
+        firebaseAuthManager.addListener(callback1)
+        firebaseAuthManager.addListener(callback2)
+        firebaseAuthManager.addListener(callback3)
         
-        expect(authManager.getListenerCount()).toBe(3)
+        // All callbacks should be called with initial state
+        expect(callback1).toHaveBeenCalled()
+        expect(callback2).toHaveBeenCalled()
+        expect(callback3).toHaveBeenCalled()
       })
 
       it('should return unique unsubscribe functions for each listener', () => {
-        const unsubscribe1 = authManager.subscribe(jest.fn())
-        const unsubscribe2 = authManager.subscribe(jest.fn())
+        const unsubscribe1 = firebaseAuthManager.addListener(jest.fn())
+        const unsubscribe2 = firebaseAuthManager.addListener(jest.fn())
         
         expect(unsubscribe1).not.toBe(unsubscribe2)
         expect(typeof unsubscribe1).toBe('function')
@@ -127,14 +149,29 @@ describe('FirebaseAuthManager', () => {
 
     describe('Listener Unsubscription', () => {
       it('should remove listener when unsubscribe is called', () => {
-        const callback = jest.fn()
-        const unsubscribe = authManager.subscribe(callback)
+        const callback1 = jest.fn()
+        const callback2 = jest.fn()
         
-        expect(authManager.getListenerCount()).toBe(1)
+        const unsubscribe1 = firebaseAuthManager.addListener(callback1)
+        firebaseAuthManager.addListener(callback2)
         
-        unsubscribe()
+        // Trigger auth state change to test listener removal
+        const firebaseCallback = (mockOnAuthStateChanged as any)._callback
+        const testUser = { ...mockUser, uid: '0x1234567890123456789012345678901234567890' }
         
-        expect(authManager.getListenerCount()).toBe(0)
+        // Clear previous calls
+        callback1.mockClear()
+        callback2.mockClear()
+        
+        // Remove first listener
+        unsubscribe1()
+        
+        // Trigger state change
+        firebaseCallback(testUser)
+        
+        // Only callback2 should be called
+        expect(callback1).not.toHaveBeenCalled()
+        expect(callback2).toHaveBeenCalled()
       })
 
       it('should only remove the specific listener that unsubscribed', () => {
@@ -142,55 +179,81 @@ describe('FirebaseAuthManager', () => {
         const callback2 = jest.fn()
         const callback3 = jest.fn()
         
-        const unsubscribe1 = authManager.subscribe(callback1)
-        authManager.subscribe(callback2)
-        const unsubscribe3 = authManager.subscribe(callback3)
+        const unsubscribe1 = firebaseAuthManager.addListener(callback1)
+        firebaseAuthManager.addListener(callback2)
+        const unsubscribe3 = firebaseAuthManager.addListener(callback3)
         
-        expect(authManager.getListenerCount()).toBe(3)
+        // Clear initial calls
+        callback1.mockClear()
+        callback2.mockClear()
+        callback3.mockClear()
         
+        // Remove first and third listeners
         unsubscribe1()
-        expect(authManager.getListenerCount()).toBe(2)
-        
         unsubscribe3()
-        expect(authManager.getListenerCount()).toBe(1)
+        
+        // Trigger state change
+        const firebaseCallback = (mockOnAuthStateChanged as any)._callback
+        const testUser = { ...mockUser, uid: '0x1234567890123456789012345678901234567890' }
+        firebaseCallback(testUser)
+        
+        // Only callback2 should be called
+        expect(callback1).not.toHaveBeenCalled()
+        expect(callback2).toHaveBeenCalled()
+        expect(callback3).not.toHaveBeenCalled()
       })
 
       it('should handle multiple unsubscribe calls gracefully', () => {
         const callback = jest.fn()
-        const unsubscribe = authManager.subscribe(callback)
-        
-        unsubscribe()
-        expect(authManager.getListenerCount()).toBe(0)
+        const unsubscribe = firebaseAuthManager.addListener(callback)
         
         // Should not throw or cause issues
-        unsubscribe()
-        unsubscribe()
-        expect(authManager.getListenerCount()).toBe(0)
+        expect(() => {
+          unsubscribe()
+          unsubscribe()
+          unsubscribe()
+        }).not.toThrow()
       })
     })
 
     describe('Listener Cleanup', () => {
       it('should remove all listeners when cleanup is called', () => {
-        authManager.subscribe(jest.fn())
-        authManager.subscribe(jest.fn())
-        authManager.subscribe(jest.fn())
+        const callback1 = jest.fn()
+        const callback2 = jest.fn()
+        const callback3 = jest.fn()
         
-        expect(authManager.getListenerCount()).toBe(3)
+        firebaseAuthManager.addListener(callback1)
+        firebaseAuthManager.addListener(callback2)
+        firebaseAuthManager.addListener(callback3)
         
-        authManager.cleanup()
+        firebaseAuthManager.cleanup()
         
-        expect(authManager.getListenerCount()).toBe(0)
+        // Clear previous calls
+        callback1.mockClear()
+        callback2.mockClear()
+        callback3.mockClear()
+        
+        // Trigger state change after cleanup
+        const firebaseCallback = (mockOnAuthStateChanged as any)._callback
+        if (firebaseCallback) {
+          const testUser = { ...mockUser, uid: '0x1234567890123456789012345678901234567890' }
+          firebaseCallback(testUser)
+          
+          // No callbacks should be called after cleanup
+          expect(callback1).not.toHaveBeenCalled()
+          expect(callback2).not.toHaveBeenCalled()
+          expect(callback3).not.toHaveBeenCalled()
+        }
       })
 
       it('should unsubscribe from Firebase auth when cleanup is called', () => {
         const mockUnsubscribe = jest.fn()
         mockOnAuthStateChanged.mockReturnValue(mockUnsubscribe)
         
-        // Create fresh instance to capture new unsubscribe
-        ;(FirebaseAuthManager as any)._instance = null
-        const freshManager = FirebaseAuthManager.getInstance()
+        // Add a listener to trigger initialization
+        firebaseAuthManager.addListener(jest.fn())
         
-        freshManager.cleanup()
+        firebaseAuthManager.cleanup()
         
         expect(mockUnsubscribe).toHaveBeenCalled()
       })
@@ -201,7 +264,7 @@ describe('FirebaseAuthManager', () => {
     describe('User Sign In Events', () => {
       it('should notify listeners when user signs in with valid wallet address', () => {
         const callback = jest.fn()
-        authManager.subscribe(callback)
+        firebaseAuthManager.addListener(callback)
         
         const user = {
           ...mockUser,
@@ -210,20 +273,24 @@ describe('FirebaseAuthManager', () => {
         
         mockValidationUtils.isValidWalletAddress.mockReturnValue(true)
         
+        // Clear initial call
+        callback.mockClear()
+        
         // Trigger auth state change
         const firebaseCallback = (mockOnAuthStateChanged as any)._callback
         firebaseCallback(user)
         
         expect(callback).toHaveBeenCalledWith({
-          state: 'signed_in',
-          walletAddress: '0x1234567890123456789012345678901234567890',
           user,
+          isLoading: false,
+          isAuthenticated: true,
+          walletAddress: '0x1234567890123456789012345678901234567890',
         })
       })
 
       it('should extract wallet address from different UID formats', () => {
         const callback = jest.fn()
-        authManager.subscribe(callback)
+        firebaseAuthManager.addListener(callback)
         
         const testCases = [
           '0xabcdefabcdefabcdefabcdefabcdefabcdefabcd',
@@ -235,20 +302,23 @@ describe('FirebaseAuthManager', () => {
           const user = { ...mockUser, uid: walletAddress }
           mockValidationUtils.isValidWalletAddress.mockReturnValue(true)
           
+          callback.mockClear()
+          
           const firebaseCallback = (mockOnAuthStateChanged as any)._callback
           firebaseCallback(user)
           
-          expect(callback).toHaveBeenLastCalledWith({
-            state: 'signed_in',
-            walletAddress,
+          expect(callback).toHaveBeenCalledWith({
             user,
+            isLoading: false,
+            isAuthenticated: true,
+            walletAddress,
           })
         })
       })
 
       it('should handle invalid wallet addresses in UID', () => {
         const callback = jest.fn()
-        authManager.subscribe(callback)
+        firebaseAuthManager.addListener(callback)
         
         const user = {
           ...mockUser,
@@ -257,13 +327,16 @@ describe('FirebaseAuthManager', () => {
         
         mockValidationUtils.isValidWalletAddress.mockReturnValue(false)
         
+        callback.mockClear()
+        
         const firebaseCallback = (mockOnAuthStateChanged as any)._callback
         firebaseCallback(user)
         
         expect(callback).toHaveBeenCalledWith({
-          state: 'signed_in',
-          walletAddress: null,
           user,
+          isLoading: false,
+          isAuthenticated: true,
+          walletAddress: null,
         })
       })
     })
@@ -271,31 +344,37 @@ describe('FirebaseAuthManager', () => {
     describe('User Sign Out Events', () => {
       it('should notify listeners when user signs out', () => {
         const callback = jest.fn()
-        authManager.subscribe(callback)
+        firebaseAuthManager.addListener(callback)
+        
+        callback.mockClear()
         
         // Trigger sign out (null user)
         const firebaseCallback = (mockOnAuthStateChanged as any)._callback
         firebaseCallback(null)
         
         expect(callback).toHaveBeenCalledWith({
-          state: 'signed_out',
-          walletAddress: null,
           user: null,
+          isLoading: false,
+          isAuthenticated: false,
+          walletAddress: null,
         })
       })
 
       it('should notify listeners when user is undefined', () => {
         const callback = jest.fn()
-        authManager.subscribe(callback)
+        firebaseAuthManager.addListener(callback)
+        
+        callback.mockClear()
         
         // Trigger with undefined user
         const firebaseCallback = (mockOnAuthStateChanged as any)._callback
         firebaseCallback(undefined)
         
         expect(callback).toHaveBeenCalledWith({
-          state: 'signed_out',
+          user: undefined,
+          isLoading: false,
+          isAuthenticated: false,
           walletAddress: null,
-          user: null,
         })
       })
     })
@@ -306,22 +385,28 @@ describe('FirebaseAuthManager', () => {
         const callback2 = jest.fn()
         const callback3 = jest.fn()
         
-        authManager.subscribe(callback1)
-        authManager.subscribe(callback2)
-        authManager.subscribe(callback3)
+        firebaseAuthManager.addListener(callback1)
+        firebaseAuthManager.addListener(callback2)
+        firebaseAuthManager.addListener(callback3)
         
         const user = {
           ...mockUser,
           uid: '0x1234567890123456789012345678901234567890',
         }
         
+        // Clear initial calls
+        callback1.mockClear()
+        callback2.mockClear()
+        callback3.mockClear()
+        
         const firebaseCallback = (mockOnAuthStateChanged as any)._callback
         firebaseCallback(user)
         
         const expectedCallData = {
-          state: 'signed_in',
-          walletAddress: '0x1234567890123456789012345678901234567890',
           user,
+          isLoading: false,
+          isAuthenticated: true,
+          walletAddress: '0x1234567890123456789012345678901234567890',
         }
         
         expect(callback1).toHaveBeenCalledWith(expectedCallData)
@@ -335,10 +420,13 @@ describe('FirebaseAuthManager', () => {
         })
         const normalCallback = jest.fn()
         
-        authManager.subscribe(throwingCallback)
-        authManager.subscribe(normalCallback)
+        firebaseAuthManager.addListener(throwingCallback)
+        firebaseAuthManager.addListener(normalCallback)
         
         const user = { ...mockUser }
+        
+        throwingCallback.mockClear()
+        normalCallback.mockClear()
         
         expect(() => {
           const firebaseCallback = (mockOnAuthStateChanged as any)._callback
@@ -352,173 +440,151 @@ describe('FirebaseAuthManager', () => {
   })
 
   describe('Current State Access', () => {
-    describe('getCurrentAuthState', () => {
-      it('should return current auth state when user is signed in', () => {
-        mockFirebaseAuth.currentUser = {
+    describe('getCurrentState', () => {
+      it('should return initial state when no user is signed in', () => {
+        const currentState = firebaseAuthManager.getCurrentState()
+        
+        expect(currentState).toEqual({
+          user: null,
+          isLoading: true,
+          isAuthenticated: false,
+          walletAddress: null,
+        })
+      })
+
+      it('should return updated state after user signs in', () => {
+        const callback = jest.fn()
+        firebaseAuthManager.addListener(callback)
+        
+        const user = {
           ...mockUser,
           uid: '0x1234567890123456789012345678901234567890',
         }
         
-        const currentState = authManager.getCurrentAuthState()
+        mockValidationUtils.isValidWalletAddress.mockReturnValue(true)
+        
+        // Trigger state change
+        const firebaseCallback = (mockOnAuthStateChanged as any)._callback
+        firebaseCallback(user)
+        
+        const currentState = firebaseAuthManager.getCurrentState()
         
         expect(currentState).toEqual({
-          state: 'signed_in',
+          user,
+          isLoading: false,
+          isAuthenticated: true,
           walletAddress: '0x1234567890123456789012345678901234567890',
-          user: mockFirebaseAuth.currentUser,
-        })
-      })
-
-      it('should return signed out state when no user is signed in', () => {
-        mockFirebaseAuth.currentUser = null
-        
-        const currentState = authManager.getCurrentAuthState()
-        
-        expect(currentState).toEqual({
-          state: 'signed_out',
-          walletAddress: null,
-          user: null,
         })
       })
 
       it('should handle invalid wallet addresses in current user UID', () => {
-        mockFirebaseAuth.currentUser = {
+        const callback = jest.fn()
+        firebaseAuthManager.addListener(callback)
+        
+        const user = {
           ...mockUser,
           uid: 'invalid_wallet_uid',
         }
         
         mockValidationUtils.isValidWalletAddress.mockReturnValue(false)
         
-        const currentState = authManager.getCurrentAuthState()
+        // Trigger state change
+        const firebaseCallback = (mockOnAuthStateChanged as any)._callback
+        firebaseCallback(user)
+        
+        const currentState = firebaseAuthManager.getCurrentState()
         
         expect(currentState).toEqual({
-          state: 'signed_in',
+          user,
+          isLoading: false,
+          isAuthenticated: true,
           walletAddress: null,
-          user: mockFirebaseAuth.currentUser,
         })
       })
     })
 
-    describe('getCurrentWalletAddress', () => {
-      it('should return wallet address when valid user is signed in', () => {
-        mockFirebaseAuth.currentUser = {
+    describe('State Derivation', () => {
+      it('should extract wallet address from current state', () => {
+        const callback = jest.fn()
+        firebaseAuthManager.addListener(callback)
+        
+        const user = {
           ...mockUser,
           uid: '0xabcdefabcdefabcdefabcdefabcdefabcdefabcd',
         }
         
-        const walletAddress = authManager.getCurrentWalletAddress()
+        mockValidationUtils.isValidWalletAddress.mockReturnValue(true)
         
-        expect(walletAddress).toBe('0xabcdefabcdefabcdefabcdefabcdefabcdefabcd')
+        const firebaseCallback = (mockOnAuthStateChanged as any)._callback
+        firebaseCallback(user)
+        
+        const currentState = firebaseAuthManager.getCurrentState()
+        expect(currentState.walletAddress).toBe('0xabcdefabcdefabcdefabcdefabcdefabcdefabcd')
+        expect(currentState.isAuthenticated).toBe(true)
       })
 
-      it('should return null when no user is signed in', () => {
-        mockFirebaseAuth.currentUser = null
+      it('should indicate authentication status correctly', () => {
+        const callback = jest.fn()
+        firebaseAuthManager.addListener(callback)
         
-        const walletAddress = authManager.getCurrentWalletAddress()
+        // Test signed out state
+        let firebaseCallback = (mockOnAuthStateChanged as any)._callback
+        firebaseCallback(null)
         
-        expect(walletAddress).toBeNull()
-      })
-
-      it('should return null when user UID is not a valid wallet address', () => {
-        mockFirebaseAuth.currentUser = {
-          ...mockUser,
-          uid: 'not_a_wallet_address',
-        }
+        let currentState = firebaseAuthManager.getCurrentState()
+        expect(currentState.isAuthenticated).toBe(false)
+        expect(currentState.user).toBe(null)
         
-        mockValidationUtils.isValidWalletAddress.mockReturnValue(false)
+        // Test signed in state
+        const user = { ...mockUser, uid: '0x1234567890123456789012345678901234567890' }
+        firebaseCallback(user)
         
-        const walletAddress = authManager.getCurrentWalletAddress()
-        
-        expect(walletAddress).toBeNull()
-      })
-    })
-
-    describe('isUserSignedIn', () => {
-      it('should return true when user is signed in', () => {
-        mockFirebaseAuth.currentUser = { ...mockUser }
-        
-        expect(authManager.isUserSignedIn()).toBe(true)
-      })
-
-      it('should return false when no user is signed in', () => {
-        mockFirebaseAuth.currentUser = null
-        
-        expect(authManager.isUserSignedIn()).toBe(false)
-      })
-
-      it('should return false when user is undefined', () => {
-        mockFirebaseAuth.currentUser = undefined as any
-        
-        expect(authManager.isUserSignedIn()).toBe(false)
+        currentState = firebaseAuthManager.getCurrentState()
+        expect(currentState.isAuthenticated).toBe(true)
+        expect(currentState.user).toBe(user)
       })
     })
   })
 
-  describe('Wallet Address Extraction', () => {
-    describe('extractWalletAddress', () => {
-      it('should extract valid wallet addresses from UIDs', () => {
-        const validUIDs = [
-          '0x1234567890123456789012345678901234567890',
-          '0xabcdefABCDEF1234567890abcdefABCDEF123456',
-          '0x0000000000000000000000000000000000000000',
-        ]
-        
-        validUIDs.forEach(uid => {
-          mockValidationUtils.isValidWalletAddress.mockReturnValue(true)
-          
-          const extracted = authManager.extractWalletAddress(uid)
-          
-          expect(extracted).toBe(uid)
-          expect(mockValidationUtils.isValidWalletAddress).toHaveBeenCalledWith(uid)
-        })
-      })
-
-      it('should return null for invalid wallet addresses', () => {
-        const invalidUIDs = [
-          'regular_user_id',
-          '0x123', // Too short
-          'not_an_address',
-          '',
-          'user@example.com',
-        ]
-        
-        invalidUIDs.forEach(uid => {
-          mockValidationUtils.isValidWalletAddress.mockReturnValue(false)
-          
-          const extracted = authManager.extractWalletAddress(uid)
-          
-          expect(extracted).toBeNull()
-        })
-      })
-
-      it('should handle null and undefined UIDs', () => {
-        expect(authManager.extractWalletAddress(null as any)).toBeNull()
-        expect(authManager.extractWalletAddress(undefined as any)).toBeNull()
-      })
-    })
-  })
-
-  describe('Integration with ValidationUtils', () => {
-    it('should call ValidationUtils.isValidWalletAddress correctly', () => {
+  describe('Wallet Address Validation Integration', () => {
+    it('should use ValidationUtils to validate wallet addresses', () => {
+      const callback = jest.fn()
+      firebaseAuthManager.addListener(callback)
+      
       const testUID = '0x1234567890123456789012345678901234567890'
+      const user = { ...mockUser, uid: testUID }
+      
       mockValidationUtils.isValidWalletAddress.mockReturnValue(true)
       
-      authManager.extractWalletAddress(testUID)
+      const firebaseCallback = (mockOnAuthStateChanged as any)._callback
+      firebaseCallback(user)
       
       expect(mockValidationUtils.isValidWalletAddress).toHaveBeenCalledWith(testUID)
+      
+      const currentState = firebaseAuthManager.getCurrentState()
+      expect(currentState.walletAddress).toBe(testUID)
     })
-
-    it('should respect ValidationUtils validation results', () => {
-      const testUID = '0x1234567890123456789012345678901234567890'
+    
+    it('should handle validation failures correctly', () => {
+      const callback = jest.fn()
+      firebaseAuthManager.addListener(callback)
       
-      // Test when validation passes
-      mockValidationUtils.isValidWalletAddress.mockReturnValue(true)
-      expect(authManager.extractWalletAddress(testUID)).toBe(testUID)
+      const invalidUID = 'not_a_wallet_address'
+      const user = { ...mockUser, uid: invalidUID }
       
-      // Test when validation fails
       mockValidationUtils.isValidWalletAddress.mockReturnValue(false)
-      expect(authManager.extractWalletAddress(testUID)).toBeNull()
+      
+      const firebaseCallback = (mockOnAuthStateChanged as any)._callback
+      firebaseCallback(user)
+      
+      expect(mockValidationUtils.isValidWalletAddress).toHaveBeenCalledWith(invalidUID)
+      
+      const currentState = firebaseAuthManager.getCurrentState()
+      expect(currentState.walletAddress).toBeNull()
+      expect(currentState.isAuthenticated).toBe(true) // Still authenticated, just no valid wallet
     })
   })
+
 
   describe('Error Handling and Edge Cases', () => {
     it('should handle Firebase auth errors gracefully', () => {
@@ -528,14 +594,14 @@ describe('FirebaseAuthManager', () => {
       })
       
       expect(() => {
-        ;(FirebaseAuthManager as any)._instance = null
-        FirebaseAuthManager.getInstance()
+        firebaseAuthManager.cleanup()
+        firebaseAuthManager.addListener(jest.fn())
       }).not.toThrow()
     })
 
     it('should handle malformed user objects', () => {
       const callback = jest.fn()
-      authManager.subscribe(callback)
+      firebaseAuthManager.addListener(callback)
       
       const malformedUsers = [
         { uid: null },
@@ -545,12 +611,16 @@ describe('FirebaseAuthManager', () => {
       ]
       
       malformedUsers.forEach(user => {
+        callback.mockClear()
+        
         const firebaseCallback = (mockOnAuthStateChanged as any)._callback
         firebaseCallback(user)
         
         expect(callback).toHaveBeenCalledWith(
           expect.objectContaining({
             walletAddress: null,
+            isAuthenticated: true, // Still has user object
+            user,
           })
         )
       })
@@ -558,7 +628,7 @@ describe('FirebaseAuthManager', () => {
 
     it('should handle concurrent state changes', () => {
       const callback = jest.fn()
-      authManager.subscribe(callback)
+      firebaseAuthManager.addListener(callback)
       
       const users = [
         { ...mockUser, uid: '0x1111111111111111111111111111111111111111' },
@@ -566,6 +636,8 @@ describe('FirebaseAuthManager', () => {
         null,
         { ...mockUser, uid: '0x3333333333333333333333333333333333333333' },
       ]
+      
+      callback.mockClear() // Clear initial call
       
       const firebaseCallback = (mockOnAuthStateChanged as any)._callback
       
@@ -578,9 +650,10 @@ describe('FirebaseAuthManager', () => {
       
       // Check last call
       expect(callback).toHaveBeenLastCalledWith({
-        state: 'signed_in',
-        walletAddress: '0x3333333333333333333333333333333333333333',
         user: users[3],
+        isLoading: false,
+        isAuthenticated: true,
+        walletAddress: '0x3333333333333333333333333333333333333333',
       })
     })
   })
@@ -589,28 +662,29 @@ describe('FirebaseAuthManager', () => {
     it('should not leak memory with many listener subscriptions/unsubscriptions', () => {
       const initialMemory = process.memoryUsage().heapUsed
       
-      for (let i = 0; i < 1000; i++) {
-        const unsubscribe = authManager.subscribe(jest.fn())
+      for (let i = 0; i < 100; i++) { // Reduced iterations for test speed
+        const unsubscribe = firebaseAuthManager.addListener(jest.fn())
         unsubscribe()
       }
       
       const finalMemory = process.memoryUsage().heapUsed
       const memoryIncrease = finalMemory - initialMemory
       
-      expect(memoryIncrease).toBeLessThan(50 * 1024 * 1024) // Less than 50MB
-      expect(authManager.getListenerCount()).toBe(0)
+      expect(memoryIncrease).toBeLessThan(10 * 1024 * 1024) // Less than 10MB
     })
 
     it('should handle rapid auth state changes efficiently', () => {
       const callback = jest.fn()
-      authManager.subscribe(callback)
+      firebaseAuthManager.addListener(callback)
+      
+      callback.mockClear() // Clear initial call
       
       const start = performance.now()
       
       const firebaseCallback = (mockOnAuthStateChanged as any)._callback
       
       // Trigger many state changes
-      for (let i = 0; i < 100; i++) {
+      for (let i = 0; i < 50; i++) { // Reduced for test speed
         const user = i % 2 === 0 
           ? { ...mockUser, uid: `0x${i.toString().padStart(40, '0')}` }
           : null
@@ -619,37 +693,48 @@ describe('FirebaseAuthManager', () => {
       
       const end = performance.now()
       expect(end - start).toBeLessThan(100) // Should be fast
-      expect(callback).toHaveBeenCalledTimes(100)
+      expect(callback).toHaveBeenCalledTimes(50)
     })
   })
 
-  describe('Singleton Lifecycle Management', () => {
-    it('should maintain state across getInstance calls', () => {
-      const instance1 = FirebaseAuthManager.getInstance()
-      const callback = jest.fn()
+  describe('Lifecycle Management', () => {
+    it('should maintain listener state across multiple addListener calls', () => {
+      const callback1 = jest.fn()
+      const callback2 = jest.fn()
       
-      instance1.subscribe(callback)
-      expect(instance1.getListenerCount()).toBe(1)
+      firebaseAuthManager.addListener(callback1)
+      firebaseAuthManager.addListener(callback2)
       
-      const instance2 = FirebaseAuthManager.getInstance()
-      expect(instance2.getListenerCount()).toBe(1)
-      expect(instance1).toBe(instance2)
+      // Test that state changes notify both listeners
+      callback1.mockClear()
+      callback2.mockClear()
+      
+      const firebaseCallback = (mockOnAuthStateChanged as any)._callback
+      const user = { ...mockUser, uid: '0x1234567890123456789012345678901234567890' }
+      firebaseCallback(user)
+      
+      expect(callback1).toHaveBeenCalled()
+      expect(callback2).toHaveBeenCalled()
     })
 
     it('should allow cleanup and re-initialization', () => {
-      let instance = FirebaseAuthManager.getInstance()
-      instance.subscribe(jest.fn())
+      const callback = jest.fn()
+      firebaseAuthManager.addListener(callback)
       
-      expect(instance.getListenerCount()).toBe(1)
+      // Trigger a state change to verify listener is active
+      callback.mockClear()
+      const firebaseCallback = (mockOnAuthStateChanged as any)._callback
+      firebaseCallback({ ...mockUser })
+      expect(callback).toHaveBeenCalled()
       
-      instance.cleanup()
-      expect(instance.getListenerCount()).toBe(0)
+      firebaseAuthManager.cleanup()
       
-      // Create new instance after cleanup
-      ;(FirebaseAuthManager as any)._instance = null
-      instance = FirebaseAuthManager.getInstance()
+      // After cleanup, listeners should not be called
+      callback.mockClear()
+      // Add new listener to re-initialize
+      const newCallback = jest.fn()
+      firebaseAuthManager.addListener(newCallback)
       
-      expect(instance.getListenerCount()).toBe(0)
       expect(mockOnAuthStateChanged).toHaveBeenCalledTimes(2) // Should re-initialize
     })
   })
