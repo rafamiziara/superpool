@@ -6,46 +6,66 @@ export type ToastType = 'success' | 'error' | 'info' | 'warning'
 
 // Success toast for positive feedback
 export function showSuccessToast(message: string, text2?: string, duration = 3000, position: 'top' | 'bottom' = 'bottom') {
-  Toast.show({
-    type: 'success',
-    text1: message,
-    text2,
-    position,
-    visibilityTime: duration,
-  })
+  try {
+    Toast.show({
+      type: 'success',
+      text1: message,
+      text2,
+      position,
+      visibilityTime: duration,
+    })
+  } catch (error) {
+    // Gracefully handle toast library errors in testing environments
+    console.warn('Toast not displayed:', error)
+  }
 }
 
 // Error toast for error feedback  
 export function showErrorToast(message: string, text2?: string, duration = 4000, position: 'top' | 'bottom' = 'bottom') {
-  Toast.show({
-    type: 'error',
-    text1: message,
-    text2,
-    position,
-    visibilityTime: duration,
-  })
+  try {
+    Toast.show({
+      type: 'error',
+      text1: message,
+      text2,
+      position,
+      visibilityTime: duration,
+    })
+  } catch (error) {
+    // Gracefully handle toast library errors in testing environments
+    console.warn('Toast not displayed:', error)
+  }
 }
 
 // Info toast for general information
 export function showInfoToast(message: string, text2?: string, duration = 3000, position: 'top' | 'bottom' = 'bottom') {
-  Toast.show({
-    type: 'info',
-    text1: message,
-    text2,
-    position,
-    visibilityTime: duration,
-  })
+  try {
+    Toast.show({
+      type: 'info',
+      text1: message,
+      text2,
+      position,
+      visibilityTime: duration,
+    })
+  } catch (error) {
+    // Gracefully handle toast library errors in testing environments
+    console.warn('Toast not displayed:', error)
+  }
 }
 
 // Warning toast for warnings
 export function showWarningToast(message: string, text2?: string, duration = 4000, position: 'top' | 'bottom' = 'bottom') {
-  Toast.show({
-    type: 'warning',
-    text1: message,
-    text2,
-    position,
-    visibilityTime: duration,
-  })
+  try {
+    Toast.show({
+      type: 'warning',
+      text1: message,
+      text2,
+      position,
+      visibilityTime: duration,
+    })
+  } catch (error) {
+    // Gracefully handle toast library errors in testing environments
+    console.warn('Toast not displayed:', error)
+  }
 }
 
 export function showErrorFromAppError(error: AppError | null | undefined) {
