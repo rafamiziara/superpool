@@ -274,15 +274,33 @@ describe('useAuthenticationIntegration', () => {
 
       consoleErrorSpy.mockRestore()
     })
+
+    it('should log success message when authentication completes successfully', async () => {
+      const { result } = renderHookWithStore(() => useAuthenticationIntegration(), { store: mockStore })
+
+      const walletAddress = '0x1234567890123456789012345678901234567890'
+      const chainId = 1
+
+      await act(async () => {
+        await result.current.onNewConnection(walletAddress, chainId)
+      })
+
+      expect(consoleSpy).toHaveBeenCalledWith('✅ Authentication completed successfully')
+      expect(mockOrchestrator.authenticate).toHaveBeenCalled()
+    })
   })
 
   describe('Disconnection Handling', () => {
-    it('should handle wallet disconnection', () => {
+    it('should handle wallet disconnection with proper logging', () => {
       const { result } = renderHookWithStore(() => useAuthenticationIntegration(), { store: mockStore })
 
       act(() => {
         result.current.onDisconnection()
       })
+
+      // Verify console logs
+      expect(consoleSpy).toHaveBeenCalledWith('👋 Handling wallet disconnection')
+      expect(consoleSpy).toHaveBeenCalledWith('🧹 Authentication state cleared on disconnection')
 
       // Verify stores were reset/disconnected (check state changes)
       expect(mockStore.walletStore.isConnected).toBe(false)
@@ -381,7 +399,7 @@ describe('useAuthenticationIntegration', () => {
       expect(consoleSpy).toHaveBeenCalledWith('🔍 Firebase user already authenticated, no authentication needed:', 'test-uid')
     })
 
-    it('should return false when auth store has wallet address', () => {
+    it('should return false when auth store has wallet address in authLock', () => {
       mockUseAccount.mockReturnValue(createMockConnectedAccount('0x1234567890123456789012345678901234567890', 1))
 
       // Set the auth lock to simulate authenticated state
@@ -393,7 +411,8 @@ describe('useAuthenticationIntegration', () => {
       expect(consoleSpy).toHaveBeenCalledWith('🔍 MobX store shows authenticated wallet, no authentication needed')
     })
 
-    it('should return false when authentication is in progress', () => {
+
+    it('should return false when authentication is in progress via authLock', () => {
       mockUseAccount.mockReturnValue(createMockConnectedAccount('0x1234567890123456789012345678901234567890', 1))
 
       // Set the auth lock to simulate authentication in progress
@@ -488,6 +507,46 @@ describe('useAuthenticationIntegration', () => {
       const call = mockOrchestrator.authenticate.mock.calls[0]
       expect(call).toBeDefined()
     })
+
+    it('should create authentication context with proper signature functions', async () => {
+      // Mock the orchestrator to capture the authentication context but don't run authenticate
+      let capturedContext: any = null
+      mockOrchestrator.authenticate.mockImplementation(async (context) => {
+        capturedContext = context
+        // Don't actually call the signature functions, just capture the context
+        return { success: true }
+      })
+
+      mockUseAccount.mockReturnValue(createMockConnectedAccount('0x1234567890123456789012345678901234567890', 1))
+
+      const { result } = renderHookWithStore(() => useAuthenticationIntegration(), { store: mockStore })
+
+      await act(async () => {
+        await result.current.onNewConnection('0x1234567890123456789012345678901234567890', 1)
+      })
+
+      // Verify context structure
+      expect(capturedContext).toMatchObject({
+        walletAddress: '0x1234567890123456789012345678901234567890',
+        chainId: 1,
+        connector: 'appkit',
+        signatureFunctions: {
+          signTypedDataAsync: expect.any(Function),
+          signMessageAsync: expect.any(Function),
+        },
+        disconnect: expect.any(Function),
+        progressCallbacks: {
+          onStepStart: expect.any(Function),
+          onStepComplete: expect.any(Function),
+          onStepFail: expect.any(Function),
+        },
+      })
+
+      // Verify that signature functions are callable (structure test only)
+      expect(typeof capturedContext.signatureFunctions.signMessageAsync).toBe('function')
+      expect(typeof capturedContext.signatureFunctions.signTypedDataAsync).toBe('function')
+    })
+
   })
 
   describe('Error Recovery', () => {
