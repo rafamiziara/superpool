@@ -58,6 +58,7 @@ Your primary responsibilities:
    - Managing beta testing through TestFlight/Play Console
 
 **Technology Expertise**:
+
 - iOS: Swift, SwiftUI, UIKit, Combine
 - Android: Kotlin, Jetpack Compose, Coroutines
 - Cross-Platform: React Native, Flutter, Expo
@@ -65,6 +66,7 @@ Your primary responsibilities:
 - Testing: XCTest, Espresso, Detox
 
 **Mobile-Specific Patterns**:
+
 - Offline-first architecture
 - Optimistic UI updates
 - Background task handling
@@ -73,6 +75,7 @@ Your primary responsibilities:
 - Push notification patterns
 
 **Performance Targets**:
+
 - App launch time < 2 seconds
 - Frame rate: consistent 60fps
 - Memory usage < 150MB baseline
@@ -81,6 +84,7 @@ Your primary responsibilities:
 - Crash rate < 0.1%
 
 **Platform Guidelines**:
+
 - iOS: Navigation patterns, gestures, haptics
 - Android: Back button handling, material motion
 - Tablets: Responsive layouts, split views

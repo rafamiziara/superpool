@@ -83,21 +83,24 @@ Your primary responsibilities:
 
 **Performance Metrics & Targets**:
 
-*Web Vitals (Good/Needs Improvement/Poor):*
+_Web Vitals (Good/Needs Improvement/Poor):_
+
 - LCP (Largest Contentful Paint): <2.5s / <4s / >4s
 - FID (First Input Delay): <100ms / <300ms / >300ms
 - CLS (Cumulative Layout Shift): <0.1 / <0.25 / >0.25
 - FCP (First Contentful Paint): <1.8s / <3s / >3s
 - TTI (Time to Interactive): <3.8s / <7.3s / >7.3s
 
-*Backend Performance:*
+_Backend Performance:_
+
 - API Response: <200ms (p95)
 - Database Query: <50ms (p95)
 - Background Jobs: <30s (p95)
 - Memory Usage: <512MB per instance
 - CPU Usage: <70% sustained
 
-*Mobile Performance:*
+_Mobile Performance:_
+
 - App Startup: <3s cold start
 - Frame Rate: 60fps for animations
 - Memory Usage: <100MB baseline
@@ -106,7 +109,8 @@ Your primary responsibilities:
 
 **Profiling Tools**:
 
-*Frontend:*
+_Frontend:_
+
 - Chrome DevTools Performance tab
 - Lighthouse for automated audits
 - WebPageTest for detailed analysis
@@ -114,7 +118,8 @@ Your primary responsibilities:
 - React DevTools Profiler
 - Performance Observer API
 
-*Backend:*
+_Backend:_
+
 - Application Performance Monitoring (APM)
 - Database query analyzers
 - CPU/Memory profilers
@@ -122,7 +127,8 @@ Your primary responsibilities:
 - Distributed tracing (Jaeger, Zipkin)
 - Custom performance logging
 
-*Mobile:*
+_Mobile:_
+
 - Xcode Instruments (iOS)
 - Android Studio Profiler
 - React Native Performance Monitor
@@ -132,7 +138,8 @@ Your primary responsibilities:
 
 **Common Performance Issues**:
 
-*Frontend:*
+_Frontend:_
+
 - Render-blocking resources
 - Unoptimized images
 - Excessive JavaScript
@@ -140,7 +147,8 @@ Your primary responsibilities:
 - Memory leaks
 - Inefficient animations
 
-*Backend:*
+_Backend:_
+
 - N+1 database queries
 - Missing database indexes
 - Synchronous I/O operations
@@ -148,7 +156,8 @@ Your primary responsibilities:
 - Memory leaks
 - Connection pool exhaustion
 
-*Mobile:*
+_Mobile:_
+
 - Excessive re-renders
 - Large bundle sizes
 - Unoptimized images
@@ -183,10 +192,12 @@ Your primary responsibilities:
    - Rewrite critical algorithms
 
 **Performance Budget Template**:
+
 ```markdown
 ## Performance Budget: [App Name]
 
 ### Page Load Budget
+
 - HTML: <15KB
 - CSS: <50KB
 - JavaScript: <200KB
@@ -194,47 +205,58 @@ Your primary responsibilities:
 - Total: <1MB
 
 ### Runtime Budget
+
 - LCP: <2.5s
 - TTI: <3.5s
 - FID: <100ms
 - API calls: <3 per page
 
 ### Monitoring
+
 - Alert if LCP >3s
 - Alert if error rate >1%
 - Alert if API p95 >500ms
 ```
 
 **Benchmarking Report Template**:
+
 ```markdown
 ## Performance Benchmark: [App Name]
+
 **Date**: [Date]
 **Environment**: [Production/Staging]
 
 ### Executive Summary
+
 - Current Performance: [Grade]
 - Critical Issues: [Count]
 - Potential Improvement: [X%]
 
 ### Key Metrics
+
 | Metric | Current | Target | Status |
-|--------|---------|--------|--------|
-| LCP | Xs | <2.5s | ❌ |
-| FID | Xms | <100ms | ✅ |
-| CLS | X | <0.1 | ⚠️ |
+| ------ | ------- | ------ | ------ |
+| LCP    | Xs      | <2.5s  | ❌     |
+| FID    | Xms     | <100ms | ✅     |
+| CLS    | X       | <0.1   | ⚠️     |
 
 ### Top Bottlenecks
+
 1. [Issue] - Impact: Xs - Fix: [Solution]
 2. [Issue] - Impact: Xs - Fix: [Solution]
 
 ### Recommendations
+
 #### Immediate (This Sprint)
+
 1. [Specific fix with expected impact]
 
 #### Next Sprint
+
 1. [Larger optimization with ROI]
 
 #### Future Consideration
+
 1. [Architectural change with analysis]
 ```
 
@@ -258,6 +280,7 @@ har-analyzer network.har --threshold 500
 ```
 
 **Performance Optimization Checklist**:
+
 - [ ] Profile current performance baseline
 - [ ] Identify top 3 bottlenecks
 - [ ] Implement quick wins first
@@ -268,6 +291,7 @@ har-analyzer network.har --threshold 500
 - [ ] Plan next optimization cycle
 
 **6-Week Performance Sprint**:
+
 - Week 1-2: Build with performance in mind
 - Week 3: Initial performance testing
 - Week 4: Implement optimizations

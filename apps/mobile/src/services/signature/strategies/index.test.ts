@@ -36,13 +36,13 @@ describe('Strategies Index Exports', () => {
 
     it('should export all items in the StrategiesIndex namespace', () => {
       const exportKeys = Object.keys(StrategiesIndex)
-      
+
       // Should contain all expected exports
       expect(exportKeys).toContain('SignatureUtils')
       expect(exportKeys).toContain('SafeWalletStrategy')
       expect(exportKeys).toContain('RegularWalletStrategy')
       expect(exportKeys).toContain('SignatureStrategyFactory')
-      
+
       // Should have exactly the right number of exports
       expect(exportKeys).toHaveLength(4) // Classes only (interfaces aren't in runtime namespace)
     })
@@ -75,7 +75,7 @@ describe('Strategies Index Exports', () => {
       it('should export functional SafeWalletStrategy class', () => {
         expect(SafeWalletStrategy).toBe(DirectSafeWalletStrategy)
         expect(typeof SafeWalletStrategy).toBe('function')
-        
+
         const instance = new SafeWalletStrategy()
         expect(instance).toBeInstanceOf(SafeWalletStrategy)
         expect(typeof instance.sign).toBe('function')
@@ -93,7 +93,7 @@ describe('Strategies Index Exports', () => {
       it('should export functional RegularWalletStrategy class', () => {
         expect(RegularWalletStrategy).toBe(DirectRegularWalletStrategy)
         expect(typeof RegularWalletStrategy).toBe('function')
-        
+
         const instance = new RegularWalletStrategy()
         expect(instance).toBeInstanceOf(RegularWalletStrategy)
         expect(typeof instance.sign).toBe('function')
@@ -131,8 +131,12 @@ describe('Strategies Index Exports', () => {
           async sign() {
             return { signature: '0xtest', signatureType: 'personal-sign' as const }
           }
-          canHandle() { return true }
-          getStrategyName() { return 'TestStrategy' }
+          canHandle() {
+            return true
+          }
+          getStrategyName() {
+            return 'TestStrategy'
+          }
         }
 
         const strategy: SignatureStrategy = new TestStrategy()
@@ -140,12 +144,9 @@ describe('Strategies Index Exports', () => {
       })
 
       it('should work with arrays and generic types', () => {
-        const strategies: SignatureStrategy[] = [
-          new SafeWalletStrategy(),
-          new RegularWalletStrategy(),
-        ]
+        const strategies: SignatureStrategy[] = [new SafeWalletStrategy(), new RegularWalletStrategy()]
 
-        strategies.forEach(strategy => {
+        strategies.forEach((strategy) => {
           expect(typeof strategy.getStrategyName).toBe('function')
           expect(typeof strategy.canHandle).toBe('function')
           expect(typeof strategy.sign).toBe('function')
@@ -228,7 +229,7 @@ describe('Strategies Index Exports', () => {
 
     it('should work with namespace import', async () => {
       const Strategies = await import('./index')
-      
+
       expect(Strategies.SignatureUtils).toBe(SignatureUtils)
       expect(Strategies.SafeWalletStrategy).toBe(SafeWalletStrategy)
       expect(Strategies.RegularWalletStrategy).toBe(RegularWalletStrategy)
@@ -254,7 +255,7 @@ describe('Strategies Index Exports', () => {
     it('should allow classes to work together through index exports', () => {
       // Use factory to get strategy instances
       const strategy = SignatureStrategyFactory.getStrategy()
-      
+
       expect(strategy).toBeInstanceOf(RegularWalletStrategy)
       expect(strategy.getStrategyName()).toBe('RegularWalletStrategy')
     })
@@ -262,7 +263,7 @@ describe('Strategies Index Exports', () => {
     it('should allow mixed usage of direct and index imports', () => {
       // Create instance using index export
       const indexStrategy = new SafeWalletStrategy()
-      // Create instance using direct import  
+      // Create instance using direct import
       const directStrategy = new DirectSafeWalletStrategy()
 
       // Both should have same behavior
@@ -272,7 +273,7 @@ describe('Strategies Index Exports', () => {
 
     it('should work with factory using other exported classes', () => {
       const availableStrategies = SignatureStrategyFactory.getAvailableStrategies()
-      
+
       // Should contain names from both strategy classes
       expect(availableStrategies).toContain('SafeWalletStrategy')
       expect(availableStrategies).toContain('RegularWalletStrategy')
@@ -289,8 +290,12 @@ describe('Strategies Index Exports', () => {
             signatureType: 'personal-sign' as const,
           }
         }
-        canHandle() { return true }
-        getStrategyName() { return 'CustomStrategy' }
+        canHandle() {
+          return true
+        }
+        getStrategyName() {
+          return 'CustomStrategy'
+        }
       }
 
       const strategy: SignatureStrategy = new CustomStrategy()
@@ -312,7 +317,7 @@ describe('Strategies Index Exports', () => {
 
     it('should work with union types', () => {
       type StrategyClass = typeof SafeWalletStrategy | typeof RegularWalletStrategy
-      
+
       function createStrategy(StrategyClass: StrategyClass): SignatureStrategy {
         return new StrategyClass()
       }
@@ -328,21 +333,16 @@ describe('Strategies Index Exports', () => {
   describe('Module Boundaries and Isolation', () => {
     it('should not expose internal implementation details', () => {
       const exportedKeys = Object.keys(StrategiesIndex)
-      
+
       // Should only export public classes, not internal helpers
       expect(exportedKeys).not.toContain('_internal')
       expect(exportedKeys).not.toContain('private')
       expect(exportedKeys).not.toContain('helper')
-      
+
       // Should only contain the expected public exports
-      const expectedExports = [
-        'SignatureUtils',
-        'SafeWalletStrategy',
-        'RegularWalletStrategy', 
-        'SignatureStrategyFactory',
-      ]
-      
-      expectedExports.forEach(exportName => {
+      const expectedExports = ['SignatureUtils', 'SafeWalletStrategy', 'RegularWalletStrategy', 'SignatureStrategyFactory']
+
+      expectedExports.forEach((exportName) => {
         expect(exportedKeys).toContain(exportName)
       })
     })
@@ -365,10 +365,10 @@ describe('Strategies Index Exports', () => {
       // Test SignatureUtils behavior
       const indexPromise = Promise.resolve('0xtestIndex')
       const directPromise = Promise.resolve('0xtestDirect')
-      
+
       const indexResult = await SignatureUtils.withTimeout(indexPromise, 5000, 'Index Test')
       const directResult = await DirectSignatureUtils.withTimeout(directPromise, 5000, 'Direct Test')
-      
+
       expect(indexResult).toBe('0xtestIndex')
       expect(directResult).toBe('0xtestDirect')
     })
@@ -376,7 +376,7 @@ describe('Strategies Index Exports', () => {
     it('should maintain consistent factory behavior', () => {
       const indexStrategies = SignatureStrategyFactory.getAvailableStrategies()
       const directStrategies = DirectSignatureStrategyFactory.getAvailableStrategies()
-      
+
       expect(indexStrategies).toEqual(directStrategies)
       expect(indexStrategies).toHaveLength(directStrategies.length)
     })
@@ -384,7 +384,7 @@ describe('Strategies Index Exports', () => {
     it('should create equivalent instances', () => {
       const indexSafe = new SafeWalletStrategy()
       const directSafe = new DirectSafeWalletStrategy()
-      const indexRegular = new RegularWalletStrategy() 
+      const indexRegular = new RegularWalletStrategy()
       const directRegular = new DirectRegularWalletStrategy()
 
       // Should have identical method results
@@ -399,15 +399,10 @@ describe('Strategies Index Exports', () => {
     it('should provide clear export structure', () => {
       // The index should act as a clear API surface
       const exports = Object.keys(StrategiesIndex).sort()
-      
+
       // Should be in alphabetical order for predictability
-      const expectedOrder = [
-        'RegularWalletStrategy',
-        'SafeWalletStrategy', 
-        'SignatureStrategyFactory',
-        'SignatureUtils',
-      ]
-      
+      const expectedOrder = ['RegularWalletStrategy', 'SafeWalletStrategy', 'SignatureStrategyFactory', 'SignatureUtils']
+
       expect(exports).toEqual(expectedOrder)
     })
 
@@ -425,13 +420,13 @@ describe('Strategies Index Exports', () => {
       // Test that factory can use strategies that it exports
       const strategy = SignatureStrategyFactory.getStrategy()
       const factoryStrategies = SignatureStrategyFactory.getAvailableStrategies()
-      
+
       expect(factoryStrategies).toContain(strategy.getStrategyName())
     })
 
     it('should handle dynamic imports correctly', async () => {
       const dynamicImport = await import('./index')
-      
+
       expect(dynamicImport.SignatureUtils).toBe(SignatureUtils)
       expect(dynamicImport.SafeWalletStrategy).toBe(SafeWalletStrategy)
       expect(dynamicImport.RegularWalletStrategy).toBe(RegularWalletStrategy)
@@ -442,7 +437,7 @@ describe('Strategies Index Exports', () => {
       // Simulate different contexts importing the same module
       const context1 = await import('./index')
       const context2 = await import('./index')
-      
+
       expect(context1.SignatureUtils).toBe(context2.SignatureUtils)
       expect(context1.SafeWalletStrategy).toBe(context2.SafeWalletStrategy)
       expect(context1.RegularWalletStrategy).toBe(context2.RegularWalletStrategy)

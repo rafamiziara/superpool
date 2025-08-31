@@ -36,7 +36,7 @@ describe('useAuthentication', () => {
       user: null,
     })
 
-    // Reset auth store to initial state  
+    // Reset auth store to initial state
     runInAction(() => {
       mockStore.authenticationStore.authError = null
       mockStore.authenticationStore.authLock = {
@@ -53,7 +53,7 @@ describe('useAuthentication', () => {
       mockStore.authenticationStore.progressError = null
       mockStore.authenticationStore.isProgressComplete = false
     })
-    
+
     // Clear mocks after store setup to preserve the jest mock functions
     jest.clearAllMocks()
   })
@@ -308,7 +308,7 @@ describe('useAuthentication', () => {
       })
       rerender({})
       expect(result.current.currentStep).toBe('generate-message')
-      
+
       // Then reset
       act(() => {
         result.current.resetProgress()
@@ -352,7 +352,7 @@ describe('useAuthentication', () => {
       // Verify function returns all steps
       expect(Array.isArray(allSteps)).toBe(true)
       expect(allSteps.length).toBeGreaterThan(0)
-      expect(allSteps.every(step => step.step && step.title && step.description)).toBe(true)
+      expect(allSteps.every((step) => step.step && step.title && step.description)).toBe(true)
     })
   })
 
@@ -408,7 +408,12 @@ describe('useAuthentication', () => {
       rerender({})
 
       expect(Array.isArray(result.current._debug.authStore.completedSteps)).toBe(true)
-      expect(result.current._debug.authStore.completedSteps).toEqual(['connect-wallet', 'generate-message', 'request-signature', 'verify-signature'])
+      expect(result.current._debug.authStore.completedSteps).toEqual([
+        'connect-wallet',
+        'generate-message',
+        'request-signature',
+        'verify-signature',
+      ])
     })
 
     it('should handle empty completed steps in debug info', () => {

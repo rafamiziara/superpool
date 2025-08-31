@@ -52,9 +52,9 @@ describe('FeedbackManager', () => {
       }
 
       FeedbackManager.showErrorFeedback(mockAppError, recoveryResult)
-      
+
       expect(showErrorFromAppError).not.toHaveBeenCalled()
-      
+
       jest.advanceTimersByTime(2000)
       expect(showErrorFromAppError).toHaveBeenCalledWith(mockAppError)
     })

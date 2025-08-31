@@ -93,7 +93,7 @@ describe('SignatureService', () => {
       expect(() => new SignatureService()).not.toThrow()
       const instance = new SignatureService()
       expect(instance).toBeInstanceOf(SignatureService)
-      
+
       // But verify no instance methods exist
       expect(typeof (instance as any).requestSignature).toBe('undefined')
     })
@@ -102,11 +102,7 @@ describe('SignatureService', () => {
   describe('Signature Request Validation', () => {
     describe('Valid Request Processing', () => {
       it('should validate and process valid signature request', async () => {
-        const result = await SignatureService.requestSignature(
-          validSignatureRequest,
-          mockSignatureFunctions,
-          mockConnector
-        )
+        const result = await SignatureService.requestSignature(validSignatureRequest, mockSignatureFunctions, mockConnector)
 
         expect(result).toEqual(mockSignatureResult)
         expect(mockDevOnly).toHaveBeenCalledWith(
@@ -158,26 +154,26 @@ describe('SignatureService', () => {
       it('should reject request with empty message', async () => {
         const invalidRequest = { ...validSignatureRequest, message: '' }
 
-        await expect(
-          SignatureService.requestSignature(invalidRequest, mockSignatureFunctions, mockConnector)
-        ).rejects.toThrow('Signature request missing message data')
+        await expect(SignatureService.requestSignature(invalidRequest, mockSignatureFunctions, mockConnector)).rejects.toThrow(
+          'Signature request missing message data'
+        )
       })
 
       it('should reject request with whitespace-only message', async () => {
         const invalidRequest = { ...validSignatureRequest, message: '   \n\t  ' }
 
-        await expect(
-          SignatureService.requestSignature(invalidRequest, mockSignatureFunctions, mockConnector)
-        ).rejects.toThrow('Signature request missing message data')
+        await expect(SignatureService.requestSignature(invalidRequest, mockSignatureFunctions, mockConnector)).rejects.toThrow(
+          'Signature request missing message data'
+        )
       })
 
       it('should reject request with missing message', async () => {
         const invalidRequest = { ...validSignatureRequest }
         delete (invalidRequest as any).message
 
-        await expect(
-          SignatureService.requestSignature(invalidRequest, mockSignatureFunctions, mockConnector)
-        ).rejects.toThrow('Signature request missing message data')
+        await expect(SignatureService.requestSignature(invalidRequest, mockSignatureFunctions, mockConnector)).rejects.toThrow(
+          'Signature request missing message data'
+        )
       })
 
       it('should accept very long messages', async () => {
@@ -198,26 +194,26 @@ describe('SignatureService', () => {
       it('should reject request with empty nonce', async () => {
         const invalidRequest = { ...validSignatureRequest, nonce: '' }
 
-        await expect(
-          SignatureService.requestSignature(invalidRequest, mockSignatureFunctions, mockConnector)
-        ).rejects.toThrow('Signature request missing nonce')
+        await expect(SignatureService.requestSignature(invalidRequest, mockSignatureFunctions, mockConnector)).rejects.toThrow(
+          'Signature request missing nonce'
+        )
       })
 
       it('should reject request with whitespace-only nonce', async () => {
         const invalidRequest = { ...validSignatureRequest, nonce: '   \t\n  ' }
 
-        await expect(
-          SignatureService.requestSignature(invalidRequest, mockSignatureFunctions, mockConnector)
-        ).rejects.toThrow('Signature request missing nonce')
+        await expect(SignatureService.requestSignature(invalidRequest, mockSignatureFunctions, mockConnector)).rejects.toThrow(
+          'Signature request missing nonce'
+        )
       })
 
       it('should reject request with missing nonce', async () => {
         const invalidRequest = { ...validSignatureRequest }
         delete (invalidRequest as any).nonce
 
-        await expect(
-          SignatureService.requestSignature(invalidRequest, mockSignatureFunctions, mockConnector)
-        ).rejects.toThrow('Signature request missing nonce')
+        await expect(SignatureService.requestSignature(invalidRequest, mockSignatureFunctions, mockConnector)).rejects.toThrow(
+          'Signature request missing nonce'
+        )
       })
 
       it('should accept different nonce formats', async () => {
@@ -234,11 +230,7 @@ describe('SignatureService', () => {
         for (const nonce of nonceFormats) {
           const request = { ...validSignatureRequest, nonce }
           await SignatureService.requestSignature(request, mockSignatureFunctions, mockConnector)
-          expect(mockStrategy.sign).toHaveBeenCalledWith(
-            expect.objectContaining({ nonce }),
-            mockSignatureFunctions,
-            mockConnector
-          )
+          expect(mockStrategy.sign).toHaveBeenCalledWith(expect.objectContaining({ nonce }), mockSignatureFunctions, mockConnector)
         }
       })
     })
@@ -247,26 +239,26 @@ describe('SignatureService', () => {
       it('should reject request with empty wallet address', async () => {
         const invalidRequest = { ...validSignatureRequest, walletAddress: '' }
 
-        await expect(
-          SignatureService.requestSignature(invalidRequest, mockSignatureFunctions, mockConnector)
-        ).rejects.toThrow('Signature request missing wallet address')
+        await expect(SignatureService.requestSignature(invalidRequest, mockSignatureFunctions, mockConnector)).rejects.toThrow(
+          'Signature request missing wallet address'
+        )
       })
 
       it('should reject request with whitespace-only wallet address', async () => {
         const invalidRequest = { ...validSignatureRequest, walletAddress: '   \t\n  ' }
 
-        await expect(
-          SignatureService.requestSignature(invalidRequest, mockSignatureFunctions, mockConnector)
-        ).rejects.toThrow('Signature request missing wallet address')
+        await expect(SignatureService.requestSignature(invalidRequest, mockSignatureFunctions, mockConnector)).rejects.toThrow(
+          'Signature request missing wallet address'
+        )
       })
 
       it('should reject request with missing wallet address', async () => {
         const invalidRequest = { ...validSignatureRequest }
         delete (invalidRequest as any).walletAddress
 
-        await expect(
-          SignatureService.requestSignature(invalidRequest, mockSignatureFunctions, mockConnector)
-        ).rejects.toThrow('Signature request missing wallet address')
+        await expect(SignatureService.requestSignature(invalidRequest, mockSignatureFunctions, mockConnector)).rejects.toThrow(
+          'Signature request missing wallet address'
+        )
       })
 
       it('should reject request with invalid wallet address format', async () => {
@@ -283,17 +275,17 @@ describe('SignatureService', () => {
 
         for (const walletAddress of invalidAddresses) {
           const invalidRequest = { ...validSignatureRequest, walletAddress }
-          await expect(
-            SignatureService.requestSignature(invalidRequest, mockSignatureFunctions, mockConnector)
-          ).rejects.toThrow(`Invalid wallet address format: ${walletAddress}`)
+          await expect(SignatureService.requestSignature(invalidRequest, mockSignatureFunctions, mockConnector)).rejects.toThrow(
+            `Invalid wallet address format: ${walletAddress}`
+          )
         }
       })
 
       it('should reject request with empty wallet address separately', async () => {
         const invalidRequest = { ...validSignatureRequest, walletAddress: '' }
-        await expect(
-          SignatureService.requestSignature(invalidRequest, mockSignatureFunctions, mockConnector)
-        ).rejects.toThrow('Signature request missing wallet address')
+        await expect(SignatureService.requestSignature(invalidRequest, mockSignatureFunctions, mockConnector)).rejects.toThrow(
+          'Signature request missing wallet address'
+        )
       })
 
       it('should accept valid wallet address formats', async () => {
@@ -308,11 +300,7 @@ describe('SignatureService', () => {
         for (const walletAddress of validAddresses) {
           const request = { ...validSignatureRequest, walletAddress }
           await SignatureService.requestSignature(request, mockSignatureFunctions, mockConnector)
-          expect(mockStrategy.sign).toHaveBeenCalledWith(
-            expect.objectContaining({ walletAddress }),
-            mockSignatureFunctions,
-            mockConnector
-          )
+          expect(mockStrategy.sign).toHaveBeenCalledWith(expect.objectContaining({ walletAddress }), mockSignatureFunctions, mockConnector)
         }
       })
     })
@@ -321,26 +309,26 @@ describe('SignatureService', () => {
       it('should reject request with zero timestamp', async () => {
         const invalidRequest = { ...validSignatureRequest, timestamp: 0 }
 
-        await expect(
-          SignatureService.requestSignature(invalidRequest, mockSignatureFunctions, mockConnector)
-        ).rejects.toThrow('Signature request missing valid timestamp')
+        await expect(SignatureService.requestSignature(invalidRequest, mockSignatureFunctions, mockConnector)).rejects.toThrow(
+          'Signature request missing valid timestamp'
+        )
       })
 
       it('should reject request with negative timestamp', async () => {
         const invalidRequest = { ...validSignatureRequest, timestamp: -1 }
 
-        await expect(
-          SignatureService.requestSignature(invalidRequest, mockSignatureFunctions, mockConnector)
-        ).rejects.toThrow('Signature request missing valid timestamp')
+        await expect(SignatureService.requestSignature(invalidRequest, mockSignatureFunctions, mockConnector)).rejects.toThrow(
+          'Signature request missing valid timestamp'
+        )
       })
 
       it('should reject request with missing timestamp', async () => {
         const invalidRequest = { ...validSignatureRequest }
         delete (invalidRequest as any).timestamp
 
-        await expect(
-          SignatureService.requestSignature(invalidRequest, mockSignatureFunctions, mockConnector)
-        ).rejects.toThrow('Signature request missing valid timestamp')
+        await expect(SignatureService.requestSignature(invalidRequest, mockSignatureFunctions, mockConnector)).rejects.toThrow(
+          'Signature request missing valid timestamp'
+        )
       })
 
       it('should accept various valid timestamp formats', async () => {
@@ -354,11 +342,7 @@ describe('SignatureService', () => {
         for (const timestamp of validTimestamps) {
           const request = { ...validSignatureRequest, timestamp }
           await SignatureService.requestSignature(request, mockSignatureFunctions, mockConnector)
-          expect(mockStrategy.sign).toHaveBeenCalledWith(
-            expect.objectContaining({ timestamp }),
-            mockSignatureFunctions,
-            mockConnector
-          )
+          expect(mockStrategy.sign).toHaveBeenCalledWith(expect.objectContaining({ timestamp }), mockSignatureFunctions, mockConnector)
         }
       })
     })
@@ -369,22 +353,14 @@ describe('SignatureService', () => {
       await SignatureService.requestSignature(validSignatureRequest, mockSignatureFunctions, mockConnector)
 
       expect(mockSignatureStrategyFactory.getStrategy).toHaveBeenCalledWith(mockConnector)
-      expect(mockStrategy.sign).toHaveBeenCalledWith(
-        validSignatureRequest,
-        mockSignatureFunctions,
-        mockConnector
-      )
+      expect(mockStrategy.sign).toHaveBeenCalledWith(validSignatureRequest, mockSignatureFunctions, mockConnector)
     })
 
     it('should handle signature request without connector', async () => {
       await SignatureService.requestSignature(validSignatureRequest, mockSignatureFunctions)
 
       expect(mockSignatureStrategyFactory.getStrategy).toHaveBeenCalledWith(undefined)
-      expect(mockStrategy.sign).toHaveBeenCalledWith(
-        validSignatureRequest,
-        mockSignatureFunctions,
-        undefined
-      )
+      expect(mockStrategy.sign).toHaveBeenCalledWith(validSignatureRequest, mockSignatureFunctions, undefined)
     })
 
     it('should handle different strategy types', async () => {
@@ -392,12 +368,10 @@ describe('SignatureService', () => {
 
       for (const strategyType of strategyTypes) {
         mockStrategy.getStrategyName.mockReturnValue(strategyType)
-        
+
         await SignatureService.requestSignature(validSignatureRequest, mockSignatureFunctions, mockConnector)
-        
-        expect(consoleLogSpy).toHaveBeenCalledWith(
-          `📱 Using ${strategyType} signing strategy`
-        )
+
+        expect(consoleLogSpy).toHaveBeenCalledWith(`📱 Using ${strategyType} signing strategy`)
       }
     })
 
@@ -423,9 +397,9 @@ describe('SignatureService', () => {
       const signingError = new Error('Strategy signing failed')
       mockStrategy.sign.mockRejectedValue(signingError)
 
-      await expect(
-        SignatureService.requestSignature(validSignatureRequest, mockSignatureFunctions, mockConnector)
-      ).rejects.toThrow('Strategy signing failed')
+      await expect(SignatureService.requestSignature(validSignatureRequest, mockSignatureFunctions, mockConnector)).rejects.toThrow(
+        'Strategy signing failed'
+      )
 
       expect(consoleErrorSpy).toHaveBeenCalledWith(
         '❌ Signature request failed:',
@@ -460,9 +434,9 @@ describe('SignatureService', () => {
     it('should reject invalid signature formats', async () => {
       mockSignatureUtils.isValidSignatureFormat.mockReturnValue(false)
 
-      await expect(
-        SignatureService.requestSignature(validSignatureRequest, mockSignatureFunctions, mockConnector)
-      ).rejects.toThrow(`Invalid signature received: ${JSON.stringify(mockSignatureResult.signature)}`)
+      await expect(SignatureService.requestSignature(validSignatureRequest, mockSignatureFunctions, mockConnector)).rejects.toThrow(
+        `Invalid signature received: ${JSON.stringify(mockSignatureResult.signature)}`
+      )
     })
 
     it('should handle different signature result types', async () => {
@@ -483,13 +457,9 @@ describe('SignatureService', () => {
 
       for (const result of signatureResults) {
         mockStrategy.sign.mockResolvedValue(result)
-        
-        const returnedResult = await SignatureService.requestSignature(
-          validSignatureRequest,
-          mockSignatureFunctions,
-          mockConnector
-        )
-        
+
+        const returnedResult = await SignatureService.requestSignature(validSignatureRequest, mockSignatureFunctions, mockConnector)
+
         expect(returnedResult).toBe(result)
         expect(mockDevOnly).toHaveBeenCalledWith(
           '✅ Signature request completed:',
@@ -512,10 +482,10 @@ describe('SignatureService', () => {
       for (const result of edgeCaseResults) {
         mockStrategy.sign.mockResolvedValue(result)
         mockSignatureUtils.isValidSignatureFormat.mockReturnValue(false)
-        
-        await expect(
-          SignatureService.requestSignature(validSignatureRequest, mockSignatureFunctions, mockConnector)
-        ).rejects.toThrow(`Invalid signature received: ${JSON.stringify(result.signature)}`)
+
+        await expect(SignatureService.requestSignature(validSignatureRequest, mockSignatureFunctions, mockConnector)).rejects.toThrow(
+          `Invalid signature received: ${JSON.stringify(result.signature)}`
+        )
       }
     })
   })
@@ -531,9 +501,9 @@ describe('SignatureService', () => {
 
       for (const connectorInfo of connectorTypes) {
         const connector = { ...mockConnector, ...connectorInfo }
-        
+
         await SignatureService.requestSignature(validSignatureRequest, mockSignatureFunctions, connector)
-        
+
         expect(consoleLogSpy).toHaveBeenCalledWith(
           '🔍 Signature request preview:',
           expect.objectContaining({
@@ -572,19 +542,13 @@ describe('SignatureService', () => {
     it('should call devOnly for validation success', async () => {
       await SignatureService.requestSignature(validSignatureRequest, mockSignatureFunctions, mockConnector)
 
-      expect(mockDevOnly).toHaveBeenCalledWith(
-        '✅ Signature request validation passed:',
-        expect.any(Object)
-      )
+      expect(mockDevOnly).toHaveBeenCalledWith('✅ Signature request validation passed:', expect.any(Object))
     })
 
     it('should call devOnly for completion success', async () => {
       await SignatureService.requestSignature(validSignatureRequest, mockSignatureFunctions, mockConnector)
 
-      expect(mockDevOnly).toHaveBeenCalledWith(
-        '✅ Signature request completed:',
-        expect.any(Object)
-      )
+      expect(mockDevOnly).toHaveBeenCalledWith('✅ Signature request completed:', expect.any(Object))
     })
 
     it('should log strategy selection', async () => {
@@ -635,9 +599,7 @@ describe('SignatureService', () => {
         nonce: `nonce-${i}`,
       }))
 
-      const promises = requests.map(request =>
-        SignatureService.requestSignature(request, mockSignatureFunctions, mockConnector)
-      )
+      const promises = requests.map((request) => SignatureService.requestSignature(request, mockSignatureFunctions, mockConnector))
 
       const results = await Promise.all(promises)
 
@@ -671,9 +633,9 @@ describe('SignatureService', () => {
       expect(result1).toEqual(mockSignatureResult)
 
       // Second request should fail validation
-      await expect(
-        SignatureService.requestSignature(requests[1], mockSignatureFunctions, mockConnector)
-      ).rejects.toThrow('Signature request missing message data')
+      await expect(SignatureService.requestSignature(requests[1], mockSignatureFunctions, mockConnector)).rejects.toThrow(
+        'Signature request missing message data'
+      )
 
       // Third request should succeed
       const result3 = await SignatureService.requestSignature(requests[2], mockSignatureFunctions, mockConnector)
@@ -749,9 +711,9 @@ describe('SignatureService', () => {
         throw factoryError
       })
 
-      await expect(
-        SignatureService.requestSignature(validSignatureRequest, mockSignatureFunctions, mockConnector)
-      ).rejects.toThrow('Strategy factory failed')
+      await expect(SignatureService.requestSignature(validSignatureRequest, mockSignatureFunctions, mockConnector)).rejects.toThrow(
+        'Strategy factory failed'
+      )
     })
 
     it('should handle signature utils validation errors', async () => {
@@ -760,9 +722,9 @@ describe('SignatureService', () => {
         throw validationError
       })
 
-      await expect(
-        SignatureService.requestSignature(validSignatureRequest, mockSignatureFunctions, mockConnector)
-      ).rejects.toThrow('Signature validation failed')
+      await expect(SignatureService.requestSignature(validSignatureRequest, mockSignatureFunctions, mockConnector)).rejects.toThrow(
+        'Signature validation failed'
+      )
     })
 
     it('should maintain error stack traces', async () => {

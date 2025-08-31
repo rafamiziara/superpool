@@ -46,14 +46,14 @@ export function createAppError(type: ErrorType, message?: string, originalError?
     userFriendlyMessage: ERROR_MESSAGES[type],
     name: 'AppError',
     timestamp: new Date(),
-    stack: (new Error()).stack,
+    stack: new Error().stack,
   })
   // Override constructor to return Object constructor
   Object.defineProperty(error, 'constructor', {
     value: Object,
     writable: true,
     enumerable: false,
-    configurable: true
+    configurable: true,
   })
   return error
 }
@@ -85,11 +85,23 @@ export function categorizeError(error: unknown): AppError {
   }
 
   // Categorize based on error message content
-  if (lowerMessage.includes('user rejected') || lowerMessage.includes('user denied') || lowerMessage.includes('user cancelled') || lowerMessage.includes('walletconnect: user rejected')) {
+  if (
+    lowerMessage.includes('user rejected') ||
+    lowerMessage.includes('user denied') ||
+    lowerMessage.includes('user cancelled') ||
+    lowerMessage.includes('walletconnect: user rejected')
+  ) {
     return createAppError(ErrorType.SIGNATURE_REJECTED, errorMessage, error)
   }
 
-  if (lowerMessage.includes('chainid not found') || (lowerMessage.includes('chain') && lowerMessage.includes('not found')) || lowerMessage.includes('chain id mismatch') || lowerMessage.includes('wrong network') || lowerMessage.includes('switch to polygon') || lowerMessage.includes('unsupported chain')) {
+  if (
+    lowerMessage.includes('chainid not found') ||
+    (lowerMessage.includes('chain') && lowerMessage.includes('not found')) ||
+    lowerMessage.includes('chain id mismatch') ||
+    lowerMessage.includes('wrong network') ||
+    lowerMessage.includes('switch to polygon') ||
+    lowerMessage.includes('unsupported chain')
+  ) {
     return createAppError(ErrorType.NETWORK_ERROR, errorMessage, error)
   }
 
@@ -98,7 +110,11 @@ export function categorizeError(error: unknown): AppError {
   }
 
   // Handle transaction-related errors
-  if (lowerMessage.includes('insufficient funds') || lowerMessage.includes('insufficient balance') || lowerMessage.includes('not enough eth for gas')) {
+  if (
+    lowerMessage.includes('insufficient funds') ||
+    lowerMessage.includes('insufficient balance') ||
+    lowerMessage.includes('not enough eth for gas')
+  ) {
     return createAppError(ErrorType.INSUFFICIENT_FUNDS, errorMessage, error)
   }
 
@@ -107,12 +123,21 @@ export function categorizeError(error: unknown): AppError {
   }
 
   // More general transaction patterns
-  if (lowerMessage.includes('gas estimation failed') || lowerMessage.includes('transaction underpriced') || lowerMessage.includes('nonce too low')) {
+  if (
+    lowerMessage.includes('gas estimation failed') ||
+    lowerMessage.includes('transaction underpriced') ||
+    lowerMessage.includes('nonce too low')
+  ) {
     return createAppError(ErrorType.NETWORK_ERROR, errorMessage, error)
   }
 
   // Check network errors first (including connection timeout)
-  if (lowerMessage.includes('network') || lowerMessage.includes('fetch') || lowerMessage.includes('err_network') || lowerMessage.includes('connection timeout')) {
+  if (
+    lowerMessage.includes('network') ||
+    lowerMessage.includes('fetch') ||
+    lowerMessage.includes('err_network') ||
+    lowerMessage.includes('connection timeout')
+  ) {
     return createAppError(ErrorType.NETWORK_ERROR, errorMessage, error)
   }
 
@@ -133,7 +158,12 @@ export function categorizeError(error: unknown): AppError {
     return createAppError(ErrorType.AUTHENTICATION_FAILED, 'Signature validation failed. Please try connecting again.', error)
   }
 
-  if (lowerMessage.includes('auth') || lowerMessage.includes('token') || lowerMessage.includes('login failed') || lowerMessage.includes('invalid credentials')) {
+  if (
+    lowerMessage.includes('auth') ||
+    lowerMessage.includes('token') ||
+    lowerMessage.includes('login failed') ||
+    lowerMessage.includes('invalid credentials')
+  ) {
     return createAppError(ErrorType.AUTHENTICATION_FAILED, errorMessage, error)
   }
 
@@ -146,14 +176,15 @@ export function categorizeError(error: unknown): AppError {
 
 // Helper to check if error is user-initiated (like canceling a signature)
 export function isUserInitiatedError(error: AppError | null | undefined): boolean {
-  return error?.type === ErrorType.SIGNATURE_REJECTED || 
-         error?.type === ErrorType.TRANSACTION_REJECTED
+  return error?.type === ErrorType.SIGNATURE_REJECTED || error?.type === ErrorType.TRANSACTION_REJECTED
 }
 
 // Helper to check if error should be retried automatically
 export function shouldRetryError(error: AppError | null | undefined): boolean {
-  return error?.type === ErrorType.NETWORK_ERROR || 
-         error?.type === ErrorType.BACKEND_ERROR || 
-         error?.type === ErrorType.TIMEOUT_ERROR ||
-         error?.type === ErrorType.AUTHENTICATION_FAILED
+  return (
+    error?.type === ErrorType.NETWORK_ERROR ||
+    error?.type === ErrorType.BACKEND_ERROR ||
+    error?.type === ErrorType.TIMEOUT_ERROR ||
+    error?.type === ErrorType.AUTHENTICATION_FAILED
+  )
 }

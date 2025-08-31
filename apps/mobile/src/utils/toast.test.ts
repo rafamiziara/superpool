@@ -37,7 +37,7 @@ jest.doMock('./errorHandling', () => ({
     INSUFFICIENT_FUNDS: 'Insufficient funds to complete transaction.',
     SESSION_CORRUPTION: 'Session corrupted. Please reconnect your wallet.',
     CHAIN_MISMATCH: 'Wrong network selected. Please switch to the correct chain.',
-  }
+  },
 }))
 
 // Import after mocking - use require to ensure mocks are applied
@@ -323,18 +323,15 @@ describe('toast utilities', () => {
 
     describe('Error Type to Duration Mapping', () => {
       it('should use shorter duration for user-initiated errors', () => {
-        const userErrors = [
-          ErrorType.SIGNATURE_REJECTED,
-          ErrorType.TRANSACTION_REJECTED,
-        ]
+        const userErrors = [ErrorType.SIGNATURE_REJECTED, ErrorType.TRANSACTION_REJECTED]
 
-        userErrors.forEach(errorType => {
+        userErrors.forEach((errorType) => {
           const error = createMockAppError(errorType)
           showErrorFromAppError(error)
         })
 
         const calls = mockToast.show.mock.calls
-        calls.forEach(call => {
+        calls.forEach((call) => {
           expect(call[0].visibilityTime).toBe(3000) // Shorter duration
         })
       })
@@ -347,48 +344,41 @@ describe('toast utilities', () => {
           ErrorType.AUTHENTICATION_FAILED,
         ]
 
-        technicalErrors.forEach(errorType => {
+        technicalErrors.forEach((errorType) => {
           const error = createMockAppError(errorType)
           showErrorFromAppError(error)
         })
 
         const calls = mockToast.show.mock.calls
-        calls.forEach(call => {
+        calls.forEach((call) => {
           expect(call[0].visibilityTime).toBe(5000) // Longer duration
         })
       })
 
       it('should use persistent duration for critical errors', () => {
-        const criticalErrors = [
-          ErrorType.CHAIN_MISMATCH,
-          ErrorType.INSUFFICIENT_FUNDS,
-        ]
+        const criticalErrors = [ErrorType.CHAIN_MISMATCH, ErrorType.INSUFFICIENT_FUNDS]
 
-        criticalErrors.forEach(errorType => {
+        criticalErrors.forEach((errorType) => {
           const error = createMockAppError(errorType)
           showErrorFromAppError(error)
         })
 
         const calls = mockToast.show.mock.calls
-        calls.forEach(call => {
+        calls.forEach((call) => {
           expect(call[0].visibilityTime).toBe(8000) // Persistent duration
         })
       })
 
       it('should use standard duration for other errors', () => {
-        const standardErrors = [
-          ErrorType.WALLET_CONNECTION,
-          ErrorType.BACKEND_ERROR,
-          ErrorType.UNKNOWN_ERROR,
-        ]
+        const standardErrors = [ErrorType.WALLET_CONNECTION, ErrorType.BACKEND_ERROR, ErrorType.UNKNOWN_ERROR]
 
-        standardErrors.forEach(errorType => {
+        standardErrors.forEach((errorType) => {
           const error = createMockAppError(errorType)
           showErrorFromAppError(error)
         })
 
         const calls = mockToast.show.mock.calls
-        calls.forEach(call => {
+        calls.forEach((call) => {
           expect(call[0].visibilityTime).toBe(4000) // Standard duration
         })
       })
@@ -398,7 +388,7 @@ describe('toast utilities', () => {
       it('should use userFriendlyMessage as text2', () => {
         const error = createMockAppError(ErrorType.NETWORK_ERROR)
         error.userFriendlyMessage = 'Check your internet connection'
-        
+
         showErrorFromAppError(error)
 
         expect(mockToast.show).toHaveBeenCalledWith(
@@ -411,7 +401,7 @@ describe('toast utilities', () => {
       it('should handle errors without userFriendlyMessage', () => {
         const error = createMockAppError(ErrorType.UNKNOWN_ERROR)
         error.userFriendlyMessage = ''
-        
+
         showErrorFromAppError(error)
 
         expect(mockToast.show).toHaveBeenCalledWith(
@@ -554,7 +544,7 @@ describe('toast utilities', () => {
         authToasts.networkMismatch() // No network name
 
         expect(mockToast.show).toHaveBeenCalledTimes(3)
-        
+
         // Check that calls were made with appropriate fallback text
         const calls = mockToast.show.mock.calls
         expect(calls[0][0].text2).toContain('connected') // Generic connected message
@@ -690,7 +680,7 @@ describe('toast utilities', () => {
         showInfoToast('Test')
         showWarningToast('Test')
 
-        mockToast.show.mock.calls.forEach(call => {
+        mockToast.show.mock.calls.forEach((call) => {
           expect(call[0].position).toBe('bottom')
         })
       })
@@ -716,9 +706,9 @@ describe('toast utilities', () => {
     describe('Toast Type Definitions', () => {
       it('should support all ToastType values', () => {
         const toastTypes: ToastType[] = ['success', 'error', 'info', 'warning']
-        
+
         // This is mainly a compilation test to ensure types are exported correctly
-        toastTypes.forEach(type => {
+        toastTypes.forEach((type) => {
           expect(typeof type).toBe('string')
           expect(['success', 'error', 'info', 'warning']).toContain(type)
         })
@@ -775,12 +765,12 @@ describe('toast utilities', () => {
   describe('Performance and Memory', () => {
     it('should handle rapid toast calls efficiently', () => {
       const start = performance.now()
-      
+
       for (let i = 0; i < 100; i++) {
         showSuccessToast(`Message ${i}`)
         showErrorToast(`Error ${i}`)
       }
-      
+
       const end = performance.now()
       expect(end - start).toBeLessThan(500) // Should be reasonably fast (adjusted for test environment)
       expect(mockToast.show).toHaveBeenCalledTimes(200)
@@ -788,7 +778,7 @@ describe('toast utilities', () => {
 
     it('should not cause memory leaks with repeated calls', () => {
       const initialMemory = process.memoryUsage().heapUsed
-      
+
       for (let i = 0; i < 1000; i++) {
         showSuccessToast(`Test ${i}`)
         const mockError = {
@@ -800,17 +790,17 @@ describe('toast utilities', () => {
         } as AppError
         showErrorFromAppError(mockError)
       }
-      
+
       const finalMemory = process.memoryUsage().heapUsed
       const memoryIncrease = finalMemory - initialMemory
-      
+
       expect(memoryIncrease).toBeLessThan(100 * 1024 * 1024) // Less than 100MB (adjusted for test environment)
     })
   })
 
   describe('Integration with Error Handling', () => {
     it('should work correctly with all error types from errorHandling module', () => {
-      Object.values(ErrorType).forEach(errorType => {
+      Object.values(ErrorType).forEach((errorType) => {
         const mockError = {
           type: errorType,
           message: `${errorType} message`,

@@ -52,9 +52,9 @@ describe('ErrorAnalyzer', () => {
         const sessionId = 'a1b2c3d4e5f6789012345678901234567890123456789012345678901234abcd'
         const errorMessage = `session: ${sessionId} failed to connect`
         const error = new Error(errorMessage)
-        
+
         const result = ErrorAnalyzer.analyzeError(error)
-        
+
         expect(result.errorType).toBe('session')
         expect(result.sessionContext!.sessionId).toBe(sessionId)
       })
@@ -81,9 +81,9 @@ describe('ErrorAnalyzer', () => {
         const sessionId = 'a1b2c3d4e5f6789012345678901234567890123456789012345678901234abcd'
         const errorMessage = `session: ${sessionId} Failed`
         const error = new Error(errorMessage)
-        
+
         const result = ErrorAnalyzer.analyzeError(error)
-        
+
         expect(result.errorType).toBe('session')
         expect(result.sessionContext!.sessionId).toBe(sessionId)
       })
@@ -92,9 +92,9 @@ describe('ErrorAnalyzer', () => {
         const shortSessionId = 'abc123'
         const errorMessage = `session: ${shortSessionId} failed`
         const error = new Error(errorMessage)
-        
+
         const result = ErrorAnalyzer.analyzeError(error)
-        
+
         // Short session IDs don't match the 64-character regex, so should be undefined
         expect(result.sessionContext!.sessionId).toBeUndefined()
         expect(result.sessionContext!.isSessionError).toBe(true)
@@ -236,14 +236,14 @@ describe('ErrorAnalyzer', () => {
       it('should call categorizeError for session errors with specific message', () => {
         const { categorizeError } = require('../../../utils')
         const error = new Error('No matching key')
-        
+
         categorizeError.mockClear()
         ErrorAnalyzer.analyzeError(error)
-        
+
         // Should be called twice: once for original error, once for session-specific error
         expect(categorizeError).toHaveBeenCalledWith(expect.any(Error))
         const sessionErrorCall = (categorizeError as jest.Mock).mock.calls.find(
-          call => call[0] instanceof Error && call[0].message === 'WalletConnect session error'
+          (call) => call[0] instanceof Error && call[0].message === 'WalletConnect session error'
         )
         expect(sessionErrorCall).toBeTruthy()
       })
@@ -251,13 +251,13 @@ describe('ErrorAnalyzer', () => {
       it('should call categorizeError for timeout errors with specific message', () => {
         const { categorizeError } = require('../../../utils')
         const error = new Error('Request timed out')
-        
+
         categorizeError.mockClear()
         ErrorAnalyzer.analyzeError(error)
-        
+
         expect(categorizeError).toHaveBeenCalledWith(expect.any(Error))
         const timeoutErrorCall = (categorizeError as jest.Mock).mock.calls.find(
-          call => call[0] instanceof Error && call[0].message === 'Signature request timed out. Please try connecting again.'
+          (call) => call[0] instanceof Error && call[0].message === 'Signature request timed out. Please try connecting again.'
         )
         expect(timeoutErrorCall).toBeTruthy()
       })
@@ -265,13 +265,13 @@ describe('ErrorAnalyzer', () => {
       it('should call categorizeError for connector errors with specific message', () => {
         const { categorizeError } = require('../../../utils')
         const error = new Error('ConnectorNotConnectedError')
-        
+
         categorizeError.mockClear()
         ErrorAnalyzer.analyzeError(error)
-        
+
         expect(categorizeError).toHaveBeenCalledWith(expect.any(Error))
         const connectorErrorCall = (categorizeError as jest.Mock).mock.calls.find(
-          call => call[0] instanceof Error && call[0].message === 'User rejected the request.'
+          (call) => call[0] instanceof Error && call[0].message === 'User rejected the request.'
         )
         expect(connectorErrorCall).toBeTruthy()
       })
@@ -279,10 +279,10 @@ describe('ErrorAnalyzer', () => {
       it('should call categorizeError with original error for generic errors', () => {
         const { categorizeError } = require('../../../utils')
         const originalError = new Error('Some random error')
-        
+
         categorizeError.mockClear()
         ErrorAnalyzer.analyzeError(originalError)
-        
+
         expect(categorizeError).toHaveBeenCalledWith(originalError)
       })
     })
@@ -292,9 +292,9 @@ describe('ErrorAnalyzer', () => {
         const sessionId = 'a1b2c3d4e5f6789012345678901234567890123456789012345678901234abcd'
         const errorMessage = `session: ${sessionId} failed`
         const error = new Error(errorMessage)
-        
+
         const result = ErrorAnalyzer.analyzeError(error)
-        
+
         expect(result.sessionContext).toEqual({
           errorMessage,
           sessionId,
@@ -305,7 +305,7 @@ describe('ErrorAnalyzer', () => {
       it('should handle missing session context gracefully', () => {
         const error = new Error('Generic error')
         const result = ErrorAnalyzer.analyzeError(error)
-        
+
         expect(result.sessionContext).toBeUndefined()
       })
     })
@@ -322,7 +322,7 @@ describe('ErrorAnalyzer', () => {
         const longMessage = 'A'.repeat(10000) + ' WalletConnect session error'
         const error = new Error(longMessage)
         const result = ErrorAnalyzer.analyzeError(error)
-        
+
         expect(result.errorType).toBe('session')
         expect(result.sessionContext!.errorMessage).toBe(longMessage)
       })
@@ -332,7 +332,7 @@ describe('ErrorAnalyzer', () => {
         const specialCharsMessage = `Error with [special] chars (and) symbols: session: ${sessionId} failed`
         const error = new Error(specialCharsMessage)
         const result = ErrorAnalyzer.analyzeError(error)
-        
+
         expect(result.errorType).toBe('session')
         expect(result.sessionContext!.sessionId).toBe(sessionId)
       })
@@ -345,18 +345,18 @@ describe('ErrorAnalyzer', () => {
           'ConnectorNotConnectedError', // Case-sensitive check
         ]
 
-        const results = mixedCaseErrors.map(msg => ErrorAnalyzer.analyzeError(new Error(msg)))
-        
+        const results = mixedCaseErrors.map((msg) => ErrorAnalyzer.analyzeError(new Error(msg)))
+
         expect(results[0].errorType).toBe('generic') // WALLETCONNECT won't match 'WalletConnect'
         expect(results[1].errorType).toBe('session')
-        expect(results[2].errorType).toBe('timeout') 
+        expect(results[2].errorType).toBe('timeout')
         expect(results[3].errorType).toBe('connector')
       })
 
       it('should handle circular reference objects', () => {
         const circularObj: any = { message: 'test' }
         circularObj.self = circularObj
-        
+
         const result = ErrorAnalyzer.analyzeError(circularObj)
         expect(result.errorType).toBe('generic')
         expect(result.originalError).toBe(circularObj)
@@ -373,23 +373,27 @@ describe('ErrorAnalyzer', () => {
         ]
 
         const start = performance.now()
-        
+
         for (let i = 0; i < 1000; i++) {
-          errors.forEach(error => ErrorAnalyzer.analyzeError(error))
+          errors.forEach((error) => ErrorAnalyzer.analyzeError(error))
         }
-        
+
         const end = performance.now()
         expect(end - start).toBeLessThan(200) // Should be reasonably fast
       })
 
       it('should handle large batches of errors efficiently', () => {
         const batchSize = 10000
-        const errors = Array.from({ length: batchSize }, (_, i) => 
-          new Error(`Error ${i}: ${i % 4 === 0 ? 'WalletConnect' : i % 4 === 1 ? 'timed out' : i % 4 === 2 ? 'ConnectorNotConnectedError' : 'generic'}`)
+        const errors = Array.from(
+          { length: batchSize },
+          (_, i) =>
+            new Error(
+              `Error ${i}: ${i % 4 === 0 ? 'WalletConnect' : i % 4 === 1 ? 'timed out' : i % 4 === 2 ? 'ConnectorNotConnectedError' : 'generic'}`
+            )
         )
 
         const start = performance.now()
-        const results = errors.map(error => ErrorAnalyzer.analyzeError(error))
+        const results = errors.map((error) => ErrorAnalyzer.analyzeError(error))
         const end = performance.now()
 
         expect(results).toHaveLength(batchSize)
@@ -401,29 +405,18 @@ describe('ErrorAnalyzer', () => {
   describe('Private Method Behavior', () => {
     describe('Session Error Analysis', () => {
       it('should identify various session error patterns', () => {
-        const sessionPatterns = [
-          'No matching key',
-          'session: abc',
-          'pairing failed',
-          'WalletConnect error',
-          'relayer down',
-        ]
+        const sessionPatterns = ['No matching key', 'session: abc', 'pairing failed', 'WalletConnect error', 'relayer down']
 
-        sessionPatterns.forEach(pattern => {
+        sessionPatterns.forEach((pattern) => {
           const result = ErrorAnalyzer.analyzeError(new Error(pattern))
           expect(result.errorType).toBe('session')
         })
       })
 
       it('should not identify non-session errors as session errors', () => {
-        const nonSessionPatterns = [
-          'Network timeout',
-          'Database error',
-          'Invalid input',
-          'Server error 500',
-        ]
+        const nonSessionPatterns = ['Network timeout', 'Database error', 'Invalid input', 'Server error 500']
 
-        nonSessionPatterns.forEach(pattern => {
+        nonSessionPatterns.forEach((pattern) => {
           const result = ErrorAnalyzer.analyzeError(new Error(pattern))
           expect(result.errorType).not.toBe('session')
         })
@@ -432,26 +425,18 @@ describe('ErrorAnalyzer', () => {
 
     describe('Connector Error Analysis', () => {
       it('should identify connector error patterns', () => {
-        const connectorPatterns = [
-          'ConnectorNotConnectedError',
-          'Connector not connected',
-        ]
+        const connectorPatterns = ['ConnectorNotConnectedError', 'Connector not connected']
 
-        connectorPatterns.forEach(pattern => {
+        connectorPatterns.forEach((pattern) => {
           const result = ErrorAnalyzer.analyzeError(new Error(pattern))
           expect(result.errorType).toBe('connector')
         })
       })
 
       it('should not identify non-connector errors as connector errors', () => {
-        const nonConnectorPatterns = [
-          'Connection timeout',
-          'Network error',
-          'Invalid connector',
-          'Connector setup failed',
-        ]
+        const nonConnectorPatterns = ['Connection timeout', 'Network error', 'Invalid connector', 'Connector setup failed']
 
-        nonConnectorPatterns.forEach(pattern => {
+        nonConnectorPatterns.forEach((pattern) => {
           const result = ErrorAnalyzer.analyzeError(new Error(pattern))
           expect(result.errorType).not.toBe('connector')
         })

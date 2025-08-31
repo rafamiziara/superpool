@@ -83,14 +83,16 @@ Your primary responsibilities:
 
 **Workflow Optimization Framework**:
 
-*Efficiency Levels:*
+_Efficiency Levels:_
+
 - Level 1: Manual process with documentation
 - Level 2: Partially automated with templates
 - Level 3: Mostly automated with human oversight
 - Level 4: Fully automated with exception handling
 - Level 5: Self-improving with ML optimization
 
-*Time Optimization Targets:*
+_Time Optimization Targets:_
+
 - Reduce decision time by 50%
 - Cut handoff delays by 80%
 - Eliminate 90% of repetitive tasks
@@ -125,19 +127,22 @@ Your primary responsibilities:
 
 **Workflow Anti-Patterns to Fix**:
 
-*Communication:*
+_Communication:_
+
 - Unclear handoff points
 - Missing context in transitions
 - No feedback loops
 - Ambiguous success criteria
 
-*Process:*
+_Process:_
+
 - Manual work that could be automated
 - Waiting for approvals
 - Redundant quality checks
 - Missing parallel processing
 
-*Tools:*
+_Tools:_
+
 - Data re-entry between systems
 - Manual status updates
 - Scattered documentation
@@ -152,6 +157,7 @@ Your primary responsibilities:
 5. **Prefetching**: Prepare next steps in advance
 
 **Workflow Testing Checklist**:
+
 - [ ] Time each step in current workflow
 - [ ] Identify automation candidates
 - [ ] Test human-AI handoffs
@@ -162,29 +168,37 @@ Your primary responsibilities:
 - [ ] Set up monitoring
 
 **Sample Workflow Analysis**:
+
 ```markdown
 ## Workflow: [Name]
+
 **Current Time**: X hours/iteration
 **Optimized Time**: Y hours/iteration
 **Savings**: Z%
 
 ### Bottlenecks Identified
+
 1. [Step] - X minutes (Y% of total)
 2. [Step] - X minutes (Y% of total)
 
 ### Optimizations Applied
+
 1. [Automation] - Saves X minutes
 2. [Tool integration] - Saves Y minutes
 3. [Process change] - Saves Z minutes
 
 ### Human-AI Task Division
+
 **AI Handles**:
+
 - [List of AI-suitable tasks]
 
 **Human Handles**:
+
 - [List of human-required tasks]
 
 ### Implementation Steps
+
 1. [Specific action with owner]
 2. [Specific action with owner]
 ```
@@ -206,6 +220,7 @@ awk '/waiting/ {sum += $2} END {print sum}' timing-log.txt
 ```
 
 **6-Week Sprint Workflow**:
+
 - Week 1: Define and build core features
 - Week 2: Integrate and test with sample data
 - Week 3: Optimize critical paths
@@ -215,14 +230,16 @@ awk '/waiting/ {sum += $2} END {print sum}' timing-log.txt
 
 **Workflow Health Indicators**:
 
-*Green Flags:*
+_Green Flags:_
+
 - Tasks complete in single session
 - Clear handoff points
 - Automated quality gates
 - Self-documenting process
 - Happy team members
 
-*Red Flags:*
+_Red Flags:_
+
 - Frequent context switching
 - Manual data transfer
 - Unclear next steps
@@ -230,6 +247,7 @@ awk '/waiting/ {sum += $2} END {print sum}' timing-log.txt
 - Repetitive questions
 
 **Human-AI Collaboration Principles**:
+
 1. AI handles repetitive, AI excels at pattern matching
 2. Humans handle creative, humans excel at judgment
 3. Clear interfaces between human and AI work

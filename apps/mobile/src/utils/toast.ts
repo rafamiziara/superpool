@@ -20,7 +20,7 @@ export function showSuccessToast(message: string, text2?: string, duration = 300
   }
 }
 
-// Error toast for error feedback  
+// Error toast for error feedback
 export function showErrorToast(message: string, text2?: string, duration = 4000, position: 'top' | 'bottom' = 'bottom') {
   try {
     Toast.show({
@@ -127,7 +127,7 @@ function getErrorDuration(errorType: ErrorType): number {
   }
 }
 
-// Authentication-specific toast helpers 
+// Authentication-specific toast helpers
 export const authToasts = {
   walletConnected: (walletName?: string) =>
     showSuccessToast(
@@ -136,21 +136,14 @@ export const authToasts = {
       3000
     ),
 
-  authSuccess: () =>
-    showSuccessToast('Authentication Successful', 'Welcome to SuperPool!', 3000),
+  authSuccess: () => showSuccessToast('Authentication Successful', 'Welcome to SuperPool!', 3000),
 
-  walletDisconnected: () =>
-    showInfoToast('Wallet Disconnected', 'Your wallet has been safely disconnected', 3000),
+  walletDisconnected: () => showInfoToast('Wallet Disconnected', 'Your wallet has been safely disconnected', 3000),
 
   connectionFailed: (reason?: string) =>
-    showErrorToast(
-      'Connection Failed',
-      reason || 'Failed to connect to wallet. Please try again.',
-      4000
-    ),
+    showErrorToast('Connection Failed', reason || 'Failed to connect to wallet. Please try again.', 4000),
 
-  signatureRejected: () =>
-    showWarningToast('Signature Rejected', 'Please approve the signature to continue', 4000),
+  signatureRejected: () => showWarningToast('Signature Rejected', 'Please approve the signature to continue', 4000),
 
   networkMismatch: (networkName?: string) =>
     showWarningToast(
@@ -159,39 +152,28 @@ export const authToasts = {
       6000
     ),
 
-  sessionRecovery: () =>
-    showInfoToast('Recovering Session', 'Attempting to restore your connection...', 3000),
+  sessionRecovery: () => showInfoToast('Recovering Session', 'Attempting to restore your connection...', 3000),
 
-  sessionExpired: () =>
-    showWarningToast('Session Expired', 'Please reconnect your wallet to continue', 5000),
+  sessionExpired: () => showWarningToast('Session Expired', 'Please reconnect your wallet to continue', 5000),
 }
 
 // General app toast helpers
 export const appToasts = {
-  operationSuccess: (message: string) =>
-    showSuccessToast('Success', message, 3000),
+  operationSuccess: (message: string) => showSuccessToast('Success', message, 3000),
 
-  operationFailed: (title: string, message?: string) =>
-    showErrorToast(title, message || '', 4000),
+  operationFailed: (title: string, message?: string) => showErrorToast(title, message || '', 4000),
 
-  loading: (message: string) =>
-    showInfoToast('Please Wait', message, 2000),
+  loading: (message: string) => showInfoToast('Please Wait', message, 2000),
 
-  dataSaved: (message: string) =>
-    showSuccessToast('Saved', message, 2500),
+  dataSaved: (message: string) => showSuccessToast('Saved', message, 2500),
 
-  dataLoaded: (message: string) =>
-    showInfoToast('Updated', message, 2000),
+  dataLoaded: (message: string) => showInfoToast('Updated', message, 2000),
 
-  validationError: (message: string) =>
-    showWarningToast('Validation Error', message, 4000),
+  validationError: (message: string) => showWarningToast('Validation Error', message, 4000),
 
-  permissionDenied: (message: string) =>
-    showErrorToast('Permission Required', message, 5000),
+  permissionDenied: (message: string) => showErrorToast('Permission Required', message, 5000),
 
-  offline: () =>
-    showWarningToast('No Internet', 'Some features may not work properly', 5000),
+  offline: () => showWarningToast('No Internet', 'Some features may not work properly', 5000),
 
-  online: () =>
-    showSuccessToast('Connected', 'Internet connection restored', 2000),
+  online: () => showSuccessToast('Connected', 'Internet connection restored', 2000),
 }

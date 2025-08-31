@@ -28,14 +28,16 @@ export class TimeoutErrorHandler implements ErrorHandler<void> {
     // Disconnect wallet on timeout - handle both sync and async disconnect functions
     try {
       const disconnectResult = this.disconnectFunction()
-      
+
       // If disconnect function returns a Promise, catch any rejections
-      if (disconnectResult !== undefined && 
-          disconnectResult !== null && 
-          typeof disconnectResult === 'object' &&
-          'catch' in disconnectResult && 
-          typeof (disconnectResult as any).catch === 'function') {
-        (disconnectResult as any).catch(() => {
+      if (
+        disconnectResult !== undefined &&
+        disconnectResult !== null &&
+        typeof disconnectResult === 'object' &&
+        'catch' in disconnectResult &&
+        typeof (disconnectResult as any).catch === 'function'
+      ) {
+        ;(disconnectResult as any).catch(() => {
           // Silently handle disconnect failures - timeout handling should continue
         })
       }

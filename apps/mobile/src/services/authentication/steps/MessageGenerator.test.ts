@@ -70,7 +70,10 @@ describe('MessageGenerator', () => {
 
         expect(mockGenerateAuthMessageFn).toHaveBeenCalledWith({ walletAddress: validWalletAddress })
         expect(consoleLogSpy).toHaveBeenCalledWith('📝 Generating authentication message for address:', validWalletAddress)
-        expect(consoleLogSpy).toHaveBeenCalledWith('✅ Authentication message generated:', 'Please sign this message to authenticate with Supe...')
+        expect(consoleLogSpy).toHaveBeenCalledWith(
+          '✅ Authentication message generated:',
+          'Please sign this message to authenticate with Supe...'
+        )
       })
 
       it('should handle string timestamp conversion correctly', async () => {
@@ -207,7 +210,7 @@ describe('MessageGenerator', () => {
 
         for (const address of addresses) {
           mockGenerateAuthMessageFn.mockResolvedValue(mockResponse)
-          
+
           const result = await messageGenerator.generateAuthenticationMessage(address)
 
           expect(result).toBeDefined()
@@ -227,8 +230,9 @@ describe('MessageGenerator', () => {
         }
         mockGenerateAuthMessageFn.mockResolvedValue(mockResponse)
 
-        await expect(messageGenerator.generateAuthenticationMessage(validWalletAddress))
-          .rejects.toThrow('Invalid timestamp received from authentication message')
+        await expect(messageGenerator.generateAuthenticationMessage(validWalletAddress)).rejects.toThrow(
+          'Invalid timestamp received from authentication message'
+        )
       })
 
       it('should throw error for null timestamp', async () => {
@@ -241,8 +245,9 @@ describe('MessageGenerator', () => {
         }
         mockGenerateAuthMessageFn.mockResolvedValue(mockResponse)
 
-        await expect(messageGenerator.generateAuthenticationMessage(validWalletAddress))
-          .rejects.toThrow('Invalid timestamp received from authentication message')
+        await expect(messageGenerator.generateAuthenticationMessage(validWalletAddress)).rejects.toThrow(
+          'Invalid timestamp received from authentication message'
+        )
       })
 
       it('should throw error for undefined timestamp', async () => {
@@ -255,8 +260,9 @@ describe('MessageGenerator', () => {
         }
         mockGenerateAuthMessageFn.mockResolvedValue(mockResponse)
 
-        await expect(messageGenerator.generateAuthenticationMessage(validWalletAddress))
-          .rejects.toThrow('Invalid timestamp received from authentication message')
+        await expect(messageGenerator.generateAuthenticationMessage(validWalletAddress)).rejects.toThrow(
+          'Invalid timestamp received from authentication message'
+        )
       })
 
       it('should handle zero timestamp', async () => {
@@ -311,8 +317,7 @@ describe('MessageGenerator', () => {
         const firebaseError = new Error('Firebase function failed')
         mockGenerateAuthMessageFn.mockRejectedValue(firebaseError)
 
-        await expect(messageGenerator.generateAuthenticationMessage(validWalletAddress))
-          .rejects.toThrow('Firebase function failed')
+        await expect(messageGenerator.generateAuthenticationMessage(validWalletAddress)).rejects.toThrow('Firebase function failed')
 
         expect(mockGenerateAuthMessageFn).toHaveBeenCalledWith({ walletAddress: validWalletAddress })
       })
@@ -321,8 +326,7 @@ describe('MessageGenerator', () => {
         const timeoutError = new Error('Request timeout')
         mockGenerateAuthMessageFn.mockRejectedValue(timeoutError)
 
-        await expect(messageGenerator.generateAuthenticationMessage(validWalletAddress))
-          .rejects.toThrow('Request timeout')
+        await expect(messageGenerator.generateAuthenticationMessage(validWalletAddress)).rejects.toThrow('Request timeout')
       })
 
       it('should handle malformed response data', async () => {
@@ -332,16 +336,14 @@ describe('MessageGenerator', () => {
         mockGenerateAuthMessageFn.mockResolvedValue(mockResponse)
 
         // This should throw when trying to destructure the response
-        await expect(messageGenerator.generateAuthenticationMessage(validWalletAddress))
-          .rejects.toThrow()
+        await expect(messageGenerator.generateAuthenticationMessage(validWalletAddress)).rejects.toThrow()
       })
 
       it('should handle missing data property in response', async () => {
         const mockResponse = {} // Missing data property
         mockGenerateAuthMessageFn.mockResolvedValue(mockResponse)
 
-        await expect(messageGenerator.generateAuthenticationMessage(validWalletAddress))
-          .rejects.toThrow()
+        await expect(messageGenerator.generateAuthenticationMessage(validWalletAddress)).rejects.toThrow()
       })
 
       it('should handle partial response data', async () => {
@@ -353,8 +355,9 @@ describe('MessageGenerator', () => {
         }
         mockGenerateAuthMessageFn.mockResolvedValue(mockResponse)
 
-        await expect(messageGenerator.generateAuthenticationMessage(validWalletAddress))
-          .rejects.toThrow('Invalid timestamp received from authentication message')
+        await expect(messageGenerator.generateAuthenticationMessage(validWalletAddress)).rejects.toThrow(
+          'Invalid timestamp received from authentication message'
+        )
       })
     })
 
@@ -467,8 +470,9 @@ describe('MessageGenerator', () => {
         }
         mockGenerateAuthMessageFn.mockResolvedValue(mockResponse)
 
-        await expect(messageGenerator.generateAuthenticationMessage(validWalletAddress))
-          .rejects.toThrow('Invalid timestamp received from authentication message')
+        await expect(messageGenerator.generateAuthenticationMessage(validWalletAddress)).rejects.toThrow(
+          'Invalid timestamp received from authentication message'
+        )
       })
 
       it('should reject boolean timestamps', async () => {
@@ -481,8 +485,9 @@ describe('MessageGenerator', () => {
         }
         mockGenerateAuthMessageFn.mockResolvedValue(mockResponse)
 
-        await expect(messageGenerator.generateAuthenticationMessage(validWalletAddress))
-          .rejects.toThrow('Invalid timestamp received from authentication message')
+        await expect(messageGenerator.generateAuthenticationMessage(validWalletAddress)).rejects.toThrow(
+          'Invalid timestamp received from authentication message'
+        )
       })
 
       it('should reject array timestamps', async () => {
@@ -495,8 +500,9 @@ describe('MessageGenerator', () => {
         }
         mockGenerateAuthMessageFn.mockResolvedValue(mockResponse)
 
-        await expect(messageGenerator.generateAuthenticationMessage(validWalletAddress))
-          .rejects.toThrow('Invalid timestamp received from authentication message')
+        await expect(messageGenerator.generateAuthenticationMessage(validWalletAddress)).rejects.toThrow(
+          'Invalid timestamp received from authentication message'
+        )
       })
 
       it('should reject object timestamps', async () => {
@@ -509,8 +515,9 @@ describe('MessageGenerator', () => {
         }
         mockGenerateAuthMessageFn.mockResolvedValue(mockResponse)
 
-        await expect(messageGenerator.generateAuthenticationMessage(validWalletAddress))
-          .rejects.toThrow('Invalid timestamp received from authentication message')
+        await expect(messageGenerator.generateAuthenticationMessage(validWalletAddress)).rejects.toThrow(
+          'Invalid timestamp received from authentication message'
+        )
       })
     })
   })
@@ -522,22 +529,19 @@ describe('MessageGenerator', () => {
         throw syncError
       })
 
-      await expect(messageGenerator.generateAuthenticationMessage(validWalletAddress))
-        .rejects.toThrow('Synchronous Firebase error')
+      await expect(messageGenerator.generateAuthenticationMessage(validWalletAddress)).rejects.toThrow('Synchronous Firebase error')
     })
 
     it('should handle Firebase function returning undefined', async () => {
       mockGenerateAuthMessageFn.mockResolvedValue(undefined)
 
-      await expect(messageGenerator.generateAuthenticationMessage(validWalletAddress))
-        .rejects.toThrow()
+      await expect(messageGenerator.generateAuthenticationMessage(validWalletAddress)).rejects.toThrow()
     })
 
     it('should handle Firebase function returning null', async () => {
       mockGenerateAuthMessageFn.mockResolvedValue(null)
 
-      await expect(messageGenerator.generateAuthenticationMessage(validWalletAddress))
-        .rejects.toThrow()
+      await expect(messageGenerator.generateAuthenticationMessage(validWalletAddress)).rejects.toThrow()
     })
 
     it('should handle wallet address parameter edge cases', async () => {
@@ -572,15 +576,13 @@ describe('MessageGenerator', () => {
       mockGenerateAuthMessageFn.mockResolvedValue(mockResponse)
 
       const addresses = Array.from({ length: 10 }, (_, i) => `0x${i.toString().padStart(40, '0')}`)
-      
-      const promises = addresses.map(address => 
-        messageGenerator.generateAuthenticationMessage(address)
-      )
+
+      const promises = addresses.map((address) => messageGenerator.generateAuthenticationMessage(address))
 
       const results = await Promise.all(promises)
 
       expect(results).toHaveLength(10)
-      results.forEach(result => {
+      results.forEach((result) => {
         expect(result).toEqual({
           message: 'Test message',
           nonce: 'test-nonce',
@@ -673,7 +675,8 @@ describe('MessageGenerator', () => {
     it('should work with realistic Firebase response format', async () => {
       const realisticResponse = {
         data: {
-          message: 'Welcome to SuperPool!\n\nPlease sign this message to verify your wallet ownership.\n\nThis request will not trigger a blockchain transaction or cost any gas fees.\n\nWallet address: 0x742d35Cc6634C0532925a3b8D238a5D2DD8dC5b8\nNonce: sp_auth_1641024000000_abc123\nTimestamp: 1641024000000',
+          message:
+            'Welcome to SuperPool!\n\nPlease sign this message to verify your wallet ownership.\n\nThis request will not trigger a blockchain transaction or cost any gas fees.\n\nWallet address: 0x742d35Cc6634C0532925a3b8D238a5D2DD8dC5b8\nNonce: sp_auth_1641024000000_abc123\nTimestamp: 1641024000000',
           nonce: 'sp_auth_1641024000000_abc123',
           timestamp: 1641024000000,
         },
@@ -693,8 +696,9 @@ describe('MessageGenerator', () => {
       const authError = new Error('PERMISSION_DENIED: Missing or insufficient permissions')
       mockGenerateAuthMessageFn.mockRejectedValue(authError)
 
-      await expect(messageGenerator.generateAuthenticationMessage(validWalletAddress))
-        .rejects.toThrow('PERMISSION_DENIED: Missing or insufficient permissions')
+      await expect(messageGenerator.generateAuthenticationMessage(validWalletAddress)).rejects.toThrow(
+        'PERMISSION_DENIED: Missing or insufficient permissions'
+      )
     })
   })
 })

@@ -132,13 +132,10 @@ describe('SignatureStrategyFactory', () => {
 
         SignatureStrategyFactory.getStrategy(mockConnector)
 
-        expect(consoleLogSpy).toHaveBeenCalledWith(
-          '🔍 Selected signature strategy: SafeWalletStrategy',
-          {
-            connectorId: 'safe-wallet',
-            connectorName: 'Safe Wallet',
-          }
-        )
+        expect(consoleLogSpy).toHaveBeenCalledWith('🔍 Selected signature strategy: SafeWalletStrategy', {
+          connectorId: 'safe-wallet',
+          connectorName: 'Safe Wallet',
+        })
       })
 
       it('should log when RegularWalletStrategy is selected', () => {
@@ -148,13 +145,10 @@ describe('SignatureStrategyFactory', () => {
 
         SignatureStrategyFactory.getStrategy(mockConnector)
 
-        expect(consoleLogSpy).toHaveBeenCalledWith(
-          '🔍 Selected signature strategy: RegularWalletStrategy',
-          {
-            connectorId: 'safe-wallet',
-            connectorName: 'Safe Wallet',
-          }
-        )
+        expect(consoleLogSpy).toHaveBeenCalledWith('🔍 Selected signature strategy: RegularWalletStrategy', {
+          connectorId: 'safe-wallet',
+          connectorName: 'Safe Wallet',
+        })
       })
 
       it('should log with undefined connector properties when connector is undefined', () => {
@@ -163,13 +157,10 @@ describe('SignatureStrategyFactory', () => {
 
         SignatureStrategyFactory.getStrategy(undefined)
 
-        expect(consoleLogSpy).toHaveBeenCalledWith(
-          '🔍 Selected signature strategy: SafeWalletStrategy',
-          {
-            connectorId: undefined,
-            connectorName: undefined,
-          }
-        )
+        expect(consoleLogSpy).toHaveBeenCalledWith('🔍 Selected signature strategy: SafeWalletStrategy', {
+          connectorId: undefined,
+          connectorName: undefined,
+        })
       })
 
       it('should warn when falling back to new RegularWalletStrategy', () => {
@@ -178,9 +169,7 @@ describe('SignatureStrategyFactory', () => {
 
         SignatureStrategyFactory.getStrategy(mockConnector)
 
-        expect(consoleWarnSpy).toHaveBeenCalledWith(
-          '⚠️ No specific strategy found, falling back to regular wallet strategy'
-        )
+        expect(consoleWarnSpy).toHaveBeenCalledWith('⚠️ No specific strategy found, falling back to regular wallet strategy')
       })
     })
 
@@ -192,13 +181,10 @@ describe('SignatureStrategyFactory', () => {
         const strategy = SignatureStrategyFactory.getStrategy(minimalConnector)
 
         expect(strategy).toBe(mockSafeWalletInstance)
-        expect(consoleLogSpy).toHaveBeenCalledWith(
-          '🔍 Selected signature strategy: SafeWalletStrategy',
-          {
-            connectorId: 'test',
-            connectorName: undefined,
-          }
-        )
+        expect(consoleLogSpy).toHaveBeenCalledWith('🔍 Selected signature strategy: SafeWalletStrategy', {
+          connectorId: 'test',
+          connectorName: undefined,
+        })
       })
 
       it('should handle connector with null/undefined properties', () => {
@@ -209,13 +195,10 @@ describe('SignatureStrategyFactory', () => {
         const strategy = SignatureStrategyFactory.getStrategy(nullPropsConnector)
 
         expect(strategy).toBe(mockRegularWalletInstance)
-        expect(consoleLogSpy).toHaveBeenCalledWith(
-          '🔍 Selected signature strategy: RegularWalletStrategy',
-          {
-            connectorId: null,
-            connectorName: null,
-          }
-        )
+        expect(consoleLogSpy).toHaveBeenCalledWith('🔍 Selected signature strategy: RegularWalletStrategy', {
+          connectorId: null,
+          connectorName: null,
+        })
       })
     })
   })

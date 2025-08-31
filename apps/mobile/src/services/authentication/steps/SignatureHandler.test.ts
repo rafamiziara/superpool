@@ -153,11 +153,7 @@ describe('SignatureHandler', () => {
       })
 
       it('should handle different signature types', async () => {
-        const signatureTypes: Array<SignatureResult['signatureType']> = [
-          'personal-sign',
-          'typed-data', 
-          'safe-wallet'
-        ]
+        const signatureTypes: Array<SignatureResult['signatureType']> = ['personal-sign', 'typed-data', 'safe-wallet']
 
         for (const signatureType of signatureTypes) {
           const mockSignatureResult: SignatureResult = {
@@ -202,7 +198,7 @@ describe('SignatureHandler', () => {
 
       it('should handle different chain IDs correctly', async () => {
         const chainIds = [1, 137, 31337, 80001, undefined]
-        
+
         const mockSignatureResult: SignatureResult = {
           signature: '0xchaintest',
           signatureType: 'personal-sign',
@@ -212,7 +208,7 @@ describe('SignatureHandler', () => {
           mockSignatureService.requestSignature.mockResolvedValue(mockSignatureResult)
 
           const contextWithChainId = { ...mockContext, chainId }
-          
+
           await signatureHandler.requestWalletSignature(contextWithChainId, mockAuthMessage)
 
           expect(mockSignatureService.requestSignature).toHaveBeenCalledWith(
@@ -256,32 +252,28 @@ describe('SignatureHandler', () => {
         const signatureError = new Error('Signature request failed')
         mockSignatureService.requestSignature.mockRejectedValue(signatureError)
 
-        await expect(signatureHandler.requestWalletSignature(mockContext, mockAuthMessage))
-          .rejects.toThrow('Signature request failed')
+        await expect(signatureHandler.requestWalletSignature(mockContext, mockAuthMessage)).rejects.toThrow('Signature request failed')
       })
 
       it('should handle user rejection errors', async () => {
         const userRejectionError = new Error('User rejected the request')
         mockSignatureService.requestSignature.mockRejectedValue(userRejectionError)
 
-        await expect(signatureHandler.requestWalletSignature(mockContext, mockAuthMessage))
-          .rejects.toThrow('User rejected the request')
+        await expect(signatureHandler.requestWalletSignature(mockContext, mockAuthMessage)).rejects.toThrow('User rejected the request')
       })
 
       it('should handle timeout errors', async () => {
         const timeoutError = new Error('Request timeout')
         mockSignatureService.requestSignature.mockRejectedValue(timeoutError)
 
-        await expect(signatureHandler.requestWalletSignature(mockContext, mockAuthMessage))
-          .rejects.toThrow('Request timeout')
+        await expect(signatureHandler.requestWalletSignature(mockContext, mockAuthMessage)).rejects.toThrow('Request timeout')
       })
 
       it('should handle network errors', async () => {
         const networkError = new Error('Network connection failed')
         mockSignatureService.requestSignature.mockRejectedValue(networkError)
 
-        await expect(signatureHandler.requestWalletSignature(mockContext, mockAuthMessage))
-          .rejects.toThrow('Network connection failed')
+        await expect(signatureHandler.requestWalletSignature(mockContext, mockAuthMessage)).rejects.toThrow('Network connection failed')
       })
 
       it('should handle malformed signature service response', async () => {
@@ -341,7 +333,8 @@ describe('SignatureHandler', () => {
 
         await signatureHandler.requestWalletSignature(mockContext, longAuthMessage)
 
-        expect(consoleLogSpy).toHaveBeenCalledWith('🔐 Signature request prepared:', 
+        expect(consoleLogSpy).toHaveBeenCalledWith(
+          '🔐 Signature request prepared:',
           expect.objectContaining({
             messagePreview: longMessage.substring(0, 50) + '...',
           })
@@ -363,7 +356,8 @@ describe('SignatureHandler', () => {
 
         await signatureHandler.requestWalletSignature(mockContext, authMessageWithUndefinedMessage)
 
-        expect(consoleLogSpy).toHaveBeenCalledWith('🔐 Signature request prepared:', 
+        expect(consoleLogSpy).toHaveBeenCalledWith(
+          '🔐 Signature request prepared:',
           expect.objectContaining({
             messagePreview: 'undefined...',
           })
@@ -380,7 +374,8 @@ describe('SignatureHandler', () => {
 
         await signatureHandler.requestWalletSignature(mockContext, mockAuthMessage)
 
-        expect(consoleLogSpy).toHaveBeenCalledWith('🔐 Signature request prepared:', 
+        expect(consoleLogSpy).toHaveBeenCalledWith(
+          '🔐 Signature request prepared:',
           expect.objectContaining({
             connectorId: 'test-connector',
           })
@@ -402,7 +397,8 @@ describe('SignatureHandler', () => {
 
         await signatureHandler.requestWalletSignature(contextWithoutConnector, mockAuthMessage)
 
-        expect(consoleLogSpy).toHaveBeenCalledWith('🔐 Signature request prepared:', 
+        expect(consoleLogSpy).toHaveBeenCalledWith(
+          '🔐 Signature request prepared:',
           expect.objectContaining({
             connectorId: undefined,
           })
@@ -442,7 +438,7 @@ describe('SignatureHandler', () => {
 
       it('should handle different connector types', async () => {
         const connectorTypes = ['injected', 'walletConnect', 'safe', 'coinbaseWallet']
-        
+
         const mockSignatureResult: SignatureResult = {
           signature: '0xconnectortype',
           signatureType: 'personal-sign',
@@ -465,11 +461,7 @@ describe('SignatureHandler', () => {
           const result = await signatureHandler.requestWalletSignature(contextWithConnectorType, mockAuthMessage)
 
           expect(result).toEqual(mockSignatureResult)
-          expect(mockSignatureService.requestSignature).toHaveBeenCalledWith(
-            expect.any(Object),
-            expect.any(Object),
-            connectorWithType
-          )
+          expect(mockSignatureService.requestSignature).toHaveBeenCalledWith(expect.any(Object), expect.any(Object), connectorWithType)
         }
       })
 
@@ -545,7 +537,7 @@ describe('SignatureHandler', () => {
 
       it('should handle edge case timestamps', async () => {
         const timestamps = [0, -1, 9999999999999, 1641024000000]
-        
+
         const mockSignatureResult: SignatureResult = {
           signature: '0xtimestamp',
           signatureType: 'personal-sign',
@@ -578,14 +570,12 @@ describe('SignatureHandler', () => {
 
       mockSignatureService.requestSignature.mockResolvedValue(mockSignatureResult)
 
-      const promises = Array.from({ length: 5 }, () => 
-        signatureHandler.requestWalletSignature(mockContext, mockAuthMessage)
-      )
+      const promises = Array.from({ length: 5 }, () => signatureHandler.requestWalletSignature(mockContext, mockAuthMessage))
 
       const results = await Promise.all(promises)
 
       expect(results).toHaveLength(5)
-      results.forEach(result => {
+      results.forEach((result) => {
         expect(result).toEqual(mockSignatureResult)
       })
       expect(mockSignatureService.requestSignature).toHaveBeenCalledTimes(5)
@@ -670,11 +660,7 @@ describe('SignatureHandler', () => {
 
       await signatureHandler.requestWalletSignature(mockContext, mockAuthMessage)
 
-      expect(callOrder).toEqual([
-        'Log: Requesting signature',
-        'Log: Request prepared',
-        'SignatureService.requestSignature',
-      ])
+      expect(callOrder).toEqual(['Log: Requesting signature', 'Log: Request prepared', 'SignatureService.requestSignature'])
 
       console.log = originalConsoleLog
     })

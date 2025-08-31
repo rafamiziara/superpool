@@ -176,7 +176,7 @@ describe('TimeoutErrorHandler', () => {
       it('should implement ErrorHandler interface correctly', () => {
         expect(typeof handler.handle).toBe('function')
         expect(typeof handler.getHandlerName).toBe('function')
-        
+
         const result = handler.handle()
         expect(result).toHaveProperty('shouldDisconnect')
         expect(result).toHaveProperty('shouldShowError')
@@ -210,7 +210,7 @@ describe('TimeoutErrorHandler', () => {
 
         // Technical failures should:
         // - Disconnect the wallet
-        // - Show error to user  
+        // - Show error to user
         // - Have reasonable delay
         // - Not perform special cleanup
         expect(result.shouldDisconnect).toBe(true)
@@ -240,13 +240,13 @@ describe('TimeoutErrorHandler', () => {
     describe('Edge Cases', () => {
       it('should handle multiple rapid calls', () => {
         const results = []
-        
+
         for (let i = 0; i < 10; i++) {
           results.push(handler.handle())
         }
 
         expect(results).toHaveLength(10)
-        expect(results.every(r => r.shouldDisconnect === true)).toBe(true)
+        expect(results.every((r) => r.shouldDisconnect === true)).toBe(true)
         expect(mockDisconnectFunction).toHaveBeenCalledTimes(10)
       })
 
@@ -283,11 +283,11 @@ describe('TimeoutErrorHandler', () => {
     describe('Performance', () => {
       it('should handle timeout errors very quickly', () => {
         const start = performance.now()
-        
+
         for (let i = 0; i < 1000; i++) {
           handler.handle()
         }
-        
+
         const end = performance.now()
         expect(end - start).toBeLessThan(1000) // Should be reasonably fast
         expect(mockDisconnectFunction).toHaveBeenCalledTimes(1000)
@@ -302,20 +302,18 @@ describe('TimeoutErrorHandler', () => {
 
         const finalMemory = process.memoryUsage().heapUsed
         const memoryIncrease = finalMemory - initialMemory
-        
+
         // Memory increase should be reasonable (less than 10MB for 1k calls)
         expect(memoryIncrease).toBeLessThan(10 * 1024 * 1024)
       })
 
       it('should scale well with multiple handlers', () => {
-        const handlers = Array.from({ length: 100 }, () => 
-          new TimeoutErrorHandler(jest.fn())
-        )
+        const handlers = Array.from({ length: 100 }, () => new TimeoutErrorHandler(jest.fn()))
 
         const start = performance.now()
-        
-        handlers.forEach(h => h.handle())
-        
+
+        handlers.forEach((h) => h.handle())
+
         const end = performance.now()
         expect(end - start).toBeLessThan(100) // Should handle 100 handlers reasonably quickly
       })

@@ -45,7 +45,7 @@ describe('ValidationUtils', () => {
           '0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF',
         ]
 
-        validAddresses.forEach(address => {
+        validAddresses.forEach((address) => {
           expect(ValidationUtils.isValidWalletAddress(address)).toBe(true)
         })
       })
@@ -65,7 +65,7 @@ describe('ValidationUtils', () => {
           '0x' + 'a'.repeat(41), // Too long
         ]
 
-        wrongLengthAddresses.forEach(address => {
+        wrongLengthAddresses.forEach((address) => {
           expect(ValidationUtils.isValidWalletAddress(address)).toBe(false)
         })
       })
@@ -77,7 +77,7 @@ describe('ValidationUtils', () => {
           'x1234567890123456789012345678901234567890',
         ]
 
-        noPrefixAddresses.forEach(address => {
+        noPrefixAddresses.forEach((address) => {
           expect(ValidationUtils.isValidWalletAddress(address)).toBe(false)
         })
       })
@@ -90,7 +90,7 @@ describe('ValidationUtils', () => {
           '0xGHIJKLMNOPQRSTUVWXYZghijklmnopqrstuvwxyz', // Invalid hex chars
         ]
 
-        invalidCharAddresses.forEach(address => {
+        invalidCharAddresses.forEach((address) => {
           expect(ValidationUtils.isValidWalletAddress(address)).toBe(false)
         })
       })
@@ -116,20 +116,15 @@ describe('ValidationUtils', () => {
           'a'.repeat(32), // At max length
         ]
 
-        validNonces.forEach(nonce => {
+        validNonces.forEach((nonce) => {
           expect(ValidationUtils.isValidNonce(nonce)).toBe(true)
         })
       })
 
       it('should handle special characters in nonces', () => {
-        const specialCharNonces = [
-          'nonce-with-dashes',
-          'nonce_with_underscores',
-          'nonce.with.dots',
-          'nonce123!@#',
-        ]
+        const specialCharNonces = ['nonce-with-dashes', 'nonce_with_underscores', 'nonce.with.dots', 'nonce123!@#']
 
-        specialCharNonces.forEach(nonce => {
+        specialCharNonces.forEach((nonce) => {
           expect(ValidationUtils.isValidNonce(nonce)).toBe(true)
         })
       })
@@ -161,7 +156,7 @@ describe('ValidationUtils', () => {
           now - 299000, // Just under 5 minutes ago
         ]
 
-        recentTimestamps.forEach(timestamp => {
+        recentTimestamps.forEach((timestamp) => {
           expect(ValidationUtils.isValidTimestamp(timestamp)).toBe(true)
         })
       })
@@ -182,7 +177,7 @@ describe('ValidationUtils', () => {
           now + 86400000, // 1 day in future
         ]
 
-        futureTimestamps.forEach(timestamp => {
+        futureTimestamps.forEach((timestamp) => {
           expect(ValidationUtils.isValidTimestamp(timestamp)).toBe(false)
         })
       })
@@ -195,24 +190,15 @@ describe('ValidationUtils', () => {
           now - 3600000, // 1 hour ago
         ]
 
-        expiredTimestamps.forEach(timestamp => {
+        expiredTimestamps.forEach((timestamp) => {
           expect(ValidationUtils.isValidTimestamp(timestamp)).toBe(false)
         })
       })
 
       it('should return false for invalid timestamp values', () => {
-        const invalidTimestamps = [
-          0,
-          -1,
-          -1000,
-          null,
-          undefined,
-          NaN,
-          Infinity,
-          -Infinity,
-        ]
+        const invalidTimestamps = [0, -1, -1000, null, undefined, NaN, Infinity, -Infinity]
 
-        invalidTimestamps.forEach(timestamp => {
+        invalidTimestamps.forEach((timestamp) => {
           expect(ValidationUtils.isValidTimestamp(timestamp as any)).toBe(false)
         })
       })
@@ -230,7 +216,7 @@ describe('ValidationUtils', () => {
           'Short message',
         ]
 
-        validMessages.forEach(message => {
+        validMessages.forEach((message) => {
           expect(ValidationUtils.isValidAuthMessage(message)).toBe(true)
         })
       })
@@ -243,7 +229,7 @@ describe('ValidationUtils', () => {
           'Unicode message: 你好世界 🌍',
         ]
 
-        specialCharMessages.forEach(message => {
+        specialCharMessages.forEach((message) => {
           expect(ValidationUtils.isValidAuthMessage(message)).toBe(true)
         })
       })
@@ -267,7 +253,7 @@ describe('ValidationUtils', () => {
   describe('isValidChainId', () => {
     describe('Valid Chain IDs', () => {
       it('should return true for supported chain IDs', () => {
-        SUPPORTED_CHAIN_IDS.forEach(chainId => {
+        SUPPORTED_CHAIN_IDS.forEach((chainId) => {
           expect(ValidationUtils.isValidChainId(chainId)).toBe(true)
         })
       })
@@ -283,7 +269,7 @@ describe('ValidationUtils', () => {
           999999, // Random high number
         ]
 
-        unsupportedChainIds.forEach(chainId => {
+        unsupportedChainIds.forEach((chainId) => {
           expect(ValidationUtils.isValidChainId(chainId)).toBe(false)
         })
       })
@@ -300,7 +286,7 @@ describe('ValidationUtils', () => {
           '1' as any, // String instead of number
         ]
 
-        invalidChainIds.forEach(chainId => {
+        invalidChainIds.forEach((chainId) => {
           expect(ValidationUtils.isValidChainId(chainId as any)).toBe(false)
         })
       })
@@ -317,7 +303,7 @@ describe('ValidationUtils', () => {
           '0x' + '1'.repeat(10), // Minimum valid length (10 chars + 0x)
         ]
 
-        validHexSignatures.forEach(signature => {
+        validHexSignatures.forEach((signature) => {
           expect(ValidationUtils.isValidSignatureFormat(signature)).toBe(true)
         })
       })
@@ -329,7 +315,7 @@ describe('ValidationUtils', () => {
           'safe-wallet:0xABCDEFABCDEFABCDEFABCDEFABCDEFABCDEFABCD:test:1234567890',
         ]
 
-        validSafeTokens.forEach(token => {
+        validSafeTokens.forEach((token) => {
           expect(ValidationUtils.isValidSignatureFormat(token)).toBe(true)
         })
       })
@@ -345,7 +331,7 @@ describe('ValidationUtils', () => {
           '0x123!@#', // Invalid characters
         ]
 
-        invalidHexSignatures.forEach(signature => {
+        invalidHexSignatures.forEach((signature) => {
           expect(ValidationUtils.isValidSignatureFormat(signature)).toBe(false)
         })
       })
@@ -359,7 +345,7 @@ describe('ValidationUtils', () => {
           '', // Empty
         ]
 
-        invalidTokens.forEach(token => {
+        invalidTokens.forEach((token) => {
           expect(ValidationUtils.isValidSignatureFormat(token)).toBe(false)
         })
       })
@@ -384,7 +370,7 @@ describe('ValidationUtils', () => {
     describe('Valid Requests', () => {
       it('should return success for completely valid auth request', () => {
         const result = ValidationUtils.validateAuthRequest(validAuthRequest)
-        
+
         expect(result.isValid).toBe(true)
         expect(result.errors).toHaveLength(0)
       })
@@ -406,7 +392,7 @@ describe('ValidationUtils', () => {
           },
         ]
 
-        variations.forEach(variation => {
+        variations.forEach((variation) => {
           const result = ValidationUtils.validateAuthRequest(variation)
           expect(result.isValid).toBe(true)
           expect(result.errors).toHaveLength(0)
@@ -422,7 +408,7 @@ describe('ValidationUtils', () => {
         }
 
         const result = ValidationUtils.validateAuthRequest(invalidRequest)
-        
+
         expect(result.isValid).toBe(false)
         expect(result.errors).toContain('Invalid wallet address format')
       })
@@ -434,7 +420,7 @@ describe('ValidationUtils', () => {
         }
 
         const result = ValidationUtils.validateAuthRequest(invalidRequest)
-        
+
         expect(result.isValid).toBe(false)
         expect(result.errors).toContain('Invalid or missing nonce')
       })
@@ -446,7 +432,7 @@ describe('ValidationUtils', () => {
         }
 
         const result = ValidationUtils.validateAuthRequest(invalidRequest)
-        
+
         expect(result.isValid).toBe(false)
         expect(result.errors).toContain('Invalid or expired timestamp')
       })
@@ -458,7 +444,7 @@ describe('ValidationUtils', () => {
         }
 
         const result = ValidationUtils.validateAuthRequest(invalidRequest)
-        
+
         expect(result.isValid).toBe(false)
         expect(result.errors).toContain('Invalid or missing message')
       })
@@ -470,7 +456,7 @@ describe('ValidationUtils', () => {
         }
 
         const result = ValidationUtils.validateAuthRequest(invalidRequest)
-        
+
         expect(result.isValid).toBe(false)
         expect(result.errors).toContain('Unsupported chain ID')
       })
@@ -482,7 +468,7 @@ describe('ValidationUtils', () => {
         }
 
         const result = ValidationUtils.validateAuthRequest(requestWithSignature)
-        
+
         // Signature validation is not part of validateAuthRequest
         expect(result.isValid).toBe(true)
         expect(result.errors).toHaveLength(0)
@@ -499,7 +485,7 @@ describe('ValidationUtils', () => {
         }
 
         const result = ValidationUtils.validateAuthRequest(multipleInvalidRequest)
-        
+
         expect(result.isValid).toBe(false)
         expect(result.errors).toHaveLength(5) // All validated fields should have errors
         expect(result.errors).toContain('Invalid wallet address format')
@@ -512,10 +498,10 @@ describe('ValidationUtils', () => {
       it('should handle null and undefined request', () => {
         const nullResult = ValidationUtils.validateAuthRequest({} as any)
         const undefinedParamsResult = ValidationUtils.validateAuthRequest({} as any)
-        
+
         expect(nullResult.isValid).toBe(false)
         expect(nullResult.errors.length).toBeGreaterThan(0)
-        
+
         expect(undefinedParamsResult.isValid).toBe(false)
         expect(undefinedParamsResult.errors.length).toBeGreaterThan(0)
       })
@@ -528,8 +514,8 @@ describe('ValidationUtils', () => {
         return Promise.resolve(ValidationUtils.isValidWalletAddress(`0x${'a'.repeat(40)}`))
       })
 
-      return Promise.all(promises).then(results => {
-        expect(results.every(result => result === true)).toBe(true)
+      return Promise.all(promises).then((results) => {
+        expect(results.every((result) => result === true)).toBe(true)
       })
     })
 
@@ -565,11 +551,11 @@ describe('ValidationUtils', () => {
       }))
 
       const start = performance.now()
-      
-      largeDataset.forEach(data => {
+
+      largeDataset.forEach((data) => {
         ValidationUtils.validateAuthRequest(data)
       })
-      
+
       const end = performance.now()
       expect(end - start).toBeLessThan(1000) // Should complete within 1 second
     })
@@ -590,11 +576,11 @@ describe('ValidationUtils', () => {
       // With private constructor, TypeScript prevents instantiation
       // But with 'as any' it bypasses the check, so we test that the class is designed as static
       expect(ValidationUtils.prototype.constructor).toBe(ValidationUtils)
-      
+
       // Try to instantiate - this should work with 'as any' but we can check it exists
       const instance = new (ValidationUtils as any)()
       expect(instance).toBeInstanceOf(ValidationUtils)
-      
+
       // The key test is that all methods should be static (not on prototype)
       expect(ValidationUtils.prototype.isValidWalletAddress).toBeUndefined()
       expect(ValidationUtils.prototype.isValidNonce).toBeUndefined()

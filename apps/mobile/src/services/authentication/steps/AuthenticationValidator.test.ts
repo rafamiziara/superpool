@@ -73,8 +73,7 @@ describe('AuthenticationValidator', () => {
         mockAuthStore.isLoggingOut = false
         mockWalletStore.validateInitialState.mockReturnValue({ isValid: true })
 
-        await expect(validator.validatePreConditions(mockValidationContext))
-          .resolves.toBeUndefined()
+        await expect(validator.validatePreConditions(mockValidationContext)).resolves.toBeUndefined()
 
         expect(consoleLogSpy).toHaveBeenCalledWith('🔍 Validating authentication pre-conditions...')
         expect(consoleLogSpy).toHaveBeenCalledWith('✅ Pre-conditions validated successfully')
@@ -93,9 +92,7 @@ describe('AuthenticationValidator', () => {
       it('should call initial connection state validation', async () => {
         await validator.validatePreConditions(mockValidationContext)
 
-        expect(mockWalletStore.validateInitialState).toHaveBeenCalledWith(
-          mockValidationContext.walletAddress
-        )
+        expect(mockWalletStore.validateInitialState).toHaveBeenCalledWith(mockValidationContext.walletAddress)
       })
     })
 
@@ -103,8 +100,7 @@ describe('AuthenticationValidator', () => {
       it('should throw error when logout is in progress', async () => {
         mockAuthStore.isLoggingOut = true
 
-        await expect(validator.validatePreConditions(mockValidationContext))
-          .rejects.toThrow('Authentication cancelled: logout in progress')
+        await expect(validator.validatePreConditions(mockValidationContext)).rejects.toThrow('Authentication cancelled: logout in progress')
 
         expect(consoleLogSpy).toHaveBeenCalledWith('⏸️ Skipping authentication: logout in progress')
       })
@@ -130,8 +126,7 @@ describe('AuthenticationValidator', () => {
           error: validationError,
         })
 
-        await expect(validator.validatePreConditions(mockValidationContext))
-          .rejects.toThrow(validationError)
+        await expect(validator.validatePreConditions(mockValidationContext)).rejects.toThrow(validationError)
 
         expect(consoleWarnSpy).toHaveBeenCalledWith('❌ Invalid initial connection state:', validationError)
       })
@@ -142,8 +137,7 @@ describe('AuthenticationValidator', () => {
           error: undefined,
         })
 
-        await expect(validator.validatePreConditions(mockValidationContext))
-          .rejects.toThrow('Invalid connection state')
+        await expect(validator.validatePreConditions(mockValidationContext)).rejects.toThrow('Invalid connection state')
       })
 
       it('should handle undefined error message', async () => {
@@ -152,8 +146,7 @@ describe('AuthenticationValidator', () => {
           error: undefined,
         })
 
-        await expect(validator.validatePreConditions(mockValidationContext))
-          .rejects.toThrow('Invalid connection state')
+        await expect(validator.validatePreConditions(mockValidationContext)).rejects.toThrow('Invalid connection state')
       })
     })
 
@@ -167,7 +160,7 @@ describe('AuthenticationValidator', () => {
 
         for (const walletAddress of addresses) {
           mockWalletStore.validateInitialState.mockReturnValue({ isValid: true })
-          
+
           const context: ValidationContext = { walletAddress }
 
           await validator.validatePreConditions(context)
@@ -191,22 +184,13 @@ describe('AuthenticationValidator', () => {
 
         expect(result).toBe(true)
         expect(mockWalletStore.captureState).toHaveBeenCalled()
-        expect(mockWalletStore.validateState).toHaveBeenCalledWith(
-          mockAtomicState,
-          currentState,
-          testCheckpoint
-        )
+        expect(mockWalletStore.validateState).toHaveBeenCalledWith(mockAtomicState, currentState, testCheckpoint)
         expect(consoleLogSpy).toHaveBeenCalledWith(`🔍 Validating state consistency at checkpoint: ${testCheckpoint}`)
         expect(consoleLogSpy).toHaveBeenCalledWith(`✅ State consistency validated at ${testCheckpoint}`)
       })
 
       it('should work with different checkpoint names', () => {
-        const checkpoints = [
-          'message-generation',
-          'signature-request',
-          'firebase-auth',
-          'completion',
-        ]
+        const checkpoints = ['message-generation', 'signature-request', 'firebase-auth', 'completion']
 
         mockWalletStore.validateState.mockReturnValue(true)
 
@@ -239,11 +223,7 @@ describe('AuthenticationValidator', () => {
         validator.validateStateConsistency(mockAtomicState, testCheckpoint)
 
         expect(mockWalletStore.captureState).toHaveBeenCalled()
-        expect(mockWalletStore.validateState).toHaveBeenCalledWith(
-          mockAtomicState,
-          currentState,
-          testCheckpoint
-        )
+        expect(mockWalletStore.validateState).toHaveBeenCalledWith(mockAtomicState, currentState, testCheckpoint)
       })
     })
 
@@ -263,11 +243,7 @@ describe('AuthenticationValidator', () => {
           const result = validator.validateStateConsistency(testState as AtomicConnectionState, testCheckpoint)
 
           expect(result).toBe(true)
-          expect(mockWalletStore.validateState).toHaveBeenCalledWith(
-            testState,
-            expect.any(Object),
-            testCheckpoint
-          )
+          expect(mockWalletStore.validateState).toHaveBeenCalledWith(testState, expect.any(Object), testCheckpoint)
         }
       })
     })
@@ -381,8 +357,7 @@ describe('AuthenticationValidator', () => {
           throw new Error('State validation error')
         })
 
-        expect(() => validator.validateStateConsistency(mockAtomicState, 'test'))
-          .toThrow('State validation error')
+        expect(() => validator.validateStateConsistency(mockAtomicState, 'test')).toThrow('State validation error')
       })
 
       it('should handle wallet store validateInitialState throwing error', async () => {
@@ -390,8 +365,7 @@ describe('AuthenticationValidator', () => {
           throw new Error('Initial state validation error')
         })
 
-        await expect(validator.validatePreConditions(mockValidationContext))
-          .rejects.toThrow('Initial state validation error')
+        await expect(validator.validatePreConditions(mockValidationContext)).rejects.toThrow('Initial state validation error')
       })
     })
 
@@ -490,7 +464,7 @@ describe('AuthenticationValidator', () => {
     it('should handle state consistency validation with realistic state changes', () => {
       // Setup initial state
       const initialState = { ...mockAtomicState }
-      
+
       // Simulate state change during authentication
       const changedState = { ...mockAtomicState, chainId: 1 } // Chain switched
       mockWalletStore.captureState.mockReturnValue(changedState)
@@ -499,11 +473,7 @@ describe('AuthenticationValidator', () => {
       const result = validator.validateStateConsistency(initialState, 'chain-switch-detection')
 
       expect(result).toBe(false)
-      expect(mockWalletStore.validateState).toHaveBeenCalledWith(
-        initialState,
-        changedState,
-        'chain-switch-detection'
-      )
+      expect(mockWalletStore.validateState).toHaveBeenCalledWith(initialState, changedState, 'chain-switch-detection')
     })
 
     it('should handle complete authentication abortion flow', () => {
@@ -524,9 +494,7 @@ describe('AuthenticationValidator', () => {
     it('should handle multiple rapid validation calls', async () => {
       mockWalletStore.validateInitialState.mockReturnValue({ isValid: true })
 
-      const promises = Array.from({ length: 5 }, () => 
-        validator.validatePreConditions(mockValidationContext)
-      )
+      const promises = Array.from({ length: 5 }, () => validator.validatePreConditions(mockValidationContext))
 
       await Promise.all(promises)
 
@@ -542,7 +510,7 @@ describe('AuthenticationValidator', () => {
       }
 
       expect(results).toHaveLength(10)
-      results.forEach(result => expect(result).toBe(true))
+      results.forEach((result) => expect(result).toBe(true))
       expect(mockWalletStore.captureState).toHaveBeenCalledTimes(10)
     })
 

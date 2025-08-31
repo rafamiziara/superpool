@@ -29,12 +29,12 @@ describe('ErrorHandler Interface', () => {
 
     it('should return a proper ErrorRecoveryResult from handle method', () => {
       const result = handler.handle('test-context')
-      
+
       expect(result).toHaveProperty('shouldDisconnect')
       expect(result).toHaveProperty('shouldShowError')
       expect(result).toHaveProperty('errorDelay')
       expect(result).toHaveProperty('cleanupPerformed')
-      
+
       expect(typeof result.shouldDisconnect).toBe('boolean')
       expect(typeof result.shouldShowError).toBe('boolean')
       expect(typeof result.errorDelay).toBe('number')
@@ -72,7 +72,7 @@ describe('ErrorHandler Interface', () => {
     it('should support async handlers', async () => {
       class AsyncHandler implements ErrorHandler<string> {
         async handle(context: string): Promise<ErrorRecoveryResult> {
-          await new Promise(resolve => setTimeout(resolve, 10))
+          await new Promise((resolve) => setTimeout(resolve, 10))
           return RecoveryActions.technicalFailure()
         }
         getHandlerName(): string {
@@ -92,7 +92,7 @@ describe('RecoveryActions', () => {
   describe('createResult', () => {
     it('should create a result with all specified properties', () => {
       const result = RecoveryActions.createResult(true, false, 500, true)
-      
+
       expect(result).toEqual({
         shouldDisconnect: true,
         shouldShowError: false,
@@ -103,7 +103,7 @@ describe('RecoveryActions', () => {
 
     it('should use default values for optional parameters', () => {
       const result = RecoveryActions.createResult(false, true)
-      
+
       expect(result).toEqual({
         shouldDisconnect: false,
         shouldShowError: true,
@@ -114,7 +114,7 @@ describe('RecoveryActions', () => {
 
     it('should handle edge case values', () => {
       const result = RecoveryActions.createResult(true, true, -1, true)
-      
+
       expect(result.errorDelay).toBe(-1) // Should accept negative values
       expect(result.shouldDisconnect).toBe(true)
       expect(result.shouldShowError).toBe(true)
@@ -125,7 +125,7 @@ describe('RecoveryActions', () => {
   describe('userInitiated', () => {
     it('should create a user-initiated recovery result with default delay', () => {
       const result = RecoveryActions.userInitiated()
-      
+
       expect(result).toEqual({
         shouldDisconnect: false,
         shouldShowError: true,
@@ -137,7 +137,7 @@ describe('RecoveryActions', () => {
     it('should create a user-initiated recovery result with custom delay', () => {
       const customDelay = 2500
       const result = RecoveryActions.userInitiated(customDelay)
-      
+
       expect(result).toEqual({
         shouldDisconnect: false,
         shouldShowError: true,
@@ -161,7 +161,7 @@ describe('RecoveryActions', () => {
   describe('technicalFailure', () => {
     it('should create a technical failure recovery result with default delay', () => {
       const result = RecoveryActions.technicalFailure()
-      
+
       expect(result).toEqual({
         shouldDisconnect: true,
         shouldShowError: true,
@@ -173,7 +173,7 @@ describe('RecoveryActions', () => {
     it('should create a technical failure recovery result with custom delay', () => {
       const customDelay = 3000
       const result = RecoveryActions.technicalFailure(customDelay)
-      
+
       expect(result).toEqual({
         shouldDisconnect: true,
         shouldShowError: true,
@@ -185,7 +185,7 @@ describe('RecoveryActions', () => {
     it('should always require disconnect for technical failures', () => {
       const result1 = RecoveryActions.technicalFailure(0)
       const result2 = RecoveryActions.technicalFailure(5000)
-      
+
       expect(result1.shouldDisconnect).toBe(true)
       expect(result2.shouldDisconnect).toBe(true)
     })
@@ -194,7 +194,7 @@ describe('RecoveryActions', () => {
   describe('sessionError', () => {
     it('should create a session error recovery result with cleanup success', () => {
       const result = RecoveryActions.sessionError(true)
-      
+
       expect(result).toEqual({
         shouldDisconnect: true,
         shouldShowError: false,
@@ -205,7 +205,7 @@ describe('RecoveryActions', () => {
 
     it('should create a session error recovery result with cleanup failure', () => {
       const result = RecoveryActions.sessionError(false)
-      
+
       expect(result).toEqual({
         shouldDisconnect: true,
         shouldShowError: false,
@@ -217,7 +217,7 @@ describe('RecoveryActions', () => {
     it('should never show error for session errors', () => {
       const resultSuccess = RecoveryActions.sessionError(true)
       const resultFailure = RecoveryActions.sessionError(false)
-      
+
       expect(resultSuccess.shouldShowError).toBe(false)
       expect(resultFailure.shouldShowError).toBe(false)
     })
@@ -225,7 +225,7 @@ describe('RecoveryActions', () => {
     it('should always require disconnect for session errors', () => {
       const resultSuccess = RecoveryActions.sessionError(true)
       const resultFailure = RecoveryActions.sessionError(false)
-      
+
       expect(resultSuccess.shouldDisconnect).toBe(true)
       expect(resultFailure.shouldDisconnect).toBe(true)
     })
@@ -234,7 +234,7 @@ describe('RecoveryActions', () => {
   describe('serviceUnavailable', () => {
     it('should create a service unavailable recovery result', () => {
       const result = RecoveryActions.serviceUnavailable()
-      
+
       expect(result).toEqual({
         shouldDisconnect: false,
         shouldShowError: true,
@@ -324,7 +324,7 @@ describe('RecoveryActions', () => {
         RecoveryActions.serviceUnavailable(),
       ]
 
-      results.forEach(result => {
+      results.forEach((result) => {
         expect(typeof result.shouldDisconnect).toBe('boolean')
         expect(typeof result.shouldShowError).toBe('boolean')
         expect(typeof result.cleanupPerformed).toBe('boolean')
@@ -339,7 +339,7 @@ describe('RecoveryActions', () => {
         RecoveryActions.sessionError(false),
       ]
 
-      results.forEach(result => {
+      results.forEach((result) => {
         expect(typeof result.errorDelay).toBe('number')
         expect(result.errorDelay).toBeGreaterThanOrEqual(0)
       })
@@ -355,7 +355,7 @@ describe('RecoveryActions', () => {
       // Should not affect new instances
       const newResult = RecoveryActions.userInitiated()
       expect(newResult.errorDelay).toBe(1500) // Default value, not modified
-      
+
       // But the specific instance should be mutable (objects are mutable by default)
       expect(result.errorDelay).toBe(9999)
     })
@@ -364,7 +364,7 @@ describe('RecoveryActions', () => {
   describe('Performance', () => {
     it('should create results quickly', () => {
       const start = performance.now()
-      
+
       for (let i = 0; i < 1000; i++) {
         RecoveryActions.createResult(i % 2 === 0, i % 3 === 0, i, i % 4 === 0)
         RecoveryActions.userInitiated(i)
@@ -372,7 +372,7 @@ describe('RecoveryActions', () => {
         RecoveryActions.sessionError(i % 2 === 0)
         RecoveryActions.serviceUnavailable()
       }
-      
+
       const end = performance.now()
       expect(end - start).toBeLessThan(100) // Should be very fast
     })

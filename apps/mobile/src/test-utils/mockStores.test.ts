@@ -54,13 +54,13 @@ describe('mockStores', () => {
         setAuthLock: jest.fn(),
         setAuthError: jest.fn(),
       }
-      
+
       MockedAuthenticationStore.mockImplementation(() => mockStore)
     })
 
     it('should create a mock AuthenticationStore instance', () => {
       const store = createMockAuthenticationStore()
-      
+
       expect(AuthenticationStore).toHaveBeenCalled()
       expect(store).toBe(mockStore)
     })
@@ -133,13 +133,13 @@ describe('mockStores', () => {
         address: undefined,
         chainId: undefined,
       }
-      
+
       MockedWalletStore.mockImplementation(() => mockStore)
     })
 
     it('should create a mock WalletStore instance', () => {
       const store = createMockWalletStore()
-      
+
       expect(WalletStore).toHaveBeenCalled()
       expect(store).toBe(mockStore)
     })
@@ -185,13 +185,13 @@ describe('mockStores', () => {
         setLoading: jest.fn(),
         setError: jest.fn(),
       }
-      
+
       MockedPoolManagementStore.mockImplementation(() => mockStore)
     })
 
     it('should create a mock PoolManagementStore instance', () => {
       const store = createMockPoolManagementStore()
-      
+
       expect(PoolManagementStore).toHaveBeenCalled()
       expect(store).toBe(mockStore)
     })
@@ -240,13 +240,13 @@ describe('mockStores', () => {
         resetOnboardingState: jest.fn(),
         onboardingCurrentIndex: 0,
       }
-      
+
       MockedUIStore.mockImplementation(() => mockStore)
     })
 
     it('should create a mock UIStore instance', () => {
       const store = createMockUIStore()
-      
+
       expect(UIStore).toHaveBeenCalled()
       expect(store).toBe(mockStore)
     })
@@ -279,13 +279,13 @@ describe('mockStores', () => {
         poolManagementStore: null,
         uiStore: null,
       }
-      
+
       MockedRootStore.mockImplementation(() => mockRootStore)
     })
 
     it('should create a mock RootStore instance', () => {
       const store = createMockRootStore()
-      
+
       expect(RootStore).toHaveBeenCalled()
       expect(store).toBe(mockRootStore)
     })
@@ -350,7 +350,7 @@ describe('mockStores', () => {
         expect(store.walletStore.address).toBe('0x1234567890123456789012345678901234567890')
         expect(store.walletStore.chainId).toBe(137)
         expect(store.poolManagementStore.userAddress).toBe('0x1234567890123456789012345678901234567890')
-        
+
         // Check that addPool was called
         expect(store.poolManagementStore.addPool).toHaveBeenCalledWith(
           expect.objectContaining({
@@ -540,10 +540,10 @@ describe('mockStores', () => {
         setAuthLock: jest.fn(),
         setAuthError: jest.fn(),
       }
-      
+
       mockAuthStore.completedSteps.clear = jest.fn()
       mockAuthStore.completedSteps.add = jest.fn()
-      
+
       MockedAuthenticationStore.mockImplementation(() => mockAuthStore)
 
       const store = createMockAuthenticationStore()
@@ -555,10 +555,10 @@ describe('mockStores', () => {
 
     it('should allow test-specific mock implementations', () => {
       const store = createMockAuthenticationStore()
-      
+
       // Override mock implementation for specific test
       store.startStep.mockImplementation(() => 'test-specific-result')
-      
+
       const result = store.startStep('test')
       expect(result).toBe('test-specific-result')
     })
@@ -577,7 +577,7 @@ describe('mockStores', () => {
       expect(() => walletStore.connect()).not.toThrow()
       expect(() => poolStore.loadPools()).not.toThrow()
       expect(() => uiStore.setOnboardingIndex(1)).not.toThrow()
-      
+
       // Should have expected properties
       expect(rootStore.authenticationStore).toBeTruthy()
       expect(rootStore.walletStore).toBeTruthy()

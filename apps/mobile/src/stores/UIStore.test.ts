@@ -62,14 +62,14 @@ describe('UIStore', () => {
     it('should log the index change', () => {
       const consoleSpy = jest.spyOn(console, 'log')
       store.setOnboardingIndex(2)
-      
+
       expect(consoleSpy).toHaveBeenCalledWith('📱 UIStore.setOnboardingIndex: 2')
     })
 
     it('should log negative values as 0', () => {
       const consoleSpy = jest.spyOn(console, 'log')
       store.setOnboardingIndex(-3)
-      
+
       expect(consoleSpy).toHaveBeenCalledWith('📱 UIStore.setOnboardingIndex: -3')
       expect(store.onboardingCurrentIndex).toBe(0) // But actual value is 0
     })
@@ -97,7 +97,7 @@ describe('UIStore', () => {
     it('should log reset action', () => {
       const consoleSpy = jest.spyOn(console, 'log')
       store.resetOnboardingState()
-      
+
       expect(consoleSpy).toHaveBeenCalledWith('🔄 UIStore.resetOnboardingState called')
     })
 
@@ -105,7 +105,7 @@ describe('UIStore', () => {
       const consoleSpy = jest.spyOn(console, 'log')
       store.onboardingCurrentIndex = 0
       store.resetOnboardingState()
-      
+
       expect(consoleSpy).toHaveBeenCalledWith('🔄 UIStore.resetOnboardingState called')
     })
   })
@@ -113,85 +113,70 @@ describe('UIStore', () => {
   describe('MobX Reactivity', () => {
     it('should trigger reactions when onboarding index changes', () => {
       const reactionSpy = jest.fn()
-      
+
       const { reaction } = require('mobx')
-      const dispose = reaction(
-        () => store.onboardingCurrentIndex,
-        reactionSpy
-      )
-      
+      const dispose = reaction(() => store.onboardingCurrentIndex, reactionSpy)
+
       store.setOnboardingIndex(2)
       expect(reactionSpy).toHaveBeenCalledWith(2, 0)
-      
+
       dispose()
     })
 
     it('should trigger reactions for computed currentOnboardingSlide', () => {
       const reactionSpy = jest.fn()
-      
+
       const { reaction } = require('mobx')
-      const dispose = reaction(
-        () => store.currentOnboardingSlide,
-        reactionSpy
-      )
-      
+      const dispose = reaction(() => store.currentOnboardingSlide, reactionSpy)
+
       store.setOnboardingIndex(3)
       expect(reactionSpy).toHaveBeenCalledWith(3, 0)
-      
+
       dispose()
     })
 
     it('should trigger reactions on reset', () => {
       const reactionSpy = jest.fn()
-      
+
       const { reaction } = require('mobx')
-      const dispose = reaction(
-        () => store.onboardingCurrentIndex,
-        reactionSpy
-      )
-      
+      const dispose = reaction(() => store.onboardingCurrentIndex, reactionSpy)
+
       store.setOnboardingIndex(5)
       reactionSpy.mockClear() // Clear previous calls
-      
+
       store.resetOnboardingState()
       expect(reactionSpy).toHaveBeenCalledWith(0, 5)
-      
+
       dispose()
     })
 
     it('should not trigger reactions when value does not change', () => {
       const reactionSpy = jest.fn()
-      
+
       const { reaction } = require('mobx')
-      const dispose = reaction(
-        () => store.onboardingCurrentIndex,
-        reactionSpy
-      )
-      
+      const dispose = reaction(() => store.onboardingCurrentIndex, reactionSpy)
+
       store.setOnboardingIndex(0) // Same as initial value
       expect(reactionSpy).not.toHaveBeenCalled()
-      
+
       dispose()
     })
 
     it('should handle multiple rapid changes', () => {
       const reactionSpy = jest.fn()
-      
+
       const { reaction } = require('mobx')
-      const dispose = reaction(
-        () => store.onboardingCurrentIndex,
-        reactionSpy
-      )
-      
+      const dispose = reaction(() => store.onboardingCurrentIndex, reactionSpy)
+
       store.setOnboardingIndex(1)
       store.setOnboardingIndex(2)
       store.setOnboardingIndex(3)
-      
+
       expect(reactionSpy).toHaveBeenCalledTimes(3)
       expect(reactionSpy).toHaveBeenNthCalledWith(1, 1, 0)
       expect(reactionSpy).toHaveBeenNthCalledWith(2, 2, 1)
       expect(reactionSpy).toHaveBeenNthCalledWith(3, 3, 2)
-      
+
       dispose()
     })
   })
@@ -199,32 +184,32 @@ describe('UIStore', () => {
   describe('Integration Scenarios', () => {
     it('should support typical onboarding flow', () => {
       const states = []
-      
+
       // Simulate typical onboarding progression
       states.push(store.currentOnboardingSlide) // 0 - Welcome
-      
+
       store.setOnboardingIndex(1)
       states.push(store.currentOnboardingSlide) // 1 - Feature 1
-      
+
       store.setOnboardingIndex(2)
       states.push(store.currentOnboardingSlide) // 2 - Feature 2
-      
+
       store.setOnboardingIndex(3)
       states.push(store.currentOnboardingSlide) // 3 - Feature 3
-      
+
       store.resetOnboardingState()
       states.push(store.currentOnboardingSlide) // 0 - Reset
-      
+
       expect(states).toEqual([0, 1, 2, 3, 0])
     })
 
     it('should handle going backwards in onboarding', () => {
       store.setOnboardingIndex(3)
       expect(store.currentOnboardingSlide).toBe(3)
-      
+
       store.setOnboardingIndex(1) // Go back
       expect(store.currentOnboardingSlide).toBe(1)
-      
+
       store.setOnboardingIndex(2) // Go forward again
       expect(store.currentOnboardingSlide).toBe(2)
     })
@@ -233,11 +218,11 @@ describe('UIStore', () => {
       // Simulate saving/loading state
       store.setOnboardingIndex(2)
       const savedIndex = store.onboardingCurrentIndex
-      
+
       // Create new store (simulate app restart)
       const newStore = new UIStore()
       newStore.setOnboardingIndex(savedIndex)
-      
+
       expect(newStore.currentOnboardingSlide).toBe(2)
     })
   })
@@ -260,7 +245,7 @@ describe('UIStore', () => {
       store.resetOnboardingState()
       store.resetOnboardingState()
       store.resetOnboardingState()
-      
+
       expect(store.onboardingCurrentIndex).toBe(0)
     })
 
@@ -284,11 +269,11 @@ describe('UIStore', () => {
   describe('Performance', () => {
     it('should handle many index changes efficiently', () => {
       const startTime = performance.now()
-      
+
       for (let i = 0; i < 1000; i++) {
         store.setOnboardingIndex(i)
       }
-      
+
       const endTime = performance.now()
       expect(endTime - startTime).toBeLessThan(100) // Should be very fast
       expect(store.onboardingCurrentIndex).toBe(999)
@@ -301,7 +286,7 @@ describe('UIStore', () => {
         store.resetOnboardingState()
         store.setOnboardingIndex(i + 1)
       }
-      
+
       // Should end up in final state
       expect(store.onboardingCurrentIndex).toBe(100)
     })
@@ -310,11 +295,11 @@ describe('UIStore', () => {
   describe('Logging Behavior', () => {
     it('should log all setOnboardingIndex calls', () => {
       const consoleSpy = jest.spyOn(console, 'log')
-      
+
       store.setOnboardingIndex(1)
       store.setOnboardingIndex(2)
       store.setOnboardingIndex(0)
-      
+
       expect(consoleSpy).toHaveBeenCalledTimes(3)
       expect(consoleSpy).toHaveBeenNthCalledWith(1, '📱 UIStore.setOnboardingIndex: 1')
       expect(consoleSpy).toHaveBeenNthCalledWith(2, '📱 UIStore.setOnboardingIndex: 2')
@@ -323,10 +308,10 @@ describe('UIStore', () => {
 
     it('should log all resetOnboardingState calls', () => {
       const consoleSpy = jest.spyOn(console, 'log')
-      
+
       store.resetOnboardingState()
       store.resetOnboardingState()
-      
+
       expect(consoleSpy).toHaveBeenCalledTimes(2)
       expect(consoleSpy).toHaveBeenNthCalledWith(1, '🔄 UIStore.resetOnboardingState called')
       expect(consoleSpy).toHaveBeenNthCalledWith(2, '🔄 UIStore.resetOnboardingState called')
@@ -337,11 +322,11 @@ describe('UIStore', () => {
       jest.spyOn(console, 'log').mockImplementation(() => {
         throw new Error('Logging failed')
       })
-      
+
       // Should still work despite logging failure
       expect(() => store.setOnboardingIndex(5)).not.toThrow()
       expect(store.onboardingCurrentIndex).toBe(5)
-      
+
       expect(() => store.resetOnboardingState()).not.toThrow()
       expect(store.onboardingCurrentIndex).toBe(0)
     })

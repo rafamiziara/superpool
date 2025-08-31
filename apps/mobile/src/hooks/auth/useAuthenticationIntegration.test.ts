@@ -408,7 +408,6 @@ describe('useAuthenticationIntegration', () => {
       expect(consoleSpy).toHaveBeenCalledWith('🔍 MobX store shows authenticated wallet, no authentication needed')
     })
 
-
     it('should return false when authentication is in progress via authLock', () => {
       mockUseAccount.mockReturnValue(createMockConnectedAccount('0x1234567890123456789012345678901234567890', 1))
 
@@ -780,7 +779,6 @@ describe('useAuthenticationIntegration', () => {
       expect(mockStore.authenticationStore.failedStep).toBe('connect-wallet')
       expect(mockStore.authenticationStore.progressError).toBe('Test error')
     })
-
   })
 
   describe('Error Recovery', () => {

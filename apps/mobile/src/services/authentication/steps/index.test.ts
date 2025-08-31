@@ -64,14 +64,14 @@ describe('Authentication Steps Index Exports', () => {
 
     it('should export all items in the AuthStepsIndex namespace', () => {
       const exportKeys = Object.keys(AuthStepsIndex)
-      
+
       // Should contain all expected class exports
       expect(exportKeys).toContain('AuthenticationStepExecutor')
       expect(exportKeys).toContain('AuthenticationValidator')
       expect(exportKeys).toContain('FirebaseAuthenticator')
       expect(exportKeys).toContain('MessageGenerator')
       expect(exportKeys).toContain('SignatureHandler')
-      
+
       // Should have exactly the right number of exports (classes only, types don't appear in runtime namespace)
       expect(exportKeys).toHaveLength(5)
     })
@@ -89,7 +89,7 @@ describe('Authentication Steps Index Exports', () => {
     describe('AuthenticationStepExecutor Export', () => {
       it('should export functional AuthenticationStepExecutor class', () => {
         expect(AuthenticationStepExecutor).toBe(DirectAuthenticationStepExecutor)
-        
+
         const instance = new AuthenticationStepExecutor()
         expect(instance).toBeInstanceOf(AuthenticationStepExecutor)
         expect(typeof instance.executeStep).toBe('function')
@@ -100,7 +100,7 @@ describe('Authentication Steps Index Exports', () => {
       it('should be instantiable from index export', async () => {
         const executor = new AuthenticationStepExecutor()
         const mockStepFunction = jest.fn().mockResolvedValue('test')
-        
+
         const result = await executor.executeInternalStep(mockStepFunction)
         expect(result).toBe('test')
       })
@@ -109,11 +109,11 @@ describe('Authentication Steps Index Exports', () => {
     describe('AuthenticationValidator Export', () => {
       it('should export functional AuthenticationValidator class', () => {
         expect(AuthenticationValidator).toBe(DirectAuthenticationValidator)
-        
+
         const mockAuthStore = {} as any
         const mockWalletStore = {} as any
         const instance = new AuthenticationValidator(mockAuthStore, mockWalletStore)
-        
+
         expect(instance).toBeInstanceOf(AuthenticationValidator)
         expect(typeof instance.validatePreConditions).toBe('function')
         expect(typeof instance.validateStateConsistency).toBe('function')
@@ -122,14 +122,14 @@ describe('Authentication Steps Index Exports', () => {
       })
 
       it('should be instantiable from index export', () => {
-        const mockAuthStore = { 
+        const mockAuthStore = {
           isLoggingOut: false,
           authLock: {
             abortController: null,
-          }
+          },
         } as any
         const mockWalletStore = { captureState: jest.fn() } as any
-        
+
         const validator = new AuthenticationValidator(mockAuthStore, mockWalletStore)
         expect(validator.checkAuthenticationAborted()).toBe(false)
       })
@@ -138,7 +138,7 @@ describe('Authentication Steps Index Exports', () => {
     describe('FirebaseAuthenticator Export', () => {
       it('should export functional FirebaseAuthenticator class', () => {
         expect(FirebaseAuthenticator).toBe(DirectFirebaseAuthenticator)
-        
+
         const instance = new FirebaseAuthenticator()
         expect(instance).toBeInstanceOf(FirebaseAuthenticator)
         expect(typeof instance.verifySignatureAndGetToken).toBe('function')
@@ -154,7 +154,7 @@ describe('Authentication Steps Index Exports', () => {
     describe('MessageGenerator Export', () => {
       it('should export functional MessageGenerator class', () => {
         expect(MessageGenerator).toBe(DirectMessageGenerator)
-        
+
         const instance = new MessageGenerator()
         expect(instance).toBeInstanceOf(MessageGenerator)
         expect(typeof instance.generateAuthenticationMessage).toBe('function')
@@ -169,7 +169,7 @@ describe('Authentication Steps Index Exports', () => {
     describe('SignatureHandler Export', () => {
       it('should export functional SignatureHandler class', () => {
         expect(SignatureHandler).toBe(DirectSignatureHandler)
-        
+
         const instance = new SignatureHandler()
         expect(instance).toBeInstanceOf(SignatureHandler)
         expect(typeof instance.requestWalletSignature).toBe('function')
@@ -313,16 +313,16 @@ describe('Authentication Steps Index Exports', () => {
 
       expect(stepExecutor).toBeInstanceOf(AuthenticationStepExecutor)
       expect(stepExecutor).toBeInstanceOf(DirectAuthenticationStepExecutor)
-      
+
       expect(authValidator).toBeInstanceOf(AuthenticationValidator)
       expect(authValidator).toBeInstanceOf(DirectAuthenticationValidator)
-      
+
       expect(firebaseAuth).toBeInstanceOf(FirebaseAuthenticator)
       expect(firebaseAuth).toBeInstanceOf(DirectFirebaseAuthenticator)
-      
+
       expect(messageGen).toBeInstanceOf(MessageGenerator)
       expect(messageGen).toBeInstanceOf(DirectMessageGenerator)
-      
+
       expect(signatureHandler).toBeInstanceOf(SignatureHandler)
       expect(signatureHandler).toBeInstanceOf(DirectSignatureHandler)
     })
@@ -368,16 +368,18 @@ describe('Authentication Steps Index Exports', () => {
     it('should allow classes to work together through index exports', async () => {
       const stepExecutor = new AuthenticationStepExecutor()
       const messageGenerator = new MessageGenerator()
-      
+
       // Mock Firebase function
       jest.doMock('firebase/functions', () => ({
-        httpsCallable: jest.fn().mockReturnValue(jest.fn().mockResolvedValue({
-          data: {
-            message: 'Test message',
-            nonce: 'test-nonce',
-            timestamp: 1641024000000,
-          },
-        })),
+        httpsCallable: jest.fn().mockReturnValue(
+          jest.fn().mockResolvedValue({
+            data: {
+              message: 'Test message',
+              nonce: 'test-nonce',
+              timestamp: 1641024000000,
+            },
+          })
+        ),
       }))
 
       // Test that executor can orchestrate message generation
@@ -396,7 +398,7 @@ describe('Authentication Steps Index Exports', () => {
     it('should allow mixed usage of direct and index imports', () => {
       // Create instance using index export
       const indexExecutor = new AuthenticationStepExecutor()
-      // Create instance using direct import  
+      // Create instance using direct import
       const directExecutor = new DirectAuthenticationStepExecutor()
 
       // Both should have same constructor
@@ -405,11 +407,14 @@ describe('Authentication Steps Index Exports', () => {
 
     it('should support complex authentication flow integration', async () => {
       const stepExecutor = new AuthenticationStepExecutor()
-      const authValidator = new AuthenticationValidator({} as any, { 
-        captureState: jest.fn(),
-        validateState: jest.fn().mockReturnValue(true),
-        validateInitialState: jest.fn().mockReturnValue({ isValid: true }),
-      } as any)
+      const authValidator = new AuthenticationValidator(
+        {} as any,
+        {
+          captureState: jest.fn(),
+          validateState: jest.fn().mockReturnValue(true),
+          validateInitialState: jest.fn().mockReturnValue({ isValid: true }),
+        } as any
+      )
       const messageGenerator = new MessageGenerator()
       const signatureHandler = new SignatureHandler()
       const firebaseAuth = new FirebaseAuthenticator()
@@ -478,7 +483,7 @@ describe('Authentication Steps Index Exports', () => {
 
     it('should work with union types', () => {
       type AuthService = MessageGenerator | SignatureHandler | FirebaseAuthenticator
-      
+
       function getServiceName(service: AuthService): string {
         if (service instanceof MessageGenerator) return 'MessageGenerator'
         if (service instanceof SignatureHandler) return 'SignatureHandler'
@@ -499,12 +504,12 @@ describe('Authentication Steps Index Exports', () => {
   describe('Module Boundaries and Isolation', () => {
     it('should not expose internal implementation details', () => {
       const exportedKeys = Object.keys(AuthStepsIndex)
-      
+
       // Should only export public classes, not internal helpers
       expect(exportedKeys).not.toContain('_internal')
       expect(exportedKeys).not.toContain('private')
       expect(exportedKeys).not.toContain('helper')
-      
+
       // Should only contain the expected public exports
       const expectedExports = [
         'AuthenticationStepExecutor',
@@ -513,8 +518,8 @@ describe('Authentication Steps Index Exports', () => {
         'MessageGenerator',
         'SignatureHandler',
       ]
-      
-      expectedExports.forEach(exportName => {
+
+      expectedExports.forEach((exportName) => {
         expect(exportedKeys).toContain(exportName)
       })
     })
@@ -611,7 +616,7 @@ describe('Authentication Steps Index Exports', () => {
     it('should provide clear export structure', () => {
       // The index should act as a clear API surface
       const exports = Object.keys(AuthStepsIndex).sort()
-      
+
       // Should be in alphabetical order for predictability
       const expectedOrder = [
         'AuthenticationStepExecutor',
@@ -620,7 +625,7 @@ describe('Authentication Steps Index Exports', () => {
         'MessageGenerator',
         'SignatureHandler',
       ]
-      
+
       expect(exports).toEqual(expectedOrder)
     })
 

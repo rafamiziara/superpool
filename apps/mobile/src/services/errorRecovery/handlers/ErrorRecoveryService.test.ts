@@ -35,7 +35,9 @@ describe('ErrorRecoveryService', () => {
   beforeEach(() => {
     // Create mock stores
     mockAuthStore = {
-      get isAuthenticating() { return false },
+      get isAuthenticating() {
+        return false
+      },
     } as jest.Mocked<AuthenticationStore>
 
     mockWalletStore = {
@@ -53,7 +55,7 @@ describe('ErrorRecoveryService', () => {
 
     // Reset all mocks
     jest.clearAllMocks()
-    
+
     // Reset static state
     ;(ErrorRecoveryService as any).authStore = undefined
     ;(ErrorRecoveryService as any).walletStore = undefined
@@ -127,10 +129,10 @@ describe('ErrorRecoveryService', () => {
     it('should handle wallet store being cleared after function creation', () => {
       ErrorRecoveryService.initialize(mockAuthStore, mockWalletStore)
       const disconnectFn = (ErrorRecoveryService as any).getDisconnectFunction()
-      
+
       // Clear wallet store
       ;(ErrorRecoveryService as any).walletStore = null
-      
+
       // Should not throw when calling the function
       expect(() => disconnectFn()).not.toThrow()
     })
@@ -310,7 +312,7 @@ describe('ErrorRecoveryService', () => {
       it('should pass correct context to GenericErrorHandler', async () => {
         mockWalletStore.isConnected = true
         const originalError = new Error('Test error')
-        
+
         ;(ErrorAnalyzer.analyzeError as jest.Mock).mockReturnValue({
           errorType: 'generic',
           appError: mockAppError,
@@ -333,9 +335,7 @@ describe('ErrorRecoveryService', () => {
         await ErrorRecoveryService.handleAuthenticationError(new Error('Generic error'))
 
         const genericHandlerMock = (GenericErrorHandler as jest.Mock).mock.instances[0]
-        expect(genericHandlerMock.handle).toHaveBeenCalledWith(
-          expect.objectContaining({ isConnected: false })
-        )
+        expect(genericHandlerMock.handle).toHaveBeenCalledWith(expect.objectContaining({ isConnected: false }))
       })
 
       it('should handle missing wallet store gracefully', async () => {
@@ -344,9 +344,7 @@ describe('ErrorRecoveryService', () => {
         await ErrorRecoveryService.handleAuthenticationError(new Error('Generic error'))
 
         const genericHandlerMock = (GenericErrorHandler as jest.Mock).mock.instances[0]
-        expect(genericHandlerMock.handle).toHaveBeenCalledWith(
-          expect.objectContaining({ isConnected: false })
-        )
+        expect(genericHandlerMock.handle).toHaveBeenCalledWith(expect.objectContaining({ isConnected: false }))
       })
     })
 
@@ -357,7 +355,6 @@ describe('ErrorRecoveryService', () => {
           appError: mockAppError,
           originalError: new Error('Timeout error'),
         })
-
         ;(TimeoutErrorHandler as jest.Mock).mockImplementation(() => ({
           handle: jest.fn().mockImplementation(() => {
             throw new Error('Handler failed')
@@ -387,7 +384,6 @@ describe('ErrorRecoveryService', () => {
           originalError: new Error('Session error'),
           sessionContext: { sessionId: 'test', errorMessage: 'test', isSessionError: true },
         })
-
         ;(SessionErrorHandler as jest.Mock).mockImplementation(() => ({
           handle: jest.fn().mockRejectedValue(new Error('Async handler failed')),
           getHandlerName: jest.fn().mockReturnValue('session-error'),
@@ -412,7 +408,6 @@ describe('ErrorRecoveryService', () => {
           appError: mockAppError,
           originalError: new Error('Test error'),
         })
-
         ;(GenericErrorHandler as jest.Mock).mockImplementation(() => ({
           handle: jest.fn().mockReturnValue({ shouldDisconnect: false, shouldShowError: true, errorDelay: 0, cleanupPerformed: false }),
           getHandlerName: jest.fn().mockReturnValue('generic-error'),
@@ -476,17 +471,13 @@ describe('ErrorRecoveryService', () => {
       const cleanupError = new Error('Firebase cleanup failed')
       ;(FirebaseCleanupManager.handleFirebaseCleanup as jest.Mock).mockRejectedValue(cleanupError)
 
-      await expect(
-        ErrorRecoveryService.handleFirebaseCleanup('test reason')
-      ).rejects.toThrow('Firebase cleanup failed')
+      await expect(ErrorRecoveryService.handleFirebaseCleanup('test reason')).rejects.toThrow('Firebase cleanup failed')
     })
 
     it('should work without initialization', async () => {
       ;(FirebaseCleanupManager.handleFirebaseCleanup as jest.Mock).mockResolvedValue(undefined)
 
-      await expect(
-        ErrorRecoveryService.handleFirebaseCleanup('test reason')
-      ).resolves.not.toThrow()
+      await expect(ErrorRecoveryService.handleFirebaseCleanup('test reason')).resolves.not.toThrow()
     })
   })
 
@@ -507,14 +498,16 @@ describe('ErrorRecoveryService', () => {
     it('should return status when initialized', () => {
       // Create new mock stores with desired state
       const authStoreWithAuth = {
-        get isAuthenticating() { return true },
+        get isAuthenticating() {
+          return true
+        },
       } as jest.Mocked<AuthenticationStore>
-      
+
       const walletStoreWithConnection = {
         isConnected: true,
         disconnect: jest.fn(),
       } as unknown as jest.Mocked<WalletStore>
-      
+
       ;(FirebaseCleanupManager.getCurrentUserId as jest.Mock).mockReturnValue('firebase-user-456')
 
       ErrorRecoveryService.initialize(authStoreWithAuth, walletStoreWithConnection)
@@ -559,14 +552,16 @@ describe('ErrorRecoveryService', () => {
 
       // Create new mock stores with changed states
       const authStoreChanged = {
-        get isAuthenticating() { return true },
+        get isAuthenticating() {
+          return true
+        },
       } as jest.Mocked<AuthenticationStore>
-      
+
       const walletStoreChanged = {
         isConnected: true,
         disconnect: jest.fn(),
       } as unknown as jest.Mocked<WalletStore>
-      
+
       // Re-initialize with changed stores
       ErrorRecoveryService.initialize(authStoreChanged, walletStoreChanged)
 
@@ -616,7 +611,6 @@ describe('ErrorRecoveryService', () => {
         appError: mockAppError,
         originalError: new Error('Concurrent error'),
       })
-
       ;(GenericErrorHandler as jest.Mock).mockImplementation(() => ({
         handle: jest.fn().mockReturnValue({
           shouldDisconnect: false,
@@ -628,7 +622,7 @@ describe('ErrorRecoveryService', () => {
       }))
 
       const errors = Array.from({ length: 5 }, (_, i) => new Error(`Concurrent error ${i}`))
-      const promises = errors.map(error => ErrorRecoveryService.handleAuthenticationError(error))
+      const promises = errors.map((error) => ErrorRecoveryService.handleAuthenticationError(error))
 
       const results = await Promise.all(promises)
 
@@ -653,13 +647,11 @@ describe('ErrorRecoveryService', () => {
   describe('Edge Cases and Error Handling', () => {
     it('should handle null error input', async () => {
       ErrorRecoveryService.initialize(mockAuthStore, mockWalletStore)
-
       ;(ErrorAnalyzer.analyzeError as jest.Mock).mockReturnValue({
         errorType: 'generic',
         appError: mockAppError,
         originalError: null,
       })
-
       ;(GenericErrorHandler as jest.Mock).mockImplementation(() => ({
         handle: jest.fn().mockReturnValue({
           shouldDisconnect: false,
@@ -678,13 +670,11 @@ describe('ErrorRecoveryService', () => {
 
     it('should handle undefined error input', async () => {
       ErrorRecoveryService.initialize(mockAuthStore, mockWalletStore)
-
       ;(ErrorAnalyzer.analyzeError as jest.Mock).mockReturnValue({
         errorType: 'generic',
         appError: mockAppError,
         originalError: undefined,
       })
-
       ;(GenericErrorHandler as jest.Mock).mockImplementation(() => ({
         handle: jest.fn().mockReturnValue({
           shouldDisconnect: false,
@@ -695,14 +685,11 @@ describe('ErrorRecoveryService', () => {
         getHandlerName: jest.fn().mockReturnValue('generic-error'),
       }))
 
-      await expect(
-        ErrorRecoveryService.handleAuthenticationError(undefined)
-      ).resolves.toBeDefined()
+      await expect(ErrorRecoveryService.handleAuthenticationError(undefined)).resolves.toBeDefined()
     })
 
     it('should handle ErrorAnalyzer throwing error', async () => {
       ErrorRecoveryService.initialize(mockAuthStore, mockWalletStore)
-
       ;(ErrorAnalyzer.analyzeError as jest.Mock).mockImplementation(() => {
         throw new Error('Analyzer failed')
       })
@@ -729,7 +716,6 @@ describe('ErrorRecoveryService', () => {
         appError: mockAppError,
         originalError: new Error('Test'),
       })
-
       ;(GenericErrorHandler as jest.Mock).mockImplementation(() => ({
         handle: jest.fn().mockReturnValue({
           shouldDisconnect: false,
@@ -750,13 +736,11 @@ describe('ErrorRecoveryService', () => {
   describe('Performance', () => {
     beforeEach(() => {
       ErrorRecoveryService.initialize(mockAuthStore, mockWalletStore)
-
       ;(ErrorAnalyzer.analyzeError as jest.Mock).mockReturnValue({
         errorType: 'generic',
         appError: mockAppError,
         originalError: new Error('Performance test'),
       })
-
       ;(GenericErrorHandler as jest.Mock).mockImplementation(() => ({
         handle: jest.fn().mockReturnValue({
           shouldDisconnect: false,
@@ -770,9 +754,9 @@ describe('ErrorRecoveryService', () => {
 
     it('should handle errors quickly', async () => {
       const start = performance.now()
-      
+
       await ErrorRecoveryService.handleAuthenticationError(new Error('Performance test'))
-      
+
       const end = performance.now()
       expect(end - start).toBeLessThan(50)
     })
@@ -781,11 +765,9 @@ describe('ErrorRecoveryService', () => {
       const errors = Array.from({ length: 100 }, (_, i) => new Error(`Error ${i}`))
 
       const start = performance.now()
-      
-      await Promise.all(errors.map(error => 
-        ErrorRecoveryService.handleAuthenticationError(error)
-      ))
-      
+
+      await Promise.all(errors.map((error) => ErrorRecoveryService.handleAuthenticationError(error)))
+
       const end = performance.now()
       expect(end - start).toBeLessThan(500)
     })
