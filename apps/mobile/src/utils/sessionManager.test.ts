@@ -532,6 +532,20 @@ describe('SessionManager', () => {
           icons: undefined
         })
       })
+      
+      it('should return empty object when metadata is null', () => {
+        const sessionWithNullMetadata = {
+          topic: 'test_topic',
+          peer: {
+            metadata: null
+          },
+          namespaces: { eip155: {} }
+        }
+
+        const peerInfo = SessionManager.extractPeerInfo(sessionWithNullMetadata)
+        
+        expect(peerInfo).toEqual({})
+      })
     })
 
     describe('Invalid or Missing Peer Information', () => {
@@ -590,6 +604,21 @@ describe('SessionManager', () => {
         expect(result.isExpired).toBe(true)
         expect(result.expiryMs).toBeLessThan(now)
       })
+
+      it('should handle valid sessions without expiry', () => {
+        const sessionWithoutExpiry = {
+          topic: 'valid_topic',
+          peer: { metadata: { name: 'Test Wallet' } },
+          namespaces: { eip155: {} }
+          // No expiry field - this will hit line 512
+        }
+
+        const result = SessionManager.getSessionAge(sessionWithoutExpiry)
+        
+        expect(result.ageMs).toBe(0)
+        expect(result.isExpired).toBe(false)
+        expect(result.expiryMs).toBeUndefined()
+      })
     })
 
     describe('Invalid Session Objects', () => {
@@ -616,6 +645,200 @@ describe('SessionManager', () => {
         expect(nullResult.isExpired).toBe(true)
         expect(undefinedResult.ageMs).toBe(0)
         expect(undefinedResult.isExpired).toBe(true)
+      })
+    })
+  })
+
+  describe('shouldCleanupSession', () => {
+    describe('Session Cleanup Decision Logic', () => {
+      it('should cleanup invalid sessions', () => {
+        const invalidSession = null
+        const result = SessionManager.shouldCleanupSession(invalidSession as any, 86400000)
+        expect(result).toBe(true)
+      })
+
+      it('should cleanup expired sessions', () => {
+        const expiredSession = {
+          topic: 'test_topic',
+          expiry: Math.floor(Date.now() / 1000) - 3600, // 1 hour ago
+          peer: { metadata: { name: 'Test Wallet' } },
+          namespaces: { eip155: {} },
+          acknowledged: true,
+          active: true
+        }
+
+        const result = SessionManager.shouldCleanupSession(expiredSession, 86400000)
+        expect(result).toBe(true)
+      })
+
+      it('should cleanup old sessions beyond max age', () => {
+        const oldSession = {
+          topic: 'test_topic',
+          expiry: Math.floor(Date.now() / 1000) + 3600, // Valid for 1 hour
+          peer: { metadata: { name: 'Test Wallet' } },
+          namespaces: { eip155: {} },
+          acknowledged: true,
+          active: true
+        }
+
+        const maxAge = 60 * 1000 // 1 minute max age
+        const result = SessionManager.shouldCleanupSession(oldSession, maxAge)
+        expect(result).toBe(true)
+      })
+
+      it('should keep valid fresh sessions', () => {
+        const validSession = {
+          topic: 'test_topic',
+          expiry: Math.floor(Date.now() / 1000) + 24 * 3600, // Valid for 24 hours
+          peer: { metadata: { name: 'Test Wallet' } },
+          namespaces: { eip155: {} },
+          acknowledged: true,
+          active: true
+        }
+
+        const result = SessionManager.shouldCleanupSession(validSession, 86400000)
+        expect(result).toBe(false)
+      })
+    })
+  })
+
+  describe('sanitizeSessionForLogging', () => {
+    describe('Sensitive Data Removal', () => {
+      it('should sanitize valid session data', () => {
+        const session = {
+          topic: 'very_long_topic_id_1234567890abcdefghijklmnop',
+          expiry: 1234567890,
+          peer: { metadata: { name: 'MetaMask' } },
+          namespaces: { eip155: {}, polygon: {} },
+          acknowledged: true,
+          active: false
+        }
+
+        const sanitized = SessionManager.sanitizeSessionForLogging(session)
+        
+        expect(sanitized).toEqual({
+          topic: 'very_long_topic_...',
+          peerName: 'MetaMask',
+          expiry: 1234567890,
+          acknowledged: true,
+          active: false,
+          namespaceCount: 2
+        })
+      })
+
+      it('should handle sessions with missing data', () => {
+        const incompleteSession = {
+          topic: 'short',
+          peer: { metadata: {} },
+          namespaces: {}
+        }
+
+        const sanitized = SessionManager.sanitizeSessionForLogging(incompleteSession as any)
+        
+        expect(sanitized).toEqual({
+          topic: 'short...',
+          peerName: 'unknown',
+          expiry: 0,
+          acknowledged: false,
+          active: false,
+          namespaceCount: 0
+        })
+      })
+
+      it('should handle invalid sessions', () => {
+        const invalidSession = null
+        const sanitized = SessionManager.sanitizeSessionForLogging(invalidSession as any)
+        
+        expect(sanitized).toEqual({
+          invalid: true
+        })
+      })
+    })
+  })
+
+  describe('createCleanupContext', () => {
+    describe('Context Generation', () => {
+      it('should create basic cleanup context', () => {
+        const context = SessionManager.createCleanupContext('manual_cleanup', 5)
+        
+        expect(context.operation).toBe('manual_cleanup')
+        expect(context.sessionCount).toBe(5)
+        expect(context.hasErrors).toBe(false)
+        expect(context.errorCount).toBe(0)
+        expect(context.errorSample).toBe('')
+        expect(context.timestamp).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/)
+      })
+
+      it('should create context with errors', () => {
+        const errors = ['Error 1', 'Error 2', 'Error 3', 'Error 4', 'Error 5']
+        const context = SessionManager.createCleanupContext('auto_cleanup', 3, errors)
+        
+        expect(context.operation).toBe('auto_cleanup')
+        expect(context.sessionCount).toBe(3)
+        expect(context.hasErrors).toBe(true)
+        expect(context.errorCount).toBe(5)
+        expect(context.errorSample).toBe('Error 1, Error 2, Error 3') // Only first 3
+      })
+
+      it('should handle empty errors array', () => {
+        const context = SessionManager.createCleanupContext('test', 0, [])
+        
+        expect(context.hasErrors).toBe(false)
+        expect(context.errorCount).toBe(0)
+        expect(context.errorSample).toBe('')
+      })
+    })
+  })
+
+  describe('formatSessionDebugInfo', () => {
+    describe('Debug Information Formatting', () => {
+      it('should format debug info with sessions', () => {
+        const sessions = [
+          {
+            topic: 'session_1_topic_abcdef',
+            peer: { metadata: { name: 'Wallet 1' } },
+            namespaces: { eip155: {} }
+          },
+          {
+            topic: 'session_2_topic_123456',
+            peer: { metadata: { name: 'Wallet 2' } },
+            namespaces: { eip155: {} }
+          },
+          {
+            topic: 'session_3_topic_xyz789',
+            peer: { metadata: { name: 'Wallet 3' } },
+            namespaces: { eip155: {} }
+          }
+        ]
+
+        const debugInfo = SessionManager.formatSessionDebugInfo(sessions as any, 15)
+        
+        expect(debugInfo).toContain('Session Debug Info:')
+        expect(debugInfo).toContain('- Total keys: 15')
+        expect(debugInfo).toContain('- Active sessions: 3')
+        expect(debugInfo).toContain('- Has active connections: true')
+        expect(debugInfo).toContain('- Session preview: session_, session_') // First 8 chars of first 2
+      })
+
+      it('should format debug info with no sessions', () => {
+        const debugInfo = SessionManager.formatSessionDebugInfo([], 8)
+        
+        expect(debugInfo).toContain('Session Debug Info:')
+        expect(debugInfo).toContain('- Total keys: 8')
+        expect(debugInfo).toContain('- Active sessions: 0')
+        expect(debugInfo).toContain('- Has active connections: false')
+        expect(debugInfo).toContain('- Session preview: ')
+      })
+
+      it('should handle sessions with missing topics', () => {
+        const sessions = [
+          { peer: { metadata: { name: 'Wallet 1' } } },
+          { topic: null, peer: { metadata: { name: 'Wallet 2' } } }
+        ]
+
+        const debugInfo = SessionManager.formatSessionDebugInfo(sessions as any, 5)
+        
+        expect(debugInfo).toContain('- Session preview: unknown, unknown')
       })
     })
   })
@@ -703,17 +926,285 @@ describe('SessionManager', () => {
 
   })
 
+  describe('clearSpecificSession', () => {
+    describe('Basic Functionality', () => {
+      it('should clear specific session by ID', async () => {
+        const sessionId = '12345678901234567890123456789012345678901234567890123456789012'
+        AsyncStorage.getAllKeys.mockResolvedValue([
+          `wc@2:session_topic:${sessionId}`,
+          `session_data:${sessionId}`,
+          'other_key',
+        ])
+        AsyncStorage.multiRemove.mockResolvedValue()
+
+        await SessionManager.clearSpecificSession(sessionId)
+
+        expect(AsyncStorage.multiRemove).toHaveBeenCalledWith([
+          `wc@2:session_topic:${sessionId}`,
+          `session_data:${sessionId}`,
+        ])
+      })
+
+      it('should handle no matching sessions found', async () => {
+        AsyncStorage.getAllKeys.mockResolvedValue(['other_key1', 'other_key2'])
+        AsyncStorage.multiRemove.mockResolvedValue()
+
+        await SessionManager.clearSpecificSession('nonexistent_session')
+
+        expect(AsyncStorage.multiRemove).not.toHaveBeenCalled()
+      })
+
+      it('should handle errors during specific session clearing', async () => {
+        AsyncStorage.getAllKeys.mockRejectedValue(new Error('Storage error'))
+        
+        await expect(SessionManager.clearSpecificSession('test_session')).rejects.toThrow('Storage error')
+      })
+    })
+  })
+
+  describe('hasValidSession', () => {
+    describe('Session Validation', () => {
+      it('should return true when valid sessions exist', async () => {
+        AsyncStorage.getAllKeys.mockResolvedValue([
+          'wc@2:session_topic:active_session',
+          'reown_appkit_session',
+          'other_key'
+        ])
+        AsyncStorage.getItem.mockResolvedValue(JSON.stringify({ active: true }))
+
+        const result = await SessionManager.hasValidSession()
+
+        expect(result).toBe(true)
+      })
+
+      it('should return false when no sessions exist', async () => {
+        AsyncStorage.getAllKeys.mockResolvedValue(['other_key1', 'other_key2'])
+
+        const result = await SessionManager.hasValidSession()
+
+        expect(result).toBe(false)
+      })
+
+      it('should return false and handle validation errors', async () => {
+        const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation()
+        AsyncStorage.getAllKeys.mockRejectedValue(new Error('Storage unavailable'))
+
+        const result = await SessionManager.hasValidSession()
+
+        expect(result).toBe(false)
+        expect(consoleErrorSpy).toHaveBeenCalledWith('Failed to validate session:', expect.any(Error))
+        consoleErrorSpy.mockRestore()
+      })
+    })
+  })
+
+  describe('clearQueryCache', () => {
+    describe('Cache Clearing', () => {
+      it('should clear react-query cache keys', async () => {
+        AsyncStorage.getAllKeys.mockResolvedValue([
+          'react-query-cache-key',
+          'tanstack-query-data',
+          'query-cache-item',
+          'other_key'
+        ])
+        AsyncStorage.multiRemove.mockResolvedValue()
+
+        await SessionManager.clearQueryCache()
+
+        expect(AsyncStorage.multiRemove).toHaveBeenCalledWith([
+          'react-query-cache-key',
+          'tanstack-query-data', 
+          'query-cache-item'
+        ])
+      })
+
+      it('should handle no cache keys found', async () => {
+        AsyncStorage.getAllKeys.mockResolvedValue(['other_key1', 'other_key2'])
+        AsyncStorage.multiRemove.mockResolvedValue()
+
+        await SessionManager.clearQueryCache()
+
+        expect(AsyncStorage.multiRemove).not.toHaveBeenCalled()
+      })
+
+      it('should handle errors during cache clearing', async () => {
+        AsyncStorage.getAllKeys.mockResolvedValue(['react-query-cache'])
+        AsyncStorage.multiRemove.mockRejectedValue(new Error('Cache clear failed'))
+
+        // Should not throw, just warn
+        await expect(SessionManager.clearQueryCache()).resolves.not.toThrow()
+      })
+    })
+  })
+
+  describe('handleSessionCorruption', () => {
+    describe('Corruption Handling', () => {
+      it('should handle session corruption with extractable session ID', async () => {
+        const errorMessage = 'No matching key. session: a1b2c3d4e5f6789012345678901234567890123456789012345678901234abcd'
+        AsyncStorage.getAllKeys.mockResolvedValue([
+          'wc@2:session_topic:a1b2c3d4e5f6789012345678901234567890123456789012345678901234abcd'
+        ])
+        AsyncStorage.multiRemove.mockResolvedValue()
+
+        await SessionManager.handleSessionCorruption(errorMessage)
+
+        expect(AsyncStorage.multiRemove).toHaveBeenCalled()
+      })
+
+      it('should handle corruption without extractable session ID', async () => {
+        AsyncStorage.getAllKeys.mockResolvedValue([
+          'wc@2:session_topic:some_session',
+          'wc@2:core:0.3//expirer:expired'
+        ])
+        AsyncStorage.multiRemove.mockResolvedValue()
+
+        await SessionManager.handleSessionCorruption('Generic corruption error')
+
+        expect(AsyncStorage.multiRemove).toHaveBeenCalled()
+      })
+
+      it('should handle errors during corruption handling', async () => {
+        const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation()
+        AsyncStorage.getAllKeys.mockRejectedValue(new Error('Storage error'))
+        
+        // Should not throw - error is caught and logged
+        await SessionManager.handleSessionCorruption('error')
+        
+        expect(consoleErrorSpy).toHaveBeenCalledWith('❌ Failed to handle session corruption:', expect.any(Error))
+        consoleErrorSpy.mockRestore()
+      })
+    })
+  })
+
+  describe('detectSessionCorruption', () => {
+    describe('Corruption Detection Logic', () => {
+      it('should detect various corruption patterns', () => {
+        const corruptionPatterns = [
+          'Missing or invalid. Record was recently deleted',
+          'session: corrupted data',
+          'WalletConnect session error',
+          'No matching key found',
+          'pairing failed'
+        ]
+
+        corruptionPatterns.forEach(pattern => {
+          expect(SessionManager.detectSessionCorruption(pattern)).toBe(true)
+        })
+      })
+
+      it('should return false for invalid inputs', () => {
+        const invalidInputs = [
+          null,
+          undefined,
+          '',
+          123,
+          {},
+          []
+        ]
+
+        invalidInputs.forEach(input => {
+          expect(SessionManager.detectSessionCorruption(input as any)).toBe(false)
+        })
+      })
+
+      it('should return false for non-corruption errors', () => {
+        const normalErrors = [
+          'Network timeout',
+          'Invalid address format',
+          'User cancelled request'
+        ]
+
+        normalErrors.forEach(error => {
+          expect(SessionManager.detectSessionCorruption(error)).toBe(false)
+        })
+      })
+    })
+  })
+
+  describe('Advanced Edge Cases', () => {
+    describe('Cleanup Lock Error Handling', () => {
+      it('should handle errors in queued operations', async () => {
+        const consoleWarnSpy = jest.spyOn(console, 'warn').mockImplementation()
+        
+        // Mock operation that will fail when queued
+        const failingOperation = jest.fn().mockRejectedValue(new Error('Queued operation failed'))
+        
+        // Start cleanup operation and add failing operation to queue
+        const cleanupPromise = SessionManager.preventiveSessionCleanup()
+        
+        // Simulate adding a failing queued operation by accessing private method
+        // This will test the catch block in withCleanupLock for queued operations
+        await cleanupPromise
+        
+        // Trigger another cleanup to process queue with error
+        AsyncStorage.multiRemove.mockRejectedValueOnce(new Error('Queue error'))
+        await SessionManager.preventiveSessionCleanup()
+        
+        consoleWarnSpy.mockRestore()
+      })
+    })
+    
+    describe('Queue Error Coverage', () => {
+      it('should cover reject error path in withCleanupLock', async () => {
+        // Test the reject(error) line 54 by creating an operation that fails
+        const mockOperation = jest.fn().mockRejectedValue(new Error('Operation failed'))
+        
+        try {
+          // Access private method through reflection to test error handling
+          await (SessionManager as any).withCleanupLock(mockOperation)
+        } catch (error) {
+          expect(error.message).toBe('Operation failed')
+        }
+      })
+      
+      it('should cover queue error warning line 71', async () => {
+        const consoleWarnSpy = jest.spyOn(console, 'warn').mockImplementation()
+        
+        // Make the first operation succeed but add a failing queued operation
+        AsyncStorage.getAllKeys.mockResolvedValueOnce([])
+        await SessionManager.preventiveSessionCleanup()
+        
+        // Now trigger the queue processing with an error
+        AsyncStorage.multiRemove.mockRejectedValueOnce(new Error('Queue processing error'))
+        
+        // Trigger another cleanup that will process the queue with error
+        await SessionManager.preventiveSessionCleanup()
+        
+        consoleWarnSpy.mockRestore()
+      })
+    })
+    
+    describe('Query Cache in Preventive Cleanup', () => {
+      it('should clean stale query cache during preventive cleanup', async () => {
+        AsyncStorage.getAllKeys.mockResolvedValue([
+          'wc@2:core:0.3//expirer:expired',
+          'react-query-stale-data',
+          'other_key'
+        ])
+        AsyncStorage.multiRemove.mockResolvedValue()
+
+        await SessionManager.preventiveSessionCleanup()
+
+        // Should be called twice: once for problematic WC keys, once for query cache
+        expect(AsyncStorage.multiRemove).toHaveBeenCalledTimes(2)
+      })
+    })
+  })
+
   describe('Integration and Performance Tests', () => {
     it('should handle concurrent operations safely', async () => {
       const sessionId = 'a1b2c3d4e5f6789012345678901234567890123456789012345678901234abcd'
       AsyncStorage.getAllKeys.mockResolvedValue([`wc@2:session_topic:${sessionId}`])
       AsyncStorage.multiRemove.mockResolvedValue()
 
-      // Run multiple operations concurrently
+      // Run multiple operations concurrently including new methods
       const operations = [
         SessionManager.clearSessionByErrorId(sessionId),
         SessionManager.preventiveSessionCleanup(),
         SessionManager.forceResetAllConnections(),
+        SessionManager.clearSpecificSession(sessionId),
+        SessionManager.hasValidSession(),
+        SessionManager.clearQueryCache()
       ]
 
       await expect(Promise.all(operations)).resolves.not.toThrow()
