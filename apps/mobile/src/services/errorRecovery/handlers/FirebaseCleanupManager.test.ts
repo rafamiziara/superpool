@@ -21,9 +21,9 @@ describe('FirebaseCleanupManager', () => {
   beforeEach(() => {
     mockSignOut = signOut as jest.Mock
     mockFirebaseAuth = FIREBASE_AUTH as any
-    
+
     jest.clearAllMocks()
-    
+
     // Reset Firebase Auth mock state
     mockFirebaseAuth.currentUser = null
   })
@@ -56,17 +56,11 @@ describe('FirebaseCleanupManager', () => {
       it('should handle different cleanup reasons', async () => {
         const consoleSpy = jest.spyOn(console, 'log').mockImplementation()
 
-        const reasons = [
-          'authentication failure',
-          'session timeout',
-          'manual logout',
-          'security breach',
-          'wallet connection error',
-        ]
+        const reasons = ['authentication failure', 'session timeout', 'manual logout', 'security breach', 'wallet connection error']
 
         for (const reason of reasons) {
           consoleSpy.mockClear()
-          
+
           await FirebaseCleanupManager.handleFirebaseCleanup(reason)
 
           expect(consoleSpy).toHaveBeenCalledWith(`🔄 Initiating Firebase cleanup due to: ${reason}`)
@@ -78,9 +72,9 @@ describe('FirebaseCleanupManager', () => {
 
       it('should complete cleanup within reasonable time', async () => {
         const start = performance.now()
-        
+
         await FirebaseCleanupManager.handleFirebaseCleanup('performance test')
-        
+
         const end = performance.now()
         expect(end - start).toBeLessThan(50)
       })
@@ -93,9 +87,9 @@ describe('FirebaseCleanupManager', () => {
 
         const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation()
 
-        await expect(
-          FirebaseCleanupManager.handleFirebaseCleanup('test reason')
-        ).rejects.toThrow('Firebase cleanup failed: Firebase signOut failed')
+        await expect(FirebaseCleanupManager.handleFirebaseCleanup('test reason')).rejects.toThrow(
+          'Firebase cleanup failed: Firebase signOut failed'
+        )
 
         expect(consoleErrorSpy).toHaveBeenCalledWith('❌ Failed to sign out from Firebase:', signOutError)
         expect(mockSignOut).toHaveBeenCalledWith(FIREBASE_AUTH)
@@ -109,9 +103,9 @@ describe('FirebaseCleanupManager', () => {
 
         const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation()
 
-        await expect(
-          FirebaseCleanupManager.handleFirebaseCleanup('test reason')
-        ).rejects.toThrow('Firebase cleanup failed: String error message')
+        await expect(FirebaseCleanupManager.handleFirebaseCleanup('test reason')).rejects.toThrow(
+          'Firebase cleanup failed: String error message'
+        )
 
         expect(consoleErrorSpy).toHaveBeenCalledWith('❌ Failed to sign out from Firebase:', signOutError)
 
@@ -121,9 +115,7 @@ describe('FirebaseCleanupManager', () => {
       it('should handle null/undefined error rejection', async () => {
         mockSignOut.mockRejectedValue(null)
 
-        await expect(
-          FirebaseCleanupManager.handleFirebaseCleanup('test reason')
-        ).rejects.toThrow('Firebase cleanup failed: null')
+        await expect(FirebaseCleanupManager.handleFirebaseCleanup('test reason')).rejects.toThrow('Firebase cleanup failed: null')
       })
 
       it('should handle complex error objects', async () => {
@@ -134,9 +126,9 @@ describe('FirebaseCleanupManager', () => {
         }
         mockSignOut.mockRejectedValue(complexError)
 
-        await expect(
-          FirebaseCleanupManager.handleFirebaseCleanup('test reason')
-        ).rejects.toThrow('Firebase cleanup failed: [object Object]')
+        await expect(FirebaseCleanupManager.handleFirebaseCleanup('test reason')).rejects.toThrow(
+          'Firebase cleanup failed: [object Object]'
+        )
       })
 
       it('should preserve original error information', async () => {
@@ -145,9 +137,7 @@ describe('FirebaseCleanupManager', () => {
 
         const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation()
 
-        await expect(
-          FirebaseCleanupManager.handleFirebaseCleanup('test reason')
-        ).rejects.toThrow()
+        await expect(FirebaseCleanupManager.handleFirebaseCleanup('test reason')).rejects.toThrow()
 
         expect(consoleErrorSpy).toHaveBeenCalledWith('❌ Failed to sign out from Firebase:', originalError)
 
@@ -161,9 +151,7 @@ describe('FirebaseCleanupManager', () => {
       })
 
       it('should handle multiple simultaneous cleanup calls', async () => {
-        const promises = Array.from({ length: 5 }, (_, i) =>
-          FirebaseCleanupManager.handleFirebaseCleanup(`concurrent test ${i}`)
-        )
+        const promises = Array.from({ length: 5 }, (_, i) => FirebaseCleanupManager.handleFirebaseCleanup(`concurrent test ${i}`))
 
         await Promise.all(promises)
 
@@ -172,9 +160,7 @@ describe('FirebaseCleanupManager', () => {
 
       it('should handle cleanup calls with different reasons simultaneously', async () => {
         const reasons = ['reason1', 'reason2', 'reason3', 'reason4', 'reason5']
-        const promises = reasons.map(reason =>
-          FirebaseCleanupManager.handleFirebaseCleanup(reason)
-        )
+        const promises = reasons.map((reason) => FirebaseCleanupManager.handleFirebaseCleanup(reason))
 
         await Promise.all(promises)
 
@@ -195,14 +181,12 @@ describe('FirebaseCleanupManager', () => {
           }
         })
 
-        const promises = Array.from({ length: 5 }, (_, i) =>
-          FirebaseCleanupManager.handleFirebaseCleanup(`test ${i}`)
-        )
+        const promises = Array.from({ length: 5 }, (_, i) => FirebaseCleanupManager.handleFirebaseCleanup(`test ${i}`))
 
         const results = await Promise.allSettled(promises)
 
-        expect(results.slice(0, 2).every(r => r.status === 'fulfilled')).toBe(true)
-        expect(results.slice(2).every(r => r.status === 'rejected')).toBe(true)
+        expect(results.slice(0, 2).every((r) => r.status === 'fulfilled')).toBe(true)
+        expect(results.slice(2).every((r) => r.status === 'rejected')).toBe(true)
       })
     })
 
@@ -223,9 +207,7 @@ describe('FirebaseCleanupManager', () => {
         mockSignOut.mockResolvedValue(undefined)
         const longReason = 'A'.repeat(1000)
 
-        await expect(
-          FirebaseCleanupManager.handleFirebaseCleanup(longReason)
-        ).resolves.not.toThrow()
+        await expect(FirebaseCleanupManager.handleFirebaseCleanup(longReason)).resolves.not.toThrow()
 
         expect(mockSignOut).toHaveBeenCalledWith(FIREBASE_AUTH)
       })
@@ -234,18 +216,14 @@ describe('FirebaseCleanupManager', () => {
         mockSignOut.mockResolvedValue(undefined)
         const specialReason = 'Test with special chars: !@#$%^&*()_+{}|:"<>?[]\\;\',./'
 
-        await expect(
-          FirebaseCleanupManager.handleFirebaseCleanup(specialReason)
-        ).resolves.not.toThrow()
+        await expect(FirebaseCleanupManager.handleFirebaseCleanup(specialReason)).resolves.not.toThrow()
       })
 
       it('should handle unicode characters in reason', async () => {
         mockSignOut.mockResolvedValue(undefined)
         const unicodeReason = 'Test with unicode: 🔄🚪❌🎯🧹'
 
-        await expect(
-          FirebaseCleanupManager.handleFirebaseCleanup(unicodeReason)
-        ).resolves.not.toThrow()
+        await expect(FirebaseCleanupManager.handleFirebaseCleanup(unicodeReason)).resolves.not.toThrow()
       })
     })
 
@@ -255,9 +233,7 @@ describe('FirebaseCleanupManager', () => {
       })
 
       it('should handle multiple cleanup operations efficiently', async () => {
-        const operations = Array.from({ length: 1000 }, (_, i) =>
-          FirebaseCleanupManager.handleFirebaseCleanup(`operation-${i}`)
-        )
+        const operations = Array.from({ length: 1000 }, (_, i) => FirebaseCleanupManager.handleFirebaseCleanup(`operation-${i}`))
 
         const start = performance.now()
         await Promise.all(operations)
@@ -401,18 +377,13 @@ describe('FirebaseCleanupManager', () => {
     })
 
     it('should return valid user IDs of different formats', () => {
-      const userIds = [
-        'simple-id',
-        'user-123-456',
-        'firebase-generated-uid-with-long-string-12345',
-        'special-chars_123',
-      ]
+      const userIds = ['simple-id', 'user-123-456', 'firebase-generated-uid-with-long-string-12345', 'special-chars_123']
 
-      userIds.forEach(uid => {
+      userIds.forEach((uid) => {
         mockFirebaseAuth.currentUser = { uid }
-        
+
         const result = FirebaseCleanupManager.getCurrentUserId()
-        
+
         expect(result).toBe(uid)
       })
     })
@@ -438,10 +409,10 @@ describe('FirebaseCleanupManager', () => {
       // Each method call should be independent and not affect others
       mockFirebaseAuth.currentUser = { uid: 'test-1' }
       const userId1 = FirebaseCleanupManager.getCurrentUserId()
-      
+
       mockFirebaseAuth.currentUser = { uid: 'test-2' }
       const userId2 = FirebaseCleanupManager.getCurrentUserId()
-      
+
       expect(userId1).toBe('test-1')
       expect(userId2).toBe('test-2')
     })
@@ -462,7 +433,7 @@ describe('FirebaseCleanupManager', () => {
       // Perform cleanup (sign out)
       mockSignOut.mockResolvedValue(undefined)
       await FirebaseCleanupManager.handleFirebaseCleanup('test cleanup')
-      
+
       // Simulate Firebase updating auth state after signOut
       mockFirebaseAuth.currentUser = null
       expect(FirebaseCleanupManager.isUserSignedIn()).toBe(false)
@@ -471,13 +442,11 @@ describe('FirebaseCleanupManager', () => {
 
     it('should handle error recovery scenarios', async () => {
       mockFirebaseAuth.currentUser = { uid: 'error-user' }
-      
+
       // First cleanup attempt fails
       mockSignOut.mockRejectedValueOnce(new Error('Network error'))
-      
-      await expect(
-        FirebaseCleanupManager.handleFirebaseCleanup('first attempt')
-      ).rejects.toThrow('Firebase cleanup failed: Network error')
+
+      await expect(FirebaseCleanupManager.handleFirebaseCleanup('first attempt')).rejects.toThrow('Firebase cleanup failed: Network error')
 
       // User should still be signed in after failed cleanup
       expect(FirebaseCleanupManager.isUserSignedIn()).toBe(true)
@@ -490,17 +459,11 @@ describe('FirebaseCleanupManager', () => {
     })
 
     it('should handle rapid state changes', async () => {
-      const stateChanges = [
-        { uid: 'user1' },
-        null,
-        { uid: 'user2' },
-        undefined,
-        { uid: 'user3' },
-      ]
+      const stateChanges = [{ uid: 'user1' }, null, { uid: 'user2' }, undefined, { uid: 'user3' }]
 
       for (let i = 0; i < stateChanges.length; i++) {
         mockFirebaseAuth.currentUser = stateChanges[i]
-        
+
         const isSignedIn = FirebaseCleanupManager.isUserSignedIn()
         const userId = FirebaseCleanupManager.getCurrentUserId()
 
@@ -522,7 +485,7 @@ describe('FirebaseCleanupManager', () => {
       const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation()
 
       mockFirebaseAuth.currentUser = { uid: 'test-user' }
-      
+
       FirebaseCleanupManager.isUserSignedIn()
       FirebaseCleanupManager.getCurrentUserId()
 
@@ -546,10 +509,8 @@ describe('FirebaseCleanupManager', () => {
 
       for (const { error, expectedMessage } of errorTypes) {
         mockSignOut.mockRejectedValueOnce(error)
-        
-        await expect(
-          FirebaseCleanupManager.handleFirebaseCleanup('test')
-        ).rejects.toThrow(expectedMessage)
+
+        await expect(FirebaseCleanupManager.handleFirebaseCleanup('test')).rejects.toThrow(expectedMessage)
       }
     })
   })

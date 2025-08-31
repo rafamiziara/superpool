@@ -69,7 +69,7 @@ describe('StoreContext', () => {
       }
 
       const { getByTestId } = render(<TestComponent />)
-      
+
       expect(getByTestId('context-value')).toHaveProp('children', 'null-value')
     })
   })
@@ -78,11 +78,7 @@ describe('StoreContext', () => {
     it('should provide store context to children', () => {
       const TestChild = () => {
         const store = React.useContext(StoreContext)
-        return (
-          <Text testID="child">
-            {store ? 'store-provided' : 'no-store'}
-          </Text>
-        )
+        return <Text testID="child">{store ? 'store-provided' : 'no-store'}</Text>
       }
 
       const { getByTestId } = render(
@@ -174,9 +170,7 @@ describe('StoreContext', () => {
     it('should throw error when used outside StoreProvider', () => {
       const { result } = renderHook(() => useStore())
 
-      expect(result.error).toEqual(
-        new Error('useStore must be used within a StoreProvider')
-      )
+      expect(result.error).toEqual(new Error('useStore must be used within a StoreProvider'))
     })
 
     it('should throw error with exact message', () => {
@@ -188,9 +182,7 @@ describe('StoreContext', () => {
     it('should work with nested providers', () => {
       const NestedProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => (
         <StoreProvider>
-          <StoreProvider>
-            {children}
-          </StoreProvider>
+          <StoreProvider>{children}</StoreProvider>
         </StoreProvider>
       )
 
@@ -218,9 +210,7 @@ describe('StoreContext', () => {
     it('should throw error when used outside StoreProvider', () => {
       const { result } = renderHook(() => useAuthenticationStore())
 
-      expect(result.error).toEqual(
-        new Error('useStore must be used within a StoreProvider')
-      )
+      expect(result.error).toEqual(new Error('useStore must be used within a StoreProvider'))
     })
 
     it('should provide access to authentication store methods', () => {
@@ -246,9 +236,7 @@ describe('StoreContext', () => {
     it('should throw error when used outside StoreProvider', () => {
       const { result } = renderHook(() => useWalletStore())
 
-      expect(result.error).toEqual(
-        new Error('useStore must be used within a StoreProvider')
-      )
+      expect(result.error).toEqual(new Error('useStore must be used within a StoreProvider'))
     })
 
     it('should provide access to wallet store properties', () => {
@@ -274,9 +262,7 @@ describe('StoreContext', () => {
     it('should throw error when used outside StoreProvider', () => {
       const { result } = renderHook(() => usePoolManagementStore())
 
-      expect(result.error).toEqual(
-        new Error('useStore must be used within a StoreProvider')
-      )
+      expect(result.error).toEqual(new Error('useStore must be used within a StoreProvider'))
     })
 
     it('should provide access to pool management store properties', () => {
@@ -301,9 +287,7 @@ describe('StoreContext', () => {
     it('should throw error when used outside StoreProvider', () => {
       const { result } = renderHook(() => useUIStore())
 
-      expect(result.error).toEqual(
-        new Error('useStore must be used within a StoreProvider')
-      )
+      expect(result.error).toEqual(new Error('useStore must be used within a StoreProvider'))
     })
 
     it('should provide access to UI store properties', () => {
@@ -334,9 +318,7 @@ describe('StoreContext', () => {
     it('should throw error when used outside StoreProvider', () => {
       const { result } = renderHook(() => useStores())
 
-      expect(result.error).toEqual(
-        new Error('useStore must be used within a StoreProvider')
-      )
+      expect(result.error).toEqual(new Error('useStore must be used within a StoreProvider'))
     })
 
     it('should provide access to all individual stores', () => {
@@ -431,8 +413,7 @@ describe('StoreContext', () => {
         const { authenticationStore, walletStore } = useStores()
         return (
           <Text testID="multi-store">
-            Auth: {authenticationStore.isAuthenticated ? 'yes' : 'no'}, 
-            Wallet: {walletStore.isConnected ? 'yes' : 'no'}
+            Auth: {authenticationStore.isAuthenticated ? 'yes' : 'no'}, Wallet: {walletStore.isConnected ? 'yes' : 'no'}
           </Text>
         )
       }
@@ -472,11 +453,11 @@ describe('StoreContext', () => {
     it('should support conditional rendering with stores', () => {
       const ConditionalComponent = () => {
         const { authenticationStore } = useStores()
-        
+
         if (authenticationStore.isAuthenticated) {
           return <Text testID="authenticated">Authenticated Content</Text>
         }
-        
+
         return <Text testID="not-authenticated">Login Required</Text>
       }
 
@@ -498,7 +479,7 @@ describe('StoreContext', () => {
           useStore() // This will throw
           return <Text>Should not render</Text>
         }
-        
+
         render(<TestComponent />)
       }).toThrow('useStore must be used within a StoreProvider')
     })
@@ -506,16 +487,16 @@ describe('StoreContext', () => {
     it('should handle null context value explicitly', () => {
       const TestComponent = () => {
         const context = React.useContext(StoreContext)
-        
+
         if (!context) {
           return <Text testID="null-context">No store available</Text>
         }
-        
+
         return <Text testID="has-context">Store available</Text>
       }
 
       const { getByTestId } = render(<TestComponent />)
-      
+
       expect(getByTestId('null-context')).toHaveProp('children', 'No store available')
     })
 

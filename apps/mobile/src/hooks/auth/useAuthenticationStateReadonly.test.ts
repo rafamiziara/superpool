@@ -368,9 +368,7 @@ describe('useAuthenticationStateReadonly', () => {
         rerender({})
 
         expect(result.current.isAuthenticating).toBe(i % 2 === 0)
-        expect(result.current.authError).toEqual(
-          i % 2 === 0 ? `Error ${i}` : null
-        )
+        expect(result.current.authError).toEqual(i % 2 === 0 ? `Error ${i}` : null)
       }
     })
   })

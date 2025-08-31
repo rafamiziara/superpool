@@ -94,7 +94,7 @@ describe('useAuthStateSynchronization', () => {
 
   beforeEach(() => {
     jest.clearAllMocks()
-    
+
     // Reset mock states before creating store
     Object.assign(mockFirebaseAuth, {
       isAuthenticated: false,
@@ -104,7 +104,7 @@ describe('useAuthStateSynchronization', () => {
     })
 
     mockUseAccount.mockReturnValue(createMockDisconnectedAccount())
-    
+
     // Ensure Firebase signOut mock is properly reset and configured
     mockFirebaseSignOut.mockReset()
     mockFirebaseSignOut.mockResolvedValue(undefined)
@@ -428,7 +428,7 @@ describe('useAuthStateSynchronization', () => {
     it('should react to wallet store state changes', async () => {
       renderHookWithStore(() => useAuthStateSynchronization(), { store: mockStore })
 
-      // Initially disconnected - verify the hook starts with correct state  
+      // Initially disconnected - verify the hook starts with correct state
       expect(mockDevOnly).toHaveBeenCalledWith(
         '🔄 Auth state sync check:',
         expect.objectContaining({
@@ -439,7 +439,7 @@ describe('useAuthStateSynchronization', () => {
       // Wallet store changes are reactive via MobX observables
       // The hook will react to actual wallet store property changes
       expect(mockDevOnly).toHaveBeenCalledTimes(1)
-      
+
       // Test actual reactive behavior by changing store properties
       runInAction(() => {
         mockStore.walletStore.isConnected = true
@@ -448,7 +448,7 @@ describe('useAuthStateSynchronization', () => {
 
       // Wait a bit for MobX reactions to process
       await act(async () => {
-        await new Promise(resolve => setTimeout(resolve, 10))
+        await new Promise((resolve) => setTimeout(resolve, 10))
       })
 
       // The autorun should have triggered additional times due to the observable wallet store changes

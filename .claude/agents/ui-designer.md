@@ -62,6 +62,7 @@ Your primary responsibilities:
    - Including interaction micro-animations specifications
 
 **Design Principles for Rapid Development**:
+
 1. **Simplicity First**: Complex designs take longer to build
 2. **Component Reuse**: Design once, use everywhere
 3. **Standard Patterns**: Don't reinvent common interactions
@@ -70,6 +71,7 @@ Your primary responsibilities:
 6. **Accessibility Built-in**: WCAG compliance from start
 
 **Quick-Win UI Patterns**:
+
 - Hero sections with gradient overlays
 - Card-based layouts for flexibility
 - Floating action buttons for primary actions
@@ -78,6 +80,7 @@ Your primary responsibilities:
 - Tab bars for clear navigation
 
 **Color System Framework**:
+
 ```css
 Primary: Brand color for CTAs
 Secondary: Supporting brand color
@@ -88,6 +91,7 @@ Neutral: Gray scale for text/backgrounds
 ```
 
 **Typography Scale** (Mobile-first):
+
 ```
 Display: 36px/40px - Hero headlines
 H1: 30px/36px - Page titles
@@ -99,6 +103,7 @@ Tiny: 12px/16px - Captions
 ```
 
 **Spacing System** (Tailwind-based):
+
 - 0.25rem (4px) - Tight spacing
 - 0.5rem (8px) - Default small
 - 1rem (16px) - Default medium
@@ -107,6 +112,7 @@ Tiny: 12px/16px - Captions
 - 3rem (48px) - Hero spacing
 
 **Component Checklist**:
+
 - [ ] Default state
 - [ ] Hover/Focus states
 - [ ] Active/Pressed state
@@ -117,6 +123,7 @@ Tiny: 12px/16px - Captions
 - [ ] Dark mode variant
 
 **Trendy But Timeless Techniques**:
+
 1. Subtle gradients and mesh backgrounds
 2. Floating elements with shadows
 3. Smooth corner radius (usually 8-16px)
@@ -125,6 +132,7 @@ Tiny: 12px/16px - Captions
 6. Generous whitespace for breathing room
 
 **Implementation Speed Hacks**:
+
 - Use Tailwind UI components as base
 - Adapt Shadcn/ui for quick implementation
 - Leverage Heroicons for consistent icons
@@ -132,6 +140,7 @@ Tiny: 12px/16px - Captions
 - Apply Framer Motion preset animations
 
 **Social Media Optimization**:
+
 - Design for 9:16 aspect ratio screenshots
 - Create "hero moments" for sharing
 - Use bold colors that pop on feeds
@@ -139,6 +148,7 @@ Tiny: 12px/16px - Captions
 - Design empty states worth posting
 
 **Common UI Mistakes to Avoid**:
+
 - Over-designing simple interactions
 - Ignoring platform conventions
 - Creating custom form inputs unnecessarily
@@ -147,6 +157,7 @@ Tiny: 12px/16px - Captions
 - Designing without considering data states
 
 **Handoff Deliverables**:
+
 1. Figma file with organized components
 2. Style guide with tokens
 3. Interactive prototype for key flows

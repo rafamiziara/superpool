@@ -15,7 +15,7 @@ describe('GenericErrorHandler', () => {
   beforeEach(() => {
     mockDisconnectFunction = jest.fn()
     handler = new GenericErrorHandler(mockDisconnectFunction)
-    
+
     mockAppError = {
       name: 'AppError',
       message: 'Test error message',
@@ -59,7 +59,7 @@ describe('GenericErrorHandler', () => {
 
       it('should handle user-initiated errors without disconnecting', () => {
         const context = createMockContext({ isConnected: true })
-        
+
         const result = handler.handle(context)
 
         expect(result.shouldDisconnect).toBe(false)
@@ -71,7 +71,7 @@ describe('GenericErrorHandler', () => {
 
       it('should handle user-initiated errors when not connected', () => {
         const context = createMockContext({ isConnected: false })
-        
+
         const result = handler.handle(context)
 
         expect(result.shouldDisconnect).toBe(false)
@@ -97,7 +97,7 @@ describe('GenericErrorHandler', () => {
 
       it('should use immediate delay for user-initiated errors when not disconnecting', () => {
         const context = createMockContext({ isConnected: false })
-        
+
         const result = handler.handle(context)
 
         expect(result.errorDelay).toBe(1500)
@@ -112,7 +112,7 @@ describe('GenericErrorHandler', () => {
 
       it('should disconnect and show error for technical failures when connected', () => {
         const context = createMockContext({ isConnected: true })
-        
+
         const result = handler.handle(context)
 
         expect(result.shouldDisconnect).toBe(true)
@@ -124,7 +124,7 @@ describe('GenericErrorHandler', () => {
 
       it('should not disconnect when already disconnected', () => {
         const context = createMockContext({ isConnected: false })
-        
+
         const result = handler.handle(context)
 
         expect(result.shouldDisconnect).toBe(false)
@@ -178,7 +178,7 @@ describe('GenericErrorHandler', () => {
       it('should calculate 2000ms delay for disconnect scenarios', () => {
         const { isUserInitiatedError } = require('../../../utils')
         isUserInitiatedError.mockReturnValue(false)
-        
+
         const context = createMockContext({ isConnected: true })
         const result = handler.handle(context)
 
@@ -188,7 +188,7 @@ describe('GenericErrorHandler', () => {
       it('should calculate 1500ms delay for user-initiated errors', () => {
         const { isUserInitiatedError } = require('../../../utils')
         isUserInitiatedError.mockReturnValue(true)
-        
+
         const context = createMockContext({ isConnected: true })
         const result = handler.handle(context)
 
@@ -198,7 +198,7 @@ describe('GenericErrorHandler', () => {
       it('should calculate 0ms delay for non-disconnect technical errors', () => {
         const { isUserInitiatedError } = require('../../../utils')
         isUserInitiatedError.mockReturnValue(false)
-        
+
         const context = createMockContext({ isConnected: false })
         const result = handler.handle(context)
 
@@ -208,7 +208,7 @@ describe('GenericErrorHandler', () => {
       it('should use createResult with calculated delay', () => {
         const { isUserInitiatedError } = require('../../../utils')
         isUserInitiatedError.mockReturnValue(false)
-        
+
         const context = createMockContext({ isConnected: true })
         const result = handler.handle(context)
 
@@ -221,7 +221,7 @@ describe('GenericErrorHandler', () => {
       it('should log error details for all errors', () => {
         const { isUserInitiatedError } = require('../../../utils')
         isUserInitiatedError.mockReturnValue(false)
-        
+
         const consoleSpy = jest.spyOn(console, 'log').mockImplementation()
         const context = createMockContext()
 
@@ -240,7 +240,7 @@ describe('GenericErrorHandler', () => {
       it('should log different messages for disconnect vs non-disconnect scenarios', () => {
         const { isUserInitiatedError } = require('../../../utils')
         isUserInitiatedError.mockReturnValue(false)
-        
+
         const consoleSpy = jest.spyOn(console, 'log').mockImplementation()
 
         // Test disconnect scenario
@@ -261,7 +261,7 @@ describe('GenericErrorHandler', () => {
       it('should log user-initiated scenarios correctly', () => {
         const { isUserInitiatedError } = require('../../../utils')
         isUserInitiatedError.mockReturnValue(true)
-        
+
         const consoleSpy = jest.spyOn(console, 'log').mockImplementation()
         const context = createMockContext({ isConnected: true })
 
@@ -277,7 +277,7 @@ describe('GenericErrorHandler', () => {
       it('should handle all required context properties', () => {
         const { isUserInitiatedError } = require('../../../utils')
         isUserInitiatedError.mockReturnValue(false)
-        
+
         const context: GenericErrorContext = {
           appError: mockAppError,
           isConnected: true,
@@ -293,7 +293,7 @@ describe('GenericErrorHandler', () => {
       it('should handle missing originalError gracefully', () => {
         const { isUserInitiatedError } = require('../../../utils')
         isUserInitiatedError.mockReturnValue(false)
-        
+
         const context: GenericErrorContext = {
           appError: mockAppError,
           isConnected: false,
@@ -308,12 +308,12 @@ describe('GenericErrorHandler', () => {
       it('should handle different error types', () => {
         const { isUserInitiatedError } = require('../../../utils')
         isUserInitiatedError.mockReturnValue(true)
-        
+
         const differentAppError = {
           ...mockAppError,
           type: ErrorType.SIGNATURE_REJECTED,
         }
-        
+
         const context = createMockContext({ appError: differentAppError })
         const result = handler.handle(context)
 
@@ -325,7 +325,7 @@ describe('GenericErrorHandler', () => {
     describe('Return Value Patterns', () => {
       it('should return consistent structure for all scenarios', () => {
         const { isUserInitiatedError } = require('../../../utils')
-        
+
         const scenarios = [
           { userInitiated: true, connected: true },
           { userInitiated: true, connected: false },
@@ -333,10 +333,10 @@ describe('GenericErrorHandler', () => {
           { userInitiated: false, connected: false },
         ]
 
-        scenarios.forEach(scenario => {
+        scenarios.forEach((scenario) => {
           isUserInitiatedError.mockReturnValue(scenario.userInitiated)
           const context = createMockContext({ isConnected: scenario.connected })
-          
+
           const result = handler.handle(context)
 
           expect(result).toHaveProperty('shouldDisconnect')
@@ -353,7 +353,7 @@ describe('GenericErrorHandler', () => {
       it('should never perform cleanup', () => {
         const { isUserInitiatedError } = require('../../../utils')
         isUserInitiatedError.mockReturnValue(false)
-        
+
         const context = createMockContext({ isConnected: true })
         const result = handler.handle(context)
 
@@ -362,7 +362,7 @@ describe('GenericErrorHandler', () => {
 
       it('should always show error', () => {
         const { isUserInitiatedError } = require('../../../utils')
-        
+
         // Test both user-initiated and technical errors
         isUserInitiatedError.mockReturnValue(true)
         const userResult = handler.handle(createMockContext())
@@ -378,9 +378,9 @@ describe('GenericErrorHandler', () => {
       it('should handle null appError gracefully', () => {
         const { isUserInitiatedError } = require('../../../utils')
         isUserInitiatedError.mockReturnValue(false)
-        
+
         const context = createMockContext({ appError: null as any })
-        
+
         // Should not throw
         const result = handler.handle(context)
         expect(result).toBeDefined()
@@ -389,14 +389,14 @@ describe('GenericErrorHandler', () => {
       it('should handle complex originalError objects', () => {
         const { isUserInitiatedError } = require('../../../utils')
         isUserInitiatedError.mockReturnValue(false)
-        
+
         const complexError = {
           message: 'Complex error',
           code: 500,
           nested: { innerError: 'inner' },
           stack: 'stack trace...',
         }
-        
+
         const context = createMockContext({ originalError: complexError })
         const result = handler.handle(context)
 
@@ -406,7 +406,7 @@ describe('GenericErrorHandler', () => {
       it('should handle boolean edge cases for isConnected', () => {
         const { isUserInitiatedError } = require('../../../utils')
         isUserInitiatedError.mockReturnValue(false)
-        
+
         // Test explicit false
         const falseContext = createMockContext({ isConnected: false })
         const falseResult = handler.handle(falseContext)
@@ -421,14 +421,14 @@ describe('GenericErrorHandler', () => {
       it('should handle very long error messages', () => {
         const { isUserInitiatedError } = require('../../../utils')
         isUserInitiatedError.mockReturnValue(false)
-        
+
         const longMessage = 'A'.repeat(10000)
         const longAppError = {
           ...mockAppError,
           message: longMessage,
           userFriendlyMessage: longMessage,
         }
-        
+
         const context = createMockContext({ appError: longAppError })
         const result = handler.handle(context)
 
@@ -440,12 +440,12 @@ describe('GenericErrorHandler', () => {
       it('should handle errors quickly', () => {
         const { isUserInitiatedError } = require('../../../utils')
         isUserInitiatedError.mockReturnValue(false)
-        
+
         const context = createMockContext()
         const start = performance.now()
-        
+
         handler.handle(context)
-        
+
         const end = performance.now()
         expect(end - start).toBeLessThan(50)
       })
@@ -453,18 +453,18 @@ describe('GenericErrorHandler', () => {
       it('should handle multiple errors efficiently', () => {
         const { isUserInitiatedError } = require('../../../utils')
         isUserInitiatedError.mockReturnValue(false)
-        
-        const contexts = Array.from({ length: 1000 }, (_, i) => 
-          createMockContext({ 
+
+        const contexts = Array.from({ length: 1000 }, (_, i) =>
+          createMockContext({
             appError: { ...mockAppError, message: `Error ${i}` },
             isConnected: i % 2 === 0,
           })
         )
 
         const start = performance.now()
-        
-        contexts.forEach(context => handler.handle(context))
-        
+
+        contexts.forEach((context) => handler.handle(context))
+
         const end = performance.now()
         expect(end - start).toBeLessThan(2000)
       })
@@ -474,7 +474,7 @@ describe('GenericErrorHandler', () => {
       it('should call isUserInitiatedError with correct appError', () => {
         const { isUserInitiatedError } = require('../../../utils')
         isUserInitiatedError.mockReturnValue(false)
-        
+
         const context = createMockContext()
         handler.handle(context)
 
@@ -487,9 +487,9 @@ describe('GenericErrorHandler', () => {
         isUserInitiatedError.mockImplementation(() => {
           throw new Error('Utility function failed')
         })
-        
+
         const context = createMockContext()
-        
+
         // Should handle gracefully (may depend on implementation)
         expect(() => handler.handle(context)).toThrow('Utility function failed')
       })
@@ -498,7 +498,7 @@ describe('GenericErrorHandler', () => {
     describe('Disconnect Function Behavior', () => {
       it('should call disconnect function only when necessary', () => {
         const { isUserInitiatedError } = require('../../../utils')
-        
+
         // User-initiated, connected - should not disconnect
         isUserInitiatedError.mockReturnValue(true)
         handler.handle(createMockContext({ isConnected: true }))
@@ -538,13 +538,13 @@ describe('GenericErrorHandler', () => {
     it('should implement ErrorHandler interface correctly', () => {
       expect(typeof handler.handle).toBe('function')
       expect(typeof handler.getHandlerName).toBe('function')
-      
+
       const { isUserInitiatedError } = require('../../../utils')
       isUserInitiatedError.mockReturnValue(false)
-      
+
       const context = createMockContext()
       const result = handler.handle(context)
-      
+
       expect(result).toHaveProperty('shouldDisconnect')
       expect(result).toHaveProperty('shouldShowError')
       expect(result).toHaveProperty('errorDelay')
@@ -558,7 +558,7 @@ describe('GenericErrorHandler', () => {
     it('should handle GenericErrorContext correctly', () => {
       const { isUserInitiatedError } = require('../../../utils')
       isUserInitiatedError.mockReturnValue(false)
-      
+
       const context: GenericErrorContext = {
         appError: mockAppError,
         isConnected: true,

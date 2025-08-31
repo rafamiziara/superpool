@@ -25,16 +25,16 @@ describe('mobxConfig', () => {
 
   beforeEach(() => {
     jest.clearAllMocks()
-    
+
     // Mock console methods
     originalConsoleLog = console.log
     originalConsoleTime = console.time
     originalConsoleTimeEnd = console.timeEnd
-    
+
     console.log = jest.fn()
     console.time = jest.fn()
     console.timeEnd = jest.fn()
-    
+
     // Store original __DEV__ value
     originalDEV = global.__DEV__
   })
@@ -44,7 +44,7 @@ describe('mobxConfig', () => {
     console.log = originalConsoleLog
     console.time = originalConsoleTime
     console.timeEnd = originalConsoleTimeEnd
-    
+
     // Restore __DEV__
     global.__DEV__ = originalDEV
   })
@@ -64,31 +64,31 @@ describe('mobxConfig', () => {
 
     it('should log configuration message for iOS platform', () => {
       mockPlatform.OS = 'ios'
-      
+
       configureMobX()
-      
+
       expect(console.log).toHaveBeenCalledWith('📱 MobX configured for ios environment')
     })
 
     it('should log configuration message for Android platform', () => {
       mockPlatform.OS = 'android'
-      
+
       configureMobX()
-      
+
       expect(console.log).toHaveBeenCalledWith('📱 MobX configured for android environment')
     })
 
     it('should log configuration message for web platform', () => {
       mockPlatform.OS = 'web'
-      
+
       configureMobX()
-      
+
       expect(console.log).toHaveBeenCalledWith('📱 MobX configured for web environment')
     })
 
     it('should call MobX configure exactly once per invocation', () => {
       configureMobX()
-      
+
       expect(mockMobxConfigure).toHaveBeenCalledTimes(1)
     })
 
@@ -96,7 +96,7 @@ describe('mobxConfig', () => {
       configureMobX()
       configureMobX()
       configureMobX()
-      
+
       expect(mockMobxConfigure).toHaveBeenCalledTimes(3)
       expect(console.log).toHaveBeenCalledTimes(3)
     })
@@ -106,21 +106,21 @@ describe('mobxConfig', () => {
     describe('isDevelopment', () => {
       it('should return true when __DEV__ is true', () => {
         global.__DEV__ = true
-        
+
         // Re-import to get fresh value
         jest.resetModules()
         const { mobxUtils: freshUtils } = require('./mobxConfig')
-        
+
         expect(freshUtils.isDevelopment).toBe(true)
       })
 
       it('should return false when __DEV__ is false', () => {
         global.__DEV__ = false
-        
+
         // Re-import to get fresh value
         jest.resetModules()
         const { mobxUtils: freshUtils } = require('./mobxConfig')
-        
+
         expect(freshUtils.isDevelopment).toBe(false)
       })
     })
@@ -128,47 +128,42 @@ describe('mobxConfig', () => {
     describe('log', () => {
       it('should log messages in development mode', () => {
         global.__DEV__ = true
-        
+
         mobxUtils.log('Test message', 'arg1', 42, { key: 'value' })
-        
-        expect(console.log).toHaveBeenCalledWith(
-          '🏪 [MobX] Test message', 
-          'arg1', 
-          42, 
-          { key: 'value' }
-        )
+
+        expect(console.log).toHaveBeenCalledWith('🏪 [MobX] Test message', 'arg1', 42, { key: 'value' })
       })
 
       it('should not log messages in production mode', () => {
         global.__DEV__ = false
-        
+
         mobxUtils.log('Test message', 'should not appear')
-        
+
         expect(console.log).not.toHaveBeenCalled()
       })
 
       it('should handle messages with no additional arguments', () => {
         global.__DEV__ = true
-        
+
         mobxUtils.log('Simple message')
-        
+
         expect(console.log).toHaveBeenCalledWith('🏪 [MobX] Simple message')
       })
 
       it('should handle empty messages', () => {
         global.__DEV__ = true
-        
+
         mobxUtils.log('')
-        
+
         expect(console.log).toHaveBeenCalledWith('🏪 [MobX] ')
       })
 
       it('should handle complex object arguments', () => {
         global.__DEV__ = true
         const complexObj = { nested: { array: [1, 2, 3], fn: () => {} } }
-        
+
         mobxUtils.log('Complex object', complexObj)
-        
+
         expect(console.log).toHaveBeenCalledWith('🏪 [MobX] Complex object', complexObj)
       })
     })
@@ -176,40 +171,40 @@ describe('mobxConfig', () => {
     describe('time', () => {
       it('should start timing in development mode when console.time exists', () => {
         global.__DEV__ = true
-        
+
         mobxUtils.time('test-operation')
-        
+
         expect(console.time).toHaveBeenCalledWith('🏪 [MobX] test-operation')
       })
 
       it('should not start timing in production mode', () => {
         global.__DEV__ = false
-        
+
         mobxUtils.time('test-operation')
-        
+
         expect(console.time).not.toHaveBeenCalled()
       })
 
       it('should handle missing console.time gracefully', () => {
         global.__DEV__ = true
         console.time = undefined as any
-        
+
         expect(() => mobxUtils.time('test-operation')).not.toThrow()
       })
 
       it('should handle empty label', () => {
         global.__DEV__ = true
-        
+
         mobxUtils.time('')
-        
+
         expect(console.time).toHaveBeenCalledWith('🏪 [MobX] ')
       })
 
       it('should handle special characters in label', () => {
         global.__DEV__ = true
-        
+
         mobxUtils.time('test-operation:123/special-chars')
-        
+
         expect(console.time).toHaveBeenCalledWith('🏪 [MobX] test-operation:123/special-chars')
       })
     })
@@ -217,34 +212,34 @@ describe('mobxConfig', () => {
     describe('timeEnd', () => {
       it('should end timing in development mode when console.timeEnd exists', () => {
         global.__DEV__ = true
-        
+
         mobxUtils.timeEnd('test-operation')
-        
+
         expect(console.timeEnd).toHaveBeenCalledWith('🏪 [MobX] test-operation')
       })
 
       it('should not end timing in production mode', () => {
         global.__DEV__ = false
-        
+
         mobxUtils.timeEnd('test-operation')
-        
+
         expect(console.timeEnd).not.toHaveBeenCalled()
       })
 
       it('should handle missing console.timeEnd gracefully', () => {
         global.__DEV__ = true
         console.timeEnd = undefined as any
-        
+
         expect(() => mobxUtils.timeEnd('test-operation')).not.toThrow()
       })
 
       it('should match time() label format', () => {
         global.__DEV__ = true
         const label = 'matching-operation'
-        
+
         mobxUtils.time(label)
         mobxUtils.timeEnd(label)
-        
+
         expect(console.time).toHaveBeenCalledWith(`🏪 [MobX] ${label}`)
         expect(console.timeEnd).toHaveBeenCalledWith(`🏪 [MobX] ${label}`)
       })
@@ -254,12 +249,12 @@ describe('mobxConfig', () => {
       it('should support complete time/timeEnd workflow', () => {
         global.__DEV__ = true
         const operationLabel = 'store-initialization'
-        
+
         mobxUtils.time(operationLabel)
         // Simulate some work
         mobxUtils.log('Operation in progress')
         mobxUtils.timeEnd(operationLabel)
-        
+
         expect(console.time).toHaveBeenCalledWith(`🏪 [MobX] ${operationLabel}`)
         expect(console.log).toHaveBeenCalledWith('🏪 [MobX] Operation in progress')
         expect(console.timeEnd).toHaveBeenCalledWith(`🏪 [MobX] ${operationLabel}`)
@@ -267,12 +262,12 @@ describe('mobxConfig', () => {
 
       it('should handle nested timing operations', () => {
         global.__DEV__ = true
-        
+
         mobxUtils.time('outer-operation')
         mobxUtils.time('inner-operation')
         mobxUtils.timeEnd('inner-operation')
         mobxUtils.timeEnd('outer-operation')
-        
+
         expect(console.time).toHaveBeenCalledTimes(2)
         expect(console.timeEnd).toHaveBeenCalledTimes(2)
       })
@@ -282,14 +277,14 @@ describe('mobxConfig', () => {
   describe('MobX configuration options', () => {
     it('should enforce actions always for strict state management', () => {
       configureMobX()
-      
+
       const configCall = mockMobxConfigure.mock.calls[0][0]
       expect(configCall.enforceActions).toBe('always')
     })
 
     it('should disable noisy development warnings', () => {
       configureMobX()
-      
+
       const configCall = mockMobxConfigure.mock.calls[0][0]
       expect(configCall.computedRequiresReaction).toBe(false)
       expect(configCall.reactionRequiresObservable).toBe(false)
@@ -298,7 +293,7 @@ describe('mobxConfig', () => {
 
     it('should keep error boundaries enabled', () => {
       configureMobX()
-      
+
       const configCall = mockMobxConfigure.mock.calls[0][0]
       expect(configCall.disableErrorBoundaries).toBe(false)
     })
@@ -307,10 +302,10 @@ describe('mobxConfig', () => {
   describe('React Native compatibility', () => {
     it('should be compatible with different React Native platforms', () => {
       const platforms = ['ios', 'android', 'web', 'windows', 'macos']
-      
-      platforms.forEach(platform => {
+
+      platforms.forEach((platform) => {
         mockPlatform.OS = platform as any
-        
+
         expect(() => configureMobX()).not.toThrow()
         expect(console.log).toHaveBeenCalledWith(`📱 MobX configured for ${platform} environment`)
       })
@@ -327,11 +322,11 @@ describe('mobxConfig', () => {
   describe('production vs development behavior', () => {
     it('should behave appropriately in production environment', () => {
       global.__DEV__ = false
-      
+
       mobxUtils.log('Should not appear')
       mobxUtils.time('Should not time')
       mobxUtils.timeEnd('Should not time')
-      
+
       expect(console.log).not.toHaveBeenCalled()
       expect(console.time).not.toHaveBeenCalled()
       expect(console.timeEnd).not.toHaveBeenCalled()
@@ -339,11 +334,11 @@ describe('mobxConfig', () => {
 
     it('should behave appropriately in development environment', () => {
       global.__DEV__ = true
-      
+
       mobxUtils.log('Should appear')
       mobxUtils.time('Should time')
       mobxUtils.timeEnd('Should time')
-      
+
       expect(console.log).toHaveBeenCalled()
       expect(console.time).toHaveBeenCalled()
       expect(console.timeEnd).toHaveBeenCalled()
@@ -353,14 +348,14 @@ describe('mobxConfig', () => {
   describe('memory and performance', () => {
     it('should not leak memory with repeated configuration calls', () => {
       const initialMemory = process.memoryUsage().heapUsed
-      
+
       for (let i = 0; i < 100; i++) {
         configureMobX()
       }
-      
+
       const finalMemory = process.memoryUsage().heapUsed
       const memoryIncrease = finalMemory - initialMemory
-      
+
       // Allow for some memory increase but not excessive
       expect(memoryIncrease).toBeLessThan(10 * 1024 * 1024) // Less than 10MB
     })
@@ -368,11 +363,11 @@ describe('mobxConfig', () => {
     it('should perform logging operations quickly', () => {
       global.__DEV__ = true
       const start = performance.now()
-      
+
       for (let i = 0; i < 1000; i++) {
         mobxUtils.log(`Performance test ${i}`, { data: i })
       }
-      
+
       const end = performance.now()
       expect(end - start).toBeLessThan(1000) // Should complete in under 1 second
     })

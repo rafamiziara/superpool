@@ -17,7 +17,7 @@ describe('Utils Index Barrel Export', () => {
     it('should export all expected utilities', () => {
       const expectedExports = ['TimeoutUtils', 'AuthUtils']
       const actualExports = Object.keys(utils)
-      
+
       expect(actualExports).toEqual(expect.arrayContaining(expectedExports))
       expect(actualExports).toHaveLength(expectedExports.length)
     })
@@ -25,8 +25,8 @@ describe('Utils Index Barrel Export', () => {
     it('should not export any unexpected utilities', () => {
       const expectedExports = ['TimeoutUtils', 'AuthUtils']
       const actualExports = Object.keys(utils)
-      
-      actualExports.forEach(exportName => {
+
+      actualExports.forEach((exportName) => {
         expect(expectedExports).toContain(exportName)
       })
     })
@@ -51,7 +51,7 @@ describe('Utils Index Barrel Export', () => {
 
     it('should maintain TimeoutUtils class behavior through export', () => {
       const promise = Promise.resolve('test')
-      
+
       expect(() => utils.TimeoutUtils.withTimeout(promise, 1000)).not.toThrow()
     })
   })
@@ -76,7 +76,7 @@ describe('Utils Index Barrel Export', () => {
 
     it('should maintain AuthUtils class behavior through export', () => {
       const nonce = utils.AuthUtils.generateNonce(16)
-      
+
       expect(typeof nonce).toBe('string')
       expect(nonce.length).toBe(16)
     })
@@ -88,11 +88,11 @@ describe('Utils Index Barrel Export', () => {
       const testWalletAddress = '0x742d35Cc6634C0532925a3b8D238a5D2DD8dC5b8'
       const testNonce = 'test_nonce'
       const testTimestamp = Date.now()
-      
+
       // TimeoutUtils static method test
       const delayPromise = utils.TimeoutUtils.delay(0)
       expect(delayPromise).toBeInstanceOf(Promise)
-      
+
       // AuthUtils static method test
       const authToken = utils.AuthUtils.createSafeAuthToken(testWalletAddress, testNonce, testTimestamp)
       expect(typeof authToken).toBe('string')
@@ -107,13 +107,13 @@ describe('Utils Index Barrel Export', () => {
 
     it('should allow method chaining where applicable', () => {
       const testAddress = '0x742d35Cc6634C0532925a3b8D238a5D2DD8dC5b8'
-      
+
       // Test that we can use the utilities in combination
       const nonce = utils.AuthUtils.generateNonce(32)
       const timestamp = Date.now()
       const message = utils.AuthUtils.createAuthMessage(testAddress, nonce, timestamp)
       const isValidFormat = utils.AuthUtils.validateAuthMessageFormat(message, testAddress)
-      
+
       expect(typeof nonce).toBe('string')
       expect(typeof message).toBe('string')
       expect(isValidFormat).toBe(true)
@@ -151,7 +151,7 @@ describe('Utils Index Barrel Export', () => {
   describe('usage patterns validation', () => {
     it('should support destructured imports', () => {
       const { TimeoutUtils: TU, AuthUtils: AU } = utils
-      
+
       expect(TU).toBe(TimeoutUtils)
       expect(AU).toBe(AuthUtils)
       expect(typeof TU.delay).toBe('function')
@@ -167,7 +167,7 @@ describe('Utils Index Barrel Export', () => {
       // Verify that exported utilities maintain their TypeScript types
       const nonce = utils.AuthUtils.generateNonce()
       const timeout = utils.TimeoutUtils.TIMEOUTS.PERSONAL_SIGN
-      
+
       expect(typeof nonce).toBe('string')
       expect(typeof timeout).toBe('number')
     })
@@ -183,9 +183,9 @@ describe('Utils Index Barrel Export', () => {
     it('should provide clear utility purpose through exports', () => {
       // Test that the barrel export makes it clear what utilities are available
       const utilityNames = Object.keys(utils)
-      
-      expect(utilityNames.some(name => name.includes('Timeout'))).toBe(true)
-      expect(utilityNames.some(name => name.includes('Auth'))).toBe(true)
+
+      expect(utilityNames.some((name) => name.includes('Timeout'))).toBe(true)
+      expect(utilityNames.some((name) => name.includes('Auth'))).toBe(true)
     })
   })
 })

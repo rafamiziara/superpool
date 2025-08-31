@@ -17,7 +17,7 @@ jest.mock('../../../utils', () => ({
 describe('SessionErrorHandler', () => {
   let handler: SessionErrorHandler
   let mockDisconnectFunction: jest.Mock
-  
+
   const mockSessionContext: SessionErrorContext = {
     errorMessage: 'WalletConnect session error',
     sessionId: 'abc123',
@@ -55,7 +55,6 @@ describe('SessionErrorHandler', () => {
   })
 
   describe('handle method', () => {
-
     describe('Success Scenarios', () => {
       beforeEach(() => {
         const { SessionManager } = require('../../../utils')
@@ -75,7 +74,7 @@ describe('SessionErrorHandler', () => {
         const { SessionManager } = require('../../../utils')
         expect(SessionManager.clearSessionByErrorId).toHaveBeenCalledWith('abc123')
         expect(SessionManager.forceResetAllConnections).toHaveBeenCalled()
-        
+
         // Verify disconnect was called
         expect(mockDisconnectFunction).toHaveBeenCalled()
       })
@@ -186,7 +185,7 @@ describe('SessionErrorHandler', () => {
         const { SessionManager } = require('../../../utils')
         SessionManager.clearSessionByErrorId.mockResolvedValue(undefined)
         SessionManager.forceResetAllConnections.mockResolvedValue(undefined)
-        
+
         mockDisconnectFunction.mockImplementation(() => {
           throw new Error('Disconnect failed')
         })
@@ -311,10 +310,7 @@ describe('SessionErrorHandler', () => {
         const handler2 = new SessionErrorHandler(mockDisconnectFunction)
 
         // Handle two errors simultaneously
-        await Promise.all([
-          handler.handle(mockSessionContext),
-          handler2.handle(mockSessionContext)
-        ])
+        await Promise.all([handler.handle(mockSessionContext), handler2.handle(mockSessionContext)])
 
         // Both should schedule their own toasts
         jest.advanceTimersByTime(1500)
@@ -374,26 +370,23 @@ describe('SessionErrorHandler', () => {
 
       it('should handle concurrent cleanup operations', async () => {
         const { SessionManager } = require('../../../utils')
-        
+
         let resolveCleanup: () => void
-        const cleanupPromise = new Promise<void>(resolve => {
+        const cleanupPromise = new Promise<void>((resolve) => {
           resolveCleanup = resolve
         })
-        
+
         SessionManager.forceResetAllConnections.mockReturnValue(cleanupPromise)
 
         // Start multiple handlers simultaneously
-        const promises = [
-          handler.handle(mockSessionContext),
-          handler.handle({ ...mockSessionContext, sessionId: 'other-session' }),
-        ]
+        const promises = [handler.handle(mockSessionContext), handler.handle({ ...mockSessionContext, sessionId: 'other-session' })]
 
         // Let them all start, then resolve
         resolveCleanup!()
         const results = await Promise.all(promises)
 
         expect(results).toHaveLength(2)
-        expect(results.every(r => r.shouldDisconnect)).toBe(true)
+        expect(results.every((r) => r.shouldDisconnect)).toBe(true)
         expect(mockDisconnectFunction).toHaveBeenCalledTimes(2)
       })
     })
@@ -404,9 +397,9 @@ describe('SessionErrorHandler', () => {
         SessionManager.forceResetAllConnections.mockResolvedValue(undefined)
 
         const start = performance.now()
-        
+
         await handler.handle(mockSessionContext)
-        
+
         const end = performance.now()
         expect(end - start).toBeLessThan(50) // Should be very fast
       })
@@ -421,9 +414,9 @@ describe('SessionErrorHandler', () => {
         }))
 
         const start = performance.now()
-        
-        await Promise.all(contexts.map(context => handler.handle(context)))
-        
+
+        await Promise.all(contexts.map((context) => handler.handle(context)))
+
         const end = performance.now()
         expect(end - start).toBeLessThan(1000) // Should handle 100 errors within 1 second
       })
@@ -443,7 +436,7 @@ describe('SessionErrorHandler', () => {
 
     it('should handle both success and failure cases correctly', async () => {
       const { SessionManager } = require('../../../utils')
-      
+
       // Test success case
       SessionManager.forceResetAllConnections.mockResolvedValue(undefined)
       const successResult = await handler.handle(mockSessionContext)

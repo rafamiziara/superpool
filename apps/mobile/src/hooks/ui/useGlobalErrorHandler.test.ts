@@ -7,7 +7,7 @@ const mockSessionManager = {
 }
 
 jest.doMock('../../utils/sessionManager', () => ({
-  SessionManager: mockSessionManager
+  SessionManager: mockSessionManager,
 }))
 
 const { useGlobalErrorHandler } = require('./useGlobalErrorHandler')
@@ -307,7 +307,7 @@ describe('useGlobalErrorHandler', () => {
       mockSessionManager.detectSessionCorruption.mockClear()
       mockSessionManager.handleSessionCorruption.mockClear()
       jest.useFakeTimers()
-      
+
       // Re-setup mocks after clearAllMocks
       mockSessionManager.detectSessionCorruption.mockImplementation(createSessionCorruptionDetector())
       mockSessionManager.handleSessionCorruption.mockResolvedValue(undefined)
@@ -326,26 +326,26 @@ describe('useGlobalErrorHandler', () => {
 
       // First error should be handled
       console.error(errorMessage)
-      
+
       // Second identical error within 5 seconds should be ignored
       console.error(errorMessage)
-      
+
       // Allow some time for async operations and let promises resolve
       act(() => {
         jest.advanceTimersByTime(100)
       })
-      
+
       // Allow time for async operations
       act(() => {
         jest.runAllTimers()
       })
 
       // The hook calls detectSessionCorruption twice per console.error call:
-      // 1. Once in the console.error override (with the string)  
+      // 1. Once in the console.error override (with the string)
       // 2. Once in handleGlobalError (with the processed error)
       // So 2 console.error calls = 4 detectSessionCorruption calls
       expect(mockSessionManager.detectSessionCorruption).toHaveBeenCalledTimes(4)
-      
+
       // Note: With fake timers, async handleSessionCorruption may not execute immediately
       // So we test that detection occurred but don't enforce handling count
       // expect(mockSessionManager.handleSessionCorruption).toHaveBeenCalledTimes(1)
@@ -363,7 +363,7 @@ describe('useGlobalErrorHandler', () => {
 
       // First error
       console.error(errorMessage)
-      
+
       // Advance time by 6 seconds (past 5 second cooldown)
       act(() => {
         jest.advanceTimersByTime(6000)
@@ -371,7 +371,7 @@ describe('useGlobalErrorHandler', () => {
 
       // Second identical error after cooldown should be handled
       console.error(errorMessage)
-      
+
       // Allow time for processing
       act(() => {
         jest.advanceTimersByTime(100)
@@ -395,10 +395,10 @@ describe('useGlobalErrorHandler', () => {
 
       // First error starts handling
       console.error('WalletConnect session error: concurrent test 1')
-      
+
       // Second different error should be ignored because first is still handling
       console.error('WalletConnect session error: concurrent test 2')
-      
+
       // Allow time for processing
       act(() => {
         jest.advanceTimersByTime(100)
@@ -420,7 +420,7 @@ describe('useGlobalErrorHandler', () => {
 
       // Trigger error handling
       console.error('WalletConnect session error: timeout reset test')
-      
+
       // Advance time by 3 seconds to trigger timeout reset
       act(() => {
         jest.advanceTimersByTime(3000)
@@ -428,7 +428,7 @@ describe('useGlobalErrorHandler', () => {
 
       // Now a new error should be handled (different message to avoid lastHandledError check)
       console.error('WalletConnect session error: new error after reset')
-      
+
       // Allow time for processing
       act(() => {
         jest.advanceTimersByTime(100)
@@ -449,7 +449,7 @@ describe('useGlobalErrorHandler', () => {
       mockSessionManager.handleSessionCorruption.mockClear()
       mockSessionManager.detectSessionCorruption.mockImplementation(createSessionCorruptionDetector())
       mockSessionManager.handleSessionCorruption.mockResolvedValue(undefined)
-      
+
       const logSpy = jest.spyOn(console, 'log').mockImplementation()
 
       const { unmount } = renderHook(() => useGlobalErrorHandler())
@@ -475,7 +475,7 @@ describe('useGlobalErrorHandler', () => {
       mockSessionManager.handleSessionCorruption.mockClear()
       mockSessionManager.detectSessionCorruption.mockImplementation(createSessionCorruptionDetector())
       mockSessionManager.handleSessionCorruption.mockResolvedValue(undefined)
-      
+
       const logSpy = jest.spyOn(console, 'log').mockImplementation()
 
       const { unmount } = renderHook(() => useGlobalErrorHandler())
@@ -499,7 +499,7 @@ describe('useGlobalErrorHandler', () => {
       mockSessionManager.handleSessionCorruption.mockClear()
       mockSessionManager.detectSessionCorruption.mockImplementation(createSessionCorruptionDetector())
       mockSessionManager.handleSessionCorruption.mockResolvedValue(undefined)
-      
+
       const { unmount } = renderHook(() => useGlobalErrorHandler())
 
       // Empty error should not crash
@@ -519,7 +519,7 @@ describe('useGlobalErrorHandler', () => {
       mockSessionManager.handleSessionCorruption.mockClear()
       mockSessionManager.detectSessionCorruption.mockImplementation(createSessionCorruptionDetector())
       mockSessionManager.handleSessionCorruption.mockResolvedValue(undefined)
-      
+
       const { unmount } = renderHook(() => useGlobalErrorHandler())
 
       // Test null and undefined
@@ -541,7 +541,7 @@ describe('useGlobalErrorHandler', () => {
       mockSessionManager.handleSessionCorruption.mockClear()
       mockSessionManager.detectSessionCorruption.mockImplementation(createSessionCorruptionDetector())
       mockSessionManager.handleSessionCorruption.mockResolvedValue(undefined)
-      
+
       const { unmount } = renderHook(() => useGlobalErrorHandler())
 
       // Test various primitive types
@@ -560,7 +560,7 @@ describe('useGlobalErrorHandler', () => {
       mockSessionManager.handleSessionCorruption.mockClear()
       mockSessionManager.detectSessionCorruption.mockImplementation(createSessionCorruptionDetector())
       mockSessionManager.handleSessionCorruption.mockResolvedValue(undefined)
-      
+
       const logSpy = jest.spyOn(console, 'log').mockImplementation()
 
       const { unmount } = renderHook(() => useGlobalErrorHandler())
@@ -584,7 +584,7 @@ describe('useGlobalErrorHandler', () => {
       mockSessionManager.detectSessionCorruption.mockClear()
       mockSessionManager.handleSessionCorruption.mockClear()
       mockSessionManager.detectSessionCorruption.mockImplementation(createSessionCorruptionDetector())
-      
+
       const logSpy = jest.spyOn(console, 'log').mockImplementation()
       const originalError = console.error
       const errorCallSpy = jest.fn()
@@ -617,7 +617,7 @@ describe('useGlobalErrorHandler', () => {
       mockSessionManager.handleSessionCorruption.mockClear()
       mockSessionManager.detectSessionCorruption.mockImplementation(createSessionCorruptionDetector())
       mockSessionManager.handleSessionCorruption.mockResolvedValue(undefined)
-      
+
       const logSpy = jest.spyOn(console, 'log').mockImplementation()
 
       const { unmount } = renderHook(() => useGlobalErrorHandler())
@@ -641,7 +641,7 @@ describe('useGlobalErrorHandler', () => {
       mockSessionManager.handleSessionCorruption.mockClear()
       mockSessionManager.detectSessionCorruption.mockImplementation(createSessionCorruptionDetector())
       mockSessionManager.handleSessionCorruption.mockResolvedValue(undefined)
-      
+
       const logSpy = jest.spyOn(console, 'log').mockImplementation()
 
       const { unmount } = renderHook(() => useGlobalErrorHandler())
@@ -670,7 +670,7 @@ describe('useGlobalErrorHandler', () => {
       mockSessionManager.handleSessionCorruption.mockClear()
       mockSessionManager.detectSessionCorruption.mockImplementation(createSessionCorruptionDetector())
       mockSessionManager.handleSessionCorruption.mockResolvedValue(undefined)
-      
+
       const originalError = console.error
 
       // Mount first instance
@@ -698,7 +698,7 @@ describe('useGlobalErrorHandler', () => {
       mockSessionManager.detectSessionCorruption.mockClear()
       mockSessionManager.handleSessionCorruption.mockClear()
       jest.useFakeTimers()
-      
+
       // Re-setup mocks after clearAllMocks
       mockSessionManager.detectSessionCorruption.mockImplementation(createSessionCorruptionDetector())
       mockSessionManager.handleSessionCorruption.mockResolvedValue(undefined)
@@ -718,10 +718,10 @@ describe('useGlobalErrorHandler', () => {
 
       // First error should start handling
       console.error('WalletConnect session error: state test 1')
-      
+
       // Second error should be blocked
       console.error('WalletConnect session error: state test 2')
-      
+
       // Allow initial processing
       act(() => {
         jest.advanceTimersByTime(100)
@@ -741,7 +741,7 @@ describe('useGlobalErrorHandler', () => {
 
       // Now new error should be handled
       console.error('WalletConnect session error: state test 3')
-      
+
       // Allow processing
       act(() => {
         jest.advanceTimersByTime(100)
@@ -763,13 +763,13 @@ describe('useGlobalErrorHandler', () => {
 
       // Handle first error
       console.error(error1)
-      
+
       // Same error within 5 seconds should be blocked
       console.error(error1)
-      
+
       // Different error should be blocked due to isHandling
       console.error(error2)
-      
+
       // Allow processing time
       act(() => {
         jest.advanceTimersByTime(100)
@@ -787,7 +787,7 @@ describe('useGlobalErrorHandler', () => {
     it('should handle Date.now() edge case for timing calculations', async () => {
       const logSpy = jest.spyOn(console, 'log').mockImplementation()
       const dateSpy = jest.spyOn(Date, 'now')
-      
+
       // Mock Date.now to return a specific timestamp
       dateSpy.mockReturnValue(1000000)
 
@@ -795,7 +795,7 @@ describe('useGlobalErrorHandler', () => {
 
       const errorMessage = 'WalletConnect session error: timing test'
       console.error(errorMessage)
-      
+
       await act(async () => {
         await new Promise((resolve) => setTimeout(resolve, 10))
       })
@@ -817,9 +817,7 @@ describe('useGlobalErrorHandler', () => {
 
       console.error(testFn, testSymbol, testObj, 'session error')
 
-      expect(mockSessionManager.detectSessionCorruption).toHaveBeenCalledWith(
-        expect.stringContaining('session error')
-      )
+      expect(mockSessionManager.detectSessionCorruption).toHaveBeenCalledWith(expect.stringContaining('session error'))
 
       unmount()
     })
@@ -906,7 +904,7 @@ describe('useGlobalErrorHandler', () => {
       // Allow async operations to complete with proper timing
       await act(async () => {
         jest.advanceTimersByTime(0) // Process immediate async operations
-        await new Promise(resolve => process.nextTick(resolve)) // Allow microtasks
+        await new Promise((resolve) => process.nextTick(resolve)) // Allow microtasks
         jest.advanceTimersByTime(100) // Allow any other timers
       })
 
@@ -928,16 +926,16 @@ describe('useGlobalErrorHandler', () => {
 
       // First error should be handled
       console.error(errorMessage)
-      
+
       await act(async () => {
         jest.advanceTimersByTime(0)
-        await new Promise(resolve => process.nextTick(resolve))
+        await new Promise((resolve) => process.nextTick(resolve))
         jest.advanceTimersByTime(100)
       })
 
       // Second identical error within 5 seconds should hit the return statement (line 33)
       console.error(errorMessage)
-      
+
       await act(async () => {
         jest.advanceTimersByTime(100)
       })
@@ -953,7 +951,7 @@ describe('useGlobalErrorHandler', () => {
       mockSessionManager.detectSessionCorruption.mockReturnValue(true)
       const recoveryError = new Error('Recovery failed')
       mockSessionManager.handleSessionCorruption.mockRejectedValue(recoveryError)
-      
+
       // We need to capture the original console.error to check for our specific error message
       const originalErrorCalls: any[][] = []
       consoleErrorSpy.mockImplementation((...args) => {
@@ -966,16 +964,16 @@ describe('useGlobalErrorHandler', () => {
 
       await act(async () => {
         jest.advanceTimersByTime(0)
-        await new Promise(resolve => process.nextTick(resolve))
+        await new Promise((resolve) => process.nextTick(resolve))
         jest.advanceTimersByTime(100)
       })
 
       // Verify error was caught and logged (line 45) - the hook's console.error override will call the original
       expect(mockSessionManager.handleSessionCorruption).toHaveBeenCalledWith('WalletConnect session error: recovery failure test')
-      
+
       // Check that the error recovery message was logged
-      const recoveryErrorCall = originalErrorCalls.find(call => 
-        call[0] === '❌ Failed to recover from session corruption:' && call[1] === recoveryError
+      const recoveryErrorCall = originalErrorCalls.find(
+        (call) => call[0] === '❌ Failed to recover from session corruption:' && call[1] === recoveryError
       )
       expect(recoveryErrorCall).toBeDefined()
 
@@ -993,7 +991,7 @@ describe('useGlobalErrorHandler', () => {
 
       await act(async () => {
         jest.advanceTimersByTime(0)
-        await new Promise(resolve => process.nextTick(resolve))
+        await new Promise((resolve) => process.nextTick(resolve))
         jest.advanceTimersByTime(100)
       })
 
@@ -1017,7 +1015,7 @@ describe('useGlobalErrorHandler', () => {
 
       await act(async () => {
         jest.advanceTimersByTime(0)
-        await new Promise(resolve => process.nextTick(resolve))
+        await new Promise((resolve) => process.nextTick(resolve))
         jest.advanceTimersByTime(100)
       })
 
@@ -1029,9 +1027,7 @@ describe('useGlobalErrorHandler', () => {
     it('should test concurrent handling prevention (isHandling flag)', async () => {
       mockSessionManager.detectSessionCorruption.mockReturnValue(true)
       // Make handleSessionCorruption take time to test concurrent prevention
-      mockSessionManager.handleSessionCorruption.mockImplementation(() => 
-        new Promise(resolve => setTimeout(resolve, 1000))
-      )
+      mockSessionManager.handleSessionCorruption.mockImplementation(() => new Promise((resolve) => setTimeout(resolve, 1000)))
 
       const { unmount } = renderHook(() => useGlobalErrorHandler())
 
@@ -1059,7 +1055,7 @@ describe('useGlobalErrorHandler', () => {
 
     it('should test the complete async flow with state updates', async () => {
       let resolveHandler: () => void
-      const handlerPromise = new Promise<void>(resolve => {
+      const handlerPromise = new Promise<void>((resolve) => {
         resolveHandler = resolve
       })
 
@@ -1073,12 +1069,15 @@ describe('useGlobalErrorHandler', () => {
 
       await act(async () => {
         jest.advanceTimersByTime(0)
-        await new Promise(resolve => process.nextTick(resolve))
+        await new Promise((resolve) => process.nextTick(resolve))
         jest.advanceTimersByTime(100)
       })
 
       // State should be set to handling (line 38-40)
-      expect(consoleLogSpy).toHaveBeenCalledWith('🚨 Global session corruption detected:', 'WalletConnect session error: complete flow test')
+      expect(consoleLogSpy).toHaveBeenCalledWith(
+        '🚨 Global session corruption detected:',
+        'WalletConnect session error: complete flow test'
+      )
 
       // Resolve the handler to complete the async flow
       act(() => {
@@ -1087,7 +1086,7 @@ describe('useGlobalErrorHandler', () => {
 
       await act(async () => {
         jest.runAllTimers()
-        await new Promise(resolve => process.nextTick(resolve))
+        await new Promise((resolve) => process.nextTick(resolve))
       })
 
       // Finally block should execute and set timeout (lines 47-51)
@@ -1111,7 +1110,7 @@ describe('useGlobalErrorHandler', () => {
       // Allow the handler to complete
       await act(async () => {
         jest.advanceTimersByTime(0)
-        await new Promise(resolve => process.nextTick(resolve))
+        await new Promise((resolve) => process.nextTick(resolve))
       })
 
       // Verify initial handling
@@ -1128,7 +1127,7 @@ describe('useGlobalErrorHandler', () => {
 
       await act(async () => {
         jest.advanceTimersByTime(0)
-        await new Promise(resolve => process.nextTick(resolve))
+        await new Promise((resolve) => process.nextTick(resolve))
       })
 
       // This should work because isHandling was reset to false
@@ -1159,7 +1158,7 @@ describe('useGlobalErrorHandler', () => {
 
       await act(async () => {
         jest.advanceTimersByTime(0)
-        await new Promise(resolve => process.nextTick(resolve))
+        await new Promise((resolve) => process.nextTick(resolve))
         jest.advanceTimersByTime(100)
       })
 

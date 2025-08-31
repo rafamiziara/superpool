@@ -8,13 +8,13 @@ jest.mock('./SignatureUtils', () => ({
   SignatureUtils: {
     withTimeout: jest.fn(),
     validateSignatureResult: jest.fn(),
-    createSafeAuthToken: jest.fn()
-  }
+    createSafeAuthToken: jest.fn(),
+  },
 }))
 
 // Mock devOnly utility
 jest.mock('../../../utils', () => ({
-  devOnly: jest.fn()
+  devOnly: jest.fn(),
 }))
 
 const mockSignatureUtils = SignatureUtils as jest.Mocked<typeof SignatureUtils>
@@ -28,10 +28,10 @@ describe('SafeWalletStrategy', () => {
 
   beforeEach(() => {
     strategy = new SafeWalletStrategy()
-    
+
     mockSignatureFunctions = {
       signMessageAsync: jest.fn(),
-      signTypedDataAsync: jest.fn()
+      signTypedDataAsync: jest.fn(),
     }
 
     mockRequest = {
@@ -39,18 +39,18 @@ describe('SafeWalletStrategy', () => {
       nonce: 'safe123nonce456',
       timestamp: 1234567890,
       walletAddress: '0x742d35Cc6624C4532F7845A7b6d4b7c5c4dF5b9e',
-      chainId: 1
+      chainId: 1,
     }
 
     mockSafeConnector = {
       id: 'safe',
       name: 'Safe Wallet',
-      type: 'safe'
+      type: 'safe',
     } as Connector
 
     // Reset all mocks
     jest.clearAllMocks()
-    
+
     // Set up default mock implementations
     mockSignatureUtils.withTimeout.mockImplementation(async (promise) => await promise)
     mockSignatureUtils.validateSignatureResult.mockReturnValue(true)
@@ -70,10 +70,10 @@ describe('SafeWalletStrategy', () => {
           { id: 'safe', name: 'Any Name', type: 'any' },
           { id: 'safe-wallet', name: 'Wallet', type: 'custom' },
           { id: 'SAFE', name: 'Wallet', type: 'custom' },
-          { id: 'mysafeconnector', name: 'Wallet', type: 'custom' }
+          { id: 'mysafeconnector', name: 'Wallet', type: 'custom' },
         ] as Connector[]
 
-        safeConnectors.forEach(connector => {
+        safeConnectors.forEach((connector) => {
           expect(strategy.canHandle(connector)).toBe(true)
         })
       })
@@ -84,10 +84,10 @@ describe('SafeWalletStrategy', () => {
           { id: 'wallet2', name: 'SAFE WALLET', type: 'custom' },
           { id: 'wallet3', name: 'safe wallet', type: 'custom' },
           { id: 'wallet4', name: 'MySafeWallet', type: 'custom' },
-          { id: 'wallet5', name: 'WalletSafe', type: 'custom' }
+          { id: 'wallet5', name: 'WalletSafe', type: 'custom' },
         ] as Connector[]
 
-        safeConnectors.forEach(connector => {
+        safeConnectors.forEach((connector) => {
           expect(strategy.canHandle(connector)).toBe(true)
         })
       })
@@ -98,10 +98,10 @@ describe('SafeWalletStrategy', () => {
           { id: 'walletconnect', name: 'WalletConnect', type: 'walletconnect' },
           { id: 'coinbase', name: 'Coinbase Wallet', type: 'coinbaseWallet' },
           { id: 'injected', name: 'Browser Wallet', type: 'injected' },
-          { id: 'custom', name: 'Custom Wallet', type: 'custom' }
+          { id: 'custom', name: 'Custom Wallet', type: 'custom' },
         ] as Connector[]
 
-        nonSafeConnectors.forEach(connector => {
+        nonSafeConnectors.forEach((connector) => {
           expect(strategy.canHandle(connector)).toBe(false)
         })
       })
@@ -117,11 +117,11 @@ describe('SafeWalletStrategy', () => {
           { id: 'unsafe', name: 'Wallet', type: 'custom' }, // 'safe' in id but not Safe wallet
           { id: 'wallet', name: 'Unsafe Wallet', type: 'custom' }, // 'safe' in name but not Safe wallet
           { id: 'safewallet', name: 'Wallet', type: 'custom' }, // Contains 'safe'
-          { id: 'wallet', name: 'SafeWallet', type: 'custom' } // Contains 'safe'
+          { id: 'wallet', name: 'SafeWallet', type: 'custom' }, // Contains 'safe'
         ] as Connector[]
 
         // These should all return true because they contain 'safe'
-        edgeCases.forEach(connector => {
+        edgeCases.forEach((connector) => {
           expect(strategy.canHandle(connector)).toBe(true)
         })
       })
@@ -151,13 +151,13 @@ describe('SafeWalletStrategy', () => {
 
         expect(result).toEqual({
           signature: '0x1234567890abcdef',
-          signatureType: 'personal-sign'
+          signatureType: 'personal-sign',
         })
 
         expect(mockSignatureFunctions.signMessageAsync).toHaveBeenCalledWith({
           message: mockRequest.message,
           account: mockRequest.walletAddress as `0x${string}`,
-          connector: mockSafeConnector
+          connector: mockSafeConnector,
         })
 
         expect(mockSignatureUtils.withTimeout).toHaveBeenCalledWith(
@@ -186,7 +186,7 @@ describe('SafeWalletStrategy', () => {
         expect(mockSignatureFunctions.signMessageAsync).toHaveBeenCalledWith({
           message: mockRequest.message,
           account: mockRequest.walletAddress as `0x${string}`,
-          connector: mockSafeConnector
+          connector: mockSafeConnector,
         })
       })
 
@@ -194,18 +194,18 @@ describe('SafeWalletStrategy', () => {
         const differentSafeConnectors = [
           { id: 'safe', name: 'Safe', type: 'safe' },
           { id: 'gnosis-safe', name: 'Gnosis Safe', type: 'safe' },
-          { id: 'safe-mobile', name: 'Safe Mobile', type: 'safe' }
+          { id: 'safe-mobile', name: 'Safe Mobile', type: 'safe' },
         ] as Connector[]
 
         for (const connector of differentSafeConnectors) {
           mockSignatureFunctions.signMessageAsync.mockClear()
-          
+
           await strategy.sign(mockRequest, mockSignatureFunctions, connector)
 
           expect(mockSignatureFunctions.signMessageAsync).toHaveBeenCalledWith({
             message: mockRequest.message,
             account: mockRequest.walletAddress as `0x${string}`,
-            connector
+            connector,
           })
         }
       })
@@ -215,13 +215,13 @@ describe('SafeWalletStrategy', () => {
 
         expect(result).toEqual({
           signature: '0x1234567890abcdef',
-          signatureType: 'personal-sign'
+          signatureType: 'personal-sign',
         })
 
         expect(mockSignatureFunctions.signMessageAsync).toHaveBeenCalledWith({
           message: mockRequest.message,
           account: mockRequest.walletAddress as `0x${string}`,
-          connector: undefined
+          connector: undefined,
         })
       })
     })
@@ -237,7 +237,7 @@ describe('SafeWalletStrategy', () => {
 
         expect(result).toEqual({
           signature: 'safe-wallet:0x742d35:safe123:1234567890',
-          signatureType: 'safe-wallet'
+          signatureType: 'safe-wallet',
         })
 
         expect(mockSignatureFunctions.signMessageAsync).toHaveBeenCalled()
@@ -266,7 +266,7 @@ describe('SafeWalletStrategy', () => {
 
         expect(result).toEqual({
           signature: 'safe-wallet:0x742d35:safe123:1234567890',
-          signatureType: 'safe-wallet'
+          signatureType: 'safe-wallet',
         })
 
         expect(mockSignatureUtils.createSafeAuthToken).toHaveBeenCalledWith(mockRequest)
@@ -275,13 +275,13 @@ describe('SafeWalletStrategy', () => {
       it('should log signing error and fallback', async () => {
         const consoleSpy = jest.spyOn(console, 'log').mockImplementation()
         const errorMessage = 'Method not supported by Safe'
-        
+
         mockSignatureFunctions.signMessageAsync.mockRejectedValue(new Error(errorMessage))
 
         await strategy.sign(mockRequest, mockSignatureFunctions, mockSafeConnector)
 
         expect(consoleSpy).toHaveBeenCalledWith(
-          '❌ Safe direct signing failed, using ownership verification fallback...', 
+          '❌ Safe direct signing failed, using ownership verification fallback...',
           expect.any(Error)
         )
 
@@ -296,7 +296,7 @@ describe('SafeWalletStrategy', () => {
           { message: 'Object error' },
           'String error',
           null,
-          undefined
+          undefined,
         ]
 
         for (const error of errorTypes) {
@@ -322,17 +322,11 @@ describe('SafeWalletStrategy', () => {
       })
 
       it('should use 20 second timeout for Safe wallets', async () => {
-        mockSignatureFunctions.signMessageAsync.mockImplementation(
-          () => new Promise(resolve => setTimeout(() => resolve('0x123'), 100))
-        )
+        mockSignatureFunctions.signMessageAsync.mockImplementation(() => new Promise((resolve) => setTimeout(() => resolve('0x123'), 100)))
 
         await strategy.sign(mockRequest, mockSignatureFunctions, mockSafeConnector)
 
-        expect(mockSignatureUtils.withTimeout).toHaveBeenCalledWith(
-          expect.any(Promise),
-          20000,
-          'Safe connector signing'
-        )
+        expect(mockSignatureUtils.withTimeout).toHaveBeenCalledWith(expect.any(Promise), 20000, 'Safe connector signing')
       })
     })
   })
@@ -346,7 +340,7 @@ describe('SafeWalletStrategy', () => {
 
         expect(result).toEqual({
           signature: 'safe-wallet:0x742d35:safe123:1234567890',
-          signatureType: 'safe-wallet'
+          signatureType: 'safe-wallet',
         })
 
         expect(mockSignatureUtils.createSafeAuthToken).toHaveBeenCalledWith(mockRequest)
@@ -369,12 +363,12 @@ describe('SafeWalletStrategy', () => {
           { ...mockRequest, walletAddress: '0x123' },
           { ...mockRequest, nonce: 'different-nonce' },
           { ...mockRequest, timestamp: 999999999 },
-          { ...mockRequest, chainId: 137 }
+          { ...mockRequest, chainId: 137 },
         ]
 
         for (const request of differentRequests) {
           mockSignatureFunctions.signMessageAsync.mockRejectedValueOnce(new Error('Failed'))
-          
+
           await strategy.sign(request, mockSignatureFunctions, mockSafeConnector)
 
           expect(mockSignatureUtils.createSafeAuthToken).toHaveBeenCalledWith(request)
@@ -386,14 +380,10 @@ describe('SafeWalletStrategy', () => {
   describe('Integration with SignatureUtils', () => {
     it('should call all required SignatureUtils methods in successful flow', async () => {
       mockSignatureFunctions.signMessageAsync.mockResolvedValue('0x123abc')
-      
+
       await strategy.sign(mockRequest, mockSignatureFunctions, mockSafeConnector)
 
-      expect(mockSignatureUtils.withTimeout).toHaveBeenCalledWith(
-        expect.any(Promise),
-        20000,
-        'Safe connector signing'
-      )
+      expect(mockSignatureUtils.withTimeout).toHaveBeenCalledWith(expect.any(Promise), 20000, 'Safe connector signing')
       expect(mockSignatureUtils.validateSignatureResult).toHaveBeenCalledWith('0x123abc')
     })
 
@@ -407,19 +397,19 @@ describe('SafeWalletStrategy', () => {
 
     it('should maintain proper method call order', async () => {
       const callOrder: string[] = []
-      
+
       mockSignatureUtils.withTimeout.mockImplementation(async (promise) => {
         callOrder.push('withTimeout')
         return await promise
       })
-      
+
       mockSignatureUtils.validateSignatureResult.mockImplementation((sig) => {
         callOrder.push('validateSignatureResult')
         return true
       })
 
       mockSignatureFunctions.signMessageAsync.mockResolvedValue('0x123')
-      
+
       await strategy.sign(mockRequest, mockSignatureFunctions, mockSafeConnector)
 
       expect(callOrder).toEqual(['withTimeout', 'validateSignatureResult'])
@@ -448,7 +438,7 @@ describe('SafeWalletStrategy', () => {
 
     it('should log direct signing attempt', async () => {
       mockSignatureFunctions.signMessageAsync.mockResolvedValue('0x123')
-      
+
       await strategy.sign(mockRequest, mockSignatureFunctions, mockSafeConnector)
 
       expect(consoleSpy).toHaveBeenCalledWith('🔐 Safe wallet detected, trying direct connector signing...')
@@ -466,14 +456,10 @@ describe('SafeWalletStrategy', () => {
 
     it('should log development-only success messages', async () => {
       mockSignatureFunctions.signMessageAsync.mockResolvedValue('0x1234567890abcdef')
-      
+
       await strategy.sign(mockRequest, mockSignatureFunctions, mockSafeConnector)
 
-      expect(devOnly).toHaveBeenCalledWith(
-        '✅ Safe wallet direct signing successful:',
-        'string',
-        '0x12345678...'
-      )
+      expect(devOnly).toHaveBeenCalledWith('✅ Safe wallet direct signing successful:', 'string', '0x12345678...')
     })
   })
 
@@ -484,7 +470,7 @@ describe('SafeWalletStrategy', () => {
         'Short msg',
         'Very long Safe wallet authentication message with lots of details...',
         'Special chars: !@#$%^&*()_+',
-        'Unicode: 测试消息'
+        'Unicode: 测试消息',
       ]
 
       mockSignatureFunctions.signMessageAsync.mockResolvedValue('0x123')
@@ -496,18 +482,13 @@ describe('SafeWalletStrategy', () => {
         expect(mockSignatureFunctions.signMessageAsync).toHaveBeenCalledWith({
           message,
           account: mockRequest.walletAddress as `0x${string}`,
-          connector: mockSafeConnector
+          connector: mockSafeConnector,
         })
       }
     })
 
     it('should handle requests with different wallet addresses', async () => {
-      const addresses = [
-        '0x0000000000000000000000000000000000000000',
-        '0xffffffffffffffffffffffffffffffffffffffff',
-        '0x123',
-        '0xabc456def'
-      ]
+      const addresses = ['0x0000000000000000000000000000000000000000', '0xffffffffffffffffffffffffffffffffffffffff', '0x123', '0xabc456def']
 
       mockSignatureFunctions.signMessageAsync.mockResolvedValue('0x123')
 
@@ -518,7 +499,7 @@ describe('SafeWalletStrategy', () => {
         expect(mockSignatureFunctions.signMessageAsync).toHaveBeenCalledWith({
           message: mockRequest.message,
           account: walletAddress as `0x${string}`,
-          connector: mockSafeConnector
+          connector: mockSafeConnector,
         })
       }
     })
@@ -541,13 +522,13 @@ describe('SafeWalletStrategy', () => {
         () => {
           mockSignatureFunctions.signMessageAsync.mockResolvedValue('invalid')
           mockSignatureUtils.validateSignatureResult.mockReturnValue(false)
-        }
+        },
       ]
 
       for (const setupFailure of failures) {
         jest.clearAllMocks()
         setupFailure()
-        
+
         const result = await strategy.sign(mockRequest, mockSignatureFunctions, mockSafeConnector)
 
         expect(result.signatureType).toBe('safe-wallet')
@@ -586,17 +567,15 @@ describe('SafeWalletStrategy', () => {
 
   describe('Performance and Memory', () => {
     it('should handle multiple concurrent sign requests', async () => {
-      mockSignatureFunctions.signMessageAsync.mockImplementation(
-        () => new Promise(resolve => setTimeout(() => resolve('0x123'), 10))
-      )
+      mockSignatureFunctions.signMessageAsync.mockImplementation(() => new Promise((resolve) => setTimeout(() => resolve('0x123'), 10)))
 
       const requests = Array(5).fill(mockRequest)
-      const promises = requests.map(req => strategy.sign(req, mockSignatureFunctions, mockSafeConnector))
+      const promises = requests.map((req) => strategy.sign(req, mockSignatureFunctions, mockSafeConnector))
 
       const results = await Promise.all(promises)
 
       expect(results).toHaveLength(5)
-      results.forEach(result => {
+      results.forEach((result) => {
         expect(result.signatureType).toBe('personal-sign')
       })
     })
@@ -609,7 +588,7 @@ describe('SafeWalletStrategy', () => {
       }
 
       expect(strategies).toHaveLength(100)
-      strategies.forEach(s => {
+      strategies.forEach((s) => {
         expect(s.getStrategyName()).toBe('safe-wallet')
       })
     })
@@ -618,9 +597,9 @@ describe('SafeWalletStrategy', () => {
       // Test repeated fallback creation
       for (let i = 0; i < 50; i++) {
         mockSignatureFunctions.signMessageAsync.mockRejectedValueOnce(new Error(`Failure ${i}`))
-        
+
         const result = await strategy.sign(mockRequest, mockSignatureFunctions, mockSafeConnector)
-        
+
         expect(result.signatureType).toBe('safe-wallet')
       }
 
@@ -631,44 +610,31 @@ describe('SafeWalletStrategy', () => {
   describe('Integration with devOnly utility', () => {
     it('should call devOnly for successful signing logs', async () => {
       mockSignatureFunctions.signMessageAsync.mockResolvedValue('0x1234567890abcdef')
-      
+
       await strategy.sign(mockRequest, mockSignatureFunctions, mockSafeConnector)
 
-      expect(devOnly).toHaveBeenCalledWith(
-        '✅ Safe wallet direct signing successful:',
-        'string',
-        '0x12345678...'
-      )
+      expect(devOnly).toHaveBeenCalledWith('✅ Safe wallet direct signing successful:', 'string', '0x12345678...')
     })
 
     it('should not call devOnly on fallback path', async () => {
       mockSignatureFunctions.signMessageAsync.mockRejectedValue(new Error('Failed'))
-      
+
       await strategy.sign(mockRequest, mockSignatureFunctions, mockSafeConnector)
 
       expect(devOnly).not.toHaveBeenCalled()
     })
 
     it('should handle different signature lengths in devOnly call', async () => {
-      const signatures = [
-        '0x12',
-        '0x1234567890',
-        '0x' + 'a'.repeat(100),
-        ''
-      ]
+      const signatures = ['0x12', '0x1234567890', '0x' + 'a'.repeat(100), '']
 
       for (const signature of signatures) {
         mockSignatureFunctions.signMessageAsync.mockResolvedValueOnce(signature)
         devOnly.mockClear()
-        
+
         await strategy.sign(mockRequest, mockSignatureFunctions, mockSafeConnector)
 
         const expectedPreview = signature.substring(0, 10) + '...'
-        expect(devOnly).toHaveBeenCalledWith(
-          '✅ Safe wallet direct signing successful:',
-          'string',
-          expectedPreview
-        )
+        expect(devOnly).toHaveBeenCalledWith('✅ Safe wallet direct signing successful:', 'string', expectedPreview)
       }
     })
   })

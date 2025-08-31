@@ -26,7 +26,7 @@ describe('RootStore', () => {
 
     it('should create separate instances for each child store', () => {
       const anotherRootStore = new RootStore()
-      
+
       expect(rootStore.authenticationStore).not.toBe(anotherRootStore.authenticationStore)
       expect(rootStore.walletStore).not.toBe(anotherRootStore.walletStore)
       expect(rootStore.poolManagementStore).not.toBe(anotherRootStore.poolManagementStore)
@@ -37,7 +37,7 @@ describe('RootStore', () => {
   describe('setUserContext', () => {
     it('should set user address in pool management store', () => {
       const userAddress = '0x1234567890123456789012345678901234567890'
-      
+
       rootStore.setUserContext(userAddress)
       expect(rootStore.poolManagementStore.userAddress).toBe(userAddress)
     })
@@ -45,7 +45,7 @@ describe('RootStore', () => {
     it('should clear user address when null', () => {
       const userAddress = '0x1234567890123456789012345678901234567890'
       rootStore.setUserContext(userAddress)
-      
+
       rootStore.setUserContext(null)
       expect(rootStore.poolManagementStore.userAddress).toBeNull()
     })
@@ -53,50 +53,41 @@ describe('RootStore', () => {
     it('should log warning when user address set but wallet not connected', () => {
       const consoleSpy = jest.spyOn(console, 'log')
       const userAddress = '0x1234567890123456789012345678901234567890'
-      
+
       // Wallet is not connected
       expect(rootStore.walletStore.isConnected).toBe(false)
-      
+
       rootStore.setUserContext(userAddress)
-      
-      expect(consoleSpy).toHaveBeenCalledWith(
-        'User address set but wallet not connected:',
-        userAddress
-      )
-      
+
+      expect(consoleSpy).toHaveBeenCalledWith('User address set but wallet not connected:', userAddress)
+
       consoleSpy.mockRestore()
     })
 
     it('should not log warning when user address set and wallet is connected', () => {
       const consoleSpy = jest.spyOn(console, 'log')
       const userAddress = '0x1234567890123456789012345678901234567890'
-      
+
       // Connect wallet first
       rootStore.walletStore.setConnectionState({
         isConnected: true,
-        address: userAddress
+        address: userAddress,
       })
-      
+
       rootStore.setUserContext(userAddress)
-      
-      expect(consoleSpy).not.toHaveBeenCalledWith(
-        expect.stringMatching(/User address set but wallet not connected/),
-        expect.anything()
-      )
-      
+
+      expect(consoleSpy).not.toHaveBeenCalledWith(expect.stringMatching(/User address set but wallet not connected/), expect.anything())
+
       consoleSpy.mockRestore()
     })
 
     it('should not log warning when setting user address to null', () => {
       const consoleSpy = jest.spyOn(console, 'log')
-      
+
       rootStore.setUserContext(null)
-      
-      expect(consoleSpy).not.toHaveBeenCalledWith(
-        expect.stringMatching(/User address set but wallet not connected/),
-        expect.anything()
-      )
-      
+
+      expect(consoleSpy).not.toHaveBeenCalledWith(expect.stringMatching(/User address set but wallet not connected/), expect.anything())
+
       consoleSpy.mockRestore()
     })
   })
@@ -105,7 +96,7 @@ describe('RootStore', () => {
     it('should return wallet address when connected', () => {
       const userAddress = '0x1234567890123456789012345678901234567890'
       rootStore.walletStore.setConnectionState({ address: userAddress })
-      
+
       expect(rootStore.currentUserAddress).toBe(userAddress)
     })
 
@@ -120,16 +111,13 @@ describe('RootStore', () => {
 
     it('should be reactive to wallet address changes', () => {
       const reactionSpy = jest.fn()
-      
+
       const { reaction } = require('mobx')
-      const dispose = reaction(
-        () => rootStore.currentUserAddress,
-        reactionSpy
-      )
-      
+      const dispose = reaction(() => rootStore.currentUserAddress, reactionSpy)
+
       rootStore.walletStore.setConnectionState({ address: '0x123' })
       expect(reactionSpy).toHaveBeenCalledWith('0x123', null, expect.anything())
-      
+
       dispose()
     })
   })
@@ -146,9 +134,9 @@ describe('RootStore', () => {
         startTime: Date.now(),
         walletAddress: '0x123',
         abortController: new AbortController(),
-        requestId: 'test-id'
+        requestId: 'test-id',
       })
-      
+
       expect(rootStore.isLoading).toBe(true)
     })
 
@@ -180,22 +168,19 @@ describe('RootStore', () => {
     it('should return true when multiple stores are loading', () => {
       rootStore.walletStore.setConnecting(true)
       rootStore.poolManagementStore.setLoading('pools', true)
-      
+
       expect(rootStore.isLoading).toBe(true)
     })
 
     it('should be reactive to loading state changes', () => {
       const reactionSpy = jest.fn()
-      
+
       const { reaction } = require('mobx')
-      const dispose = reaction(
-        () => rootStore.isLoading,
-        reactionSpy
-      )
-      
+      const dispose = reaction(() => rootStore.isLoading, reactionSpy)
+
       rootStore.walletStore.setConnecting(true)
       expect(reactionSpy).toHaveBeenCalledWith(true, false, expect.anything())
-      
+
       dispose()
     })
   })
@@ -214,7 +199,7 @@ describe('RootStore', () => {
         timestamp: new Date(),
       }
       rootStore.authenticationStore.setAuthError(error)
-      
+
       expect(rootStore.hasErrors).toBe(true)
     })
 
@@ -231,22 +216,19 @@ describe('RootStore', () => {
     it('should return true when multiple stores have errors', () => {
       rootStore.walletStore.setConnectionError('Connection failed')
       rootStore.poolManagementStore.setError('Pool error')
-      
+
       expect(rootStore.hasErrors).toBe(true)
     })
 
     it('should be reactive to error state changes', () => {
       const reactionSpy = jest.fn()
-      
+
       const { reaction } = require('mobx')
-      const dispose = reaction(
-        () => rootStore.hasErrors,
-        reactionSpy
-      )
-      
+      const dispose = reaction(() => rootStore.hasErrors, reactionSpy)
+
       rootStore.walletStore.setConnectionError('Error')
       expect(reactionSpy).toHaveBeenCalledWith(true, false, expect.anything())
-      
+
       dispose()
     })
   })
@@ -258,14 +240,14 @@ describe('RootStore', () => {
 
     it('should return authentication error message', () => {
       const error: AppError = {
-        name: 'AppError', 
+        name: 'AppError',
         message: 'Auth failed',
         type: ErrorType.AUTHENTICATION_FAILED,
         userFriendlyMessage: 'Authentication failed. Please try connecting your wallet again.',
         timestamp: new Date(),
       }
       rootStore.authenticationStore.setAuthError(error)
-      
+
       expect(rootStore.allErrors).toEqual(['Auth failed'])
     })
 
@@ -290,7 +272,7 @@ describe('RootStore', () => {
       rootStore.authenticationStore.setAuthError(authError)
       rootStore.walletStore.setConnectionError('Connection failed')
       rootStore.poolManagementStore.setError('Pool error')
-      
+
       const errors = rootStore.allErrors
       expect(errors).toHaveLength(3)
       expect(errors).toContain('Auth failed')
@@ -302,22 +284,19 @@ describe('RootStore', () => {
       rootStore.authenticationStore.setAuthError(null)
       rootStore.walletStore.setConnectionError(null)
       rootStore.poolManagementStore.setError(null)
-      
+
       expect(rootStore.allErrors).toEqual([])
     })
 
     it('should be reactive to error changes', () => {
       const reactionSpy = jest.fn()
-      
+
       const { reaction } = require('mobx')
-      const dispose = reaction(
-        () => rootStore.allErrors.length,
-        reactionSpy
-      )
-      
+      const dispose = reaction(() => rootStore.allErrors.length, reactionSpy)
+
       rootStore.walletStore.setConnectionError('Error')
       expect(reactionSpy).toHaveBeenCalledWith(1, 0, expect.anything())
-      
+
       dispose()
     })
   })
@@ -327,39 +306,39 @@ describe('RootStore', () => {
       // Set up some state in all stores
       const authError: AppError = {
         name: 'AppError',
-        message: 'Auth error', 
+        message: 'Auth error',
         type: ErrorType.AUTHENTICATION_FAILED,
         userFriendlyMessage: 'Authentication failed. Please try connecting your wallet again.',
         timestamp: new Date(),
       }
       rootStore.authenticationStore.setAuthError(authError)
-      
+
       await rootStore.walletStore.connect('0x123', 1)
       rootStore.walletStore.setConnectionError('Connection error')
-      
+
       rootStore.poolManagementStore.setUserAddress('0x123')
       rootStore.poolManagementStore.setError('Pool error')
       rootStore.poolManagementStore.setLoading('pools', true)
-      
+
       rootStore.uiStore.setOnboardingIndex(5)
     })
 
     it('should reset all child stores', () => {
       rootStore.reset()
-      
+
       // Check authentication store reset
       expect(rootStore.authenticationStore.authError).toBeNull()
-      
+
       // Check wallet store reset
       expect(rootStore.walletStore.isConnected).toBe(false)
       expect(rootStore.walletStore.address).toBeUndefined()
       expect(rootStore.walletStore.connectionError).toBeNull()
-      
+
       // Check pool management store reset
       expect(rootStore.poolManagementStore.userAddress).toBeNull()
       expect(rootStore.poolManagementStore.error).toBeNull()
       expect(rootStore.poolManagementStore.loading.pools).toBe(false)
-      
+
       // Check UI store reset
       expect(rootStore.uiStore.onboardingCurrentIndex).toBe(0)
     })
@@ -370,10 +349,10 @@ describe('RootStore', () => {
       expect(rootStore.walletStore.isConnected).toBe(true)
       expect(rootStore.poolManagementStore.error).not.toBeNull()
       expect(rootStore.uiStore.onboardingCurrentIndex).not.toBe(0)
-      
+
       // Call reset and verify it clears all state
       rootStore.reset()
-      
+
       // All stores should be reset
       expect(rootStore.authenticationStore.authError).toBeNull()
       expect(rootStore.walletStore.isConnected).toBe(false)
@@ -383,7 +362,7 @@ describe('RootStore', () => {
 
     it('should reset computed values', () => {
       rootStore.reset()
-      
+
       expect(rootStore.isLoading).toBe(false)
       expect(rootStore.hasErrors).toBe(false)
       expect(rootStore.allErrors).toEqual([])
@@ -394,13 +373,13 @@ describe('RootStore', () => {
   describe('Integration Tests', () => {
     it('should maintain consistency between wallet address and user context', async () => {
       const userAddress = '0x1234567890123456789012345678901234567890'
-      
+
       // Connect wallet
       await rootStore.walletStore.connect(userAddress, 1)
-      
+
       // Set user context
       rootStore.setUserContext(userAddress)
-      
+
       // Both should be consistent
       expect(rootStore.currentUserAddress).toBe(userAddress)
       expect(rootStore.poolManagementStore.userAddress).toBe(userAddress)
@@ -410,17 +389,17 @@ describe('RootStore', () => {
       // Start with loading state
       rootStore.poolManagementStore.setLoading('pools', true)
       expect(rootStore.isLoading).toBe(true)
-      
+
       // Add error while loading
       rootStore.walletStore.setConnectionError('Network error')
       expect(rootStore.hasErrors).toBe(true)
       expect(rootStore.isLoading).toBe(true)
-      
+
       // Complete loading
       rootStore.poolManagementStore.setLoading('pools', false)
       expect(rootStore.isLoading).toBe(false)
       expect(rootStore.hasErrors).toBe(true) // Still has error
-      
+
       // Clear error
       rootStore.walletStore.setConnectionError(null)
       expect(rootStore.hasErrors).toBe(false)
@@ -429,31 +408,31 @@ describe('RootStore', () => {
 
     it('should handle authentication flow integration', async () => {
       const userAddress = '0x1234567890123456789012345678901234567890'
-      
+
       // Start authentication
       rootStore.authenticationStore.setAuthLock({
         isLocked: true,
         startTime: Date.now(),
         walletAddress: userAddress,
         abortController: new AbortController(),
-        requestId: 'test-id'
+        requestId: 'test-id',
       })
       expect(rootStore.isLoading).toBe(true)
-      
+
       // Connect wallet during authentication
       await rootStore.walletStore.connect(userAddress, 1)
       expect(rootStore.isLoading).toBe(true) // Still loading due to auth
-      
+
       // Complete authentication by releasing the lock
       rootStore.authenticationStore.setAuthLock({
         isLocked: false,
         startTime: 0,
         walletAddress: null,
         abortController: null,
-        requestId: null
+        requestId: null,
       })
       expect(rootStore.isLoading).toBe(false)
-      
+
       // Set user context
       rootStore.setUserContext(userAddress)
       expect(rootStore.currentUserAddress).toBe(userAddress)
@@ -466,14 +445,14 @@ describe('RootStore', () => {
       // Set up some state first
       rootStore.walletStore.setConnecting(true)
       rootStore.poolManagementStore.setError('Test error')
-      
+
       // Verify state is set
       expect(rootStore.isLoading).toBe(true)
       expect(rootStore.hasErrors).toBe(true)
-      
+
       // Reset should clear all state
       expect(() => rootStore.reset()).not.toThrow()
-      
+
       // Verify state is cleared
       expect(rootStore.isLoading).toBe(false)
       expect(rootStore.hasErrors).toBe(false)
@@ -488,11 +467,11 @@ describe('RootStore', () => {
         startTime: Date.now(),
         walletAddress: '0x123',
         abortController: new AbortController(),
-        requestId: 'test-id'
+        requestId: 'test-id',
       })
-      
+
       expect(rootStore.isLoading).toBe(true)
-      
+
       // Clear all loading states
       rootStore.walletStore.setConnecting(false)
       rootStore.poolManagementStore.setLoading('pools', false)
@@ -501,9 +480,9 @@ describe('RootStore', () => {
         startTime: 0,
         walletAddress: null,
         abortController: null,
-        requestId: null
+        requestId: null,
       })
-      
+
       expect(rootStore.isLoading).toBe(false)
     })
 
@@ -512,15 +491,15 @@ describe('RootStore', () => {
       const authError: AppError = {
         name: 'AppError',
         message: 'Authentication failed',
-        type: ErrorType.AUTHENTICATION_FAILED, 
+        type: ErrorType.AUTHENTICATION_FAILED,
         userFriendlyMessage: 'Authentication failed. Please try connecting your wallet again.',
         timestamp: new Date(),
       }
       rootStore.authenticationStore.setAuthError(authError)
-      
+
       rootStore.walletStore.setConnectionError('Network timeout')
       rootStore.poolManagementStore.setError('Invalid pool data')
-      
+
       const allErrors = rootStore.allErrors
       expect(allErrors).toHaveLength(3)
       expect(allErrors).toContain('Authentication failed')
@@ -533,7 +512,7 @@ describe('RootStore', () => {
     it('should handle very long error messages', () => {
       const longError = 'A'.repeat(10000)
       rootStore.poolManagementStore.setError(longError)
-      
+
       expect(rootStore.allErrors).toContain(longError)
       expect(rootStore.hasErrors).toBe(true)
     })
@@ -541,7 +520,7 @@ describe('RootStore', () => {
     it('should handle special characters in addresses', () => {
       const specialAddress = '0xabcdef1234567890abcdef1234567890abcdef12'
       rootStore.setUserContext(specialAddress)
-      
+
       expect(rootStore.poolManagementStore.userAddress).toBe(specialAddress)
     })
 
@@ -551,12 +530,12 @@ describe('RootStore', () => {
         '0x2222222222222222222222222222222222222222',
         '0x3333333333333333333333333333333333333333',
       ]
-      
-      addresses.forEach(address => {
+
+      addresses.forEach((address) => {
         rootStore.setUserContext(address)
         expect(rootStore.poolManagementStore.userAddress).toBe(address)
       })
-      
+
       rootStore.setUserContext(null)
       expect(rootStore.poolManagementStore.userAddress).toBeNull()
     })
@@ -565,12 +544,12 @@ describe('RootStore', () => {
       // Set up state
       rootStore.setUserContext('0x123')
       rootStore.uiStore.setOnboardingIndex(5)
-      
+
       // Reset multiple times
       rootStore.reset()
       rootStore.reset()
       rootStore.reset()
-      
+
       // Should still be in clean state
       expect(rootStore.currentUserAddress).toBeNull()
       expect(rootStore.uiStore.onboardingCurrentIndex).toBe(0)
@@ -584,21 +563,21 @@ describe('RootStore', () => {
       const loadingSpy = jest.fn()
       const errorsSpy = jest.fn()
       const userAddressSpy = jest.fn()
-      
+
       const { reaction } = require('mobx')
       const disposeLoading = reaction(() => rootStore.isLoading, loadingSpy)
       const disposeErrors = reaction(() => rootStore.hasErrors, errorsSpy)
       const disposeUserAddress = reaction(() => rootStore.currentUserAddress, userAddressSpy)
-      
+
       // Make changes that should trigger all reactions
       rootStore.walletStore.setConnecting(true)
       rootStore.poolManagementStore.setError('Error')
       rootStore.walletStore.setConnectionState({ address: '0x123' })
-      
+
       expect(loadingSpy).toHaveBeenCalledWith(true, false, expect.anything())
       expect(errorsSpy).toHaveBeenCalledWith(true, false, expect.anything())
       expect(userAddressSpy).toHaveBeenCalledWith('0x123', null, expect.anything())
-      
+
       disposeLoading()
       disposeErrors()
       disposeUserAddress()
@@ -606,7 +585,7 @@ describe('RootStore', () => {
 
     it('should handle complex reaction chains', () => {
       const chainReactionSpy = jest.fn()
-      
+
       const { reaction } = require('mobx')
       const dispose = reaction(
         () => ({
@@ -616,16 +595,16 @@ describe('RootStore', () => {
         }),
         chainReactionSpy
       )
-      
+
       // Single change should trigger reaction with all state
       rootStore.walletStore.setConnectionState({ address: '0x123' })
-      
+
       expect(chainReactionSpy).toHaveBeenCalledWith(
         { loading: false, errors: 0, user: '0x123' },
         { loading: false, errors: 0, user: null },
         expect.anything()
       )
-      
+
       dispose()
     })
   })
@@ -638,9 +617,9 @@ describe('RootStore', () => {
         startTime: Date.now(),
         walletAddress: '0x123',
         abortController: null, // null abort controller
-        requestId: 'test-id'
+        requestId: 'test-id',
       })
-      
+
       expect(rootStore.isLoading).toBe(true)
     })
 
@@ -651,14 +630,14 @@ describe('RootStore', () => {
         startTime: 0,
         walletAddress: null,
         abortController: null,
-        requestId: null
+        requestId: null,
       })
       rootStore.walletStore.setConnecting(false)
       rootStore.poolManagementStore.setLoading('pools', false)
       rootStore.poolManagementStore.setLoading('loans', false)
       rootStore.poolManagementStore.setLoading('transactions', false)
       rootStore.poolManagementStore.setLoading('memberActions', false)
-      
+
       expect(rootStore.isLoading).toBe(false)
     })
 
@@ -667,7 +646,7 @@ describe('RootStore', () => {
       rootStore.authenticationStore.setAuthError(null)
       rootStore.walletStore.setConnectionError(null)
       rootStore.poolManagementStore.setError(null)
-      
+
       expect(rootStore.hasErrors).toBe(false)
     })
 
@@ -679,19 +658,16 @@ describe('RootStore', () => {
 
     it('should handle setUserContext with empty string address', () => {
       const consoleSpy = jest.spyOn(console, 'log')
-      
+
       // Ensure wallet is not connected
       expect(rootStore.walletStore.isConnected).toBe(false)
-      
+
       rootStore.setUserContext('')
-      
+
       expect(rootStore.poolManagementStore.userAddress).toBe('')
       // Empty string is falsy in boolean context, so it won't trigger the warning
-      expect(consoleSpy).not.toHaveBeenCalledWith(
-        'User address set but wallet not connected:',
-        ''
-      )
-      
+      expect(consoleSpy).not.toHaveBeenCalledWith('User address set but wallet not connected:', '')
+
       consoleSpy.mockRestore()
     })
 
@@ -703,11 +679,11 @@ describe('RootStore', () => {
         userFriendlyMessage: 'Authentication failed. Please try connecting your wallet again.',
         timestamp: new Date(),
       }
-      
+
       rootStore.authenticationStore.setAuthError(authError)
       rootStore.walletStore.setConnectionError(null) // null error
       rootStore.poolManagementStore.setError('Pool error')
-      
+
       const errors = rootStore.allErrors
       expect(errors).toHaveLength(2)
       expect(errors).toContain('Auth error')
@@ -717,12 +693,12 @@ describe('RootStore', () => {
 
     it('should handle constructor property initialization', () => {
       const newStore = new RootStore()
-      
+
       expect(newStore.authenticationStore).toBeDefined()
       expect(newStore.walletStore).toBeDefined()
       expect(newStore.poolManagementStore).toBeDefined()
       expect(newStore.uiStore).toBeDefined()
-      
+
       // Verify initial state
       expect(newStore.isLoading).toBe(false)
       expect(newStore.hasErrors).toBe(false)
@@ -734,22 +710,19 @@ describe('RootStore', () => {
       const consoleSpy = jest.spyOn(console, 'log')
       const walletAddress = '0x1111111111111111111111111111111111111111'
       const contextAddress = '0x2222222222222222222222222222222222222222'
-      
+
       // Connect wallet with one address
       rootStore.walletStore.setConnectionState({
         isConnected: true,
-        address: walletAddress
+        address: walletAddress,
       })
-      
+
       // Set user context with different address
       rootStore.setUserContext(contextAddress)
-      
+
       // Should not log warning because wallet is connected (even though addresses differ)
-      expect(consoleSpy).not.toHaveBeenCalledWith(
-        'User address set but wallet not connected:',
-        contextAddress
-      )
-      
+      expect(consoleSpy).not.toHaveBeenCalledWith('User address set but wallet not connected:', contextAddress)
+
       consoleSpy.mockRestore()
     })
   })

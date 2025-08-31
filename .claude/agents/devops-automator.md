@@ -58,6 +58,7 @@ Your primary responsibilities:
    - Automating cost optimization
 
 **Technology Stack**:
+
 - CI/CD: GitHub Actions, GitLab CI, CircleCI
 - Cloud: AWS, GCP, Azure, Vercel, Netlify
 - IaC: Terraform, Pulumi, CDK
@@ -66,6 +67,7 @@ Your primary responsibilities:
 - Logging: ELK Stack, CloudWatch, Splunk
 
 **Automation Patterns**:
+
 - Blue-green deployments
 - Canary releases
 - Feature flag deployments
@@ -74,6 +76,7 @@ Your primary responsibilities:
 - Zero-downtime deployments
 
 **Pipeline Best Practices**:
+
 - Fast feedback loops (< 10 min builds)
 - Parallel test execution
 - Incremental builds
@@ -82,6 +85,7 @@ Your primary responsibilities:
 - Environment promotion
 
 **Monitoring Strategy**:
+
 - Four Golden Signals (latency, traffic, errors, saturation)
 - Business metrics tracking
 - User experience monitoring
@@ -90,6 +94,7 @@ Your primary responsibilities:
 - Capacity planning metrics
 
 **Rapid Development Support**:
+
 - Preview environments for PRs
 - Instant rollbacks
 - Feature flag integration

@@ -172,7 +172,8 @@ describe('FirebaseAuthenticator', () => {
 
         await authenticator.verifySignatureAndGetToken(mockContext, mockSignatureResult)
 
-        expect(consoleLogSpy).toHaveBeenCalledWith('📱 Generated device info:', 
+        expect(consoleLogSpy).toHaveBeenCalledWith(
+          '📱 Generated device info:',
           expect.objectContaining({
             deviceId: expect.stringMatching(/mobile-ios-\d+-\w+/),
             platform: 'ios',
@@ -236,11 +237,7 @@ describe('FirebaseAuthenticator', () => {
     })
 
     describe('Different Signature Types', () => {
-      const signatureTypes: Array<SignatureResult['signatureType']> = [
-        'personal-sign',
-        'typed-data',
-        'safe-wallet',
-      ]
+      const signatureTypes: Array<SignatureResult['signatureType']> = ['personal-sign', 'typed-data', 'safe-wallet']
 
       it('should handle all signature types correctly', async () => {
         for (const signatureType of signatureTypes) {
@@ -284,9 +281,7 @@ describe('FirebaseAuthenticator', () => {
 
           await authenticator.verifySignatureAndGetToken(contextWithChainId, mockSignatureResult)
 
-          expect(mockVerifySignatureAndLogin).toHaveBeenCalledWith(
-            expect.objectContaining({ chainId })
-          )
+          expect(mockVerifySignatureAndLogin).toHaveBeenCalledWith(expect.objectContaining({ chainId }))
         }
       })
     })
@@ -296,9 +291,9 @@ describe('FirebaseAuthenticator', () => {
         const firebaseError = new Error('Backend verification failed')
         mockVerifySignatureAndLogin.mockRejectedValue(firebaseError)
 
-        await expect(
-          authenticator.verifySignatureAndGetToken(mockContext, mockSignatureResult)
-        ).rejects.toThrow('Backend verification failed')
+        await expect(authenticator.verifySignatureAndGetToken(mockContext, mockSignatureResult)).rejects.toThrow(
+          'Backend verification failed'
+        )
       })
 
       it('should handle malformed response data', async () => {
@@ -308,7 +303,7 @@ describe('FirebaseAuthenticator', () => {
         mockVerifySignatureAndLogin.mockResolvedValue(mockResponse)
 
         const result = await authenticator.verifySignatureAndGetToken(mockContext, mockSignatureResult)
-        
+
         expect(result).toBeUndefined()
         expect(mockDevOnly).toHaveBeenCalledWith('📋 Firebase token received:', 'undefined', 'missing')
       })
@@ -329,16 +324,8 @@ describe('FirebaseAuthenticator', () => {
       it('should call devOnly for token logging without exposing token content', async () => {
         await authenticator.verifySignatureAndGetToken(mockContext, mockSignatureResult)
 
-        expect(mockDevOnly).toHaveBeenCalledWith(
-          '📋 Firebase token received:',
-          'string',
-          'present'
-        )
-        expect(mockDevOnly).not.toHaveBeenCalledWith(
-          expect.anything(),
-          expect.anything(),
-          expect.stringContaining(mockFirebaseToken)
-        )
+        expect(mockDevOnly).toHaveBeenCalledWith('📋 Firebase token received:', 'string', 'present')
+        expect(mockDevOnly).not.toHaveBeenCalledWith(expect.anything(), expect.anything(), expect.stringContaining(mockFirebaseToken))
       })
 
       it('should handle missing token in devOnly logging', async () => {
@@ -392,9 +379,7 @@ describe('FirebaseAuthenticator', () => {
         const firebaseError = new Error('Firebase authentication failed')
         mockSignInWithCustomToken.mockRejectedValue(firebaseError)
 
-        await expect(
-          authenticator.signInWithFirebase(mockFirebaseToken, 'personal-sign')
-        ).rejects.toThrow('Firebase authentication failed')
+        await expect(authenticator.signInWithFirebase(mockFirebaseToken, 'personal-sign')).rejects.toThrow('Firebase authentication failed')
 
         expect(consoleErrorSpy).toHaveBeenCalledWith('❌ Firebase authentication failed:', firebaseError)
         expect(mockDevOnly).toHaveBeenCalledWith('📋 Token details:', {
@@ -451,7 +436,7 @@ describe('FirebaseAuthenticator', () => {
         let promiseError: any = null
 
         // Start the promise and handle it separately
-        signInPromise = authenticator.signInWithFirebase(mockFirebaseToken, 'safe-wallet').catch(error => {
+        signInPromise = authenticator.signInWithFirebase(mockFirebaseToken, 'safe-wallet').catch((error) => {
           promiseError = error
           promiseResolved = true
           return Promise.reject(error)
@@ -459,7 +444,7 @@ describe('FirebaseAuthenticator', () => {
 
         // Advance through initial delay + all retry delays
         await jest.advanceTimersByTimeAsync(2000) // Initial delay
-        await jest.advanceTimersByTimeAsync(1000) // Retry 1 delay  
+        await jest.advanceTimersByTimeAsync(1000) // Retry 1 delay
         await jest.advanceTimersByTimeAsync(2000) // Retry 2 delay
         await jest.advanceTimersByTimeAsync(3000) // Retry 3 delay
 
@@ -478,7 +463,7 @@ describe('FirebaseAuthenticator', () => {
 
         // Advance through initial delay + all retry delays
         await jest.advanceTimersByTimeAsync(2000) // Initial delay
-        await jest.advanceTimersByTimeAsync(1000) // Retry 1 delay  
+        await jest.advanceTimersByTimeAsync(1000) // Retry 1 delay
         await jest.advanceTimersByTimeAsync(2000) // Retry 2 delay
         await jest.advanceTimersByTimeAsync(3000) // Retry 3 delay
 
@@ -497,7 +482,7 @@ describe('FirebaseAuthenticator', () => {
 
         // Advance through initial delay + all retry delays
         await jest.advanceTimersByTimeAsync(2000) // Initial delay
-        await jest.advanceTimersByTimeAsync(1000) // Retry 1 delay  
+        await jest.advanceTimersByTimeAsync(1000) // Retry 1 delay
         await jest.advanceTimersByTimeAsync(2000) // Retry 2 delay
         await jest.advanceTimersByTimeAsync(3000) // Retry 3 delay
 
@@ -533,7 +518,7 @@ describe('FirebaseAuthenticator', () => {
 
         // Advance through initial delay + all retry delays step by step
         await jest.advanceTimersByTimeAsync(2000) // Initial delay
-        await jest.advanceTimersByTimeAsync(1000) // Retry 1 delay  
+        await jest.advanceTimersByTimeAsync(1000) // Retry 1 delay
         await jest.advanceTimersByTimeAsync(2000) // Retry 2 delay
         await jest.advanceTimersByTimeAsync(3000) // Retry 3 delay
 
@@ -546,9 +531,7 @@ describe('FirebaseAuthenticator', () => {
 
       it('should log retry attempt details', async () => {
         const firebaseError = new Error('Retry logging test')
-        mockSignInWithCustomToken
-          .mockRejectedValueOnce(firebaseError)
-          .mockResolvedValueOnce({})
+        mockSignInWithCustomToken.mockRejectedValueOnce(firebaseError).mockResolvedValueOnce({})
 
         const signInPromise = authenticator.signInWithFirebase(mockFirebaseToken, 'safe-wallet')
 
@@ -633,9 +616,7 @@ describe('FirebaseAuthenticator', () => {
 
   describe('Performance and Memory', () => {
     it('should handle concurrent Firebase sign-ins', async () => {
-      const promises = Array.from({ length: 3 }, () => 
-        authenticator.signInWithFirebase(mockFirebaseToken, 'personal-sign')
-      )
+      const promises = Array.from({ length: 3 }, () => authenticator.signInWithFirebase(mockFirebaseToken, 'personal-sign'))
 
       await Promise.all(promises)
 
@@ -652,9 +633,7 @@ describe('FirebaseAuthenticator', () => {
 
     it('should not leak memory during retry attempts', async () => {
       const firebaseError = new Error('Memory test error')
-      mockSignInWithCustomToken
-        .mockRejectedValueOnce(firebaseError)
-        .mockResolvedValueOnce({})
+      mockSignInWithCustomToken.mockRejectedValueOnce(firebaseError).mockResolvedValueOnce({})
 
       const signInPromise = authenticator.signInWithFirebase(mockFirebaseToken, 'safe-wallet')
 
@@ -682,12 +661,12 @@ describe('FirebaseAuthenticator', () => {
 
       // Step 1: Verify signature and get token
       const token = await authenticator.verifySignatureAndGetToken(mockContext, safeSignatureResult)
-      
+
       // Step 2: Sign in with Firebase
       const signInPromise = authenticator.signInWithFirebase(token, safeSignatureResult.signatureType)
-      
+
       await jest.advanceTimersByTimeAsync(2000) // Safe wallet delay
-      
+
       await signInPromise
 
       expect(token).toBe('integration-token')
@@ -697,7 +676,7 @@ describe('FirebaseAuthenticator', () => {
     it('should handle complete authentication flow for regular wallet', async () => {
       // Step 1: Verify signature and get token
       const token = await authenticator.verifySignatureAndGetToken(mockContext, mockSignatureResult)
-      
+
       // Step 2: Sign in with Firebase (no delay for regular wallets)
       await authenticator.signInWithFirebase(token, mockSignatureResult.signatureType)
 
@@ -711,9 +690,9 @@ describe('FirebaseAuthenticator', () => {
       const verificationError = new Error('Backend verification failed')
       mockVerifySignatureAndLogin.mockRejectedValue(verificationError)
 
-      await expect(
-        authenticator.verifySignatureAndGetToken(mockContext, mockSignatureResult)
-      ).rejects.toThrow('Backend verification failed')
+      await expect(authenticator.verifySignatureAndGetToken(mockContext, mockSignatureResult)).rejects.toThrow(
+        'Backend verification failed'
+      )
 
       expect(mockSignInWithCustomToken).not.toHaveBeenCalled()
     })
@@ -759,7 +738,7 @@ describe('FirebaseAuthenticator', () => {
 
       // Advance through initial delay + all retry delays step by step
       await jest.advanceTimersByTimeAsync(2000) // Initial delay
-      await jest.advanceTimersByTimeAsync(1000) // Retry 1 delay  
+      await jest.advanceTimersByTimeAsync(1000) // Retry 1 delay
       await jest.advanceTimersByTimeAsync(2000) // Retry 2 delay
       await jest.advanceTimersByTimeAsync(3000) // Retry 3 delay
 
@@ -782,7 +761,7 @@ describe('FirebaseAuthenticator', () => {
 
       // Advance through initial delay + all retry delays
       await jest.advanceTimersByTimeAsync(2000) // Initial delay
-      await jest.advanceTimersByTimeAsync(1000) // Retry 1 delay  
+      await jest.advanceTimersByTimeAsync(1000) // Retry 1 delay
       await jest.advanceTimersByTimeAsync(2000) // Retry 2 delay
       await jest.advanceTimersByTimeAsync(3000) // Retry 3 delay
 
@@ -802,7 +781,7 @@ describe('FirebaseAuthenticator', () => {
 
       // Advance through initial delay + all retry delays
       await jest.advanceTimersByTimeAsync(2000) // Initial delay
-      await jest.advanceTimersByTimeAsync(1000) // Retry 1 delay  
+      await jest.advanceTimersByTimeAsync(1000) // Retry 1 delay
       await jest.advanceTimersByTimeAsync(2000) // Retry 2 delay
       await jest.advanceTimersByTimeAsync(3000) // Retry 3 delay
 
@@ -839,7 +818,7 @@ describe('FirebaseAuthenticator', () => {
 
       // Advance through initial delay + all retry delays
       await jest.advanceTimersByTimeAsync(2000) // Initial delay
-      await jest.advanceTimersByTimeAsync(1000) // Retry 1 delay  
+      await jest.advanceTimersByTimeAsync(1000) // Retry 1 delay
       await jest.advanceTimersByTimeAsync(2000) // Retry 2 delay
       await jest.advanceTimersByTimeAsync(3000) // Retry 3 delay
 

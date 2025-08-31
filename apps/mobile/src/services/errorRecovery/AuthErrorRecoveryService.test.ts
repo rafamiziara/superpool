@@ -67,7 +67,7 @@ describe('AuthErrorRecoveryService', () => {
     it('should be instantiable but not necessary (legacy class)', () => {
       // Legacy class can be instantiated but all methods are static
       expect(() => new (AuthErrorRecoveryService as any)()).not.toThrow()
-      
+
       // Verify that it's primarily designed for static usage
       const instance = new (AuthErrorRecoveryService as any)()
       expect(instance).toBeDefined()
@@ -85,9 +85,7 @@ describe('AuthErrorRecoveryService', () => {
     it('should log legacy service initialization message', () => {
       AuthErrorRecoveryService.initialize(mockAuthStore, mockWalletStore)
 
-      expect(consoleLogSpy).toHaveBeenCalledWith(
-        '🔧 AuthErrorRecoveryService (legacy) initialized - delegating to ErrorRecoveryService'
-      )
+      expect(consoleLogSpy).toHaveBeenCalledWith('🔧 AuthErrorRecoveryService (legacy) initialized - delegating to ErrorRecoveryService')
     })
 
     it('should handle initialize with different store instances', () => {
@@ -96,10 +94,7 @@ describe('AuthErrorRecoveryService', () => {
 
       AuthErrorRecoveryService.initialize(alternateAuthStore, alternateWalletStore)
 
-      expect(mockErrorRecoveryService.initialize).toHaveBeenCalledWith(
-        alternateAuthStore,
-        alternateWalletStore
-      )
+      expect(mockErrorRecoveryService.initialize).toHaveBeenCalledWith(alternateAuthStore, alternateWalletStore)
     })
 
     it('should handle multiple initialization calls', () => {
@@ -148,14 +143,7 @@ describe('AuthErrorRecoveryService', () => {
     })
 
     it('should handle different error types', async () => {
-      const errorTypes = [
-        new Error('Standard error'),
-        'String error',
-        { message: 'Object error' },
-        null,
-        undefined,
-        123,
-      ]
+      const errorTypes = [new Error('Standard error'), 'String error', { message: 'Object error' }, null, undefined, 123]
 
       for (const error of errorTypes) {
         await AuthErrorRecoveryService.handleAuthenticationError(error)
@@ -170,26 +158,18 @@ describe('AuthErrorRecoveryService', () => {
       const rejectionError = new Error('Recovery service failed')
       mockErrorRecoveryService.handleAuthenticationError.mockRejectedValue(rejectionError)
 
-      await expect(
-        AuthErrorRecoveryService.handleAuthenticationError(new Error('Test error'))
-      ).rejects.toThrow('Recovery service failed')
+      await expect(AuthErrorRecoveryService.handleAuthenticationError(new Error('Test error'))).rejects.toThrow('Recovery service failed')
     })
 
     it('should handle multiple concurrent error handling calls', async () => {
-      const errors = [
-        new Error('Error 1'),
-        new Error('Error 2'),
-        new Error('Error 3'),
-      ]
+      const errors = [new Error('Error 1'), new Error('Error 2'), new Error('Error 3')]
 
-      const promises = errors.map(error =>
-        AuthErrorRecoveryService.handleAuthenticationError(error)
-      )
+      const promises = errors.map((error) => AuthErrorRecoveryService.handleAuthenticationError(error))
 
       await Promise.all(promises)
 
       expect(mockErrorRecoveryService.handleAuthenticationError).toHaveBeenCalledTimes(3)
-      errors.forEach(error => {
+      errors.forEach((error) => {
         expect(mockErrorRecoveryService.handleAuthenticationError).toHaveBeenCalledWith(error)
       })
     })
@@ -241,10 +221,7 @@ describe('AuthErrorRecoveryService', () => {
     it('should delegate showErrorFeedback to ErrorRecoveryService', () => {
       AuthErrorRecoveryService.showErrorFeedback(mockAppError, mockRecoveryResult)
 
-      expect(mockErrorRecoveryService.showErrorFeedback).toHaveBeenCalledWith(
-        mockAppError,
-        mockRecoveryResult
-      )
+      expect(mockErrorRecoveryService.showErrorFeedback).toHaveBeenCalledWith(mockAppError, mockRecoveryResult)
       expect(mockErrorRecoveryService.showErrorFeedback).toHaveBeenCalledTimes(1)
     })
 
@@ -273,7 +250,7 @@ describe('AuthErrorRecoveryService', () => {
         },
       ]
 
-      errorTypes.forEach(error => {
+      errorTypes.forEach((error) => {
         AuthErrorRecoveryService.showErrorFeedback(error, mockRecoveryResult)
         expect(mockErrorRecoveryService.showErrorFeedback).toHaveBeenCalledWith(error, mockRecoveryResult)
       })
@@ -303,7 +280,7 @@ describe('AuthErrorRecoveryService', () => {
         },
       ]
 
-      recoveryResults.forEach(result => {
+      recoveryResults.forEach((result) => {
         AuthErrorRecoveryService.showErrorFeedback(mockAppError, result)
         expect(mockErrorRecoveryService.showErrorFeedback).toHaveBeenCalledWith(mockAppError, result)
       })
@@ -357,22 +334,18 @@ describe('AuthErrorRecoveryService', () => {
       const cleanupError = new Error('Firebase cleanup failed')
       mockErrorRecoveryService.handleFirebaseCleanup.mockRejectedValue(cleanupError)
 
-      await expect(
-        AuthErrorRecoveryService.handleFirebaseCleanup('test reason')
-      ).rejects.toThrow('Firebase cleanup failed')
+      await expect(AuthErrorRecoveryService.handleFirebaseCleanup('test reason')).rejects.toThrow('Firebase cleanup failed')
     })
 
     it('should handle multiple concurrent cleanup calls', async () => {
       const reasons = ['reason1', 'reason2', 'reason3']
 
-      const promises = reasons.map(reason =>
-        AuthErrorRecoveryService.handleFirebaseCleanup(reason)
-      )
+      const promises = reasons.map((reason) => AuthErrorRecoveryService.handleFirebaseCleanup(reason))
 
       await Promise.all(promises)
 
       expect(mockErrorRecoveryService.handleFirebaseCleanup).toHaveBeenCalledTimes(3)
-      reasons.forEach(reason => {
+      reasons.forEach((reason) => {
         expect(mockErrorRecoveryService.handleFirebaseCleanup).toHaveBeenCalledWith(reason)
       })
     })
@@ -444,9 +417,7 @@ describe('AuthErrorRecoveryService', () => {
       const serviceError = new Error('Service internal error')
       mockErrorRecoveryService.handleAuthenticationError.mockRejectedValue(serviceError)
 
-      await expect(
-        AuthErrorRecoveryService.handleAuthenticationError(new Error('auth error'))
-      ).rejects.toThrow('Service internal error')
+      await expect(AuthErrorRecoveryService.handleAuthenticationError(new Error('auth error'))).rejects.toThrow('Service internal error')
 
       // Ensure delegation still happened
       expect(mockErrorRecoveryService.handleAuthenticationError).toHaveBeenCalled()
@@ -454,14 +425,9 @@ describe('AuthErrorRecoveryService', () => {
 
     it('should work as drop-in replacement for ErrorRecoveryService', () => {
       // Test that all static methods exist and are callable
-      const methods = [
-        'initialize',
-        'handleAuthenticationError',
-        'showErrorFeedback',
-        'handleFirebaseCleanup',
-      ]
+      const methods = ['initialize', 'handleAuthenticationError', 'showErrorFeedback', 'handleFirebaseCleanup']
 
-      methods.forEach(method => {
+      methods.forEach((method) => {
         expect(typeof (AuthErrorRecoveryService as any)[method]).toBe('function')
       })
     })
@@ -540,7 +506,7 @@ describe('AuthErrorRecoveryService', () => {
 
     it('should not retain references to passed parameters', () => {
       const testError = new Error('Memory test')
-      
+
       // Call method with error
       AuthErrorRecoveryService.handleAuthenticationError(testError)
 

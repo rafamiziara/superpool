@@ -1,11 +1,11 @@
-import { 
-  ErrorType, 
-  ERROR_MESSAGES, 
-  createAppError, 
-  categorizeError, 
-  isUserInitiatedError, 
+import {
+  ErrorType,
+  ERROR_MESSAGES,
+  createAppError,
+  categorizeError,
+  isUserInitiatedError,
   shouldRetryError,
-  type AppError 
+  type AppError,
 } from './errorHandling'
 
 describe('errorHandling', () => {
@@ -21,7 +21,7 @@ describe('errorHandling', () => {
 
     it('should be immutable', () => {
       expect(() => {
-        (ErrorType as any).NEW_ERROR = 'NEW_ERROR'
+        ;(ErrorType as any).NEW_ERROR = 'NEW_ERROR'
       }).not.toThrow() // TypeScript prevents this, but runtime doesn't
 
       // But the original values should remain unchanged
@@ -40,7 +40,7 @@ describe('errorHandling', () => {
     })
 
     it('should have messages for all enum values', () => {
-      Object.values(ErrorType).forEach(errorType => {
+      Object.values(ErrorType).forEach((errorType) => {
         expect(ERROR_MESSAGES[errorType]).toBeDefined()
         expect(typeof ERROR_MESSAGES[errorType]).toBe('string')
         expect(ERROR_MESSAGES[errorType].length).toBeGreaterThan(0)
@@ -48,7 +48,7 @@ describe('errorHandling', () => {
     })
 
     it('should have appropriate message content', () => {
-      Object.values(ERROR_MESSAGES).forEach(message => {
+      Object.values(ERROR_MESSAGES).forEach((message) => {
         expect(message).not.toContain('undefined')
         expect(message).not.toContain('null')
         expect(message.trim()).toBe(message) // No leading/trailing whitespace
@@ -61,11 +61,7 @@ describe('errorHandling', () => {
   describe('createAppError', () => {
     describe('Basic Error Creation', () => {
       it('should create AppError with all required properties', () => {
-        const error = createAppError(
-          ErrorType.AUTHENTICATION_FAILED,
-          'Custom message',
-          new Error('Original error')
-        )
+        const error = createAppError(ErrorType.AUTHENTICATION_FAILED, 'Custom message', new Error('Original error'))
 
         expect(error.type).toBe(ErrorType.AUTHENTICATION_FAILED)
         expect(error.message).toBe('Custom message')
@@ -98,7 +94,7 @@ describe('errorHandling', () => {
       it('should preserve original error information', () => {
         const originalError = new Error('Database connection failed')
         originalError.stack = 'Stack trace here'
-        
+
         const error = createAppError(ErrorType.NETWORK_ERROR, 'Network failed', originalError)
 
         expect(error.originalError).toBe(originalError)
@@ -109,9 +105,9 @@ describe('errorHandling', () => {
 
     describe('All Error Types', () => {
       it('should create errors for all error types', () => {
-        Object.values(ErrorType).forEach(errorType => {
+        Object.values(ErrorType).forEach((errorType) => {
           const error = createAppError(errorType)
-          
+
           expect(error.type).toBe(errorType)
           expect(error.userFriendlyMessage).toBe(ERROR_MESSAGES[errorType])
           expect(error.name).toBe('AppError')
@@ -131,13 +127,11 @@ describe('errorHandling', () => {
       })
 
       it('should create unique timestamps for rapid creation', () => {
-        const errors = Array.from({ length: 10 }, () => 
-          createAppError(ErrorType.UNKNOWN_ERROR)
-        )
+        const errors = Array.from({ length: 10 }, () => createAppError(ErrorType.UNKNOWN_ERROR))
 
-        const timestamps = errors.map(e => e.timestamp.getTime())
+        const timestamps = errors.map((e) => e.timestamp.getTime())
         const uniqueTimestamps = new Set(timestamps)
-        
+
         // At least some should be unique (depending on timing)
         expect(uniqueTimestamps.size).toBeGreaterThanOrEqual(1)
       })
@@ -146,14 +140,14 @@ describe('errorHandling', () => {
     describe('Error Inheritance', () => {
       it('should be instance of Error', () => {
         const error = createAppError(ErrorType.AUTHENTICATION_FAILED)
-        
+
         expect(error).toBeInstanceOf(Error)
         expect(error.constructor.name).toBe('Object') // AppError is an object with Error prototype
       })
 
       it('should have Error-like properties', () => {
         const error = createAppError(ErrorType.SIGNATURE_REJECTED, 'Test message')
-        
+
         expect(error.message).toBe('Test message')
         expect(error.name).toBe('AppError')
         expect(typeof error.toString).toBe('function')
@@ -172,7 +166,7 @@ describe('errorHandling', () => {
           new Error('Session topic not found'),
         ]
 
-        sessionErrors.forEach(error => {
+        sessionErrors.forEach((error) => {
           const result = categorizeError(error)
           expect(result.type).toBe(ErrorType.SESSION_CORRUPTION)
         })
@@ -186,7 +180,7 @@ describe('errorHandling', () => {
           new Error('pairing EXPIRED'),
         ]
 
-        caseVariations.forEach(error => {
+        caseVariations.forEach((error) => {
           const result = categorizeError(error)
           expect(result.type).toBe(ErrorType.SESSION_CORRUPTION)
         })
@@ -205,7 +199,7 @@ describe('errorHandling', () => {
           new Error('Unsupported chain'),
         ]
 
-        networkErrors.forEach(error => {
+        networkErrors.forEach((error) => {
           const result = categorizeError(error)
           expect(result.type).toBe(ErrorType.NETWORK_ERROR)
         })
@@ -218,7 +212,7 @@ describe('errorHandling', () => {
           new Error('Please switch to Polygon network'),
         ]
 
-        chainErrors.forEach(error => {
+        chainErrors.forEach((error) => {
           const result = categorizeError(error)
           expect(result.type).toBe(ErrorType.NETWORK_ERROR)
         })
@@ -235,7 +229,7 @@ describe('errorHandling', () => {
           new Error('User cancelled'),
         ]
 
-        signatureErrors.forEach(error => {
+        signatureErrors.forEach((error) => {
           const result = categorizeError(error)
           expect(result.type).toBe(ErrorType.SIGNATURE_REJECTED)
         })
@@ -252,25 +246,17 @@ describe('errorHandling', () => {
           new Error('Nonce too low'),
         ]
 
-        transactionErrors.forEach(error => {
+        transactionErrors.forEach((error) => {
           const result = categorizeError(error)
           // These could be either TRANSACTION_REJECTED or INSUFFICIENT_FUNDS
-          expect([
-            ErrorType.TRANSACTION_REJECTED, 
-            ErrorType.INSUFFICIENT_FUNDS,
-            ErrorType.NETWORK_ERROR
-          ]).toContain(result.type)
+          expect([ErrorType.TRANSACTION_REJECTED, ErrorType.INSUFFICIENT_FUNDS, ErrorType.NETWORK_ERROR]).toContain(result.type)
         })
       })
 
       it('should specifically detect insufficient funds', () => {
-        const fundsErrors = [
-          new Error('insufficient funds'),
-          new Error('Insufficient balance'),
-          new Error('Not enough ETH for gas'),
-        ]
+        const fundsErrors = [new Error('insufficient funds'), new Error('Insufficient balance'), new Error('Not enough ETH for gas')]
 
-        fundsErrors.forEach(error => {
+        fundsErrors.forEach((error) => {
           const result = categorizeError(error)
           expect(result.type).toBe(ErrorType.INSUFFICIENT_FUNDS)
         })
@@ -286,7 +272,7 @@ describe('errorHandling', () => {
           new Error('Operation timed out after 30s'),
         ]
 
-        timeoutErrors.forEach(error => {
+        timeoutErrors.forEach((error) => {
           const result = categorizeError(error)
           expect(result.type).toBe(ErrorType.TIMEOUT_ERROR)
         })
@@ -302,7 +288,7 @@ describe('errorHandling', () => {
           new Error('Auth token expired'),
         ]
 
-        authErrors.forEach(error => {
+        authErrors.forEach((error) => {
           const result = categorizeError(error)
           expect(result.type).toBe(ErrorType.AUTHENTICATION_FAILED)
         })
@@ -318,7 +304,7 @@ describe('errorHandling', () => {
           new Error(''),
         ]
 
-        genericErrors.forEach(error => {
+        genericErrors.forEach((error) => {
           const result = categorizeError(error)
           expect(result.type).toBe(ErrorType.UNKNOWN_ERROR)
         })
@@ -333,14 +319,9 @@ describe('errorHandling', () => {
       })
 
       it('should handle non-Error objects', () => {
-        const nonErrorInputs = [
-          'String error',
-          { message: 'Object error' },
-          42,
-          [],
-        ]
+        const nonErrorInputs = ['String error', { message: 'Object error' }, 42, []]
 
-        nonErrorInputs.forEach(input => {
+        nonErrorInputs.forEach((input) => {
           const result = categorizeError(input as any)
           expect(result.type).toBe(ErrorType.UNKNOWN_ERROR)
         })
@@ -398,12 +379,9 @@ describe('errorHandling', () => {
   describe('isUserInitiatedError', () => {
     describe('User-Initiated Errors', () => {
       it('should return true for signature rejections', () => {
-        const userErrors = [
-          createAppError(ErrorType.SIGNATURE_REJECTED),
-          createAppError(ErrorType.TRANSACTION_REJECTED),
-        ]
+        const userErrors = [createAppError(ErrorType.SIGNATURE_REJECTED), createAppError(ErrorType.TRANSACTION_REJECTED)]
 
-        userErrors.forEach(error => {
+        userErrors.forEach((error) => {
           expect(isUserInitiatedError(error)).toBe(true)
         })
       })
@@ -411,7 +389,7 @@ describe('errorHandling', () => {
       it('should handle direct error classification', () => {
         const rejectionError = new Error('User rejected the request')
         const categorized = categorizeError(rejectionError)
-        
+
         expect(isUserInitiatedError(categorized)).toBe(true)
       })
     })
@@ -428,7 +406,7 @@ describe('errorHandling', () => {
           createAppError(ErrorType.UNKNOWN_ERROR),
         ]
 
-        systemErrors.forEach(error => {
+        systemErrors.forEach((error) => {
           expect(isUserInitiatedError(error)).toBe(false)
         })
       })
@@ -441,14 +419,9 @@ describe('errorHandling', () => {
       })
 
       it('should handle malformed AppError objects', () => {
-        const malformedErrors = [
-          { type: undefined } as any,
-          { type: null } as any,
-          { type: 'INVALID_TYPE' } as any,
-          {} as any,
-        ]
+        const malformedErrors = [{ type: undefined } as any, { type: null } as any, { type: 'INVALID_TYPE' } as any, {} as any]
 
-        malformedErrors.forEach(error => {
+        malformedErrors.forEach((error) => {
           expect(isUserInitiatedError(error)).toBe(false)
         })
       })
@@ -464,7 +437,7 @@ describe('errorHandling', () => {
           createAppError(ErrorType.AUTHENTICATION_FAILED),
         ]
 
-        retryableErrors.forEach(error => {
+        retryableErrors.forEach((error) => {
           expect(shouldRetryError(error)).toBe(true)
         })
       })
@@ -472,12 +445,9 @@ describe('errorHandling', () => {
 
     describe('Non-Retryable Errors', () => {
       it('should return false for user-initiated errors', () => {
-        const nonRetryableErrors = [
-          createAppError(ErrorType.SIGNATURE_REJECTED),
-          createAppError(ErrorType.TRANSACTION_REJECTED),
-        ]
+        const nonRetryableErrors = [createAppError(ErrorType.SIGNATURE_REJECTED), createAppError(ErrorType.TRANSACTION_REJECTED)]
 
-        nonRetryableErrors.forEach(error => {
+        nonRetryableErrors.forEach((error) => {
           expect(shouldRetryError(error)).toBe(false)
         })
       })
@@ -489,7 +459,7 @@ describe('errorHandling', () => {
           createAppError(ErrorType.SESSION_CORRUPTION),
         ]
 
-        nonRetryableSystemErrors.forEach(error => {
+        nonRetryableSystemErrors.forEach((error) => {
           expect(shouldRetryError(error)).toBe(false)
         })
       })
@@ -507,13 +477,9 @@ describe('errorHandling', () => {
       })
 
       it('should handle malformed AppError objects', () => {
-        const malformedErrors = [
-          { type: undefined } as any,
-          { type: 'INVALID_TYPE' } as any,
-          {} as any,
-        ]
+        const malformedErrors = [{ type: undefined } as any, { type: 'INVALID_TYPE' } as any, {} as any]
 
-        malformedErrors.forEach(error => {
+        malformedErrors.forEach((error) => {
           expect(shouldRetryError(error)).toBe(false)
         })
       })
@@ -524,16 +490,16 @@ describe('errorHandling', () => {
     it('should work together in error processing pipeline', () => {
       // Simulate a complete error processing flow
       const originalError = new Error('User rejected the request')
-      
+
       // Step 1: Categorize the error
       const categorized = categorizeError(originalError)
-      
+
       // Step 2: Check if user-initiated
       const isUserInitiated = isUserInitiatedError(categorized)
-      
+
       // Step 3: Check if should retry
       const shouldRetry = shouldRetryError(categorized)
-      
+
       // Assertions
       expect(categorized.type).toBe(ErrorType.SIGNATURE_REJECTED)
       expect(isUserInitiated).toBe(true)
@@ -565,7 +531,7 @@ describe('errorHandling', () => {
 
       testCases.forEach(({ error, expectedType, expectedUserInitiated, expectedRetryable }) => {
         const categorized = categorizeError(error)
-        
+
         expect(categorized.type).toBe(expectedType)
         expect(isUserInitiatedError(categorized)).toBe(expectedUserInitiated)
         expect(shouldRetryError(categorized)).toBe(expectedRetryable)
@@ -575,13 +541,11 @@ describe('errorHandling', () => {
 
   describe('Performance and Memory', () => {
     it('should handle large volumes of error categorization efficiently', () => {
-      const errors = Array.from({ length: 1000 }, (_, i) => 
-        new Error(`Test error ${i}: User rejected request`)
-      )
+      const errors = Array.from({ length: 1000 }, (_, i) => new Error(`Test error ${i}: User rejected request`))
 
       const start = performance.now()
-      
-      const results = errors.map(error => {
+
+      const results = errors.map((error) => {
         const categorized = categorizeError(error)
         return {
           categorized,
@@ -589,18 +553,18 @@ describe('errorHandling', () => {
           shouldRetry: shouldRetryError(categorized),
         }
       })
-      
+
       const end = performance.now()
-      
+
       expect(end - start).toBeLessThan(100) // Should be fast
       expect(results).toHaveLength(1000)
-      expect(results.every(r => r.isUserInitiated)).toBe(true)
-      expect(results.every(r => !r.shouldRetry)).toBe(true)
+      expect(results.every((r) => r.isUserInitiated)).toBe(true)
+      expect(results.every((r) => !r.shouldRetry)).toBe(true)
     })
 
     it('should not leak memory with repeated operations', () => {
       const initialMemory = process.memoryUsage().heapUsed
-      
+
       // Perform many operations
       for (let i = 0; i < 10000; i++) {
         const error = new Error(`Error ${i}`)
@@ -608,10 +572,10 @@ describe('errorHandling', () => {
         isUserInitiatedError(categorized)
         shouldRetryError(categorized)
       }
-      
+
       const finalMemory = process.memoryUsage().heapUsed
       const memoryIncrease = finalMemory - initialMemory
-      
+
       // Memory increase should be reasonable
       expect(memoryIncrease).toBeLessThan(50 * 1024 * 1024) // Less than 50MB
     })

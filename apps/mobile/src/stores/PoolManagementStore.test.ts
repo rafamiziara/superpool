@@ -103,18 +103,18 @@ describe('PoolManagementStore', () => {
 
       store.setLoading('loans', true)
       expect(store.loading.loans).toBe(true)
-      
+
       store.setLoading('pools', false)
       expect(store.loading.pools).toBe(false)
     })
 
     it('should handle all loading state keys', () => {
       const keys: (keyof LoadingStates)[] = ['pools', 'loans', 'transactions', 'memberActions']
-      
-      keys.forEach(key => {
+
+      keys.forEach((key) => {
         store.setLoading(key, true)
         expect(store.loading[key]).toBe(true)
-        
+
         store.setLoading(key, false)
         expect(store.loading[key]).toBe(false)
       })
@@ -145,7 +145,7 @@ describe('PoolManagementStore', () => {
     it('should update a pool', () => {
       const updates = { name: 'Updated Pool', totalLiquidity: BigInt(2000) }
       store.updatePool('pool-1', updates)
-      
+
       const updatedPool = store.pools.get('pool-1')!
       expect(updatedPool.name).toBe('Updated Pool')
       expect(updatedPool.totalLiquidity).toBe(BigInt(2000))
@@ -175,7 +175,7 @@ describe('PoolManagementStore', () => {
       const pool1 = { ...mockPool, id: 'pool-1', updatedAt: new Date('2023-01-01') }
       const pool2 = { ...mockPool, id: 'pool-2', updatedAt: new Date('2023-01-02') }
       const pool3 = { ...mockPool, id: 'pool-3', isActive: false, updatedAt: new Date('2023-01-03') }
-      
+
       store.addPool(pool1)
       store.addPool(pool2)
       store.addPool(pool3)
@@ -192,13 +192,13 @@ describe('PoolManagementStore', () => {
     it('should return only active pools', () => {
       const activePools = store.activePools
       expect(activePools).toHaveLength(2)
-      expect(activePools.every(pool => pool.isActive && !pool.isPaused)).toBe(true)
+      expect(activePools.every((pool) => pool.isActive && !pool.isPaused)).toBe(true)
     })
 
     it('should return user pools when user address is set', () => {
       const userAddress = '0xadmin1'
       store.setUserAddress(userAddress)
-      
+
       const userPools = store.userPools
       expect(userPools).toHaveLength(3) // User is admin in all mock pools
     })
@@ -222,7 +222,7 @@ describe('PoolManagementStore', () => {
     it('should update a loan', () => {
       const updates = { status: LoanStatus.APPROVED, amount: BigInt(150) }
       store.updateLoan('loan-1', updates)
-      
+
       const updatedLoan = store.loans.get('loan-1')!
       expect(updatedLoan.status).toBe(LoanStatus.APPROVED)
       expect(updatedLoan.amount).toBe(BigInt(150))
@@ -236,7 +236,7 @@ describe('PoolManagementStore', () => {
 
     it('should approve a loan', () => {
       store.approveLoan('loan-1')
-      
+
       const loan = store.loans.get('loan-1')!
       expect(loan.status).toBe(LoanStatus.APPROVED)
       expect(loan.approvedAt).toBeInstanceOf(Date)
@@ -244,7 +244,7 @@ describe('PoolManagementStore', () => {
 
     it('should disburse a loan', () => {
       store.disburseLoan('loan-1')
-      
+
       const loan = store.loans.get('loan-1')!
       expect(loan.status).toBe(LoanStatus.DISBURSED)
       expect(loan.disbursedAt).toBeInstanceOf(Date)
@@ -253,10 +253,10 @@ describe('PoolManagementStore', () => {
     it('should handle partial loan repayment', () => {
       const loan = { ...mockLoan, amount: BigInt(100), interestAccrued: BigInt(10) }
       store.loans.set('loan-1', loan)
-      
+
       const repaymentAmount = BigInt(50)
       store.repayLoan('loan-1', repaymentAmount)
-      
+
       const updatedLoan = store.loans.get('loan-1')!
       expect(updatedLoan.amountRepaid).toBe(BigInt(50))
       expect(updatedLoan.status).toBe(LoanStatus.REQUESTED) // Not fully repaid
@@ -266,10 +266,10 @@ describe('PoolManagementStore', () => {
     it('should handle full loan repayment', () => {
       const loan = { ...mockLoan, amount: BigInt(100), interestAccrued: BigInt(10) }
       store.loans.set('loan-1', loan)
-      
+
       const repaymentAmount = BigInt(110) // Full amount + interest
       store.repayLoan('loan-1', repaymentAmount)
-      
+
       const updatedLoan = store.loans.get('loan-1')!
       expect(updatedLoan.amountRepaid).toBe(BigInt(110))
       expect(updatedLoan.status).toBe(LoanStatus.REPAID)
@@ -279,10 +279,10 @@ describe('PoolManagementStore', () => {
     it('should handle overpayment', () => {
       const loan = { ...mockLoan, amount: BigInt(100), interestAccrued: BigInt(10) }
       store.loans.set('loan-1', loan)
-      
+
       const repaymentAmount = BigInt(150) // More than needed
       store.repayLoan('loan-1', repaymentAmount)
-      
+
       const updatedLoan = store.loans.get('loan-1')!
       expect(updatedLoan.amountRepaid).toBe(BigInt(150))
       expect(updatedLoan.status).toBe(LoanStatus.REPAID)
@@ -305,7 +305,7 @@ describe('PoolManagementStore', () => {
       const loan2 = { ...mockLoan, id: 'loan-2', requestedAt: new Date('2023-01-02') }
       const loan3 = { ...mockLoan, id: 'loan-3', borrower: '0xother', requestedAt: new Date('2023-01-03') }
       const loan4 = { ...mockLoan, id: 'loan-4', status: LoanStatus.DISBURSED }
-      
+
       store.addLoan(loan1)
       store.addLoan(loan2)
       store.addLoan(loan3)
@@ -346,7 +346,7 @@ describe('PoolManagementStore', () => {
     it('should update a transaction', () => {
       const updates = { status: TransactionStatus.CONFIRMED, amount: BigInt(150) }
       store.updateTransaction('tx-1', updates)
-      
+
       const updatedTx = store.transactions.get('tx-1')!
       expect(updatedTx.status).toBe(TransactionStatus.CONFIRMED)
       expect(updatedTx.amount).toBe(BigInt(150))
@@ -362,7 +362,7 @@ describe('PoolManagementStore', () => {
       const txHash = '0xabcdef'
       const blockNumber = 12345
       store.confirmTransaction('tx-1', txHash, blockNumber)
-      
+
       const tx = store.transactions.get('tx-1')!
       expect(tx.status).toBe(TransactionStatus.CONFIRMED)
       expect(tx.txHash).toBe(txHash)
@@ -373,7 +373,7 @@ describe('PoolManagementStore', () => {
     it('should confirm a transaction without block number', () => {
       const txHash = '0xabcdef'
       store.confirmTransaction('tx-1', txHash)
-      
+
       const tx = store.transactions.get('tx-1')!
       expect(tx.status).toBe(TransactionStatus.CONFIRMED)
       expect(tx.txHash).toBe(txHash)
@@ -382,7 +382,7 @@ describe('PoolManagementStore', () => {
 
     it('should fail a transaction', () => {
       store.failTransaction('tx-1')
-      
+
       const tx = store.transactions.get('tx-1')!
       expect(tx.status).toBe(TransactionStatus.FAILED)
     })
@@ -393,7 +393,7 @@ describe('PoolManagementStore', () => {
       const tx1 = { ...mockTransaction, id: 'tx-1', status: TransactionStatus.PENDING, createdAt: new Date('2023-01-01') }
       const tx2 = { ...mockTransaction, id: 'tx-2', status: TransactionStatus.PENDING, createdAt: new Date('2023-01-02') }
       const tx3 = { ...mockTransaction, id: 'tx-3', status: TransactionStatus.CONFIRMED }
-      
+
       store.addTransaction(tx1)
       store.addTransaction(tx2)
       store.addTransaction(tx3)
@@ -409,37 +409,37 @@ describe('PoolManagementStore', () => {
 
   describe('Pool Filtering', () => {
     beforeEach(() => {
-      const pool1 = { 
-        ...mockPool, 
-        id: 'pool-1', 
-        name: 'Bitcoin Pool', 
+      const pool1 = {
+        ...mockPool,
+        id: 'pool-1',
+        name: 'Bitcoin Pool',
         description: 'Pool for Bitcoin loans',
         isActive: true,
         availableLiquidity: BigInt(1000),
         members: ['0xuser1'],
-        admins: []
+        admins: [],
       }
-      const pool2 = { 
-        ...mockPool, 
-        id: 'pool-2', 
+      const pool2 = {
+        ...mockPool,
+        id: 'pool-2',
         name: 'Ethereum Pool',
-        description: 'Pool for Ethereum loans', 
+        description: 'Pool for Ethereum loans',
         isActive: false,
         availableLiquidity: BigInt(500),
         members: [],
-        admins: ['0xuser1']
+        admins: ['0xuser1'],
       }
-      const pool3 = { 
-        ...mockPool, 
-        id: 'pool-3', 
+      const pool3 = {
+        ...mockPool,
+        id: 'pool-3',
         name: 'Stablecoin Pool',
         description: 'USDC lending pool',
         isActive: true,
         availableLiquidity: BigInt(2000),
         members: [],
-        admins: []
+        admins: [],
       }
-      
+
       store.addPool(pool1)
       store.addPool(pool2)
       store.addPool(pool3)
@@ -450,7 +450,7 @@ describe('PoolManagementStore', () => {
       const filters: PoolFilters = { isActive: true }
       const filtered = store.getFilteredPools(filters)
       expect(filtered).toHaveLength(2)
-      expect(filtered.every(pool => pool.isActive)).toBe(true)
+      expect(filtered.every((pool) => pool.isActive)).toBe(true)
     })
 
     it('should filter pools by inactive status', () => {
@@ -487,19 +487,19 @@ describe('PoolManagementStore', () => {
     })
 
     it('should apply multiple filters together', () => {
-      const filters: PoolFilters = { 
-        isActive: true, 
+      const filters: PoolFilters = {
+        isActive: true,
         minLiquidity: BigInt(1000),
-        searchTerm: 'pool' // Should match all
+        searchTerm: 'pool', // Should match all
       }
       const filtered = store.getFilteredPools(filters)
       expect(filtered).toHaveLength(2) // pool1 and pool3
     })
 
     it('should return empty array when no pools match filters', () => {
-      const filters: PoolFilters = { 
+      const filters: PoolFilters = {
         isActive: true,
-        minLiquidity: BigInt(10000) // Too high
+        minLiquidity: BigInt(10000), // Too high
       }
       const filtered = store.getFilteredPools(filters)
       expect(filtered).toHaveLength(0)
@@ -516,18 +516,18 @@ describe('PoolManagementStore', () => {
   describe('Pool Statistics', () => {
     beforeEach(() => {
       store.addPool(mockPool)
-      
+
       const loan1 = { ...mockLoan, id: 'loan-1', poolId: 'pool-1', status: LoanStatus.DISBURSED }
       const loan2 = { ...mockLoan, id: 'loan-2', poolId: 'pool-1', status: LoanStatus.REQUESTED }
       const loan3 = { ...mockLoan, id: 'loan-3', poolId: 'other-pool' } // Different pool
-      
+
       store.addLoan(loan1)
       store.addLoan(loan2)
       store.addLoan(loan3)
-      
+
       const tx1 = { ...mockTransaction, id: 'tx-1', poolId: 'pool-1', createdAt: new Date('2023-01-02') }
       const tx2 = { ...mockTransaction, id: 'tx-2', poolId: 'pool-1', createdAt: new Date('2023-01-01') }
-      
+
       store.addTransaction(tx1)
       store.addTransaction(tx2)
     })
@@ -542,8 +542,8 @@ describe('PoolManagementStore', () => {
         utilizationRate: 20, // 200 / 1000 * 100
         recentTransactions: [
           expect.objectContaining({ id: 'tx-1' }), // Most recent first
-          expect.objectContaining({ id: 'tx-2' })
-        ]
+          expect.objectContaining({ id: 'tx-2' }),
+        ],
       })
     })
 
@@ -555,7 +555,7 @@ describe('PoolManagementStore', () => {
     it('should handle pools with zero liquidity', () => {
       const zeroLiquidityPool = { ...mockPool, id: 'zero-pool', totalLiquidity: BigInt(0) }
       store.addPool(zeroLiquidityPool)
-      
+
       const stats = store.getPoolStats('zero-pool')
       expect(stats?.utilizationRate).toBe(0)
     })
@@ -566,7 +566,7 @@ describe('PoolManagementStore', () => {
         const tx = { ...mockTransaction, id: `tx-${i}`, poolId: 'pool-1' }
         store.addTransaction(tx)
       }
-      
+
       const stats = store.getPoolStats('pool-1')
       expect(stats?.recentTransactions).toHaveLength(10)
     })
@@ -577,7 +577,7 @@ describe('PoolManagementStore', () => {
       const poolWithRoles = {
         ...mockPool,
         admins: ['0xadmin1', '0xadmin2'],
-        members: ['0xmember1', '0xmember2']
+        members: ['0xmember1', '0xmember2'],
       }
       store.addPool(poolWithRoles)
     })
@@ -639,15 +639,15 @@ describe('PoolManagementStore', () => {
     describe('loadPools', () => {
       it('should set loading state during pool loading', async () => {
         const consoleSpy = jest.spyOn(console, 'log').mockImplementation()
-        
+
         // Since loadPools is a placeholder that completes synchronously,
         // we test the complete flow including the loading state reset
         await store.loadPools()
-        
+
         expect(store.loading.pools).toBe(false) // Should be false after completion
         expect(store.error).toBeNull()
         expect(consoleSpy).toHaveBeenCalledWith('Loading pools...')
-        
+
         consoleSpy.mockRestore()
       })
 
@@ -656,11 +656,11 @@ describe('PoolManagementStore', () => {
         console.log = jest.fn().mockImplementation(() => {
           throw new Error('Network error')
         })
-        
+
         await store.loadPools()
         expect(store.error).toBe('Network error')
         expect(store.loading.pools).toBe(false)
-        
+
         console.log = originalConsoleLog
       })
 
@@ -669,10 +669,10 @@ describe('PoolManagementStore', () => {
         console.log = jest.fn().mockImplementation(() => {
           throw 'String error'
         })
-        
+
         await store.loadPools()
         expect(store.error).toBe('Failed to load pools')
-        
+
         console.log = originalConsoleLog
       })
     })
@@ -698,15 +698,15 @@ describe('PoolManagementStore', () => {
 
       it('should set loading state during pool creation', async () => {
         const consoleSpy = jest.spyOn(console, 'log').mockImplementation()
-        
+
         // Since createPool is a placeholder that completes synchronously,
         // we test the complete flow including the loading state reset
         await store.createPool(poolData)
-        
+
         expect(store.loading.memberActions).toBe(false) // Should be false after completion
         expect(store.error).toBeNull()
         expect(consoleSpy).toHaveBeenCalledWith('Creating pool...', poolData)
-        
+
         consoleSpy.mockRestore()
       })
 
@@ -715,11 +715,11 @@ describe('PoolManagementStore', () => {
         console.log = jest.fn().mockImplementation(() => {
           throw new Error('Creation failed')
         })
-        
+
         await expect(store.createPool(poolData)).rejects.toThrow('Creation failed')
         expect(store.error).toBe('Creation failed')
         expect(store.loading.memberActions).toBe(false)
-        
+
         console.log = originalConsoleLog
       })
 
@@ -728,10 +728,10 @@ describe('PoolManagementStore', () => {
         console.log = jest.fn().mockImplementation(() => {
           throw 'String error'
         })
-        
+
         await expect(store.createPool(poolData)).rejects.toBe('String error')
         expect(store.error).toBe('Failed to create pool')
-        
+
         console.log = originalConsoleLog
       })
     })
@@ -749,7 +749,7 @@ describe('PoolManagementStore', () => {
 
       it('should add user to pool members', async () => {
         await store.joinPool('pool-1')
-        
+
         const pool = store.pools.get('pool-1')!
         expect(pool.members).toContain('0xnewuser')
       })
@@ -759,11 +759,11 @@ describe('PoolManagementStore', () => {
         await store.joinPool('pool-1')
         const poolAfterFirst = store.pools.get('pool-1')!
         const membersCountAfterFirst = poolAfterFirst.members.length
-        
+
         // Try to add same user again
         await store.joinPool('pool-1')
         const poolAfterSecond = store.pools.get('pool-1')!
-        
+
         expect(poolAfterSecond.members.length).toBe(membersCountAfterFirst) // No change
       })
 
@@ -776,7 +776,7 @@ describe('PoolManagementStore', () => {
         // Since joinPool is a placeholder that completes synchronously,
         // we test the complete flow including the loading state reset
         await store.joinPool('pool-1')
-        
+
         expect(store.loading.memberActions).toBe(false) // Should be false after completion
       })
 
@@ -786,10 +786,10 @@ describe('PoolManagementStore', () => {
         store.updatePool = jest.fn().mockImplementation(() => {
           throw new Error('Update failed')
         })
-        
+
         await expect(store.joinPool('pool-1')).rejects.toThrow('Update failed')
         expect(store.error).toBe('Update failed')
-        
+
         store.updatePool = originalUpdatePool
       })
 
@@ -799,10 +799,10 @@ describe('PoolManagementStore', () => {
         store.updatePool = jest.fn().mockImplementation(() => {
           throw 'String error' // Non-Error type
         })
-        
+
         await expect(store.joinPool('pool-1')).rejects.toBe('String error')
         expect(store.error).toBe('Failed to join pool')
-        
+
         store.updatePool = originalUpdatePool
       })
     })
@@ -821,7 +821,7 @@ describe('PoolManagementStore', () => {
 
     it('should reset all state to initial values', () => {
       store.reset()
-      
+
       expect(store.pools.size).toBe(0)
       expect(store.loans.size).toBe(0)
       expect(store.transactions.size).toBe(0)
@@ -839,47 +839,38 @@ describe('PoolManagementStore', () => {
   describe('MobX Reactivity', () => {
     it('should trigger reactions when pools change', () => {
       const reactionSpy = jest.fn()
-      
+
       // Create a simple reaction to track allPools
       const { reaction } = require('mobx')
-      const dispose = reaction(
-        () => store.allPools.length,
-        reactionSpy
-      )
-      
+      const dispose = reaction(() => store.allPools.length, reactionSpy)
+
       store.addPool(mockPool)
       expect(reactionSpy).toHaveBeenCalledWith(1, 0, expect.anything())
-      
+
       dispose()
     })
 
     it('should trigger reactions when loading state changes', () => {
       const reactionSpy = jest.fn()
-      
+
       const { reaction } = require('mobx')
-      const dispose = reaction(
-        () => store.loading.pools,
-        reactionSpy
-      )
-      
+      const dispose = reaction(() => store.loading.pools, reactionSpy)
+
       store.setLoading('pools', true)
       expect(reactionSpy).toHaveBeenCalledWith(true, false, expect.anything())
-      
+
       dispose()
     })
 
     it('should trigger reactions when user address changes', () => {
       const reactionSpy = jest.fn()
-      
+
       const { reaction } = require('mobx')
-      const dispose = reaction(
-        () => store.userAddress,
-        reactionSpy
-      )
-      
+      const dispose = reaction(() => store.userAddress, reactionSpy)
+
       store.setUserAddress('0x123')
       expect(reactionSpy).toHaveBeenCalledWith('0x123', null, expect.anything())
-      
+
       dispose()
     })
   })
@@ -887,13 +878,13 @@ describe('PoolManagementStore', () => {
   describe('Edge Cases', () => {
     it('should handle bigint serialization in updates', () => {
       store.addPool(mockPool)
-      
+
       // Update with new bigint values
       store.updatePool('pool-1', {
         totalLiquidity: BigInt('999999999999999999999'),
-        availableLiquidity: BigInt('888888888888888888888')
+        availableLiquidity: BigInt('888888888888888888888'),
       })
-      
+
       const pool = store.pools.get('pool-1')!
       expect(pool.totalLiquidity).toBe(BigInt('999999999999999999999'))
       expect(pool.availableLiquidity).toBe(BigInt('888888888888888888888'))
@@ -901,14 +892,14 @@ describe('PoolManagementStore', () => {
 
     it('should handle empty search terms', () => {
       store.addPool(mockPool)
-      
+
       const filtered = store.getFilteredPools({ searchTerm: '' })
       expect(filtered).toHaveLength(1) // Empty string should not filter anything
     })
 
     it('should handle case-insensitive search', () => {
       store.addPool({ ...mockPool, name: 'Bitcoin Pool' })
-      
+
       const filtered = store.getFilteredPools({ searchTerm: 'BITCOIN' })
       expect(filtered).toHaveLength(1)
     })
@@ -916,13 +907,13 @@ describe('PoolManagementStore', () => {
     it('should handle multiple loans for same borrower', () => {
       const userAddress = '0xborrower'
       store.setUserAddress(userAddress)
-      
+
       const loan1 = { ...mockLoan, id: 'loan-1', amount: BigInt(100) }
       const loan2 = { ...mockLoan, id: 'loan-2', amount: BigInt(200) }
-      
+
       store.addLoan(loan1)
       store.addLoan(loan2)
-      
+
       const userLoans = store.userLoans
       expect(userLoans).toHaveLength(2)
       expect(userLoans.reduce((sum, loan) => sum + loan.amount, BigInt(0))).toBe(BigInt(300))

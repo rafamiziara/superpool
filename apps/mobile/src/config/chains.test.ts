@@ -36,7 +36,7 @@ describe('chains configuration', () => {
   describe('getChainConfig', () => {
     it('should return configuration object with localhost', () => {
       const config = getChainConfig()
-      
+
       expect(config).toHaveProperty('localhost')
       expect(config.localhost).toBe(localhost)
     })
@@ -44,7 +44,7 @@ describe('chains configuration', () => {
     it('should return consistent configuration on multiple calls', () => {
       const config1 = getChainConfig()
       const config2 = getChainConfig()
-      
+
       expect(config1).toEqual(config2)
       expect(config1.localhost).toBe(config2.localhost)
     })
@@ -78,7 +78,7 @@ describe('chains configuration', () => {
   describe('getLocalhostRpcUrl', () => {
     it('should return correct localhost RPC URL', () => {
       const rpcUrl = getLocalhostRpcUrl()
-      
+
       expect(rpcUrl).toBe('http://127.0.0.1:8545')
       expect(rpcUrl).toBe(localhost.rpcUrls.default.http[0])
     })
@@ -86,13 +86,13 @@ describe('chains configuration', () => {
     it('should return consistent URL on multiple calls', () => {
       const url1 = getLocalhostRpcUrl()
       const url2 = getLocalhostRpcUrl()
-      
+
       expect(url1).toBe(url2)
     })
 
     it('should return valid URL format', () => {
       const rpcUrl = getLocalhostRpcUrl()
-      
+
       expect(rpcUrl).toMatch(/^https?:\/\//)
       expect(() => new URL(rpcUrl)).not.toThrow()
     })
@@ -101,12 +101,12 @@ describe('chains configuration', () => {
   describe('chain configuration integrity', () => {
     it('should maintain readonly chain configuration', () => {
       const originalName = localhost.name
-      
+
       // Try to modify (should not affect original due to 'as const')
       expect(() => {
         ;(localhost as any).name = 'Modified'
       }).not.toThrow() // Assignment might work but shouldn't affect the type
-      
+
       // Verify we can still access the original structure
       expect(localhost.name).toBeDefined()
       expect(typeof localhost.name).toBe('string')
@@ -114,8 +114,8 @@ describe('chains configuration', () => {
 
     it('should have all required chain properties', () => {
       const requiredProps = ['id', 'name', 'nativeCurrency', 'rpcUrls', 'blockExplorers']
-      
-      requiredProps.forEach(prop => {
+
+      requiredProps.forEach((prop) => {
         expect(localhost).toHaveProperty(prop)
         expect(localhost[prop as keyof typeof localhost]).toBeDefined()
       })
@@ -130,8 +130,8 @@ describe('chains configuration', () => {
     it('should have valid RPC URL structure', () => {
       expect(Array.isArray(localhost.rpcUrls.default.http)).toBe(true)
       expect(localhost.rpcUrls.default.http.length).toBeGreaterThan(0)
-      
-      localhost.rpcUrls.default.http.forEach(url => {
+
+      localhost.rpcUrls.default.http.forEach((url) => {
         expect(typeof url).toBe('string')
         expect(url.length).toBeGreaterThan(0)
         expect(() => new URL(url)).not.toThrow()
@@ -143,7 +143,7 @@ describe('chains configuration', () => {
     it('should work with common blockchain development tools', () => {
       // Hardhat default chain ID
       expect(isLocalhost(31337)).toBe(true)
-      
+
       // Default Hardhat RPC URL
       expect(getLocalhostRpcUrl()).toContain('127.0.0.1:8545')
     })
@@ -177,7 +177,7 @@ describe('chains configuration', () => {
       expect(localhost).toHaveProperty('name')
       expect(localhost).toHaveProperty('nativeCurrency')
       expect(localhost).toHaveProperty('rpcUrls')
-      
+
       // Should have default RPC URL
       expect(localhost.rpcUrls).toHaveProperty('default')
       expect(localhost.rpcUrls.default).toHaveProperty('http')
@@ -185,7 +185,7 @@ describe('chains configuration', () => {
 
     it('should be compatible with network switching', () => {
       const chainId = localhost.id
-      
+
       expect(typeof chainId).toBe('number')
       expect(chainId).toBeGreaterThan(0)
       expect(isLocalhost(chainId)).toBe(true)

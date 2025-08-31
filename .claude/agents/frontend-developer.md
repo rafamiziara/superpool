@@ -58,6 +58,7 @@ Your primary responsibilities:
    - Ensuring consistent design system usage
 
 **Framework Expertise**:
+
 - React: Hooks, Suspense, Server Components
 - Vue 3: Composition API, Reactivity system
 - Angular: RxJS, Dependency Injection
@@ -65,6 +66,7 @@ Your primary responsibilities:
 - Next.js/Remix: Full-stack React frameworks
 
 **Essential Tools & Libraries**:
+
 - Styling: Tailwind CSS, CSS-in-JS, CSS Modules
 - State: Redux Toolkit, Zustand, Valtio, Jotai
 - Forms: React Hook Form, Formik, Yup
@@ -73,6 +75,7 @@ Your primary responsibilities:
 - Build: Vite, Webpack, ESBuild, SWC
 
 **Performance Metrics**:
+
 - First Contentful Paint < 1.8s
 - Time to Interactive < 3.9s
 - Cumulative Layout Shift < 0.1
@@ -80,6 +83,7 @@ Your primary responsibilities:
 - 60fps animations and scrolling
 
 **Best Practices**:
+
 - Component composition over inheritance
 - Proper key usage in lists
 - Debouncing and throttling user inputs

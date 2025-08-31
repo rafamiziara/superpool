@@ -205,8 +205,12 @@ describe('SignatureStrategy Interface', () => {
               signatureType,
             }
           }
-          canHandle(_connector?: Connector) { return true }
-          getStrategyName() { return `${signatureType}Strategy` }
+          canHandle(_connector?: Connector) {
+            return true
+          }
+          getStrategyName() {
+            return `${signatureType}Strategy`
+          }
         }
 
         const strategy = new TypedStrategy()
@@ -225,8 +229,12 @@ describe('SignatureStrategy Interface', () => {
             signatureType: 'personal-sign',
           }
         }
-        canHandle(_connector?: Connector) { return true }
-        getStrategyName() { return 'CompleteResultStrategy' }
+        canHandle(_connector?: Connector) {
+          return true
+        }
+        getStrategyName() {
+          return 'CompleteResultStrategy'
+        }
       }
 
       const strategy = new CompleteResultStrategy()
@@ -244,8 +252,12 @@ describe('SignatureStrategy Interface', () => {
         async sign(_request: SignatureRequest, _functions: SignatureFunctions, _connector?: Connector): Promise<SignatureResult> {
           throw new Error('Signing failed')
         }
-        canHandle(_connector?: Connector) { return true }
-        getStrategyName() { return 'ErrorThrowingStrategy' }
+        canHandle(_connector?: Connector) {
+          return true
+        }
+        getStrategyName() {
+          return 'ErrorThrowingStrategy'
+        }
       }
 
       const strategy = new ErrorThrowingStrategy()
@@ -265,7 +277,9 @@ describe('SignatureStrategy Interface', () => {
           return true
         }
 
-        getStrategyName() { return 'AsyncCompatibleStrategy' }
+        getStrategyName() {
+          return 'AsyncCompatibleStrategy'
+        }
       }
 
       const strategy = new AsyncCompatibleStrategy()
@@ -279,8 +293,12 @@ describe('SignatureStrategy Interface', () => {
         async sign(_request: SignatureRequest, _functions: SignatureFunctions, _connector?: Connector): Promise<SignatureResult> {
           return { signature: '0xemptyName', signatureType: 'personal-sign' }
         }
-        canHandle(_connector?: Connector) { return true }
-        getStrategyName() { return '' }
+        canHandle(_connector?: Connector) {
+          return true
+        }
+        getStrategyName() {
+          return ''
+        }
       }
 
       const strategy = new EmptyNameStrategy()
@@ -305,7 +323,9 @@ describe('SignatureStrategy Interface', () => {
           return true
         }
 
-        getStrategyName() { return 'MinimalConnectorStrategy' }
+        getStrategyName() {
+          return 'MinimalConnectorStrategy'
+        }
       }
 
       const strategy = new MinimalConnectorStrategy()
@@ -321,16 +341,24 @@ describe('SignatureStrategy Interface', () => {
         async sign(_request: SignatureRequest, _functions: SignatureFunctions, _connector?: Connector): Promise<SignatureResult> {
           return { signature: '0xpersonal', signatureType: 'personal-sign' }
         }
-        canHandle(connector?: Connector) { return connector?.type !== 'safe' }
-        getStrategyName() { return 'PersonalSignStrategy' }
+        canHandle(connector?: Connector) {
+          return connector?.type !== 'safe'
+        }
+        getStrategyName() {
+          return 'PersonalSignStrategy'
+        }
       }
 
       class SafeStrategy implements SignatureStrategy {
         async sign(_request: SignatureRequest, _functions: SignatureFunctions, _connector?: Connector): Promise<SignatureResult> {
           return { signature: '0xsafe', signatureType: 'safe-wallet' }
         }
-        canHandle(connector?: Connector) { return connector?.type === 'safe' }
-        getStrategyName() { return 'SafeStrategy' }
+        canHandle(connector?: Connector) {
+          return connector?.type === 'safe'
+        }
+        getStrategyName() {
+          return 'SafeStrategy'
+        }
       }
 
       const personalStrategy = new PersonalSignStrategy()
@@ -353,15 +381,27 @@ describe('SignatureStrategy Interface', () => {
     it('should work with array of strategies', async () => {
       const strategies: SignatureStrategy[] = [
         {
-          async sign(_request: SignatureRequest, _functions: SignatureFunctions, _connector?: Connector) { return { signature: '0x1', signatureType: 'personal-sign' as const } },
-          canHandle(_connector?: Connector) { return true },
-          getStrategyName() { return 'Strategy1' }
+          async sign(_request: SignatureRequest, _functions: SignatureFunctions, _connector?: Connector) {
+            return { signature: '0x1', signatureType: 'personal-sign' as const }
+          },
+          canHandle(_connector?: Connector) {
+            return true
+          },
+          getStrategyName() {
+            return 'Strategy1'
+          },
         },
         {
-          async sign(_request: SignatureRequest, _functions: SignatureFunctions, _connector?: Connector) { return { signature: '0x2', signatureType: 'typed-data' as const } },
-          canHandle(_connector?: Connector) { return false },
-          getStrategyName() { return 'Strategy2' }
-        }
+          async sign(_request: SignatureRequest, _functions: SignatureFunctions, _connector?: Connector) {
+            return { signature: '0x2', signatureType: 'typed-data' as const }
+          },
+          canHandle(_connector?: Connector) {
+            return false
+          },
+          getStrategyName() {
+            return 'Strategy2'
+          },
+        },
       ]
 
       expect(strategies).toHaveLength(2)
@@ -395,8 +435,12 @@ describe('SignatureStrategy Interface', () => {
           }
         }
 
-        canHandle(_connector?: Connector) { return true }
-        getStrategyName() { return 'RealTypeStrategy' }
+        canHandle(_connector?: Connector) {
+          return true
+        }
+        getStrategyName() {
+          return 'RealTypeStrategy'
+        }
       }
 
       const strategy = new RealTypeStrategy()
@@ -426,7 +470,9 @@ describe('SignatureStrategy Interface', () => {
           return connector?.type === 'injected'
         }
 
-        getStrategyName() { return 'RealConnectorStrategy' }
+        getStrategyName() {
+          return 'RealConnectorStrategy'
+        }
       }
 
       const strategy = new RealConnectorStrategy()
@@ -495,7 +541,7 @@ describe('SignatureConfig Interface', () => {
         { timeoutMs: 15000, retryCount: 5, strategy: 'MultiRetryStrategy' },
       ]
 
-      configsWithRetry.forEach(config => {
+      configsWithRetry.forEach((config) => {
         expect(typeof config.retryCount).toBe('number')
         expect(config.retryCount).toBeGreaterThanOrEqual(0)
       })
@@ -504,15 +550,9 @@ describe('SignatureConfig Interface', () => {
 
   describe('Strategy Names', () => {
     it('should accept different strategy names', () => {
-      const strategies = [
-        'RegularWalletStrategy',
-        'SafeWalletStrategy',
-        'CustomStrategy',
-        'TestStrategy123',
-        '',
-      ]
+      const strategies = ['RegularWalletStrategy', 'SafeWalletStrategy', 'CustomStrategy', 'TestStrategy123', '']
 
-      strategies.forEach(strategyName => {
+      strategies.forEach((strategyName) => {
         const config: SignatureConfig = {
           timeoutMs: 15000,
           strategy: strategyName,
@@ -524,14 +564,9 @@ describe('SignatureConfig Interface', () => {
     })
 
     it('should work with strategy names containing special characters', () => {
-      const specialNames = [
-        'Strategy-With-Dashes',
-        'Strategy_With_Underscores',
-        'Strategy With Spaces',
-        'Strategy@#$%Special',
-      ]
+      const specialNames = ['Strategy-With-Dashes', 'Strategy_With_Underscores', 'Strategy With Spaces', 'Strategy@#$%Special']
 
-      specialNames.forEach(name => {
+      specialNames.forEach((name) => {
         const config: SignatureConfig = {
           timeoutMs: 10000,
           strategy: name,
@@ -551,7 +586,7 @@ describe('SignatureConfig Interface', () => {
       ]
 
       expect(configs).toHaveLength(3)
-      configs.forEach(config => {
+      configs.forEach((config) => {
         expect(typeof config.timeoutMs).toBe('number')
         expect(typeof config.strategy).toBe('string')
       })
@@ -564,7 +599,7 @@ describe('SignatureConfig Interface', () => {
         custom: { timeoutMs: 10000, retryCount: 3, strategy: 'CustomStrategy' },
       }
 
-      Object.values(configMap).forEach(config => {
+      Object.values(configMap).forEach((config) => {
         expect(config).toHaveProperty('timeoutMs')
         expect(config).toHaveProperty('strategy')
         expect(typeof config.timeoutMs).toBe('number')
@@ -605,7 +640,7 @@ describe('SignatureConfig Interface', () => {
         { timeoutMs: -1, strategy: 'NegativeTimeout' }, // TypeScript allows this
       ]
 
-      extremeConfigs.forEach(config => {
+      extremeConfigs.forEach((config) => {
         expect(typeof config.timeoutMs).toBe('number')
         expect(config.strategy).toBeTruthy()
       })
@@ -617,7 +652,7 @@ describe('SignatureConfig Interface', () => {
         { timeoutMs: 10000, retryCount: -1, strategy: 'NegativeRetry' },
       ]
 
-      extremeRetryConfigs.forEach(config => {
+      extremeRetryConfigs.forEach((config) => {
         expect(typeof config.retryCount).toBe('number')
         expect(config.strategy).toBeTruthy()
       })

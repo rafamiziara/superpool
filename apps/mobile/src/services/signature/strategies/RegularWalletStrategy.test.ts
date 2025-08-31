@@ -10,8 +10,8 @@ jest.mock('./SignatureUtils', () => ({
     validateSignatureResult: jest.fn(),
     isSafeWalletError: jest.fn(),
     logSignaturePreview: jest.fn(),
-    createSafeAuthToken: jest.fn()
-  }
+    createSafeAuthToken: jest.fn(),
+  },
 }))
 
 const mockSignatureUtils = SignatureUtils as jest.Mocked<typeof SignatureUtils>
@@ -23,10 +23,10 @@ describe('RegularWalletStrategy', () => {
 
   beforeEach(() => {
     strategy = new RegularWalletStrategy()
-    
+
     mockSignatureFunctions = {
       signMessageAsync: jest.fn(),
-      signTypedDataAsync: jest.fn()
+      signTypedDataAsync: jest.fn(),
     }
 
     mockRequest = {
@@ -34,12 +34,12 @@ describe('RegularWalletStrategy', () => {
       nonce: 'abc123def456',
       timestamp: 1234567890,
       walletAddress: '0x742d35Cc6624C4532F7845A7b6d4b7c5c4dF5b9e',
-      chainId: 1
+      chainId: 1,
     }
 
     // Reset all mocks
     jest.clearAllMocks()
-    
+
     // Set up default mock implementations
     mockSignatureUtils.withTimeout.mockImplementation(async (promise) => await promise)
     mockSignatureUtils.validateSignatureResult.mockReturnValue(true)
@@ -60,10 +60,10 @@ describe('RegularWalletStrategy', () => {
           { id: 'metamask', name: 'MetaMask', type: 'injected' },
           { id: 'walletconnect', name: 'WalletConnect', type: 'walletconnect' },
           { id: 'coinbase', name: 'Coinbase Wallet', type: 'coinbaseWallet' },
-          { id: 'injected', name: 'Injected', type: 'injected' }
+          { id: 'injected', name: 'Injected', type: 'injected' },
         ] as Connector[]
 
-        regularConnectors.forEach(connector => {
+        regularConnectors.forEach((connector) => {
           expect(strategy.canHandle(connector)).toBe(true)
         })
       })
@@ -78,10 +78,10 @@ describe('RegularWalletStrategy', () => {
           { id: 'wallet1', name: 'Safe Wallet', type: 'custom' },
           { id: 'wallet2', name: 'SAFE WALLET', type: 'custom' },
           { id: 'wallet3', name: 'safe wallet', type: 'custom' },
-          { id: 'wallet4', name: 'MySafeWallet', type: 'custom' }
+          { id: 'wallet4', name: 'MySafeWallet', type: 'custom' },
         ] as Connector[]
 
-        safeConnectors.forEach(connector => {
+        safeConnectors.forEach((connector) => {
           expect(strategy.canHandle(connector)).toBe(false)
         })
       })
@@ -90,10 +90,10 @@ describe('RegularWalletStrategy', () => {
         const safeConnectors = [
           { id: 'safe-wallet', name: 'Wallet', type: 'custom' },
           { id: 'SAFE', name: 'Wallet', type: 'custom' },
-          { id: 'mysafeconnector', name: 'Wallet', type: 'custom' }
+          { id: 'mysafeconnector', name: 'Wallet', type: 'custom' },
         ] as Connector[]
 
-        safeConnectors.forEach(connector => {
+        safeConnectors.forEach((connector) => {
           expect(strategy.canHandle(connector)).toBe(false)
         })
       })
@@ -129,23 +129,19 @@ describe('RegularWalletStrategy', () => {
 
         expect(result).toEqual({
           signature: '0x1234567890abcdef',
-          signatureType: 'personal-sign'
+          signatureType: 'personal-sign',
         })
 
         expect(mockSignatureFunctions.signMessageAsync).toHaveBeenCalledWith({
           message: mockRequest.message,
-          account: mockRequest.walletAddress as `0x${string}`
+          account: mockRequest.walletAddress as `0x${string}`,
         })
 
-        expect(mockSignatureUtils.withTimeout).toHaveBeenCalledWith(
-          expect.any(Promise),
-          15000,
-          'Personal sign request'
-        )
+        expect(mockSignatureUtils.withTimeout).toHaveBeenCalledWith(expect.any(Promise), 15000, 'Personal sign request')
 
         expect(mockSignatureUtils.validateSignatureResult).toHaveBeenCalledWith('0x1234567890abcdef')
         expect(mockSignatureUtils.logSignaturePreview).toHaveBeenCalledWith('0x1234567890abcdef', 'Personal message')
-        
+
         // Should not attempt EIP-712 signing
         expect(mockSignatureFunctions.signTypedDataAsync).not.toHaveBeenCalled()
       })
@@ -173,32 +169,32 @@ describe('RegularWalletStrategy', () => {
 
         expect(result).toEqual({
           signature: '0xabcdef567890123',
-          signatureType: 'typed-data'
+          signatureType: 'typed-data',
         })
 
         // Should have tried personal sign first
         expect(mockSignatureFunctions.signMessageAsync).toHaveBeenCalled()
-        
+
         // Should have fallen back to EIP-712
         expect(mockSignatureFunctions.signTypedDataAsync).toHaveBeenCalledWith({
           domain: {
             name: 'SuperPool Authentication',
             version: '1',
-            chainId: 1
+            chainId: 1,
           },
           types: {
             Authentication: [
               { name: 'wallet', type: 'address' },
               { name: 'nonce', type: 'string' },
-              { name: 'timestamp', type: 'uint256' }
-            ]
+              { name: 'timestamp', type: 'uint256' },
+            ],
           },
           primaryType: 'Authentication',
           message: {
             wallet: mockRequest.walletAddress as `0x${string}`,
             nonce: mockRequest.nonce,
-            timestamp: BigInt(mockRequest.timestamp)
-          }
+            timestamp: BigInt(mockRequest.timestamp),
+          },
         })
 
         expect(mockSignatureUtils.logSignaturePreview).toHaveBeenCalledWith('0xabcdef567890123', 'EIP-712')
@@ -212,22 +208,22 @@ describe('RegularWalletStrategy', () => {
         expect(typedDataCall.domain).toEqual({
           name: 'SuperPool Authentication',
           version: '1',
-          chainId: 1
+          chainId: 1,
         })
 
         expect(typedDataCall.types).toEqual({
           Authentication: [
             { name: 'wallet', type: 'address' },
             { name: 'nonce', type: 'string' },
-            { name: 'timestamp', type: 'uint256' }
-          ]
+            { name: 'timestamp', type: 'uint256' },
+          ],
         })
 
         expect(typedDataCall.primaryType).toBe('Authentication')
         expect(typedDataCall.message).toEqual({
           wallet: mockRequest.walletAddress as `0x${string}`,
           nonce: mockRequest.nonce,
-          timestamp: BigInt(mockRequest.timestamp)
+          timestamp: BigInt(mockRequest.timestamp),
         })
       })
 
@@ -258,12 +254,12 @@ describe('RegularWalletStrategy', () => {
 
         expect(result).toEqual({
           signature: 'safe-wallet:0x742d35:abc123:1234567890',
-          signatureType: 'safe-wallet'
+          signatureType: 'safe-wallet',
         })
 
         expect(mockSignatureUtils.isSafeWalletError).toHaveBeenCalledWith('Method disabled')
         expect(mockSignatureUtils.createSafeAuthToken).toHaveBeenCalledWith(mockRequest)
-        
+
         // Should not attempt EIP-712 when Safe is detected
         expect(mockSignatureFunctions.signTypedDataAsync).not.toHaveBeenCalled()
       })
@@ -277,7 +273,7 @@ describe('RegularWalletStrategy', () => {
 
         expect(result).toEqual({
           signature: 'safe-wallet:0x123:nonce:123',
-          signatureType: 'safe-wallet'
+          signatureType: 'safe-wallet',
         })
 
         expect(mockSignatureUtils.isSafeWalletError).toHaveBeenCalledWith('"invalid-signature"')
@@ -289,7 +285,7 @@ describe('RegularWalletStrategy', () => {
         // Personal sign fails with non-Safe error
         mockSignatureFunctions.signMessageAsync.mockRejectedValue(new Error('Network timeout'))
         mockSignatureUtils.isSafeWalletError.mockReturnValueOnce(false) // For personal sign error
-        
+
         // EIP-712 fails with Safe error
         mockSignatureFunctions.signTypedDataAsync.mockRejectedValue(new Error('eth_signTypedData_v4 does not exist'))
         mockSignatureUtils.isSafeWalletError.mockReturnValueOnce(true) // For EIP-712 error
@@ -298,7 +294,7 @@ describe('RegularWalletStrategy', () => {
 
         expect(result).toEqual({
           signature: 'safe-wallet:0x123:nonce:123',
-          signatureType: 'safe-wallet'
+          signatureType: 'safe-wallet',
         })
 
         expect(mockSignatureUtils.isSafeWalletError).toHaveBeenCalledTimes(2)
@@ -308,7 +304,7 @@ describe('RegularWalletStrategy', () => {
         // Personal sign fails normally
         mockSignatureFunctions.signMessageAsync.mockRejectedValue(new Error('User rejected'))
         mockSignatureUtils.isSafeWalletError.mockReturnValueOnce(false)
-        
+
         // EIP-712 returns invalid signature
         mockSignatureFunctions.signTypedDataAsync.mockResolvedValue('{"error": "safe:// redirect"}')
         mockSignatureUtils.validateSignatureResult.mockReturnValue(false)
@@ -324,11 +320,9 @@ describe('RegularWalletStrategy', () => {
         mockSignatureUtils.validateSignatureResult.mockReturnValue(false)
         mockSignatureUtils.isSafeWalletError.mockReturnValue(true)
 
-        await expect(
-          strategy.sign(mockRequest, mockSignatureFunctions)
-        ).resolves.toEqual({
+        await expect(strategy.sign(mockRequest, mockSignatureFunctions)).resolves.toEqual({
           signature: 'safe-wallet:0x123:nonce:123',
-          signatureType: 'safe-wallet'
+          signatureType: 'safe-wallet',
         })
       })
     })
@@ -339,9 +333,7 @@ describe('RegularWalletStrategy', () => {
         mockSignatureFunctions.signTypedDataAsync.mockRejectedValue(new Error('Network error'))
         mockSignatureUtils.isSafeWalletError.mockReturnValue(false)
 
-        await expect(strategy.sign(mockRequest, mockSignatureFunctions)).rejects.toThrow(
-          'All signature methods failed'
-        )
+        await expect(strategy.sign(mockRequest, mockSignatureFunctions)).rejects.toThrow('All signature methods failed')
       })
 
       it('should throw error when personal sign validation fails with non-Safe error', async () => {
@@ -367,27 +359,19 @@ describe('RegularWalletStrategy', () => {
   describe('Timeout Handling', () => {
     it('should use regular wallet timeout (15s) for personal signing', async () => {
       mockSignatureFunctions.signMessageAsync.mockResolvedValue('0x123')
-      
+
       await strategy.sign(mockRequest, mockSignatureFunctions)
 
-      expect(mockSignatureUtils.withTimeout).toHaveBeenCalledWith(
-        expect.any(Promise),
-        15000,
-        'Personal sign request'
-      )
+      expect(mockSignatureUtils.withTimeout).toHaveBeenCalledWith(expect.any(Promise), 15000, 'Personal sign request')
     })
 
     it('should use regular wallet timeout (15s) for EIP-712 signing', async () => {
       mockSignatureFunctions.signMessageAsync.mockRejectedValue(new Error('Failed'))
       mockSignatureFunctions.signTypedDataAsync.mockResolvedValue('0x123')
-      
+
       await strategy.sign(mockRequest, mockSignatureFunctions)
 
-      expect(mockSignatureUtils.withTimeout).toHaveBeenCalledWith(
-        expect.any(Promise),
-        15000,
-        'EIP-712 signature request'
-      )
+      expect(mockSignatureUtils.withTimeout).toHaveBeenCalledWith(expect.any(Promise), 15000, 'EIP-712 signature request')
     })
 
     it('should handle timeout errors from SignatureUtils', async () => {
@@ -402,7 +386,7 @@ describe('RegularWalletStrategy', () => {
       mockSignatureUtils.isSafeWalletError.mockReturnValue(true)
 
       const result = await strategy.sign(mockRequest, mockSignatureFunctions)
-      
+
       expect(result.signatureType).toBe('safe-wallet')
     })
   })
@@ -419,12 +403,12 @@ describe('RegularWalletStrategy', () => {
     it('should handle connector parameter in sign method', async () => {
       const mockConnector = { id: 'test', name: 'Test', type: 'test' } as Connector
       mockSignatureFunctions.signMessageAsync.mockResolvedValue('0x123')
-      
+
       await strategy.sign(mockRequest, mockSignatureFunctions, mockConnector)
 
       expect(mockSignatureFunctions.signMessageAsync).toHaveBeenCalledWith({
         message: mockRequest.message,
-        account: mockRequest.walletAddress as `0x${string}`
+        account: mockRequest.walletAddress as `0x${string}`,
       })
     })
 
@@ -434,7 +418,7 @@ describe('RegularWalletStrategy', () => {
         'Short',
         'Very long authentication message with lots of details...',
         'Message with special chars: !@#$%^&*()_+',
-        'Unicode message: 测试消息'
+        'Unicode message: 测试消息',
       ]
 
       mockSignatureFunctions.signMessageAsync.mockResolvedValue('0x123')
@@ -445,17 +429,13 @@ describe('RegularWalletStrategy', () => {
 
         expect(mockSignatureFunctions.signMessageAsync).toHaveBeenCalledWith({
           message,
-          account: mockRequest.walletAddress as `0x${string}`
+          account: mockRequest.walletAddress as `0x${string}`,
         })
       }
     })
 
     it('should handle requests with different wallet addresses', async () => {
-      const addresses = [
-        '0x0000000000000000000000000000000000000000',
-        '0xffffffffffffffffffffffffffffffffffffffff',
-        '0x123abc'
-      ]
+      const addresses = ['0x0000000000000000000000000000000000000000', '0xffffffffffffffffffffffffffffffffffffffff', '0x123abc']
 
       mockSignatureFunctions.signMessageAsync.mockResolvedValue('0x123')
 
@@ -465,7 +445,7 @@ describe('RegularWalletStrategy', () => {
 
         expect(mockSignatureFunctions.signMessageAsync).toHaveBeenCalledWith({
           message: mockRequest.message,
-          account: walletAddress as `0x${string}`
+          account: walletAddress as `0x${string}`,
         })
       }
     })
@@ -478,7 +458,7 @@ describe('RegularWalletStrategy', () => {
         null,
         undefined,
         42,
-        { code: -32603, message: 'RPC Error' }
+        { code: -32603, message: 'RPC Error' },
       ]
 
       mockSignatureUtils.isSafeWalletError.mockReturnValue(false)
@@ -505,7 +485,7 @@ describe('RegularWalletStrategy', () => {
 
     it('should log personal signing attempt', async () => {
       mockSignatureFunctions.signMessageAsync.mockResolvedValue('0x123')
-      
+
       await strategy.sign(mockRequest, mockSignatureFunctions)
 
       expect(consoleSpy).toHaveBeenCalledWith('📱 Trying personal message signing first for better UX...')
@@ -545,7 +525,7 @@ describe('RegularWalletStrategy', () => {
   describe('Integration with SignatureUtils', () => {
     it('should call all required SignatureUtils methods in successful flow', async () => {
       mockSignatureFunctions.signMessageAsync.mockResolvedValue('0x123abc')
-      
+
       await strategy.sign(mockRequest, mockSignatureFunctions)
 
       expect(mockSignatureUtils.withTimeout).toHaveBeenCalled()
@@ -565,23 +545,23 @@ describe('RegularWalletStrategy', () => {
 
     it('should maintain proper method call order', async () => {
       const callOrder: string[] = []
-      
+
       mockSignatureUtils.withTimeout.mockImplementation(async (promise) => {
         callOrder.push('withTimeout')
         return await promise
       })
-      
+
       mockSignatureUtils.validateSignatureResult.mockImplementation((sig) => {
         callOrder.push('validateSignatureResult')
         return true
       })
-      
+
       mockSignatureUtils.logSignaturePreview.mockImplementation(() => {
         callOrder.push('logSignaturePreview')
       })
 
       mockSignatureFunctions.signMessageAsync.mockResolvedValue('0x123')
-      
+
       await strategy.sign(mockRequest, mockSignatureFunctions)
 
       expect(callOrder).toEqual(['withTimeout', 'validateSignatureResult', 'logSignaturePreview'])
@@ -619,17 +599,15 @@ describe('RegularWalletStrategy', () => {
 
   describe('Performance and Memory', () => {
     it('should handle multiple concurrent sign requests', async () => {
-      mockSignatureFunctions.signMessageAsync.mockImplementation(
-        () => new Promise(resolve => setTimeout(() => resolve('0x123'), 10))
-      )
+      mockSignatureFunctions.signMessageAsync.mockImplementation(() => new Promise((resolve) => setTimeout(() => resolve('0x123'), 10)))
 
       const requests = Array(5).fill(mockRequest)
-      const promises = requests.map(req => strategy.sign(req, mockSignatureFunctions))
+      const promises = requests.map((req) => strategy.sign(req, mockSignatureFunctions))
 
       const results = await Promise.all(promises)
 
       expect(results).toHaveLength(5)
-      results.forEach(result => {
+      results.forEach((result) => {
         expect(result.signatureType).toBe('personal-sign')
       })
     })
@@ -642,7 +620,7 @@ describe('RegularWalletStrategy', () => {
       }
 
       expect(strategies).toHaveLength(100)
-      strategies.forEach(s => {
+      strategies.forEach((s) => {
         expect(s.getStrategyName()).toBe('regular-wallet')
       })
     })

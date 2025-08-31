@@ -54,7 +54,7 @@ describe('appCheckProvider', () => {
   beforeEach(() => {
     jest.clearAllMocks()
     mockPlatformOS = 'ios' // Reset to default
-    
+
     // Mock console.error to avoid test output pollution
     originalConsoleError = console.error
     console.error = jest.fn()
@@ -242,10 +242,10 @@ describe('appCheckProvider', () => {
         it('should fetch token successfully with valid response', async () => {
           const mockToken = 'valid_app_check_token_12345'
           const deviceId = 'test_device_id'
-          
+
           mockPlatformOS = 'ios'
           mockGetIosIdForVendorAsync.mockResolvedValue(deviceId)
-          
+
           mockFetch.mockResolvedValue({
             ok: true,
             json: async () => ({ token: mockToken }),
@@ -274,10 +274,10 @@ describe('appCheckProvider', () => {
         it('should set appropriate expiry time for tokens', async () => {
           const mockToken = 'token_with_expiry'
           const deviceId = 'test_device_id_expiry'
-          
+
           mockPlatformOS = 'android'
           mockGetAndroidId.mockResolvedValue(deviceId)
-          
+
           mockFetch.mockResolvedValue({
             ok: true,
             json: async () => ({ token: mockToken }),
@@ -301,7 +301,7 @@ describe('appCheckProvider', () => {
         it('should return dummy token on network failure', async () => {
           mockPlatformOS = 'ios'
           mockGetIosIdForVendorAsync.mockResolvedValue('device_id')
-          
+
           mockFetch.mockRejectedValue(new Error('Network error'))
 
           const provider = customAppCheckProviderFactory()
@@ -314,7 +314,7 @@ describe('appCheckProvider', () => {
         it('should return dummy token on HTTP error response', async () => {
           mockPlatformOS = 'android'
           mockGetAndroidId.mockResolvedValue('android_device')
-          
+
           mockFetch.mockResolvedValue({
             ok: false,
             status: 500,
@@ -330,7 +330,7 @@ describe('appCheckProvider', () => {
         it('should return dummy token when response lacks token field', async () => {
           mockPlatformOS = 'web'
           mockSecureStore.getItemAsync.mockResolvedValue('web_device_id')
-          
+
           mockFetch.mockResolvedValue({
             ok: true,
             json: async () => ({ message: 'success' }), // No token field
@@ -345,7 +345,7 @@ describe('appCheckProvider', () => {
         it('should return dummy token on JSON parsing error', async () => {
           mockPlatformOS = 'ios'
           mockGetIosIdForVendorAsync.mockResolvedValue('ios_device')
-          
+
           mockFetch.mockResolvedValue({
             ok: true,
             json: async () => {
@@ -418,10 +418,7 @@ describe('appCheckProvider', () => {
           const provider = customAppCheckProviderFactory()
           await provider.getToken()
 
-          expect(mockFetch).toHaveBeenCalledWith(
-            'https://test-functions.firebase.com/customAppCheckMinter',
-            expect.any(Object)
-          )
+          expect(mockFetch).toHaveBeenCalledWith('https://test-functions.firebase.com/customAppCheckMinter', expect.any(Object))
         })
 
         it('should handle missing environment variable gracefully', async () => {
@@ -431,7 +428,7 @@ describe('appCheckProvider', () => {
 
           mockPlatformOS = 'ios'
           mockGetIosIdForVendorAsync.mockResolvedValue('test_device')
-          
+
           const provider = customAppCheckProviderFactory()
           const result = await provider.getToken()
 
@@ -456,20 +453,20 @@ describe('appCheckProvider', () => {
       it('should work correctly with concurrent token requests', async () => {
         mockPlatformOS = 'ios'
         mockGetIosIdForVendorAsync.mockResolvedValue('concurrent_device')
-        
+
         mockFetch.mockResolvedValue({
           ok: true,
           json: async () => ({ token: 'concurrent_token' }),
         })
 
         const provider = customAppCheckProviderFactory()
-        
+
         // Make concurrent requests
         const promises = Array.from({ length: 5 }, () => provider.getToken())
         const results = await Promise.all(promises)
 
         // All should succeed and return valid tokens
-        results.forEach(result => {
+        results.forEach((result) => {
           expect(result.token).toBeTruthy()
           expect(result.expiry).toBeGreaterThan(Date.now())
         })
@@ -485,7 +482,7 @@ describe('appCheckProvider', () => {
         mockPlatformOS = 'ios'
         mockGetIosIdForVendorAsync.mockRejectedValue(new Error('Device ID unavailable'))
         mockUuid.v4.mockReturnValue('fallback_device_id')
-        
+
         mockFetch.mockResolvedValue({
           ok: true,
           json: async () => ({ token: 'fallback_token' }),
@@ -508,17 +505,18 @@ describe('appCheckProvider', () => {
       it('should handle slow network requests', async () => {
         mockPlatformOS = 'android'
         mockGetAndroidId.mockResolvedValue('slow_device')
-        
+
         // Simulate slow response
-        mockFetch.mockImplementation(() => 
-          new Promise(resolve => {
-            setTimeout(() => {
-              resolve({
-                ok: true,
-                json: async () => ({ token: 'slow_token' }),
-              })
-            }, 100) // 100ms delay
-          })
+        mockFetch.mockImplementation(
+          () =>
+            new Promise((resolve) => {
+              setTimeout(() => {
+                resolve({
+                  ok: true,
+                  json: async () => ({ token: 'slow_token' }),
+                })
+              }, 100) // 100ms delay
+            })
         )
 
         const provider = customAppCheckProviderFactory()
@@ -535,9 +533,9 @@ describe('appCheckProvider', () => {
   describe('Performance and Memory', () => {
     it('should handle rapid provider creation efficiently', () => {
       const start = performance.now()
-      
+
       const providers = Array.from({ length: 100 }, () => customAppCheckProviderFactory())
-      
+
       const end = performance.now()
       expect(end - start).toBeLessThan(100) // Should be very fast
       expect(providers).toHaveLength(100)
@@ -546,7 +544,7 @@ describe('appCheckProvider', () => {
     it('should not leak memory with repeated token requests', async () => {
       mockPlatformOS = 'ios'
       mockGetIosIdForVendorAsync.mockResolvedValue('memory_test_device')
-      
+
       mockFetch.mockResolvedValue({
         ok: true,
         json: async () => ({ token: 'memory_test_token' }),
@@ -554,14 +552,14 @@ describe('appCheckProvider', () => {
 
       const initialMemory = process.memoryUsage().heapUsed
       const provider = customAppCheckProviderFactory()
-      
+
       // Make many token requests
       const promises = Array.from({ length: 50 }, () => provider.getToken())
       await Promise.all(promises)
-      
+
       const finalMemory = process.memoryUsage().heapUsed
       const memoryIncrease = finalMemory - initialMemory
-      
+
       expect(memoryIncrease).toBeLessThan(50 * 1024 * 1024) // Less than 50MB
     })
   })
@@ -571,7 +569,7 @@ describe('appCheckProvider', () => {
       const deviceId = 'integration_test_device_id'
       mockPlatformOS = 'android'
       mockGetAndroidId.mockResolvedValue(deviceId)
-      
+
       mockFetch.mockResolvedValue({
         ok: true,
         json: async () => ({ token: 'integration_token' }),
@@ -598,7 +596,7 @@ describe('appCheckProvider', () => {
       mockPlatformOS = 'ios'
       const iosId = 'ios_device_123'
       mockGetIosIdForVendorAsync.mockResolvedValue(iosId)
-      
+
       const iosDeviceId = await getUniqueDeviceId()
       expect(iosDeviceId).toBe(iosId)
 
@@ -606,7 +604,7 @@ describe('appCheckProvider', () => {
       mockPlatformOS = 'android'
       const androidId = 'android_device_456'
       mockGetAndroidId.mockResolvedValue(androidId)
-      
+
       const androidDeviceId = await getUniqueDeviceId()
       expect(androidDeviceId).toBe(androidId)
 

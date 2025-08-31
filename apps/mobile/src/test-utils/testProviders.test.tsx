@@ -40,9 +40,7 @@ describe('testProviders', () => {
   })
 
   describe('TestStoreProvider', () => {
-    const TestChild = ({ testProp }: { testProp?: string }) => (
-      <Text testID="test-child">Test Child {testProp}</Text>
-    )
+    const TestChild = ({ testProp }: { testProp?: string }) => <Text testID="test-child">Test Child {testProp}</Text>
 
     it('should render children with default mock store', () => {
       const { getByTestId } = render(
@@ -127,7 +125,14 @@ describe('testProviders', () => {
           {null}
           {undefined}
           {/* Array children */}
-          {[<Text key="1" testID="array-child-1">Array 1</Text>, <Text key="2" testID="array-child-2">Array 2</Text>]}
+          {[
+            <Text key="1" testID="array-child-1">
+              Array 1
+            </Text>,
+            <Text key="2" testID="array-child-2">
+              Array 2
+            </Text>,
+          ]}
         </TestStoreProvider>
       )
 
@@ -153,7 +158,7 @@ describe('testProviders', () => {
       )
 
       expect(getByTestId('test-child')).toBeTruthy()
-      
+
       // Both providers should be called
       expect(MockedStoreContext.Provider).toHaveBeenCalled()
     })
@@ -169,10 +174,8 @@ describe('testProviders', () => {
 
     it('should create wrapped component with default mock store', () => {
       const WrappedComponent = withMockStore(TestComponent)
-      
-      const { getByTestId, getByText } = render(
-        <WrappedComponent title="Test Title" count={5} />
-      )
+
+      const { getByTestId, getByText } = render(<WrappedComponent title="Test Title" count={5} />)
 
       expect(getByTestId('test-component')).toBeTruthy()
       expect(getByText('Test Title')).toBeTruthy()
@@ -186,10 +189,8 @@ describe('testProviders', () => {
       } as RootStore
 
       const WrappedComponent = withMockStore(TestComponent, customStore)
-      
-      const { getByTestId, getByText } = render(
-        <WrappedComponent title="Custom Store Test" />
-      )
+
+      const { getByTestId, getByText } = render(<WrappedComponent title="Custom Store Test" />)
 
       expect(getByTestId('test-component')).toBeTruthy()
       expect(getByText('Custom Store Test')).toBeTruthy()
@@ -198,7 +199,7 @@ describe('testProviders', () => {
 
     it('should pass all props to wrapped component', () => {
       const WrappedComponent = withMockStore(TestComponent)
-      
+
       const props = {
         title: 'Props Test',
         count: 10,
@@ -236,22 +237,18 @@ describe('testProviders', () => {
       const NoPropsComponent: React.FC = () => <Text testID="no-props">No Props</Text>
 
       const WrappedComponent = withMockStore(NoPropsComponent)
-      
+
       const { getByTestId } = render(<WrappedComponent />)
 
       expect(getByTestId('no-props')).toBeTruthy()
     })
 
     it('should work with components that have optional props', () => {
-      const OptionalPropsComponent: React.FC<{ title?: string; visible?: boolean }> = ({ 
-        title = 'Default Title', 
-        visible = true 
-      }) => (
+      const OptionalPropsComponent: React.FC<{ title?: string; visible?: boolean }> = ({ title = 'Default Title', visible = true }) =>
         visible ? <Text testID="optional-props">{title}</Text> : null
-      )
 
       const WrappedComponent = withMockStore(OptionalPropsComponent)
-      
+
       // Test with no props
       const { getByTestId, getByText, rerender } = render(<WrappedComponent />)
       expect(getByTestId('optional-props')).toBeTruthy()
@@ -267,25 +264,16 @@ describe('testProviders', () => {
     })
 
     it('should preserve component functionality when wrapped', () => {
-      const InteractiveComponent: React.FC<{ onPress?: () => void; disabled?: boolean }> = ({ 
-        onPress,
-        disabled = false 
-      }) => (
-        <Text 
-          testID="interactive" 
-          onPress={disabled ? undefined : onPress}
-          style={{ opacity: disabled ? 0.5 : 1 }}
-        >
+      const InteractiveComponent: React.FC<{ onPress?: () => void; disabled?: boolean }> = ({ onPress, disabled = false }) => (
+        <Text testID="interactive" onPress={disabled ? undefined : onPress} style={{ opacity: disabled ? 0.5 : 1 }}>
           {disabled ? 'Disabled' : 'Enabled'}
         </Text>
       )
 
       const mockOnPress = jest.fn()
       const WrappedComponent = withMockStore(InteractiveComponent)
-      
-      const { getByTestId, getByText } = render(
-        <WrappedComponent onPress={mockOnPress} />
-      )
+
+      const { getByTestId, getByText } = render(<WrappedComponent onPress={mockOnPress} />)
 
       expect(getByTestId('interactive')).toBeTruthy()
       expect(getByText('Enabled')).toBeTruthy()
@@ -293,18 +281,12 @@ describe('testProviders', () => {
 
     it('should handle wrapped component re-renders correctly', () => {
       const StatefulComponent: React.FC<{ initialCount: number }> = ({ initialCount }) => {
-        return (
-          <Text testID="stateful">
-            Count: {initialCount}
-          </Text>
-        )
+        return <Text testID="stateful">Count: {initialCount}</Text>
       }
 
       const WrappedComponent = withMockStore(StatefulComponent)
-      
-      const { getByTestId, getByText, rerender } = render(
-        <WrappedComponent initialCount={0} />
-      )
+
+      const { getByTestId, getByText, rerender } = render(<WrappedComponent initialCount={0} />)
 
       expect(getByText('Count: 0')).toBeTruthy()
 
@@ -324,7 +306,7 @@ describe('testProviders', () => {
 
       // Should cast StoreContext.Provider to the expected type
       expect(MockedStoreContext.Provider).toHaveBeenCalled()
-      
+
       const providerCall = MockedStoreContext.Provider.mock.calls[0]
       expect(providerCall[0]).toHaveProperty('value')
       expect(providerCall[0]).toHaveProperty('children')
@@ -347,7 +329,7 @@ describe('testProviders', () => {
   describe('TypeScript interface compliance', () => {
     it('should accept valid TestStoreProviderProps', () => {
       const TestChild = () => <Text>Child</Text>
-      
+
       // These should not cause TypeScript errors
       expect(() => (
         <TestStoreProvider>

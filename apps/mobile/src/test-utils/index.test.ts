@@ -11,16 +11,16 @@ import {
   createMockUIStore,
   createMockRootStore,
   mockStorePresets,
-  
+
   // Re-exported from testProviders
   TestStoreProvider,
   withMockStore,
-  
+
   // Re-exported from renderWithStore
   renderWithStore,
   renderHookWithStore,
   renderWithoutStore,
-  
+
   // Direct exports
   waitForMobX,
   createMockFirebaseUser,
@@ -97,9 +97,9 @@ describe('test-utils index', () => {
 
     it('should wait for default timeout of 100ms', async () => {
       const promise = waitForMobX()
-      
+
       expect(jest.getTimerCount()).toBe(1)
-      
+
       jest.advanceTimersByTime(100)
       await expect(promise).resolves.toBeUndefined()
     })
@@ -107,9 +107,9 @@ describe('test-utils index', () => {
     it('should wait for custom timeout', async () => {
       const customTimeout = 250
       const promise = waitForMobX(customTimeout)
-      
+
       expect(jest.getTimerCount()).toBe(1)
-      
+
       // Should resolve after timeout
       jest.advanceTimersByTime(customTimeout)
       await expect(promise).resolves.toBeUndefined()
@@ -117,9 +117,9 @@ describe('test-utils index', () => {
 
     it('should return a Promise<void>', async () => {
       const result = waitForMobX()
-      
+
       expect(result).toBeInstanceOf(Promise)
-      
+
       jest.advanceTimersByTime(100)
       const resolvedValue = await result
       expect(resolvedValue).toBeUndefined()
@@ -127,7 +127,7 @@ describe('test-utils index', () => {
 
     it('should work with zero timeout', async () => {
       const promise = waitForMobX(0)
-      
+
       jest.advanceTimersByTime(0)
       await expect(promise).resolves.toBeUndefined()
     })
@@ -135,24 +135,24 @@ describe('test-utils index', () => {
     it('should work with very large timeout', async () => {
       const largeTimeout = 10000
       const promise = waitForMobX(largeTimeout)
-      
+
       expect(jest.getTimerCount()).toBe(1)
-      
+
       jest.advanceTimersByTime(largeTimeout)
       await expect(promise).resolves.toBeUndefined()
     })
 
     it('should work in real-time scenarios', async () => {
       jest.useRealTimers()
-      
+
       const startTime = Date.now()
       const timeout = 50
-      
+
       await waitForMobX(timeout)
-      
+
       const endTime = Date.now()
       const elapsed = endTime - startTime
-      
+
       // Should take approximately the specified timeout
       // Allow for some tolerance in timing
       expect(elapsed).toBeGreaterThanOrEqual(timeout - 10)
@@ -163,7 +163,7 @@ describe('test-utils index', () => {
   describe('createMockFirebaseUser utility', () => {
     it('should create mock user with default values', () => {
       const mockUser = createMockFirebaseUser()
-      
+
       expect(mockUser).toEqual({
         uid: 'test-user-id',
         email: 'test@example.com',
@@ -181,9 +181,9 @@ describe('test-utils index', () => {
         displayName: 'Custom User',
         emailVerified: false,
       }
-      
+
       const mockUser = createMockFirebaseUser(overrides)
-      
+
       expect(mockUser).toEqual({
         uid: 'custom-user-id',
         email: 'custom@example.com',
@@ -199,9 +199,9 @@ describe('test-utils index', () => {
         photoURL: 'https://example.com/photo.jpg',
         phoneNumber: '+1234567890',
       }
-      
+
       const mockUser = createMockFirebaseUser(overrides)
-      
+
       expect(mockUser).toEqual({
         uid: 'test-user-id',
         email: 'test@example.com',
@@ -214,7 +214,7 @@ describe('test-utils index', () => {
 
     it('should handle empty overrides', () => {
       const mockUser = createMockFirebaseUser({})
-      
+
       expect(mockUser).toEqual({
         uid: 'test-user-id',
         email: 'test@example.com',
@@ -234,9 +234,9 @@ describe('test-utils index', () => {
           lastSignInTime: '2023-01-02',
         },
       }
-      
+
       const mockUser = createMockFirebaseUser(overrides)
-      
+
       expect(mockUser).toEqual({
         uid: 'new-id',
         email: 'test@example.com',
@@ -257,9 +257,9 @@ describe('test-utils index', () => {
         displayName: null,
         email: undefined,
       }
-      
+
       const mockUser = createMockFirebaseUser(overrides)
-      
+
       expect(mockUser).toEqual({
         uid: 'test-user-id',
         email: undefined,
@@ -291,7 +291,7 @@ describe('test-utils index', () => {
     it('should be valid Ethereum addresses', () => {
       // Basic Ethereum address validation
       const ethereumAddressRegex = /^0x[a-fA-F0-9]{40}$/
-      
+
       expect(ethereumAddressRegex.test(MOCK_ETH_ADDRESS)).toBe(true)
       expect(ethereumAddressRegex.test(MOCK_ETH_ADDRESS_2)).toBe(true)
     })
@@ -357,39 +357,32 @@ describe('test-utils index', () => {
       const mockStoresExports = Object.keys(mockStores)
       const expectedMockStoresExports = [
         'createMockAuthenticationStore',
-        'createMockWalletStore', 
+        'createMockWalletStore',
         'createMockPoolManagementStore',
         'createMockUIStore',
         'createMockRootStore',
-        'mockStorePresets'
+        'mockStorePresets',
       ]
 
-      expectedMockStoresExports.forEach(exportName => {
+      expectedMockStoresExports.forEach((exportName) => {
         expect(mockStoresExports).toContain(exportName)
       })
     })
 
     it('should export all utilities from testProviders', () => {
       const testProvidersExports = Object.keys(testProviders)
-      const expectedTestProvidersExports = [
-        'TestStoreProvider',
-        'withMockStore'
-      ]
+      const expectedTestProvidersExports = ['TestStoreProvider', 'withMockStore']
 
-      expectedTestProvidersExports.forEach(exportName => {
+      expectedTestProvidersExports.forEach((exportName) => {
         expect(testProvidersExports).toContain(exportName)
       })
     })
 
     it('should export all utilities from renderWithStore', () => {
       const renderWithStoreExports = Object.keys(renderWithStoreModule)
-      const expectedRenderWithStoreExports = [
-        'renderWithStore',
-        'renderHookWithStore', 
-        'renderWithoutStore'
-      ]
+      const expectedRenderWithStoreExports = ['renderWithStore', 'renderHookWithStore', 'renderWithoutStore']
 
-      expectedRenderWithStoreExports.forEach(exportName => {
+      expectedRenderWithStoreExports.forEach((exportName) => {
         expect(renderWithStoreExports).toContain(exportName)
       })
     })
@@ -428,7 +421,7 @@ describe('test-utils index', () => {
           isConnected: true,
           address: MOCK_ETH_ADDRESS,
           chainId: TEST_CHAIN_IDS.POLYGON_MAINNET,
-        }
+        },
       })
 
       // Create a mock Firebase user

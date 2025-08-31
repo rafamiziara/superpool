@@ -101,7 +101,7 @@ describe('renderWithStore', () => {
       // Simulate provider behavior by rendering children
       return <>{children}</>
     })
-    
+
     // Add a lastProps property to track calls
     ;(MockedTestStoreProvider as any).lastProps = null
   })
@@ -133,9 +133,7 @@ describe('renderWithStore', () => {
     })
 
     it('should render component with custom wrapper', () => {
-      const CustomWrapper: React.FC<{ children: React.ReactNode }> = ({ children }) => (
-        <View testID="custom-wrapper">{children}</View>
-      )
+      const CustomWrapper: React.FC<{ children: React.ReactNode }> = ({ children }) => <View testID="custom-wrapper">{children}</View>
 
       renderWithStore(<TestComponent />, { wrapper: CustomWrapper })
 
@@ -159,9 +157,7 @@ describe('renderWithStore', () => {
     })
 
     it('should nest custom wrapper inside TestStoreProvider', () => {
-      const CustomWrapper: React.FC<{ children: React.ReactNode }> = ({ children }) => (
-        <View testID="custom-wrapper">{children}</View>
-      )
+      const CustomWrapper: React.FC<{ children: React.ReactNode }> = ({ children }) => <View testID="custom-wrapper">{children}</View>
 
       const result = renderWithStore(<TestComponent />, { wrapper: CustomWrapper })
 
@@ -176,10 +172,7 @@ describe('renderWithStore', () => {
 
       renderWithStore(<TestComponent />, additionalOptions)
 
-      expect(originalRender).toHaveBeenCalledWith(
-        expect.anything(),
-        expect.objectContaining(additionalOptions)
-      )
+      expect(originalRender).toHaveBeenCalledWith(expect.anything(), expect.objectContaining(additionalOptions))
     })
 
     it('should exclude wrapper from passed options', () => {
@@ -299,13 +292,7 @@ describe('renderWithStore', () => {
   describe('exports and re-exports', () => {
     it('should re-export testing library functions', () => {
       // The module should re-export everything from @testing-library/react-native
-      const {
-        screen,
-        fireEvent,
-        waitFor,
-        act,
-        render: exportedRender,
-      } = require('./renderWithStore')
+      const { screen, fireEvent, waitFor, act, render: exportedRender } = require('./renderWithStore')
 
       expect(screen).toBeDefined()
       expect(fireEvent).toBeDefined()
@@ -379,13 +366,9 @@ describe('renderWithStore', () => {
     it('should handle complex wrapper scenarios', () => {
       const TestComponent = () => <Text>Complex Test</Text>
 
-      const NavigationWrapper = ({ children }: { children: React.ReactNode }) => (
-        <View testID="navigation-wrapper">{children}</View>
-      )
+      const NavigationWrapper = ({ children }: { children: React.ReactNode }) => <View testID="navigation-wrapper">{children}</View>
 
-      const ThemeWrapper = ({ children }: { children: React.ReactNode }) => (
-        <View testID="theme-wrapper">{children}</View>
-      )
+      const ThemeWrapper = ({ children }: { children: React.ReactNode }) => <View testID="theme-wrapper">{children}</View>
 
       // Test with nested custom wrappers
       const CombinedWrapper = ({ children }: { children: React.ReactNode }) => (

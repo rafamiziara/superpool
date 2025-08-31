@@ -194,14 +194,14 @@ describe('AuthenticationOrchestrator', () => {
       walletConnectKeys: ['key1', 'key2'],
       sessionData: {},
     })
-    
+
     mockAuthErrorRecoveryService.handleAuthenticationError.mockResolvedValue({
       appError: new Error('Mock error'),
-      recoveryResult: { 
-        shouldDisconnect: false, 
-        shouldShowError: true, 
-        errorDelay: 0, 
-        cleanupPerformed: false 
+      recoveryResult: {
+        shouldDisconnect: false,
+        shouldShowError: true,
+        errorDelay: 0,
+        cleanupPerformed: false,
       },
     })
 
@@ -234,7 +234,7 @@ describe('AuthenticationOrchestrator', () => {
 
     it('should create separate instances for different orchestrator instances', () => {
       const orchestrator2 = new AuthenticationOrchestrator(mockAuthStore, mockWalletStoreInstance)
-      
+
       expect(orchestrator).not.toBe(orchestrator2)
       expect(mockMessageGenerator).toHaveBeenCalledTimes(2)
       expect(mockSignatureHandler).toHaveBeenCalledTimes(2)
@@ -249,10 +249,7 @@ describe('AuthenticationOrchestrator', () => {
 
         await orchestrator.authenticate(mockAuthContext)
 
-        expect(mockAuthStore.acquireAuthLock).toHaveBeenCalledWith(
-          mockAuthContext.walletAddress,
-          expect.stringMatching(/auth_\\d+_\\w+/)
-        )
+        expect(mockAuthStore.acquireAuthLock).toHaveBeenCalledWith(mockAuthContext.walletAddress, expect.stringMatching(/auth_\\d+_\\w+/))
       })
 
       it('should reject authentication when lock acquisition fails', async () => {
@@ -272,9 +269,7 @@ describe('AuthenticationOrchestrator', () => {
 
         await orchestrator.authenticate(mockAuthContext)
 
-        expect(consoleWarnSpy).toHaveBeenCalledWith(
-          expect.stringContaining('🕐 Authentication lock expired')
-        )
+        expect(consoleWarnSpy).toHaveBeenCalledWith(expect.stringContaining('🕐 Authentication lock expired'))
         expect(mockAuthStore.releaseAuthLock).toHaveBeenCalled()
       })
 
@@ -286,9 +281,7 @@ describe('AuthenticationOrchestrator', () => {
 
         await orchestrator.authenticate(mockAuthContext)
 
-        expect(consoleLogSpy).toHaveBeenCalledWith(
-          '🚫 Duplicate authentication attempt for same wallet, ignoring'
-        )
+        expect(consoleLogSpy).toHaveBeenCalledWith('🚫 Duplicate authentication attempt for same wallet, ignoring')
       })
 
       it('should abort current authentication for different wallet', async () => {
@@ -300,9 +293,7 @@ describe('AuthenticationOrchestrator', () => {
 
         await orchestrator.authenticate(mockAuthContext)
 
-        expect(consoleLogSpy).toHaveBeenCalledWith(
-          '🔄 Different wallet detected, aborting current authentication'
-        )
+        expect(consoleLogSpy).toHaveBeenCalledWith('🔄 Different wallet detected, aborting current authentication')
         expect(mockAuthStore.releaseAuthLock).toHaveBeenCalled()
       })
     })
@@ -323,7 +314,7 @@ describe('AuthenticationOrchestrator', () => {
   describe('Request Deduplication', () => {
     it('should generate unique request IDs', async () => {
       const firstCallPromise = orchestrator.authenticate(mockAuthContext)
-      await new Promise(resolve => setTimeout(resolve, 10)) // Small delay
+      await new Promise((resolve) => setTimeout(resolve, 10)) // Small delay
       const secondCallPromise = orchestrator.authenticate({
         ...mockAuthContext,
         walletAddress: '0xDifferentWallet',
@@ -333,33 +324,26 @@ describe('AuthenticationOrchestrator', () => {
 
       // Should have generated different request IDs
       expect(consoleLogSpy).toHaveBeenCalledWith('🆔 Generated request ID:', expect.stringMatching(/auth_\\d+_\\w+/))
-      const requestIdCalls = consoleLogSpy.mock.calls.filter(call => 
-        call[0] === '🆔 Generated request ID:'
-      )
+      const requestIdCalls = consoleLogSpy.mock.calls.filter((call) => call[0] === '🆔 Generated request ID:')
       expect(requestIdCalls.length).toBeGreaterThanOrEqual(2)
     })
 
     it('should detect and prevent duplicate requests for same wallet', async () => {
       // First call should proceed
       const firstPromise = orchestrator.authenticate(mockAuthContext)
-      
+
       // Second call should be rejected as duplicate
       const secondPromise = orchestrator.authenticate(mockAuthContext)
 
       await Promise.allSettled([firstPromise, secondPromise])
 
-      expect(consoleLogSpy).toHaveBeenCalledWith(
-        expect.stringContaining('🚫 Duplicate authentication request detected')
-      )
+      expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining('🚫 Duplicate authentication request detected'))
     })
 
     it('should clean up request tracking after completion', async () => {
       await orchestrator.authenticate(mockAuthContext)
 
-      expect(consoleLogSpy).toHaveBeenCalledWith(
-        '🧹 Authentication request cleanup completed for:',
-        mockAuthContext.walletAddress
-      )
+      expect(consoleLogSpy).toHaveBeenCalledWith('🧹 Authentication request cleanup completed for:', mockAuthContext.walletAddress)
     })
 
     it('should clean up request tracking after errors', async () => {
@@ -371,10 +355,7 @@ describe('AuthenticationOrchestrator', () => {
         // Expected to throw
       }
 
-      expect(consoleLogSpy).toHaveBeenCalledWith(
-        '🧹 Authentication request cleanup completed for:',
-        mockAuthContext.walletAddress
-      )
+      expect(consoleLogSpy).toHaveBeenCalledWith('🧹 Authentication request cleanup completed for:', mockAuthContext.walletAddress)
     })
   })
 
@@ -393,7 +374,7 @@ describe('AuthenticationOrchestrator', () => {
       expect(mockStepExecutor.executeStep).toHaveBeenNthCalledWith(2, 'request-signature', expect.any(Function))
       expect(mockStepExecutor.executeStep).toHaveBeenNthCalledWith(3, 'verify-signature', expect.any(Function))
       expect(mockStepExecutor.executeStep).toHaveBeenNthCalledWith(4, 'firebase-auth', expect.any(Function))
-      
+
       // Verify success actions
       expect(mockAuthToasts.success).toHaveBeenCalled()
       expect(mockRouter.replace).toHaveBeenCalledWith('/dashboard')
@@ -454,7 +435,7 @@ describe('AuthenticationOrchestrator', () => {
       it('should abort after message generation if requested', async () => {
         mockValidator.checkAuthenticationAborted
           .mockReturnValueOnce(false) // Initial check passes
-          .mockReturnValueOnce(true)  // Abort after message generation
+          .mockReturnValueOnce(true) // Abort after message generation
 
         await orchestrator.authenticate(mockAuthContext)
 
@@ -466,7 +447,7 @@ describe('AuthenticationOrchestrator', () => {
         mockValidator.checkAuthenticationAborted
           .mockReturnValueOnce(false) // After message generation
           .mockReturnValueOnce(false) // After signature request
-          .mockReturnValueOnce(true)  // Abort after signature verification
+          .mockReturnValueOnce(true) // Abort after signature verification
 
         await orchestrator.authenticate(mockAuthContext)
 
@@ -478,9 +459,9 @@ describe('AuthenticationOrchestrator', () => {
         // Mock all intermediate checks to pass, final check to fail
         mockValidator.checkAuthenticationAborted
           .mockReturnValueOnce(false) // After message generation
-          .mockReturnValueOnce(false) // After signature request  
+          .mockReturnValueOnce(false) // After signature request
           .mockReturnValueOnce(false) // After signature verification
-          .mockReturnValueOnce(true)  // Final abort check (line 291)
+          .mockReturnValueOnce(true) // Final abort check (line 291)
 
         await orchestrator.authenticate(mockAuthContext)
 
@@ -602,10 +583,7 @@ describe('AuthenticationOrchestrator', () => {
         // Expected to throw
       }
 
-      expect(mockAuthContext.progressCallbacks?.onStepFail).toHaveBeenCalledWith(
-        'request-signature',
-        'signature request failed'
-      )
+      expect(mockAuthContext.progressCallbacks?.onStepFail).toHaveBeenCalledWith('request-signature', 'signature request failed')
     })
 
     describe('Error Step Detection', () => {
@@ -629,10 +607,7 @@ describe('AuthenticationOrchestrator', () => {
             // Expected to throw
           }
 
-          expect(mockAuthContext.progressCallbacks?.onStepFail).toHaveBeenCalledWith(
-            expectedStep,
-            errorMessage
-          )
+          expect(mockAuthContext.progressCallbacks?.onStepFail).toHaveBeenCalledWith(expectedStep, errorMessage)
         })
       })
     })
@@ -642,10 +617,7 @@ describe('AuthenticationOrchestrator', () => {
 
       await orchestrator.authenticate(mockAuthContext)
 
-      expect(consoleWarnSpy).toHaveBeenCalledWith(
-        '⚠️ Failed to get session debug info:',
-        expect.any(Error)
-      )
+      expect(consoleWarnSpy).toHaveBeenCalledWith('⚠️ Failed to get session debug info:', expect.any(Error))
     })
   })
 
@@ -696,9 +668,7 @@ describe('AuthenticationOrchestrator', () => {
         { ...mockAuthContext, walletAddress: '0x789' },
       ]
 
-      const results = await Promise.allSettled(
-        contexts.map(context => orchestrator.authenticate(context))
-      )
+      const results = await Promise.allSettled(contexts.map((context) => orchestrator.authenticate(context)))
 
       // At least one should succeed, others may be rejected due to duplicate detection
       expect(results).toHaveLength(3)
@@ -716,10 +686,7 @@ describe('AuthenticationOrchestrator', () => {
         // Expected to throw
       }
 
-      expect(consoleLogSpy).toHaveBeenCalledWith(
-        '🧹 Authentication request cleanup completed for:',
-        mockAuthContext.walletAddress
-      )
+      expect(consoleLogSpy).toHaveBeenCalledWith('🧹 Authentication request cleanup completed for:', mockAuthContext.walletAddress)
     })
   })
 
@@ -760,11 +727,11 @@ describe('AuthenticationOrchestrator', () => {
       mockMessageGen.generateAuthenticationMessage.mockRejectedValue(complexError)
 
       const mockAppError = new Error('Processed error')
-      const mockRecoveryResult = { 
-        shouldDisconnect: false, 
-        shouldShowError: true, 
-        errorDelay: 0, 
-        cleanupPerformed: true 
+      const mockRecoveryResult = {
+        shouldDisconnect: false,
+        shouldShowError: true,
+        errorDelay: 0,
+        cleanupPerformed: true,
       }
       mockAuthErrorRecoveryService.handleAuthenticationError.mockResolvedValue({
         appError: mockAppError,
@@ -777,10 +744,7 @@ describe('AuthenticationOrchestrator', () => {
         expect(error).toBe(mockAppError)
       }
 
-      expect(mockAuthErrorRecoveryService.showErrorFeedback).toHaveBeenCalledWith(
-        mockAppError,
-        mockRecoveryResult
-      )
+      expect(mockAuthErrorRecoveryService.showErrorFeedback).toHaveBeenCalledWith(mockAppError, mockRecoveryResult)
     })
   })
 
@@ -788,13 +752,13 @@ describe('AuthenticationOrchestrator', () => {
   describe('Coverage Completeness Tests', () => {
     it('should test all error step detection branches', () => {
       const orchestratorInstance = new AuthenticationOrchestrator(mockAuthStore, mockWalletStoreInstance)
-      
+
       // Access private method through any cast for testing
       const getCurrentStepFromError = (orchestratorInstance as any).getCurrentStepFromError.bind(orchestratorInstance)
 
       // Test all specific error patterns
       expect(getCurrentStepFromError(new Error('signature request failed'))).toBe('request-signature')
-      expect(getCurrentStepFromError(new Error('signature verification error'))).toBe('verify-signature') 
+      expect(getCurrentStepFromError(new Error('signature verification error'))).toBe('verify-signature')
       expect(getCurrentStepFromError(new Error('firebase token error'))).toBe('firebase-auth')
       expect(getCurrentStepFromError(new Error('auth message failed'))).toBe('generate-message')
       expect(getCurrentStepFromError(new Error('lock state error'))).toBe('acquire-lock')
@@ -824,17 +788,17 @@ describe('AuthenticationOrchestrator', () => {
       await orchestrator.authenticate(mockAuthContext)
 
       expect(mockAuthErrorRecoveryService.handleFirebaseCleanup).toHaveBeenCalledWith('connection state change')
-      
+
       // Reset for second test
       jest.clearAllMocks()
       mockValidator.validateStateConsistency.mockReturnValue(true)
-      
+
       // Test final abort check (lines 291-292)
       mockValidator.checkAuthenticationAborted
         .mockReturnValueOnce(false) // After message generation
-        .mockReturnValueOnce(false) // After signature request  
+        .mockReturnValueOnce(false) // After signature request
         .mockReturnValueOnce(false) // After signature verification
-        .mockReturnValueOnce(true)  // Final abort check
+        .mockReturnValueOnce(true) // Final abort check
 
       await orchestrator.authenticate(mockAuthContext)
 

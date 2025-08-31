@@ -46,9 +46,9 @@ describe('WalletStore', () => {
     })
 
     it('should return true for isWalletConnected when connected and has address', () => {
-      store.setConnectionState({ 
+      store.setConnectionState({
         isConnected: true,
-        address: '0x1234567890123456789012345678901234567890'
+        address: '0x1234567890123456789012345678901234567890',
       })
       expect(store.isWalletConnected).toBe(true)
     })
@@ -59,7 +59,7 @@ describe('WalletStore', () => {
         address: undefined,
         chainId: undefined,
         isConnecting: false,
-        connectionError: null
+        connectionError: null,
       }
       expect(store.currentState).toEqual(expectedState)
     })
@@ -70,7 +70,7 @@ describe('WalletStore', () => {
         address: '0x123',
         chainId: 1,
         isConnecting: true,
-        connectionError: 'Error'
+        connectionError: 'Error',
       })
 
       const expectedState: WalletState = {
@@ -78,7 +78,7 @@ describe('WalletStore', () => {
         address: '0x123',
         chainId: 1,
         isConnecting: true,
-        connectionError: 'Error'
+        connectionError: 'Error',
       }
       expect(store.currentState).toEqual(expectedState)
     })
@@ -91,7 +91,7 @@ describe('WalletStore', () => {
         address: '0x123',
         chainId: 1,
         isConnecting: true,
-        connectionError: 'Test error'
+        connectionError: 'Test error',
       }
 
       store.setConnectionState(newState)
@@ -125,7 +125,7 @@ describe('WalletStore', () => {
 
       expect(store.isConnected).toBe(false)
       expect(store.address).toBe('0x123') // address should remain unchanged
-      
+
       // Test that we can manually set address to undefined using direct property assignment
       store.address = undefined
       expect(store.address).toBeUndefined()
@@ -147,7 +147,7 @@ describe('WalletStore', () => {
     it('should clear connection error when setting connecting to true', () => {
       store.setConnectionError('Previous error')
       store.setConnecting(true)
-      
+
       expect(store.isConnecting).toBe(true)
       expect(store.connectionError).toBeNull()
     })
@@ -155,7 +155,7 @@ describe('WalletStore', () => {
     it('should not affect connection error when setting connecting to false', () => {
       store.setConnectionError('Existing error')
       store.setConnecting(false)
-      
+
       expect(store.isConnecting).toBe(false)
       expect(store.connectionError).toBe('Existing error')
     })
@@ -177,7 +177,7 @@ describe('WalletStore', () => {
     it('should set connecting to false when error is set', () => {
       store.setConnecting(true)
       store.setConnectionError('Connection failed')
-      
+
       expect(store.connectionError).toBe('Connection failed')
       expect(store.isConnecting).toBe(false)
     })
@@ -185,7 +185,7 @@ describe('WalletStore', () => {
     it('should not affect connecting state when clearing error', () => {
       store.setConnecting(true)
       store.setConnectionError(null)
-      
+
       expect(store.connectionError).toBeNull()
       expect(store.isConnecting).toBe(true)
     })
@@ -215,10 +215,10 @@ describe('WalletStore', () => {
     it('should log connection success', async () => {
       const consoleSpy = jest.spyOn(console, 'log')
       await store.connect(mockAddress, mockChainId)
-      
+
       expect(consoleSpy).toHaveBeenCalledWith('🔗 Wallet connected:', {
         address: mockAddress,
-        chainId: mockChainId
+        chainId: mockChainId,
       })
     })
 
@@ -226,14 +226,14 @@ describe('WalletStore', () => {
       // Test connecting state behavior during connection flow
       // The connect method should handle connecting state properly
       expect(store.isConnecting).toBe(false)
-      
+
       // Test the connecting state logic by manually testing the sequence
       store.setConnecting(true)
       expect(store.isConnecting).toBe(true)
-      
+
       store.setConnecting(false)
       expect(store.isConnecting).toBe(false)
-      
+
       // Test actual connection flow
       await store.connect(mockAddress, mockChainId)
       expect(store.isConnecting).toBe(false) // Should be false after connection completes
@@ -243,13 +243,13 @@ describe('WalletStore', () => {
       // Test error handling by testing the error state setting behavior
       // Since we can't easily make the real connect method fail,
       // we'll test the setConnectionError method which is used in error handling
-      
+
       store.setConnecting(true)
       store.setConnectionError('Connection failed')
-      
+
       expect(store.connectionError).toBe('Connection failed')
       expect(store.isConnecting).toBe(false) // Should be set to false when error occurs
-      
+
       // Test that non-Error strings are handled as expected in error logic
       const isErrorInstance = 'string error' instanceof Error
       const expectedMessage = isErrorInstance ? 'string error' : 'Connection failed'
@@ -259,12 +259,12 @@ describe('WalletStore', () => {
     it('should handle non-Error exceptions', async () => {
       // Test the error handling logic without actually throwing errors
       // Test that non-Error exceptions are handled correctly in the error handling logic
-      
+
       const nonErrorException = 'String error'
       const errorMessage = nonErrorException instanceof Error ? nonErrorException.message : 'Connection failed'
-      
+
       expect(errorMessage).toBe('Connection failed')
-      
+
       // Test the error setting behavior
       store.setConnectionError(errorMessage)
       expect(store.connectionError).toBe('Connection failed')
@@ -330,14 +330,14 @@ describe('WalletStore', () => {
         address,
         chainId,
         timestamp: expect.any(Number),
-        sequenceNumber: expect.any(Number)
+        sequenceNumber: expect.any(Number),
       })
     })
 
     it('should increment sequence number', () => {
       const initialSequence = store.captureState().sequenceNumber
       const result = store.updateConnectionState(true, '0x123', 1)
-      
+
       expect(result.sequenceNumber).toBe(initialSequence + 1)
       expect(result.sequenceNumber).toBe(initialSequence + 1)
     })
@@ -367,7 +367,7 @@ describe('WalletStore', () => {
       store.setConnectionState({
         isConnected: true,
         address: '0x123',
-        chainId: 1
+        chainId: 1,
       })
 
       const beforeTime = Date.now()
@@ -379,7 +379,7 @@ describe('WalletStore', () => {
         address: '0x123',
         chainId: 1,
         timestamp: expect.any(Number),
-        sequenceNumber: expect.any(Number)
+        sequenceNumber: expect.any(Number),
       })
 
       expect(snapshot.timestamp).toBeGreaterThanOrEqual(beforeTime)
@@ -406,7 +406,7 @@ describe('WalletStore', () => {
         address: '0x123',
         chainId: 1,
         timestamp: Date.now(),
-        sequenceNumber: 1
+        sequenceNumber: 1,
       }
 
       const currentState: AtomicConnectionState = {
@@ -414,7 +414,7 @@ describe('WalletStore', () => {
         address: '0x123',
         chainId: 1,
         timestamp: Date.now(),
-        sequenceNumber: 1
+        sequenceNumber: 1,
       }
 
       const isValid = store.validateState(lockedState, currentState, 'test')
@@ -427,7 +427,7 @@ describe('WalletStore', () => {
         address: '0x123',
         chainId: 1,
         timestamp: Date.now(),
-        sequenceNumber: 1
+        sequenceNumber: 1,
       }
 
       const currentState: AtomicConnectionState = {
@@ -435,7 +435,7 @@ describe('WalletStore', () => {
         address: '0x123',
         chainId: 1,
         timestamp: Date.now(),
-        sequenceNumber: 2
+        sequenceNumber: 2,
       }
 
       const isValid = store.validateState(lockedState, currentState, 'test')
@@ -444,13 +444,13 @@ describe('WalletStore', () => {
 
     it('should invalidate different connection status', () => {
       const consoleSpy = jest.spyOn(console, 'log')
-      
+
       const lockedState: AtomicConnectionState = {
         isConnected: true,
         address: '0x123',
         chainId: 1,
         timestamp: Date.now(),
-        sequenceNumber: 1
+        sequenceNumber: 1,
       }
 
       const currentState: AtomicConnectionState = {
@@ -458,18 +458,18 @@ describe('WalletStore', () => {
         address: '0x123',
         chainId: 1,
         timestamp: Date.now(),
-        sequenceNumber: 1
+        sequenceNumber: 1,
       }
 
       const isValid = store.validateState(lockedState, currentState, 'test-checkpoint')
       expect(isValid).toBe(false)
-      
+
       expect(consoleSpy).toHaveBeenCalledWith(
         '❌ Connection state changed at test-checkpoint:',
         expect.objectContaining({
           locked: lockedState,
           current: currentState,
-          sequenceDrift: 0
+          sequenceDrift: 0,
         })
       )
     })
@@ -480,7 +480,7 @@ describe('WalletStore', () => {
         address: '0x123',
         chainId: 1,
         timestamp: Date.now(),
-        sequenceNumber: 1
+        sequenceNumber: 1,
       }
 
       const currentState: AtomicConnectionState = {
@@ -488,7 +488,7 @@ describe('WalletStore', () => {
         address: '0x456',
         chainId: 1,
         timestamp: Date.now(),
-        sequenceNumber: 1
+        sequenceNumber: 1,
       }
 
       const isValid = store.validateState(lockedState, currentState, 'test')
@@ -501,7 +501,7 @@ describe('WalletStore', () => {
         address: '0x123',
         chainId: 1,
         timestamp: Date.now(),
-        sequenceNumber: 1
+        sequenceNumber: 1,
       }
 
       const currentState: AtomicConnectionState = {
@@ -509,7 +509,7 @@ describe('WalletStore', () => {
         address: '0x123',
         chainId: 2,
         timestamp: Date.now(),
-        sequenceNumber: 1
+        sequenceNumber: 1,
       }
 
       const isValid = store.validateState(lockedState, currentState, 'test')
@@ -518,13 +518,13 @@ describe('WalletStore', () => {
 
     it('should calculate sequence drift', () => {
       const consoleSpy = jest.spyOn(console, 'log')
-      
+
       const lockedState: AtomicConnectionState = {
         isConnected: true,
         address: '0x123',
         chainId: 1,
         timestamp: Date.now(),
-        sequenceNumber: 1
+        sequenceNumber: 1,
       }
 
       const currentState: AtomicConnectionState = {
@@ -532,15 +532,15 @@ describe('WalletStore', () => {
         address: '0x123',
         chainId: 1,
         timestamp: Date.now(),
-        sequenceNumber: 5
+        sequenceNumber: 5,
       }
 
       store.validateState(lockedState, currentState, 'test')
-      
+
       expect(consoleSpy).toHaveBeenCalledWith(
         expect.any(String),
         expect.objectContaining({
-          sequenceDrift: 4
+          sequenceDrift: 4,
         })
       )
     })
@@ -551,7 +551,7 @@ describe('WalletStore', () => {
         address: undefined,
         chainId: undefined,
         timestamp: Date.now(),
-        sequenceNumber: 1
+        sequenceNumber: 1,
       }
 
       const currentState: AtomicConnectionState = {
@@ -559,7 +559,7 @@ describe('WalletStore', () => {
         address: undefined,
         chainId: undefined,
         timestamp: Date.now(),
-        sequenceNumber: 1
+        sequenceNumber: 1,
       }
 
       const isValid = store.validateState(lockedState, currentState, 'test')
@@ -572,7 +572,7 @@ describe('WalletStore', () => {
       store.setConnectionState({
         isConnected: true,
         address: '0x1234567890123456789012345678901234567890',
-        chainId: 1
+        chainId: 1,
       })
 
       const result = store.validateInitialState('0x1234567890123456789012345678901234567890')
@@ -583,7 +583,7 @@ describe('WalletStore', () => {
       store.setConnectionState({
         isConnected: true,
         address: '0x1234567890123456789012345678901234567890',
-        chainId: 1
+        chainId: 1,
       })
 
       const result = store.validateInitialState('0X1234567890123456789012345678901234567890')
@@ -594,13 +594,13 @@ describe('WalletStore', () => {
       store.setConnectionState({
         isConnected: false,
         address: '0x123',
-        chainId: 1
+        chainId: 1,
       })
 
       const result = store.validateInitialState('0x123')
       expect(result).toEqual({
         isValid: false,
-        error: 'Wallet connection state invalid'
+        error: 'Wallet connection state invalid',
       })
     })
 
@@ -608,13 +608,13 @@ describe('WalletStore', () => {
       store.setConnectionState({
         isConnected: true,
         address: undefined,
-        chainId: 1
+        chainId: 1,
       })
 
       const result = store.validateInitialState('0x123')
       expect(result).toEqual({
         isValid: false,
-        error: 'Wallet connection state invalid'
+        error: 'Wallet connection state invalid',
       })
     })
 
@@ -622,13 +622,13 @@ describe('WalletStore', () => {
       store.setConnectionState({
         isConnected: true,
         address: '0x123',
-        chainId: 1
+        chainId: 1,
       })
 
       const result = store.validateInitialState('0x456')
       expect(result).toEqual({
         isValid: false,
-        error: 'Wallet address mismatch'
+        error: 'Wallet address mismatch',
       })
     })
 
@@ -636,13 +636,13 @@ describe('WalletStore', () => {
       store.setConnectionState({
         isConnected: true,
         address: '0x123',
-        chainId: undefined
+        chainId: undefined,
       })
 
       const result = store.validateInitialState('0x123')
       expect(result).toEqual({
         isValid: false,
-        error: 'ChainId not found'
+        error: 'ChainId not found',
       })
     })
   })
@@ -652,10 +652,10 @@ describe('WalletStore', () => {
       // Increment sequence counter
       await store.connect('0x123', 1)
       store.disconnect()
-      
+
       const beforeReset = store.captureState()
       expect(beforeReset.sequenceNumber).toBeGreaterThan(0)
-      
+
       store.resetSequence()
       const afterReset = store.captureState()
       expect(afterReset.sequenceNumber).toBe(0)
@@ -683,16 +683,16 @@ describe('WalletStore', () => {
       // Since we can't spy on MobX actions, test the behavior instead
       store.setConnectionState({ isConnected: true, address: '0x123', chainId: 1 })
       store.updateConnectionState(true, '0x456', 2) // increment sequence
-      
+
       const beforeReset = store.captureState()
       expect(beforeReset.sequenceNumber).toBeGreaterThan(0)
-      
+
       store.reset()
-      
+
       expect(store.isConnected).toBe(false)
       expect(store.address).toBeUndefined()
       expect(store.chainId).toBeUndefined()
-      
+
       const afterReset = store.captureState()
       expect(afterReset.sequenceNumber).toBe(0)
     })
@@ -701,46 +701,37 @@ describe('WalletStore', () => {
   describe('MobX Reactivity', () => {
     it('should trigger reactions when connection state changes', () => {
       const reactionSpy = jest.fn()
-      
+
       const { reaction } = require('mobx')
-      const dispose = reaction(
-        () => store.isConnected,
-        reactionSpy
-      )
-      
+      const dispose = reaction(() => store.isConnected, reactionSpy)
+
       store.setConnectionState({ isConnected: true })
       expect(reactionSpy).toHaveBeenCalledWith(true, false, expect.anything())
-      
+
       dispose()
     })
 
     it('should trigger reactions when address changes', () => {
       const reactionSpy = jest.fn()
-      
+
       const { reaction } = require('mobx')
-      const dispose = reaction(
-        () => store.address,
-        reactionSpy
-      )
-      
+      const dispose = reaction(() => store.address, reactionSpy)
+
       store.setConnectionState({ address: '0x123' })
       expect(reactionSpy).toHaveBeenCalledWith('0x123', undefined, expect.anything())
-      
+
       dispose()
     })
 
     it('should trigger reactions for computed isWalletConnected', () => {
       const reactionSpy = jest.fn()
-      
+
       const { reaction } = require('mobx')
-      const dispose = reaction(
-        () => store.isWalletConnected,
-        reactionSpy
-      )
-      
+      const dispose = reaction(() => store.isWalletConnected, reactionSpy)
+
       store.setConnectionState({ isConnected: true, address: '0x123' })
       expect(reactionSpy).toHaveBeenCalledWith(true, false, expect.anything())
-      
+
       dispose()
     })
   })
@@ -748,11 +739,7 @@ describe('WalletStore', () => {
   describe('Edge Cases', () => {
     it('should handle rapid connection state changes', async () => {
       // Simulate rapid state changes
-      const promises = [
-        store.connect('0x123', 1),
-        store.connect('0x456', 2),
-        store.connect('0x789', 3)
-      ]
+      const promises = [store.connect('0x123', 1), store.connect('0x456', 2), store.connect('0x789', 3)]
 
       await Promise.all(promises)
 
@@ -764,13 +751,13 @@ describe('WalletStore', () => {
 
     it('should handle connection during disconnection', async () => {
       await store.connect('0x123', 1)
-      
+
       // Start disconnect (synchronous)
       store.disconnect()
-      
+
       // Immediately try to connect
       await store.connect('0x456', 2)
-      
+
       expect(store.isConnected).toBe(true)
       expect(store.address).toBe('0x456')
       expect(store.chainId).toBe(2)
@@ -779,7 +766,7 @@ describe('WalletStore', () => {
     it('should handle very large chain IDs', async () => {
       const largeChainId = 999999999999999
       await store.connect('0x123', largeChainId)
-      
+
       expect(store.chainId).toBe(largeChainId)
     })
 
@@ -794,7 +781,7 @@ describe('WalletStore', () => {
         address: '0x123',
         chainId: 1,
         timestamp: Date.now(),
-        sequenceNumber: -1
+        sequenceNumber: -1,
       }
 
       const currentState: AtomicConnectionState = {
@@ -802,7 +789,7 @@ describe('WalletStore', () => {
         address: '0x123',
         chainId: 1,
         timestamp: Date.now(),
-        sequenceNumber: 0
+        sequenceNumber: 0,
       }
 
       const isValid = store.validateState(lockedState, currentState, 'test')
@@ -811,13 +798,13 @@ describe('WalletStore', () => {
 
     it('should maintain sequence order across multiple operations', () => {
       const initialSequence = store.captureState().sequenceNumber
-      
+
       const state1 = store.updateConnectionState(true, '0x123', 1)
       const seq1 = state1.sequenceNumber
-      
+
       store.disconnect()
       const seq2 = store.captureState().sequenceNumber
-      
+
       const state3 = store.updateConnectionState(true, '0x456', 2)
       const seq3 = state3.sequenceNumber
 
@@ -832,13 +819,13 @@ describe('WalletStore', () => {
       // Test string error handling logic by verifying the error message transformation
       const stringError = 'String error'
       const processedError = stringError instanceof Error ? stringError.message : 'Connection failed'
-      
+
       expect(processedError).toBe('Connection failed')
-      
+
       // Test that string errors get normalized to 'Connection failed'
       store.setConnectionError(processedError)
       expect(store.connectionError).toBe('Connection failed')
-      
+
       // Test Error object handling
       const errorObject = new Error('Actual error message')
       const processedErrorObject = errorObject instanceof Error ? errorObject.message : 'Connection failed'

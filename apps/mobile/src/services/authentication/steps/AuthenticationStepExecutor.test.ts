@@ -129,12 +129,7 @@ describe('AuthenticationStepExecutor', () => {
       })
 
       it('should handle different step types', async () => {
-        const steps: AuthStep[] = [
-          'generate-message',
-          'request-signature',
-          'verify-signature',
-          'acquire-lock',
-        ]
+        const steps: AuthStep[] = ['generate-message', 'request-signature', 'verify-signature', 'acquire-lock']
 
         for (const step of steps) {
           const mockStepFunction = jest.fn().mockResolvedValue(`${step}-result`)
@@ -253,10 +248,7 @@ describe('AuthenticationStepExecutor', () => {
 
         await expect(executePromise).rejects.toEqual(complexError)
 
-        expect(mockProgressCallbacks.onStepFail).toHaveBeenCalledWith(
-          testStep,
-          '[object Object]'
-        )
+        expect(mockProgressCallbacks.onStepFail).toHaveBeenCalledWith(testStep, '[object Object]')
       })
 
       it('should skip error callbacks when skipProgressCallbacks is true', async () => {
@@ -449,8 +441,7 @@ describe('AuthenticationStepExecutor', () => {
       const internalError = new Error('Internal step failed')
       const mockInternalFunction = jest.fn().mockRejectedValue(internalError)
 
-      await expect(executor.executeInternalStep(mockInternalFunction))
-        .rejects.toThrow('Internal step failed')
+      await expect(executor.executeInternalStep(mockInternalFunction)).rejects.toThrow('Internal step failed')
 
       expect(mockProgressCallbacks.onStepFail).not.toHaveBeenCalled()
     })
@@ -512,9 +503,9 @@ describe('AuthenticationStepExecutor', () => {
       }
 
       expect(results).toEqual(['message-generated', 'signature-requested', 'signature-verified'])
-      
+
       // Verify all callbacks were called
-      steps.forEach(stepInfo => {
+      steps.forEach((stepInfo) => {
         expect(mockProgressCallbacks.onStepStart).toHaveBeenCalledWith(stepInfo.step)
         expect(mockProgressCallbacks.onStepComplete).toHaveBeenCalledWith(stepInfo.step)
       })
@@ -522,16 +513,13 @@ describe('AuthenticationStepExecutor', () => {
 
     it('should handle mixed step execution types', async () => {
       // Regular step
-      const regularPromise = executor.executeStep('generate-message', 
-        jest.fn().mockResolvedValue('regular'))
+      const regularPromise = executor.executeStep('generate-message', jest.fn().mockResolvedValue('regular'))
 
       // Lock step
-      const lockPromise = executor.executeLockStep(
-        jest.fn().mockResolvedValue('lock'))
+      const lockPromise = executor.executeLockStep(jest.fn().mockResolvedValue('lock'))
 
       // Internal step
-      const internalResult = await executor.executeInternalStep(
-        jest.fn().mockResolvedValue('internal'))
+      const internalResult = await executor.executeInternalStep(jest.fn().mockResolvedValue('internal'))
 
       // Advance timers for the async steps
       jest.advanceTimersByTime(1000)
@@ -545,8 +533,7 @@ describe('AuthenticationStepExecutor', () => {
 
     it('should handle step failure in middle of flow', async () => {
       // First step succeeds
-      const step1Promise = executor.executeStep('generate-message',
-        jest.fn().mockResolvedValue('step1-success'))
+      const step1Promise = executor.executeStep('generate-message', jest.fn().mockResolvedValue('step1-success'))
 
       jest.advanceTimersByTime(400)
       const step1Result = await step1Promise
@@ -554,8 +541,7 @@ describe('AuthenticationStepExecutor', () => {
       expect(step1Result).toBe('step1-success')
 
       // Second step fails
-      const step2Promise = executor.executeStep('request-signature',
-        jest.fn().mockRejectedValue(new Error('step2-failed')))
+      const step2Promise = executor.executeStep('request-signature', jest.fn().mockRejectedValue(new Error('step2-failed')))
 
       jest.advanceTimersByTime(200)
 
@@ -575,10 +561,8 @@ describe('AuthenticationStepExecutor', () => {
     })
 
     it('should handle many concurrent steps efficiently', async () => {
-      const stepPromises = Array.from({ length: 10 }, (_, i) => 
-        executor.executeStep('generate-message', 
-          jest.fn().mockResolvedValue(`result-${i}`)
-        )
+      const stepPromises = Array.from({ length: 10 }, (_, i) =>
+        executor.executeStep('generate-message', jest.fn().mockResolvedValue(`result-${i}`))
       )
 
       jest.advanceTimersByTime(400)
@@ -628,13 +612,11 @@ describe('AuthenticationStepExecutor', () => {
     })
 
     it('should handle undefined step function', async () => {
-      await expect(executor.executeStep('generate-message', undefined as any))
-        .rejects.toThrow()
+      await expect(executor.executeStep('generate-message', undefined as any)).rejects.toThrow()
     })
 
     it('should handle null step function', async () => {
-      await expect(executor.executeStep('generate-message', null as any))
-        .rejects.toThrow()
+      await expect(executor.executeStep('generate-message', null as any)).rejects.toThrow()
     })
 
     it('should handle malformed options object', async () => {
@@ -660,9 +642,11 @@ describe('AuthenticationStepExecutor', () => {
 
       // The promise should still be pending
       let resolved = false
-      executePromise.then(() => { resolved = true })
+      executePromise.then(() => {
+        resolved = true
+      })
 
-      await new Promise(resolve => setTimeout(resolve, 0)) // Give microtasks a chance
+      await new Promise((resolve) => setTimeout(resolve, 0)) // Give microtasks a chance
 
       expect(resolved).toBe(false)
     })
@@ -670,12 +654,7 @@ describe('AuthenticationStepExecutor', () => {
 
   describe('Type Safety and Interface Compliance', () => {
     it('should handle all AuthStep types', async () => {
-      const authSteps: AuthStep[] = [
-        'generate-message',
-        'request-signature', 
-        'verify-signature',
-        'acquire-lock',
-      ]
+      const authSteps: AuthStep[] = ['generate-message', 'request-signature', 'verify-signature', 'acquire-lock']
 
       executor = new AuthenticationStepExecutor(mockProgressCallbacks)
 

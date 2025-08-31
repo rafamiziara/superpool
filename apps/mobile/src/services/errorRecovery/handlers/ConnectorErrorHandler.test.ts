@@ -68,7 +68,7 @@ describe('ConnectorErrorHandler', () => {
         const result = handler.handle()
 
         expect(result.shouldDisconnect).toBe(false) // No disconnect needed
-        expect(result.shouldShowError).toBe(true)   // Show error to user
+        expect(result.shouldShowError).toBe(true) // Show error to user
         expect(result.cleanupPerformed).toBe(false) // No special cleanup
       })
 
@@ -124,7 +124,7 @@ describe('ConnectorErrorHandler', () => {
       it('should implement ErrorHandler interface correctly', () => {
         expect(typeof handler.handle).toBe('function')
         expect(typeof handler.getHandlerName).toBe('function')
-        
+
         const result = handler.handle()
         expect(result).toHaveProperty('shouldDisconnect')
         expect(result).toHaveProperty('shouldShowError')
@@ -196,7 +196,7 @@ describe('ConnectorErrorHandler', () => {
       it('should produce same result regardless of context', () => {
         // Handler should ignore context since connector errors are straightforward
         const result = handler.handle()
-        
+
         expect(result.shouldDisconnect).toBe(false)
         expect(result.shouldShowError).toBe(true)
       })
@@ -214,15 +214,15 @@ describe('ConnectorErrorHandler', () => {
     describe('Edge Cases', () => {
       it('should handle multiple rapid calls', () => {
         const results = []
-        
+
         for (let i = 0; i < 100; i++) {
           results.push(handler.handle())
         }
 
         expect(results).toHaveLength(100)
-        expect(results.every(r => r.shouldDisconnect === false)).toBe(true)
-        expect(results.every(r => r.shouldShowError === true)).toBe(true)
-        expect(results.every(r => r.errorDelay === 1500)).toBe(true)
+        expect(results.every((r) => r.shouldDisconnect === false)).toBe(true)
+        expect(results.every((r) => r.shouldShowError === true)).toBe(true)
+        expect(results.every((r) => r.errorDelay === 1500)).toBe(true)
       })
 
       it('should maintain state isolation between instances', () => {
@@ -235,25 +235,23 @@ describe('ConnectorErrorHandler', () => {
       })
 
       it('should handle concurrent executions', async () => {
-        const promises = Array.from({ length: 10 }, () => 
-          Promise.resolve(handler.handle())
-        )
+        const promises = Array.from({ length: 10 }, () => Promise.resolve(handler.handle()))
 
         const results = await Promise.all(promises)
 
         expect(results).toHaveLength(10)
-        expect(results.every(r => r.shouldDisconnect === false)).toBe(true)
+        expect(results.every((r) => r.shouldDisconnect === false)).toBe(true)
       })
     })
 
     describe('Performance', () => {
       it('should handle connector errors very quickly', () => {
         const start = performance.now()
-        
+
         for (let i = 0; i < 1000; i++) {
           handler.handle()
         }
-        
+
         const end = performance.now()
         expect(end - start).toBeLessThan(1000) // Should be reasonably fast
       })
@@ -267,20 +265,18 @@ describe('ConnectorErrorHandler', () => {
 
         const finalMemory = process.memoryUsage().heapUsed
         const memoryIncrease = finalMemory - initialMemory
-        
+
         // Memory increase should be reasonable for test environment
         expect(memoryIncrease).toBeLessThan(50 * 1024 * 1024) // Less than 50MB
       })
 
       it('should scale well with multiple handlers', () => {
-        const handlers = Array.from({ length: 100 }, () => 
-          new ConnectorErrorHandler()
-        )
+        const handlers = Array.from({ length: 100 }, () => new ConnectorErrorHandler())
 
         const start = performance.now()
-        
-        handlers.forEach(h => h.handle())
-        
+
+        handlers.forEach((h) => h.handle())
+
         const end = performance.now()
         expect(end - start).toBeLessThan(50)
       })
@@ -355,7 +351,7 @@ describe('ConnectorErrorHandler', () => {
         // Connector errors typically mean the user closed their wallet
         // or the wallet app was closed during signing, so it's user-initiated
         expect(result.shouldDisconnect).toBe(false) // Already disconnected
-        expect(result.shouldShowError).toBe(true)   // Inform user what happened
+        expect(result.shouldShowError).toBe(true) // Inform user what happened
       })
 
       it('should not perform unnecessary cleanup', () => {

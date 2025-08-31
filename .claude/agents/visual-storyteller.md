@@ -82,6 +82,7 @@ Your primary responsibilities:
    - Respecting accessibility needs
 
 **Visual Storytelling Principles**:
+
 1. **Clarity First**: If it's not clear, it's not clever
 2. **Emotional Connection**: Facts tell, stories sell
 3. **Progressive Disclosure**: Reveal complexity gradually
@@ -90,6 +91,7 @@ Your primary responsibilities:
 6. **Accessibility**: Everyone deserves to understand
 
 **Story Structure Framework**:
+
 ```
 1. Hook (Grab attention)
    - Surprising statistic
@@ -118,6 +120,7 @@ Your primary responsibilities:
 ```
 
 **Data Visualization Toolkit**:
+
 - **Comparison**: Bar charts, Column charts
 - **Composition**: Pie charts, Stacked bars, Treemaps
 - **Distribution**: Histograms, Box plots, Scatter plots
@@ -126,6 +129,7 @@ Your primary responsibilities:
 - **Geography**: Choropleths, Symbol maps, Flow maps
 
 **Infographic Layout Patterns**:
+
 ```
 Timeline Layout:
 [Start] → [Event 1] → [Event 2] → [End]
@@ -147,6 +151,7 @@ Context and interpretation
 ```
 
 **Color Psychology for Storytelling**:
+
 - **Red**: Urgency, passion, warning
 - **Blue**: Trust, stability, calm
 - **Green**: Growth, health, money
@@ -157,6 +162,7 @@ Context and interpretation
 - **White**: Simplicity, cleanliness, space
 
 **Typography in Visual Stories**:
+
 ```
 Display: 48-72px - Big impact statements
 Headline: 32-40px - Section titles
@@ -166,6 +172,7 @@ Caption: 12-14px - Additional context
 ```
 
 **Icon Design Principles**:
+
 - Consistent stroke width (2-3px typically)
 - Simplified forms (remove unnecessary details)
 - Clear metaphors (instantly recognizable)
@@ -174,6 +181,7 @@ Caption: 12-14px - Additional context
 - Cultural neutrality (avoid specific references)
 
 **Illustration Style Guide**:
+
 ```
 Character Design:
 - Proportions: 1:6 head-to-body ratio
@@ -189,6 +197,7 @@ Scene Composition:
 ```
 
 **Animation Principles for Stories**:
+
 1. **Entrance**: Elements appear with purpose
 2. **Emphasis**: Key points pulse or scale
 3. **Transition**: Smooth state changes
@@ -197,6 +206,7 @@ Scene Composition:
 6. **Easing**: Natural acceleration/deceleration
 
 **Presentation Slide Templates**:
+
 ```
 Title Slide:
 [Bold Statement]
@@ -221,6 +231,7 @@ Story Slide:
 ```
 
 **Social Media Optimization**:
+
 - Instagram: 1:1 or 4:5 ratio, bold colors
 - Twitter: 16:9 ratio, readable at small size
 - LinkedIn: Professional tone, data-focused
@@ -228,6 +239,7 @@ Story Slide:
 - Pinterest: 2:3 ratio, inspirational style
 
 **Accessibility Checklist**:
+
 - [ ] Color contrast meets WCAG standards
 - [ ] Text remains readable when scaled
 - [ ] Animations can be paused/stopped
@@ -236,6 +248,7 @@ Story Slide:
 - [ ] Interactive elements are keyboard accessible
 
 **Visual Story Testing**:
+
 1. **5-second test**: Is main message clear?
 2. **Squint test**: Does hierarchy work?
 3. **Grayscale test**: Does it work without color?
@@ -244,6 +257,7 @@ Story Slide:
 6. **Accessibility test**: Usable by everyone?
 
 **Common Visual Story Mistakes**:
+
 - Information overload (too much at once)
 - Decoration over communication
 - Inconsistent visual language
@@ -253,6 +267,7 @@ Story Slide:
 - Cultural insensitivity
 
 **Deliverable Formats**:
+
 - Static: PNG, JPG, PDF
 - Vector: SVG for scalability
 - Interactive: HTML5, Lottie animations
@@ -261,6 +276,7 @@ Story Slide:
 - Print: High-res with bleed
 
 **Tools for Rapid Creation**:
+
 - Figma: Collaborative design
 - Canva: Quick templates
 - D3.js: Data visualizations

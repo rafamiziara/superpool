@@ -7,7 +7,7 @@ describe('utils index exports', () => {
   describe('Core Utilities', () => {
     it('should export ValidationUtils', async () => {
       const { ValidationUtils } = await import('./index')
-      
+
       expect(ValidationUtils).toBeDefined()
       expect(typeof ValidationUtils.isValidWalletAddress).toBe('function')
       expect(typeof ValidationUtils.isValidNonce).toBe('function')
@@ -20,7 +20,7 @@ describe('utils index exports', () => {
 
     it('should export SessionManager', async () => {
       const { SessionManager } = await import('./index')
-      
+
       expect(SessionManager).toBeDefined()
       expect(typeof SessionManager.clearSessionByErrorId).toBe('function')
       expect(typeof SessionManager.forceResetAllConnections).toBe('function')
@@ -34,10 +34,10 @@ describe('utils index exports', () => {
 
     it('should export Firebase utilities', async () => {
       const { customAppCheckProviderFactory, firebaseAuthManager } = await import('./index')
-      
+
       expect(customAppCheckProviderFactory).toBeDefined()
       expect(typeof customAppCheckProviderFactory).toBe('function')
-      
+
       expect(firebaseAuthManager).toBeDefined()
       expect(typeof firebaseAuthManager.getInstance).toBe('function')
     })
@@ -89,40 +89,27 @@ describe('utils index exports', () => {
     })
 
     it('should export error handling utilities', async () => {
-      const { 
-        categorizeError, 
-        createAppError, 
-        ERROR_MESSAGES, 
-        ErrorType, 
-        isUserInitiatedError 
-      } = await import('./index')
+      const { categorizeError, createAppError, ERROR_MESSAGES, ErrorType, isUserInitiatedError } = await import('./index')
 
       expect(categorizeError).toBeDefined()
       expect(typeof categorizeError).toBe('function')
-      
+
       expect(createAppError).toBeDefined()
       expect(typeof createAppError).toBe('function')
-      
+
       expect(ERROR_MESSAGES).toBeDefined()
       expect(typeof ERROR_MESSAGES).toBe('object')
-      
+
       expect(ErrorType).toBeDefined()
       expect(typeof ErrorType).toBe('object')
-      
+
       expect(isUserInitiatedError).toBeDefined()
       expect(typeof isUserInitiatedError).toBe('function')
     })
 
     it('should export toast utilities', async () => {
-      const {
-        appToasts,
-        authToasts,
-        showErrorFromAppError,
-        showErrorToast,
-        showInfoToast,
-        showSuccessToast,
-        showWarningToast,
-      } = await import('./index')
+      const { appToasts, authToasts, showErrorFromAppError, showErrorToast, showInfoToast, showSuccessToast, showWarningToast } =
+        await import('./index')
 
       const toastFunctions = {
         showErrorFromAppError,
@@ -140,7 +127,7 @@ describe('utils index exports', () => {
       expect(appToasts).toBeDefined()
       expect(typeof appToasts).toBe('object')
       expect(typeof appToasts.operationSuccess).toBe('function')
-      
+
       expect(authToasts).toBeDefined()
       expect(typeof authToasts).toBe('object')
       expect(typeof authToasts.walletConnected).toBe('function')
@@ -262,8 +249,8 @@ describe('utils index exports', () => {
       expect(SUPPORTED_CHAIN_IDS).toBeDefined()
       expect(Array.isArray(SUPPORTED_CHAIN_IDS)).toBe(true)
       expect(SUPPORTED_CHAIN_IDS.length).toBeGreaterThan(0)
-      
-      SUPPORTED_CHAIN_IDS.forEach(chainId => {
+
+      SUPPORTED_CHAIN_IDS.forEach((chainId) => {
         expect(typeof chainId).toBe('number')
         expect(chainId).toBeGreaterThan(0)
       })
@@ -274,7 +261,7 @@ describe('utils index exports', () => {
     it('should export all required type definitions', async () => {
       // Import for type checking - these are compile-time checks
       const module = await import('./index')
-      
+
       // The fact that the import succeeds means types are exported correctly
       expect(module).toBeDefined()
     })
@@ -283,7 +270,7 @@ describe('utils index exports', () => {
       // This is more of a compilation test
       // If the type is not exported, TypeScript would fail during compilation
       const { SUPPORTED_CHAIN_IDS } = await import('./index')
-      
+
       // We can at least verify the runtime values align with the type
       expect(Array.isArray(SUPPORTED_CHAIN_IDS)).toBe(true)
     })
@@ -292,13 +279,13 @@ describe('utils index exports', () => {
   describe('Export Integrity', () => {
     it('should not have any undefined exports', async () => {
       const allExports = await import('./index')
-      
+
       // Get all exported names from the module
       const exportNames = Object.keys(allExports)
-      
+
       expect(exportNames.length).toBeGreaterThan(0)
-      
-      exportNames.forEach(exportName => {
+
+      exportNames.forEach((exportName) => {
         expect(allExports[exportName as keyof typeof allExports]).toBeDefined()
       })
     })
@@ -306,7 +293,7 @@ describe('utils index exports', () => {
     it('should export expected number of items', async () => {
       const allExports = await import('./index')
       const exportNames = Object.keys(allExports)
-      
+
       // We expect a significant number of exports (utilities, constants, types)
       // This is a sanity check to ensure nothing is missing
       expect(exportNames.length).toBeGreaterThan(30)
@@ -319,24 +306,24 @@ describe('utils index exports', () => {
         SessionManager,
         customAppCheckProviderFactory,
         firebaseAuthManager,
-        
+
         // Logging
         secureLogger,
         debug,
         info,
         warn,
         error,
-        
+
         // Error handling
         ErrorType,
         categorizeError,
         createAppError,
-        
+
         // Toast utilities
         showSuccessToast,
         authToasts,
         appToasts,
-        
+
         // Constants
         AUTH_TIMEOUTS,
         LOG_LEVELS,
@@ -374,28 +361,28 @@ describe('utils index exports', () => {
   describe('Module Loading Performance', () => {
     it('should load the module efficiently', async () => {
       const start = performance.now()
-      
+
       // Load the entire utils module
       await import('./index')
-      
+
       const end = performance.now()
       const loadTime = end - start
-      
+
       // Module should load quickly (within reasonable time)
       expect(loadTime).toBeLessThan(100) // Less than 100ms
     })
 
     it('should not cause memory issues when importing', async () => {
       const initialMemory = process.memoryUsage().heapUsed
-      
+
       // Import multiple times to test for memory leaks
       for (let i = 0; i < 10; i++) {
         await import('./index')
       }
-      
+
       const finalMemory = process.memoryUsage().heapUsed
       const memoryIncrease = finalMemory - initialMemory
-      
+
       // Should not cause significant memory increase
       expect(memoryIncrease).toBeLessThan(10 * 1024 * 1024) // Less than 10MB
     })
@@ -414,7 +401,7 @@ describe('utils index exports', () => {
       const { ValidationUtils } = await import('./ValidationUtils')
       const { ErrorType } = await import('./errorHandling')
       const { LOG_LEVELS } = await import('./constants')
-      
+
       expect(ValidationUtils).toBeDefined()
       expect(ErrorType).toBeDefined()
       expect(LOG_LEVELS).toBeDefined()
@@ -425,26 +412,23 @@ describe('utils index exports', () => {
     it('should have consistent naming conventions', async () => {
       const allExports = await import('./index')
       const exportNames = Object.keys(allExports)
-      
+
       // Check that constants are UPPER_CASE
-      const constantNames = exportNames.filter(name => 
-        name === name.toUpperCase() && name.includes('_')
-      )
-      
+      const constantNames = exportNames.filter((name) => name === name.toUpperCase() && name.includes('_'))
+
       expect(constantNames.length).toBeGreaterThan(10)
-      
+
       // Check that functions are camelCase
-      const functionNames = exportNames.filter(name => 
-        name.charAt(0) === name.charAt(0).toLowerCase() && 
-        typeof allExports[name as keyof typeof allExports] === 'function'
+      const functionNames = exportNames.filter(
+        (name) => name.charAt(0) === name.charAt(0).toLowerCase() && typeof allExports[name as keyof typeof allExports] === 'function'
       )
-      
+
       expect(functionNames.length).toBeGreaterThan(5)
     })
 
     it('should organize exports by logical categories', async () => {
       const allExports = await import('./index')
-      
+
       // Check that we have exports from all expected categories
       const categories = {
         validation: ['ValidationUtils'],
@@ -455,9 +439,9 @@ describe('utils index exports', () => {
         firebase: ['firebaseAuthManager', 'customAppCheckProviderFactory'],
         constants: ['AUTH_TIMEOUTS', 'SUPPORTED_CHAIN_IDS'],
       }
-      
+
       Object.entries(categories).forEach(([category, expectedExports]) => {
-        expectedExports.forEach(exportName => {
+        expectedExports.forEach((exportName) => {
           expect(allExports).toHaveProperty(exportName)
         })
       })
