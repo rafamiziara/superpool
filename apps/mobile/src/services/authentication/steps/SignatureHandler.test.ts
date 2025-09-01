@@ -1,7 +1,7 @@
 import type { SignatureFunctions, SignatureRequest, SignatureResult } from '@superpool/types'
 import type { Connector } from 'wagmi'
 import { SignatureService } from '../../signature'
-import { SignatureHandler, SignatureContext } from './SignatureHandler'
+import { SignatureContext, SignatureHandler } from './SignatureHandler'
 import type { GeneratedAuthMessage } from './MessageGenerator'
 
 // Mock SignatureService

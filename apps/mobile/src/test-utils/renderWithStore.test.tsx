@@ -6,7 +6,7 @@
 import React from 'react'
 import { Text, View } from 'react-native'
 import { RenderResult } from '@testing-library/react-native'
-import { renderWithStore, renderHookWithStore, renderWithoutStore } from './renderWithStore'
+import { renderHookWithStore, renderWithoutStore, renderWithStore } from './renderWithStore'
 import { createMockRootStore } from './mockStores'
 import { TestStoreProvider } from './testProviders'
 import { useStores } from '../stores'

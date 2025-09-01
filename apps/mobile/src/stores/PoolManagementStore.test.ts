@@ -1,4 +1,4 @@
-import { PoolManagementStore, PoolFilters, LoadingStates } from './PoolManagementStore'
+import { LoadingStates, PoolFilters, PoolManagementStore } from './PoolManagementStore'
 import { LendingPool, Loan, LoanStatus, Transaction, TransactionStatus, TransactionType } from '@superpool/types'
 
 describe('PoolManagementStore', () => {

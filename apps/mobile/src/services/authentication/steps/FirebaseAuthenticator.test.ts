@@ -1,5 +1,4 @@
 import type { SignatureResult } from '@superpool/types'
-import type { Connector } from 'wagmi'
 
 // Mock all external dependencies using jest.doMock for proper timing
 const mockSignInWithCustomToken = jest.fn()
@@ -37,12 +36,6 @@ const mockRetryPolicy = {
   fatalErrors: ['invalid-token'],
 }
 
-const mockRetryResult = {
-  success: true,
-  attemptsMade: 1,
-  totalTime: 100,
-  policyUsed: 'test-policy',
-}
 
 jest.doMock('firebase/auth', () => ({
   signInWithCustomToken: mockSignInWithCustomToken,
@@ -135,7 +128,7 @@ describe('FirebaseAuthenticator', () => {
 
     // Setup retry executor mock to actually execute the provided function
     const { RetryExecutor } = require('../utils/retryPolicies')
-    RetryExecutor.executeWithRetry.mockImplementation(async (fn: () => Promise<any>, policy: any, options?: any) => {
+    RetryExecutor.executeWithRetry.mockImplementation(async (fn: () => Promise<any>, policy: any) => {
       try {
         // Execute the function to trigger actual Firebase auth calls
         await fn()

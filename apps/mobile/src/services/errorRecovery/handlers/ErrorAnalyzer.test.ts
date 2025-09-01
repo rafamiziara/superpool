@@ -1,5 +1,4 @@
-import { ErrorType } from '@superpool/types'
-import { ErrorAnalyzer, ErrorAnalysisResult } from './ErrorAnalyzer'
+import { ErrorAnalyzer } from './ErrorAnalyzer'
 
 // Mock the categorizeError function from utils
 jest.mock('../../../utils', () => ({

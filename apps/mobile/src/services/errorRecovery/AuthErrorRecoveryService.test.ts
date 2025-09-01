@@ -19,8 +19,6 @@ jest.mock('../../stores/AuthenticationStore')
 jest.mock('../../stores/WalletStore')
 
 const mockErrorRecoveryService = ErrorRecoveryService as jest.Mocked<typeof ErrorRecoveryService>
-const mockAuthenticationStore = AuthenticationStore as jest.MockedClass<typeof AuthenticationStore>
-const mockWalletStore = WalletStore as jest.MockedClass<typeof WalletStore>
 
 describe('AuthErrorRecoveryService', () => {
   let mockAuthStore: jest.Mocked<AuthenticationStore>

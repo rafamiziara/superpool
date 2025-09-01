@@ -1,4 +1,4 @@
-import { renderHook, act } from '@testing-library/react-native'
+import { act, renderHook } from '@testing-library/react-native'
 
 // Mock SessionManager using jest.doMock for proper timing
 const mockSessionManager = {
@@ -11,7 +11,6 @@ jest.doMock('../../utils/sessionManager', () => ({
 }))
 
 const { useGlobalErrorHandler } = require('./useGlobalErrorHandler')
-const { SessionManager } = require('../../utils/sessionManager')
 
 // Helper function to create session corruption detection mock
 const createSessionCorruptionDetector = (shouldDetect = true) => {
@@ -55,7 +54,7 @@ describe('useGlobalErrorHandler', () => {
       if (consoleLogSpy && consoleLogSpy.mockRestore) {
         consoleLogSpy.mockRestore()
       }
-    } catch (e) {
+    } catch {
       // Ignore if already restored
     }
     console.error = originalConsoleError
@@ -586,8 +585,6 @@ describe('useGlobalErrorHandler', () => {
       mockSessionManager.detectSessionCorruption.mockImplementation(createSessionCorruptionDetector())
 
       const logSpy = jest.spyOn(console, 'log').mockImplementation()
-      const originalError = console.error
-      const errorCallSpy = jest.fn()
 
       // We need to spy on the actual error calls made by the finally block
       // Since console.error is overridden by the hook, we'll track the original calls

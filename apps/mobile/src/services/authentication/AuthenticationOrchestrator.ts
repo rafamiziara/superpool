@@ -1,10 +1,10 @@
-import { AuthProgressCallbacks, AuthStep, AuthenticationContext } from '@superpool/types'
+import { AuthenticationContext, AuthProgressCallbacks, AuthStep } from '@superpool/types'
 import { router } from 'expo-router'
 import type { Connector } from 'wagmi'
 import { FIREBASE_AUTH } from '../../firebase.config'
 import { AuthenticationStore } from '../../stores/AuthenticationStore'
 import { WalletStore } from '../../stores/WalletStore'
-import { SessionManager, authToasts } from '../../utils'
+import { authToasts, SessionManager } from '../../utils'
 import { AuthErrorRecoveryService } from '../errorRecovery'
 import { AuthenticationStepExecutor, AuthenticationValidator, FirebaseAuthenticator, MessageGenerator, SignatureHandler } from './steps'
 

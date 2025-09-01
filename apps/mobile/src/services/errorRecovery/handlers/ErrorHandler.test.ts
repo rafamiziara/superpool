@@ -3,7 +3,7 @@ import { ErrorHandler, RecoveryActions } from './ErrorHandler'
 
 // Mock implementation for testing the interface
 class MockErrorHandler implements ErrorHandler<string> {
-  handle(context: string): ErrorRecoveryResult {
+  handle(_context: string): ErrorRecoveryResult {
     return RecoveryActions.createResult(false, true, 1000, true)
   }
 

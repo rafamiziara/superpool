@@ -1,11 +1,10 @@
 import {
-  ErrorType,
-  ERROR_MESSAGES,
-  createAppError,
   categorizeError,
+  createAppError,
+  ERROR_MESSAGES,
+  ErrorType,
   isUserInitiatedError,
   shouldRetryError,
-  type AppError,
 } from './errorHandling'
 
 describe('errorHandling', () => {

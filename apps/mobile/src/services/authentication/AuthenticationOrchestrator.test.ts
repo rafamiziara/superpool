@@ -1,5 +1,5 @@
-import type { AuthProgressCallbacks, AuthenticationContext } from '@superpool/types'
 import type { Connector } from 'wagmi'
+import type { AuthenticationContext } from '@superpool/types'
 
 // Mock all external dependencies using jest.doMock for proper timing
 const mockRouter = {

@@ -107,6 +107,18 @@ export default [
       '@typescript-eslint/no-empty-object-type': 'warn',
       '@typescript-eslint/triple-slash-reference': 'off', // Allow for Next.js and React Native
       '@typescript-eslint/no-require-imports': 'off', // Allow for React Native assets
+      
+      // Import sorting configuration (relaxed for now)
+      'sort-imports': [
+        'warn',
+        {
+          ignoreCase: true,
+          ignoreDeclarationSort: true, // Don't sort import declarations
+          ignoreMemberSort: false,
+          memberSyntaxSortOrder: ['none', 'all', 'multiple', 'single'],
+          allowSeparatedGroups: true,
+        },
+      ],
     },
   },
 
@@ -130,7 +142,14 @@ export default [
     },
     rules: {
       '@typescript-eslint/no-explicit-any': 'off',
-      '@typescript-eslint/no-unused-vars': 'off',
+      '@typescript-eslint/no-unused-vars': [
+        'error',
+        {
+          argsIgnorePattern: '^_',
+          varsIgnorePattern: '^_',
+          ignoreRestSiblings: true,
+        },
+      ],
       '@typescript-eslint/no-unused-expressions': 'off', // Allow chai expect statements
       'no-unused-expressions': 'off', // Allow chai expect statements
     },

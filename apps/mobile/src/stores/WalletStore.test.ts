@@ -1,4 +1,4 @@
-import { WalletStore, AtomicConnectionState, WalletState } from './WalletStore'
+import { AtomicConnectionState, WalletState, WalletStore } from './WalletStore'
 
 describe('WalletStore', () => {
   let store: WalletStore

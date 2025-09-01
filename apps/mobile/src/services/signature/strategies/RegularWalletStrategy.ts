@@ -1,5 +1,5 @@
 import type { Connector } from 'wagmi'
-import type { SignatureRequest, SignatureResult, SignatureFunctions } from '@superpool/types'
+import type { SignatureFunctions, SignatureRequest, SignatureResult } from '@superpool/types'
 import type { SignatureStrategy } from './SignatureStrategy'
 import { SignatureUtils } from './SignatureUtils'
 

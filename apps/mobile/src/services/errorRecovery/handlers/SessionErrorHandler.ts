@@ -1,5 +1,5 @@
 import { ErrorRecoveryResult, SessionErrorContext } from '@superpool/types'
-import { SessionManager, authToasts } from '../../../utils'
+import { authToasts, SessionManager } from '../../../utils'
 import type { ErrorHandler } from './ErrorHandler'
 import { RecoveryActions } from './ErrorHandler'
 
