@@ -51,7 +51,7 @@ describe('Security Tests', function () {
       await maliciousContract.attackCreateLoan(ethers.parseEther('1'))
 
       // Verify the pool's state is consistent - only one loan should be created
-      expect(await lendingPool.nextLoanId()).to.equal(2) // Only one loan created
+      expect(await lendingPool.nextLoanId()).to.equal(2) // Only one loan created (nextLoanId = 2 after first loan)
 
       // Pool funds should be reduced by exactly the loan amount
       const finalPoolFunds = await lendingPool.totalFunds()
@@ -64,19 +64,19 @@ describe('Security Tests', function () {
       await lendingPool.connect(borrower).createLoan(loanAmount)
 
       // Calculate repayment amount
-      const repaymentAmount = await lendingPool.calculateRepaymentAmount(1)
+      const repaymentAmount = await lendingPool.calculateRepaymentAmount(2)
 
       // Test that the borrower can repay normally (our CEI pattern works)
       const initialPoolFunds = await lendingPool.totalFunds()
 
       // Borrower repays with excess to test refund mechanism
       const excessPayment = ethers.parseEther('0.5')
-      await lendingPool.connect(borrower).repayLoan(1, {
+      await lendingPool.connect(borrower).repayLoan(2, {
         value: repaymentAmount + excessPayment,
       })
 
       // Verify loan is properly repaid and funds are correct
-      const loan = await lendingPool.getLoan(1)
+      const loan = await lendingPool.getLoan(2)
       expect(loan.isRepaid).to.be.true
 
       const finalPoolFunds = await lendingPool.totalFunds()
@@ -124,7 +124,7 @@ describe('Security Tests', function () {
       await largeLendingPool.connect(borrower).createLoan(largeAmount)
 
       // Calculate repayment - should not overflow
-      const repaymentAmount = await largeLendingPool.calculateRepaymentAmount(1)
+      const repaymentAmount = await largeLendingPool.calculateRepaymentAmount(2)
 
       // Verify the calculation is correct (amount + 99.99% interest)
       const expectedInterest = (largeAmount * BigInt(highInterestRate)) / BigInt(10000)
@@ -152,7 +152,7 @@ describe('Security Tests', function () {
       await testPool.connect(borrower).createLoan(maxSafeAmount)
 
       // This should not overflow
-      const repaymentAmount = await testPool.calculateRepaymentAmount(1)
+      const repaymentAmount = await testPool.calculateRepaymentAmount(2)
       expect(repaymentAmount).to.equal(maxSafeAmount * BigInt(2)) // 100% interest = double
     })
 
@@ -179,7 +179,7 @@ describe('Security Tests', function () {
         const loanAmount = ethers.parseEther('1')
         await testPool.connect(borrower).createLoan(loanAmount)
 
-        const repaymentAmount = await testPool.calculateRepaymentAmount(1)
+        const repaymentAmount = await testPool.calculateRepaymentAmount(2)
         const expectedInterest = (loanAmount * BigInt(testCase.rate)) / BigInt(10000)
         const expectedRepayment = loanAmount + expectedInterest
 
@@ -200,8 +200,9 @@ describe('Security Tests', function () {
 
       // Try to create a loan from the rejecting contract
       // This should fail because the loan transfer will be rejected
-      await expect(rejectingContract.createLoan(await lendingPool.getAddress(), ethers.parseEther('1'))).to.be.revertedWith(
-        'Transfer failed'
+      await expect(rejectingContract.createLoan(await lendingPool.getAddress(), ethers.parseEther('1'))).to.be.revertedWithCustomError(
+        lendingPool,
+        'TransferFailed'
       )
     })
 
@@ -215,11 +216,11 @@ describe('Security Tests', function () {
       const loanAmount = ethers.parseEther('1')
       await lendingPool.connect(borrower).createLoan(loanAmount)
 
-      const repaymentAmount = await lendingPool.calculateRepaymentAmount(1)
+      const repaymentAmount = await lendingPool.calculateRepaymentAmount(2)
 
       // Even if borrower is a gas-consuming contract, repayment should work
       // (though it might consume more gas)
-      await expect(lendingPool.connect(borrower).repayLoan(1, { value: repaymentAmount })).to.not.be.reverted
+      await expect(lendingPool.connect(borrower).repayLoan(2, { value: repaymentAmount })).to.not.be.reverted
     })
   })
 
@@ -248,18 +249,18 @@ describe('Security Tests', function () {
       await zeroPool.connect(borrower).createLoan(loanAmount)
 
       // With 0% interest, repayment should equal loan amount
-      const repaymentAmount = await zeroPool.calculateRepaymentAmount(1)
+      const repaymentAmount = await zeroPool.calculateRepaymentAmount(2)
       expect(repaymentAmount).to.equal(loanAmount)
 
       // Repayment should work
-      await expect(zeroPool.connect(borrower).repayLoan(1, { value: loanAmount })).to.not.be.reverted
+      await expect(zeroPool.connect(borrower).repayLoan(2, { value: loanAmount })).to.not.be.reverted
     })
 
     it('Should handle minimum loan amounts', async function () {
       const minAmount = 1000 // 1000 wei (larger amount for meaningful interest)
       await lendingPool.connect(borrower).createLoan(minAmount)
 
-      const repaymentAmount = await lendingPool.calculateRepaymentAmount(1)
+      const repaymentAmount = await lendingPool.calculateRepaymentAmount(2)
       // With 5% interest: 1000 + (1000 * 500 / 10000) = 1000 + 50 = 1050
       const expectedInterest = (BigInt(minAmount) * BigInt(interestRate)) / BigInt(10000)
       const expectedRepayment = BigInt(minAmount) + expectedInterest
@@ -272,12 +273,12 @@ describe('Security Tests', function () {
       const loanAmount = ethers.parseEther('1')
       await lendingPool.connect(borrower).createLoan(loanAmount)
 
-      const repaymentAmount = await lendingPool.calculateRepaymentAmount(1)
+      const repaymentAmount = await lendingPool.calculateRepaymentAmount(2)
       const excessPayment = ethers.parseEther('5') // Much more than needed
 
       const initialBalance = await ethers.provider.getBalance(borrower.address)
 
-      const tx = await lendingPool.connect(borrower).repayLoan(1, {
+      const tx = await lendingPool.connect(borrower).repayLoan(2, {
         value: repaymentAmount + excessPayment,
       })
       const receipt = await tx.wait()
