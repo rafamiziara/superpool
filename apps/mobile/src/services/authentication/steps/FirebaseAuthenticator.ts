@@ -4,6 +4,8 @@ import { httpsCallable, HttpsCallable } from 'firebase/functions'
 import { Platform } from 'react-native'
 import { FIREBASE_AUTH, FIREBASE_FUNCTIONS } from '../../../firebase.config'
 import { devOnly } from '../../../utils'
+import { FirebaseAuthCircuitBreakers } from '../utils/circuitBreaker'
+import { ErrorCategorizer, RetryExecutor, RetryPolicies } from '../utils/retryPolicies'
 
 export interface SignatureVerificationContext {
   walletAddress: string
@@ -76,70 +78,90 @@ export class FirebaseAuthenticator {
   }
 
   /**
-   * Signs in with Firebase using custom token with Safe wallet retry logic
+   * Signs in with Firebase using enhanced fail-fast approach with intelligent retry
    */
   async signInWithFirebase(firebaseToken: string, signatureType: string): Promise<void> {
-    console.log('🔑 Signing in with Firebase...')
+    console.log('🔑 Starting Firebase authentication with fail-fast strategy...')
 
-    const isSafeWallet = signatureType === 'safe-wallet'
+    // Get circuit breaker for this signature type
+    const circuitBreaker = FirebaseAuthCircuitBreakers.getCircuitBreakerForSignatureType(signatureType)
+    
+    // Get appropriate retry policy
+    const retryPolicy = RetryPolicies.getPolicyForWallet(signatureType, { isFirstAttempt: true })
+    
+    console.log(`📋 Using retry policy: ${retryPolicy.name} (max ${retryPolicy.maxRetries} retries)`)
 
-    // Add stabilization delay for Safe wallets
-    if (isSafeWallet) {
-      console.log('⏳ Adding delay for Safe wallet connection stabilization...')
-      await new Promise((resolve) => setTimeout(resolve, 2000))
-    }
-
-    try {
-      await signInWithCustomToken(FIREBASE_AUTH, firebaseToken)
-      console.log('✅ Firebase authentication successful')
-    } catch (firebaseError) {
-      console.error('❌ Firebase authentication failed:', firebaseError)
-      this.logTokenDetails(firebaseToken)
-
-      // For Safe wallets, retry with increasing delays
-      if (isSafeWallet) {
-        console.log('🔄 Retrying Firebase authentication for Safe wallet...')
-        await this.retrySafeWalletFirebaseAuth(firebaseToken)
-      } else {
-        throw firebaseError
-      }
-    }
-  }
-
-  /**
-   * Retry logic specifically for Safe wallet Firebase authentication
-   */
-  private async retrySafeWalletFirebaseAuth(firebaseToken: string): Promise<void> {
-    let retryCount = 0
-    const maxRetries = 3
-
-    while (retryCount < maxRetries) {
-      retryCount++
-      const delay = retryCount * 1000 // 1s, 2s, 3s delays
-
-      try {
-        console.log(`🔄 Retry ${retryCount}/${maxRetries} after ${delay}ms delay...`)
-        await new Promise((resolve) => setTimeout(resolve, delay))
-        await signInWithCustomToken(FIREBASE_AUTH, firebaseToken)
-        console.log(`✅ Firebase authentication successful on retry ${retryCount}`)
-        return // Success, exit retry loop
-      } catch (retryError) {
-        console.error(`❌ Firebase authentication retry ${retryCount}/${maxRetries} failed:`, retryError)
-
-        if (retryCount >= maxRetries) {
-          // Check for App Check issues on final retry failure
-          const errorMessage = retryError instanceof Error ? retryError.message : String(retryError)
-          if (errorMessage.includes('internal') || errorMessage.includes('app-check')) {
-            console.log('🚨 Detected potential App Check issue for Safe wallet')
-            throw new Error(
-              'Safe wallet authentication failed due to device verification. Please try disconnecting and reconnecting your wallet.'
-            )
+    // Execute Firebase sign-in with circuit breaker protection
+    const circuitResult = await circuitBreaker.execute(async () => {
+      // Execute sign-in with retry policy
+      return await RetryExecutor.executeWithRetry(
+        async () => {
+          // Add stabilization delay for Safe wallets on first attempt only
+          if (signatureType === 'safe-wallet') {
+            console.log('⏳ Adding stabilization delay for Safe wallet...')
+            await new Promise(resolve => setTimeout(resolve, 1500))
           }
-          throw retryError
+
+          await signInWithCustomToken(FIREBASE_AUTH, firebaseToken)
+          console.log('✅ Firebase authentication successful')
+        },
+        retryPolicy,
+        {
+          onRetry: (context) => {
+            console.log(`🔄 Firebase auth retry ${context.attempt}/${context.totalAttempts}`, {
+              error: context.lastError.message,
+              elapsedTime: context.elapsedTime
+            })
+          }
         }
-      }
+      )
+    })
+
+    // Handle circuit breaker result
+    if (!circuitResult.success) {
+      console.error('❌ Firebase authentication failed with circuit breaker', {
+        circuitState: circuitResult.circuitState,
+        error: circuitResult.error?.message,
+        metrics: circuitResult.metrics
+      })
+
+      this.logTokenDetails(firebaseToken)
+      
+      // Provide user-friendly error message based on error category
+      const userFriendlyMessage = ErrorCategorizer.getUserFriendlyMessage(
+        circuitResult.error || new Error('Authentication failed')
+      )
+      
+      throw new Error(`Firebase authentication failed: ${userFriendlyMessage}`)
     }
+
+    // Handle retry executor result
+    const retryResult = circuitResult.result
+    if (!retryResult?.success) {
+      console.error('❌ Firebase authentication failed after retries', {
+        error: retryResult?.error?.message,
+        attemptsMade: retryResult?.attemptsMade,
+        totalTime: retryResult?.totalTime,
+        policyUsed: retryResult?.policyUsed
+      })
+
+      this.logTokenDetails(firebaseToken)
+      
+      const userFriendlyMessage = ErrorCategorizer.getUserFriendlyMessage(
+        retryResult?.error || new Error('Authentication failed')
+      )
+      
+      throw new Error(`Firebase authentication failed: ${userFriendlyMessage}`)
+    }
+
+    console.log('✅ Firebase authentication completed successfully', {
+      circuitState: circuitResult.circuitState,
+      attemptsUsed: retryResult.attemptsMade,
+      totalTime: retryResult.totalTime,
+      policyUsed: retryResult.policyUsed
+    })
   }
+
 
   /**
    * Safely log token details for debugging (never logs actual token content)
