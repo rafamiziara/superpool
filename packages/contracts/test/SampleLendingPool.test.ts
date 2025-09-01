@@ -66,7 +66,7 @@ describe('SampleLendingPool', function () {
     })
 
     it('Should reject zero deposits', async function () {
-      await expect(lendingPool.connect(lender).depositFunds({ value: 0 })).to.be.revertedWith('Amount must be greater than 0')
+      await expect(lendingPool.connect(lender).depositFunds({ value: 0 })).to.be.revertedWithCustomError(lendingPool, 'InvalidAmount')
     })
 
     it('Should allow multiple deposits', async function () {
@@ -94,10 +94,10 @@ describe('SampleLendingPool', function () {
 
       await expect(lendingPool.connect(borrower).createLoan(loanAmount))
         .to.emit(lendingPool, 'LoanCreated')
-        .withArgs(1, borrower.address, loanAmount)
+        .withArgs(2, borrower.address, loanAmount)
 
       // Check loan details
-      const loan = await lendingPool.getLoan(1)
+      const loan = await lendingPool.getLoan(2)
       expect(loan.borrower).to.equal(borrower.address)
       expect(loan.amount).to.equal(loanAmount)
       expect(loan.interestRate).to.equal(interestRate)
@@ -141,7 +141,7 @@ describe('SampleLendingPool', function () {
     it('Should reject loan when pool is inactive', async function () {
       await lendingPool.connect(owner).togglePoolStatus()
 
-      await expect(lendingPool.connect(borrower).createLoan(ethers.parseEther('5'))).to.be.revertedWith('Pool is not active')
+      await expect(lendingPool.connect(borrower).createLoan(ethers.parseEther('5'))).to.be.revertedWithCustomError(lendingPool, 'PoolNotActive')
     })
   })
 
@@ -213,8 +213,9 @@ describe('SampleLendingPool', function () {
       const repaymentAmount = await lendingPool.calculateRepaymentAmount(loanId)
       const insufficientAmount = repaymentAmount - ethers.parseEther('0.1')
 
-      await expect(lendingPool.connect(borrower).repayLoan(loanId, { value: insufficientAmount })).to.be.revertedWith(
-        'Insufficient repayment amount'
+      await expect(lendingPool.connect(borrower).repayLoan(loanId, { value: insufficientAmount })).to.be.revertedWithCustomError(
+        lendingPool,
+        'InsufficientRepaymentAmount'
       )
     })
 

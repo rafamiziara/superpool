@@ -49,7 +49,7 @@ describe('Security Improvements Summary', function () {
 
       // Create normal loans to verify CEI pattern works
       await pool.createLoan(ethers.parseEther('0.5'))
-      const loan = await pool.loans(1)
+      const loan = await pool.loans(2)
 
       // Verify state is updated before external call (CEI pattern implemented)
       expect(loan.borrower).to.equal(owner.address)
@@ -87,7 +87,7 @@ describe('Security Improvements Summary', function () {
       await expect(pool.createLoan(ethers.parseEther('1'))).to.not.be.reverted
 
       // Verify loan was created with correct interest calculation
-      const loan = await pool.loans(1)
+      const loan = await pool.loans(2)
       expect(loan.amount).to.equal(ethers.parseEther('1'))
       expect(loan.interestRate).to.equal(9999)
       expect(loan.borrower).to.equal(owner.address)
@@ -125,7 +125,7 @@ describe('Security Improvements Summary', function () {
       await pool.depositFunds({ value: ethers.parseEther('2') })
       await expect(pool.createLoan(ethers.parseEther('1'))).to.not.be.reverted
 
-      const loan = await pool.loans(1)
+      const loan = await pool.loans(2)
       expect(loan.interestRate).to.equal(0)
     })
   })
@@ -264,15 +264,15 @@ describe('Security Improvements Summary', function () {
 
       // Create a loan
       await pool.connect(addr3).createLoan(ethers.parseEther('1'))
-      const loan = await pool.loans(1)
+      const loan = await pool.loans(2)
       expect(loan.borrower).to.equal(addr3.address)
       expect(loan.amount).to.equal(ethers.parseEther('1'))
 
       // Repay the loan (tests safe arithmetic in interest calculation)
       const repaymentAmount = ethers.parseEther('1.05') // 1 ETH + 5% interest
-      await pool.connect(addr3).repayLoan(1, { value: repaymentAmount })
+      await pool.connect(addr3).repayLoan(2, { value: repaymentAmount })
 
-      const repaidLoan = await pool.loans(1)
+      const repaidLoan = await pool.loans(2)
       expect(repaidLoan.isRepaid).to.be.true
 
       // 4. Test pagination (instead of the removed getAllPoolAddresses)
