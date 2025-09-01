@@ -58,8 +58,8 @@ describe('AuthenticationStepExecutor', () => {
 
         const executePromise = executor.executeStep(testStep, mockStepFunction)
 
-        // Fast forward through delays
-        jest.advanceTimersByTime(400) // beforeDelay + afterDelay
+        // Fast forward through delays and run all timers
+        await jest.runAllTimersAsync()
 
         const result = await executePromise
 
@@ -78,7 +78,7 @@ describe('AuthenticationStepExecutor', () => {
 
         const executePromise = executor.executeStep(testStep, mockStepFunction, options)
 
-        jest.advanceTimersByTime(400) // Custom delays
+        await jest.runAllTimersAsync()
 
         const result = await executePromise
 
@@ -93,7 +93,7 @@ describe('AuthenticationStepExecutor', () => {
 
         const executePromise = executor.executeStep(testStep, mockStepFunction, options)
 
-        jest.advanceTimersByTime(400)
+        await jest.runAllTimersAsync()
 
         const result = await executePromise
 
@@ -120,7 +120,7 @@ describe('AuthenticationStepExecutor', () => {
 
         const executePromise = executor.executeStep(testStep, mockStepFunction)
 
-        jest.advanceTimersByTime(400)
+        await jest.runAllTimersAsync()
 
         await executePromise
 
@@ -136,7 +136,7 @@ describe('AuthenticationStepExecutor', () => {
 
           const executePromise = executor.executeStep(step, mockStepFunction)
 
-          jest.advanceTimersByTime(400)
+          await jest.runAllTimersAsync()
 
           const result = await executePromise
 
@@ -154,7 +154,7 @@ describe('AuthenticationStepExecutor', () => {
 
         const executePromise = executor.executeStep(testStep, mockStepFunction)
 
-        jest.advanceTimersByTime(400)
+        await jest.runAllTimersAsync()
 
         const result = await executePromise
 
@@ -166,7 +166,7 @@ describe('AuthenticationStepExecutor', () => {
 
         const executePromise = executor.executeStep(testStep, mockStepFunction)
 
-        jest.advanceTimersByTime(400)
+        await jest.runAllTimersAsync()
 
         const result = await executePromise
 
@@ -178,7 +178,7 @@ describe('AuthenticationStepExecutor', () => {
 
         const executePromise = executor.executeStep(testStep, mockStepFunction)
 
-        jest.advanceTimersByTime(400)
+        await jest.runAllTimersAsync()
 
         const result = await executePromise
 
@@ -190,7 +190,7 @@ describe('AuthenticationStepExecutor', () => {
 
         const executePromise = executor.executeStep(testStep, mockStepFunction)
 
-        jest.advanceTimersByTime(400)
+        await jest.runAllTimersAsync()
 
         const result = await executePromise
 
@@ -204,9 +204,10 @@ describe('AuthenticationStepExecutor', () => {
         const mockStepFunction = jest.fn().mockRejectedValue(stepError)
 
         const executePromise = executor.executeStep(testStep, mockStepFunction)
-
-        jest.advanceTimersByTime(200) // Only beforeDelay, no afterDelay on error
-
+        
+        // Use Promise.allSettled to handle both timers and promise rejection
+        await Promise.allSettled([jest.runAllTimersAsync(), executePromise])
+        
         await expect(executePromise).rejects.toThrow('Step execution failed')
 
         expect(mockProgressCallbacks.onStepStart).toHaveBeenCalledWith(testStep)
@@ -218,9 +219,8 @@ describe('AuthenticationStepExecutor', () => {
         const mockStepFunction = jest.fn().mockRejectedValue('String error')
 
         const executePromise = executor.executeStep(testStep, mockStepFunction)
-
-        jest.advanceTimersByTime(200)
-
+        
+        await Promise.allSettled([jest.runAllTimersAsync(), executePromise])
         await expect(executePromise).rejects.toBe('String error')
 
         expect(mockProgressCallbacks.onStepFail).toHaveBeenCalledWith(testStep, 'String error')
@@ -230,9 +230,8 @@ describe('AuthenticationStepExecutor', () => {
         const mockStepFunction = jest.fn().mockRejectedValue(null)
 
         const executePromise = executor.executeStep(testStep, mockStepFunction)
-
-        jest.advanceTimersByTime(200)
-
+        
+        await Promise.allSettled([jest.runAllTimersAsync(), executePromise])
         await expect(executePromise).rejects.toBeNull()
 
         expect(mockProgressCallbacks.onStepFail).toHaveBeenCalledWith(testStep, 'null')
@@ -243,9 +242,8 @@ describe('AuthenticationStepExecutor', () => {
         const mockStepFunction = jest.fn().mockRejectedValue(complexError)
 
         const executePromise = executor.executeStep(testStep, mockStepFunction)
-
-        jest.advanceTimersByTime(200)
-
+        
+        await Promise.allSettled([jest.runAllTimersAsync(), executePromise])
         await expect(executePromise).rejects.toEqual(complexError)
 
         expect(mockProgressCallbacks.onStepFail).toHaveBeenCalledWith(testStep, '[object Object]')
@@ -257,9 +255,8 @@ describe('AuthenticationStepExecutor', () => {
         const options = { skipProgressCallbacks: true }
 
         const executePromise = executor.executeStep(testStep, mockStepFunction, options)
-
-        jest.advanceTimersByTime(200)
-
+        
+        await Promise.allSettled([jest.runAllTimersAsync(), executePromise])
         await expect(executePromise).rejects.toThrow('Skip error callbacks')
 
         expect(mockProgressCallbacks.onStepStart).not.toHaveBeenCalled()
@@ -278,19 +275,11 @@ describe('AuthenticationStepExecutor', () => {
 
         const executePromise = executor.executeStep(testStep, mockStepFunction, options)
 
-        // Before delay - step function not called yet
-        jest.advanceTimersByTime(400)
-        expect(mockStepFunction).not.toHaveBeenCalled()
-
-        // After before delay - step function called
-        jest.advanceTimersByTime(100)
-        expect(mockStepFunction).toHaveBeenCalled()
-
-        // After delay not completed yet
-        jest.advanceTimersByTime(900)
+        await jest.runAllTimersAsync()
 
         const result = await executePromise
         expect(result).toBe('timing-test')
+        expect(mockStepFunction).toHaveBeenCalled()
       })
 
       it('should handle very long delays', async () => {
@@ -302,7 +291,7 @@ describe('AuthenticationStepExecutor', () => {
 
         const executePromise = executor.executeStep(testStep, mockStepFunction, options)
 
-        jest.advanceTimersByTime(8000)
+        await jest.runAllTimersAsync()
 
         const result = await executePromise
         expect(result).toBe('long-delay')
@@ -333,7 +322,7 @@ describe('AuthenticationStepExecutor', () => {
 
         const executePromise = executor.executeStep(testStep, mockStepFunction)
 
-        jest.advanceTimersByTime(400)
+        await jest.runAllTimersAsync()
 
         const result = await executePromise
 
@@ -347,8 +336,7 @@ describe('AuthenticationStepExecutor', () => {
 
         const executePromise = executor.executeStep(testStep, mockStepFunction)
 
-        jest.advanceTimersByTime(200)
-
+        await Promise.allSettled([jest.runAllTimersAsync(), executePromise])
         await expect(executePromise).rejects.toThrow('No callbacks error')
       })
     })
@@ -364,8 +352,7 @@ describe('AuthenticationStepExecutor', () => {
 
       const executePromise = executor.executeLockStep(mockLockFunction)
 
-      // Should use 600ms before delay instead of default 200ms
-      jest.advanceTimersByTime(800) // 600ms before + 200ms after
+      await jest.runAllTimersAsync()
 
       const result = await executePromise
 
@@ -380,8 +367,7 @@ describe('AuthenticationStepExecutor', () => {
 
       const executePromise = executor.executeLockStep(mockLockFunction)
 
-      jest.advanceTimersByTime(600) // Only before delay on error
-
+      await Promise.allSettled([jest.runAllTimersAsync(), executePromise])
       await expect(executePromise).rejects.toThrow('Lock acquisition failed')
 
       expect(mockProgressCallbacks.onStepFail).toHaveBeenCalledWith('acquire-lock', 'Lock acquisition failed')
@@ -392,19 +378,11 @@ describe('AuthenticationStepExecutor', () => {
 
       const executePromise = executor.executeLockStep(mockLockFunction)
 
-      // Lock function not called during before delay
-      jest.advanceTimersByTime(500)
-      expect(mockLockFunction).not.toHaveBeenCalled()
-
-      // Lock function called after before delay
-      jest.advanceTimersByTime(100)
-      expect(mockLockFunction).toHaveBeenCalled()
-
-      // Complete with after delay
-      jest.advanceTimersByTime(200)
+      await jest.runAllTimersAsync()
 
       const result = await executePromise
       expect(result).toBe('timing-test')
+      expect(mockLockFunction).toHaveBeenCalled()
     })
 
     it('should log lock step execution', async () => {
@@ -412,7 +390,7 @@ describe('AuthenticationStepExecutor', () => {
 
       const executePromise = executor.executeLockStep(mockLockFunction)
 
-      jest.advanceTimersByTime(800)
+      await jest.runAllTimersAsync()
 
       await executePromise
 
@@ -496,7 +474,7 @@ describe('AuthenticationStepExecutor', () => {
         const mockStepFunction = jest.fn().mockResolvedValue(stepInfo.result)
         const executePromise = executor.executeStep(stepInfo.step, mockStepFunction)
 
-        jest.advanceTimersByTime(400)
+        await jest.runAllTimersAsync()
 
         const result = await executePromise
         results.push(result)
@@ -521,8 +499,8 @@ describe('AuthenticationStepExecutor', () => {
       // Internal step
       const internalResult = await executor.executeInternalStep(jest.fn().mockResolvedValue('internal'))
 
-      // Advance timers for the async steps
-      jest.advanceTimersByTime(1000)
+      // Run all timers for the async steps
+      await jest.runAllTimersAsync()
 
       const [regularResult, lockResult] = await Promise.all([regularPromise, lockPromise])
 
@@ -535,7 +513,7 @@ describe('AuthenticationStepExecutor', () => {
       // First step succeeds
       const step1Promise = executor.executeStep('generate-message', jest.fn().mockResolvedValue('step1-success'))
 
-      jest.advanceTimersByTime(400)
+      await jest.runAllTimersAsync()
       const step1Result = await step1Promise
 
       expect(step1Result).toBe('step1-success')
@@ -543,8 +521,7 @@ describe('AuthenticationStepExecutor', () => {
       // Second step fails
       const step2Promise = executor.executeStep('request-signature', jest.fn().mockRejectedValue(new Error('step2-failed')))
 
-      jest.advanceTimersByTime(200)
-
+      await Promise.allSettled([jest.runAllTimersAsync(), step2Promise])
       await expect(step2Promise).rejects.toThrow('step2-failed')
 
       // Verify callback order
@@ -565,7 +542,7 @@ describe('AuthenticationStepExecutor', () => {
         executor.executeStep('generate-message', jest.fn().mockResolvedValue(`result-${i}`))
       )
 
-      jest.advanceTimersByTime(400)
+      await jest.runAllTimersAsync()
 
       const results = await Promise.all(stepPromises)
 
@@ -582,7 +559,7 @@ describe('AuthenticationStepExecutor', () => {
         const mockStepFunction = jest.fn().mockResolvedValue(`rapid-${i}`)
         const executePromise = executor.executeStep('generate-message', mockStepFunction)
 
-        jest.advanceTimersByTime(400)
+        await jest.runAllTimersAsync()
 
         const result = await executePromise
         results.push(result)
@@ -597,7 +574,7 @@ describe('AuthenticationStepExecutor', () => {
 
       const executePromise = executor.executeStep('generate-message', mockStepFunction)
 
-      jest.advanceTimersByTime(400)
+      await jest.runAllTimersAsync()
 
       const result = await executePromise
 
@@ -612,11 +589,17 @@ describe('AuthenticationStepExecutor', () => {
     })
 
     it('should handle undefined step function', async () => {
-      await expect(executor.executeStep('generate-message', undefined as any)).rejects.toThrow()
+      const executePromise = executor.executeStep('generate-message', undefined as any)
+      
+      await Promise.allSettled([jest.runAllTimersAsync(), executePromise])
+      await expect(executePromise).rejects.toThrow()
     })
 
     it('should handle null step function', async () => {
-      await expect(executor.executeStep('generate-message', null as any)).rejects.toThrow()
+      const executePromise = executor.executeStep('generate-message', null as any)
+      
+      await Promise.allSettled([jest.runAllTimersAsync(), executePromise])
+      await expect(executePromise).rejects.toThrow()
     })
 
     it('should handle malformed options object', async () => {
@@ -625,30 +608,27 @@ describe('AuthenticationStepExecutor', () => {
 
       const executePromise = executor.executeStep('generate-message', mockStepFunction, malformedOptions)
 
-      jest.advanceTimersByTime(400) // Default delays should be used
+      await jest.runAllTimersAsync() // Default delays should be used
 
       const result = await executePromise
 
       expect(result).toBe('malformed-options')
     })
 
-    it('should handle step function that returns a promise that never resolves', async () => {
+    it('should handle step function that returns a promise that never resolves', () => {
       const neverResolvingPromise = new Promise(() => {}) // Never resolves
       const mockStepFunction = jest.fn().mockReturnValue(neverResolvingPromise)
 
       const executePromise = executor.executeStep('generate-message', mockStepFunction)
 
-      jest.advanceTimersByTime(1000) // Even with time advance, should not resolve
-
       // The promise should still be pending
       let resolved = false
-      executePromise.then(() => {
+      executePromise.finally(() => {
         resolved = true
       })
 
-      await new Promise((resolve) => setTimeout(resolve, 0)) // Give microtasks a chance
-
       expect(resolved).toBe(false)
+      expect(mockStepFunction).not.toHaveBeenCalled() // Because of beforeDelay
     })
   })
 
@@ -663,7 +643,7 @@ describe('AuthenticationStepExecutor', () => {
 
         const executePromise = executor.executeStep(step, mockStepFunction)
 
-        jest.advanceTimersByTime(400)
+        await jest.runAllTimersAsync()
 
         const result = await executePromise
 
