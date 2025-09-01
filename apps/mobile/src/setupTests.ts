@@ -96,18 +96,31 @@ jest.mock('wagmi', () => ({
 // Mock toast utilities
 jest.mock('./utils/toast', () => ({
   authToasts: {
-    connecting: jest.fn(),
-    walletAppGuidance: jest.fn(),
-    signingMessage: jest.fn(),
-    verifying: jest.fn(),
-    success: jest.fn(),
-    sessionError: jest.fn(),
+    walletConnected: jest.fn(),
+    authSuccess: jest.fn(),
+    walletDisconnected: jest.fn(),
+    connectionFailed: jest.fn(),
+    signatureRejected: jest.fn(),
+    networkMismatch: jest.fn(),
+    sessionRecovery: jest.fn(),
+    sessionExpired: jest.fn(),
   },
   appToasts: {
-    walletConnected: jest.fn(),
-    walletDisconnected: jest.fn(),
+    operationSuccess: jest.fn(),
+    operationFailed: jest.fn(),
+    loading: jest.fn(),
+    dataSaved: jest.fn(),
+    dataLoaded: jest.fn(),
+    validationError: jest.fn(),
+    permissionDenied: jest.fn(),
+    offline: jest.fn(),
+    online: jest.fn(),
   },
   showErrorFromAppError: jest.fn(),
+  showSuccessToast: jest.fn(),
+  showErrorToast: jest.fn(),
+  showInfoToast: jest.fn(),
+  showWarningToast: jest.fn(),
 }))
 
 // Mock Firebase auth manager
