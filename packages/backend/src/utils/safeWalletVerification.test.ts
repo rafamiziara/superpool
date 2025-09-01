@@ -41,7 +41,7 @@ describe('SafeWalletVerificationService', () => {
   const validWalletAddress = '0x1234567890123456789012345678901234567890'
   const validNonce = 'test-nonce-123'
   const validTimestamp = Date.now()
-  const validSignature = `safe-wallet:${validWalletAddress}:${validNonce}:${validTimestamp}`
+  const validSignature = `safe-wallet:${validWalletAddress}:${validNonce}:${validTimestamp}:sig:0xvalidmocksignature`
 
   beforeEach(() => {
     jest.clearAllMocks()
@@ -82,7 +82,23 @@ describe('SafeWalletVerificationService', () => {
       expect(result.verification.verificationMethod).toBe('fallback')
     })
 
-    it('should perform fallback verification for unsupported Safe versions', async () => {
+    it('should reject old format-only signatures for security', async () => {
+      const oldFormatSignature = `safe-wallet:${validWalletAddress}:${validNonce}:${validTimestamp}`
+      
+      const result = await SafeWalletVerificationService.verifySafeWalletSignature(
+        validWalletAddress,
+        oldFormatSignature,
+        validNonce,
+        validTimestamp,
+        mockProvider
+      )
+
+      expect(result.isValid).toBe(false)
+      expect(result.error).toBe(SafeWalletVerificationError.INVALID_SIGNATURE_FORMAT)
+      expect(result.warnings).toContain('Format-only signatures are no longer accepted for security reasons')
+    })
+
+    it('should perform secure fallback verification for unsupported Safe versions', async () => {
       const mockContractInstance = {
         VERSION: jest.fn().mockResolvedValue('0.5.0'), // Unsupported version
         isOwner: jest.fn(),
@@ -101,19 +117,22 @@ describe('SafeWalletVerificationService', () => {
         mockProvider
       )
 
-      expect(result.isValid).toBe(true) // Fallback should succeed for valid format
+      expect(result.isValid).toBe(false) // Secure fallback should fail by default
       expect(result.verification.verificationMethod).toBe('fallback')
       expect(result.verification.safeVersionCompatibility).toBe(false)
-      expect(result.warnings).toContain('Fallback verification used - limited security guarantees')
+      expect(result.verification.ownershipVerification).toBe(false)
+      expect(result.verification.thresholdCheck).toBe(false)
+      expect(result.warnings).toContain('Safe contract interaction failed - cannot verify ownership or threshold')
     })
 
-    it('should perform full EIP-1271 verification for supported Safe versions', async () => {
+    it('should perform full EIP-1271 verification with contract validation for supported Safe versions', async () => {
       const mockContractInstance = {
         VERSION: jest.fn().mockResolvedValue('1.4.1'), // Supported version
         isOwner: jest.fn().mockResolvedValue(true),
         getThreshold: jest.fn().mockResolvedValue(BigInt(2)),
         getOwners: jest.fn().mockResolvedValue([validWalletAddress, '0xother']),
-        isValidSignature: jest.fn().mockResolvedValue(EIP1271_MAGIC_VALUE)
+        isValidSignature: jest.fn().mockResolvedValue(EIP1271_MAGIC_VALUE),
+        target: validWalletAddress // Mock contract target property
       }
       
       mockContract.mockImplementation(() => mockContractInstance as any)
@@ -132,6 +151,11 @@ describe('SafeWalletVerificationService', () => {
       expect(result.verification.ownershipVerification).toBe(true)
       expect(result.verification.thresholdCheck).toBe(true)
       expect(result.verification.safeVersionCompatibility).toBe(true)
+      
+      // Verify contract validation was performed
+      expect(mockContractInstance.VERSION).toHaveBeenCalled()
+      expect(mockContractInstance.getThreshold).toHaveBeenCalled()
+      expect(mockContractInstance.getOwners).toHaveBeenCalled()
     })
 
     it('should fail verification when EIP-1271 signature is invalid', async () => {
@@ -140,7 +164,8 @@ describe('SafeWalletVerificationService', () => {
         isOwner: jest.fn().mockResolvedValue(true),
         getThreshold: jest.fn().mockResolvedValue(BigInt(2)),
         getOwners: jest.fn().mockResolvedValue([validWalletAddress]),
-        isValidSignature: jest.fn().mockResolvedValue('0xwrongvalue') // Wrong magic value
+        isValidSignature: jest.fn().mockResolvedValue('0xwrongvalue'), // Wrong magic value
+        target: validWalletAddress
       }
       
       mockContract.mockImplementation(() => mockContractInstance as any)
@@ -163,7 +188,8 @@ describe('SafeWalletVerificationService', () => {
         isOwner: jest.fn().mockResolvedValue(false), // Not an owner
         getThreshold: jest.fn().mockResolvedValue(BigInt(2)),
         getOwners: jest.fn().mockResolvedValue(['0xother1', '0xother2']),
-        isValidSignature: jest.fn().mockResolvedValue(EIP1271_MAGIC_VALUE)
+        isValidSignature: jest.fn().mockResolvedValue(EIP1271_MAGIC_VALUE),
+        target: validWalletAddress
       }
       
       mockContract.mockImplementation(() => mockContractInstance as any)
@@ -186,7 +212,8 @@ describe('SafeWalletVerificationService', () => {
         isOwner: jest.fn().mockResolvedValue(true),
         getThreshold: jest.fn().mockResolvedValue(BigInt(1)), // Single signature
         getOwners: jest.fn().mockResolvedValue([validWalletAddress]),
-        isValidSignature: jest.fn().mockResolvedValue(EIP1271_MAGIC_VALUE)
+        isValidSignature: jest.fn().mockResolvedValue(EIP1271_MAGIC_VALUE),
+        target: validWalletAddress
       }
       
       mockContract.mockImplementation(() => mockContractInstance as any)
@@ -211,7 +238,8 @@ describe('SafeWalletVerificationService', () => {
         isOwner: jest.fn().mockResolvedValue(true),
         getThreshold: jest.fn().mockResolvedValue(BigInt(2)),
         getOwners: jest.fn().mockResolvedValue([validWalletAddress, '0xother']),
-        isValidSignature: jest.fn().mockResolvedValue(EIP1271_MAGIC_VALUE)
+        isValidSignature: jest.fn().mockResolvedValue(EIP1271_MAGIC_VALUE),
+        target: validWalletAddress
       }
       
       mockContract.mockImplementation(() => mockContractInstance as any)
@@ -231,7 +259,7 @@ describe('SafeWalletVerificationService', () => {
       )
     })
 
-    it('should fallback to basic verification on contract interaction errors', async () => {
+    it('should use secure fallback verification on contract interaction errors', async () => {
       const mockContractInstance = {
         VERSION: jest.fn().mockRejectedValue(new Error('Network error')),
         isOwner: jest.fn(),
@@ -250,9 +278,39 @@ describe('SafeWalletVerificationService', () => {
         mockProvider
       )
 
-      expect(result.isValid).toBe(true) // Falls back to basic verification
+      expect(result.isValid).toBe(false) // Secure fallback should fail by default
       expect(result.verification.verificationMethod).toBe('fallback')
-      expect(result.warnings).toContain('Fallback verification used - limited security guarantees')
+      expect(result.warnings).toContain('Safe contract interaction failed - cannot verify ownership or threshold')
+    })
+
+    it('should reject malicious contracts that return EIP-1271 magic value without proper Safe validation', async () => {
+      const mockMaliciousContract = {
+        // Malicious contract that returns magic value but fails Safe validation
+        VERSION: jest.fn().mockResolvedValue('1.0.0'), // Looks like valid version
+        isOwner: jest.fn().mockResolvedValue(true),
+        getThreshold: jest.fn().mockResolvedValue(BigInt(0)), // Invalid threshold (should be > 0)
+        getOwners: jest.fn().mockResolvedValue([]), // Invalid empty owners array
+        isValidSignature: jest.fn().mockResolvedValue(EIP1271_MAGIC_VALUE), // Returns magic value
+        target: validWalletAddress
+      }
+      
+      mockContract.mockImplementation(() => mockMaliciousContract as any)
+
+      const result = await SafeWalletVerificationService.verifySafeWalletSignature(
+        validWalletAddress,
+        validSignature,
+        validNonce,
+        validTimestamp,
+        mockProvider
+      )
+
+      // Should reject due to failed Safe contract validation
+      expect(result.isValid).toBe(false) 
+      expect(result.verification.signatureValidation).toBe(false) // EIP-1271 should fail due to contract validation
+      
+      // Verify that contract validation functions were called
+      expect(mockMaliciousContract.getThreshold).toHaveBeenCalled()
+      expect(mockMaliciousContract.getOwners).toHaveBeenCalled()
     })
   })
 
