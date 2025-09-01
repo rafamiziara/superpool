@@ -79,6 +79,22 @@ jest.mock('../../services/deviceVerification', () => ({
   },
 }))
 
+// Mock the SafeWalletVerificationService
+const mockSafeWalletVerification = jest.fn()
+jest.mock('../../utils/safeWalletVerification', () => ({
+  SafeWalletVerificationService: {
+    verifySafeWalletSignature: mockSafeWalletVerification,
+  },
+}))
+
+// Mock the ProviderService
+const mockGetProvider = jest.fn()
+jest.mock('../../services/providerService', () => ({
+  ProviderService: {
+    getProvider: mockGetProvider,
+  },
+}))
+
 const { verifySignatureAndLoginHandler } = require('./verifySignatureAndLogin')
 const { createMockDocumentSnapshot } = require('../../utils/firestore-mock')
 
@@ -120,6 +136,45 @@ describe('verifySignatureAndLoginHandler', () => {
 
     mockCreateAuthMessage.mockReturnValue(mockMessage)
     mockCreateCustomToken.mockResolvedValue(firebaseToken)
+
+    // Mock SafeWalletVerificationService with conditional behavior
+    mockSafeWalletVerification.mockImplementation(async (walletAddr, signature) => {
+      // Check if signature format is invalid (for the specific test case)
+      if (signature === `safe-wallet:${walletAddr}:invalid:format`) {
+        return {
+          isValid: false,
+          verification: {
+            signatureValidation: false,
+            ownershipVerification: false,
+            thresholdCheck: false,
+            safeVersionCompatibility: false,
+            verificationMethod: 'fallback',
+            contractAddress: walletAddr
+          },
+          error: 'INVALID_SIGNATURE_FORMAT'
+        }
+      }
+      
+      // Default successful verification for other cases
+      return {
+        isValid: true,
+        verification: {
+          signatureValidation: true,
+          ownershipVerification: true,
+          thresholdCheck: true,
+          safeVersionCompatibility: true,
+          verificationMethod: 'eip1271',
+          contractAddress: walletAddr
+        },
+        warnings: []
+      }
+    })
+
+    // Mock ProviderService
+    mockGetProvider.mockReturnValue({
+      getNetwork: jest.fn(),
+      getBlockNumber: jest.fn()
+    })
   })
 
   afterAll(() => {
@@ -449,7 +504,7 @@ describe('verifySignatureAndLoginHandler', () => {
     }
 
     // Act & Assert
-    await expect(verifySignatureAndLoginHandler(request)).rejects.toThrow('Invalid Safe wallet authentication token')
+    await expect(verifySignatureAndLoginHandler(request)).rejects.toThrow('Signature verification failed: Safe wallet authentication failed: Safe wallet verification failed: INVALID_SIGNATURE_FORMAT')
     await expect(verifySignatureAndLoginHandler(request)).rejects.toHaveProperty('code', 'unauthenticated')
   })
 

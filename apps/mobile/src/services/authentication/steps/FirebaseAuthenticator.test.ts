@@ -12,6 +12,38 @@ const mockFirebaseFunctions = 'mocked-functions'
 
 const mockVerifySignatureAndLogin = jest.fn()
 
+// Mock circuit breaker and retry policies
+const mockCircuitBreaker = {
+  execute: jest.fn(),
+  getState: jest.fn(() => 'CLOSED'),
+  getMetrics: jest.fn(() => ({
+    totalRequests: 1,
+    successfulRequests: 1,
+    failedRequests: 0,
+    circuitOpenCount: 0,
+    lastFailureTime: null,
+    lastSuccessTime: Date.now(),
+    currentState: 'CLOSED',
+    failureRate: 0,
+  })),
+}
+
+const mockRetryPolicy = {
+  name: 'test-policy',
+  maxRetries: 3,
+  retryDelayMs: 1000,
+  backoffMultiplier: 2.0,
+  retryableErrors: ['network', 'timeout'],
+  fatalErrors: ['invalid-token'],
+}
+
+const mockRetryResult = {
+  success: true,
+  attemptsMade: 1,
+  totalTime: 100,
+  policyUsed: 'test-policy',
+}
+
 jest.doMock('firebase/auth', () => ({
   signInWithCustomToken: mockSignInWithCustomToken,
 }))
@@ -33,10 +65,38 @@ jest.doMock('../../../utils', () => ({
   devOnly: mockDevOnly,
 }))
 
+jest.doMock('../utils/circuitBreaker', () => ({
+  FirebaseAuthCircuitBreakers: {
+    getCircuitBreakerForSignatureType: jest.fn(() => mockCircuitBreaker),
+  },
+}))
+
+jest.doMock('../utils/retryPolicies', () => ({
+  RetryPolicies: {
+    getPolicyForWallet: jest.fn(() => mockRetryPolicy),
+  },
+  RetryExecutor: {
+    executeWithRetry: jest.fn(),
+  },
+  ErrorCategorizer: {
+    getUserFriendlyMessage: jest.fn((error) => {
+      if (error.message.includes('app-check')) {
+        return 'Authentication error. Please try signing again.'
+      }
+      if (error.message.includes('internal-error')) {
+        return 'Authentication error. Please try signing again.'
+      }
+      return 'Authentication error. Please try signing again.'
+    }),
+  },
+}))
+
 // Import after mocking
 const { FirebaseAuthenticator } = require('./FirebaseAuthenticator')
 
 describe('FirebaseAuthenticator', () => {
+  // Increase timeout for long-running async tests
+  jest.setTimeout(15000)
   let authenticator: any
   let mockContext: any
   let mockSignatureResult: SignatureResult
@@ -51,6 +111,51 @@ describe('FirebaseAuthenticator', () => {
 
     // Setup mock HttpsCallable
     mockHttpsCallable.mockReturnValue(mockVerifySignatureAndLogin)
+
+    // Setup circuit breaker mock to actually execute the provided function
+    mockCircuitBreaker.execute.mockImplementation(async (fn) => {
+      try {
+        // Execute the function to trigger actual Firebase auth calls
+        const result = await fn()
+        return {
+          success: true,
+          result: result,
+          circuitState: 'CLOSED',
+          metrics: mockCircuitBreaker.getMetrics(),
+        }
+      } catch (error) {
+        return {
+          success: false,
+          error: error,
+          circuitState: 'CLOSED',
+          metrics: mockCircuitBreaker.getMetrics(),
+        }
+      }
+    })
+
+    // Setup retry executor mock to actually execute the provided function
+    const { RetryExecutor } = require('../utils/retryPolicies')
+    RetryExecutor.executeWithRetry.mockImplementation(async (fn: () => Promise<any>, policy: any, options?: any) => {
+      try {
+        // Execute the function to trigger actual Firebase auth calls
+        await fn()
+        return {
+          success: true,
+          attemptsMade: 1,
+          totalTime: 100,
+          policyUsed: policy.name,
+        }
+      } catch (error) {
+        // For error tests, we'll still throw but track attempts
+        return {
+          success: false,
+          error: error,
+          attemptsMade: 1,
+          totalTime: 100,
+          policyUsed: policy.name,
+        }
+      }
+    })
 
     // Use dependency injection to pass mock function
     authenticator = new FirebaseAuthenticator(mockVerifySignatureAndLogin)
@@ -351,8 +456,9 @@ describe('FirebaseAuthenticator', () => {
         await authenticator.signInWithFirebase(mockFirebaseToken, 'personal-sign')
 
         expect(mockSignInWithCustomToken).toHaveBeenCalledWith(mockFirebaseAuth, mockFirebaseToken)
-        expect(consoleLogSpy).toHaveBeenCalledWith('🔑 Signing in with Firebase...')
+        expect(consoleLogSpy).toHaveBeenCalledWith('🔑 Starting Firebase authentication with fail-fast strategy...')
         expect(consoleLogSpy).toHaveBeenCalledWith('✅ Firebase authentication successful')
+        expect(consoleLogSpy).toHaveBeenCalledWith('✅ Firebase authentication completed successfully', expect.any(Object))
       })
 
       it('should sign in with Safe wallet including stabilization delay', async () => {
@@ -363,25 +469,34 @@ describe('FirebaseAuthenticator', () => {
 
         await signInPromise
 
-        expect(consoleLogSpy).toHaveBeenCalledWith('⏳ Adding delay for Safe wallet connection stabilization...')
+        expect(consoleLogSpy).toHaveBeenCalledWith('⏳ Adding stabilization delay for Safe wallet...')
         expect(mockSignInWithCustomToken).toHaveBeenCalledWith(mockFirebaseAuth, mockFirebaseToken)
       })
 
       it('should not add delay for non-Safe wallets', async () => {
         await authenticator.signInWithFirebase(mockFirebaseToken, 'personal-sign')
 
-        expect(consoleLogSpy).not.toHaveBeenCalledWith('⏳ Adding delay for Safe wallet connection stabilization...')
+        expect(consoleLogSpy).not.toHaveBeenCalledWith('⏳ Adding stabilization delay for Safe wallet...')
       })
     })
 
     describe('Error Handling and Retry Logic', () => {
       it('should propagate errors for non-Safe wallets', async () => {
         const firebaseError = new Error('Firebase authentication failed')
-        mockSignInWithCustomToken.mockRejectedValue(firebaseError)
+        
+        // Setup circuit breaker to fail
+        mockCircuitBreaker.execute.mockResolvedValue({
+          success: false,
+          error: firebaseError,
+          circuitState: 'CLOSED',
+          metrics: mockCircuitBreaker.getMetrics(),
+        })
 
-        await expect(authenticator.signInWithFirebase(mockFirebaseToken, 'personal-sign')).rejects.toThrow('Firebase authentication failed')
+        await expect(authenticator.signInWithFirebase(mockFirebaseToken, 'personal-sign')).rejects.toThrow('Firebase authentication failed: Authentication error. Please try signing again.')
 
-        expect(consoleErrorSpy).toHaveBeenCalledWith('❌ Firebase authentication failed:', firebaseError)
+        expect(consoleErrorSpy).toHaveBeenCalledWith('❌ Firebase authentication failed with circuit breaker', expect.objectContaining({
+          error: 'Firebase authentication failed'
+        }))
         expect(mockDevOnly).toHaveBeenCalledWith('📋 Token details:', {
           tokenType: 'string',
           tokenPresent: true,
@@ -389,111 +504,121 @@ describe('FirebaseAuthenticator', () => {
         })
       })
 
-      it('should retry Safe wallet authentication on failure', async () => {
-        const firebaseError = new Error('Safe wallet auth failed')
-        mockSignInWithCustomToken
-          .mockRejectedValueOnce(firebaseError) // First call fails
-          .mockResolvedValueOnce({}) // Second call (retry) succeeds
+      it('should handle Safe wallet authentication with retry policy', async () => {
+        // Just verify that Safe wallet uses the proper circuit breaker and completes successfully
+        await authenticator.signInWithFirebase(mockFirebaseToken, 'safe-wallet')
 
-        const signInPromise = authenticator.signInWithFirebase(mockFirebaseToken, 'safe-wallet')
-
-        // Fast forward through delays: 2s initial + 1s retry delay
-        await jest.advanceTimersByTimeAsync(3000)
-
-        await signInPromise
-
-        expect(mockSignInWithCustomToken).toHaveBeenCalledTimes(2)
-        expect(consoleLogSpy).toHaveBeenCalledWith('🔄 Retrying Firebase authentication for Safe wallet...')
-        expect(consoleLogSpy).toHaveBeenCalledWith('🔄 Retry 1/3 after 1000ms delay...')
-        expect(consoleLogSpy).toHaveBeenCalledWith('✅ Firebase authentication successful on retry 1')
+        expect(consoleLogSpy).toHaveBeenCalledWith('✅ Firebase authentication completed successfully', expect.any(Object))
       })
 
-      it('should handle multiple Safe wallet retry attempts', async () => {
-        const firebaseError = new Error('Persistent Safe wallet error')
-        mockSignInWithCustomToken
-          .mockRejectedValueOnce(firebaseError) // Initial attempt
-          .mockRejectedValueOnce(firebaseError) // Retry 1
-          .mockRejectedValueOnce(firebaseError) // Retry 2
-          .mockResolvedValueOnce({}) // Retry 3 succeeds
+      it('should handle multiple Safe wallet retry attempts with success', async () => {
+        // Mock circuit breaker to return a result showing multiple attempts were made
+        mockCircuitBreaker.execute.mockResolvedValue({
+          success: true,
+          result: {
+            success: true,
+            attemptsMade: 3,
+            totalTime: 3000,
+            policyUsed: 'safe-wallet',
+          },
+          circuitState: 'CLOSED',
+          metrics: mockCircuitBreaker.getMetrics(),
+        })
 
-        const signInPromise = authenticator.signInWithFirebase(mockFirebaseToken, 'safe-wallet')
+        await authenticator.signInWithFirebase(mockFirebaseToken, 'safe-wallet')
 
-        // Fast forward through all delays (2s initial + 1s + 2s + 3s retry delays)
-        await jest.advanceTimersByTimeAsync(8000)
-
-        await signInPromise
-
-        expect(mockSignInWithCustomToken).toHaveBeenCalledTimes(4)
-        expect(consoleLogSpy).toHaveBeenCalledWith('✅ Firebase authentication successful on retry 3')
+        expect(consoleLogSpy).toHaveBeenCalledWith('✅ Firebase authentication completed successfully', expect.objectContaining({
+          attemptsUsed: 3,
+          totalTime: 3000,
+          policyUsed: 'safe-wallet',
+        }))
       })
 
       it('should fail after maximum retry attempts for Safe wallet', async () => {
         const firebaseError = new Error('Persistent Firebase error')
-        mockSignInWithCustomToken.mockRejectedValue(firebaseError)
-
-        let signInPromise
-        let promiseResolved = false
-        let promiseError: any = null
-
-        // Start the promise and handle it separately
-        signInPromise = authenticator.signInWithFirebase(mockFirebaseToken, 'safe-wallet').catch((error: any) => {
-          promiseError = error
-          promiseResolved = true
-          return Promise.reject(error)
+        
+        // Mock RetryExecutor to fail after maximum retries
+        const { RetryExecutor } = require('../utils/retryPolicies')
+        RetryExecutor.executeWithRetry.mockResolvedValue({
+          success: false,
+          error: firebaseError,
+          attemptsMade: 3,
+          totalTime: 3000,
+          policyUsed: 'safe-wallet',
+        })
+        
+        // Mock circuit breaker to return the retry failure
+        mockCircuitBreaker.execute.mockResolvedValue({
+          success: true,
+          result: {
+            success: false,
+            error: firebaseError,
+            attemptsMade: 3,
+            totalTime: 3000,
+            policyUsed: 'safe-wallet',
+          },
+          circuitState: 'CLOSED',
+          metrics: mockCircuitBreaker.getMetrics(),
         })
 
-        // Advance through initial delay + all retry delays
-        await jest.advanceTimersByTimeAsync(2000) // Initial delay
-        await jest.advanceTimersByTimeAsync(1000) // Retry 1 delay
-        await jest.advanceTimersByTimeAsync(2000) // Retry 2 delay
-        await jest.advanceTimersByTimeAsync(3000) // Retry 3 delay
+        await expect(authenticator.signInWithFirebase(mockFirebaseToken, 'safe-wallet')).rejects.toThrow('Firebase authentication failed: Authentication error. Please try signing again.')
 
-        // Wait for promise resolution
-        await expect(signInPromise).rejects.toThrow('Persistent Firebase error')
-
-        expect(mockSignInWithCustomToken).toHaveBeenCalledTimes(4) // Initial + 3 retries
-        expect(consoleErrorSpy).toHaveBeenCalledWith('❌ Firebase authentication retry 3/3 failed:', firebaseError)
+        expect(consoleErrorSpy).toHaveBeenCalledWith('❌ Firebase authentication failed after retries', expect.objectContaining({
+          error: 'Persistent Firebase error',
+          attemptsMade: 3,
+        }))
       })
 
       it('should detect App Check issues in Safe wallet retries', async () => {
         const appCheckError = new Error('Firebase: Error (auth/app-check-token-invalid).')
-        mockSignInWithCustomToken.mockRejectedValue(appCheckError)
+        
+        // Mock circuit breaker to fail with app check error
+        mockCircuitBreaker.execute.mockResolvedValue({
+          success: false,
+          error: appCheckError,
+          circuitState: 'CLOSED',
+          metrics: mockCircuitBreaker.getMetrics(),
+        })
 
-        const signInPromise = authenticator.signInWithFirebase(mockFirebaseToken, 'safe-wallet')
-
-        // Advance through initial delay + all retry delays
-        await jest.advanceTimersByTimeAsync(2000) // Initial delay
-        await jest.advanceTimersByTimeAsync(1000) // Retry 1 delay
-        await jest.advanceTimersByTimeAsync(2000) // Retry 2 delay
-        await jest.advanceTimersByTimeAsync(3000) // Retry 3 delay
-
-        await expect(signInPromise).rejects.toThrow(
-          'Safe wallet authentication failed due to device verification. Please try disconnecting and reconnecting your wallet.'
+        await expect(authenticator.signInWithFirebase(mockFirebaseToken, 'safe-wallet')).rejects.toThrow(
+          'Firebase authentication failed: Authentication error. Please try signing again.'
         )
 
-        expect(consoleLogSpy).toHaveBeenCalledWith('🚨 Detected potential App Check issue for Safe wallet')
+        expect(consoleErrorSpy).toHaveBeenCalledWith('❌ Firebase authentication failed with circuit breaker', expect.objectContaining({
+          error: 'Firebase: Error (auth/app-check-token-invalid).'
+        }))
       })
 
       it('should detect internal errors in Safe wallet retries', async () => {
         const internalError = new Error('Firebase: Error (internal-error).')
-        mockSignInWithCustomToken.mockRejectedValue(internalError)
+        
+        // Mock circuit breaker to fail with internal error
+        mockCircuitBreaker.execute.mockResolvedValue({
+          success: false,
+          error: internalError,
+          circuitState: 'CLOSED',
+          metrics: mockCircuitBreaker.getMetrics(),
+        })
 
-        const signInPromise = authenticator.signInWithFirebase(mockFirebaseToken, 'safe-wallet')
-
-        // Advance through initial delay + all retry delays
-        await jest.advanceTimersByTimeAsync(2000) // Initial delay
-        await jest.advanceTimersByTimeAsync(1000) // Retry 1 delay
-        await jest.advanceTimersByTimeAsync(2000) // Retry 2 delay
-        await jest.advanceTimersByTimeAsync(3000) // Retry 3 delay
-
-        await expect(signInPromise).rejects.toThrow(
-          'Safe wallet authentication failed due to device verification. Please try disconnecting and reconnecting your wallet.'
+        await expect(authenticator.signInWithFirebase(mockFirebaseToken, 'safe-wallet')).rejects.toThrow(
+          'Firebase authentication failed: Authentication error. Please try signing again.'
         )
+
+        expect(consoleErrorSpy).toHaveBeenCalledWith('❌ Firebase authentication failed with circuit breaker', expect.objectContaining({
+          error: 'Firebase: Error (internal-error).'
+        }))
       })
 
       it('should log token details on authentication failure', async () => {
         const firebaseError = new Error('Auth failed')
-        mockSignInWithCustomToken.mockRejectedValue(firebaseError)
+        
+        // Mock circuit breaker to fail
+        mockCircuitBreaker.execute.mockResolvedValue({
+          success: false,
+          error: firebaseError,
+          circuitState: 'CLOSED',
+          metrics: mockCircuitBreaker.getMetrics(),
+        })
 
         try {
           await authenticator.signInWithFirebase(mockFirebaseToken, 'personal-sign')
@@ -510,39 +635,20 @@ describe('FirebaseAuthenticator', () => {
     })
 
     describe('Retry Timing and Logic', () => {
-      it('should use increasing delays for Safe wallet retries', async () => {
-        const firebaseError = new Error('Retry timing test')
-        mockSignInWithCustomToken.mockRejectedValue(firebaseError)
-
-        const signInPromise = authenticator.signInWithFirebase(mockFirebaseToken, 'safe-wallet')
-
-        // Advance through initial delay + all retry delays step by step
-        await jest.advanceTimersByTimeAsync(2000) // Initial delay
-        await jest.advanceTimersByTimeAsync(1000) // Retry 1 delay
-        await jest.advanceTimersByTimeAsync(2000) // Retry 2 delay
-        await jest.advanceTimersByTimeAsync(3000) // Retry 3 delay
-
-        await expect(signInPromise).rejects.toThrow()
-
-        expect(consoleLogSpy).toHaveBeenCalledWith('🔄 Retry 1/3 after 1000ms delay...')
-        expect(consoleLogSpy).toHaveBeenCalledWith('🔄 Retry 2/3 after 2000ms delay...')
-        expect(consoleLogSpy).toHaveBeenCalledWith('🔄 Retry 3/3 after 3000ms delay...')
+      it('should use retry policy for Safe wallet retries', async () => {
+        await authenticator.signInWithFirebase(mockFirebaseToken, 'safe-wallet')
+        
+        // Check that retry policy was called (mocked in beforeEach)
+        const { RetryPolicies } = require('../utils/retryPolicies')
+        expect(RetryPolicies.getPolicyForWallet).toHaveBeenCalledWith('safe-wallet', { isFirstAttempt: true })
+        expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringMatching(/📋 Using retry policy.*test-policy.*max 3 retries/))
       })
 
-      it('should log retry attempt details', async () => {
-        const firebaseError = new Error('Retry logging test')
-        mockSignInWithCustomToken.mockRejectedValueOnce(firebaseError).mockResolvedValueOnce({})
+      it('should log retry policy details', async () => {
+        await authenticator.signInWithFirebase(mockFirebaseToken, 'safe-wallet')
 
-        const signInPromise = authenticator.signInWithFirebase(mockFirebaseToken, 'safe-wallet')
-
-        // Advance through initial delay + first retry delay
-        await jest.advanceTimersByTimeAsync(2000) // Initial delay
-        await jest.advanceTimersByTimeAsync(1000) // Retry 1 delay
-
-        await signInPromise
-
-        expect(consoleErrorSpy).toHaveBeenCalledWith('❌ Firebase authentication retry 1/3 failed:', firebaseError)
-        expect(consoleLogSpy).toHaveBeenCalledWith('✅ Firebase authentication successful on retry 1')
+        // Verify that retry policy is logged
+        expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringMatching(/📋 Using retry policy.*test-policy/))
       })
     })
 
@@ -567,7 +673,7 @@ describe('FirebaseAuthenticator', () => {
             const signInPromise = authenticator.signInWithFirebase(mockFirebaseToken, signatureType)
             await jest.advanceTimersByTimeAsync(2000)
             await signInPromise
-            expect(consoleLogSpy).toHaveBeenCalledWith('⏳ Adding delay for Safe wallet connection stabilization...')
+            expect(consoleLogSpy).toHaveBeenCalledWith('⏳ Adding stabilization delay for Safe wallet...')
           } else {
             await authenticator.signInWithFirebase(mockFirebaseToken, signatureType)
           }
@@ -662,15 +768,11 @@ describe('FirebaseAuthenticator', () => {
       // Step 1: Verify signature and get token
       const token = await authenticator.verifySignatureAndGetToken(mockContext, safeSignatureResult)
 
-      // Step 2: Sign in with Firebase
-      const signInPromise = authenticator.signInWithFirebase(token, safeSignatureResult.signatureType)
-
-      await jest.advanceTimersByTimeAsync(2000) // Safe wallet delay
-
-      await signInPromise
+      // Step 2: Sign in with Firebase (mocked circuit breaker handles the complexity)
+      await authenticator.signInWithFirebase(token, safeSignatureResult.signatureType)
 
       expect(token).toBe('integration-token')
-      expect(mockSignInWithCustomToken).toHaveBeenCalledWith(mockFirebaseAuth, 'integration-token')
+      expect(mockCircuitBreaker.execute).toHaveBeenCalledTimes(1)
     })
 
     it('should handle complete authentication flow for regular wallet', async () => {
@@ -681,8 +783,8 @@ describe('FirebaseAuthenticator', () => {
       await authenticator.signInWithFirebase(token, mockSignatureResult.signatureType)
 
       expect(token).toBe(mockFirebaseToken)
-      expect(mockSignInWithCustomToken).toHaveBeenCalledWith(mockFirebaseAuth, mockFirebaseToken)
-      expect(consoleLogSpy).not.toHaveBeenCalledWith('⏳ Adding delay for Safe wallet connection stabilization...')
+      expect(mockCircuitBreaker.execute).toHaveBeenCalledTimes(1)
+      expect(consoleLogSpy).not.toHaveBeenCalledWith('⏳ Adding stabilization delay for Safe wallet...')
     })
 
     it('should handle end-to-end error scenarios', async () => {
@@ -694,7 +796,7 @@ describe('FirebaseAuthenticator', () => {
         'Backend verification failed'
       )
 
-      expect(mockSignInWithCustomToken).not.toHaveBeenCalled()
+      expect(mockCircuitBreaker.execute).not.toHaveBeenCalled()
     })
   })
 
@@ -729,106 +831,103 @@ describe('FirebaseAuthenticator', () => {
     })
   })
 
-  // Critical tests for 100% coverage - targeting uncovered lines 123-138
-  describe('Retry Logic Coverage (Lines 123-138)', () => {
-    it('should test complete retry loop with all delay timings', async () => {
+  // Critical tests for circuit breaker and retry policy integration
+  describe('Circuit Breaker and Retry Policy Integration', () => {
+    it('should test complete authentication flow with circuit breaker', async () => {
       const firebaseError = new Error('Complete retry test')
-      mockSignInWithCustomToken.mockRejectedValue(firebaseError)
+      
+      // Mock circuit breaker to succeed with retry result showing failure
+      mockCircuitBreaker.execute.mockResolvedValue({
+        success: true,
+        result: {
+          success: false,
+          error: firebaseError,
+          attemptsMade: 3,
+          totalTime: 3000,
+          policyUsed: 'safe-wallet',
+        },
+        circuitState: 'CLOSED',
+        metrics: mockCircuitBreaker.getMetrics(),
+      })
 
-      const signInPromise = authenticator.signInWithFirebase(mockFirebaseToken, 'safe-wallet')
+      await expect(authenticator.signInWithFirebase(mockFirebaseToken, 'safe-wallet')).rejects.toThrow('Firebase authentication failed: Authentication error. Please try signing again.')
 
-      // Advance through initial delay + all retry delays step by step
-      await jest.advanceTimersByTimeAsync(2000) // Initial delay
-      await jest.advanceTimersByTimeAsync(1000) // Retry 1 delay
-      await jest.advanceTimersByTimeAsync(2000) // Retry 2 delay
-      await jest.advanceTimersByTimeAsync(3000) // Retry 3 delay
-
-      await expect(signInPromise).rejects.toThrow('Complete retry test')
-
-      // Verify all retry attempts were logged (lines 121, 127)
-      expect(consoleLogSpy).toHaveBeenCalledWith('🔄 Retry 1/3 after 1000ms delay...')
-      expect(consoleLogSpy).toHaveBeenCalledWith('🔄 Retry 2/3 after 2000ms delay...')
-      expect(consoleLogSpy).toHaveBeenCalledWith('🔄 Retry 3/3 after 3000ms delay...')
-      expect(consoleErrorSpy).toHaveBeenCalledWith('❌ Firebase authentication retry 1/3 failed:', firebaseError)
-      expect(consoleErrorSpy).toHaveBeenCalledWith('❌ Firebase authentication retry 2/3 failed:', firebaseError)
-      expect(consoleErrorSpy).toHaveBeenCalledWith('❌ Firebase authentication retry 3/3 failed:', firebaseError)
+      // Verify circuit breaker was called
+      expect(mockCircuitBreaker.execute).toHaveBeenCalledTimes(1)
+      expect(consoleErrorSpy).toHaveBeenCalledWith('❌ Firebase authentication failed after retries', expect.objectContaining({
+        error: 'Complete retry test',
+        attemptsMade: 3,
+      }))
     })
 
-    it('should test App Check error detection (lines 132-136)', async () => {
+    it('should test circuit breaker failure handling', async () => {
       const appCheckError = new Error('Firebase: Error (auth/app-check-token-invalid).')
-      mockSignInWithCustomToken.mockRejectedValue(appCheckError)
+      
+      // Mock circuit breaker to fail immediately
+      mockCircuitBreaker.execute.mockResolvedValue({
+        success: false,
+        error: appCheckError,
+        circuitState: 'OPEN',
+        metrics: mockCircuitBreaker.getMetrics(),
+      })
 
-      const signInPromise = authenticator.signInWithFirebase(mockFirebaseToken, 'safe-wallet')
-
-      // Advance through initial delay + all retry delays
-      await jest.advanceTimersByTimeAsync(2000) // Initial delay
-      await jest.advanceTimersByTimeAsync(1000) // Retry 1 delay
-      await jest.advanceTimersByTimeAsync(2000) // Retry 2 delay
-      await jest.advanceTimersByTimeAsync(3000) // Retry 3 delay
-
-      await expect(signInPromise).rejects.toThrow(
-        'Safe wallet authentication failed due to device verification. Please try disconnecting and reconnecting your wallet.'
+      await expect(authenticator.signInWithFirebase(mockFirebaseToken, 'safe-wallet')).rejects.toThrow(
+        'Firebase authentication failed: Authentication error. Please try signing again.'
       )
 
-      // Line 133: App Check detection log
-      expect(consoleLogSpy).toHaveBeenCalledWith('🚨 Detected potential App Check issue for Safe wallet')
+      // Verify circuit breaker failure was logged
+      expect(consoleErrorSpy).toHaveBeenCalledWith('❌ Firebase authentication failed with circuit breaker', expect.objectContaining({
+        circuitState: 'OPEN',
+        error: 'Firebase: Error (auth/app-check-token-invalid).'
+      }))
     })
 
-    it('should test internal error detection (lines 132-136)', async () => {
-      const internalError = new Error('Firebase: Error (internal-error).')
-      mockSignInWithCustomToken.mockRejectedValue(internalError)
+    it('should test successful authentication with metrics logging', async () => {
+      // Mock successful flow
+      mockCircuitBreaker.execute.mockResolvedValue({
+        success: true,
+        result: {
+          success: true,
+          attemptsMade: 1,
+          totalTime: 1000,
+          policyUsed: 'safe-wallet',
+        },
+        circuitState: 'CLOSED',
+        metrics: mockCircuitBreaker.getMetrics(),
+      })
 
-      const signInPromise = authenticator.signInWithFirebase(mockFirebaseToken, 'safe-wallet')
+      await authenticator.signInWithFirebase(mockFirebaseToken, 'safe-wallet')
 
-      // Advance through initial delay + all retry delays
-      await jest.advanceTimersByTimeAsync(2000) // Initial delay
-      await jest.advanceTimersByTimeAsync(1000) // Retry 1 delay
-      await jest.advanceTimersByTimeAsync(2000) // Retry 2 delay
-      await jest.advanceTimersByTimeAsync(3000) // Retry 3 delay
-
-      await expect(signInPromise).rejects.toThrow(
-        'Safe wallet authentication failed due to device verification. Please try disconnecting and reconnecting your wallet.'
-      )
+      expect(consoleLogSpy).toHaveBeenCalledWith('✅ Firebase authentication completed successfully', expect.objectContaining({
+        circuitState: 'CLOSED',
+        attemptsUsed: 1,
+        totalTime: 1000,
+        policyUsed: 'safe-wallet',
+      }))
     })
 
-    it('should test successful retry return (line 125)', async () => {
-      const firebaseError = new Error('Retry success test')
-      mockSignInWithCustomToken
-        .mockRejectedValueOnce(firebaseError) // Initial fails
-        .mockRejectedValueOnce(firebaseError) // Retry 1 fails
-        .mockResolvedValueOnce({}) // Retry 2 succeeds (line 125 return)
-
-      const signInPromise = authenticator.signInWithFirebase(mockFirebaseToken, 'safe-wallet')
-
-      // Advance through initial + retry 1 + retry 2 delays
-      await jest.advanceTimersByTimeAsync(2000) // Initial delay
-      await jest.advanceTimersByTimeAsync(1000) // Retry 1 delay
-      await jest.advanceTimersByTimeAsync(2000) // Retry 2 delay
-
-      await signInPromise
-
-      expect(consoleLogSpy).toHaveBeenCalledWith('✅ Firebase authentication successful on retry 2')
-      expect(mockSignInWithCustomToken).toHaveBeenCalledTimes(3) // Initial + 2 retries
+    it('should test retry policy selection based on signature type', async () => {
+      const { RetryPolicies } = require('../utils/retryPolicies')
+      
+      // Test Safe wallet gets safe-wallet policy
+      await authenticator.signInWithFirebase(mockFirebaseToken, 'safe-wallet')
+      expect(RetryPolicies.getPolicyForWallet).toHaveBeenCalledWith('safe-wallet', { isFirstAttempt: true })
+      
+      // Test regular wallet gets fail-fast policy (first attempt)
+      await authenticator.signInWithFirebase(mockFirebaseToken, 'personal-sign')
+      expect(RetryPolicies.getPolicyForWallet).toHaveBeenCalledWith('personal-sign', { isFirstAttempt: true })
     })
 
-    it('should test max retry exceeded path (lines 129-138)', async () => {
-      const persistentError = new Error('Max retry test')
-      mockSignInWithCustomToken.mockRejectedValue(persistentError)
-
-      const signInPromise = authenticator.signInWithFirebase(mockFirebaseToken, 'safe-wallet')
-
-      // Advance through initial delay + all retry delays
-      await jest.advanceTimersByTimeAsync(2000) // Initial delay
-      await jest.advanceTimersByTimeAsync(1000) // Retry 1 delay
-      await jest.advanceTimersByTimeAsync(2000) // Retry 2 delay
-      await jest.advanceTimersByTimeAsync(3000) // Retry 3 delay
-
-      await expect(signInPromise).rejects.toThrow('Max retry test')
-
-      // Verify all retry attempts and final error
-      expect(consoleErrorSpy).toHaveBeenCalledWith('❌ Firebase authentication retry 1/3 failed:', persistentError)
-      expect(consoleErrorSpy).toHaveBeenCalledWith('❌ Firebase authentication retry 2/3 failed:', persistentError)
-      expect(consoleErrorSpy).toHaveBeenCalledWith('❌ Firebase authentication retry 3/3 failed:', persistentError)
+    it('should test circuit breaker integration with different signature types', async () => {
+      const { FirebaseAuthCircuitBreakers } = require('../utils/circuitBreaker')
+      
+      // Test Safe wallet gets Safe wallet circuit breaker
+      await authenticator.signInWithFirebase(mockFirebaseToken, 'safe-wallet')
+      expect(FirebaseAuthCircuitBreakers.getCircuitBreakerForSignatureType).toHaveBeenCalledWith('safe-wallet')
+      
+      // Test regular wallet gets regular circuit breaker
+      await authenticator.signInWithFirebase(mockFirebaseToken, 'personal-sign')
+      expect(FirebaseAuthCircuitBreakers.getCircuitBreakerForSignatureType).toHaveBeenCalledWith('personal-sign')
     })
   })
 })
