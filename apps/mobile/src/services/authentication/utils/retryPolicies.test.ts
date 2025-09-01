@@ -306,9 +306,8 @@ describe('RetryExecutor', () => {
       const startTime = Date.now()
       const resultPromise = RetryExecutor.executeWithRetry(mockFn, testPolicy)
       
-      // Fast-forward through the delays
-      jest.advanceTimersByTime(100) // First retry delay: 100ms
-      jest.advanceTimersByTime(200) // Second retry delay: 200ms (100 * 2^1)
+      // Fast-forward through the delays using async timer execution
+      await jest.runAllTimersAsync()
       
       const result = await resultPromise
 
