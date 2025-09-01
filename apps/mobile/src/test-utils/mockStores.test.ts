@@ -11,10 +11,10 @@ import { UIStore } from '../stores/UIStore'
 import { WalletStore } from '../stores/WalletStore'
 import {
   createMockAuthenticationStore,
-  createMockWalletStore,
   createMockPoolManagementStore,
-  createMockUIStore,
   createMockRootStore,
+  createMockUIStore,
+  createMockWalletStore,
   mockStorePresets,
 } from './mockStores'
 

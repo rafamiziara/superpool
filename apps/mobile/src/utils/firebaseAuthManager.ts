@@ -1,5 +1,5 @@
 import { FirebaseAuthState } from '@superpool/types'
-import { User, onAuthStateChanged } from 'firebase/auth'
+import { onAuthStateChanged, User } from 'firebase/auth'
 import { FIREBASE_AUTH } from '../firebase.config'
 import { ValidationUtils } from './ValidationUtils'
 

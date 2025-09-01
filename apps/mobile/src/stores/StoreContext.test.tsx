@@ -7,15 +7,15 @@ import React from 'react'
 import { Text } from 'react-native'
 import { render, renderHook } from '@testing-library/react-native'
 import {
+  rootStore,
   StoreContext,
   StoreProvider,
-  useStore,
   useAuthenticationStore,
-  useWalletStore,
   usePoolManagementStore,
-  useUIStore,
+  useStore,
   useStores,
-  rootStore,
+  useUIStore,
+  useWalletStore,
 } from './StoreContext'
 import { RootStore } from './RootStore'
 

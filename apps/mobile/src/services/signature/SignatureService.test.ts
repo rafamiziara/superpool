@@ -1,4 +1,4 @@
-import { SignatureRequest, SignatureResult, SignatureFunctions } from '@superpool/types'
+import { SignatureFunctions, SignatureRequest, SignatureResult } from '@superpool/types'
 import type { Connector } from 'wagmi'
 import { devOnly } from '../../utils'
 import { SignatureStrategyFactory, SignatureUtils } from './strategies'

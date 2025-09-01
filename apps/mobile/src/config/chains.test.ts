@@ -100,8 +100,6 @@ describe('chains configuration', () => {
 
   describe('chain configuration integrity', () => {
     it('should maintain readonly chain configuration', () => {
-      const originalName = localhost.name
-
       // Try to modify (should not affect original due to 'as const')
       expect(() => {
         ;(localhost as any).name = 'Modified'

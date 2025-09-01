@@ -1,6 +1,6 @@
-import type { SignatureRequest, SignatureResult, SignatureFunctions } from '@superpool/types'
+import type { SignatureFunctions, SignatureRequest, SignatureResult } from '@superpool/types'
 import type { Connector } from 'wagmi'
-import type { SignatureStrategy, SignatureConfig } from './SignatureStrategy'
+import type { SignatureConfig, SignatureStrategy } from './SignatureStrategy'
 
 describe('SignatureStrategy Interface', () => {
   let mockRequest: SignatureRequest

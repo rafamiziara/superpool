@@ -1,5 +1,5 @@
 import React, { ReactElement } from 'react'
-import { render, RenderOptions, RenderResult, renderHook } from '@testing-library/react-native'
+import { render, renderHook, RenderOptions, RenderResult } from '@testing-library/react-native'
 import { TestStoreProvider } from './testProviders'
 import { RootStore } from '../stores/RootStore'
 import { createMockRootStore } from './mockStores'

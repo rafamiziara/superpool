@@ -1,8 +1,8 @@
 import {
+  CircuitBreakerConfig,
   CircuitBreakerState,
   FirebaseAuthCircuitBreaker,
-  FirebaseAuthCircuitBreakers,
-  CircuitBreakerConfig
+  FirebaseAuthCircuitBreakers
 } from './circuitBreaker'
 
 describe('FirebaseAuthCircuitBreaker', () => {

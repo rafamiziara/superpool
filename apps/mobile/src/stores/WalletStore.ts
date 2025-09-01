@@ -1,4 +1,4 @@
-import { makeAutoObservable, action } from 'mobx'
+import { action, makeAutoObservable } from 'mobx'
 
 export interface AtomicConnectionState {
   isConnected: boolean

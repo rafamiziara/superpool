@@ -1,6 +1,6 @@
 import {
-  ErrorCategory,
   ErrorCategorizer,
+  ErrorCategory,
   RetryExecutor,
   RetryPolicies,
   RetryPolicy
@@ -303,7 +303,6 @@ describe('RetryExecutor', () => {
         .mockRejectedValueOnce(new Error('network error'))
         .mockResolvedValueOnce('success')
 
-      const startTime = Date.now()
       const resultPromise = RetryExecutor.executeWithRetry(mockFn, testPolicy)
       
       // Fast-forward through the delays using async timer execution

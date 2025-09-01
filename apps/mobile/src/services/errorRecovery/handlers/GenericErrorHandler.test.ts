@@ -1,5 +1,5 @@
 import { ErrorType } from '../../../utils/errorHandling'
-import { GenericErrorHandler, GenericErrorContext } from './GenericErrorHandler'
+import { GenericErrorContext, GenericErrorHandler } from './GenericErrorHandler'
 import { RecoveryActions } from './ErrorHandler'
 
 // Mock the utility functions

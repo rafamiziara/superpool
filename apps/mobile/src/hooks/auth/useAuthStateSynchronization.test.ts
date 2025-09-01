@@ -53,8 +53,6 @@ const createMockDisconnectedAccount = () => ({
 })
 
 // Mock dependencies
-const mockSignOut = jest.fn()
-
 jest.mock('../../firebase.config', () => ({
   FIREBASE_AUTH: {
     signOut: jest.fn(),

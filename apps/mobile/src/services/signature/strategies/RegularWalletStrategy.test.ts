@@ -1,6 +1,6 @@
 import { RegularWalletStrategy } from './RegularWalletStrategy'
 import { SignatureUtils } from './SignatureUtils'
-import type { SignatureRequest, SignatureFunctions, SignatureResult } from '@superpool/types'
+import type { SignatureFunctions, SignatureRequest } from '@superpool/types'
 import type { Connector } from 'wagmi'
 
 // Mock SignatureUtils

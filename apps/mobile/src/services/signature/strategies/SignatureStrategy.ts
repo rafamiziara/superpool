@@ -1,4 +1,4 @@
-import type { SignatureRequest, SignatureResult, SignatureFunctions } from '@superpool/types'
+import type { SignatureFunctions, SignatureRequest, SignatureResult } from '@superpool/types'
 import type { Connector } from 'wagmi'
 
 /**

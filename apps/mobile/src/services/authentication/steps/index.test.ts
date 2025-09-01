@@ -15,25 +15,21 @@ import * as AuthStepsIndex from './index'
 import {
   AuthenticationStepExecutor,
   AuthenticationValidator,
-  ValidationContext,
   FirebaseAuthenticator,
-  SignatureVerificationContext,
-  MessageGenerator,
   GeneratedAuthMessage,
-  SignatureHandler,
+  MessageGenerator,
   SignatureContext,
+  SignatureHandler,
+  SignatureVerificationContext,
+  ValidationContext,
 } from './index'
 
 // Direct imports for comparison
 import { AuthenticationStepExecutor as DirectAuthenticationStepExecutor } from './AuthenticationStepExecutor'
 import { AuthenticationValidator as DirectAuthenticationValidator } from './AuthenticationValidator'
-import type { ValidationContext as DirectValidationContext } from './AuthenticationValidator'
 import { FirebaseAuthenticator as DirectFirebaseAuthenticator } from './FirebaseAuthenticator'
-import type { SignatureVerificationContext as DirectSignatureVerificationContext } from './FirebaseAuthenticator'
 import { MessageGenerator as DirectMessageGenerator } from './MessageGenerator'
-import type { GeneratedAuthMessage as DirectGeneratedAuthMessage } from './MessageGenerator'
 import { SignatureHandler as DirectSignatureHandler } from './SignatureHandler'
-import type { SignatureContext as DirectSignatureContext } from './SignatureHandler'
 
 describe('Authentication Steps Index Exports', () => {
   describe('Export Availability', () => {
@@ -367,7 +363,6 @@ describe('Authentication Steps Index Exports', () => {
   describe('Cross-Module Integration', () => {
     it('should allow classes to work together through index exports', async () => {
       const stepExecutor = new AuthenticationStepExecutor()
-      const messageGenerator = new MessageGenerator()
 
       // Mock Firebase function
       jest.doMock('firebase/functions', () => ({

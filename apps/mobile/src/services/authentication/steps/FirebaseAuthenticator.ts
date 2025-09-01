@@ -1,6 +1,6 @@
 import type { SignatureResult } from '@superpool/types'
 import { signInWithCustomToken } from 'firebase/auth'
-import { httpsCallable, HttpsCallable } from 'firebase/functions'
+import { HttpsCallable, httpsCallable } from 'firebase/functions'
 import { Platform } from 'react-native'
 import { FIREBASE_AUTH, FIREBASE_FUNCTIONS } from '../../../firebase.config'
 import { devOnly } from '../../../utils'

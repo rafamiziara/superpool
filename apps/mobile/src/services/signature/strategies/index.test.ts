@@ -1,16 +1,16 @@
 // Test all exports from the barrel index file
 import * as StrategiesIndex from './index'
 import {
-  SignatureStrategy,
-  SignatureConfig,
-  SignatureUtils,
-  SafeWalletStrategy,
   RegularWalletStrategy,
+  SafeWalletStrategy,
+  SignatureConfig,
+  SignatureStrategy,
   SignatureStrategyFactory,
+  SignatureUtils,
 } from './index'
 
 // Direct imports for comparison
-import { SignatureStrategy as DirectSignatureStrategy, SignatureConfig as DirectSignatureConfig } from './SignatureStrategy'
+import { SignatureConfig as DirectSignatureConfig, SignatureStrategy as DirectSignatureStrategy } from './SignatureStrategy'
 import { SignatureUtils as DirectSignatureUtils } from './SignatureUtils'
 import { SafeWalletStrategy as DirectSafeWalletStrategy } from './SafeWalletStrategy'
 import { RegularWalletStrategy as DirectRegularWalletStrategy } from './RegularWalletStrategy'

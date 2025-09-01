@@ -1,5 +1,5 @@
 import { AuthMessage } from '@superpool/types'
-import { httpsCallable, HttpsCallable } from 'firebase/functions'
+import { HttpsCallable, httpsCallable } from 'firebase/functions'
 import { FIREBASE_FUNCTIONS } from '../../../firebase.config'
 
 export type GeneratedAuthMessage = AuthMessage

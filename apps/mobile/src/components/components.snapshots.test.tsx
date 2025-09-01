@@ -1,5 +1,5 @@
 import React from 'react'
-import { render, renderWithStore, mockStorePresets } from '../test-utils'
+import { mockStorePresets, render, renderWithStore } from '../test-utils'
 import { LoadingSpinner } from './LoadingSpinner'
 import { ProgressIndicator } from './ProgressIndicator'
 import { AuthProgressIndicator } from './AuthProgressIndicator'

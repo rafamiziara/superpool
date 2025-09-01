@@ -474,7 +474,6 @@ describe('useAuthSessionRecovery', () => {
       const { result } = renderHookWithStore(() => useAuthSessionRecovery(), { store: mockStore })
 
       let firstRecoveryPromise: any
-      let secondRecoveryResult: any
 
       // Test concurrent calls within act to capture the behavior
       await act(async () => {
@@ -482,7 +481,7 @@ describe('useAuthSessionRecovery', () => {
         firstRecoveryPromise = result.current.triggerRecovery()
 
         // Try second recovery immediately after first
-        secondRecoveryResult = result.current.triggerRecovery()
+        result.current.triggerRecovery()
 
         // Wait for first recovery to complete
         await firstRecoveryPromise
