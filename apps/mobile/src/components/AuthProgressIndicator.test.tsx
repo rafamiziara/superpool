@@ -88,9 +88,9 @@ describe('AuthProgressIndicator', () => {
 
       const { getByTestId } = renderWithStore(<AuthProgressIndicator />, { store: mockStore })
 
-      // Initially no current step
+      // Initially no current step (connect-wallet is completed by default in mock)
       let progressStats = getByTestId('progress-stats')
-      expect(progressStats.props.children).toEqual([0, ' of ', 6, ' completed']) // No steps completed initially
+      expect(progressStats.props.children).toEqual([1, ' of ', 6, ' completed']) // connect-wallet completed by default
 
       // Start a step
       act(() => {
@@ -110,7 +110,7 @@ describe('AuthProgressIndicator', () => {
       await waitForMobX()
 
       progressStats = getByTestId('progress-stats')
-      expect(progressStats.props.children).toEqual([1, ' of ', 6, ' completed']) // generate-message completed
+      expect(progressStats.props.children).toEqual([2, ' of ', 6, ' completed']) // connect-wallet + generate-message completed
     })
 
     it('should update progress indicator when currentStep changes', async () => {
@@ -180,7 +180,7 @@ describe('AuthProgressIndicator', () => {
       await waitForMobX()
 
       const progressStats = getByTestId('progress-stats')
-      expect(progressStats.props.children).toEqual([2, ' of ', 6, ' completed']) // 2 steps completed
+      expect(progressStats.props.children).toEqual([3, ' of ', 6, ' completed']) // connect-wallet + generate-message + request-signature completed
     })
 
     it('should handle edge case with all steps completed', async () => {
