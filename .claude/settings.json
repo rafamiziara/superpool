@@ -1,12 +1,11 @@
 {
   "hooks": {
-    "PreToolUse": [
+    "Stop": [
       {
-        "matcher": "Edit|Write|Bash",
         "hooks": [
           {
             "type": "command",
-            "command": "type .claude\\commands\\quality.md 2>nul || cat .claude/commands/quality.md"
+            "command": "node .claude/hooks/check-quality.js"
           }
         ]
       }
