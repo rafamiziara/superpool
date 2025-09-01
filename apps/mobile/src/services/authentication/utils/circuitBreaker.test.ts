@@ -115,7 +115,7 @@ describe('FirebaseAuthCircuitBreaker', () => {
       expect(circuitBreaker.getState()).toBe(CircuitBreakerState.OPEN)
 
       // Fast-forward past recovery timeout
-      jest.advanceTimersByTime(testConfig.recoveryTimeout)
+      await jest.runAllTimersAsync()
 
       // Next request should transition to HALF_OPEN
       const successFn = jest.fn().mockResolvedValue('success')
@@ -130,7 +130,7 @@ describe('FirebaseAuthCircuitBreaker', () => {
       const errorFn = jest.fn().mockRejectedValue(new Error('error'))
       await circuitBreaker.execute(errorFn)
       await circuitBreaker.execute(errorFn)
-      jest.advanceTimersByTime(testConfig.recoveryTimeout)
+      await jest.runAllTimersAsync()
 
       const successFn = jest.fn().mockResolvedValue('success')
       
@@ -151,7 +151,7 @@ describe('FirebaseAuthCircuitBreaker', () => {
       const errorFn = jest.fn().mockRejectedValue(new Error('error'))
       await circuitBreaker.execute(errorFn)
       await circuitBreaker.execute(errorFn)
-      jest.advanceTimersByTime(testConfig.recoveryTimeout)
+      await jest.runAllTimersAsync()
 
       // Transition to HALF_OPEN
       const successFn = jest.fn().mockResolvedValue('success')
@@ -168,7 +168,7 @@ describe('FirebaseAuthCircuitBreaker', () => {
       const errorFn = jest.fn().mockRejectedValue(new Error('error'))
       await circuitBreaker.execute(errorFn)
       await circuitBreaker.execute(errorFn)
-      jest.advanceTimersByTime(testConfig.recoveryTimeout)
+      await jest.runAllTimersAsync()
 
       const successFn = jest.fn().mockResolvedValue('success')
       await circuitBreaker.execute(successFn) // First request allowed
