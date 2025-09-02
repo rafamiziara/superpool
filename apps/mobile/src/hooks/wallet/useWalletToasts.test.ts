@@ -1,12 +1,17 @@
 import { EventEmitter } from 'events'
 import { useAccount } from 'wagmi'
 import { createMockRootStore, renderHookWithStore } from '../../test-utils'
-import { authToasts } from '../../utils/toast'
+import { createMockAuthToasts } from '../../__mocks__/factories/utilFactory'
 import { useWalletToasts } from './useWalletToasts'
 
-// wagmi and toast utils are already mocked in setupTests.ts
+// wagmi is already mocked in setupTests.ts
 const mockUseAccount = useAccount as jest.MockedFunction<typeof useAccount>
-const mockAuthToasts = authToasts as jest.Mocked<typeof authToasts>
+const mockAuthToasts = createMockAuthToasts()
+
+// Mock the toast utils module
+jest.doMock('../../utils/toast', () => ({
+  authToasts: mockAuthToasts,
+}))
 
 // Helper function to create mock account states with proper typing
 const createMockAccountState = (overrides = {}) =>

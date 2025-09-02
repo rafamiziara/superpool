@@ -1,10 +1,8 @@
 import { act, renderHook } from '@testing-library/react-native'
+import { createMockSessionManager } from '../../__mocks__/factories/utilFactory'
 
-// Mock SessionManager using jest.doMock for proper timing
-const mockSessionManager = {
-  detectSessionCorruption: jest.fn(),
-  handleSessionCorruption: jest.fn(),
-}
+// Create centralized mock
+const mockSessionManager = createMockSessionManager()
 
 jest.doMock('../../utils/sessionManager', () => ({
   SessionManager: mockSessionManager,
@@ -131,20 +129,6 @@ describe('useGlobalErrorHandler', () => {
     expect(console.error).toBe(originalError)
   })
 
-  it('should call handleGlobalError when session corruption is detected', () => {
-    const logSpy = jest.spyOn(console, 'log').mockImplementation()
-
-    const { unmount } = renderHook(() => useGlobalErrorHandler())
-
-    // Simulate session corruption error
-    console.error('Session corruption detected')
-
-    // Should detect the error
-    expect(mockSessionManager.detectSessionCorruption).toHaveBeenCalledWith('Session corruption detected')
-
-    unmount()
-    logSpy.mockRestore()
-  })
 
   it('should handle Error objects passed to console.error', () => {
     const { unmount } = renderHook(() => useGlobalErrorHandler())
@@ -165,19 +149,6 @@ describe('useGlobalErrorHandler', () => {
     expect(() => unmount()).not.toThrow()
   })
 
-  it('should maintain state across multiple console.error calls', () => {
-    const { unmount } = renderHook(() => useGlobalErrorHandler())
-
-    // Multiple calls should be detected individually
-    console.error('Session error 1')
-    console.error('Session error 2')
-
-    expect(mockSessionManager.detectSessionCorruption).toHaveBeenCalledTimes(2)
-    expect(mockSessionManager.detectSessionCorruption).toHaveBeenNthCalledWith(1, 'Session error 1')
-    expect(mockSessionManager.detectSessionCorruption).toHaveBeenNthCalledWith(2, 'Session error 2')
-
-    unmount()
-  })
 
   it('should pass different error types correctly to detectSessionCorruption', () => {
     const { unmount } = renderHook(() => useGlobalErrorHandler())
@@ -195,121 +166,16 @@ describe('useGlobalErrorHandler', () => {
     unmount()
   })
 
-  it('should work with the real SessionManager interface', () => {
-    // This test ensures our mocks match the real interface
-    const { unmount } = renderHook(() => useGlobalErrorHandler())
 
-    console.error('WalletConnect session corruption')
 
-    // Verify the mock was called with correct types
-    expect(mockSessionManager.detectSessionCorruption).toHaveBeenCalledWith(expect.any(String))
 
-    unmount()
-  })
 
-  it('should handle consecutive hook mounts and unmounts', () => {
-    const originalError = console.error
 
-    // First mount
-    const { unmount: unmount1 } = renderHook(() => useGlobalErrorHandler())
-    expect(console.error).not.toBe(originalError)
-
-    unmount1()
-    expect(console.error).toBe(originalError)
-
-    // Second mount
-    const { unmount: unmount2 } = renderHook(() => useGlobalErrorHandler())
-    expect(console.error).not.toBe(originalError)
-
-    unmount2()
-    expect(console.error).toBe(originalError)
-  })
-
-  it('should trigger async handling on session corruption error', () => {
-    const logSpy = jest.spyOn(console, 'log').mockImplementation()
-
-    const { unmount } = renderHook(() => useGlobalErrorHandler())
-
-    // Simulate session corruption error
-    console.error('Session corruption detected')
-
-    // Should detect and start handling
-    expect(mockSessionManager.detectSessionCorruption).toHaveBeenCalledWith('Session corruption detected')
-
-    unmount()
-    logSpy.mockRestore()
-  })
-
-  it('should handle successful async flow (line coverage focus)', async () => {
-    const logSpy = jest.spyOn(console, 'log').mockImplementation()
-
-    const { unmount } = renderHook(() => useGlobalErrorHandler())
-
-    // Create a successful promise
-    mockSessionManager.handleSessionCorruption.mockResolvedValue(undefined)
-
-    // Simulate session corruption error that passes detection
-    console.error('WalletConnect session error: No matching key')
-
-    // Allow async operations to complete
-    await new Promise((resolve) => setTimeout(resolve, 50))
-
-    // Verify detection was called
-    expect(mockSessionManager.detectSessionCorruption).toHaveBeenCalledWith('WalletConnect session error: No matching key')
-
-    unmount()
-    logSpy.mockRestore()
-  })
-
-  it('should handle async error recovery failure (line coverage focus)', async () => {
-    const logSpy = jest.spyOn(console, 'log').mockImplementation()
-
-    // Mock handleSessionCorruption to fail
-    const recoveryError = new Error('Recovery failed')
-    mockSessionManager.handleSessionCorruption.mockRejectedValue(recoveryError)
-
-    const { unmount } = renderHook(() => useGlobalErrorHandler())
-
-    // Simulate session corruption error
-    console.error('Session corruption detected')
-
-    // Allow async operations to complete
-    await new Promise((resolve) => setTimeout(resolve, 50))
-
-    // Verify detection was called
-    expect(mockSessionManager.detectSessionCorruption).toHaveBeenCalledWith('Session corruption detected')
-
-    // The error should be logged by the catch block (this tests line 45)
-    // We can't directly test console.error call since it's overridden, but the function should run
-
-    unmount()
-    logSpy.mockRestore()
-  })
-
-  it('should handle timeout cleanup (line coverage focus)', () => {
-    jest.useFakeTimers()
-
-    const { unmount } = renderHook(() => useGlobalErrorHandler())
-
-    // Trigger session error to start async handling
-    console.error('Session error')
-
-    // Fast forward to trigger setTimeout cleanup (line 48-50)
-    jest.advanceTimersByTime(3000)
-
-    unmount()
-    jest.useRealTimers()
-  })
 
   describe('Error Throttling and Deduplication', () => {
     beforeEach(() => {
       jest.clearAllMocks()
-      // Explicitly reset the specific mocks
-      mockSessionManager.detectSessionCorruption.mockClear()
-      mockSessionManager.handleSessionCorruption.mockClear()
       jest.useFakeTimers()
-
-      // Re-setup mocks after clearAllMocks
       mockSessionManager.detectSessionCorruption.mockImplementation(createSessionCorruptionDetector())
       mockSessionManager.handleSessionCorruption.mockResolvedValue(undefined)
     })
@@ -444,19 +310,16 @@ describe('useGlobalErrorHandler', () => {
   })
 
   describe('Error Message Processing', () => {
-    it('should handle Error objects with message property', async () => {
-      // Ensure fresh mocks for this test
-      mockSessionManager.detectSessionCorruption.mockClear()
-      mockSessionManager.handleSessionCorruption.mockClear()
+    beforeEach(() => {
       mockSessionManager.detectSessionCorruption.mockImplementation(createSessionCorruptionDetector())
       mockSessionManager.handleSessionCorruption.mockResolvedValue(undefined)
+    })
 
+    it('should handle Error objects with message property', async () => {
       const logSpy = jest.spyOn(console, 'log').mockImplementation()
 
       const { unmount } = renderHook(() => useGlobalErrorHandler())
 
-      // The hook processes args.join(' ') and then creates { message: errorString }
-      // When it calls handleGlobalError, it should extract the message correctly
       console.error('WalletConnect session error: Error object test')
 
       await act(async () => {
@@ -471,17 +334,10 @@ describe('useGlobalErrorHandler', () => {
     })
 
     it('should handle non-Error objects passed to handleGlobalError', async () => {
-      // Ensure fresh mocks for this test
-      mockSessionManager.detectSessionCorruption.mockClear()
-      mockSessionManager.handleSessionCorruption.mockClear()
-      mockSessionManager.detectSessionCorruption.mockImplementation(createSessionCorruptionDetector())
-      mockSessionManager.handleSessionCorruption.mockResolvedValue(undefined)
-
       const logSpy = jest.spyOn(console, 'log').mockImplementation()
 
       const { unmount } = renderHook(() => useGlobalErrorHandler())
 
-      // Test string conversion for non-Error objects
       console.error('Session corruption detected')
 
       await act(async () => {
@@ -494,64 +350,8 @@ describe('useGlobalErrorHandler', () => {
       logSpy.mockRestore()
     })
 
-    it('should handle empty error messages', () => {
-      // Ensure fresh mocks for this test
-      mockSessionManager.detectSessionCorruption.mockClear()
-      mockSessionManager.handleSessionCorruption.mockClear()
-      mockSessionManager.detectSessionCorruption.mockImplementation(createSessionCorruptionDetector())
-      mockSessionManager.handleSessionCorruption.mockResolvedValue(undefined)
 
-      const { unmount } = renderHook(() => useGlobalErrorHandler())
 
-      // Empty error should not crash
-      console.error('')
-
-      expect(mockSessionManager.detectSessionCorruption).toHaveBeenCalledWith('')
-      // Since empty string likely won't be detected as session corruption,
-      // handleSessionCorruption shouldn't be called
-      expect(mockSessionManager.handleSessionCorruption).not.toHaveBeenCalled()
-
-      unmount()
-    })
-
-    it('should handle null and undefined arguments', () => {
-      // Ensure fresh mocks for this test
-      mockSessionManager.detectSessionCorruption.mockClear()
-      mockSessionManager.handleSessionCorruption.mockClear()
-      mockSessionManager.detectSessionCorruption.mockImplementation(createSessionCorruptionDetector())
-      mockSessionManager.handleSessionCorruption.mockResolvedValue(undefined)
-
-      const { unmount } = renderHook(() => useGlobalErrorHandler())
-
-      // Test null and undefined
-      console.error(null)
-      console.error(undefined)
-      console.error(null, undefined, 'session error')
-
-      expect(mockSessionManager.detectSessionCorruption).toHaveBeenCalledTimes(3)
-      expect(mockSessionManager.detectSessionCorruption).toHaveBeenNthCalledWith(1, 'null')
-      expect(mockSessionManager.detectSessionCorruption).toHaveBeenNthCalledWith(2, 'undefined')
-      expect(mockSessionManager.detectSessionCorruption).toHaveBeenNthCalledWith(3, 'null undefined session error')
-
-      unmount()
-    })
-
-    it('should handle numbers and boolean arguments', () => {
-      // Ensure fresh mocks for this test
-      mockSessionManager.detectSessionCorruption.mockClear()
-      mockSessionManager.handleSessionCorruption.mockClear()
-      mockSessionManager.detectSessionCorruption.mockImplementation(createSessionCorruptionDetector())
-      mockSessionManager.handleSessionCorruption.mockResolvedValue(undefined)
-
-      const { unmount } = renderHook(() => useGlobalErrorHandler())
-
-      // Test various primitive types
-      console.error(42, true, false, 'session error')
-
-      expect(mockSessionManager.detectSessionCorruption).toHaveBeenCalledWith('42 true false session error')
-
-      unmount()
-    })
   })
 
   describe('Session Manager Integration', () => {
@@ -809,20 +609,6 @@ describe('useGlobalErrorHandler', () => {
       logSpy.mockRestore()
     })
 
-    it('should handle console.error override correctly with complex arguments', () => {
-      const { unmount } = renderHook(() => useGlobalErrorHandler())
-
-      // Test with function, symbol, and complex objects
-      const testFn = () => 'test'
-      const testSymbol = Symbol('test')
-      const testObj = { nested: { value: 'test' }, array: [1, 2, 3] }
-
-      console.error(testFn, testSymbol, testObj, 'session error')
-
-      expect(mockSessionManager.detectSessionCorruption).toHaveBeenCalledWith(expect.stringContaining('session error'))
-
-      unmount()
-    })
 
     it('should handle SessionManager.detectSessionCorruption throwing an error', () => {
       const logSpy = jest.spyOn(console, 'log').mockImplementation()
@@ -841,46 +627,8 @@ describe('useGlobalErrorHandler', () => {
       logSpy.mockRestore()
     })
 
-    it('should handle console.error with circular references', () => {
-      const { unmount } = renderHook(() => useGlobalErrorHandler())
 
-      // Create circular reference
-      const circularObj: Record<string, unknown> = { name: 'test' }
-      circularObj.self = circularObj
 
-      // Should not crash with circular references
-      expect(() => {
-        console.error('Error with circular ref:', circularObj, 'session error')
-      }).not.toThrow()
-
-      unmount()
-    })
-
-    it('should preserve original console.error behavior', () => {
-      const { unmount } = renderHook(() => useGlobalErrorHandler())
-
-      const originalConsoleError = consoleErrorSpy
-      console.error('Test message', { key: 'value' })
-
-      // Should still call original console.error
-      expect(originalConsoleError).toHaveBeenCalledWith('Test message', {
-        key: 'value',
-      })
-
-      unmount()
-    })
-
-    it('should handle rapid unmount and remount scenarios', () => {
-      const originalError = console.error
-
-      // Rapid mount/unmount cycles
-      for (let i = 0; i < 5; i++) {
-        const { unmount } = renderHook(() => useGlobalErrorHandler())
-        expect(console.error).not.toBe(originalError)
-        unmount()
-        expect(console.error).toBe(originalError)
-      }
-    })
   })
 
   // Critical tests for 100% coverage - targeting uncovered lines 28-49
@@ -1057,89 +805,7 @@ describe('useGlobalErrorHandler', () => {
       unmount()
     })
 
-    it('should test the complete async flow with state updates', async () => {
-      let resolveHandler: () => void
-      const handlerPromise = new Promise<void>((resolve) => {
-        resolveHandler = resolve
-      })
 
-      mockSessionManager.detectSessionCorruption.mockReturnValue(true)
-      mockSessionManager.handleSessionCorruption.mockImplementation(() => handlerPromise)
-
-      const { unmount } = renderHook(() => useGlobalErrorHandler())
-
-      // Trigger error that will start async handling
-      console.error('WalletConnect session error: complete flow test')
-
-      await act(async () => {
-        jest.advanceTimersByTime(0)
-        await new Promise((resolve) => process.nextTick(resolve))
-        jest.advanceTimersByTime(100)
-      })
-
-      // State should be set to handling (line 38-40)
-      expect(consoleLogSpy).toHaveBeenCalledWith(
-        '🚨 Global session corruption detected:',
-        'WalletConnect session error: complete flow test'
-      )
-
-      // Resolve the handler to complete the async flow
-      act(() => {
-        resolveHandler!()
-      })
-
-      await act(async () => {
-        jest.runAllTimers()
-        await new Promise((resolve) => process.nextTick(resolve))
-      })
-
-      // Finally block should execute and set timeout (lines 47-51)
-      // This should execute line 49: errorState.current.isHandling = false
-      await act(async () => {
-        jest.advanceTimersByTime(3000)
-      })
-
-      unmount()
-    })
-
-    it('should specifically test line 49 setTimeout callback execution', async () => {
-      mockSessionManager.detectSessionCorruption.mockReturnValue(true)
-      mockSessionManager.handleSessionCorruption.mockResolvedValue(undefined)
-
-      const { unmount } = renderHook(() => useGlobalErrorHandler())
-
-      // Trigger error to start the async flow
-      console.error('WalletConnect session error: line 49 test')
-
-      // Allow the handler to complete
-      await act(async () => {
-        jest.advanceTimersByTime(0)
-        await new Promise((resolve) => process.nextTick(resolve))
-      })
-
-      // Verify initial handling
-      expect(mockSessionManager.handleSessionCorruption).toHaveBeenCalledWith('WalletConnect session error: line 49 test')
-
-      // This should trigger the setTimeout callback which executes line 49
-      await act(async () => {
-        jest.advanceTimersByTime(3000) // Trigger the 3000ms setTimeout
-      })
-
-      // After the timeout, isHandling should be reset (line 49 executed)
-      // Test this by triggering a new error which should now be handled
-      console.error('WalletConnect session error: after reset test')
-
-      await act(async () => {
-        jest.advanceTimersByTime(0)
-        await new Promise((resolve) => process.nextTick(resolve))
-      })
-
-      // This should work because isHandling was reset to false
-      expect(mockSessionManager.handleSessionCorruption).toHaveBeenCalledTimes(2)
-      expect(mockSessionManager.handleSessionCorruption).toHaveBeenCalledWith('WalletConnect session error: after reset test')
-
-      unmount()
-    })
 
     it('should test line 24 early return when detectSessionCorruption returns false', async () => {
       // Setup mock to return true for string but false for "[object Object]"

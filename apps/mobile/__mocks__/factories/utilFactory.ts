@@ -85,3 +85,39 @@ export const createMockStorage = (
   getAllKeys: jest.fn(() => Promise.resolve([])),
   ...overrides,
 })
+
+// Session Manager Factory
+export const createMockSessionManager = (
+  overrides: Partial<{
+    detectSessionCorruption: jest.Mock
+    handleSessionCorruption: jest.Mock
+  }> = {}
+) => ({
+  detectSessionCorruption: jest.fn(() => false),
+  handleSessionCorruption: jest.fn(() => Promise.resolve()),
+  ...overrides,
+})
+
+// Auth Toasts Factory
+export const createMockAuthToasts = (
+  overrides: Partial<{
+    walletConnected: jest.Mock
+    authSuccess: jest.Mock
+    walletDisconnected: jest.Mock
+    connectionFailed: jest.Mock
+    signatureRejected: jest.Mock
+    networkMismatch: jest.Mock
+    sessionRecovery: jest.Mock
+    sessionExpired: jest.Mock
+  }> = {}
+) => ({
+  walletConnected: jest.fn(),
+  authSuccess: jest.fn(),
+  walletDisconnected: jest.fn(),
+  connectionFailed: jest.fn(),
+  signatureRejected: jest.fn(),
+  networkMismatch: jest.fn(),
+  sessionRecovery: jest.fn(),
+  sessionExpired: jest.fn(),
+  ...overrides,
+})
