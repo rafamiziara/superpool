@@ -4,6 +4,7 @@
  */
 
 import { act } from '@testing-library/react-native'
+import { useAccount } from 'wagmi'
 import { createMockRootStore, renderHookWithStore } from '../../test-utils'
 import { useAuthSessionRecovery } from './useAuthSessionRecovery'
 
@@ -65,9 +66,7 @@ jest.mock('../../utils', () => ({
   },
 }))
 
-jest.mock('wagmi', () => ({
-  useAccount: jest.fn(() => createMockDisconnectedAccount()),
-}))
+// wagmi hooks are already mocked in setupTests.ts
 
 // Mock Firebase auth hook
 const mockFirebaseAuth = {
@@ -87,7 +86,7 @@ const mockSignOut = require('../../firebase.config').FIREBASE_AUTH.signOut as je
 const mockIsValidWalletAddress = require('../../utils').ValidationUtils.isValidWalletAddress as jest.MockedFunction<
   (address: string) => boolean
 >
-const mockUseAccount = require('wagmi').useAccount as jest.MockedFunction<typeof import('wagmi').useAccount>
+const mockUseAccount = useAccount as jest.MockedFunction<typeof useAccount>
 
 describe('useAuthSessionRecovery', () => {
   let mockStore: ReturnType<typeof createMockRootStore>

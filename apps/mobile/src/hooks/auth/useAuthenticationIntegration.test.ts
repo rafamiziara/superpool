@@ -5,6 +5,7 @@
 
 import { act } from '@testing-library/react-native'
 import type { Connector } from 'wagmi'
+import { useAccount, useSignMessage, useSignTypedData, useDisconnect } from 'wagmi'
 import { createMockRootStore, renderHookWithStore } from '../../test-utils'
 import { useAuthenticationIntegration } from './useAuthenticationIntegration'
 
@@ -69,37 +70,18 @@ jest.mock('../../firebase.config', () => ({
   },
 }))
 
-// Mock wagmi hooks
+// wagmi hooks are already mocked in setupTests.ts - just get typed references
+const mockUseAccount = useAccount as jest.MockedFunction<typeof useAccount>
+const mockUseSignMessage = useSignMessage as jest.MockedFunction<typeof useSignMessage>
+const mockUseSignTypedData = useSignTypedData as jest.MockedFunction<typeof useSignTypedData>
+const mockUseDisconnect = useDisconnect as jest.MockedFunction<typeof useDisconnect>
+
+// Extract mock functions for easier testing
 const mockSignMessageAsync = jest.fn()
 const mockSignTypedDataAsync = jest.fn()
 const mockDisconnect = jest.fn()
 
-jest.mock('wagmi', () => ({
-  useAccount: jest.fn(() => ({
-    isConnected: false,
-    address: undefined,
-    chain: createMockChain(1, 'Ethereum'),
-    addresses: undefined,
-    chainId: undefined,
-    connector: undefined,
-    isReconnecting: false,
-    isConnecting: false,
-    isDisconnected: true,
-    status: 'disconnected',
-  })),
-  useSignMessage: jest.fn(() => ({
-    signMessageAsync: mockSignMessageAsync,
-  })),
-  useSignTypedData: jest.fn(() => ({
-    signTypedDataAsync: mockSignTypedDataAsync,
-  })),
-  useDisconnect: jest.fn(() => ({
-    disconnect: mockDisconnect,
-  })),
-}))
-
 // Mock references
-const mockUseAccount = require('wagmi').useAccount as jest.MockedFunction<typeof import('wagmi').useAccount>
 const AuthenticationOrchestratorMock = require('../../services/authentication').AuthenticationOrchestrator as jest.MockedFunction<
   new (
     authStore: import('../../stores/AuthenticationStore').AuthenticationStore,

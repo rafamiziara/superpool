@@ -10,7 +10,7 @@ import { createMockRootStore, renderHookWithStore } from '../../test-utils'
 import { AuthStep } from '@superpool/types'
 import { AppError, ErrorType } from '../../utils/errorHandling'
 
-// Mock Firebase auth hook
+// Firebase auth hook mock - using inline since this is hook-specific state
 const mockFirebaseAuth = {
   isAuthenticated: false,
   isLoading: false,
