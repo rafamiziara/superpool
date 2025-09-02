@@ -1,11 +1,16 @@
 import { FirebaseAuthState } from '@superpool/types'
 import { renderHook } from '@testing-library/react-native'
 import { User } from 'firebase/auth'
-import { firebaseAuthManager } from '../../utils/firebaseAuthManager'
+import { createMockFirebaseAuthManager } from '../../__mocks__/factories/utilFactory'
 import { useFirebaseAuth } from './useFirebaseAuth'
 
-// The firebaseAuthManager is already mocked in setupTests.ts
-const mockManager = firebaseAuthManager as jest.Mocked<typeof firebaseAuthManager>
+// Create centralized mock
+const mockManager = createMockFirebaseAuthManager()
+
+// Mock the firebaseAuthManager module
+jest.doMock('../../utils/firebaseAuthManager', () => ({
+  firebaseAuthManager: mockManager,
+}))
 
 describe('useFirebaseAuth', () => {
   beforeEach(() => {

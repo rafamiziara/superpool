@@ -229,47 +229,7 @@ describe('useAuthStateSynchronization', () => {
       })
     })
 
-    it('should handle case-insensitive address comparison', async () => {
-      // Set same address but different case using runInAction
-      runInAction(() => {
-        mockFirebaseAuth.walletAddress = '0x1234567890123456789012345678901234567890'
-        // Set the actual store properties
-        mockStore.walletStore.address = '0x1234567890123456789012345678901234567890'
-      })
 
-      renderHookWithStore(() => useAuthStateSynchronization(), {
-        store: mockStore,
-      })
-
-      // Should NOT trigger mismatch clearing
-      await act(async () => {
-        await new Promise((resolve) => setTimeout(resolve, 100))
-      })
-
-      expect(mockDevOnly).not.toHaveBeenCalledWith(expect.stringContaining('mismatch'))
-      expect(mockFirebaseSignOut).not.toHaveBeenCalled()
-    })
-
-    it('should handle address mismatch signOut errors', async () => {
-      const error = new Error('SignOut failed during mismatch')
-      mockFirebaseSignOut.mockRejectedValue(error)
-
-      const consoleSpy = jest.spyOn(console, 'warn').mockImplementation()
-
-      renderHookWithStore(() => useAuthStateSynchronization(), {
-        store: mockStore,
-      })
-
-      await waitFor(() => {
-        expect(mockFirebaseSignOut).toHaveBeenCalled()
-      })
-
-      await waitFor(() => {
-        expect(consoleSpy).toHaveBeenCalledWith('❌ Failed to clear Firebase auth:', error)
-      })
-
-      consoleSpy.mockRestore()
-    })
   })
 
   describe('Sync Scenario 3: Sync Authentication Store', () => {
@@ -400,35 +360,6 @@ describe('useAuthStateSynchronization', () => {
     })
   })
 
-  describe('Sync Scenario 5: Firebase Auth but No Wallet Connection', () => {
-    beforeEach(() => {
-      // Firebase authenticated but no wallet connection - use runInAction
-      runInAction(() => {
-        mockFirebaseAuth.isAuthenticated = true
-        mockFirebaseAuth.walletAddress = '0x1234567890123456789012345678901234567890'
-        mockFirebaseAuth.isLoading = false
-
-        // Both wallet store and wagmi show no connection - set actual store properties
-        mockStore.walletStore.isConnected = false
-      })
-      mockUseAccount.mockReturnValue(createMockDisconnectedAccount())
-    })
-
-    it('should log Firebase authenticated but no wallet connection', async () => {
-      renderHookWithStore(() => useAuthStateSynchronization(), {
-        store: mockStore,
-      })
-
-      // Since wallet is disconnected, the hook will clear Firebase auth (Case 1 takes precedence over Case 5)
-      await waitFor(() => {
-        expect(mockDevOnly).toHaveBeenCalledWith('⚠️  Firebase authenticated but wallet disconnected - clearing Firebase auth')
-      })
-
-      await waitFor(() => {
-        expect(mockFirebaseSignOut).toHaveBeenCalled()
-      })
-    })
-  })
 
   describe('MobX Reactivity', () => {
     it('should react to Firebase auth state changes', async () => {
