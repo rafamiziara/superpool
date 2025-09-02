@@ -1,5 +1,5 @@
 import React from 'react'
-import { render } from '../test-utils'
+import { render } from '@mocks/factories/testFactory'
 import { LoadingSpinner } from './LoadingSpinner'
 
 describe('LoadingSpinner', () => {

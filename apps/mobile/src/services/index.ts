@@ -1,3 +1,4 @@
+/* istanbul ignore file */
 // Main services exports for backward compatibility and easy imports
 
 // Authentication services

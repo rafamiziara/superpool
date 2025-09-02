@@ -1,7 +1,7 @@
 import { FirebaseAuthState } from '@superpool/types'
 import { renderHook } from '@testing-library/react-native'
 import { User } from 'firebase/auth'
-import { createMockFirebaseAuthManager } from '../../__mocks__/factories/utilFactory'
+import { createMockFirebaseAuthManager } from '@mocks/factories/serviceFactory'
 import { useFirebaseAuth } from './useFirebaseAuth'
 
 // Create centralized mock

@@ -5,7 +5,7 @@
 
 import { act } from '@testing-library/react-native'
 import { useAccount } from 'wagmi'
-import { createMockRootStore, renderHookWithStore } from '../../test-utils'
+import { createMockRootStore, renderHookWithStore } from '@mocks/factories/testFactory'
 import { useAuthSessionRecovery } from './useAuthSessionRecovery'
 
 // Create proper Chain type mock

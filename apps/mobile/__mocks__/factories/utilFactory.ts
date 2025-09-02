@@ -41,33 +41,9 @@ export const createMockToast = (
   ...overrides,
 })
 
-// Firebase Auth Manager Factory
-export const createMockFirebaseAuthManager = (
-  overrides: Partial<{
-    getCurrentState: jest.Mock
-    addListener: jest.Mock
-    isAuthenticated: boolean
-    user: unknown
-  }> = {}
-) => ({
-  getCurrentState: jest.fn(() => ({
-    user: null,
-    isLoading: false,
-    isAuthenticated: false,
-    walletAddress: null,
-    ...overrides,
-  })),
-  addListener: jest.fn((callback) => {
-    callback({
-      user: null,
-      isLoading: false,
-      isAuthenticated: false,
-      walletAddress: null,
-      ...overrides,
-    })
-    return jest.fn() // cleanup function
-  }),
-})
+// Firebase Auth Manager Factory - moved to serviceFactory.ts
+// Re-export for backward compatibility
+export { createMockFirebaseAuthManager } from './serviceFactory'
 
 // Storage Factory (AsyncStorage/SecureStore)
 export const createMockStorage = (

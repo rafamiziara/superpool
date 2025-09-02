@@ -1,6 +1,6 @@
 import { AuthenticationStore } from './AuthenticationStore'
 import { AppError, ErrorType } from '../utils/errorHandling'
-import { waitForMobX } from '../test-utils'
+import { waitForMobX } from '@mocks/factories/testFactory'
 
 describe('AuthenticationStore', () => {
   let store: AuthenticationStore

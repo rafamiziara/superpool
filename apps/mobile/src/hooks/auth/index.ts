@@ -1,3 +1,4 @@
+/* istanbul ignore file */
 // Authentication domain hooks
 export { useAuthentication } from './useAuthentication'
 export type { Authentication } from './useAuthentication'

@@ -6,7 +6,7 @@
 import { act } from '@testing-library/react-native'
 import { runInAction } from 'mobx'
 import { useAuthentication } from './useAuthentication'
-import { createMockRootStore, renderHookWithStore } from '../../test-utils'
+import { createMockRootStore, renderHookWithStore } from '@mocks/factories/testFactory'
 import { AuthStep } from '@superpool/types'
 import { AppError, ErrorType } from '../../utils/errorHandling'
 

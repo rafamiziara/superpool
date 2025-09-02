@@ -1,4 +1,4 @@
-import { renderHookWithStore } from '../../test-utils'
+import { renderHookWithStore } from '@mocks/factories/testFactory'
 import { useAccount } from 'wagmi'
 import { useWalletConnectionTrigger } from './useWalletConnectionTrigger'
 

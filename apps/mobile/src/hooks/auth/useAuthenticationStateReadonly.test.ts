@@ -5,7 +5,7 @@
 
 import { runInAction } from 'mobx'
 import { useAuthenticationStateReadonly } from './useAuthenticationStateReadonly'
-import { createMockRootStore, renderHookWithStore } from '../../test-utils'
+import { createMockRootStore, renderHookWithStore } from '@mocks/factories/testFactory'
 import { AppError, ErrorType } from '../../utils/errorHandling'
 
 // Mock Firebase auth hook

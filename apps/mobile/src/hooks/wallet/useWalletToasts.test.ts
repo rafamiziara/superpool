@@ -1,7 +1,7 @@
 import { EventEmitter } from 'events'
 import { useAccount } from 'wagmi'
-import { createMockRootStore, renderHookWithStore } from '../../test-utils'
-import { createMockAuthToasts } from '../../__mocks__/factories/utilFactory'
+import { createMockRootStore, renderHookWithStore } from '@mocks/factories/testFactory'
+import { createMockAuthToasts } from '@mocks/factories/utilFactory'
 import { useWalletToasts } from './useWalletToasts'
 
 // wagmi is already mocked in setupTests.ts
