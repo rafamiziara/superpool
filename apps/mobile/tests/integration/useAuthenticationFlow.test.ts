@@ -6,20 +6,20 @@
  */
 
 import { act, renderHook, waitFor } from '@testing-library/react-native'
-import { useAuthentication } from './useAuthentication'
-import { useAuthenticationIntegration } from './useAuthenticationIntegration'
-import { useAuthSessionRecovery } from './useAuthSessionRecovery'
-import { useAuthStateSynchronization } from './useAuthStateSynchronization'
+import { useAuthentication } from '../../src/hooks/auth/useAuthentication'
+import { useAuthenticationIntegration } from '../../src/hooks/auth/useAuthenticationIntegration'
+import { useAuthSessionRecovery } from '../../src/hooks/auth/useAuthSessionRecovery'
+import { useAuthStateSynchronization } from '../../src/hooks/auth/useAuthStateSynchronization'
 
 // Mock dependencies
-jest.mock('../../firebase.config', () => ({
+jest.mock('../../src/firebase.config', () => ({
   FIREBASE_AUTH: {
     currentUser: null,
     signOut: jest.fn(() => Promise.resolve()),
   },
 }))
 
-jest.mock('../../utils', () => ({
+jest.mock('../../src/utils', () => ({
   devOnly: jest.fn(),
   ValidationUtils: {
     isValidWalletAddress: jest.fn((address: string) => /^0x[a-fA-F0-9]{40}$/.test(address)),
@@ -108,7 +108,7 @@ const mockWalletStore = {
   updateConnectionState: jest.fn(),
 }
 
-jest.mock('../../stores', () => ({
+jest.mock('../../src/stores', () => ({
   useStores: () => ({
     authenticationStore: mockAuthStore,
     walletStore: mockWalletStore,
