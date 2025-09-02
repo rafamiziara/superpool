@@ -14,7 +14,7 @@ import {
   SecureLogger,
   warn,
 } from './secureLogger'
-import { LOG_LEVELS } from './constants'
+import { LOG_LEVELS } from '../config/constants'
 
 // Mock __DEV__ global
 type GlobalWithDev = typeof global & { __DEV__?: boolean }

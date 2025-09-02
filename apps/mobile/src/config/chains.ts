@@ -33,26 +33,3 @@ export const localhost: Chain = {
   testnet: true,
 } as const
 
-/**
- * Get chain configuration based on environment
- */
-export function getChainConfig() {
-  return {
-    localhost,
-    // Add other custom chain configurations here if needed
-  }
-}
-
-/**
- * Check if we're running against localhost
- */
-export function isLocalhost(chainId: number): boolean {
-  return chainId === localhost.id
-}
-
-/**
- * Get RPC URL for localhost
- */
-export function getLocalhostRpcUrl(): string {
-  return localhost.rpcUrls.default.http[0]
-}

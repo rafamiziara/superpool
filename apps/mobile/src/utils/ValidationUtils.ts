@@ -1,4 +1,4 @@
-import { AUTH_VALIDATION, SIGNATURE_FORMATS, SUPPORTED_CHAIN_IDS, WALLET_ADDRESS_FORMAT } from './constants'
+import { AUTH_VALIDATION, SIGNATURE_FORMATS, SUPPORTED_CHAIN_IDS, WALLET_ADDRESS_FORMAT } from '../config/constants'
 
 /**
  * Common validation utilities for service layer operations

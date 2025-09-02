@@ -6,7 +6,7 @@ import {
   SESSION_ID_PATTERNS,
   SESSION_TIMEOUTS,
   WALLETCONNECT_SESSION_KEY,
-} from './constants'
+} from '../config/constants'
 
 // Type definitions for session data
 type SessionDataValue = string | number | boolean | null | object | undefined

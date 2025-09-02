@@ -1,4 +1,4 @@
-import { LOG_LEVELS } from './constants'
+import { LOG_LEVELS } from '../config/constants'
 
 /**
  * Secure logging utility that prevents sensitive data exposure in production
