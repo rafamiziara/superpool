@@ -1,5 +1,5 @@
 import { act, renderHook } from '@testing-library/react-native'
-import { createMockSessionManager } from '../../__mocks__/factories/utilFactory'
+import { createMockSessionManager } from '@mocks/factories/utilFactory'
 
 // Create centralized mock
 const mockSessionManager = createMockSessionManager()
@@ -129,7 +129,6 @@ describe('useGlobalErrorHandler', () => {
     expect(console.error).toBe(originalError)
   })
 
-
   it('should handle Error objects passed to console.error', () => {
     const { unmount } = renderHook(() => useGlobalErrorHandler())
 
@@ -149,7 +148,6 @@ describe('useGlobalErrorHandler', () => {
     expect(() => unmount()).not.toThrow()
   })
 
-
   it('should pass different error types correctly to detectSessionCorruption', () => {
     const { unmount } = renderHook(() => useGlobalErrorHandler())
 
@@ -165,12 +163,6 @@ describe('useGlobalErrorHandler', () => {
 
     unmount()
   })
-
-
-
-
-
-
 
   describe('Error Throttling and Deduplication', () => {
     beforeEach(() => {
@@ -349,9 +341,6 @@ describe('useGlobalErrorHandler', () => {
       unmount()
       logSpy.mockRestore()
     })
-
-
-
   })
 
   describe('Session Manager Integration', () => {
@@ -609,7 +598,6 @@ describe('useGlobalErrorHandler', () => {
       logSpy.mockRestore()
     })
 
-
     it('should handle SessionManager.detectSessionCorruption throwing an error', () => {
       const logSpy = jest.spyOn(console, 'log').mockImplementation()
       mockSessionManager.detectSessionCorruption.mockImplementation(() => {
@@ -626,9 +614,6 @@ describe('useGlobalErrorHandler', () => {
       unmount()
       logSpy.mockRestore()
     })
-
-
-
   })
 
   // Critical tests for 100% coverage - targeting uncovered lines 28-49
@@ -804,8 +789,6 @@ describe('useGlobalErrorHandler', () => {
 
       unmount()
     })
-
-
 
     it('should test line 24 early return when detectSessionCorruption returns false', async () => {
       // Setup mock to return true for string but false for "[object Object]"

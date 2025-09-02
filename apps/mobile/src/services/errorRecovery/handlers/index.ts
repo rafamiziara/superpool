@@ -1,3 +1,4 @@
+/* istanbul ignore file */
 // Error recovery modules for clean separation of concerns and error handling
 // Re-export shared types from @superpool/types for convenience
 export { ErrorRecoveryResult, ErrorType, SessionErrorContext } from '@superpool/types'

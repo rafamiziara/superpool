@@ -6,8 +6,8 @@
 import { act, waitFor } from '@testing-library/react-native'
 import { runInAction } from 'mobx'
 import { useAccount } from 'wagmi'
-import { createMockRootStore, renderHookWithStore } from '../../test-utils'
-import { createMockFirebaseAuthManager } from '../../__mocks__/factories/utilFactory'
+import { createMockRootStore, renderHookWithStore } from '@mocks/factories/testFactory'
+import { createMockFirebaseAuthManager } from '@mocks/factories/utilFactory'
 import { AppError, ErrorType } from '../../utils/errorHandling'
 import { useAuthStateSynchronization, useAuthStateValidation } from './useAuthStateSynchronization'
 
@@ -228,8 +228,6 @@ describe('useAuthStateSynchronization', () => {
         expect(mockDevOnly).toHaveBeenCalledWith('✅ Firebase auth cleared due to address mismatch')
       })
     })
-
-
   })
 
   describe('Sync Scenario 3: Sync Authentication Store', () => {
@@ -359,7 +357,6 @@ describe('useAuthStateSynchronization', () => {
       expect(mockDevOnly).not.toHaveBeenCalledWith(expect.stringContaining('authentication may be needed'))
     })
   })
-
 
   describe('MobX Reactivity', () => {
     it('should react to Firebase auth state changes', async () => {

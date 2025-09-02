@@ -1,8 +1,7 @@
 import { AuthStep } from '@superpool/types'
 import { act } from '@testing-library/react-native'
 import React from 'react'
-import { createMockRootStore } from '../__mocks__/factories/storeFactory'
-import { renderWithStore, waitForMobX } from '../test-utils'
+import { createMockRootStore, renderWithStore, waitForMobX } from '@mocks/factories/testFactory'
 import { AuthProgressIndicator } from './AuthProgressIndicator'
 
 describe('AuthProgressIndicator', () => {

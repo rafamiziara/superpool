@@ -2,7 +2,7 @@
 
 ## 🏗️ **Mock Architecture Overview**
 
-Our centralized mock system eliminates duplication and provides consistent, maintainable mocks across all tests. The system follows a factory pattern for flexibility while maintaining simplicity.
+Our centralized mock system eliminates duplication and provides consistent, maintainable mocks across all tests. The system follows Jest best practices with a pure factory pattern for maximum flexibility and performance.
 
 ---
 
@@ -10,7 +10,7 @@ Our centralized mock system eliminates duplication and provides consistent, main
 
 ```
 apps/mobile/__mocks__/
-├── index.ts                    # Central registry
+├── index.ts                    # Central registry - single import point
 ├── external/                   # External library mocks
 │   ├── asyncStorage.ts       # React Native AsyncStorage
 │   ├── firebase.ts           # Firebase services
@@ -20,34 +20,155 @@ apps/mobile/__mocks__/
 │   ├── stores.ts             # MobX store mocks
 │   ├── services.ts           # Service layer mocks
 │   └── utils.ts              # Utility function mocks
-└── factories/                  # Mock factory functions
+└── factories/                  # Mock factory functions (MAIN)
     ├── storeFactory.ts       # Store mock factories
     ├── serviceFactory.ts     # Service mock factories
-    └── utilFactory.ts        # Utility mock factories
+    ├── utilFactory.ts        # Utility mock factories
+    └── testFactory.ts        # Test helpers & render functions
 ```
+
+## ✨ **Key Benefits**
+
+- **🚀 Performance**: Simple factory objects vs heavy MobX instances
+- **🎯 Consistency**: Single source of truth for all mocks
+- **📦 Jest Compliance**: Follows `__mocks__` convention
+- **🔧 Maintainable**: Easy to update and extend
+- **🧪 Predictable**: Clear factory patterns everyone understands
 
 ---
 
 ## 🎭 **Mock Categories**
 
-### **1. External Library Mocks**
+## 🗺️ **How to Use the Mock System**
 
-Mock third-party dependencies to control their behavior in tests.
+### **Primary Import Pattern**
+
+```typescript
+// ✅ CORRECT: Import everything from the centralized system
+import { 
+  createMockRootStore, 
+  renderWithStore, 
+  renderHookWithStore,
+  waitForMobX,
+  mockStorePresets 
+} from '../__mocks__/factories/testFactory'
+
+// ✅ Also correct: Import specific factories
+import { createMockAuthenticationStore } from '../__mocks__/factories/storeFactory'
+import { createMockFirebaseAuthManager } from '../__mocks__/factories/serviceFactory'
+```
+
+### **⚠️ Avoid These Patterns**
+
+```typescript
+// ❌ WRONG: Don't import from test-utils (removed)
+import { createMockRootStore } from '../test-utils'
+
+// ❌ WRONG: Don't create inline mocks
+const mockStore = {
+  auth: { isAuthenticated: false },
+  wallet: { isConnected: false }
+}
+```
+
+---
+
+## 🎨 **Factory Categories**
+
+### **1. Test Factories (testFactory.ts)** - **Your Main Tools**
+
+Render functions and test utilities - this is what you'll use 90% of the time.
+
+#### **Component Testing**
+
+```typescript
+import { renderWithStore, mockStorePresets } from '../__mocks__/factories/testFactory'
+
+describe('MyComponent', () => {
+  it('should render with authenticated user', () => {
+    const store = mockStorePresets.authenticatedWithWallet()
+    const { getByTestId } = renderWithStore(<MyComponent />, { store })
+    
+    expect(getByTestId('user-info')).toBeTruthy()
+  })
+})
+```
+
+#### **Hook Testing**
+
+```typescript
+import { renderHookWithStore, createMockRootStore } from '../__mocks__/factories/testFactory'
+
+describe('useMyHook', () => {
+  it('should return correct state', () => {
+    const store = createMockRootStore({
+      authenticationStore: { isAuthenticated: true }
+    })
+    
+    const { result } = renderHookWithStore(() => useMyHook(), { store })
+    expect(result.current.isAuthenticated).toBe(true)
+  })
+})
+```
+
+### **2. Store Factories (storeFactory.ts)**
+
+Create mock store instances with custom configurations.
+
+#### **Basic Store Creation**
+
+```typescript
+import { createMockRootStore } from '../__mocks__/factories/storeFactory'
+
+// Simple store with defaults
+const store = createMockRootStore()
+
+// Store with custom authentication state
+const authenticatedStore = createMockRootStore({
+  authenticationStore: {
+    currentStep: 'firebase-auth',
+    completedSteps: new Set(['connect-wallet', 'generate-message']),
+    isProgressComplete: false
+  },
+  walletStore: {
+    isConnected: true,
+    address: '0x1234567890123456789012345678901234567890',
+    chainId: 137
+  }
+})
+```
+
+### **3. Service Factories (serviceFactory.ts)**
+
+Mock business logic services and API clients.
+
+```typescript
+import { createMockFirebaseAuthManager } from '../__mocks__/factories/serviceFactory'
+
+// Mock Firebase auth with custom behavior
+const authManager = createMockFirebaseAuthManager({
+  getCurrentState: jest.fn(() => ({
+    isAuthenticated: true,
+    user: { uid: 'test-user' },
+    walletAddress: '0x123...'
+  }))
+})
+```
+
+### **4. External Library Mocks**
+
+Third-party dependencies are automatically mocked via setupTests.ts.
 
 #### **AsyncStorage Mock**
 
 ```typescript
-// __mocks__/external/asyncStorage.ts
+// Already available globally - no import needed
+// __mocks__/external/asyncStorage.ts provides:
 export default {
   getItem: jest.fn(() => Promise.resolve(null)),
   setItem: jest.fn(() => Promise.resolve()),
   removeItem: jest.fn(() => Promise.resolve()),
   clear: jest.fn(() => Promise.resolve()),
-  getAllKeys: jest.fn(() => Promise.resolve([])),
-  multiGet: jest.fn(() => Promise.resolve([])),
-  multiSet: jest.fn(() => Promise.resolve()),
-  multiRemove: jest.fn(() => Promise.resolve()),
-  mergeItem: jest.fn(() => Promise.resolve()),
 }
 ```
 
@@ -308,7 +429,7 @@ jest.mock('wagmi', () => wagmi)
 ### **Test Utilities Integration**
 
 ```typescript
-// src/test-utils/renderWithStore.tsx
+// __mocks__/factories/testFactory.ts
 import { createMockRootStore } from '../__mocks__/factories/storeFactory'
 
 export function renderWithStore(

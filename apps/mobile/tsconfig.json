@@ -6,7 +6,8 @@
       "@superpool/assets/*": ["../../packages/assets/*"],
       "@superpool/ui/*": ["../../packages/ui/*"],
       "@superpool/types/*": ["../../packages/types/*"],
-      "@superpool/design/*": ["../../packages/design/*"]
+      "@superpool/design/*": ["../../packages/design/*"],
+      "@mocks/*": ["./__mocks__/*"]
     }
   },
   "extends": "expo/tsconfig.base"

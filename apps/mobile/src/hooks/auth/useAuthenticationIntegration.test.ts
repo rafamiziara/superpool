@@ -5,8 +5,8 @@
 
 import { act } from '@testing-library/react-native'
 import type { Connector } from 'wagmi'
-import { useAccount, useSignMessage, useSignTypedData, useDisconnect } from 'wagmi'
-import { createMockRootStore, renderHookWithStore } from '../../test-utils'
+import { useAccount, useDisconnect, useSignMessage, useSignTypedData } from 'wagmi'
+import { createMockRootStore, renderHookWithStore } from '@mocks/factories/testFactory'
 import { useAuthenticationIntegration } from './useAuthenticationIntegration'
 
 // Create proper Chain type mock

@@ -7,11 +7,11 @@
 
 import '@testing-library/jest-dom'
 import { configure } from 'mobx'
-import { firebaseApp, firebaseAuth, firebaseFunctions } from '../__mocks__/external/firebase'
-import asyncStorage from '../__mocks__/external/asyncStorage'
-import { expoApplication, expoSecureStore } from '../__mocks__/external/expo'
-import wagmi from '../__mocks__/external/wagmi'
-import { firebaseAuthManager, toast } from '../__mocks__/internal/utils'
+import { firebaseApp, firebaseAuth, firebaseFunctions } from '@mocks/external/firebase'
+import asyncStorage from '@mocks/external/asyncStorage'
+import { expoApplication, expoSecureStore } from '@mocks/external/expo'
+import wagmi from '@mocks/external/wagmi'
+import { firebaseAuthManager, toast } from '@mocks/internal/utils'
 
 // Configure MobX for testing environment
 configure({

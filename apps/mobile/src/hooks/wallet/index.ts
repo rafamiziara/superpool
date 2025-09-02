@@ -1,3 +1,4 @@
+/* istanbul ignore file */
 // Wallet domain hooks
 export { useWalletConnectionTrigger } from './useWalletConnectionTrigger'
 

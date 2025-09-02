@@ -1,3 +1,4 @@
+/* istanbul ignore file */
 // Hook domain re-exports for cleaner imports
 // Example: import { useAuthentication, useWalletToasts } from '../hooks'
 

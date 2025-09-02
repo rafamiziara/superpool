@@ -16,7 +16,8 @@ export { default as stores } from './internal/stores'
 export { default as services } from './internal/services'
 export { default as utils } from './internal/utils'
 
-// Mock factories
+// Mock factories - centralized testing utilities
 export * from './factories/storeFactory'
 export * from './factories/serviceFactory'
 export * from './factories/utilFactory'
+export * from './factories/testFactory'
