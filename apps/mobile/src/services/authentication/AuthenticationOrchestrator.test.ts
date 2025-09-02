@@ -106,28 +106,28 @@ jest.doMock('expo-router', () => ({
   router: mockRouter,
 }))
 
-jest.doMock('../../src/firebase.config', () => ({
+jest.doMock('../../firebase.config', () => ({
   FIREBASE_AUTH: mockFirebaseAuth,
 }))
 
-jest.doMock('../../src/stores/AuthenticationStore', () => ({
+jest.doMock('../../stores/AuthenticationStore', () => ({
   AuthenticationStore: mockAuthenticationStore,
 }))
 
-jest.doMock('../../src/stores/WalletStore', () => ({
+jest.doMock('../../stores/WalletStore', () => ({
   WalletStore: mockWalletStore,
 }))
 
-jest.doMock('../../src/utils', () => ({
+jest.doMock('../../utils', () => ({
   SessionManager: mockSessionManager,
   authToasts: mockAuthToasts,
 }))
 
-jest.doMock('../../src/services/errorRecovery', () => ({
+jest.doMock('../errorRecovery', () => ({
   AuthErrorRecoveryService: mockAuthErrorRecoveryService,
 }))
 
-jest.doMock('../../src/services/authentication/steps', () => ({
+jest.doMock('./steps', () => ({
   AuthenticationStepExecutor: mockAuthenticationStepExecutor,
   AuthenticationValidator: mockAuthenticationValidator,
   FirebaseAuthenticator: mockFirebaseAuthenticator,
@@ -136,7 +136,7 @@ jest.doMock('../../src/services/authentication/steps', () => ({
 }))
 
 // Import after mocking
-const { AuthenticationOrchestrator } = require('../../src/services/authentication/AuthenticationOrchestrator')
+const { AuthenticationOrchestrator } = require('./AuthenticationOrchestrator')
 
 describe('AuthenticationOrchestrator', () => {
   let orchestrator: typeof AuthenticationOrchestrator
