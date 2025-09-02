@@ -8,7 +8,7 @@
 // ==========================================
 
 // Validation utilities
-export type { SupportedChainId } from './constants'
+export type { SupportedChainId } from '../config/constants'
 export { ValidationUtils } from './ValidationUtils'
 
 // Session management
@@ -91,4 +91,4 @@ export {
   // Type exports
   type ToastDuration,
   type ToastPosition,
-} from './constants'
+} from '../config/constants'

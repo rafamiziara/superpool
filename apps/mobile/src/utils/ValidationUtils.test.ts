@@ -1,8 +1,8 @@
 import { ValidationUtils } from './ValidationUtils'
-import { AUTH_VALIDATION, SUPPORTED_CHAIN_IDS } from './constants'
+import { AUTH_VALIDATION, SUPPORTED_CHAIN_IDS } from '../config/constants'
 
 // Mock constants to control test behavior
-jest.mock('./constants', () => ({
+jest.mock('../config/constants', () => ({
   AUTH_VALIDATION: {
     MAX_NONCE_LENGTH: 100,
     MAX_MESSAGE_LENGTH: 2000,
