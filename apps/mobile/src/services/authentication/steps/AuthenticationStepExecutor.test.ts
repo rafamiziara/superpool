@@ -204,10 +204,10 @@ describe('AuthenticationStepExecutor', () => {
         const mockStepFunction = jest.fn().mockRejectedValue(stepError)
 
         const executePromise = executor.executeStep(testStep, mockStepFunction)
-        
+
         // Use Promise.allSettled to handle both timers and promise rejection
         await Promise.allSettled([jest.runAllTimersAsync(), executePromise])
-        
+
         await expect(executePromise).rejects.toThrow('Step execution failed')
 
         expect(mockProgressCallbacks.onStepStart).toHaveBeenCalledWith(testStep)
@@ -219,7 +219,7 @@ describe('AuthenticationStepExecutor', () => {
         const mockStepFunction = jest.fn().mockRejectedValue('String error')
 
         const executePromise = executor.executeStep(testStep, mockStepFunction)
-        
+
         await Promise.allSettled([jest.runAllTimersAsync(), executePromise])
         await expect(executePromise).rejects.toBe('String error')
 
@@ -230,7 +230,7 @@ describe('AuthenticationStepExecutor', () => {
         const mockStepFunction = jest.fn().mockRejectedValue(null)
 
         const executePromise = executor.executeStep(testStep, mockStepFunction)
-        
+
         await Promise.allSettled([jest.runAllTimersAsync(), executePromise])
         await expect(executePromise).rejects.toBeNull()
 
@@ -242,7 +242,7 @@ describe('AuthenticationStepExecutor', () => {
         const mockStepFunction = jest.fn().mockRejectedValue(complexError)
 
         const executePromise = executor.executeStep(testStep, mockStepFunction)
-        
+
         await Promise.allSettled([jest.runAllTimersAsync(), executePromise])
         await expect(executePromise).rejects.toEqual(complexError)
 
@@ -255,7 +255,7 @@ describe('AuthenticationStepExecutor', () => {
         const options = { skipProgressCallbacks: true }
 
         const executePromise = executor.executeStep(testStep, mockStepFunction, options)
-        
+
         await Promise.allSettled([jest.runAllTimersAsync(), executePromise])
         await expect(executePromise).rejects.toThrow('Skip error callbacks')
 
@@ -590,14 +590,14 @@ describe('AuthenticationStepExecutor', () => {
 
     it('should handle undefined step function', async () => {
       const executePromise = executor.executeStep('generate-message', undefined as any)
-      
+
       await Promise.allSettled([jest.runAllTimersAsync(), executePromise])
       await expect(executePromise).rejects.toThrow()
     })
 
     it('should handle null step function', async () => {
       const executePromise = executor.executeStep('generate-message', null as any)
-      
+
       await Promise.allSettled([jest.runAllTimersAsync(), executePromise])
       await expect(executePromise).rejects.toThrow()
     })

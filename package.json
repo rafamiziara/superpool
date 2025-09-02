@@ -21,9 +21,7 @@
     "lint": "pnpm run lint:ts && pnpm run lint:sol",
     "lint:ts": "eslint . --config eslint.config.mjs",
     "lint:sol": "pnpm --filter contracts lint",
-    "lint:fix": "pnpm run lint:ts -- --fix && pnpm run lint:sol",
-    "format": "prettier --write .",
-    "format:check": "prettier --check ."
+    "lint:fix": "pnpm run lint:ts -- --fix && pnpm run lint:sol"
   },
   "keywords": [],
   "author": "",
@@ -35,6 +33,7 @@
     "@typescript-eslint/parser": "^8.15.0",
     "eslint": "^9.15.0",
     "eslint-config-prettier": "^9.1.0",
+    "eslint-plugin-prettier": "^5.5.4",
     "globals": "^15.12.0",
     "nyc": "^17.1.0",
     "prettier": "^3.3.3",

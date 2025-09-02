@@ -36,7 +36,6 @@ const mockRetryPolicy = {
   fatalErrors: ['invalid-token'],
 }
 
-
 jest.doMock('firebase/auth', () => ({
   signInWithCustomToken: mockSignInWithCustomToken,
 }))
@@ -476,7 +475,7 @@ describe('FirebaseAuthenticator', () => {
     describe('Error Handling and Retry Logic', () => {
       it('should propagate errors for non-Safe wallets', async () => {
         const firebaseError = new Error('Firebase authentication failed')
-        
+
         // Setup circuit breaker to fail
         mockCircuitBreaker.execute.mockResolvedValue({
           success: false,
@@ -485,11 +484,16 @@ describe('FirebaseAuthenticator', () => {
           metrics: mockCircuitBreaker.getMetrics(),
         })
 
-        await expect(authenticator.signInWithFirebase(mockFirebaseToken, 'personal-sign')).rejects.toThrow('Firebase authentication failed: Authentication error. Please try signing again.')
+        await expect(authenticator.signInWithFirebase(mockFirebaseToken, 'personal-sign')).rejects.toThrow(
+          'Firebase authentication failed: Authentication error. Please try signing again.'
+        )
 
-        expect(consoleErrorSpy).toHaveBeenCalledWith('❌ Firebase authentication failed with circuit breaker', expect.objectContaining({
-          error: 'Firebase authentication failed'
-        }))
+        expect(consoleErrorSpy).toHaveBeenCalledWith(
+          '❌ Firebase authentication failed with circuit breaker',
+          expect.objectContaining({
+            error: 'Firebase authentication failed',
+          })
+        )
         expect(mockDevOnly).toHaveBeenCalledWith('📋 Token details:', {
           tokenType: 'string',
           tokenPresent: true,
@@ -520,16 +524,19 @@ describe('FirebaseAuthenticator', () => {
 
         await authenticator.signInWithFirebase(mockFirebaseToken, 'safe-wallet')
 
-        expect(consoleLogSpy).toHaveBeenCalledWith('✅ Firebase authentication completed successfully', expect.objectContaining({
-          attemptsUsed: 3,
-          totalTime: 3000,
-          policyUsed: 'safe-wallet',
-        }))
+        expect(consoleLogSpy).toHaveBeenCalledWith(
+          '✅ Firebase authentication completed successfully',
+          expect.objectContaining({
+            attemptsUsed: 3,
+            totalTime: 3000,
+            policyUsed: 'safe-wallet',
+          })
+        )
       })
 
       it('should fail after maximum retry attempts for Safe wallet', async () => {
         const firebaseError = new Error('Persistent Firebase error')
-        
+
         // Mock RetryExecutor to fail after maximum retries
         const { RetryExecutor } = require('../utils/retryPolicies')
         RetryExecutor.executeWithRetry.mockResolvedValue({
@@ -539,7 +546,7 @@ describe('FirebaseAuthenticator', () => {
           totalTime: 3000,
           policyUsed: 'safe-wallet',
         })
-        
+
         // Mock circuit breaker to return the retry failure
         mockCircuitBreaker.execute.mockResolvedValue({
           success: true,
@@ -554,17 +561,22 @@ describe('FirebaseAuthenticator', () => {
           metrics: mockCircuitBreaker.getMetrics(),
         })
 
-        await expect(authenticator.signInWithFirebase(mockFirebaseToken, 'safe-wallet')).rejects.toThrow('Firebase authentication failed: Authentication error. Please try signing again.')
+        await expect(authenticator.signInWithFirebase(mockFirebaseToken, 'safe-wallet')).rejects.toThrow(
+          'Firebase authentication failed: Authentication error. Please try signing again.'
+        )
 
-        expect(consoleErrorSpy).toHaveBeenCalledWith('❌ Firebase authentication failed after retries', expect.objectContaining({
-          error: 'Persistent Firebase error',
-          attemptsMade: 3,
-        }))
+        expect(consoleErrorSpy).toHaveBeenCalledWith(
+          '❌ Firebase authentication failed after retries',
+          expect.objectContaining({
+            error: 'Persistent Firebase error',
+            attemptsMade: 3,
+          })
+        )
       })
 
       it('should detect App Check issues in Safe wallet retries', async () => {
         const appCheckError = new Error('Firebase: Error (auth/app-check-token-invalid).')
-        
+
         // Mock circuit breaker to fail with app check error
         mockCircuitBreaker.execute.mockResolvedValue({
           success: false,
@@ -577,14 +589,17 @@ describe('FirebaseAuthenticator', () => {
           'Firebase authentication failed: Authentication error. Please try signing again.'
         )
 
-        expect(consoleErrorSpy).toHaveBeenCalledWith('❌ Firebase authentication failed with circuit breaker', expect.objectContaining({
-          error: 'Firebase: Error (auth/app-check-token-invalid).'
-        }))
+        expect(consoleErrorSpy).toHaveBeenCalledWith(
+          '❌ Firebase authentication failed with circuit breaker',
+          expect.objectContaining({
+            error: 'Firebase: Error (auth/app-check-token-invalid).',
+          })
+        )
       })
 
       it('should detect internal errors in Safe wallet retries', async () => {
         const internalError = new Error('Firebase: Error (internal-error).')
-        
+
         // Mock circuit breaker to fail with internal error
         mockCircuitBreaker.execute.mockResolvedValue({
           success: false,
@@ -597,14 +612,17 @@ describe('FirebaseAuthenticator', () => {
           'Firebase authentication failed: Authentication error. Please try signing again.'
         )
 
-        expect(consoleErrorSpy).toHaveBeenCalledWith('❌ Firebase authentication failed with circuit breaker', expect.objectContaining({
-          error: 'Firebase: Error (internal-error).'
-        }))
+        expect(consoleErrorSpy).toHaveBeenCalledWith(
+          '❌ Firebase authentication failed with circuit breaker',
+          expect.objectContaining({
+            error: 'Firebase: Error (internal-error).',
+          })
+        )
       })
 
       it('should log token details on authentication failure', async () => {
         const firebaseError = new Error('Auth failed')
-        
+
         // Mock circuit breaker to fail
         mockCircuitBreaker.execute.mockResolvedValue({
           success: false,
@@ -630,7 +648,7 @@ describe('FirebaseAuthenticator', () => {
     describe('Retry Timing and Logic', () => {
       it('should use retry policy for Safe wallet retries', async () => {
         await authenticator.signInWithFirebase(mockFirebaseToken, 'safe-wallet')
-        
+
         // Check that retry policy was called (mocked in beforeEach)
         const { RetryPolicies } = require('../utils/retryPolicies')
         expect(RetryPolicies.getPolicyForWallet).toHaveBeenCalledWith('safe-wallet', { isFirstAttempt: true })
@@ -828,7 +846,7 @@ describe('FirebaseAuthenticator', () => {
   describe('Circuit Breaker and Retry Policy Integration', () => {
     it('should test complete authentication flow with circuit breaker', async () => {
       const firebaseError = new Error('Complete retry test')
-      
+
       // Mock circuit breaker to succeed with retry result showing failure
       mockCircuitBreaker.execute.mockResolvedValue({
         success: true,
@@ -843,19 +861,24 @@ describe('FirebaseAuthenticator', () => {
         metrics: mockCircuitBreaker.getMetrics(),
       })
 
-      await expect(authenticator.signInWithFirebase(mockFirebaseToken, 'safe-wallet')).rejects.toThrow('Firebase authentication failed: Authentication error. Please try signing again.')
+      await expect(authenticator.signInWithFirebase(mockFirebaseToken, 'safe-wallet')).rejects.toThrow(
+        'Firebase authentication failed: Authentication error. Please try signing again.'
+      )
 
       // Verify circuit breaker was called
       expect(mockCircuitBreaker.execute).toHaveBeenCalledTimes(1)
-      expect(consoleErrorSpy).toHaveBeenCalledWith('❌ Firebase authentication failed after retries', expect.objectContaining({
-        error: 'Complete retry test',
-        attemptsMade: 3,
-      }))
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        '❌ Firebase authentication failed after retries',
+        expect.objectContaining({
+          error: 'Complete retry test',
+          attemptsMade: 3,
+        })
+      )
     })
 
     it('should test circuit breaker failure handling', async () => {
       const appCheckError = new Error('Firebase: Error (auth/app-check-token-invalid).')
-      
+
       // Mock circuit breaker to fail immediately
       mockCircuitBreaker.execute.mockResolvedValue({
         success: false,
@@ -869,10 +892,13 @@ describe('FirebaseAuthenticator', () => {
       )
 
       // Verify circuit breaker failure was logged
-      expect(consoleErrorSpy).toHaveBeenCalledWith('❌ Firebase authentication failed with circuit breaker', expect.objectContaining({
-        circuitState: 'OPEN',
-        error: 'Firebase: Error (auth/app-check-token-invalid).'
-      }))
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        '❌ Firebase authentication failed with circuit breaker',
+        expect.objectContaining({
+          circuitState: 'OPEN',
+          error: 'Firebase: Error (auth/app-check-token-invalid).',
+        })
+      )
     })
 
     it('should test successful authentication with metrics logging', async () => {
@@ -891,21 +917,24 @@ describe('FirebaseAuthenticator', () => {
 
       await authenticator.signInWithFirebase(mockFirebaseToken, 'safe-wallet')
 
-      expect(consoleLogSpy).toHaveBeenCalledWith('✅ Firebase authentication completed successfully', expect.objectContaining({
-        circuitState: 'CLOSED',
-        attemptsUsed: 1,
-        totalTime: 1000,
-        policyUsed: 'safe-wallet',
-      }))
+      expect(consoleLogSpy).toHaveBeenCalledWith(
+        '✅ Firebase authentication completed successfully',
+        expect.objectContaining({
+          circuitState: 'CLOSED',
+          attemptsUsed: 1,
+          totalTime: 1000,
+          policyUsed: 'safe-wallet',
+        })
+      )
     })
 
     it('should test retry policy selection based on signature type', async () => {
       const { RetryPolicies } = require('../utils/retryPolicies')
-      
+
       // Test Safe wallet gets safe-wallet policy
       await authenticator.signInWithFirebase(mockFirebaseToken, 'safe-wallet')
       expect(RetryPolicies.getPolicyForWallet).toHaveBeenCalledWith('safe-wallet', { isFirstAttempt: true })
-      
+
       // Test regular wallet gets fail-fast policy (first attempt)
       await authenticator.signInWithFirebase(mockFirebaseToken, 'personal-sign')
       expect(RetryPolicies.getPolicyForWallet).toHaveBeenCalledWith('personal-sign', { isFirstAttempt: true })
@@ -913,11 +942,11 @@ describe('FirebaseAuthenticator', () => {
 
     it('should test circuit breaker integration with different signature types', async () => {
       const { FirebaseAuthCircuitBreakers } = require('../utils/circuitBreaker')
-      
+
       // Test Safe wallet gets Safe wallet circuit breaker
       await authenticator.signInWithFirebase(mockFirebaseToken, 'safe-wallet')
       expect(FirebaseAuthCircuitBreakers.getCircuitBreakerForSignatureType).toHaveBeenCalledWith('safe-wallet')
-      
+
       // Test regular wallet gets regular circuit breaker
       await authenticator.signInWithFirebase(mockFirebaseToken, 'personal-sign')
       expect(FirebaseAuthCircuitBreakers.getCircuitBreakerForSignatureType).toHaveBeenCalledWith('personal-sign')

@@ -610,7 +610,7 @@ describe('useGlobalErrorHandler', () => {
   describe('Edge Cases and Error Scenarios', () => {
     it('should handle extremely long error messages', async () => {
       jest.useFakeTimers()
-      
+
       // Ensure fresh mocks for this test
       mockSessionManager.detectSessionCorruption.mockClear()
       mockSessionManager.handleSessionCorruption.mockClear()

@@ -20,8 +20,6 @@ export default [
     },
     rules: {
       // Contracts specific rules
-      '@typescript-eslint/no-unused-vars': 'error',
-      '@typescript-eslint/no-explicit-any': 'warn',
       'prefer-const': 'error',
     },
   },

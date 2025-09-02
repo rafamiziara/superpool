@@ -17,7 +17,9 @@ jest.mock('./testProviders')
 jest.mock('../stores/RootStore')
 
 const mockCreateMockRootStore = createMockRootStore as jest.MockedFunction<typeof createMockRootStore>
-const MockedTestStoreProvider = TestStoreProvider as jest.MockedFunction<typeof TestStoreProvider> & { lastProps?: { children: React.ReactNode; store: any } }
+const MockedTestStoreProvider = TestStoreProvider as jest.MockedFunction<typeof TestStoreProvider> & {
+  lastProps?: { children: React.ReactNode; store: any }
+}
 const mockUseStores = useStores as jest.MockedFunction<typeof useStores>
 
 // Mock React Native Testing Library

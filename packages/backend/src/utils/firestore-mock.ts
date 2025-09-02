@@ -1,6 +1,6 @@
 /* istanbul ignore file */
 import { jest } from '@jest/globals'
-import { DocumentData, DocumentReference, DocumentSnapshot, Firestore, Timestamp, CollectionReference } from 'firebase-admin/firestore'
+import { CollectionReference, DocumentData, DocumentReference, DocumentSnapshot, Firestore, Timestamp } from 'firebase-admin/firestore'
 
 // Type for a mock Firestore instance
 const mockFirestoreInstance = {

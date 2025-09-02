@@ -1,16 +1,10 @@
-import {
-  ErrorCategorizer,
-  ErrorCategory,
-  RetryExecutor,
-  RetryPolicies,
-  RetryPolicy
-} from './retryPolicies'
+import { ErrorCategorizer, ErrorCategory, RetryExecutor, RetryPolicies, RetryPolicy } from './retryPolicies'
 
 describe('RetryPolicies', () => {
   describe('getPolicyForWallet', () => {
     it('should return Safe wallet policy for safe-wallet signature type', () => {
       const policy = RetryPolicies.getPolicyForWallet('safe-wallet')
-      
+
       expect(policy.name).toBe('safe-wallet')
       expect(policy.maxRetries).toBe(2)
       expect(policy.retryDelayMs).toBe(2000)
@@ -19,7 +13,7 @@ describe('RetryPolicies', () => {
 
     it('should return standard policy for regular wallet', () => {
       const policy = RetryPolicies.getPolicyForWallet('personal-sign')
-      
+
       expect(policy.name).toBe('standard-wallet')
       expect(policy.maxRetries).toBe(3)
       expect(policy.retryDelayMs).toBe(1000)
@@ -28,7 +22,7 @@ describe('RetryPolicies', () => {
 
     it('should return fail-fast policy for first attempts', () => {
       const policy = RetryPolicies.getPolicyForWallet('personal-sign', { isFirstAttempt: true })
-      
+
       expect(policy.name).toBe('fail-fast')
       expect(policy.maxRetries).toBe(1)
       expect(policy.retryDelayMs).toBe(500)
@@ -39,7 +33,7 @@ describe('RetryPolicies', () => {
     it('should return network policy for network errors', () => {
       const networkError = new Error('network connection failed')
       const policy = RetryPolicies.getPolicyForError(networkError)
-      
+
       expect(policy.name).toBe('network-focused')
       expect(policy.maxRetries).toBe(4)
     })
@@ -47,7 +41,7 @@ describe('RetryPolicies', () => {
     it('should return rate-limit policy for rate limiting errors', () => {
       const rateLimitError = new Error('rate limit exceeded')
       const policy = RetryPolicies.getPolicyForError(rateLimitError)
-      
+
       expect(policy.name).toBe('rate-limit-policy')
       expect(policy.retryDelayMs).toBe(5000) // Longer delay for rate limits
     })
@@ -55,7 +49,7 @@ describe('RetryPolicies', () => {
     it('should return standard policy for unknown errors', () => {
       const unknownError = new Error('unknown error')
       const policy = RetryPolicies.getPolicyForError(unknownError)
-      
+
       expect(policy.name).toBe('standard-wallet')
     })
   })
@@ -69,10 +63,10 @@ describe('ErrorCategorizer', () => {
         new Error('expired-token'),
         new Error('invalid-credential'),
         new Error('user-disabled'),
-        new Error('permission-denied')
+        new Error('permission-denied'),
       ]
 
-      fatalErrors.forEach(error => {
+      fatalErrors.forEach((error) => {
         expect(ErrorCategorizer.categorizeError(error)).toBe(ErrorCategory.FATAL)
       })
     })
@@ -87,22 +81,18 @@ describe('ErrorCategorizer', () => {
         new Error('network connection failed'),
         new Error('timeout occurred'),
         new Error('connection refused'),
-        new Error('offline mode')
+        new Error('offline mode'),
       ]
 
-      networkErrors.forEach(error => {
+      networkErrors.forEach((error) => {
         expect(ErrorCategorizer.categorizeError(error)).toBe(ErrorCategory.NETWORK)
       })
     })
 
     it('should categorize authentication errors', () => {
-      const authErrors = [
-        new Error('authentication failed'),
-        new Error('signature invalid'),
-        new Error('token expired')
-      ]
+      const authErrors = [new Error('authentication failed'), new Error('signature invalid'), new Error('token expired')]
 
-      authErrors.forEach(error => {
+      authErrors.forEach((error) => {
         expect(ErrorCategorizer.categorizeError(error)).toBe(ErrorCategory.AUTHENTICATION)
       })
     })
@@ -120,7 +110,7 @@ describe('ErrorCategorizer', () => {
       retryDelayMs: 1000,
       backoffMultiplier: 2,
       retryableErrors: ['network', 'timeout', 'internal'],
-      fatalErrors: ['invalid-token', 'permission-denied']
+      fatalErrors: ['invalid-token', 'permission-denied'],
     }
 
     it('should not retry fatal errors', () => {
@@ -154,28 +144,28 @@ describe('ErrorCategorizer', () => {
       const testCases = [
         {
           error: new Error('invalid-token'),
-          expectedMessage: 'Authentication failed. Please check your credentials and try again.'
+          expectedMessage: 'Authentication failed. Please check your credentials and try again.',
         },
         {
           error: new Error('network connection failed'),
-          expectedMessage: 'Network connection issue. Please check your internet connection and try again.'
+          expectedMessage: 'Network connection issue. Please check your internet connection and try again.',
         },
         {
           error: new Error('rate limit exceeded'),
-          expectedMessage: 'Too many attempts. Please wait a moment and try again.'
+          expectedMessage: 'Too many attempts. Please wait a moment and try again.',
         },
         {
           error: new Error('timeout occurred'),
-          expectedMessage: 'Request timed out. Please try again.'
+          expectedMessage: 'Request timed out. Please try again.',
         },
         {
           error: new Error('authentication failed'),
-          expectedMessage: 'Authentication error. Please try signing again.'
+          expectedMessage: 'Authentication error. Please try signing again.',
         },
         {
           error: new Error('unknown error'),
-          expectedMessage: 'An unexpected error occurred. Please try again.'
-        }
+          expectedMessage: 'An unexpected error occurred. Please try again.',
+        },
       ]
 
       testCases.forEach(({ error, expectedMessage }) => {
@@ -192,7 +182,7 @@ describe('RetryExecutor', () => {
     retryDelayMs: 100, // Short delay for tests
     backoffMultiplier: 2,
     retryableErrors: ['network', 'timeout'],
-    fatalErrors: ['invalid-token']
+    fatalErrors: ['invalid-token'],
   }
 
   beforeEach(() => {
@@ -207,7 +197,7 @@ describe('RetryExecutor', () => {
   describe('executeWithRetry', () => {
     it('should succeed on first attempt', async () => {
       const mockFn = jest.fn().mockResolvedValue('success')
-      
+
       const resultPromise = RetryExecutor.executeWithRetry(mockFn, testPolicy)
       jest.runAllTimers()
       const result = await resultPromise
@@ -220,11 +210,12 @@ describe('RetryExecutor', () => {
     })
 
     it('should retry on retryable errors and eventually succeed', async () => {
-      const mockFn = jest.fn()
+      const mockFn = jest
+        .fn()
         .mockRejectedValueOnce(new Error('network connection failed'))
         .mockRejectedValueOnce(new Error('timeout occurred'))
         .mockResolvedValueOnce('success')
-      
+
       const resultPromise = RetryExecutor.executeWithRetry(mockFn, testPolicy)
       jest.runAllTimers()
       const result = await resultPromise
@@ -237,7 +228,7 @@ describe('RetryExecutor', () => {
 
     it('should fail immediately on fatal errors', async () => {
       const mockFn = jest.fn().mockRejectedValue(new Error('invalid-token detected'))
-      
+
       const resultPromise = RetryExecutor.executeWithRetry(mockFn, testPolicy)
       jest.runAllTimers()
       const result = await resultPromise
@@ -250,7 +241,7 @@ describe('RetryExecutor', () => {
 
     it('should fail after exhausting all retries', async () => {
       const mockFn = jest.fn().mockRejectedValue(new Error('network connection failed'))
-      
+
       const resultPromise = RetryExecutor.executeWithRetry(mockFn, testPolicy)
       jest.runAllTimers()
       const result = await resultPromise
@@ -262,14 +253,12 @@ describe('RetryExecutor', () => {
     })
 
     it('should call onRetry callback with correct context', async () => {
-      const mockFn = jest.fn()
-        .mockRejectedValueOnce(new Error('network error'))
-        .mockResolvedValueOnce('success')
-      
+      const mockFn = jest.fn().mockRejectedValueOnce(new Error('network error')).mockResolvedValueOnce('success')
+
       const onRetrySpy = jest.fn()
-      
+
       const resultPromise = RetryExecutor.executeWithRetry(mockFn, testPolicy, {
-        onRetry: onRetrySpy
+        onRetry: onRetrySpy,
       })
       jest.runAllTimers()
       await resultPromise
@@ -279,35 +268,36 @@ describe('RetryExecutor', () => {
         attempt: 1,
         totalAttempts: 3, // maxRetries + 1
         lastError: expect.any(Error),
-        elapsedTime: expect.any(Number)
+        elapsedTime: expect.any(Number),
       })
     })
 
     it('should respect abort signal', async () => {
       const mockFn = jest.fn().mockRejectedValue(new Error('network error'))
       const abortController = new AbortController()
-      
+
       // Abort immediately
       abortController.abort()
-      
+
       const resultPromise = RetryExecutor.executeWithRetry(mockFn, testPolicy, {
-        signal: abortController.signal
+        signal: abortController.signal,
       })
 
       await expect(resultPromise).rejects.toThrow('Operation aborted')
     })
 
     it('should implement exponential backoff correctly', async () => {
-      const mockFn = jest.fn()
+      const mockFn = jest
+        .fn()
         .mockRejectedValueOnce(new Error('network error'))
         .mockRejectedValueOnce(new Error('network error'))
         .mockResolvedValueOnce('success')
 
       const resultPromise = RetryExecutor.executeWithRetry(mockFn, testPolicy)
-      
+
       // Fast-forward through the delays using async timer execution
       await jest.runAllTimersAsync()
-      
+
       const result = await resultPromise
 
       expect(result.success).toBe(true)

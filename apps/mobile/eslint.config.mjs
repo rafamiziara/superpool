@@ -17,17 +17,6 @@ export default [
         NodeJS: 'readonly',
       },
     },
-    rules: {
-      // TypeScript specific rules
-      '@typescript-eslint/no-unused-vars': [
-        'error',
-        {
-          argsIgnorePattern: '^_',
-          varsIgnorePattern: '^_',
-        },
-      ],
-      '@typescript-eslint/no-explicit-any': 'warn',
-    },
   },
 
   // Jest configuration for test files
@@ -39,29 +28,6 @@ export default [
         ...globals.node,
         jest: 'readonly',
       },
-    },
-  },
-
-  // TypeScript files specific rules
-  {
-    files: ['**/*.{ts,tsx}'],
-    rules: {
-      '@typescript-eslint/no-explicit-any': 'warn',
-      '@typescript-eslint/no-unused-vars': [
-        'error',
-        {
-          argsIgnorePattern: '^_',
-          varsIgnorePattern: '^_',
-        },
-      ],
-    },
-  },
-
-  // Specific overrides for certain files
-  {
-    files: ['**/errorHandling.ts'],
-    rules: {
-      '@typescript-eslint/no-unused-vars': 'off',
     },
   },
 

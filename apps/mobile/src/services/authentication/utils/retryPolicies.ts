@@ -33,18 +33,17 @@ export interface RetryResult<T> {
  */
 export enum ErrorCategory {
   RECOVERABLE = 'recoverable',
-  FATAL = 'fatal', 
+  FATAL = 'fatal',
   NETWORK = 'network',
   AUTHENTICATION = 'authentication',
   RATE_LIMIT = 'rate_limit',
-  TIMEOUT = 'timeout'
+  TIMEOUT = 'timeout',
 }
 
 /**
  * Pre-defined retry policies for different scenarios
  */
 export class RetryPolicies {
-  
   /**
    * Conservative policy for Safe wallets - fewer retries, longer delays
    */
@@ -53,20 +52,8 @@ export class RetryPolicies {
     maxRetries: 2,
     retryDelayMs: 2000,
     backoffMultiplier: 1.5,
-    retryableErrors: [
-      'network',
-      'timeout',
-      'internal',
-      'temporarily',
-      'rate-limit'
-    ],
-    fatalErrors: [
-      'invalid-token',
-      'expired-token',
-      'invalid-credential',
-      'user-disabled',
-      'permission-denied'
-    ]
+    retryableErrors: ['network', 'timeout', 'internal', 'temporarily', 'rate-limit'],
+    fatalErrors: ['invalid-token', 'expired-token', 'invalid-credential', 'user-disabled', 'permission-denied'],
   }
 
   /**
@@ -77,22 +64,8 @@ export class RetryPolicies {
     maxRetries: 3,
     retryDelayMs: 1000,
     backoffMultiplier: 2.0,
-    retryableErrors: [
-      'network',
-      'timeout',
-      'internal',
-      'temporarily',
-      'rate-limit',
-      'unavailable'
-    ],
-    fatalErrors: [
-      'invalid-token',
-      'expired-token', 
-      'invalid-credential',
-      'user-disabled',
-      'permission-denied',
-      'invalid-argument'
-    ]
+    retryableErrors: ['network', 'timeout', 'internal', 'temporarily', 'rate-limit', 'unavailable'],
+    fatalErrors: ['invalid-token', 'expired-token', 'invalid-credential', 'user-disabled', 'permission-denied', 'invalid-argument'],
   }
 
   /**
@@ -103,19 +76,8 @@ export class RetryPolicies {
     maxRetries: 4,
     retryDelayMs: 500,
     backoffMultiplier: 2.0,
-    retryableErrors: [
-      'network',
-      'timeout',
-      'offline',
-      'connection',
-      'unreachable'
-    ],
-    fatalErrors: [
-      'invalid-token',
-      'expired-token',
-      'invalid-credential',
-      'permission-denied'
-    ]
+    retryableErrors: ['network', 'timeout', 'offline', 'connection', 'unreachable'],
+    fatalErrors: ['invalid-token', 'expired-token', 'invalid-credential', 'permission-denied'],
   }
 
   /**
@@ -126,10 +88,7 @@ export class RetryPolicies {
     maxRetries: 1,
     retryDelayMs: 500,
     backoffMultiplier: 1.0,
-    retryableErrors: [
-      'timeout',
-      'network'
-    ],
+    retryableErrors: ['timeout', 'network'],
     fatalErrors: [
       'invalid-token',
       'expired-token',
@@ -138,8 +97,8 @@ export class RetryPolicies {
       'permission-denied',
       'invalid-argument',
       'internal',
-      'app-check'
-    ]
+      'app-check',
+    ],
   }
 
   /**
@@ -172,7 +131,7 @@ export class RetryPolicies {
       return {
         ...this.STANDARD_WALLET_POLICY,
         retryDelayMs: 5000, // Longer delay for rate limits
-        name: 'rate-limit-policy'
+        name: 'rate-limit-policy',
       }
     }
 
@@ -184,7 +143,6 @@ export class RetryPolicies {
  * Categorizes errors for appropriate handling
  */
 export class ErrorCategorizer {
-  
   /**
    * Categorize error based on message and type
    */
@@ -192,11 +150,13 @@ export class ErrorCategorizer {
     const errorMessage = error.message.toLowerCase()
 
     // Fatal errors that should not be retried
-    if (errorMessage.includes('invalid-token') ||
-        errorMessage.includes('expired-token') ||
-        errorMessage.includes('invalid-credential') ||
-        errorMessage.includes('user-disabled') ||
-        errorMessage.includes('permission-denied')) {
+    if (
+      errorMessage.includes('invalid-token') ||
+      errorMessage.includes('expired-token') ||
+      errorMessage.includes('invalid-credential') ||
+      errorMessage.includes('user-disabled') ||
+      errorMessage.includes('permission-denied')
+    ) {
       return ErrorCategory.FATAL
     }
 
@@ -206,17 +166,17 @@ export class ErrorCategorizer {
     }
 
     // Network-related errors
-    if (errorMessage.includes('network') ||
-        errorMessage.includes('connection') ||
-        errorMessage.includes('timeout') ||
-        errorMessage.includes('offline')) {
+    if (
+      errorMessage.includes('network') ||
+      errorMessage.includes('connection') ||
+      errorMessage.includes('timeout') ||
+      errorMessage.includes('offline')
+    ) {
       return ErrorCategory.NETWORK
     }
 
     // Authentication-specific errors
-    if (errorMessage.includes('auth') ||
-        errorMessage.includes('sign') ||
-        errorMessage.includes('token')) {
+    if (errorMessage.includes('auth') || errorMessage.includes('sign') || errorMessage.includes('token')) {
       return ErrorCategory.AUTHENTICATION
     }
 
@@ -246,9 +206,7 @@ export class ErrorCategorizer {
 
     // Default behavior based on error category
     const category = this.categorizeError(error)
-    return category === ErrorCategory.RECOVERABLE || 
-           category === ErrorCategory.NETWORK || 
-           category === ErrorCategory.TIMEOUT
+    return category === ErrorCategory.RECOVERABLE || category === ErrorCategory.NETWORK || category === ErrorCategory.TIMEOUT
   }
 
   /**
@@ -260,19 +218,19 @@ export class ErrorCategorizer {
     switch (category) {
       case ErrorCategory.FATAL:
         return 'Authentication failed. Please check your credentials and try again.'
-      
+
       case ErrorCategory.NETWORK:
         return 'Network connection issue. Please check your internet connection and try again.'
-      
+
       case ErrorCategory.RATE_LIMIT:
         return 'Too many attempts. Please wait a moment and try again.'
-      
+
       case ErrorCategory.TIMEOUT:
         return 'Request timed out. Please try again.'
-      
+
       case ErrorCategory.AUTHENTICATION:
         return 'Authentication error. Please try signing again.'
-      
+
       default:
         return 'An unexpected error occurred. Please try again.'
     }
@@ -283,21 +241,20 @@ export class ErrorCategorizer {
  * Retry executor that implements retry logic with policies
  */
 export class RetryExecutor {
-  
   /**
    * Execute function with retry policy
    */
   static async executeWithRetry<T>(
     fn: () => Promise<T>,
     policy: RetryPolicy,
-    context?: { 
+    context?: {
       onRetry?: (context: RetryContext) => void
       signal?: AbortSignal
     }
   ): Promise<RetryResult<T>> {
     const startTime = Date.now()
     let lastError: Error = new Error('Unknown error')
-    
+
     for (let attempt = 1; attempt <= policy.maxRetries + 1; attempt++) {
       // Check for abort signal
       if (context?.signal?.aborted) {
@@ -311,11 +268,11 @@ export class RetryExecutor {
           result,
           attemptsMade: attempt,
           totalTime: Date.now() - startTime,
-          policyUsed: policy.name
+          policyUsed: policy.name,
         }
       } catch (error) {
         lastError = error instanceof Error ? error : new Error(String(error))
-        
+
         // Don't retry if this is the last attempt
         if (attempt > policy.maxRetries) {
           break
@@ -329,19 +286,19 @@ export class RetryExecutor {
 
         // Calculate delay with backoff
         const delay = policy.retryDelayMs * Math.pow(policy.backoffMultiplier, attempt - 1)
-        
+
         console.log(`🔄 Retry ${attempt}/${policy.maxRetries} after ${delay}ms delay (${policy.name})`)
-        
+
         // Notify retry callback
         context?.onRetry?.({
           attempt,
           totalAttempts: policy.maxRetries + 1,
           lastError,
-          elapsedTime: Date.now() - startTime
+          elapsedTime: Date.now() - startTime,
         })
 
         // Wait before retrying
-        await new Promise(resolve => setTimeout(resolve, delay))
+        await new Promise((resolve) => setTimeout(resolve, delay))
       }
     }
 
@@ -350,7 +307,7 @@ export class RetryExecutor {
       error: lastError,
       attemptsMade: policy.maxRetries + 1,
       totalTime: Date.now() - startTime,
-      policyUsed: policy.name
+      policyUsed: policy.name,
     }
   }
 }

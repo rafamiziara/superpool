@@ -2,9 +2,29 @@ import js from '@eslint/js'
 import tseslint from '@typescript-eslint/eslint-plugin'
 import tsparser from '@typescript-eslint/parser'
 import prettier from 'eslint-config-prettier'
+import eslintPluginPrettierRecommended from 'eslint-plugin-prettier/recommended'
 import globals from 'globals'
 
 export default [
+  eslintPluginPrettierRecommended,
+
+  {
+    rules: {
+      'prettier/prettier': [
+        'error',
+        {
+          printWidth: 140,
+          tabWidth: 2,
+          singleQuote: true,
+          trailingComma: 'es5',
+          arrowParens: 'always',
+          semi: false,
+          endOfLine: 'auto',
+        },
+      ],
+    },
+  },
+
   // Global ignores - applies to all configurations
   {
     ignores: [
@@ -95,19 +115,13 @@ export default [
       ...js.configs.recommended.rules,
       ...tseslint.configs.recommended.rules,
 
-      // Custom rules (formatting rules removed due to Prettier integration)
-      '@typescript-eslint/no-unused-vars': [
-        'error',
-        {
-          argsIgnorePattern: '^_',
-          varsIgnorePattern: '^_',
-        },
-      ],
-      '@typescript-eslint/no-explicit-any': 'warn',
+      'no-unused-vars': 'off',
+      '@typescript-eslint/no-unused-vars': 'error',
+      '@typescript-eslint/no-explicit-any': 'error',
       '@typescript-eslint/no-empty-object-type': 'warn',
       '@typescript-eslint/triple-slash-reference': 'off', // Allow for Next.js and React Native
       '@typescript-eslint/no-require-imports': 'off', // Allow for React Native assets
-      
+
       // Import sorting configuration (relaxed for now)
       'sort-imports': [
         'warn',
@@ -141,15 +155,6 @@ export default [
       },
     },
     rules: {
-      '@typescript-eslint/no-explicit-any': 'off',
-      '@typescript-eslint/no-unused-vars': [
-        'error',
-        {
-          argsIgnorePattern: '^_',
-          varsIgnorePattern: '^_',
-          ignoreRestSiblings: true,
-        },
-      ],
       '@typescript-eslint/no-unused-expressions': 'off', // Allow chai expect statements
       'no-unused-expressions': 'off', // Allow chai expect statements
     },

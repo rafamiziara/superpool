@@ -187,7 +187,7 @@ describe('toast utilities', () => {
   })
 
   describe('showErrorFromAppError', () => {
-    const createMockAppError = (type: typeof ErrorType[keyof typeof ErrorType], message?: string): AppError => ({
+    const createMockAppError = (type: (typeof ErrorType)[keyof typeof ErrorType], message?: string): AppError => ({
       type,
       message: message || 'Generic message',
       userFriendlyMessage: 'User friendly message',

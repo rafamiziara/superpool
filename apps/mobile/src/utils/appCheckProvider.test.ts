@@ -35,7 +35,7 @@ global.fetch = mockFetch
 describe('appCheckProvider', () => {
   beforeEach(() => {
     jest.clearAllMocks()
-    
+
     // Reset all mocks with default values
     mockApplication.getAndroidId.mockReturnValue('default-android')
     mockApplication.getIosIdForVendorAsync.mockResolvedValue('default-ios')
@@ -135,9 +135,9 @@ describe('appCheckProvider', () => {
       mockApplication.getIosIdForVendorAsync.mockResolvedValue('device123')
       mockFetch.mockResolvedValue({
         ok: true,
-        json: async () => ({ 
-          appCheckToken: 'test-token', 
-          expireTimeMillis: Date.now() + 3600000 
+        json: async () => ({
+          appCheckToken: 'test-token',
+          expireTimeMillis: Date.now() + 3600000,
         }),
       })
 
@@ -187,9 +187,9 @@ describe('appCheckProvider', () => {
       mockUuid.v4.mockReturnValue('fallback-id')
       mockFetch.mockResolvedValue({
         ok: true,
-        json: async () => ({ 
-          appCheckToken: 'fallback-token', 
-          expireTimeMillis: Date.now() + 3600000 
+        json: async () => ({
+          appCheckToken: 'fallback-token',
+          expireTimeMillis: Date.now() + 3600000,
         }),
       })
 
@@ -203,8 +203,8 @@ describe('appCheckProvider', () => {
       // Since URL is constructed at module load time, this test verifies
       // that when the constructed URL is invalid (undefined + endpoint), fetch will fail
       const originalUrl = process.env.EXPO_PUBLIC_CLOUD_FUNCTIONS_BASE_URL
-      
-      // Temporarily clear the mock and let fetch actually fail  
+
+      // Temporarily clear the mock and let fetch actually fail
       const originalFetch = global.fetch
       global.fetch = jest.fn().mockRejectedValue(new Error('Invalid URL'))
 
@@ -215,7 +215,7 @@ describe('appCheckProvider', () => {
       const result = await provider.getToken()
 
       expect(result.token).toBe('dummy-token-device-not-approved')
-      
+
       // Restore original fetch
       global.fetch = originalFetch
     })
