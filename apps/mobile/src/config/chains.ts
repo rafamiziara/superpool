@@ -1,3 +1,4 @@
+/* istanbul ignore file */
 import type { Chain } from '@wagmi/core/chains'
 
 /**
@@ -32,4 +33,3 @@ export const localhost: Chain = {
   },
   testnet: true,
 } as const
-

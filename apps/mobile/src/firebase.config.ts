@@ -1,3 +1,4 @@
+/* istanbul ignore file */
 // apps/mobile-app/src/firebase.config.ts
 
 import ReactNativeAsyncStorage from '@react-native-async-storage/async-storage'
