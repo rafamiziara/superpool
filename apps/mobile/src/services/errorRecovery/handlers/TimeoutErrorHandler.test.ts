@@ -273,7 +273,7 @@ describe('TimeoutErrorHandler', () => {
       })
 
       it('should handle undefined disconnect function', () => {
-        const handlerWithUndefined = new TimeoutErrorHandler(undefined as any)
+        const handlerWithUndefined = new TimeoutErrorHandler(undefined as unknown as () => void)
         const result = handlerWithUndefined.handle()
 
         expect(result).toEqual(RecoveryActions.serviceUnavailable())

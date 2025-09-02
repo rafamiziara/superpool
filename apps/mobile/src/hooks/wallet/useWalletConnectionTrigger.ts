@@ -10,7 +10,11 @@ interface ConnectionTriggerCallbacks {
 export const useWalletConnectionTrigger = ({ onNewConnection, onDisconnection }: ConnectionTriggerCallbacks) => {
   const { address, chain, isConnected } = useAccount() // Keep for address and chain info
   const walletStore = useWalletStore()
-  const previousConnection = useRef<{ isConnected: boolean; address?: string; chainId?: number }>({
+  const previousConnection = useRef<{
+    isConnected: boolean
+    address?: string
+    chainId?: number
+  }>({
     isConnected: false,
     address: undefined,
     chainId: undefined,
@@ -25,7 +29,11 @@ export const useWalletConnectionTrigger = ({ onNewConnection, onDisconnection }:
 
   // Reset previous connection state on mount to ensure clean detection
   useEffect(() => {
-    previousConnection.current = { isConnected: false, address: undefined, chainId: undefined }
+    previousConnection.current = {
+      isConnected: false,
+      address: undefined,
+      chainId: undefined,
+    }
     console.log('🔄 Reset previous connection state on mount')
 
     return () => {
@@ -44,7 +52,11 @@ export const useWalletConnectionTrigger = ({ onNewConnection, onDisconnection }:
     const prev = previousConnection.current
 
     console.log('🔄 Connection state change detected:', {
-      previous: { isConnected: prev.isConnected, address: prev.address, chainId: prev.chainId },
+      previous: {
+        isConnected: prev.isConnected,
+        address: prev.address,
+        chainId: prev.chainId,
+      },
       current: { isConnected, address, chainId: chain?.id },
       triggerConditions: {
         newConnectionCondition: !prev.isConnected && isConnected && address,

@@ -172,9 +172,22 @@ describe('PoolManagementStore', () => {
 
   describe('Computed Getters - Pools', () => {
     beforeEach(() => {
-      const pool1 = { ...mockPool, id: 'pool-1', updatedAt: new Date('2023-01-01') }
-      const pool2 = { ...mockPool, id: 'pool-2', updatedAt: new Date('2023-01-02') }
-      const pool3 = { ...mockPool, id: 'pool-3', isActive: false, updatedAt: new Date('2023-01-03') }
+      const pool1 = {
+        ...mockPool,
+        id: 'pool-1',
+        updatedAt: new Date('2023-01-01'),
+      }
+      const pool2 = {
+        ...mockPool,
+        id: 'pool-2',
+        updatedAt: new Date('2023-01-02'),
+      }
+      const pool3 = {
+        ...mockPool,
+        id: 'pool-3',
+        isActive: false,
+        updatedAt: new Date('2023-01-03'),
+      }
 
       store.addPool(pool1)
       store.addPool(pool2)
@@ -251,7 +264,11 @@ describe('PoolManagementStore', () => {
     })
 
     it('should handle partial loan repayment', () => {
-      const loan = { ...mockLoan, amount: BigInt(100), interestAccrued: BigInt(10) }
+      const loan = {
+        ...mockLoan,
+        amount: BigInt(100),
+        interestAccrued: BigInt(10),
+      }
       store.loans.set('loan-1', loan)
 
       const repaymentAmount = BigInt(50)
@@ -264,7 +281,11 @@ describe('PoolManagementStore', () => {
     })
 
     it('should handle full loan repayment', () => {
-      const loan = { ...mockLoan, amount: BigInt(100), interestAccrued: BigInt(10) }
+      const loan = {
+        ...mockLoan,
+        amount: BigInt(100),
+        interestAccrued: BigInt(10),
+      }
       store.loans.set('loan-1', loan)
 
       const repaymentAmount = BigInt(110) // Full amount + interest
@@ -277,7 +298,11 @@ describe('PoolManagementStore', () => {
     })
 
     it('should handle overpayment', () => {
-      const loan = { ...mockLoan, amount: BigInt(100), interestAccrued: BigInt(10) }
+      const loan = {
+        ...mockLoan,
+        amount: BigInt(100),
+        interestAccrued: BigInt(10),
+      }
       store.loans.set('loan-1', loan)
 
       const repaymentAmount = BigInt(150) // More than needed
@@ -301,9 +326,22 @@ describe('PoolManagementStore', () => {
       const userAddress = '0xborrower'
       store.setUserAddress(userAddress)
 
-      const loan1 = { ...mockLoan, id: 'loan-1', requestedAt: new Date('2023-01-01') }
-      const loan2 = { ...mockLoan, id: 'loan-2', requestedAt: new Date('2023-01-02') }
-      const loan3 = { ...mockLoan, id: 'loan-3', borrower: '0xother', requestedAt: new Date('2023-01-03') }
+      const loan1 = {
+        ...mockLoan,
+        id: 'loan-1',
+        requestedAt: new Date('2023-01-01'),
+      }
+      const loan2 = {
+        ...mockLoan,
+        id: 'loan-2',
+        requestedAt: new Date('2023-01-02'),
+      }
+      const loan3 = {
+        ...mockLoan,
+        id: 'loan-3',
+        borrower: '0xother',
+        requestedAt: new Date('2023-01-03'),
+      }
       const loan4 = { ...mockLoan, id: 'loan-4', status: LoanStatus.DISBURSED }
 
       store.addLoan(loan1)
@@ -344,7 +382,10 @@ describe('PoolManagementStore', () => {
     })
 
     it('should update a transaction', () => {
-      const updates = { status: TransactionStatus.CONFIRMED, amount: BigInt(150) }
+      const updates = {
+        status: TransactionStatus.CONFIRMED,
+        amount: BigInt(150),
+      }
       store.updateTransaction('tx-1', updates)
 
       const updatedTx = store.transactions.get('tx-1')!
@@ -354,7 +395,9 @@ describe('PoolManagementStore', () => {
 
     it('should not update non-existent transaction', () => {
       const originalSize = store.transactions.size
-      store.updateTransaction('non-existent', { status: TransactionStatus.CONFIRMED })
+      store.updateTransaction('non-existent', {
+        status: TransactionStatus.CONFIRMED,
+      })
       expect(store.transactions.size).toBe(originalSize)
     })
 
@@ -390,9 +433,23 @@ describe('PoolManagementStore', () => {
 
   describe('Computed Getters - Transactions', () => {
     beforeEach(() => {
-      const tx1 = { ...mockTransaction, id: 'tx-1', status: TransactionStatus.PENDING, createdAt: new Date('2023-01-01') }
-      const tx2 = { ...mockTransaction, id: 'tx-2', status: TransactionStatus.PENDING, createdAt: new Date('2023-01-02') }
-      const tx3 = { ...mockTransaction, id: 'tx-3', status: TransactionStatus.CONFIRMED }
+      const tx1 = {
+        ...mockTransaction,
+        id: 'tx-1',
+        status: TransactionStatus.PENDING,
+        createdAt: new Date('2023-01-01'),
+      }
+      const tx2 = {
+        ...mockTransaction,
+        id: 'tx-2',
+        status: TransactionStatus.PENDING,
+        createdAt: new Date('2023-01-02'),
+      }
+      const tx3 = {
+        ...mockTransaction,
+        id: 'tx-3',
+        status: TransactionStatus.CONFIRMED,
+      }
 
       store.addTransaction(tx1)
       store.addTransaction(tx2)
@@ -517,16 +574,36 @@ describe('PoolManagementStore', () => {
     beforeEach(() => {
       store.addPool(mockPool)
 
-      const loan1 = { ...mockLoan, id: 'loan-1', poolId: 'pool-1', status: LoanStatus.DISBURSED }
-      const loan2 = { ...mockLoan, id: 'loan-2', poolId: 'pool-1', status: LoanStatus.REQUESTED }
+      const loan1 = {
+        ...mockLoan,
+        id: 'loan-1',
+        poolId: 'pool-1',
+        status: LoanStatus.DISBURSED,
+      }
+      const loan2 = {
+        ...mockLoan,
+        id: 'loan-2',
+        poolId: 'pool-1',
+        status: LoanStatus.REQUESTED,
+      }
       const loan3 = { ...mockLoan, id: 'loan-3', poolId: 'other-pool' } // Different pool
 
       store.addLoan(loan1)
       store.addLoan(loan2)
       store.addLoan(loan3)
 
-      const tx1 = { ...mockTransaction, id: 'tx-1', poolId: 'pool-1', createdAt: new Date('2023-01-02') }
-      const tx2 = { ...mockTransaction, id: 'tx-2', poolId: 'pool-1', createdAt: new Date('2023-01-01') }
+      const tx1 = {
+        ...mockTransaction,
+        id: 'tx-1',
+        poolId: 'pool-1',
+        createdAt: new Date('2023-01-02'),
+      }
+      const tx2 = {
+        ...mockTransaction,
+        id: 'tx-2',
+        poolId: 'pool-1',
+        createdAt: new Date('2023-01-01'),
+      }
 
       store.addTransaction(tx1)
       store.addTransaction(tx2)
@@ -553,7 +630,11 @@ describe('PoolManagementStore', () => {
     })
 
     it('should handle pools with zero liquidity', () => {
-      const zeroLiquidityPool = { ...mockPool, id: 'zero-pool', totalLiquidity: BigInt(0) }
+      const zeroLiquidityPool = {
+        ...mockPool,
+        id: 'zero-pool',
+        totalLiquidity: BigInt(0),
+      }
       store.addPool(zeroLiquidityPool)
 
       const stats = store.getPoolStats('zero-pool')

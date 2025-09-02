@@ -71,7 +71,7 @@ describe('ErrorHandler Interface', () => {
   describe('Async Handler Support', () => {
     it('should support async handlers', async () => {
       class AsyncHandler implements ErrorHandler<string> {
-        async handle(context: string): Promise<ErrorRecoveryResult> {
+        async handle(_context: string): Promise<ErrorRecoveryResult> {
           await new Promise((resolve) => setTimeout(resolve, 10))
           return RecoveryActions.technicalFailure()
         }
@@ -347,7 +347,7 @@ describe('RecoveryActions', () => {
 
     it('should create immutable results', () => {
       const result = RecoveryActions.userInitiated()
-      const originalDelay = result.errorDelay
+      const _originalDelay = result.errorDelay
 
       // Attempt to modify
       result.errorDelay = 9999

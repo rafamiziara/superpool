@@ -260,10 +260,10 @@ describe('AuthUtils', () => {
     })
 
     it('should handle null/undefined inputs', () => {
-      expect(AuthUtils.validateAuthMessageFormat(null as any, mockWalletAddress)).toBe(false)
-      expect(AuthUtils.validateAuthMessageFormat(validMessage, null as any)).toBe(false)
-      expect(AuthUtils.validateAuthMessageFormat(undefined as any, mockWalletAddress)).toBe(false)
-      expect(AuthUtils.validateAuthMessageFormat(validMessage, undefined as any)).toBe(false)
+      expect(AuthUtils.validateAuthMessageFormat(null as unknown as string, mockWalletAddress)).toBe(false)
+      expect(AuthUtils.validateAuthMessageFormat(validMessage, null as unknown as string)).toBe(false)
+      expect(AuthUtils.validateAuthMessageFormat(undefined as unknown as string, mockWalletAddress)).toBe(false)
+      expect(AuthUtils.validateAuthMessageFormat(validMessage, undefined as unknown as string)).toBe(false)
     })
   })
 
@@ -722,7 +722,10 @@ describe('AuthUtils', () => {
 
     it('should handle short wallet address', () => {
       const shortAddress = '0x1234567890'
-      const requestWithShortAddress = { ...mockRequest, walletAddress: shortAddress }
+      const requestWithShortAddress = {
+        ...mockRequest,
+        walletAddress: shortAddress,
+      }
 
       const context = AuthUtils.formatAuthContext(requestWithShortAddress)
 

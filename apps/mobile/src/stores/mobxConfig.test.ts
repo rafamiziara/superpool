@@ -190,7 +190,7 @@ describe('mobxConfig', () => {
 
       it('should handle missing console.time gracefully', () => {
         ;(globalThis as GlobalWithDev).__DEV__ = true
-        console.time = undefined as any
+        console.time = undefined as typeof console.time
 
         expect(() => mobxUtils.time('test-operation')).not.toThrow()
       })
@@ -231,7 +231,7 @@ describe('mobxConfig', () => {
 
       it('should handle missing console.timeEnd gracefully', () => {
         ;(globalThis as GlobalWithDev).__DEV__ = true
-        console.timeEnd = undefined as any
+        console.timeEnd = undefined as typeof console.timeEnd
 
         expect(() => mobxUtils.timeEnd('test-operation')).not.toThrow()
       })
@@ -307,7 +307,7 @@ describe('mobxConfig', () => {
       const platforms = ['ios', 'android', 'web', 'windows', 'macos']
 
       platforms.forEach((platform) => {
-        mockPlatform.OS = platform as any
+        mockPlatform.OS = platform as typeof Platform.OS
 
         expect(() => configureMobX()).not.toThrow()
         expect(console.log).toHaveBeenCalledWith(`📱 MobX configured for ${platform} environment`)

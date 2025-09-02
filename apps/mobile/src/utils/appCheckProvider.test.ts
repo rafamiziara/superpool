@@ -200,10 +200,6 @@ describe('appCheckProvider', () => {
     })
 
     it('should handle missing environment URL', async () => {
-      // Since URL is constructed at module load time, this test verifies
-      // that when the constructed URL is invalid (undefined + endpoint), fetch will fail
-      const originalUrl = process.env.EXPO_PUBLIC_CLOUD_FUNCTIONS_BASE_URL
-
       // Temporarily clear the mock and let fetch actually fail
       const originalFetch = global.fetch
       global.fetch = jest.fn().mockRejectedValue(new Error('Invalid URL'))

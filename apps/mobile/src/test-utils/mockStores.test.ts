@@ -3,12 +3,12 @@
  * Tests all factory functions, mock store creation, and preset configurations
  */
 
-import { ErrorType } from '../utils/errorHandling'
 import { AuthenticationStore } from '../stores/AuthenticationStore'
 import { PoolManagementStore } from '../stores/PoolManagementStore'
 import { RootStore } from '../stores/RootStore'
 import { UIStore } from '../stores/UIStore'
 import { WalletStore } from '../stores/WalletStore'
+import { ErrorType } from '../utils/errorHandling'
 import {
   createMockAuthenticationStore,
   createMockPoolManagementStore,
@@ -17,6 +17,63 @@ import {
   createMockWalletStore,
   mockStorePresets,
 } from './mockStores'
+
+// Type interfaces for mock store objects
+type MockSet<T> = Set<T> & {
+  clear: jest.Mock
+  add: jest.Mock
+}
+
+interface MockAuthenticationStore {
+  completedSteps: MockSet<string>
+  startStep: jest.Mock
+  completeStep: jest.Mock
+  failStep: jest.Mock
+  resetProgress: jest.Mock
+  reset: jest.Mock
+  getStepStatus: jest.Mock
+  getStepInfo: jest.Mock
+  getAllSteps: jest.Mock
+  setAuthLock: jest.Mock
+  setAuthError: jest.Mock
+}
+
+interface MockWalletStore {
+  connect: jest.Mock
+  disconnect: jest.Mock
+  updateConnectionState: jest.Mock
+  isConnected: boolean
+  address?: string
+  chainId?: number
+}
+
+interface MockPoolManagementStore {
+  loadPools: jest.Mock
+  createPool: jest.Mock
+  joinPool: jest.Mock
+  addPool: jest.Mock
+  updatePool: jest.Mock
+  removePool: jest.Mock
+  addLoan: jest.Mock
+  updateLoan: jest.Mock
+  addTransaction: jest.Mock
+  updateTransaction: jest.Mock
+  setLoading: jest.Mock
+  setError: jest.Mock
+}
+
+interface MockUIStore {
+  setOnboardingIndex: jest.Mock
+  resetOnboardingState: jest.Mock
+  onboardingCurrentIndex: number
+}
+
+interface MockRootStore {
+  authenticationStore: AuthenticationStore | null
+  walletStore: WalletStore | null
+  poolManagementStore: PoolManagementStore | null
+  uiStore: UIStore | null
+}
 
 // Mock the actual store classes
 jest.mock('../stores/AuthenticationStore')
@@ -38,11 +95,15 @@ describe('mockStores', () => {
   })
 
   describe('createMockAuthenticationStore', () => {
-    let mockStore: any
+    let mockStore: MockAuthenticationStore
 
     beforeEach(() => {
+      const completedSteps = new Set(['connect-wallet']) as MockSet<string>
+      completedSteps.clear = jest.fn()
+      completedSteps.add = jest.fn()
+
       mockStore = {
-        completedSteps: new Set(['connect-wallet']),
+        completedSteps,
         startStep: jest.fn(),
         completeStep: jest.fn(),
         failStep: jest.fn(),
@@ -55,7 +116,7 @@ describe('mockStores', () => {
         setAuthError: jest.fn(),
       }
 
-      MockedAuthenticationStore.mockImplementation(() => mockStore)
+      MockedAuthenticationStore.mockImplementation(() => mockStore as unknown as AuthenticationStore)
     })
 
     it('should create a mock AuthenticationStore instance', () => {
@@ -66,9 +127,10 @@ describe('mockStores', () => {
     })
 
     it('should clear and reset completedSteps on creation', () => {
-      mockStore.completedSteps = new Set()
-      mockStore.completedSteps.clear = jest.fn()
-      mockStore.completedSteps.add = jest.fn()
+      const newCompletedSteps = new Set() as MockSet<string>
+      newCompletedSteps.clear = jest.fn()
+      newCompletedSteps.add = jest.fn()
+      mockStore.completedSteps = newCompletedSteps
 
       createMockAuthenticationStore()
 
@@ -122,7 +184,7 @@ describe('mockStores', () => {
   })
 
   describe('createMockWalletStore', () => {
-    let mockStore: any
+    let mockStore: MockWalletStore
 
     beforeEach(() => {
       mockStore = {
@@ -134,7 +196,7 @@ describe('mockStores', () => {
         chainId: undefined,
       }
 
-      MockedWalletStore.mockImplementation(() => mockStore)
+      MockedWalletStore.mockImplementation(() => mockStore as unknown as WalletStore)
     })
 
     it('should create a mock WalletStore instance', () => {
@@ -168,7 +230,7 @@ describe('mockStores', () => {
   })
 
   describe('createMockPoolManagementStore', () => {
-    let mockStore: any
+    let mockStore: MockPoolManagementStore
 
     beforeEach(() => {
       mockStore = {
@@ -186,7 +248,7 @@ describe('mockStores', () => {
         setError: jest.fn(),
       }
 
-      MockedPoolManagementStore.mockImplementation(() => mockStore)
+      MockedPoolManagementStore.mockImplementation(() => mockStore as unknown as PoolManagementStore)
     })
 
     it('should create a mock PoolManagementStore instance', () => {
@@ -232,7 +294,7 @@ describe('mockStores', () => {
   })
 
   describe('createMockUIStore', () => {
-    let mockStore: any
+    let mockStore: MockUIStore
 
     beforeEach(() => {
       mockStore = {
@@ -241,7 +303,7 @@ describe('mockStores', () => {
         onboardingCurrentIndex: 0,
       }
 
-      MockedUIStore.mockImplementation(() => mockStore)
+      MockedUIStore.mockImplementation(() => mockStore as unknown as UIStore)
     })
 
     it('should create a mock UIStore instance', () => {
@@ -270,7 +332,7 @@ describe('mockStores', () => {
   })
 
   describe('createMockRootStore', () => {
-    let mockRootStore: any
+    let mockRootStore: MockRootStore
 
     beforeEach(() => {
       mockRootStore = {
@@ -280,7 +342,7 @@ describe('mockStores', () => {
         uiStore: null,
       }
 
-      MockedRootStore.mockImplementation(() => mockRootStore)
+      MockedRootStore.mockImplementation(() => mockRootStore as unknown as RootStore)
     })
 
     it('should create a mock RootStore instance', () => {
@@ -477,9 +539,9 @@ describe('mockStores', () => {
 
         expect(store.authenticationStore.authLock).toMatchObject({
           isLocked: true,
-          startTime: expect.any(Number),
+          startTime: expect.any(Number) as number,
           walletAddress: '0x1234567890123456789012345678901234567890',
-          abortController: expect.any(AbortController),
+          abortController: expect.any(AbortController) as AbortController,
           requestId: 'test-request-id',
         })
       })
@@ -506,7 +568,7 @@ describe('mockStores', () => {
           message: 'Authentication failed',
           type: ErrorType.AUTHENTICATION_FAILED,
           userFriendlyMessage: 'Authentication failed',
-          timestamp: expect.any(Date),
+          timestamp: expect.any(Date) as Date,
         })
       })
     })

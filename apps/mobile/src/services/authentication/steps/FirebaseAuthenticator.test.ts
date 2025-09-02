@@ -1,4 +1,5 @@
 import type { SignatureResult } from '@superpool/types'
+import type { SignatureVerificationContext } from './FirebaseAuthenticator'
 
 // Mock all external dependencies using jest.doMock for proper timing
 const mockSignInWithCustomToken = jest.fn()
@@ -85,12 +86,14 @@ jest.doMock('../utils/retryPolicies', () => ({
 
 // Import after mocking
 const { FirebaseAuthenticator } = require('./FirebaseAuthenticator')
+// Type import for better typing after mocking
+type FirebaseAuthenticatorType = InstanceType<typeof FirebaseAuthenticator>
 
 describe('FirebaseAuthenticator', () => {
   // Increase timeout for long-running async tests
   jest.setTimeout(15000)
-  let authenticator: any
-  let mockContext: any
+  let authenticator: FirebaseAuthenticatorType
+  let mockContext: SignatureVerificationContext
   let mockSignatureResult: SignatureResult
   let consoleLogSpy: jest.SpyInstance
   let consoleErrorSpy: jest.SpyInstance
@@ -127,7 +130,7 @@ describe('FirebaseAuthenticator', () => {
 
     // Setup retry executor mock to actually execute the provided function
     const { RetryExecutor } = require('../utils/retryPolicies')
-    RetryExecutor.executeWithRetry.mockImplementation(async (fn: () => Promise<any>, policy: any) => {
+    RetryExecutor.executeWithRetry.mockImplementation(async (fn: () => Promise<unknown>, policy: unknown) => {
       try {
         // Execute the function to trigger actual Firebase auth calls
         await fn()

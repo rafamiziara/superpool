@@ -10,7 +10,6 @@ import {
 } from './index'
 
 // Direct imports for comparison
-import { SignatureConfig as DirectSignatureConfig, SignatureStrategy as DirectSignatureStrategy } from './SignatureStrategy'
 import { SignatureUtils as DirectSignatureUtils } from './SignatureUtils'
 import { SafeWalletStrategy as DirectSafeWalletStrategy } from './SafeWalletStrategy'
 import { RegularWalletStrategy as DirectRegularWalletStrategy } from './RegularWalletStrategy'
@@ -129,7 +128,10 @@ describe('Strategies Index Exports', () => {
         // This test verifies the interface is properly exported by using it
         class TestStrategy implements SignatureStrategy {
           async sign() {
-            return { signature: '0xtest', signatureType: 'personal-sign' as const }
+            return {
+              signature: '0xtest',
+              signatureType: 'personal-sign' as const,
+            }
           }
           canHandle() {
             return true

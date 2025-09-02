@@ -3,9 +3,10 @@
  * Tests all exports: context, provider, hooks, and root store instance
  */
 
+import { render, renderHook } from '@testing-library/react-native'
 import React from 'react'
 import { Text } from 'react-native'
-import { render, renderHook } from '@testing-library/react-native'
+import { RootStore } from './RootStore'
 import {
   rootStore,
   StoreContext,
@@ -17,7 +18,6 @@ import {
   useUIStore,
   useWalletStore,
 } from './StoreContext'
-import { RootStore } from './RootStore'
 
 // Mock RootStore to prevent actual instantiation
 jest.mock('./RootStore', () => ({
@@ -42,8 +42,6 @@ jest.mock('./RootStore', () => ({
     },
   })),
 }))
-
-const MockedRootStore = RootStore as jest.MockedClass<typeof RootStore>
 
 describe('StoreContext', () => {
   let mockRootStore: any
@@ -505,7 +503,7 @@ describe('StoreContext', () => {
 
       const TestComponent = () => {
         renderCount++
-        const store = useStore()
+        useStore()
         return <Text testID="render-count">{renderCount}</Text>
       }
 

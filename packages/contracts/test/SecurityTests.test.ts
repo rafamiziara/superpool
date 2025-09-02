@@ -1,6 +1,6 @@
+import { SignerWithAddress } from '@nomicfoundation/hardhat-ethers/signers'
 import { expect } from 'chai'
 import { ethers, upgrades } from 'hardhat'
-import { SignerWithAddress } from '@nomicfoundation/hardhat-ethers/signers'
 import { SampleLendingPool } from '../typechain-types'
 
 describe('Security Tests', function () {
@@ -8,14 +8,13 @@ describe('Security Tests', function () {
   let owner: SignerWithAddress
   let borrower: SignerWithAddress
   let lender: SignerWithAddress
-  let attacker: SignerWithAddress
 
   const maxLoanAmount = ethers.parseEther('10')
   const interestRate = 500 // 5%
   const loanDuration = 30 * 24 * 60 * 60 // 30 days
 
   beforeEach(async function () {
-    ;[owner, borrower, lender, attacker] = await ethers.getSigners()
+    ;[owner, borrower, lender] = await ethers.getSigners()
 
     const SampleLendingPool = await ethers.getContractFactory('SampleLendingPool')
     lendingPool = (await upgrades.deployProxy(SampleLendingPool, [owner.address, maxLoanAmount, interestRate, loanDuration], {

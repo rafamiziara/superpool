@@ -85,7 +85,7 @@ const mockUseAccount = require('wagmi').useAccount as jest.MockedFunction<typeof
 
 // Get reference to the mocked Firebase auth
 const mockFirebaseConfig = require('../../firebase.config')
-const mockFirebaseSignOut = mockFirebaseConfig.FIREBASE_AUTH.signOut as jest.MockedFunction<any>
+const mockFirebaseSignOut = mockFirebaseConfig.FIREBASE_AUTH.signOut as jest.MockedFunction<() => Promise<void>>
 
 describe('useAuthStateSynchronization', () => {
   let mockStore: ReturnType<typeof createMockRootStore>
@@ -125,7 +125,9 @@ describe('useAuthStateSynchronization', () => {
     it('should skip sync when Firebase is loading', () => {
       mockFirebaseAuth.isLoading = true
 
-      renderHookWithStore(() => useAuthStateSynchronization(), { store: mockStore })
+      renderHookWithStore(() => useAuthStateSynchronization(), {
+        store: mockStore,
+      })
 
       // Should not log any sync checks when loading
       expect(mockDevOnly).not.toHaveBeenCalledWith('🔄 Auth state sync check:', expect.any(Object))
@@ -154,7 +156,9 @@ describe('useAuthStateSynchronization', () => {
     })
 
     it('should clear Firebase auth when wallet is disconnected', async () => {
-      renderHookWithStore(() => useAuthStateSynchronization(), { store: mockStore })
+      renderHookWithStore(() => useAuthStateSynchronization(), {
+        store: mockStore,
+      })
 
       await waitFor(() => {
         expect(mockDevOnly).toHaveBeenCalledWith('⚠️  Firebase authenticated but wallet disconnected - clearing Firebase auth')
@@ -176,7 +180,9 @@ describe('useAuthStateSynchronization', () => {
 
       const consoleSpy = jest.spyOn(console, 'warn').mockImplementation()
 
-      renderHookWithStore(() => useAuthStateSynchronization(), { store: mockStore })
+      renderHookWithStore(() => useAuthStateSynchronization(), {
+        store: mockStore,
+      })
 
       await waitFor(() => {
         expect(mockFirebaseSignOut).toHaveBeenCalled()
@@ -205,7 +211,9 @@ describe('useAuthStateSynchronization', () => {
     })
 
     it('should clear Firebase auth when addresses mismatch', async () => {
-      renderHookWithStore(() => useAuthStateSynchronization(), { store: mockStore })
+      renderHookWithStore(() => useAuthStateSynchronization(), {
+        store: mockStore,
+      })
 
       await waitFor(() => {
         expect(mockDevOnly).toHaveBeenCalledWith('⚠️  Wallet address mismatch with Firebase auth - clearing Firebase auth')
@@ -229,7 +237,9 @@ describe('useAuthStateSynchronization', () => {
         mockStore.walletStore.address = '0x1234567890123456789012345678901234567890'
       })
 
-      renderHookWithStore(() => useAuthStateSynchronization(), { store: mockStore })
+      renderHookWithStore(() => useAuthStateSynchronization(), {
+        store: mockStore,
+      })
 
       // Should NOT trigger mismatch clearing
       await act(async () => {
@@ -246,7 +256,9 @@ describe('useAuthStateSynchronization', () => {
 
       const consoleSpy = jest.spyOn(console, 'warn').mockImplementation()
 
-      renderHookWithStore(() => useAuthStateSynchronization(), { store: mockStore })
+      renderHookWithStore(() => useAuthStateSynchronization(), {
+        store: mockStore,
+      })
 
       await waitFor(() => {
         expect(mockFirebaseSignOut).toHaveBeenCalled()
@@ -281,7 +293,9 @@ describe('useAuthStateSynchronization', () => {
     })
 
     it('should sync authentication store with Firebase auth', async () => {
-      renderHookWithStore(() => useAuthStateSynchronization(), { store: mockStore })
+      renderHookWithStore(() => useAuthStateSynchronization(), {
+        store: mockStore,
+      })
 
       await waitFor(() => {
         expect(mockDevOnly).toHaveBeenCalledWith('✅ Syncing authentication store with Firebase auth')
@@ -303,7 +317,9 @@ describe('useAuthStateSynchronization', () => {
         }
       })
 
-      renderHookWithStore(() => useAuthStateSynchronization(), { store: mockStore })
+      renderHookWithStore(() => useAuthStateSynchronization(), {
+        store: mockStore,
+      })
 
       // Give some time for potential sync
       await act(async () => {
@@ -334,7 +350,9 @@ describe('useAuthStateSynchronization', () => {
     })
 
     it('should log that authentication may be needed', async () => {
-      renderHookWithStore(() => useAuthStateSynchronization(), { store: mockStore })
+      renderHookWithStore(() => useAuthStateSynchronization(), {
+        store: mockStore,
+      })
 
       await waitFor(() => {
         expect(mockDevOnly).toHaveBeenCalledWith('ℹ️  Wallet connected but not Firebase authenticated - authentication may be needed')
@@ -349,7 +367,9 @@ describe('useAuthStateSynchronization', () => {
         }
       })
 
-      renderHookWithStore(() => useAuthStateSynchronization(), { store: mockStore })
+      renderHookWithStore(() => useAuthStateSynchronization(), {
+        store: mockStore,
+      })
 
       await act(async () => {
         await new Promise((resolve) => setTimeout(resolve, 100))
@@ -368,7 +388,9 @@ describe('useAuthStateSynchronization', () => {
         } as AppError
       })
 
-      renderHookWithStore(() => useAuthStateSynchronization(), { store: mockStore })
+      renderHookWithStore(() => useAuthStateSynchronization(), {
+        store: mockStore,
+      })
 
       await act(async () => {
         await new Promise((resolve) => setTimeout(resolve, 100))
@@ -393,7 +415,9 @@ describe('useAuthStateSynchronization', () => {
     })
 
     it('should log Firebase authenticated but no wallet connection', async () => {
-      renderHookWithStore(() => useAuthStateSynchronization(), { store: mockStore })
+      renderHookWithStore(() => useAuthStateSynchronization(), {
+        store: mockStore,
+      })
 
       // Since wallet is disconnected, the hook will clear Firebase auth (Case 1 takes precedence over Case 5)
       await waitFor(() => {
@@ -408,7 +432,9 @@ describe('useAuthStateSynchronization', () => {
 
   describe('MobX Reactivity', () => {
     it('should react to Firebase auth state changes', async () => {
-      renderHookWithStore(() => useAuthStateSynchronization(), { store: mockStore })
+      renderHookWithStore(() => useAuthStateSynchronization(), {
+        store: mockStore,
+      })
 
       // Initially no auth - verify the hook starts with correct state
       expect(mockDevOnly).toHaveBeenCalledWith(
@@ -424,7 +450,9 @@ describe('useAuthStateSynchronization', () => {
     })
 
     it('should react to wallet store state changes', async () => {
-      renderHookWithStore(() => useAuthStateSynchronization(), { store: mockStore })
+      renderHookWithStore(() => useAuthStateSynchronization(), {
+        store: mockStore,
+      })
 
       // Initially disconnected - verify the hook starts with correct state
       expect(mockDevOnly).toHaveBeenCalledWith(
@@ -498,7 +526,9 @@ describe('useAuthStateSynchronization', () => {
         mockStore.walletStore.isConnected = false
       })
 
-      renderHookWithStore(() => useAuthStateSynchronization(), { store: mockStore })
+      renderHookWithStore(() => useAuthStateSynchronization(), {
+        store: mockStore,
+      })
 
       // First call should trigger signOut
       await waitFor(() => {
@@ -552,7 +582,9 @@ describe('useAuthStateValidation', () => {
         isLocked: false,
       }
 
-      const { result } = renderHookWithStore(() => useAuthStateValidation(), { store: mockStore })
+      const { result } = renderHookWithStore(() => useAuthStateValidation(), {
+        store: mockStore,
+      })
 
       const validation = result.current.validateConsistency()
 
@@ -579,7 +611,9 @@ describe('useAuthStateValidation', () => {
       mockFirebaseAuth.isAuthenticated = true
       mockFirebaseAuth.walletAddress = '0x1234567890123456789012345678901234567890'
 
-      const { result } = renderHookWithStore(() => useAuthStateValidation(), { store: mockStore })
+      const { result } = renderHookWithStore(() => useAuthStateValidation(), {
+        store: mockStore,
+      })
 
       const validation = result.current.validateConsistency()
 
@@ -593,7 +627,9 @@ describe('useAuthStateValidation', () => {
 
       mockUseAccount.mockReturnValue(createMockConnectedAccount('0x2222222222222222222222222222222222222222', 1))
 
-      const { result } = renderHookWithStore(() => useAuthStateValidation(), { store: mockStore })
+      const { result } = renderHookWithStore(() => useAuthStateValidation(), {
+        store: mockStore,
+      })
 
       const validation = result.current.validateConsistency()
 
@@ -610,7 +646,9 @@ describe('useAuthStateValidation', () => {
         isLocked: true,
       }
 
-      const { result } = renderHookWithStore(() => useAuthStateValidation(), { store: mockStore })
+      const { result } = renderHookWithStore(() => useAuthStateValidation(), {
+        store: mockStore,
+      })
 
       const validation = result.current.validateConsistency()
 
@@ -624,7 +662,9 @@ describe('useAuthStateValidation', () => {
 
       mockUseAccount.mockReturnValue(createMockConnectedAccount('0x1234567890123456789012345678901234567890', 1))
 
-      const { result } = renderHookWithStore(() => useAuthStateValidation(), { store: mockStore })
+      const { result } = renderHookWithStore(() => useAuthStateValidation(), {
+        store: mockStore,
+      })
 
       const validation = result.current.validateConsistency()
 
@@ -640,7 +680,9 @@ describe('useAuthStateValidation', () => {
         userFriendlyMessage: 'Test error',
       } as AppError
 
-      const { result } = renderHookWithStore(() => useAuthStateValidation(), { store: mockStore })
+      const { result } = renderHookWithStore(() => useAuthStateValidation(), {
+        store: mockStore,
+      })
 
       const validation = result.current.validateConsistency()
 
@@ -650,7 +692,9 @@ describe('useAuthStateValidation', () => {
     })
 
     it('should handle undefined addresses', () => {
-      const { result } = renderHookWithStore(() => useAuthStateValidation(), { store: mockStore })
+      const { result } = renderHookWithStore(() => useAuthStateValidation(), {
+        store: mockStore,
+      })
 
       const validation = result.current.validateConsistency()
 

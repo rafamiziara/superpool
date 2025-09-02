@@ -235,7 +235,9 @@ export class AuthenticationOrchestrator {
 
       // Step 1: Validate pre-conditions
       await this.stepExecutor.executeLockStep(async () => {
-        await this.validator.validatePreConditions({ walletAddress: context.walletAddress })
+        await this.validator.validatePreConditions({
+          walletAddress: context.walletAddress,
+        })
       })
 
       // Step 2: Generate authentication message

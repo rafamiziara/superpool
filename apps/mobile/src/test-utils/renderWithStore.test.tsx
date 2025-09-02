@@ -158,7 +158,9 @@ describe('renderWithStore', () => {
     it('should nest custom wrapper inside TestStoreProvider', () => {
       const CustomWrapper: React.FC<{ children: React.ReactNode }> = ({ children }) => <View testID="custom-wrapper">{children}</View>
 
-      const result = renderWithStore(<TestComponent />, { wrapper: CustomWrapper })
+      const result = renderWithStore(<TestComponent />, {
+        wrapper: CustomWrapper,
+      })
 
       expect(originalRender).toHaveBeenCalled()
       expect(result).toBe(mockRenderResult)

@@ -77,7 +77,7 @@ describe('utils index exports', () => {
         warn,
       }
 
-      Object.entries(loggingFunctions).forEach(([name, func]) => {
+      Object.entries(loggingFunctions).forEach(([, func]) => {
         expect(func).toBeDefined()
         expect(typeof func).toBe('function')
       })
@@ -120,7 +120,7 @@ describe('utils index exports', () => {
         showWarningToast,
       }
 
-      Object.entries(toastFunctions).forEach(([name, func]) => {
+      Object.entries(toastFunctions).forEach(([, func]) => {
         expect(func).toBeDefined()
         expect(typeof func).toBe('function')
       })
@@ -353,7 +353,7 @@ describe('utils index exports', () => {
         SUPPORTED_CHAIN_IDS,
       }
 
-      Object.entries(keyExports).forEach(([name, exported]) => {
+      Object.entries(keyExports).forEach(([, exported]) => {
         expect(exported).toBeDefined()
       })
     })
@@ -441,7 +441,7 @@ describe('utils index exports', () => {
         constants: ['AUTH_TIMEOUTS', 'SUPPORTED_CHAIN_IDS'],
       }
 
-      Object.entries(categories).forEach(([category, expectedExports]) => {
+      Object.entries(categories).forEach(([, expectedExports]) => {
         expectedExports.forEach((exportName) => {
           expect(allExports).toHaveProperty(exportName)
         })

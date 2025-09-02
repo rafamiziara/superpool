@@ -24,6 +24,11 @@ import {
   ValidationContext,
 } from './index'
 
+// Import types for better type safety in tests
+import type { AuthenticationStore } from '../../../stores/AuthenticationStore'
+import type { WalletStore } from '../../../stores/WalletStore'
+import type { Connector } from 'wagmi'
+
 // Direct imports for comparison
 import { AuthenticationStepExecutor as DirectAuthenticationStepExecutor } from './AuthenticationStepExecutor'
 import { AuthenticationValidator as DirectAuthenticationValidator } from './AuthenticationValidator'
@@ -106,8 +111,8 @@ describe('Authentication Steps Index Exports', () => {
       it('should export functional AuthenticationValidator class', () => {
         expect(AuthenticationValidator).toBe(DirectAuthenticationValidator)
 
-        const mockAuthStore = {} as any
-        const mockWalletStore = {} as any
+        const mockAuthStore = {} as jest.Mocked<AuthenticationStore>
+        const mockWalletStore = {} as jest.Mocked<WalletStore>
         const instance = new AuthenticationValidator(mockAuthStore, mockWalletStore)
 
         expect(instance).toBeInstanceOf(AuthenticationValidator)
@@ -123,8 +128,10 @@ describe('Authentication Steps Index Exports', () => {
           authLock: {
             abortController: null,
           },
-        } as any
-        const mockWalletStore = { captureState: jest.fn() } as any
+        } as jest.Mocked<AuthenticationStore>
+        const mockWalletStore = {
+          captureState: jest.fn(),
+        } as jest.Mocked<WalletStore>
 
         const validator = new AuthenticationValidator(mockAuthStore, mockWalletStore)
         expect(validator.checkAuthenticationAborted()).toBe(false)
@@ -266,7 +273,7 @@ describe('Authentication Steps Index Exports', () => {
             name: 'Test Connector',
             type: 'injected',
             uid: 'test-123',
-          } as any,
+          } as Connector,
         }
 
         expect(context).toHaveProperty('walletAddress')
@@ -302,7 +309,7 @@ describe('Authentication Steps Index Exports', () => {
 
     it('should maintain prototype chains', () => {
       const stepExecutor = new AuthenticationStepExecutor()
-      const authValidator = new AuthenticationValidator({} as any, {} as any)
+      const authValidator = new AuthenticationValidator({} as jest.Mocked<AuthenticationStore>, {} as jest.Mocked<WalletStore>)
       const firebaseAuth = new FirebaseAuthenticator()
       const messageGen = new MessageGenerator()
       const signatureHandler = new SignatureHandler()
@@ -403,12 +410,12 @@ describe('Authentication Steps Index Exports', () => {
     it('should support complex authentication flow integration', async () => {
       const stepExecutor = new AuthenticationStepExecutor()
       const authValidator = new AuthenticationValidator(
-        {} as any,
+        {} as jest.Mocked<AuthenticationStore>,
         {
           captureState: jest.fn(),
           validateState: jest.fn().mockReturnValue(true),
           validateInitialState: jest.fn().mockReturnValue({ isValid: true }),
-        } as any
+        } as jest.Mocked<WalletStore>
       )
       const messageGenerator = new MessageGenerator()
       const signatureHandler = new SignatureHandler()
@@ -522,7 +529,7 @@ describe('Authentication Steps Index Exports', () => {
     it('should maintain module encapsulation', () => {
       // Each class should be independent and not expose others' internals
       const stepExecutor = new AuthenticationStepExecutor()
-      const authValidator = new AuthenticationValidator({} as any, {} as any)
+      const authValidator = new AuthenticationValidator({} as jest.Mocked<AuthenticationStore>, {} as jest.Mocked<WalletStore>)
       const messageGen = new MessageGenerator()
 
       // Should not have cross-dependencies in their public APIs
@@ -594,7 +601,7 @@ describe('Authentication Steps Index Exports', () => {
     it('should handle circular dependency scenarios gracefully', () => {
       // Test that all classes can be instantiated without circular dependency issues
       const stepExecutor = new AuthenticationStepExecutor()
-      const authValidator = new AuthenticationValidator({} as any, {} as any)
+      const authValidator = new AuthenticationValidator({} as jest.Mocked<AuthenticationStore>, {} as jest.Mocked<WalletStore>)
       const firebaseAuth = new FirebaseAuthenticator()
       const messageGen = new MessageGenerator()
       const sigHandler = new SignatureHandler()

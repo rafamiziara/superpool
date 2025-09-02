@@ -472,7 +472,11 @@ export class SessionManager {
   /**
    * Extracts peer information from session
    */
-  static extractPeerInfo(session: WalletConnectSession): { name?: string; url?: string; icons?: string[] } {
+  static extractPeerInfo(session: WalletConnectSession): {
+    name?: string
+    url?: string
+    icons?: string[]
+  } {
     if (!this.isValidSession(session) || !session.peer) {
       return {}
     }
@@ -492,7 +496,11 @@ export class SessionManager {
   /**
    * Calculates session age and expiry status
    */
-  static getSessionAge(session: WalletConnectSession): { ageMs: number; isExpired: boolean; expiryMs?: number } {
+  static getSessionAge(session: WalletConnectSession): {
+    ageMs: number
+    isExpired: boolean
+    expiryMs?: number
+  } {
     if (!this.isValidSession(session)) {
       return { ageMs: 0, isExpired: true }
     }

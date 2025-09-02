@@ -476,13 +476,13 @@ describe('useAuthenticationStateReadonly', () => {
 
       // Set to undefined/null explicitly
       runInAction(() => {
-        mockStore.authenticationStore.authError = undefined as any
+        mockStore.authenticationStore.authError = undefined
         mockStore.authenticationStore.authLock = {
           ...mockStore.authenticationStore.authLock,
-          walletAddress: undefined as any,
+          walletAddress: undefined,
         }
       })
-      mockFirebaseAuth.walletAddress = undefined as any
+      mockFirebaseAuth.walletAddress = undefined
       rerender({})
 
       expect(result.current.authError).toBeUndefined()

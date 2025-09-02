@@ -32,14 +32,14 @@ describe('SignatureStrategy Interface', () => {
   describe('Interface Implementation Compliance', () => {
     describe('Complete Implementation', () => {
       class ValidSignatureStrategy implements SignatureStrategy {
-        async sign(request: SignatureRequest, functions: SignatureFunctions, connector?: Connector): Promise<SignatureResult> {
+        async sign(_request: SignatureRequest, _functions: SignatureFunctions, _connector?: Connector): Promise<SignatureResult> {
           return {
             signature: '0xvalidSignature',
             signatureType: 'personal-sign',
           }
         }
 
-        canHandle(connector?: Connector): boolean {
+        canHandle(_connector?: Connector): boolean {
           return true
         }
 
@@ -269,7 +269,10 @@ describe('SignatureStrategy Interface', () => {
       // This tests that the interface allows for flexible implementations
       class AsyncCompatibleStrategy implements SignatureStrategy {
         async sign(_request: SignatureRequest, _functions: SignatureFunctions, _connector?: Connector): Promise<SignatureResult> {
-          return { signature: '0xasyncCompatible', signatureType: 'personal-sign' }
+          return {
+            signature: '0xasyncCompatible',
+            signatureType: 'personal-sign',
+          }
         }
 
         canHandle(_connector?: Connector): boolean {
@@ -312,7 +315,10 @@ describe('SignatureStrategy Interface', () => {
 
       class MinimalConnectorStrategy implements SignatureStrategy {
         async sign(_request: SignatureRequest, _functions: SignatureFunctions, _connector?: Connector): Promise<SignatureResult> {
-          return { signature: '0xminimalConnector', signatureType: 'personal-sign' }
+          return {
+            signature: '0xminimalConnector',
+            signatureType: 'personal-sign',
+          }
         }
 
         canHandle(connector?: Connector): boolean {
@@ -363,7 +369,10 @@ describe('SignatureStrategy Interface', () => {
 
       const personalStrategy = new PersonalSignStrategy()
       const safeStrategy = new SafeStrategy()
-      const regularConnector = { ...mockConnector, type: 'injected' } as Connector
+      const regularConnector = {
+        ...mockConnector,
+        type: 'injected',
+      } as Connector
       const safeConnector = { ...mockConnector, type: 'safe' } as Connector
 
       expect(personalStrategy.canHandle(regularConnector)).toBe(true)
@@ -382,7 +391,10 @@ describe('SignatureStrategy Interface', () => {
       const strategies: SignatureStrategy[] = [
         {
           async sign(_request: SignatureRequest, _functions: SignatureFunctions, _connector?: Connector) {
-            return { signature: '0x1', signatureType: 'personal-sign' as const }
+            return {
+              signature: '0x1',
+              signatureType: 'personal-sign' as const,
+            }
           },
           canHandle(_connector?: Connector) {
             return true
@@ -458,7 +470,10 @@ describe('SignatureStrategy Interface', () => {
 
       class RealConnectorStrategy implements SignatureStrategy {
         async sign(_request: SignatureRequest, _functions: SignatureFunctions, _connector?: Connector): Promise<SignatureResult> {
-          return { signature: '0xrealConnector', signatureType: 'personal-sign' }
+          return {
+            signature: '0xrealConnector',
+            signatureType: 'personal-sign',
+          }
         }
 
         canHandle(connector?: Connector): boolean {
@@ -595,7 +610,11 @@ describe('SignatureConfig Interface', () => {
     it('should work as object values', () => {
       const configMap: Record<string, SignatureConfig> = {
         regular: { timeoutMs: 15000, strategy: 'RegularWalletStrategy' },
-        safe: { timeoutMs: 20000, retryCount: 1, strategy: 'SafeWalletStrategy' },
+        safe: {
+          timeoutMs: 20000,
+          retryCount: 1,
+          strategy: 'SafeWalletStrategy',
+        },
         custom: { timeoutMs: 10000, retryCount: 3, strategy: 'CustomStrategy' },
       }
 
@@ -648,7 +667,11 @@ describe('SignatureConfig Interface', () => {
 
     it('should handle extreme retry values', () => {
       const extremeRetryConfigs: SignatureConfig[] = [
-        { timeoutMs: 10000, retryCount: Number.MAX_SAFE_INTEGER, strategy: 'MaxRetry' },
+        {
+          timeoutMs: 10000,
+          retryCount: Number.MAX_SAFE_INTEGER,
+          strategy: 'MaxRetry',
+        },
         { timeoutMs: 10000, retryCount: -1, strategy: 'NegativeRetry' },
       ]
 
@@ -715,7 +738,10 @@ describe('SignatureConfig Interface', () => {
       type WithoutRetry = Omit<SignatureConfig, 'retryCount'>
 
       const timeoutConfig: TimeoutOnly = { timeoutMs: 5000 }
-      const noRetryConfig: WithoutRetry = { timeoutMs: 10000, strategy: 'NoRetryStrategy' }
+      const noRetryConfig: WithoutRetry = {
+        timeoutMs: 10000,
+        strategy: 'NoRetryStrategy',
+      }
 
       expect(timeoutConfig.timeoutMs).toBe(5000)
       expect(noRetryConfig.strategy).toBe('NoRetryStrategy')

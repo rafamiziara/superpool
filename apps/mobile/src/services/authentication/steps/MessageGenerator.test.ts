@@ -5,6 +5,7 @@ jest.mock('../../../firebase.config', () => ({
 }))
 
 import { MessageGenerator } from './MessageGenerator'
+import type { HttpsCallable } from 'firebase/functions'
 
 // Create mock Firebase function
 const mockGenerateAuthMessageFn = jest.fn()
@@ -20,7 +21,7 @@ describe('MessageGenerator', () => {
     mockGenerateAuthMessageFn.mockClear()
 
     // Pass mock function to constructor for dependency injection
-    messageGenerator = new MessageGenerator(mockGenerateAuthMessageFn as any)
+    messageGenerator = new MessageGenerator(mockGenerateAuthMessageFn as unknown as HttpsCallable)
 
     // Spy on console methods
     consoleLogSpy = jest.spyOn(console, 'log').mockImplementation()
@@ -39,8 +40,8 @@ describe('MessageGenerator', () => {
     })
 
     it('should create multiple instances correctly', () => {
-      const generator1 = new MessageGenerator(mockGenerateAuthMessageFn as any)
-      const generator2 = new MessageGenerator(mockGenerateAuthMessageFn as any)
+      const generator1 = new MessageGenerator(mockGenerateAuthMessageFn as unknown as HttpsCallable)
+      const generator2 = new MessageGenerator(mockGenerateAuthMessageFn as unknown as HttpsCallable)
 
       expect(generator1).toBeInstanceOf(MessageGenerator)
       expect(generator2).toBeInstanceOf(MessageGenerator)
@@ -68,7 +69,9 @@ describe('MessageGenerator', () => {
           timestamp: 1641024000000,
         })
 
-        expect(mockGenerateAuthMessageFn).toHaveBeenCalledWith({ walletAddress: validWalletAddress })
+        expect(mockGenerateAuthMessageFn).toHaveBeenCalledWith({
+          walletAddress: validWalletAddress,
+        })
         expect(consoleLogSpy).toHaveBeenCalledWith('📝 Generating authentication message for address:', validWalletAddress)
         expect(consoleLogSpy).toHaveBeenCalledWith(
           '✅ Authentication message generated:',
@@ -214,7 +217,9 @@ describe('MessageGenerator', () => {
           const result = await messageGenerator.generateAuthenticationMessage(address)
 
           expect(result).toBeDefined()
-          expect(mockGenerateAuthMessageFn).toHaveBeenCalledWith({ walletAddress: address })
+          expect(mockGenerateAuthMessageFn).toHaveBeenCalledWith({
+            walletAddress: address,
+          })
         }
       })
     })
@@ -319,7 +324,9 @@ describe('MessageGenerator', () => {
 
         await expect(messageGenerator.generateAuthenticationMessage(validWalletAddress)).rejects.toThrow('Firebase function failed')
 
-        expect(mockGenerateAuthMessageFn).toHaveBeenCalledWith({ walletAddress: validWalletAddress })
+        expect(mockGenerateAuthMessageFn).toHaveBeenCalledWith({
+          walletAddress: validWalletAddress,
+        })
       })
 
       it('should handle network timeouts', async () => {
@@ -556,11 +563,15 @@ describe('MessageGenerator', () => {
 
       // Empty string wallet address
       await messageGenerator.generateAuthenticationMessage('')
-      expect(mockGenerateAuthMessageFn).toHaveBeenCalledWith({ walletAddress: '' })
+      expect(mockGenerateAuthMessageFn).toHaveBeenCalledWith({
+        walletAddress: '',
+      })
 
       // Wallet address with special characters (though invalid, should still pass to Firebase)
       await messageGenerator.generateAuthenticationMessage('0x!@#$%^&*()')
-      expect(mockGenerateAuthMessageFn).toHaveBeenCalledWith({ walletAddress: '0x!@#$%^&*()' })
+      expect(mockGenerateAuthMessageFn).toHaveBeenCalledWith({
+        walletAddress: '0x!@#$%^&*()',
+      })
     })
   })
 

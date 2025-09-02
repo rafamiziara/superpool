@@ -102,7 +102,10 @@ describe('SignatureUtils', () => {
 
       it('should work with different return types', async () => {
         const numberPromise = Promise.resolve(42)
-        const objectPromise = Promise.resolve({ signature: '0xabc', type: 'test' })
+        const objectPromise = Promise.resolve({
+          signature: '0xabc',
+          type: 'test',
+        })
         const arrayPromise = Promise.resolve(['item1', 'item2'])
 
         jest.useRealTimers()
@@ -407,8 +410,16 @@ describe('SignatureUtils', () => {
 
       it('should handle different signature types', () => {
         const testCases = [
-          { signature: '0xabcdef123456', type: 'EIP-712', expectedPreview: '0xabcdef12...' },
-          { signature: 'safe-wallet:0x123:nonce:123', type: 'Safe wallet', expectedPreview: 'safe-wallet...' },
+          {
+            signature: '0xabcdef123456',
+            type: 'EIP-712',
+            expectedPreview: '0xabcdef12...',
+          },
+          {
+            signature: 'safe-wallet:0x123:nonce:123',
+            type: 'Safe wallet',
+            expectedPreview: 'safe-wallet...',
+          },
           { signature: '0x0', type: 'Minimal', expectedPreview: '0x0...' },
           { signature: '', type: 'Empty', expectedPreview: '...' },
         ]
@@ -453,7 +464,7 @@ describe('SignatureUtils', () => {
 
   describe('Static Class Behavior', () => {
     it('should not be instantiable', () => {
-      expect(() => new (SignatureUtils as any)()).toThrow()
+      expect(() => new (SignatureUtils as unknown as new () => unknown)()).toThrow()
     })
 
     it('should have all methods as static', () => {

@@ -60,7 +60,9 @@ describe('useAuthentication', () => {
 
   describe('Initial State', () => {
     it('should return initial authentication state', () => {
-      const { result } = renderHookWithStore(() => useAuthentication(), { store: mockStore })
+      const { result } = renderHookWithStore(() => useAuthentication(), {
+        store: mockStore,
+      })
 
       expect(result.current.authError).toBeNull()
       expect(result.current.isAuthenticating).toBe(false)
@@ -88,7 +90,9 @@ describe('useAuthentication', () => {
     })
 
     it('should return completed steps with connect-wallet initially', () => {
-      const { result } = renderHookWithStore(() => useAuthentication(), { store: mockStore })
+      const { result } = renderHookWithStore(() => useAuthentication(), {
+        store: mockStore,
+      })
 
       // After resetProgress is called in beforeEach, connect-wallet should be present
       expect(result.current.completedSteps.size).toBe(1)
@@ -273,7 +277,9 @@ describe('useAuthentication', () => {
     })
 
     it('should expose completeStep function', () => {
-      const { result } = renderHookWithStore(() => useAuthentication(), { store: mockStore })
+      const { result } = renderHookWithStore(() => useAuthentication(), {
+        store: mockStore,
+      })
 
       const step: AuthStep = 'generate-message'
       act(() => {
@@ -321,7 +327,9 @@ describe('useAuthentication', () => {
     })
 
     it('should expose getStepStatus function', () => {
-      const { result } = renderHookWithStore(() => useAuthentication(), { store: mockStore })
+      const { result } = renderHookWithStore(() => useAuthentication(), {
+        store: mockStore,
+      })
 
       const step: AuthStep = 'generate-message'
       const status = result.current.getStepStatus(step)
@@ -331,7 +339,9 @@ describe('useAuthentication', () => {
     })
 
     it('should expose getStepInfo function', () => {
-      const { result } = renderHookWithStore(() => useAuthentication(), { store: mockStore })
+      const { result } = renderHookWithStore(() => useAuthentication(), {
+        store: mockStore,
+      })
 
       const step: AuthStep = 'request-signature'
       const stepInfo = result.current.getStepInfo(step)
@@ -345,7 +355,9 @@ describe('useAuthentication', () => {
     })
 
     it('should expose getAllSteps function', () => {
-      const { result } = renderHookWithStore(() => useAuthentication(), { store: mockStore })
+      const { result } = renderHookWithStore(() => useAuthentication(), {
+        store: mockStore,
+      })
 
       const allSteps = result.current.getAllSteps()
 
@@ -417,7 +429,9 @@ describe('useAuthentication', () => {
     })
 
     it('should handle empty completed steps in debug info', () => {
-      const { result } = renderHookWithStore(() => useAuthentication(), { store: mockStore })
+      const { result } = renderHookWithStore(() => useAuthentication(), {
+        store: mockStore,
+      })
 
       expect(result.current._debug.authStore.completedSteps).toEqual(['connect-wallet'])
     })
@@ -512,7 +526,9 @@ describe('useAuthentication', () => {
 
   describe('Type Safety', () => {
     it('should maintain proper TypeScript types', () => {
-      const { result } = renderHookWithStore(() => useAuthentication(), { store: mockStore })
+      const { result } = renderHookWithStore(() => useAuthentication(), {
+        store: mockStore,
+      })
 
       // Verify function signatures
       expect(typeof result.current.startStep).toBe('function')

@@ -44,7 +44,10 @@ export const useAuthenticationIntegration = () => {
   const handleNewConnection = useCallback(
     async (walletAddress: string, chainId?: number) => {
       try {
-        console.log('🚀 Handling new wallet connection:', { walletAddress, chainId })
+        console.log('🚀 Handling new wallet connection:', {
+          walletAddress,
+          chainId,
+        })
 
         // Ensure wallet state is properly updated
         walletStore.connect(walletAddress, chainId || chain?.id || 1)
@@ -68,7 +71,10 @@ export const useAuthenticationIntegration = () => {
               })
             },
             signMessageAsync: (params: { message: string; account: `0x${string}`; connector?: WagmiConnector }) =>
-              signMessageAsyncRef.current({ message: params.message, account: params.account }),
+              signMessageAsyncRef.current({
+                message: params.message,
+                account: params.account,
+              }),
           },
           disconnect: disconnectRef.current,
           progressCallbacks: {

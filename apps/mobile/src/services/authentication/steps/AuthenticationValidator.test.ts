@@ -36,7 +36,7 @@ describe('AuthenticationValidator', () => {
       captureState: jest.fn().mockReturnValue(mockAtomicState),
       validateState: jest.fn().mockReturnValue(true),
       validateInitialState: jest.fn().mockReturnValue({ isValid: true }),
-    } as any
+    } as jest.Mocked<WalletStore>
 
     validator = new AuthenticationValidator(mockAuthStore, mockWalletStore)
 
@@ -60,8 +60,11 @@ describe('AuthenticationValidator', () => {
     })
 
     it('should store references to auth and wallet stores', () => {
-      // Access private members through any to verify they're stored
-      const validatorAny = validator as any
+      // Access private members through type assertion to verify they're stored
+      const validatorAny = validator as {
+        authStore: AuthenticationStore
+        walletStore: WalletStore
+      }
       expect(validatorAny.authStore).toBe(mockAuthStore)
       expect(validatorAny.walletStore).toBe(mockWalletStore)
     })
@@ -159,7 +162,9 @@ describe('AuthenticationValidator', () => {
         ]
 
         for (const walletAddress of addresses) {
-          mockWalletStore.validateInitialState.mockReturnValue({ isValid: true })
+          mockWalletStore.validateInitialState.mockReturnValue({
+            isValid: true,
+          })
 
           const context: ValidationContext = { walletAddress }
 
@@ -285,7 +290,7 @@ describe('AuthenticationValidator', () => {
       })
 
       it('should handle undefined abort controller gracefully', () => {
-        mockAuthStore.authLock.abortController = undefined as any
+        mockAuthStore.authLock.abortController = undefined as unknown as AbortController
 
         const result = validator.checkAuthenticationAborted()
 
@@ -295,13 +300,15 @@ describe('AuthenticationValidator', () => {
 
     describe('Edge Cases', () => {
       it('should handle missing authLock property', () => {
-        mockAuthStore.authLock = null as any
+        mockAuthStore.authLock = null as unknown as AuthenticationStore['authLock']
 
         expect(() => validator.checkAuthenticationAborted()).toThrow()
       })
 
       it('should handle malformed abort controller', () => {
-        mockAuthStore.authLock.abortController = { signal: null } as any
+        mockAuthStore.authLock.abortController = {
+          signal: null,
+        } as unknown as AbortController
 
         expect(() => validator.checkAuthenticationAborted()).toThrow()
       })
@@ -327,7 +334,10 @@ describe('AuthenticationValidator', () => {
 
     it('should return different states based on wallet store', () => {
       const states = [
-        { ...mockAtomicState, address: '0x1111111111111111111111111111111111111111' },
+        {
+          ...mockAtomicState,
+          address: '0x1111111111111111111111111111111111111111',
+        },
         { ...mockAtomicState, chainId: 1 },
         { ...mockAtomicState, isConnected: false },
       ]
@@ -380,7 +390,9 @@ describe('AuthenticationValidator', () => {
       })
 
       it('should handle null/undefined wallet address', async () => {
-        const nullAddressContext: ValidationContext = { walletAddress: null as any }
+        const nullAddressContext: ValidationContext = {
+          walletAddress: null as unknown as string,
+        }
         mockWalletStore.validateInitialState.mockReturnValue({ isValid: true })
 
         await validator.validatePreConditions(nullAddressContext)
@@ -518,7 +530,7 @@ describe('AuthenticationValidator', () => {
       const largeState = {
         ...mockAtomicState,
         metadata: 'A'.repeat(10000), // Large metadata
-      } as any
+      } as AtomicConnectionState & { metadata: string }
 
       mockWalletStore.captureState.mockReturnValue(largeState)
 

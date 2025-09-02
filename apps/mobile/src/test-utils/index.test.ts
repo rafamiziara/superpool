@@ -6,33 +6,30 @@
 import {
   // Re-exported from mockStores
   createMockAuthenticationStore,
-  createMockWalletStore,
-  createMockPoolManagementStore,
-  createMockUIStore,
-  createMockRootStore,
-  mockStorePresets,
-
-  // Re-exported from testProviders
-  TestStoreProvider,
-  withMockStore,
-
-  // Re-exported from renderWithStore
-  renderWithStore,
-  renderHookWithStore,
-  renderWithoutStore,
-
-  // Direct exports
-  waitForMobX,
   createMockFirebaseUser,
+  createMockPoolManagementStore,
+  createMockRootStore,
+  createMockUIStore,
+  createMockWalletStore,
   MOCK_ETH_ADDRESS,
   MOCK_ETH_ADDRESS_2,
+  mockStorePresets,
+  renderHookWithStore,
+  renderWithoutStore,
+  // Re-exported from renderWithStore
+  renderWithStore,
   TEST_CHAIN_IDS,
+  // Re-exported from testProviders
+  TestStoreProvider,
+  // Direct exports
+  waitForMobX,
+  withMockStore,
 } from './index'
 
 // Import the actual modules to verify re-exports
 import * as mockStores from './mockStores'
-import * as testProviders from './testProviders'
 import * as renderWithStoreModule from './renderWithStore'
+import * as testProviders from './testProviders'
 
 describe('test-utils index', () => {
   describe('re-exports from mockStores', () => {

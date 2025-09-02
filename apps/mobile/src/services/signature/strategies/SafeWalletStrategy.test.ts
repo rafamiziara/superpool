@@ -108,8 +108,20 @@ describe('SafeWalletStrategy', () => {
 
       it('should handle edge cases with connector properties', () => {
         expect(strategy.canHandle({ id: '', name: '', type: '' } as Connector)).toBe(false)
-        expect(strategy.canHandle({ id: null, name: null, type: 'test' } as any)).toBe(false)
-        expect(strategy.canHandle({ id: undefined, name: undefined, type: 'test' } as any)).toBe(false)
+        expect(
+          strategy.canHandle({
+            id: null,
+            name: null,
+            type: 'test',
+          } as unknown as Connector)
+        ).toBe(false)
+        expect(
+          strategy.canHandle({
+            id: undefined,
+            name: undefined,
+            type: 'test',
+          } as unknown as Connector)
+        ).toBe(false)
       })
 
       it('should handle partial Safe matches correctly', () => {
@@ -403,7 +415,7 @@ describe('SafeWalletStrategy', () => {
         return await promise
       })
 
-      mockSignatureUtils.validateSignatureResult.mockImplementation((sig) => {
+      mockSignatureUtils.validateSignatureResult.mockImplementation((_sig) => {
         callOrder.push('validateSignatureResult')
         return true
       })
@@ -505,7 +517,7 @@ describe('SafeWalletStrategy', () => {
     })
 
     it('should handle null/undefined signature results', async () => {
-      mockSignatureFunctions.signMessageAsync.mockResolvedValue(null as any)
+      mockSignatureFunctions.signMessageAsync.mockResolvedValue(null as unknown as string)
       mockSignatureUtils.validateSignatureResult.mockReturnValue(false)
 
       const result = await strategy.sign(mockRequest, mockSignatureFunctions, mockSafeConnector)
@@ -550,7 +562,11 @@ describe('SafeWalletStrategy', () => {
     it('should have consistent behavior across instances', () => {
       const strategy1 = new SafeWalletStrategy()
       const strategy2 = new SafeWalletStrategy()
-      const testConnector = { id: 'safe', name: 'Safe', type: 'safe' } as Connector
+      const testConnector = {
+        id: 'safe',
+        name: 'Safe',
+        type: 'safe',
+      } as Connector
 
       expect(strategy1.getStrategyName()).toBe(strategy2.getStrategyName())
       expect(strategy1.canHandle(testConnector)).toBe(strategy2.canHandle(testConnector))
@@ -558,7 +574,7 @@ describe('SafeWalletStrategy', () => {
 
     it('should have static timeout constant accessible', () => {
       // Access private static through any cast for testing
-      const strategyAny = strategy as any
+      const strategyAny = strategy as Record<string, unknown>
       const timeout = strategyAny.constructor.TIMEOUT_MS
 
       expect(timeout).toBe(20000)

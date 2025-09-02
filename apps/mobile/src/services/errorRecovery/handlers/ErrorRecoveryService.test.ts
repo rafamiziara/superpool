@@ -57,8 +57,8 @@ describe('ErrorRecoveryService', () => {
     jest.clearAllMocks()
 
     // Reset static state
-    ;(ErrorRecoveryService as any).authStore = undefined
-    ;(ErrorRecoveryService as any).walletStore = undefined
+    ;(ErrorRecoveryService as Record<string, unknown>).authStore = undefined
+    ;(ErrorRecoveryService as Record<string, unknown>).walletStore = undefined
   })
 
   describe('Initialization', () => {
@@ -68,8 +68,8 @@ describe('ErrorRecoveryService', () => {
       ErrorRecoveryService.initialize(mockAuthStore, mockWalletStore)
 
       expect(consoleSpy).toHaveBeenCalledWith('🔧 ErrorRecoveryService initialized with MobX stores')
-      expect((ErrorRecoveryService as any).authStore).toBe(mockAuthStore)
-      expect((ErrorRecoveryService as any).walletStore).toBe(mockWalletStore)
+      expect((ErrorRecoveryService as Record<string, unknown>).authStore).toBe(mockAuthStore)
+      expect((ErrorRecoveryService as Record<string, unknown>).walletStore).toBe(mockWalletStore)
 
       consoleSpy.mockRestore()
     })
@@ -81,13 +81,13 @@ describe('ErrorRecoveryService', () => {
       ErrorRecoveryService.initialize(mockAuthStore, mockWalletStore)
       ErrorRecoveryService.initialize(newAuthStore, newWalletStore)
 
-      expect((ErrorRecoveryService as any).authStore).toBe(newAuthStore)
-      expect((ErrorRecoveryService as any).walletStore).toBe(newWalletStore)
+      expect((ErrorRecoveryService as Record<string, unknown>).authStore).toBe(newAuthStore)
+      expect((ErrorRecoveryService as Record<string, unknown>).walletStore).toBe(newWalletStore)
     })
 
     it('should handle null store parameters', () => {
       expect(() => {
-        ErrorRecoveryService.initialize(null as any, null as any)
+        ErrorRecoveryService.initialize(null as unknown as AuthenticationStore, null as unknown as WalletStore)
       }).not.toThrow()
     })
   })
@@ -96,7 +96,7 @@ describe('ErrorRecoveryService', () => {
     it('should return disconnect function when wallet store is initialized', () => {
       ErrorRecoveryService.initialize(mockAuthStore, mockWalletStore)
 
-      const disconnectFn = (ErrorRecoveryService as any).getDisconnectFunction()
+      const disconnectFn = (ErrorRecoveryService as Record<string, unknown>).getDisconnectFunction() as (() => void) | null
 
       expect(disconnectFn).toBeDefined()
       expect(typeof disconnectFn).toBe('function')
@@ -105,7 +105,7 @@ describe('ErrorRecoveryService', () => {
     it('should return null when wallet store is not initialized', () => {
       const consoleWarnSpy = jest.spyOn(console, 'warn').mockImplementation()
 
-      const disconnectFn = (ErrorRecoveryService as any).getDisconnectFunction()
+      const disconnectFn = (ErrorRecoveryService as Record<string, unknown>).getDisconnectFunction() as (() => void) | null
 
       expect(disconnectFn).toBeNull()
       expect(consoleWarnSpy).toHaveBeenCalledWith('⚠️ WalletStore not initialized in ErrorRecoveryService')
@@ -117,7 +117,7 @@ describe('ErrorRecoveryService', () => {
       ErrorRecoveryService.initialize(mockAuthStore, mockWalletStore)
       const consoleSpy = jest.spyOn(console, 'log').mockImplementation()
 
-      const disconnectFn = (ErrorRecoveryService as any).getDisconnectFunction()
+      const disconnectFn = (ErrorRecoveryService as Record<string, unknown>).getDisconnectFunction() as (() => void) | null
       disconnectFn()
 
       expect(consoleSpy).toHaveBeenCalledWith('🔌 Disconnecting wallet via MobX store...')
@@ -128,10 +128,10 @@ describe('ErrorRecoveryService', () => {
 
     it('should handle wallet store being cleared after function creation', () => {
       ErrorRecoveryService.initialize(mockAuthStore, mockWalletStore)
-      const disconnectFn = (ErrorRecoveryService as any).getDisconnectFunction()
+      const disconnectFn = (ErrorRecoveryService as Record<string, unknown>).getDisconnectFunction() as (() => void) | null
 
       // Clear wallet store
-      ;(ErrorRecoveryService as any).walletStore = null
+      ;(ErrorRecoveryService as Record<string, unknown>).walletStore = null
 
       // Should not throw when calling the function
       expect(() => disconnectFn()).not.toThrow()
@@ -339,7 +339,7 @@ describe('ErrorRecoveryService', () => {
       })
 
       it('should handle missing wallet store gracefully', async () => {
-        ;(ErrorRecoveryService as any).walletStore = undefined
+        ;(ErrorRecoveryService as Record<string, unknown>).walletStore = undefined
 
         await ErrorRecoveryService.handleAuthenticationError(new Error('Generic error'))
 
@@ -382,7 +382,11 @@ describe('ErrorRecoveryService', () => {
           errorType: 'session',
           appError: mockAppError,
           originalError: new Error('Session error'),
-          sessionContext: { sessionId: 'test', errorMessage: 'test', isSessionError: true },
+          sessionContext: {
+            sessionId: 'test',
+            errorMessage: 'test',
+            isSessionError: true,
+          },
         })
         ;(SessionErrorHandler as jest.Mock).mockImplementation(() => ({
           handle: jest.fn().mockRejectedValue(new Error('Async handler failed')),
@@ -409,7 +413,12 @@ describe('ErrorRecoveryService', () => {
           originalError: new Error('Test error'),
         })
         ;(GenericErrorHandler as jest.Mock).mockImplementation(() => ({
-          handle: jest.fn().mockReturnValue({ shouldDisconnect: false, shouldShowError: true, errorDelay: 0, cleanupPerformed: false }),
+          handle: jest.fn().mockReturnValue({
+            shouldDisconnect: false,
+            shouldShowError: true,
+            errorDelay: 0,
+            cleanupPerformed: false,
+          }),
           getHandlerName: jest.fn().mockReturnValue('generic-error'),
         }))
 
@@ -523,7 +532,7 @@ describe('ErrorRecoveryService', () => {
     })
 
     it('should handle null stores', () => {
-      ErrorRecoveryService.initialize(null as any, null as any)
+      ErrorRecoveryService.initialize(null as unknown as AuthenticationStore, null as unknown as WalletStore)
 
       const status = ErrorRecoveryService.getServiceStatus()
 

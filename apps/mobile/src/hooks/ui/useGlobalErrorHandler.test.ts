@@ -106,7 +106,9 @@ describe('useGlobalErrorHandler', () => {
     const { unmount } = renderHook(() => useGlobalErrorHandler())
 
     // Console.error with multiple arguments
-    console.error('Error prefix:', 'WalletConnect session error', { details: 'test' })
+    console.error('Error prefix:', 'WalletConnect session error', {
+      details: 'test',
+    })
 
     const expectedMessage = 'Error prefix: WalletConnect session error [object Object]'
     expect(mockSessionManager.detectSessionCorruption).toHaveBeenCalledWith(expectedMessage)
@@ -843,7 +845,7 @@ describe('useGlobalErrorHandler', () => {
       const { unmount } = renderHook(() => useGlobalErrorHandler())
 
       // Create circular reference
-      const circularObj: any = { name: 'test' }
+      const circularObj: Record<string, unknown> = { name: 'test' }
       circularObj.self = circularObj
 
       // Should not crash with circular references
@@ -861,7 +863,9 @@ describe('useGlobalErrorHandler', () => {
       console.error('Test message', { key: 'value' })
 
       // Should still call original console.error
-      expect(originalConsoleError).toHaveBeenCalledWith('Test message', { key: 'value' })
+      expect(originalConsoleError).toHaveBeenCalledWith('Test message', {
+        key: 'value',
+      })
 
       unmount()
     })
@@ -953,7 +957,7 @@ describe('useGlobalErrorHandler', () => {
       mockSessionManager.handleSessionCorruption.mockRejectedValue(recoveryError)
 
       // We need to capture the original console.error to check for our specific error message
-      const originalErrorCalls: any[][] = []
+      const originalErrorCalls: unknown[][] = []
       consoleErrorSpy.mockImplementation((...args) => {
         originalErrorCalls.push(args)
       })

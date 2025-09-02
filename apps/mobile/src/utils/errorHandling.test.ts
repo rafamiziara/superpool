@@ -1,4 +1,12 @@
-import { categorizeError, createAppError, ERROR_MESSAGES, ErrorType, isUserInitiatedError, shouldRetryError } from './errorHandling'
+import {
+  AppError,
+  categorizeError,
+  createAppError,
+  ERROR_MESSAGES,
+  ErrorType,
+  isUserInitiatedError,
+  shouldRetryError,
+} from './errorHandling'
 
 describe('errorHandling', () => {
   describe('ErrorType enum', () => {
@@ -13,7 +21,7 @@ describe('errorHandling', () => {
 
     it('should be immutable', () => {
       expect(() => {
-        ;(ErrorType as any).NEW_ERROR = 'NEW_ERROR'
+        ;(ErrorType as Record<string, unknown>).NEW_ERROR = 'NEW_ERROR'
       }).not.toThrow() // TypeScript prevents this, but runtime doesn't
 
       // But the original values should remain unchanged
@@ -303,8 +311,8 @@ describe('errorHandling', () => {
       })
 
       it('should handle null and undefined errors', () => {
-        const nullResult = categorizeError(null as any)
-        const undefinedResult = categorizeError(undefined as any)
+        const nullResult = categorizeError(null as unknown)
+        const undefinedResult = categorizeError(undefined as unknown)
 
         expect(nullResult.type).toBe(ErrorType.UNKNOWN_ERROR)
         expect(undefinedResult.type).toBe(ErrorType.UNKNOWN_ERROR)
@@ -314,7 +322,7 @@ describe('errorHandling', () => {
         const nonErrorInputs = ['String error', { message: 'Object error' }, 42, []]
 
         nonErrorInputs.forEach((input) => {
-          const result = categorizeError(input as any)
+          const result = categorizeError(input as unknown)
           expect(result.type).toBe(ErrorType.UNKNOWN_ERROR)
         })
       })
@@ -406,12 +414,17 @@ describe('errorHandling', () => {
 
     describe('Edge Cases', () => {
       it('should handle null and undefined inputs', () => {
-        expect(isUserInitiatedError(null as any)).toBe(false)
-        expect(isUserInitiatedError(undefined as any)).toBe(false)
+        expect(isUserInitiatedError(null as unknown as AppError)).toBe(false)
+        expect(isUserInitiatedError(undefined as unknown as AppError)).toBe(false)
       })
 
       it('should handle malformed AppError objects', () => {
-        const malformedErrors = [{ type: undefined } as any, { type: null } as any, { type: 'INVALID_TYPE' } as any, {} as any]
+        const malformedErrors = [
+          { type: undefined } as unknown as AppError,
+          { type: null } as unknown as AppError,
+          { type: 'INVALID_TYPE' } as unknown as AppError,
+          {} as unknown as AppError,
+        ]
 
         malformedErrors.forEach((error) => {
           expect(isUserInitiatedError(error)).toBe(false)
@@ -464,12 +477,16 @@ describe('errorHandling', () => {
       })
 
       it('should handle null and undefined inputs', () => {
-        expect(shouldRetryError(null as any)).toBe(false)
-        expect(shouldRetryError(undefined as any)).toBe(false)
+        expect(shouldRetryError(null as unknown as AppError)).toBe(false)
+        expect(shouldRetryError(undefined as unknown as AppError)).toBe(false)
       })
 
       it('should handle malformed AppError objects', () => {
-        const malformedErrors = [{ type: undefined } as any, { type: 'INVALID_TYPE' } as any, {} as any]
+        const malformedErrors = [
+          { type: undefined } as unknown as AppError,
+          { type: 'INVALID_TYPE' } as unknown as AppError,
+          {} as unknown as AppError,
+        ]
 
         malformedErrors.forEach((error) => {
           expect(shouldRetryError(error)).toBe(false)

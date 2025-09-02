@@ -4,8 +4,8 @@
  */
 
 export * from './mockStores'
-export * from './testProviders'
 export * from './renderWithStore'
+export * from './testProviders'
 
 /**
  * Common test utilities and helpers

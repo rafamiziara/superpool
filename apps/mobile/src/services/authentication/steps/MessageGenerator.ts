@@ -34,7 +34,11 @@ export class MessageGenerator {
     const timestamp = this.validateAndParseTimestamp(rawTimestamp)
 
     console.log('✅ Authentication message generated:', message?.substring(0, 50) + '...')
-    console.log('📊 Timestamp debug:', { rawTimestamp, timestamp, type: typeof timestamp })
+    console.log('📊 Timestamp debug:', {
+      rawTimestamp,
+      timestamp,
+      type: typeof timestamp,
+    })
 
     return { message, nonce, timestamp }
   }

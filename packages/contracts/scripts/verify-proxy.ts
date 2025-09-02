@@ -74,7 +74,7 @@ async function main() {
     // Step 2: Verify the proxy contract
     console.log('\n3️⃣ Verifying proxy contract...')
     try {
-      await verifyProxy(proxyAddress, implementationAddress)
+      await verifyProxy(proxyAddress)
       console.log('   ✅ Proxy contract verified successfully')
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error'
@@ -132,56 +132,15 @@ async function verifyImplementation(implementationAddress: string): Promise<void
 }
 
 /**
- * Verify proxy contract with implementation reference
+ * Verify proxy contract with implementation
  */
-async function verifyProxy(proxyAddress: string, _implementationAddress: string): Promise<void> {
+async function verifyProxy(proxyAddress: string): Promise<void> {
   // Proxy contracts are typically deployed with the implementation address
   // and initialization data as constructor arguments
   await run('verify:verify', {
     address: proxyAddress,
     constructorArguments: [], // ERC1967Proxy constructor args would go here if needed
   })
-}
-
-/**
- * Get proxy information for debugging
- */
-async function _getProxyInfo(proxyAddress: string) {
-  const info: Record<string, string | boolean> = {}
-
-  try {
-    info.implementation = await upgrades.erc1967.getImplementationAddress(proxyAddress)
-  } catch {
-    info.implementation = 'Unable to fetch'
-  }
-
-  try {
-    info.admin = await upgrades.erc1967.getAdminAddress(proxyAddress)
-  } catch {
-    info.admin = 'N/A (UUPS proxy)'
-  }
-
-  try {
-    // Try to get the contract name by looking at the implementation
-    const implementationCode = await ethers.provider.getCode(info.implementation)
-    info.hasImplementation = implementationCode !== '0x'
-  } catch {
-    info.hasImplementation = false
-  }
-
-  return info
-}
-
-/**
- * Helper to check if address is a proxy
- */
-async function _isProxy(address: string): Promise<boolean> {
-  try {
-    await upgrades.erc1967.getImplementationAddress(address)
-    return true
-  } catch {
-    return false
-  }
 }
 
 // Handle errors

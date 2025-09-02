@@ -102,7 +102,7 @@ describe('chains configuration', () => {
     it('should maintain readonly chain configuration', () => {
       // Try to modify (should not affect original due to 'as const')
       expect(() => {
-        ;(localhost as any).name = 'Modified'
+        ;(localhost as { name: string }).name = 'Modified'
       }).not.toThrow() // Assignment might work but shouldn't affect the type
 
       // Verify we can still access the original structure

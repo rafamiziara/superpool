@@ -17,7 +17,8 @@ import {
 import { LOG_LEVELS } from './constants'
 
 // Mock __DEV__ global
-const originalDev = (global as any).__DEV__
+type GlobalWithDev = typeof global & { __DEV__?: boolean }
+const originalDev = (global as GlobalWithDev).__DEV__
 const mockConsole = {
   log: jest.fn(),
   info: jest.fn(),
@@ -50,13 +51,13 @@ describe('secureLogger', () => {
     consoleErrorSpy.mockRestore()
 
     // Restore original __DEV__
-    ;(global as any).__DEV__ = originalDev
+    ;(global as GlobalWithDev).__DEV__ = originalDev
   })
 
   describe('SecureLogger Class', () => {
     describe('Development Mode', () => {
       beforeEach(() => {
-        ;(global as any).__DEV__ = true
+        ;(global as GlobalWithDev).__DEV__ = true
       })
 
       it('should log debug messages in development mode', () => {
@@ -135,7 +136,7 @@ describe('secureLogger', () => {
 
     describe('Data Sanitization', () => {
       beforeEach(() => {
-        ;(global as any).__DEV__ = true
+        ;(global as GlobalWithDev).__DEV__ = true
       })
 
       it('should sanitize wallet addresses in strings (production mode)', () => {
@@ -143,7 +144,7 @@ describe('secureLogger', () => {
         const textWithAddress = 'User wallet: 0x1234567890123456789012345678901234567890'
 
         // Manually test the sanitization logic
-        const sanitized = (SecureLogger as any).sanitizeString(textWithAddress)
+        const sanitized = (SecureLogger as { sanitizeString: (str: string) => string }).sanitizeString(textWithAddress)
         expect(sanitized).toBe('User wallet: 0x1234...7890')
       })
 
@@ -151,7 +152,7 @@ describe('secureLogger', () => {
         const sensitiveObj = { privateKey: 'secret123' }
 
         // Directly test the sanitization method
-        const sanitized = (SecureLogger as any).sanitizeObject(sensitiveObj)
+        const sanitized = (SecureLogger as { sanitizeObject: (obj: unknown) => unknown }).sanitizeObject(sensitiveObj)
         expect(sanitized).toEqual({ privateKey: '[REDACTED]' })
       })
 
@@ -164,7 +165,7 @@ describe('secureLogger', () => {
           normalData: 'this should not be sanitized',
         }
 
-        const sanitized = (SecureLogger as any).sanitizeObject(sensitiveData)
+        const sanitized = (SecureLogger as { sanitizeObject: (obj: unknown) => unknown }).sanitizeObject(sensitiveData)
 
         expect(sanitized).toEqual({
           walletAddress: '0x1234...7890', // Wallet address truncated (hex string > 20 chars)
@@ -190,7 +191,7 @@ describe('secureLogger', () => {
           },
         }
 
-        const sanitized = (SecureLogger as any).sanitizeObject(nestedData)
+        const sanitized = (SecureLogger as { sanitizeObject: (obj: unknown) => unknown }).sanitizeObject(nestedData)
 
         expect(sanitized).toEqual({
           user: {
@@ -214,7 +215,7 @@ describe('secureLogger', () => {
           { normalData: 'safe_data' },
         ]
 
-        const sanitized = (SecureLogger as any).sanitizeData(arrayData)
+        const sanitized = (SecureLogger as { sanitizeData: (data: unknown) => unknown }).sanitizeData(arrayData)
 
         // Arrays are treated as objects in sanitizeData, so result is object with numeric keys
         expect(sanitized).toEqual({
@@ -227,7 +228,7 @@ describe('secureLogger', () => {
 
     describe('Log Level Filtering', () => {
       beforeEach(() => {
-        ;(global as any).__DEV__ = true
+        ;(global as GlobalWithDev).__DEV__ = true
       })
 
       it('should respect log level hierarchy', () => {
@@ -247,7 +248,7 @@ describe('secureLogger', () => {
 
     describe('Error Object Handling', () => {
       beforeEach(() => {
-        ;(global as any).__DEV__ = true
+        ;(global as GlobalWithDev).__DEV__ = true
       })
 
       it('should properly log Error objects', () => {
@@ -265,11 +266,11 @@ describe('secureLogger', () => {
 
       it('should sanitize Error objects with sensitive data', () => {
         const error = new Error('Authentication failed')
-        ;(error as any).privateKey = 'secret123'
-        ;(error as any).walletAddress = '0x1234567890123456789012345678901234567890'
+        ;(error as Error & Record<string, unknown>).privateKey = 'secret123'
+        ;(error as Error & Record<string, unknown>).walletAddress = '0x1234567890123456789012345678901234567890'
 
         // Test the sanitization method directly
-        const sanitized = (SecureLogger as any).sanitizeObject(error)
+        const sanitized = (SecureLogger as { sanitizeObject: (obj: unknown) => unknown }).sanitizeObject(error)
 
         // Error objects don't have the message as an enumerable property when sanitized
         expect(sanitized).toEqual({
@@ -301,7 +302,7 @@ describe('secureLogger', () => {
 
   describe('Exported Functions', () => {
     beforeEach(() => {
-      ;(global as any).__DEV__ = true
+      ;(global as GlobalWithDev).__DEV__ = true
     })
 
     describe('Basic Logging Functions', () => {
@@ -328,7 +329,7 @@ describe('secureLogger', () => {
 
     describe('devOnly Function', () => {
       it('should log devOnly messages in development mode', () => {
-        ;(global as any).__DEV__ = true
+        ;(global as GlobalWithDev).__DEV__ = true
 
         devOnly('Development message', { debug: true })
 
@@ -350,7 +351,7 @@ describe('secureLogger', () => {
       })
 
       it('should log multiple arguments in development mode', () => {
-        ;(global as any).__DEV__ = true
+        ;(global as GlobalWithDev).__DEV__ = true
 
         devOnly('Message:', 'arg1', 'arg2', 123)
 
@@ -368,7 +369,7 @@ describe('secureLogger', () => {
         })
 
         it('should handle invalid addresses', () => {
-          const result1 = logWalletAddress(null as any, 'No address')
+          const result1 = logWalletAddress(null as unknown as string, 'No address')
           const result2 = logWalletAddress('', 'Empty address')
           const result3 = logWalletAddress('short', 'Short address')
 
@@ -424,7 +425,9 @@ describe('secureLogger', () => {
 
       describe('logServiceOperation', () => {
         it('should log service operations with context', () => {
-          logServiceOperation('AuthService', 'authenticate', 'start', { userId: 123 })
+          logServiceOperation('AuthService', 'authenticate', 'start', {
+            userId: 123,
+          })
 
           expect(consoleLogSpy).toHaveBeenCalledWith('🔄 [AuthService] authenticate start', { userId: 123 })
         })
@@ -447,7 +450,7 @@ describe('secureLogger', () => {
         })
 
         it('should handle errors without Error objects', () => {
-          logServiceError('TestService', 'test', 'string error' as any)
+          logServiceError('TestService', 'test', 'string error' as unknown as Error)
 
           expect(consoleErrorSpy).toHaveBeenCalledWith(
             '❌ [TestService] test failed:',
@@ -471,7 +474,10 @@ describe('secureLogger', () => {
         })
 
         it('should log recovery actions without context', () => {
-          logRecoveryAction('wallet_disconnect', { status: 'failed', reason: 'Unable to disconnect wallet' })
+          logRecoveryAction('wallet_disconnect', {
+            status: 'failed',
+            reason: 'Unable to disconnect wallet',
+          })
 
           expect(consoleLogSpy).toHaveBeenCalledWith('🔄 Recovery: wallet_disconnect', {
             status: 'failed',
@@ -488,7 +494,10 @@ describe('secureLogger', () => {
         })
 
         it('should create contexts with additional context data', () => {
-          const context = createServiceContext('Service', 'method', { userId: 123, debug: true })
+          const context = createServiceContext('Service', 'method', {
+            userId: 123,
+            debug: true,
+          })
 
           expect(context).toMatch(/\[Service:method\] \d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z {"userId":123,"debug":true}/)
         })
@@ -512,11 +521,11 @@ describe('secureLogger', () => {
 
   describe('Edge Cases and Error Handling', () => {
     beforeEach(() => {
-      ;(global as any).__DEV__ = true
+      ;(global as GlobalWithDev).__DEV__ = true
     })
 
     it('should handle circular references in objects', () => {
-      const circularObj: any = { name: 'test' }
+      const circularObj: Record<string, unknown> = { name: 'test' }
       circularObj.self = circularObj
 
       expect(() => {
@@ -567,7 +576,7 @@ describe('secureLogger', () => {
 
   describe('Performance', () => {
     beforeEach(() => {
-      ;(global as any).__DEV__ = true
+      ;(global as GlobalWithDev).__DEV__ = true
     })
 
     it('should handle high-frequency logging efficiently', () => {

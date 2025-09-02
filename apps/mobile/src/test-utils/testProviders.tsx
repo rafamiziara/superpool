@@ -1,6 +1,6 @@
 import React, { ReactNode } from 'react'
-import { StoreContext } from '../stores/StoreContext'
 import { RootStore } from '../stores/RootStore'
+import { StoreContext } from '../stores/StoreContext'
 import { createMockRootStore } from './mockStores'
 
 /**

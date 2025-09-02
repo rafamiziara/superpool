@@ -4,6 +4,7 @@
  */
 
 import { act } from '@testing-library/react-native'
+import type { Connector } from 'wagmi'
 import { createMockRootStore, renderHookWithStore } from '../../test-utils'
 import { useAuthenticationIntegration } from './useAuthenticationIntegration'
 
@@ -99,7 +100,12 @@ jest.mock('wagmi', () => ({
 
 // Mock references
 const mockUseAccount = require('wagmi').useAccount as jest.MockedFunction<typeof import('wagmi').useAccount>
-const AuthenticationOrchestratorMock = require('../../services/authentication').AuthenticationOrchestrator as jest.MockedFunction<any>
+const AuthenticationOrchestratorMock = require('../../services/authentication').AuthenticationOrchestrator as jest.MockedFunction<
+  new (
+    authStore: import('../../stores/AuthenticationStore').AuthenticationStore,
+    walletStore: import('../../stores/WalletStore').WalletStore
+  ) => typeof mockOrchestrator
+>
 
 describe('useAuthenticationIntegration', () => {
   let mockStore: ReturnType<typeof createMockRootStore>
@@ -113,11 +119,11 @@ describe('useAuthenticationIntegration', () => {
     // Reset wagmi mocks
     mockSignMessageAsync.mockClear().mockResolvedValue('0xmockedsignature')
     mockSignTypedDataAsync.mockClear().mockResolvedValue('0xmockedsignature')
-    mockDisconnect.mockClear().mockResolvedValue(undefined as any)
+    mockDisconnect.mockClear().mockResolvedValue(undefined)
 
     // Reset orchestrator mock
     mockOrchestrator.authenticate.mockClear().mockResolvedValue({ success: true })
-    mockOrchestrator.handleDisconnection.mockClear().mockResolvedValue(undefined as any)
+    mockOrchestrator.handleDisconnection.mockClear().mockResolvedValue(undefined)
     AuthenticationOrchestratorMock.mockClear().mockImplementation(() => mockOrchestrator)
 
     mockUseAccount.mockReturnValue(createMockDisconnectedAccount())
@@ -163,8 +169,8 @@ describe('useAuthenticationIntegration', () => {
     it('should reuse orchestrator instance', () => {
       const { result } = renderHookWithStore(() => useAuthenticationIntegration(), { store: mockStore })
 
-      let orchestrator1: any
-      let orchestrator2: any
+      let orchestrator1: typeof mockOrchestrator
+      let orchestrator2: typeof mockOrchestrator
 
       act(() => {
         orchestrator1 = result.current.getOrchestrator()
@@ -388,7 +394,9 @@ describe('useAuthenticationIntegration', () => {
     it('should return false when Firebase user exists', () => {
       mockUseAccount.mockReturnValue(createMockConnectedAccount('0x1234567890123456789012345678901234567890', 1))
 
-      require('../../firebase.config').FIREBASE_AUTH.currentUser = { uid: 'test-uid' }
+      require('../../firebase.config').FIREBASE_AUTH.currentUser = {
+        uid: 'test-uid',
+      }
 
       const { result } = renderHookWithStore(() => useAuthenticationIntegration(), { store: mockStore })
 
@@ -475,7 +483,7 @@ describe('useAuthenticationIntegration', () => {
         onChainChanged: jest.fn(),
         onConnect: jest.fn(),
         onDisconnect: jest.fn(),
-      } as any
+      } as Connector
 
       mockUseAccount.mockReturnValue({
         isConnected: true,
@@ -506,7 +514,7 @@ describe('useAuthenticationIntegration', () => {
 
     it('should create authentication context with proper signature functions', async () => {
       // Mock the orchestrator to capture the authentication context but don't run authenticate
-      let capturedContext: any = null
+      let capturedContext: import('@superpool/types').AuthenticationContext | null = null
       mockOrchestrator.authenticate.mockImplementation(async (context) => {
         capturedContext = context
         // Don't actually call the signature functions, just capture the context
@@ -544,7 +552,7 @@ describe('useAuthenticationIntegration', () => {
     })
 
     it('should call signTypedDataAsync with all properties provided', async () => {
-      let capturedContext: any = null
+      let capturedContext: import('@superpool/types').AuthenticationContext | null = null
       mockOrchestrator.authenticate.mockImplementation(async (context) => {
         capturedContext = context
         return { success: true }
@@ -574,7 +582,7 @@ describe('useAuthenticationIntegration', () => {
     })
 
     it('should call signTypedDataAsync with domain fallback', async () => {
-      let capturedContext: any = null
+      let capturedContext: import('@superpool/types').AuthenticationContext | null = null
       mockOrchestrator.authenticate.mockImplementation(async (context) => {
         capturedContext = context
         return { success: true }
@@ -604,7 +612,7 @@ describe('useAuthenticationIntegration', () => {
     })
 
     it('should call signTypedDataAsync with types fallback', async () => {
-      let capturedContext: any = null
+      let capturedContext: import('@superpool/types').AuthenticationContext | null = null
       mockOrchestrator.authenticate.mockImplementation(async (context) => {
         capturedContext = context
         return { success: true }
@@ -634,7 +642,7 @@ describe('useAuthenticationIntegration', () => {
     })
 
     it('should call signTypedDataAsync with primaryType fallback', async () => {
-      let capturedContext: any = null
+      let capturedContext: import('@superpool/types').AuthenticationContext | null = null
       mockOrchestrator.authenticate.mockImplementation(async (context) => {
         capturedContext = context
         return { success: true }
@@ -664,7 +672,7 @@ describe('useAuthenticationIntegration', () => {
     })
 
     it('should call signTypedDataAsync with message fallback', async () => {
-      let capturedContext: any = null
+      let capturedContext: import('@superpool/types').AuthenticationContext | null = null
       mockOrchestrator.authenticate.mockImplementation(async (context) => {
         capturedContext = context
         return { success: true }
@@ -694,7 +702,7 @@ describe('useAuthenticationIntegration', () => {
     })
 
     it('should call signTypedDataAsync with all fallbacks', async () => {
-      let capturedContext: any = null
+      let capturedContext: import('@superpool/types').AuthenticationContext | null = null
       mockOrchestrator.authenticate.mockImplementation(async (context) => {
         capturedContext = context
         return { success: true }
@@ -724,7 +732,7 @@ describe('useAuthenticationIntegration', () => {
     })
 
     it('should call signMessageAsync function directly', async () => {
-      let capturedContext: any = null
+      let capturedContext: import('@superpool/types').AuthenticationContext | null = null
       mockOrchestrator.authenticate.mockImplementation(async (context) => {
         capturedContext = context
         return { success: true }
@@ -753,7 +761,7 @@ describe('useAuthenticationIntegration', () => {
     })
 
     it('should call all progress callback functions', async () => {
-      let capturedContext: any = null
+      let capturedContext: import('@superpool/types').AuthenticationContext | null = null
       mockOrchestrator.authenticate.mockImplementation(async (context) => {
         capturedContext = context
         return { success: true }
@@ -805,7 +813,9 @@ describe('useAuthenticationIntegration', () => {
       const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation()
 
       expect(() => {
-        renderHookWithStore(() => useAuthenticationIntegration(), { store: mockStore })
+        renderHookWithStore(() => useAuthenticationIntegration(), {
+          store: mockStore,
+        })
       }).toThrow('Account context error')
 
       consoleErrorSpy.mockRestore()
@@ -825,8 +835,8 @@ describe('useAuthenticationIntegration', () => {
 
       const { result, rerender } = renderHookWithStore(() => useAuthenticationIntegration(), { store: mockStore })
 
-      let orchestrator1: any
-      let orchestrator2: any
+      let orchestrator1: typeof mockOrchestrator
+      let orchestrator2: typeof mockOrchestrator
 
       act(() => {
         orchestrator1 = result.current.getOrchestrator()

@@ -98,7 +98,11 @@ const mockWalletStore = {
   isConnected: false,
   address: undefined as string | undefined,
   chainId: undefined as number | undefined,
-  currentState: { isConnected: false, address: undefined as string | undefined, chainId: undefined as number | undefined },
+  currentState: {
+    isConnected: false,
+    address: undefined as string | undefined,
+    chainId: undefined as number | undefined,
+  },
   connect: jest.fn(),
   disconnect: jest.fn(),
   updateConnectionState: jest.fn(),
@@ -180,7 +184,9 @@ describe('Authentication Flow Integration Tests', () => {
         () =>
           ({
             authenticate: jest.fn().mockRejectedValue(mockError),
-          }) as any
+          }) as {
+            authenticate: jest.MockedFunction<(context: import('@superpool/types').AuthenticationContext) => Promise<void>>
+          }
       )
 
       const testWalletAddress = '0x1234567890123456789012345678901234567890'

@@ -251,7 +251,7 @@ describe('WalletStore', () => {
       expect(store.isConnecting).toBe(false) // Should be set to false when error occurs
 
       // Test that non-Error strings are handled as expected in error logic
-      const isErrorInstance = ('string error' as any) instanceof Error
+      const isErrorInstance = ('string error' as unknown) instanceof Error
       const expectedMessage = isErrorInstance ? 'string error' : 'Connection failed'
       expect(expectedMessage).toBe('Connection failed')
     })
@@ -681,7 +681,11 @@ describe('WalletStore', () => {
 
     it('should call disconnect and resetSequence', () => {
       // Since we can't spy on MobX actions, test the behavior instead
-      store.setConnectionState({ isConnected: true, address: '0x123', chainId: 1 })
+      store.setConnectionState({
+        isConnected: true,
+        address: '0x123',
+        chainId: 1,
+      })
       store.updateConnectionState(true, '0x456', 2) // increment sequence
 
       const beforeReset = store.captureState()
@@ -835,7 +839,6 @@ describe('WalletStore', () => {
     it('should properly cleanup on connection failure', async () => {
       // Mock connect to fail but still test cleanup
       const store2 = new WalletStore()
-      const originalConnect = store2.connect
       store2.connect = jest.fn().mockImplementation(async () => {
         store2.setConnecting(true)
         throw new Error('Connection failed')
@@ -843,7 +846,7 @@ describe('WalletStore', () => {
 
       try {
         await store2.connect('0x123', 1)
-      } catch (error) {
+      } catch (_error) {
         // Expected to fail
       }
 

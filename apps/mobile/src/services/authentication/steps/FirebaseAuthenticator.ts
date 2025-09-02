@@ -69,7 +69,9 @@ export class FirebaseAuthenticator {
     })
 
     console.log('✅ Backend verification successful')
-    const { firebaseToken } = signatureResponse.data as { firebaseToken: string }
+    const { firebaseToken } = signatureResponse.data as {
+      firebaseToken: string
+    }
 
     devOnly('📋 Firebase token received:', typeof firebaseToken, firebaseToken ? 'present' : 'missing')
     // Never log actual token content, even in development
@@ -87,7 +89,9 @@ export class FirebaseAuthenticator {
     const circuitBreaker = FirebaseAuthCircuitBreakers.getCircuitBreakerForSignatureType(signatureType)
 
     // Get appropriate retry policy
-    const retryPolicy = RetryPolicies.getPolicyForWallet(signatureType, { isFirstAttempt: true })
+    const retryPolicy = RetryPolicies.getPolicyForWallet(signatureType, {
+      isFirstAttempt: true,
+    })
 
     console.log(`📋 Using retry policy: ${retryPolicy.name} (max ${retryPolicy.maxRetries} retries)`)
 

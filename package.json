@@ -21,7 +21,7 @@
     "lint": "pnpm run lint:ts && pnpm run lint:sol",
     "lint:ts": "eslint . --config eslint.config.mjs",
     "lint:sol": "pnpm --filter contracts lint",
-    "lint:fix": "pnpm run lint:ts -- --fix && pnpm run lint:sol"
+    "lint:fix": "eslint . --config eslint.config.mjs --fix && pnpm run lint:sol"
   },
   "keywords": [],
   "author": "",

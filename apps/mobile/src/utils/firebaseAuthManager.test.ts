@@ -13,7 +13,7 @@ const mockConsoleLog = jest.fn()
 const mockConsoleWarn = jest.fn()
 
 // Store the Firebase auth callback for manual triggering
-let authStateCallback: ((user: any) => void) | null = null
+let authStateCallback: ((user: unknown) => void) | null = null
 
 // Clear setupTests.ts mock for this specific test
 jest.unmock('./firebaseAuthManager')
@@ -69,10 +69,10 @@ describe('FirebaseAuthManager Complete Coverage', () => {
     mockConsoleWarn.mockClear()
 
     // Reset manager state
-    ;(firebaseAuthManager as any).isInitialized = false
-    ;(firebaseAuthManager as any).listeners = new Set()
-    ;(firebaseAuthManager as any).unsubscribe = null
-    ;(firebaseAuthManager as any).currentState = {
+    ;(firebaseAuthManager as Record<string, unknown>).isInitialized = false
+    ;(firebaseAuthManager as Record<string, unknown>).listeners = new Set()
+    ;(firebaseAuthManager as Record<string, unknown>).unsubscribe = null
+    ;(firebaseAuthManager as Record<string, unknown>).currentState = {
       user: null,
       isLoading: true,
       isAuthenticated: false,
@@ -109,7 +109,7 @@ describe('FirebaseAuthManager Complete Coverage', () => {
       })
 
       // Verify manager is initialized
-      expect((firebaseAuthManager as any).isInitialized).toBe(true)
+      expect((firebaseAuthManager as Record<string, unknown>).isInitialized).toBe(true)
     })
 
     it('should not reinitialize when already initialized (line 45)', () => {
@@ -130,12 +130,12 @@ describe('FirebaseAuthManager Complete Coverage', () => {
       const unsubscribe1 = firebaseAuthManager.addListener(listener1)
       firebaseAuthManager.addListener(listener2)
 
-      expect((firebaseAuthManager as any).listeners.size).toBe(2)
+      expect(((firebaseAuthManager as Record<string, unknown>).listeners as Set<unknown>).size).toBe(2)
 
       // Test the cleanup function returned by addListener (line 84-85)
       unsubscribe1()
 
-      expect((firebaseAuthManager as any).listeners.size).toBe(1)
+      expect(((firebaseAuthManager as Record<string, unknown>).listeners as Set<unknown>).size).toBe(1)
 
       // Trigger auth state change to verify only listener2 gets called
       if (authStateCallback) {
@@ -155,9 +155,9 @@ describe('FirebaseAuthManager Complete Coverage', () => {
       firebaseAuthManager.addListener(jest.fn())
 
       // Verify it's initialized
-      expect((firebaseAuthManager as any).isInitialized).toBe(true)
-      expect((firebaseAuthManager as any).listeners.size).toBe(1)
-      expect((firebaseAuthManager as any).unsubscribe).toBe(mockUnsubscribe)
+      expect((firebaseAuthManager as Record<string, unknown>).isInitialized).toBe(true)
+      expect(((firebaseAuthManager as Record<string, unknown>).listeners as Set<unknown>).size).toBe(1)
+      expect((firebaseAuthManager as Record<string, unknown>).unsubscribe).toBe(mockUnsubscribe)
 
       // Test cleanup method (lines 103-108)
       firebaseAuthManager.cleanup()
@@ -169,9 +169,9 @@ describe('FirebaseAuthManager Complete Coverage', () => {
       expect(mockUnsubscribe).toHaveBeenCalled()
 
       // Should reset all state (lines 106-108)
-      expect((firebaseAuthManager as any).unsubscribe).toBe(null)
-      expect((firebaseAuthManager as any).isInitialized).toBe(false)
-      expect((firebaseAuthManager as any).listeners.size).toBe(0)
+      expect((firebaseAuthManager as Record<string, unknown>).unsubscribe).toBe(null)
+      expect((firebaseAuthManager as Record<string, unknown>).isInitialized).toBe(false)
+      expect(((firebaseAuthManager as Record<string, unknown>).listeners as Set<unknown>).size).toBe(0)
     })
 
     it('should handle cleanup when not initialized', () => {
