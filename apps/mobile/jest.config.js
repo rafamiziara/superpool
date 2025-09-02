@@ -17,13 +17,42 @@ module.exports = {
     '!src/setupTests.ts',
     '!src/**/*.test.{ts,tsx}',
     '!src/**/*.spec.{ts,tsx}',
-    '!src/app/**',
-    '!src/**/+*.tsx',
-    '!src/firebase.config.ts',
-    '!src/utils/appCheckProvider.ts',
+    '!src/app/**', // App screens excluded for now
+    '!src/**/+*.tsx', // Expo router files
+    '!src/firebase.config.ts', // Configuration file
+    '!src/config/**', // Configuration directory
+    '!src/globals.d.ts', // Type definitions
+    '!src/assets/**', // Static assets
   ],
   coverageDirectory: '<rootDir>/../../coverage/mobile',
   coverageReporters: ['lcov', 'text'],
+  coverageThreshold: {
+    global: {
+      branches: 90,
+      functions: 95,
+      lines: 95,
+      statements: 95,
+    },
+    // Specific thresholds for critical areas
+    'src/stores/**': {
+      branches: 95,
+      functions: 95,
+      lines: 95,
+      statements: 95,
+    },
+    'src/services/**': {
+      branches: 90,
+      functions: 95,
+      lines: 95,
+      statements: 95,
+    },
+    'src/hooks/**': {
+      branches: 90,
+      functions: 95,
+      lines: 95,
+      statements: 95,
+    },
+  },
   globals: {
     __DEV__: true,
   },

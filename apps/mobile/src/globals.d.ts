@@ -1,3 +1,4 @@
+/* istanbul ignore file */
 declare global {
   var __DEV__: boolean
 

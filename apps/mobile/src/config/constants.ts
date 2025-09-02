@@ -1,3 +1,4 @@
+/* istanbul ignore file */
 /**
  * Shared constants for the SuperPool mobile application
  * Centralizes all configuration values, timeouts, and magic numbers
