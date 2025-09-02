@@ -6,7 +6,7 @@
 import { render, renderHook } from '@testing-library/react-native'
 import React from 'react'
 import { Text } from 'react-native'
-import { RootStore } from './RootStore'
+import { RootStore } from '../../src/stores/RootStore'
 import {
   rootStore,
   StoreContext,
@@ -17,7 +17,7 @@ import {
   useStores,
   useUIStore,
   useWalletStore,
-} from './StoreContext'
+} from '../../src/stores/StoreContext'
 
 // Mock RootStore to prevent actual instantiation
 jest.mock('./RootStore', () => ({
