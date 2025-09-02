@@ -5,11 +5,19 @@
 
 import { act, waitFor } from '@testing-library/react-native'
 import { runInAction } from 'mobx'
+import { useAccount } from 'wagmi'
 import { createMockRootStore, renderHookWithStore } from '../../test-utils'
+import { createMockFirebaseAuthManager } from '../../__mocks__/factories/utilFactory'
 import { AppError, ErrorType } from '../../utils/errorHandling'
 import { useAuthStateSynchronization, useAuthStateValidation } from './useAuthStateSynchronization'
 
-// Create proper Chain type mock
+// wagmi and firebase mocks are already centralized in setupTests.ts
+const mockUseAccount = useAccount as jest.MockedFunction<typeof useAccount>
+
+// Create centralized Firebase auth manager mock
+const mockFirebaseAuthManager = createMockFirebaseAuthManager()
+
+// Create chain and account state helpers for testing
 const createMockChain = (id: number, name: string) => ({
   id,
   name,
@@ -25,7 +33,6 @@ const createMockChain = (id: number, name: string) => ({
   },
 })
 
-// Create proper UseAccountReturnType mocks
 const createMockConnectedAccount = (address: string, chainId = 1) => ({
   isConnected: true as const,
   address: address as `0x${string}`,
@@ -36,7 +43,7 @@ const createMockConnectedAccount = (address: string, chainId = 1) => ({
   isReconnecting: true as const,
   isConnecting: false as const,
   isDisconnected: false as const,
-  status: 'reconnecting' as const, // Use reconnecting status for proper Wagmi compatibility
+  status: 'reconnecting' as const,
 })
 
 const createMockDisconnectedAccount = () => ({
@@ -48,11 +55,11 @@ const createMockDisconnectedAccount = () => ({
   connector: undefined,
   isReconnecting: false as const,
   isConnecting: true as const,
-  isDisconnected: false as const, // Use false to match connecting status
-  status: 'connecting' as const, // Use connecting status for proper Wagmi compatibility
+  isDisconnected: false as const,
+  status: 'connecting' as const,
 })
 
-// Mock dependencies
+// Mock dependencies that aren't centralized
 jest.mock('../../firebase.config', () => ({
   FIREBASE_AUTH: {
     signOut: jest.fn(),
@@ -63,11 +70,7 @@ jest.mock('../../utils', () => ({
   devOnly: jest.fn(),
 }))
 
-jest.mock('wagmi', () => ({
-  useAccount: jest.fn(() => createMockDisconnectedAccount()),
-}))
-
-// Mock Firebase auth hook
+// Mock Firebase auth hook using centralized factory
 const mockFirebaseAuth = {
   isAuthenticated: false,
   isLoading: false,
@@ -81,9 +84,6 @@ jest.mock('./useFirebaseAuth', () => ({
 
 // Mock references
 const mockDevOnly = require('../../utils').devOnly as jest.MockedFunction<typeof import('../../utils').devOnly>
-const mockUseAccount = require('wagmi').useAccount as jest.MockedFunction<typeof import('wagmi').useAccount>
-
-// Get reference to the mocked Firebase auth
 const mockFirebaseConfig = require('../../firebase.config')
 const mockFirebaseSignOut = mockFirebaseConfig.FIREBASE_AUTH.signOut as jest.MockedFunction<() => Promise<void>>
 
