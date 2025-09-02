@@ -36,7 +36,12 @@ describe('testProviders', () => {
     mockCreateMockRootStore.mockReturnValue(mockStore)
 
     // Mock StoreContext.Provider
-    MockedStoreContext.Provider = jest.fn().mockImplementation(({ children }) => <>{children}</>) as unknown as jest.MockInstance<React.ReactNode, [props: React.ProviderProps<RootStore | null>], unknown> & React.Provider<RootStore | null>
+    MockedStoreContext.Provider = jest.fn().mockImplementation(({ children }) => <>{children}</>) as unknown as jest.MockInstance<
+      React.ReactNode,
+      [props: React.ProviderProps<RootStore | null>],
+      unknown
+    > &
+      React.Provider<RootStore | null>
   })
 
   describe('TestStoreProvider', () => {

@@ -2,8 +2,8 @@ import { Contract, ContractRunner, isAddress, keccak256, toUtf8Bytes } from 'eth
 import { logger } from 'firebase-functions/v2'
 import { createAuthMessage } from '.'
 import {
-  EIP1271VerificationParams,
   EIP1271_MAGIC_VALUE,
+  EIP1271VerificationParams,
   SAFE_CONTRACT_ABI_FRAGMENTS,
   SafeOwnershipVerification,
   SafeVersionInfo,
@@ -11,7 +11,7 @@ import {
   SafeWalletVerification,
   SafeWalletVerificationError,
   SafeWalletVerificationResult,
-  SUPPORTED_SAFE_VERSIONS
+  SUPPORTED_SAFE_VERSIONS,
 } from '../types/safeWalletTypes'
 
 /**
@@ -19,7 +19,6 @@ import {
  * Implements EIP-1271 signature verification and Safe-specific checks
  */
 export class SafeWalletVerificationService {
-  
   /**
    * Main entry point for Safe wallet signature verification
    */
@@ -32,10 +31,10 @@ export class SafeWalletVerificationService {
     chainId?: number
   ): Promise<SafeWalletVerificationResult> {
     try {
-      logger.info('Starting Safe wallet verification', { 
-        walletAddress, 
+      logger.info('Starting Safe wallet verification', {
+        walletAddress,
         signatureLength: signature.length,
-        chainId 
+        chainId,
       })
 
       // Step 1: Validate inputs
@@ -43,7 +42,7 @@ export class SafeWalletVerificationService {
         return {
           isValid: false,
           verification: this.createFailedVerification('eip1271'),
-          error: SafeWalletVerificationError.INVALID_CONTRACT_ADDRESS
+          error: SafeWalletVerificationError.INVALID_CONTRACT_ADDRESS,
         }
       }
 
@@ -53,47 +52,47 @@ export class SafeWalletVerificationService {
         // Check if this looks like an old format-only signature for better error messaging
         const oldFormatSignature = `safe-wallet:${walletAddress}:${nonce}:${timestamp}`
         const isOldFormat = signature === oldFormatSignature
-        
+
         return {
           isValid: false,
           verification: this.createFailedVerification('fallback'),
           error: SafeWalletVerificationError.INVALID_SIGNATURE_FORMAT,
-          warnings: isOldFormat ? [
-            'Format-only signatures are no longer accepted for security reasons',
-            'Please use enhanced signature format with actual cryptographic signature data'
-          ] : [
-            'Invalid signature format - expected safe-wallet:address:nonce:timestamp:sig:signaturedata'
-          ]
+          warnings: isOldFormat
+            ? [
+                'Format-only signatures are no longer accepted for security reasons',
+                'Please use enhanced signature format with actual cryptographic signature data',
+              ]
+            : ['Invalid signature format - expected safe-wallet:address:nonce:timestamp:sig:signaturedata'],
         }
       }
 
       // Step 3: Create Safe contract instance
       const safeContract = new Contract(walletAddress, SAFE_CONTRACT_ABI_FRAGMENTS, provider as ContractRunner)
-      
+
       // Step 4: Verify it's actually a Safe contract
       const safeVersion = await this.getSafeVersion(safeContract)
       if (!safeVersion.isSupported) {
-        logger.warn('Unsupported or invalid Safe contract', { 
-          walletAddress, 
-          version: safeVersion.version 
+        logger.warn('Unsupported or invalid Safe contract', {
+          walletAddress,
+          version: safeVersion.version,
         })
-        
+
         // Fall back to basic verification for unsupported versions
         return this.performFallbackVerification(signature, walletAddress, nonce, timestamp)
       }
 
       // Step 5: Get ownership information
       const ownershipInfo = await this.verifyOwnership(safeContract, walletAddress)
-      
+
       // Step 6: Perform EIP-1271 signature verification
       const message = createAuthMessage(walletAddress, nonce, timestamp)
       const messageHash = keccak256(toUtf8Bytes(message))
-      
+
       const eip1271Result = await this.verifyEIP1271Signature({
         contractAddress: walletAddress,
         messageHash,
         signature: signatureData.actualSignature || signature,
-        provider
+        provider,
       })
 
       // Step 7: Compile verification result
@@ -103,31 +102,31 @@ export class SafeWalletVerificationService {
         thresholdCheck: ownershipInfo.threshold > 0,
         safeVersionCompatibility: safeVersion.isSupported,
         verificationMethod: 'eip1271',
-        contractAddress: walletAddress
+        contractAddress: walletAddress,
       }
 
-      const isValid = verification.signatureValidation && 
-                     verification.ownershipVerification && 
-                     verification.thresholdCheck && 
-                     verification.safeVersionCompatibility
+      const isValid =
+        verification.signatureValidation &&
+        verification.ownershipVerification &&
+        verification.thresholdCheck &&
+        verification.safeVersionCompatibility
 
       logger.info('Safe wallet verification completed', {
         walletAddress,
         isValid,
-        verification
+        verification,
       })
 
       return {
         isValid,
         verification,
-        warnings: this.generateVerificationWarnings(verification, safeVersion, ownershipInfo)
+        warnings: this.generateVerificationWarnings(verification, safeVersion, ownershipInfo),
       }
-
     } catch (error) {
-      logger.error('Safe wallet verification failed', { 
-        error, 
+      logger.error('Safe wallet verification failed', {
+        error,
         walletAddress,
-        errorMessage: error instanceof Error ? error.message : String(error)
+        errorMessage: error instanceof Error ? error.message : String(error),
       })
 
       // Fall back to basic verification on error
@@ -140,30 +139,31 @@ export class SafeWalletVerificationService {
    * SECURITY: Only accepts enhanced format with actual signature data
    */
   private static parseSafeWalletSignature(
-    signature: string, 
-    walletAddress: string, 
-    nonce: string, 
+    signature: string,
+    walletAddress: string,
+    nonce: string,
     timestamp: number
   ): { isValid: boolean; actualSignature?: string } {
     // SECURITY FIX: Remove vulnerable fallback string comparison
     // Only accept enhanced format with actual cryptographic signature data
-    
+
     if (signature.startsWith('safe-wallet:') && signature.includes(':sig:')) {
       const parts = signature.split(':')
-      if (parts.length >= 6 && 
-          parts[0] === 'safe-wallet' && 
-          parts[1] === walletAddress && 
-          parts[2] === nonce && 
-          parts[3] === timestamp.toString() &&
-          parts[4] === 'sig') {
-        
+      if (
+        parts.length >= 6 &&
+        parts[0] === 'safe-wallet' &&
+        parts[1] === walletAddress &&
+        parts[2] === nonce &&
+        parts[3] === timestamp.toString() &&
+        parts[4] === 'sig'
+      ) {
         const actualSignature = parts.slice(5).join(':')
-        
+
         // Ensure we have actual signature data, not empty
         if (actualSignature && actualSignature.length > 0) {
-          return { 
-            isValid: true, 
-            actualSignature
+          return {
+            isValid: true,
+            actualSignature,
           }
         }
       }
@@ -179,19 +179,19 @@ export class SafeWalletVerificationService {
   private static async verifyEIP1271Signature(params: EIP1271VerificationParams): Promise<boolean> {
     try {
       const contract = new Contract(params.contractAddress, SAFE_CONTRACT_ABI_FRAGMENTS, params.provider as ContractRunner)
-      
+
       // SECURITY FIX: Validate this is actually a Safe contract before trusting EIP-1271 response
       const isValidSafeContract = await this.validateSafeContract(contract)
       if (!isValidSafeContract) {
         logger.warn('EIP-1271 verification rejected - not a valid Safe contract', {
-          contractAddress: params.contractAddress
+          contractAddress: params.contractAddress,
         })
         return false
       }
-      
+
       // Call isValidSignature function from EIP-1271
       const result = await contract.isValidSignature(params.messageHash, params.signature)
-      
+
       // Check if returned magic value matches EIP-1271 standard
       const isValid = result === EIP1271_MAGIC_VALUE
 
@@ -200,15 +200,14 @@ export class SafeWalletVerificationService {
         isValid,
         returnedValue: result,
         expectedValue: EIP1271_MAGIC_VALUE,
-        contractValidated: true
+        contractValidated: true,
       })
 
       return isValid
-
     } catch (error) {
-      logger.warn('EIP-1271 verification failed', { 
+      logger.warn('EIP-1271 verification failed', {
         error: error instanceof Error ? error.message : String(error),
-        contractAddress: params.contractAddress
+        contractAddress: params.contractAddress,
       })
       return false
     }
@@ -220,9 +219,7 @@ export class SafeWalletVerificationService {
   private static async getSafeVersion(safeContract: Contract): Promise<SafeVersionInfo> {
     try {
       const version = await safeContract.VERSION()
-      const isSupported = SUPPORTED_SAFE_VERSIONS.some(supportedVersion => 
-        version.startsWith(supportedVersion)
-      )
+      const isSupported = SUPPORTED_SAFE_VERSIONS.some((supportedVersion) => version.startsWith(supportedVersion))
 
       return {
         version,
@@ -230,23 +227,22 @@ export class SafeWalletVerificationService {
         features: {
           eip1271Support: isSupported,
           messageSigningSupport: isSupported,
-          fallbackVerificationRequired: !isSupported
-        }
+          fallbackVerificationRequired: !isSupported,
+        },
       }
-
     } catch (error) {
-      logger.warn('Failed to get Safe version', { 
-        error: error instanceof Error ? error.message : String(error)
+      logger.warn('Failed to get Safe version', {
+        error: error instanceof Error ? error.message : String(error),
       })
-      
+
       return {
         version: 'unknown',
         isSupported: false,
         features: {
           eip1271Support: false,
           messageSigningSupport: false,
-          fallbackVerificationRequired: true
-        }
+          fallbackVerificationRequired: true,
+        },
       }
     }
   }
@@ -259,20 +255,19 @@ export class SafeWalletVerificationService {
       const [isOwner, threshold, owners] = await Promise.all([
         safeContract.isOwner(expectedOwner),
         safeContract.getThreshold(),
-        safeContract.getOwners()
+        safeContract.getOwners(),
       ])
 
       return {
         isOwner,
         threshold: Number(threshold),
         currentOwners: owners,
-        requiredSignatures: Number(threshold)
+        requiredSignatures: Number(threshold),
       }
-
     } catch (error) {
-      logger.warn('Failed to verify Safe ownership', { 
+      logger.warn('Failed to verify Safe ownership', {
         error: error instanceof Error ? error.message : String(error),
-        expectedOwner
+        expectedOwner,
       })
 
       // Return conservative defaults on error
@@ -280,7 +275,7 @@ export class SafeWalletVerificationService {
         isOwner: false,
         threshold: 0,
         currentOwners: [],
-        requiredSignatures: 0
+        requiredSignatures: 0,
       }
     }
   }
@@ -290,20 +285,20 @@ export class SafeWalletVerificationService {
    * SECURITY: No longer accepts format-only validation
    */
   private static performFallbackVerification(
-    signature: string, 
-    walletAddress: string, 
-    nonce: string, 
+    signature: string,
+    walletAddress: string,
+    nonce: string,
     timestamp: number
   ): SafeWalletVerificationResult {
     // SECURITY FIX: Remove unsafe format-only validation
     // Fallback now requires actual signature data and minimal verification
-    
+
     const signatureData = this.parseSafeWalletSignature(signature, walletAddress, nonce, timestamp)
-    
+
     logger.warn('Performing secure fallback Safe wallet verification', {
       walletAddress,
       hasActualSignature: !!signatureData.actualSignature,
-      signatureFormat: signatureData.isValid ? 'valid' : 'invalid'
+      signatureFormat: signatureData.isValid ? 'valid' : 'invalid',
     })
 
     // Only proceed if we have actual signature data, not just format match
@@ -314,7 +309,7 @@ export class SafeWalletVerificationService {
         thresholdCheck: false,
         safeVersionCompatibility: false,
         verificationMethod: 'fallback',
-        contractAddress: walletAddress
+        contractAddress: walletAddress,
       }
 
       return {
@@ -323,8 +318,8 @@ export class SafeWalletVerificationService {
         error: SafeWalletVerificationError.INVALID_SIGNATURE_FORMAT,
         warnings: [
           'Secure fallback verification failed - no cryptographic signature data provided',
-          'Format-only signatures are no longer accepted for security reasons'
-        ]
+          'Format-only signatures are no longer accepted for security reasons',
+        ],
       }
     }
 
@@ -335,7 +330,7 @@ export class SafeWalletVerificationService {
       thresholdCheck: false, // Cannot verify threshold without Safe contract interaction
       safeVersionCompatibility: false,
       verificationMethod: 'fallback',
-      contractAddress: walletAddress
+      contractAddress: walletAddress,
     }
 
     return {
@@ -344,8 +339,8 @@ export class SafeWalletVerificationService {
       warnings: [
         'Fallback verification has limited security guarantees',
         'Safe contract interaction failed - cannot verify ownership or threshold',
-        'Consider checking network connectivity and Safe contract deployment'
-      ]
+        'Consider checking network connectivity and Safe contract deployment',
+      ],
     }
   }
 
@@ -358,7 +353,7 @@ export class SafeWalletVerificationService {
       ownershipVerification: false,
       thresholdCheck: false,
       safeVersionCompatibility: false,
-      verificationMethod: method
+      verificationMethod: method,
     }
   }
 
@@ -395,15 +390,15 @@ export class SafeWalletVerificationService {
     try {
       // Check 1: Contract must have Safe-specific functions
       const requiredFunctions = ['getOwners', 'getThreshold', 'isOwner', 'VERSION']
-      
+
       for (const functionName of requiredFunctions) {
         try {
           // Try to call each function to ensure it exists and behaves like Safe
           if (functionName === 'VERSION') {
             const version = await contract.VERSION()
             if (typeof version !== 'string') {
-              logger.warn('Safe validation failed - VERSION function returned non-string', { 
-                returnedType: typeof version 
+              logger.warn('Safe validation failed - VERSION function returned non-string', {
+                returnedType: typeof version,
               })
               return false
             }
@@ -424,7 +419,7 @@ export class SafeWalletVerificationService {
           }
         } catch (functionError) {
           logger.warn(`Safe validation failed - missing function ${functionName}`, {
-            error: functionError instanceof Error ? functionError.message : String(functionError)
+            error: functionError instanceof Error ? functionError.message : String(functionError),
           })
           return false
         }
@@ -432,26 +427,23 @@ export class SafeWalletVerificationService {
 
       // Check 2: Verify the contract version is supported
       const version = await contract.VERSION()
-      const isSupported = SUPPORTED_SAFE_VERSIONS.some(supportedVersion => 
-        version.startsWith(supportedVersion)
-      )
+      const isSupported = SUPPORTED_SAFE_VERSIONS.some((supportedVersion) => version.startsWith(supportedVersion))
 
       if (!isSupported) {
         logger.warn('Safe validation failed - unsupported version', { version })
         return false
       }
 
-      logger.info('Safe contract validation successful', { 
+      logger.info('Safe contract validation successful', {
         contractAddress: contract.target,
-        version 
+        version,
       })
-      
-      return true
 
+      return true
     } catch (error) {
       logger.warn('Safe contract validation failed', {
         error: error instanceof Error ? error.message : String(error),
-        contractAddress: contract.target
+        contractAddress: contract.target,
       })
       return false
     }
@@ -481,7 +473,7 @@ export class SafeWalletVerificationService {
 
     return {
       isValid: errors.length === 0,
-      errors
+      errors,
     }
   }
 }

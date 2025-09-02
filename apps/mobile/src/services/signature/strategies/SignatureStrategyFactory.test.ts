@@ -269,11 +269,11 @@ describe('SignatureStrategyFactory', () => {
 
       it('should be efficient with multiple calls', () => {
         const start = performance.now()
-        
+
         for (let i = 0; i < 100; i++) {
           SignatureStrategyFactory.isConnectorSupported(mockConnector)
         }
-        
+
         const end = performance.now()
         expect(end - start).toBeLessThan(100) // Should be very fast
       })
@@ -371,11 +371,11 @@ describe('SignatureStrategyFactory', () => {
       expect(() => {
         SignatureStrategyFactory.getStrategy(mockConnector)
       }).not.toThrow()
-      
+
       expect(() => {
         SignatureStrategyFactory.isConnectorSupported(mockConnector)
       }).not.toThrow()
-      
+
       expect(() => {
         SignatureStrategyFactory.getAvailableStrategies()
       }).not.toThrow()
@@ -383,11 +383,11 @@ describe('SignatureStrategyFactory', () => {
 
     it('should handle edge case connectors gracefully', () => {
       const edgeConnector = {} as Connector
-      
+
       expect(() => {
         SignatureStrategyFactory.getStrategy(edgeConnector)
       }).not.toThrow()
-      
+
       const strategy = SignatureStrategyFactory.getStrategy(edgeConnector)
       expect(strategy).toBeInstanceOf(RegularWalletStrategy)
     })
@@ -417,12 +417,12 @@ describe('SignatureStrategyFactory', () => {
 
     it('should handle large numbers of isConnectorSupported calls', () => {
       const start = performance.now()
-      
+
       for (let i = 0; i < 1000; i++) {
         const isSupported = SignatureStrategyFactory.isConnectorSupported(mockConnector)
         expect(isSupported).toBe(true)
       }
-      
+
       const end = performance.now()
       expect(end - start).toBeLessThan(1000) // Should complete in reasonable time
     })

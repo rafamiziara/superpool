@@ -85,10 +85,10 @@ export class FirebaseAuthenticator {
 
     // Get circuit breaker for this signature type
     const circuitBreaker = FirebaseAuthCircuitBreakers.getCircuitBreakerForSignatureType(signatureType)
-    
+
     // Get appropriate retry policy
     const retryPolicy = RetryPolicies.getPolicyForWallet(signatureType, { isFirstAttempt: true })
-    
+
     console.log(`📋 Using retry policy: ${retryPolicy.name} (max ${retryPolicy.maxRetries} retries)`)
 
     // Execute Firebase sign-in with circuit breaker protection
@@ -99,7 +99,7 @@ export class FirebaseAuthenticator {
           // Add stabilization delay for Safe wallets on first attempt only
           if (signatureType === 'safe-wallet') {
             console.log('⏳ Adding stabilization delay for Safe wallet...')
-            await new Promise(resolve => setTimeout(resolve, 1500))
+            await new Promise((resolve) => setTimeout(resolve, 1500))
           }
 
           await signInWithCustomToken(FIREBASE_AUTH, firebaseToken)
@@ -110,9 +110,9 @@ export class FirebaseAuthenticator {
           onRetry: (context) => {
             console.log(`🔄 Firebase auth retry ${context.attempt}/${context.totalAttempts}`, {
               error: context.lastError.message,
-              elapsedTime: context.elapsedTime
+              elapsedTime: context.elapsedTime,
             })
-          }
+          },
         }
       )
     })
@@ -122,16 +122,14 @@ export class FirebaseAuthenticator {
       console.error('❌ Firebase authentication failed with circuit breaker', {
         circuitState: circuitResult.circuitState,
         error: circuitResult.error?.message,
-        metrics: circuitResult.metrics
+        metrics: circuitResult.metrics,
       })
 
       this.logTokenDetails(firebaseToken)
-      
+
       // Provide user-friendly error message based on error category
-      const userFriendlyMessage = ErrorCategorizer.getUserFriendlyMessage(
-        circuitResult.error || new Error('Authentication failed')
-      )
-      
+      const userFriendlyMessage = ErrorCategorizer.getUserFriendlyMessage(circuitResult.error || new Error('Authentication failed'))
+
       throw new Error(`Firebase authentication failed: ${userFriendlyMessage}`)
     }
 
@@ -142,15 +140,13 @@ export class FirebaseAuthenticator {
         error: retryResult?.error?.message,
         attemptsMade: retryResult?.attemptsMade,
         totalTime: retryResult?.totalTime,
-        policyUsed: retryResult?.policyUsed
+        policyUsed: retryResult?.policyUsed,
       })
 
       this.logTokenDetails(firebaseToken)
-      
-      const userFriendlyMessage = ErrorCategorizer.getUserFriendlyMessage(
-        retryResult?.error || new Error('Authentication failed')
-      )
-      
+
+      const userFriendlyMessage = ErrorCategorizer.getUserFriendlyMessage(retryResult?.error || new Error('Authentication failed'))
+
       throw new Error(`Firebase authentication failed: ${userFriendlyMessage}`)
     }
 
@@ -158,10 +154,9 @@ export class FirebaseAuthenticator {
       circuitState: circuitResult.circuitState,
       attemptsUsed: retryResult.attemptsMade,
       totalTime: retryResult.totalTime,
-      policyUsed: retryResult.policyUsed
+      policyUsed: retryResult.policyUsed,
     })
   }
-
 
   /**
    * Safely log token details for debugging (never logs actual token content)

@@ -141,7 +141,10 @@ describe('SampleLendingPool', function () {
     it('Should reject loan when pool is inactive', async function () {
       await lendingPool.connect(owner).togglePoolStatus()
 
-      await expect(lendingPool.connect(borrower).createLoan(ethers.parseEther('5'))).to.be.revertedWithCustomError(lendingPool, 'PoolNotActive')
+      await expect(lendingPool.connect(borrower).createLoan(ethers.parseEther('5'))).to.be.revertedWithCustomError(
+        lendingPool,
+        'PoolNotActive'
+      )
     })
   })
 

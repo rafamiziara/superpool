@@ -102,15 +102,15 @@ export const verifySignatureAndLoginHandler = async (request: CallableRequest<Ve
       logger.info('EIP-712 signature verification successful', { recoveredAddress })
     } else if (signatureType === 'safe-wallet') {
       // Enhanced Safe wallet verification with cryptographic validation
-      logger.info('Starting enhanced Safe wallet verification', { 
-        walletAddress, 
-        chainId: chainId || 80002 
+      logger.info('Starting enhanced Safe wallet verification', {
+        walletAddress,
+        chainId: chainId || 80002,
       })
 
       try {
         // Get provider for the specified chain
         const provider = ProviderService.getProvider(chainId || 80002)
-        
+
         // Perform comprehensive Safe wallet verification
         const verificationResult = await SafeWalletVerificationService.verifySafeWalletSignature(
           walletAddress,
@@ -125,7 +125,7 @@ export const verifySignatureAndLoginHandler = async (request: CallableRequest<Ve
           logger.error('Safe wallet verification failed', {
             walletAddress,
             error: verificationResult.error,
-            verification: verificationResult.verification
+            verification: verificationResult.verification,
           })
           throw new Error(`Safe wallet verification failed: ${verificationResult.error || 'Invalid signature'}`)
         }
@@ -134,14 +134,14 @@ export const verifySignatureAndLoginHandler = async (request: CallableRequest<Ve
         logger.info('Safe wallet verification successful', {
           walletAddress,
           verification: verificationResult.verification,
-          warnings: verificationResult.warnings
+          warnings: verificationResult.warnings,
         })
 
         // Log any warnings for monitoring
         if (verificationResult.warnings && verificationResult.warnings.length > 0) {
           logger.warn('Safe wallet verification warnings', {
             walletAddress,
-            warnings: verificationResult.warnings
+            warnings: verificationResult.warnings,
           })
         }
 
@@ -150,7 +150,7 @@ export const verifySignatureAndLoginHandler = async (request: CallableRequest<Ve
         logger.error('Safe wallet verification error', {
           error: error instanceof Error ? error.message : String(error),
           walletAddress,
-          chainId
+          chainId,
         })
         throw new Error(`Safe wallet authentication failed: ${error instanceof Error ? error.message : 'Verification error'}`)
       }

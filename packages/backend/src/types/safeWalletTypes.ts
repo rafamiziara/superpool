@@ -71,22 +71,22 @@ export enum SafeWalletVerificationError {
   OWNERSHIP_VERIFICATION_FAILED = 'OWNERSHIP_VERIFICATION_FAILED',
   THRESHOLD_CHECK_FAILED = 'THRESHOLD_CHECK_FAILED',
   PROVIDER_ERROR = 'PROVIDER_ERROR',
-  NETWORK_ERROR = 'NETWORK_ERROR'
+  NETWORK_ERROR = 'NETWORK_ERROR',
 }
 
 // Safe contract ABI fragments for EIP-1271 and ownership verification
 export const SAFE_CONTRACT_ABI_FRAGMENTS = [
   // EIP-1271 signature verification
   'function isValidSignature(bytes32 _dataHash, bytes _signature) external view returns (bytes4)',
-  
+
   // Safe ownership and threshold information
   'function getOwners() external view returns (address[])',
   'function getThreshold() external view returns (uint256)',
   'function isOwner(address owner) external view returns (bool)',
-  
+
   // Safe version information
   'function VERSION() external view returns (string)',
-  
+
   // Safe domain separator (for EIP-712 compatibility)
-  'function domainSeparator() external view returns (bytes32)'
+  'function domainSeparator() external view returns (bytes32)',
 ]

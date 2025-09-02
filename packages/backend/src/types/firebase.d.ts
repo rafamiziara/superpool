@@ -1,5 +1,5 @@
 /* istanbul ignore file */
-import type { DocumentData, WriteResult, DocumentSnapshot, Precondition } from 'firebase-admin/firestore'
+import type { DocumentData, DocumentSnapshot, Precondition, WriteResult } from 'firebase-admin/firestore'
 
 /**
  * A mock type for the Firestore `set` method.

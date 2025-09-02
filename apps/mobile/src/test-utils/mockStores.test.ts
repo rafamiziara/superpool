@@ -557,7 +557,7 @@ describe('mockStores', () => {
       const store = createMockAuthenticationStore() as AuthenticationStore
 
       // Override mock implementation for specific test
-      (store.startStep as jest.Mock).mockImplementation(() => 'test-specific-result')
+      ;(store.startStep as jest.Mock).mockImplementation(() => 'test-specific-result')
 
       const result = store.startStep('generate-message')
       expect(result).toBe('test-specific-result')

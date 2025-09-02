@@ -15,7 +15,7 @@ export class ProviderService {
     1: 'https://eth-mainnet.g.alchemy.com/v2/demo', // Ethereum Mainnet (fallback)
     137: 'https://polygon-rpc.com', // Polygon Mainnet
     80002: 'https://polygon-amoy.g.alchemy.com/v2/demo', // Polygon Amoy Testnet (fallback)
-    31337: 'http://127.0.0.1:8545' // Local Hardhat Network
+    31337: 'http://127.0.0.1:8545', // Local Hardhat Network
   }
 
   /**
@@ -29,7 +29,7 @@ export class ProviderService {
 
     // Get RPC URL from environment or use default
     const rpcUrl = this.getRpcUrl(chainId)
-    
+
     logger.info('Creating new provider', { chainId, rpcUrl: rpcUrl.substring(0, 30) + '...' })
 
     try {
@@ -37,10 +37,10 @@ export class ProviderService {
       this.providers.set(chainId, provider)
       return provider
     } catch (error) {
-      logger.error('Failed to create provider', { 
+      logger.error('Failed to create provider', {
         error: error instanceof Error ? error.message : String(error),
         chainId,
-        rpcUrl: rpcUrl.substring(0, 30) + '...'
+        rpcUrl: rpcUrl.substring(0, 30) + '...',
       })
       throw new Error(`Failed to create provider for chain ${chainId}`)
     }
@@ -55,7 +55,7 @@ export class ProviderService {
       1: process.env.ETHEREUM_MAINNET_RPC_URL,
       137: process.env.POLYGON_MAINNET_RPC_URL || process.env.POLYGON_RPC_URL,
       80002: process.env.POLYGON_AMOY_RPC_URL,
-      31337: process.env.LOCALHOST_RPC_URL
+      31337: process.env.LOCALHOST_RPC_URL,
     }
 
     const envUrl = envVars[chainId as keyof typeof envVars]
@@ -80,17 +80,17 @@ export class ProviderService {
     try {
       const provider = this.getProvider(chainId)
       const blockNumber = await provider.getBlockNumber()
-      
-      logger.info('Provider connectivity test successful', { 
-        chainId, 
-        blockNumber 
+
+      logger.info('Provider connectivity test successful', {
+        chainId,
+        blockNumber,
       })
-      
+
       return true
     } catch (error) {
-      logger.error('Provider connectivity test failed', { 
+      logger.error('Provider connectivity test failed', {
         error: error instanceof Error ? error.message : String(error),
-        chainId 
+        chainId,
       })
       return false
     }
@@ -106,25 +106,25 @@ export class ProviderService {
     gasPrice?: bigint
   }> {
     const provider = this.getProvider(chainId)
-    
+
     const [network, blockNumber, feeData] = await Promise.all([
       provider.getNetwork(),
       provider.getBlockNumber(),
-      provider.getFeeData().catch(() => null) // Fee data might not be available on all networks
+      provider.getFeeData().catch(() => null), // Fee data might not be available on all networks
     ])
 
     const networkNames: Record<number, string> = {
       1: 'Ethereum Mainnet',
-      137: 'Polygon Mainnet', 
+      137: 'Polygon Mainnet',
       80002: 'Polygon Amoy Testnet',
-      31337: 'Localhost Hardhat Network'
+      31337: 'Localhost Hardhat Network',
     }
 
     return {
       chainId: Number(network.chainId),
       name: networkNames[Number(network.chainId)] || `Chain ${network.chainId}`,
       blockNumber,
-      gasPrice: feeData?.gasPrice || undefined
+      gasPrice: feeData?.gasPrice || undefined,
     }
   }
 
@@ -144,7 +144,7 @@ export class ProviderService {
     if (process.env.NODE_ENV === 'development' || process.env.NODE_ENV === 'test') {
       return 31337 // Local Hardhat
     }
-    
+
     // Default to Polygon Amoy testnet
     return 80002
   }

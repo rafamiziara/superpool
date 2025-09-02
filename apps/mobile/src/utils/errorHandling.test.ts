@@ -1,11 +1,4 @@
-import {
-  categorizeError,
-  createAppError,
-  ERROR_MESSAGES,
-  ErrorType,
-  isUserInitiatedError,
-  shouldRetryError,
-} from './errorHandling'
+import { categorizeError, createAppError, ERROR_MESSAGES, ErrorType, isUserInitiatedError, shouldRetryError } from './errorHandling'
 
 describe('errorHandling', () => {
   describe('ErrorType enum', () => {
