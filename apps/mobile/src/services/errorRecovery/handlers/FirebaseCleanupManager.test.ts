@@ -16,11 +16,11 @@ jest.mock('../../../firebase.config', () => ({
 
 describe('FirebaseCleanupManager', () => {
   let mockSignOut: jest.Mock
-  let mockFirebaseAuth: any
+  let mockFirebaseAuth: Record<string, unknown>
 
   beforeEach(() => {
     mockSignOut = signOut as jest.Mock
-    mockFirebaseAuth = FIREBASE_AUTH as any
+    mockFirebaseAuth = FIREBASE_AUTH as Record<string, unknown>
 
     jest.clearAllMocks()
 
@@ -391,7 +391,7 @@ describe('FirebaseCleanupManager', () => {
 
   describe('Static Class Behavior', () => {
     it('should not be instantiable', () => {
-      expect(() => new (FirebaseCleanupManager as any)()).toThrow()
+      expect(() => new (FirebaseCleanupManager as unknown as new () => unknown)()).toThrow()
     })
 
     it('should have all methods as static', () => {
@@ -426,7 +426,10 @@ describe('FirebaseCleanupManager', () => {
       expect(FirebaseCleanupManager.getCurrentUserId()).toBeNull()
 
       // Simulate sign in
-      mockFirebaseAuth.currentUser = { uid: 'user-123', email: 'user@test.com' }
+      mockFirebaseAuth.currentUser = {
+        uid: 'user-123',
+        email: 'user@test.com',
+      }
       expect(FirebaseCleanupManager.isUserSignedIn()).toBe(true)
       expect(FirebaseCleanupManager.getCurrentUserId()).toBe('user-123')
 
@@ -500,11 +503,23 @@ describe('FirebaseCleanupManager', () => {
 
     it('should provide clear error messages for different failure types', async () => {
       const errorTypes = [
-        { error: new Error('Network timeout'), expectedMessage: 'Firebase cleanup failed: Network timeout' },
-        { error: 'String error', expectedMessage: 'Firebase cleanup failed: String error' },
-        { error: { code: 'auth/error' }, expectedMessage: 'Firebase cleanup failed: [object Object]' },
+        {
+          error: new Error('Network timeout'),
+          expectedMessage: 'Firebase cleanup failed: Network timeout',
+        },
+        {
+          error: 'String error',
+          expectedMessage: 'Firebase cleanup failed: String error',
+        },
+        {
+          error: { code: 'auth/error' },
+          expectedMessage: 'Firebase cleanup failed: [object Object]',
+        },
         { error: null, expectedMessage: 'Firebase cleanup failed: null' },
-        { error: undefined, expectedMessage: 'Firebase cleanup failed: undefined' },
+        {
+          error: undefined,
+          expectedMessage: 'Firebase cleanup failed: undefined',
+        },
       ]
 
       for (const { error, expectedMessage } of errorTypes) {

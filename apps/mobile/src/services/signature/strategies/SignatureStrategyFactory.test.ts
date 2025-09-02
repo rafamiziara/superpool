@@ -153,7 +153,10 @@ describe('SignatureStrategyFactory', () => {
       })
 
       it('should handle connector with null/undefined properties', () => {
-        const nullPropsConnector = { id: null, name: null } as any
+        const nullPropsConnector = {
+          id: null,
+          name: null,
+        } as unknown as Connector
 
         const strategy = SignatureStrategyFactory.getStrategy(nullPropsConnector)
 
@@ -348,7 +351,7 @@ describe('SignatureStrategyFactory', () => {
         type: 'custom',
         uid: 'complex-789',
         extra: 'should not affect logic',
-      } as any
+      } as unknown as Connector
 
       const strategy = SignatureStrategyFactory.getStrategy(complexConnector)
 

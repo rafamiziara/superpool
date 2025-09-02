@@ -3,27 +3,6 @@ import type { Connector } from 'wagmi'
 import { devOnly } from '../../utils'
 import { SignatureStrategyFactory, SignatureUtils } from './strategies'
 
-interface TypedDataParameter {
-  name: string
-  type: string
-}
-
-interface TypedDataDomain {
-  name?: string
-  version?: string
-  chainId?: number | bigint
-  verifyingContract?: `0x${string}`
-  salt?: `0x${string}`
-}
-
-interface _TypedData {
-  domain?: TypedDataDomain
-  types: Record<string, TypedDataParameter[]>
-  primaryType: string
-  message: Record<string, unknown>
-  account: `0x${string}` // Required to match wagmi v2
-}
-
 export class SignatureService {
   /**
    * Validates signature request parameters before processing

@@ -146,7 +146,11 @@ export const useAuthStateValidation = () => {
       issues: string[]
       walletState: { connected: boolean; address: string | undefined }
       firebaseState: { authenticated: boolean; address: string | null }
-      authStoreState: { authenticating: boolean; address: string | null; hasError: boolean }
+      authStoreState: {
+        authenticating: boolean
+        address: string | null
+        hasError: boolean
+      }
     } => {
       const issues: string[] = []
 

@@ -28,7 +28,7 @@ export class GenericErrorHandler implements ErrorHandler<GenericErrorContext> {
   }
 
   handle(context: GenericErrorContext): ErrorRecoveryResult {
-    const { appError, isConnected, originalError: _originalError } = context
+    const { appError, isConnected } = context
     const isUserInitiated = isUserInitiatedError(appError)
 
     console.log('Authentication error details:', {

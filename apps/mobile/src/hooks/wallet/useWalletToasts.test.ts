@@ -116,7 +116,9 @@ describe('useWalletToasts', () => {
     mockUseAccount.mockReturnValue(connectedState)
 
     const mockStore = createMockRootStore()
-    renderHookWithStore(() => useWalletToasts({ showConnectionToasts: true }), { store: mockStore })
+    renderHookWithStore(() => useWalletToasts({ showConnectionToasts: true }), {
+      store: mockStore,
+    })
 
     // Now update the store to trigger the connection event
     mockStore.walletStore.updateConnectionState(true, connectedState.address, connectedState.chainId)
@@ -252,7 +254,9 @@ describe('useWalletToasts', () => {
     mockUseAccount.mockReturnValue(stateWithoutConnector)
     const mockStore = createMockRootStore()
 
-    renderHookWithStore(() => useWalletToasts({ showConnectionToasts: true }), { store: mockStore })
+    renderHookWithStore(() => useWalletToasts({ showConnectionToasts: true }), {
+      store: mockStore,
+    })
 
     // Trigger connection event
     mockStore.walletStore.updateConnectionState(true, stateWithoutConnector.address, stateWithoutConnector.chainId)
@@ -279,7 +283,9 @@ describe('useWalletToasts', () => {
     // Set initial state to connected (simulating already connected state)
     mockStore.walletStore.updateConnectionState(true, connectedState.address, connectedState.chainId)
 
-    renderHookWithStore(() => useWalletToasts({ showConnectionToasts: true }), { store: mockStore })
+    renderHookWithStore(() => useWalletToasts({ showConnectionToasts: true }), {
+      store: mockStore,
+    })
 
     // Should trigger connection toast because previouslyConnected starts as false
     expect(mockAuthToasts.walletConnected).toHaveBeenCalledWith('MetaMask')

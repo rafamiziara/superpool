@@ -55,7 +55,7 @@ const { ErrorType } = require('./errorHandling')
 
 export type ToastType = 'success' | 'error' | 'info' | 'warning'
 export interface AppError extends Error {
-  type: any
+  type: import('./errorHandling').ErrorType
   originalError?: unknown
   userFriendlyMessage: string
   timestamp: Date
@@ -415,15 +415,15 @@ describe('toast utilities', () => {
     describe('Edge Cases', () => {
       it('should handle null and undefined errors gracefully', () => {
         expect(() => {
-          showErrorFromAppError(null as any)
-          showErrorFromAppError(undefined as any)
+          showErrorFromAppError(null as unknown as AppError)
+          showErrorFromAppError(undefined as unknown as AppError)
         }).not.toThrow()
 
         expect(mockToast.show).toHaveBeenCalledTimes(2)
       })
 
       it('should handle malformed error objects', () => {
-        const malformedError = { type: 'INVALID_TYPE' } as any
+        const malformedError = { type: 'INVALID_TYPE' } as unknown as AppError
 
         expect(() => {
           showErrorFromAppError(malformedError)
@@ -731,8 +731,8 @@ describe('toast utilities', () => {
 
       it('should handle null and undefined messages', () => {
         expect(() => {
-          showSuccessToast(null as any)
-          showErrorToast(undefined as any)
+          showSuccessToast(null as unknown as string)
+          showErrorToast(undefined as unknown as string)
         }).not.toThrow()
 
         expect(mockToast.show).toHaveBeenCalledTimes(2)

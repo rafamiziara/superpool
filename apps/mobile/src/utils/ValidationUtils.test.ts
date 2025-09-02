@@ -1,5 +1,5 @@
 import { ValidationUtils } from './ValidationUtils'
-import { AUTH_VALIDATION, SIGNATURE_FORMATS, SUPPORTED_CHAIN_IDS } from './constants'
+import { AUTH_VALIDATION, SUPPORTED_CHAIN_IDS } from './constants'
 
 // Mock constants to control test behavior
 jest.mock('./constants', () => ({
@@ -510,7 +510,7 @@ describe('ValidationUtils', () => {
 
   describe('Edge Cases and Integration', () => {
     it('should handle concurrent validation calls', () => {
-      const promises = Array.from({ length: 100 }, (_, i) => {
+      const promises = Array.from({ length: 100 }, (_, _i) => {
         return Promise.resolve(ValidationUtils.isValidWalletAddress(`0x${'a'.repeat(40)}`))
       })
 

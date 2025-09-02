@@ -140,25 +140,25 @@ const { AuthenticationOrchestrator } = require('./AuthenticationOrchestrator')
 
 describe('AuthenticationOrchestrator', () => {
   let orchestrator: typeof AuthenticationOrchestrator
-  let mockAuthStore: any
-  let mockWalletStoreInstance: any
-  let mockStepExecutor: any
-  let mockValidator: any
-  let mockFirebaseAuthInstance: any
-  let mockMessageGen: any
-  let mockSignatureHandlerInstance: any
+  let mockAuthStore: ReturnType<typeof createMockAuthStore>
+  let mockWalletStoreInstance: ReturnType<typeof createMockWalletStore>
+  let mockStepExecutor: ReturnType<typeof createMockStepExecutor>
+  let mockValidator: ReturnType<typeof createMockValidator>
+  let mockFirebaseAuthInstance: ReturnType<typeof createMockFirebaseAuth>
+  let mockMessageGen: ReturnType<typeof createMockMessageGen>
+  let mockSignatureHandlerInstance: ReturnType<typeof createMockSignatureHandler>
   let consoleLogSpy: jest.SpyInstance
   let consoleWarnSpy: jest.SpyInstance
 
   const mockAuthContext: AuthenticationContext = {
     walletAddress: '0x742d35Cc6634C0532925a3b8D238a5D2DD8dC5b8',
     chainId: 137,
-    connector: 'mock-connector' as any,
+    connector: 'mock-connector' as Connector,
     disconnect: jest.fn(),
     signatureFunctions: {
       personalSign: jest.fn(),
       signTypedData: jest.fn(),
-    } as any,
+    },
     progressCallbacks: {
       onStepStart: jest.fn(),
       onStepComplete: jest.fn(),
@@ -502,7 +502,7 @@ describe('AuthenticationOrchestrator', () => {
         name: 'Mock Connector',
         connect: jest.fn(),
         disconnect: jest.fn(),
-      } as any
+      } as Connector
 
       const contextWithWagmi = {
         ...mockAuthContext,
@@ -588,11 +588,26 @@ describe('AuthenticationOrchestrator', () => {
 
     describe('Error Step Detection', () => {
       const testCases = [
-        { errorMessage: 'signature request failed', expectedStep: 'request-signature' },
-        { errorMessage: 'signature verification error', expectedStep: 'verify-signature' },
-        { errorMessage: 'firebase token invalid', expectedStep: 'firebase-auth' },
-        { errorMessage: 'auth message generation failed', expectedStep: 'generate-message' },
-        { errorMessage: 'lock acquisition failed', expectedStep: 'acquire-lock' },
+        {
+          errorMessage: 'signature request failed',
+          expectedStep: 'request-signature',
+        },
+        {
+          errorMessage: 'signature verification error',
+          expectedStep: 'verify-signature',
+        },
+        {
+          errorMessage: 'firebase token invalid',
+          expectedStep: 'firebase-auth',
+        },
+        {
+          errorMessage: 'auth message generation failed',
+          expectedStep: 'generate-message',
+        },
+        {
+          errorMessage: 'lock acquisition failed',
+          expectedStep: 'acquire-lock',
+        },
         { errorMessage: 'unknown error', expectedStep: 'request-signature' }, // default
       ]
 
@@ -754,7 +769,11 @@ describe('AuthenticationOrchestrator', () => {
       const orchestratorInstance = new AuthenticationOrchestrator(mockAuthStore, mockWalletStoreInstance)
 
       // Access private method through any cast for testing
-      const getCurrentStepFromError = (orchestratorInstance as any).getCurrentStepFromError.bind(orchestratorInstance)
+      const getCurrentStepFromError = (
+        orchestratorInstance as {
+          getCurrentStepFromError: (error: Error) => string
+        }
+      ).getCurrentStepFromError.bind(orchestratorInstance)
 
       // Test all specific error patterns
       expect(getCurrentStepFromError(new Error('signature request failed'))).toBe('request-signature')

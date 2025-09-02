@@ -238,7 +238,10 @@ describe('AuthenticationStepExecutor', () => {
       })
 
       it('should handle complex error objects', async () => {
-        const complexError = { code: 'AUTH_ERROR', details: 'Authentication failed' }
+        const complexError = {
+          code: 'AUTH_ERROR',
+          details: 'Authentication failed',
+        }
         const mockStepFunction = jest.fn().mockRejectedValue(complexError)
 
         const executePromise = executor.executeStep(testStep, mockStepFunction)
@@ -464,7 +467,10 @@ describe('AuthenticationStepExecutor', () => {
     it('should handle complete authentication flow simulation', async () => {
       const steps = [
         { step: 'generate-message' as AuthStep, result: 'message-generated' },
-        { step: 'request-signature' as AuthStep, result: 'signature-requested' },
+        {
+          step: 'request-signature' as AuthStep,
+          result: 'signature-requested',
+        },
         { step: 'verify-signature' as AuthStep, result: 'signature-verified' },
       ]
 
@@ -589,14 +595,14 @@ describe('AuthenticationStepExecutor', () => {
     })
 
     it('should handle undefined step function', async () => {
-      const executePromise = executor.executeStep('generate-message', undefined as any)
+      const executePromise = executor.executeStep('generate-message', undefined as unknown as () => Promise<unknown>)
 
       await Promise.allSettled([jest.runAllTimersAsync(), executePromise])
       await expect(executePromise).rejects.toThrow()
     })
 
     it('should handle null step function', async () => {
-      const executePromise = executor.executeStep('generate-message', null as any)
+      const executePromise = executor.executeStep('generate-message', null as unknown as () => Promise<unknown>)
 
       await Promise.allSettled([jest.runAllTimersAsync(), executePromise])
       await expect(executePromise).rejects.toThrow()
@@ -604,7 +610,7 @@ describe('AuthenticationStepExecutor', () => {
 
     it('should handle malformed options object', async () => {
       const mockStepFunction = jest.fn().mockResolvedValue('malformed-options')
-      const malformedOptions = { invalidOption: 'invalid' } as any
+      const malformedOptions = { invalidOption: 'invalid' } as Record<string, unknown>
 
       const executePromise = executor.executeStep('generate-message', mockStepFunction, malformedOptions)
 
@@ -658,7 +664,9 @@ describe('AuthenticationStepExecutor', () => {
       // Test with specific typed results
       const stringResult = await executor.executeInternalStep(async () => 'string')
       const numberResult = await executor.executeInternalStep(async () => 42)
-      const objectResult = await executor.executeInternalStep(async () => ({ key: 'value' }))
+      const objectResult = await executor.executeInternalStep(async () => ({
+        key: 'value',
+      }))
 
       expect(typeof stringResult).toBe('string')
       expect(typeof numberResult).toBe('number')

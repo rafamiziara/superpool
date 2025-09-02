@@ -170,7 +170,11 @@ export class AuthUtils {
   /**
    * Calculates time since authentication attempt
    */
-  static getAuthAge(timestamp: number): { ageMs: number; ageSeconds: number; isExpired: boolean } {
+  static getAuthAge(timestamp: number): {
+    ageMs: number
+    ageSeconds: number
+    isExpired: boolean
+  } {
     const now = Date.now()
     const ageMs = now - timestamp
     const ageSeconds = Math.floor(ageMs / 1000)

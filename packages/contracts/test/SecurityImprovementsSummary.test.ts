@@ -133,6 +133,7 @@ describe('Security Improvements Summary', function () {
   describe('Phase 3: Medium-Priority Security Improvements', function () {
     it('Should have removed DoS-vulnerable getAllPoolAddresses function', async function () {
       // Verify the function doesn't exist
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       expect((poolFactory as any).getAllPoolAddresses).to.be.undefined
     })
 
@@ -276,7 +277,7 @@ describe('Security Improvements Summary', function () {
       expect(repaidLoan.isRepaid).to.be.true
 
       // 4. Test pagination (instead of the removed getAllPoolAddresses)
-      const [poolIds, poolInfos] = await poolFactory.getPoolsRange(1, 1)
+      const [poolIds] = await poolFactory.getPoolsRange(1, 1)
       expect(poolIds.length).to.equal(1)
       expect(poolIds[0]).to.equal(1)
 

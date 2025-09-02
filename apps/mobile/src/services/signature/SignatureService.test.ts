@@ -47,7 +47,7 @@ describe('SignatureService', () => {
   const mockSignatureResult: SignatureResult = {
     signature: '0xabc123def456789012345678901234567890123456789012345678901234567890123456789012345678901234567890',
     signatureType: 'personal-sign',
-  } as any
+  } as SignatureResult
 
   beforeEach(() => {
     jest.clearAllMocks()
@@ -60,7 +60,7 @@ describe('SignatureService', () => {
     mockSignatureFunctions = {
       personalSign: jest.fn().mockResolvedValue('0xmocked-signature'),
       signTypedData: jest.fn().mockResolvedValue('0xmocked-typed-signature'),
-    } as any
+    } as jest.Mocked<SignatureFunctions>
 
     // Mock connector
     mockConnector = {
@@ -68,10 +68,10 @@ describe('SignatureService', () => {
       name: 'Mock Connector',
       connect: jest.fn(),
       disconnect: jest.fn(),
-    } as any
+    } as jest.Mocked<Connector>
 
     // Mock strategy factory and utils
-    mockSignatureStrategyFactory.getStrategy.mockReturnValue(mockStrategy as any)
+    mockSignatureStrategyFactory.getStrategy.mockReturnValue(mockStrategy as jest.Mocked<typeof mockStrategy>)
     mockSignatureUtils.isValidSignatureFormat.mockReturnValue(true)
 
     // Spy on console methods
@@ -98,7 +98,7 @@ describe('SignatureService', () => {
       expect(instance).toBeInstanceOf(SignatureService)
 
       // But verify no instance methods exist
-      expect(typeof (instance as any).requestSignature).toBe('undefined')
+      expect(typeof (instance as Record<string, unknown>).requestSignature).toBe('undefined')
     })
   })
 
@@ -136,7 +136,7 @@ describe('SignatureService', () => {
 
       it('should handle requests without chainId', async () => {
         const requestWithoutChainId = { ...validSignatureRequest }
-        delete (requestWithoutChainId as any).chainId
+        delete (requestWithoutChainId as Record<string, unknown>).chainId
 
         await SignatureService.requestSignature(requestWithoutChainId, mockSignatureFunctions, mockConnector)
 
@@ -163,7 +163,10 @@ describe('SignatureService', () => {
       })
 
       it('should reject request with whitespace-only message', async () => {
-        const invalidRequest = { ...validSignatureRequest, message: '   \n\t  ' }
+        const invalidRequest = {
+          ...validSignatureRequest,
+          message: '   \n\t  ',
+        }
 
         await expect(SignatureService.requestSignature(invalidRequest, mockSignatureFunctions, mockConnector)).rejects.toThrow(
           'Signature request missing message data'
@@ -172,7 +175,7 @@ describe('SignatureService', () => {
 
       it('should reject request with missing message', async () => {
         const invalidRequest = { ...validSignatureRequest }
-        delete (invalidRequest as any).message
+        delete (invalidRequest as Record<string, unknown>).message
 
         await expect(SignatureService.requestSignature(invalidRequest, mockSignatureFunctions, mockConnector)).rejects.toThrow(
           'Signature request missing message data'
@@ -181,7 +184,10 @@ describe('SignatureService', () => {
 
       it('should accept very long messages', async () => {
         const longMessage = 'a'.repeat(10000)
-        const requestWithLongMessage = { ...validSignatureRequest, message: longMessage }
+        const requestWithLongMessage = {
+          ...validSignatureRequest,
+          message: longMessage,
+        }
 
         await SignatureService.requestSignature(requestWithLongMessage, mockSignatureFunctions, mockConnector)
 
@@ -212,7 +218,7 @@ describe('SignatureService', () => {
 
       it('should reject request with missing nonce', async () => {
         const invalidRequest = { ...validSignatureRequest }
-        delete (invalidRequest as any).nonce
+        delete (invalidRequest as Record<string, unknown>).nonce
 
         await expect(SignatureService.requestSignature(invalidRequest, mockSignatureFunctions, mockConnector)).rejects.toThrow(
           'Signature request missing nonce'
@@ -248,7 +254,10 @@ describe('SignatureService', () => {
       })
 
       it('should reject request with whitespace-only wallet address', async () => {
-        const invalidRequest = { ...validSignatureRequest, walletAddress: '   \t\n  ' }
+        const invalidRequest = {
+          ...validSignatureRequest,
+          walletAddress: '   \t\n  ',
+        }
 
         await expect(SignatureService.requestSignature(invalidRequest, mockSignatureFunctions, mockConnector)).rejects.toThrow(
           'Signature request missing wallet address'
@@ -257,7 +266,7 @@ describe('SignatureService', () => {
 
       it('should reject request with missing wallet address', async () => {
         const invalidRequest = { ...validSignatureRequest }
-        delete (invalidRequest as any).walletAddress
+        delete (invalidRequest as Record<string, unknown>).walletAddress
 
         await expect(SignatureService.requestSignature(invalidRequest, mockSignatureFunctions, mockConnector)).rejects.toThrow(
           'Signature request missing wallet address'
@@ -327,7 +336,7 @@ describe('SignatureService', () => {
 
       it('should reject request with missing timestamp', async () => {
         const invalidRequest = { ...validSignatureRequest }
-        delete (invalidRequest as any).timestamp
+        delete (invalidRequest as Record<string, unknown>).timestamp
 
         await expect(SignatureService.requestSignature(invalidRequest, mockSignatureFunctions, mockConnector)).rejects.toThrow(
           'Signature request missing valid timestamp'
@@ -456,7 +465,7 @@ describe('SignatureService', () => {
           signature: '0xabc123def456',
           signatureType: 'safe-wallet',
         },
-      ] as any[]
+      ] as SignatureResult[]
 
       for (const result of signatureResults) {
         mockStrategy.sign.mockResolvedValue(result)
@@ -521,7 +530,7 @@ describe('SignatureService', () => {
       const minimalConnector = {
         connect: jest.fn(),
         disconnect: jest.fn(),
-      } as any
+      } as jest.Mocked<Connector>
 
       await SignatureService.requestSignature(validSignatureRequest, mockSignatureFunctions, minimalConnector)
 
@@ -535,7 +544,7 @@ describe('SignatureService', () => {
     })
 
     it('should handle null connector gracefully', async () => {
-      await SignatureService.requestSignature(validSignatureRequest, mockSignatureFunctions, null as any)
+      await SignatureService.requestSignature(validSignatureRequest, mockSignatureFunctions, null as unknown as Connector)
 
       expect(mockSignatureStrategyFactory.getStrategy).toHaveBeenCalledWith(null)
     })
@@ -562,7 +571,10 @@ describe('SignatureService', () => {
 
     it('should truncate sensitive information in logs', async () => {
       const longMessage = 'Very long sensitive message that should be truncated in logs for security reasons'
-      const requestWithLongMessage = { ...validSignatureRequest, message: longMessage }
+      const requestWithLongMessage = {
+        ...validSignatureRequest,
+        message: longMessage,
+      }
 
       await SignatureService.requestSignature(requestWithLongMessage, mockSignatureFunctions, mockConnector)
 
@@ -580,7 +592,7 @@ describe('SignatureService', () => {
     it('should handle logging with undefined values gracefully', async () => {
       const resultWithUndefined = {
         ...mockSignatureResult,
-        signatureType: undefined as any,
+        signatureType: undefined as unknown as SignatureResult['signatureType'],
       }
       mockStrategy.sign.mockResolvedValue(resultWithUndefined)
 

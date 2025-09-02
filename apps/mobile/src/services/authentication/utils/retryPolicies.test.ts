@@ -21,7 +21,9 @@ describe('RetryPolicies', () => {
     })
 
     it('should return fail-fast policy for first attempts', () => {
-      const policy = RetryPolicies.getPolicyForWallet('personal-sign', { isFirstAttempt: true })
+      const policy = RetryPolicies.getPolicyForWallet('personal-sign', {
+        isFirstAttempt: true,
+      })
 
       expect(policy.name).toBe('fail-fast')
       expect(policy.maxRetries).toBe(1)

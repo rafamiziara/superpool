@@ -1,42 +1,27 @@
 import {
-  // Session constants
-  SESSION_STORAGE_KEYS,
-  SESSION_TIMEOUTS,
-  REOWN_APPKIT_SESSION_KEY,
-  WALLETCONNECT_SESSION_KEY,
-  SESSION_ERROR_INDICATORS,
-  SESSION_ID_PATTERNS,
-  RELAYER_ERROR_INDICATORS,
-
-  // Authentication constants
   AUTH_TIMEOUTS,
   AUTH_VALIDATION,
-
-  // Toast constants
-  TOAST_DURATIONS,
-  TOAST_POSITIONS,
-
-  // Logging constants
+  type AuthTimeout,
+  ERROR_RETRY_CONFIG,
+  FIREBASE_CONFIG,
   LOG_LEVELS,
   LOGGING_CONFIG,
-
-  // Firebase constants
-  FIREBASE_CONFIG,
-
-  // Wallet constants
-  WALLET_ADDRESS_FORMAT,
+  type LogLevel,
+  RELAYER_ERROR_INDICATORS,
+  REOWN_APPKIT_SESSION_KEY,
+  SESSION_ERROR_INDICATORS,
+  SESSION_ID_PATTERNS,
+  SESSION_STORAGE_KEYS,
+  SESSION_TIMEOUTS,
   SIGNATURE_FORMATS,
   SUPPORTED_CHAIN_IDS,
-
-  // Error handling
-  ERROR_RETRY_CONFIG,
-
-  // Types
-  type AuthTimeout,
-  type LogLevel,
+  type SupportedChainId,
+  TOAST_DURATIONS,
+  TOAST_POSITIONS,
   type ToastDuration,
   type ToastPosition,
-  type SupportedChainId,
+  WALLET_ADDRESS_FORMAT,
+  WALLETCONNECT_SESSION_KEY,
 } from './constants'
 
 describe('constants', () => {
@@ -229,12 +214,9 @@ describe('constants', () => {
 
       it('should match AuthTimeout type constraints', () => {
         // Type checking - these should not cause TypeScript errors
-        const regularWalletTimeout: AuthTimeout = AUTH_TIMEOUTS.REGULAR_WALLET
-        const safeWalletTimeout: AuthTimeout = AUTH_TIMEOUTS.SAFE_WALLET
         const connectWalletTimeout: AuthTimeout = AUTH_TIMEOUTS.CONNECT_WALLET
         const signatureRequestTimeout: AuthTimeout = AUTH_TIMEOUTS.SIGNATURE_REQUEST
         const verificationTimeout: AuthTimeout = AUTH_TIMEOUTS.VERIFICATION
-        const firebaseAuthTimeout: AuthTimeout = AUTH_TIMEOUTS.FIREBASE_AUTH
 
         expect(typeof connectWalletTimeout).toBe('number')
         expect(typeof signatureRequestTimeout).toBe('number')
@@ -304,12 +286,9 @@ describe('constants', () => {
       })
 
       it('should match ToastDuration type constraints', () => {
-        const defaultDuration: ToastDuration = TOAST_DURATIONS.DEFAULT
         const short: ToastDuration = TOAST_DURATIONS.SHORT
         const long: ToastDuration = TOAST_DURATIONS.LONG
         const extended: ToastDuration = TOAST_DURATIONS.EXTENDED
-        const walletSwitching: ToastDuration = TOAST_DURATIONS.WALLET_SWITCHING
-        const signatureGuidance: ToastDuration = TOAST_DURATIONS.SIGNATURE_GUIDANCE
 
         expect(typeof short).toBe('number')
         expect(typeof long).toBe('number')
@@ -642,7 +621,7 @@ describe('constants', () => {
 
       // Access all constants many times
       for (let i = 0; i < 1000; i++) {
-        const allConstants = {
+        const _ = {
           SESSION_STORAGE_KEYS,
           SESSION_TIMEOUTS,
           AUTH_TIMEOUTS,

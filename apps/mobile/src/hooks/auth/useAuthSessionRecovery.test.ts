@@ -121,7 +121,9 @@ describe('useAuthSessionRecovery', () => {
 
   describe('Initial State', () => {
     it('should return initial recovery state', () => {
-      const { result } = renderHookWithStore(() => useAuthSessionRecovery(), { store: mockStore })
+      const { result } = renderHookWithStore(() => useAuthSessionRecovery(), {
+        store: mockStore,
+      })
 
       expect(result.current).toEqual(
         expect.objectContaining({
@@ -140,7 +142,9 @@ describe('useAuthSessionRecovery', () => {
     it('should not trigger automatic recovery when Firebase is loading', () => {
       mockFirebaseAuth.isLoading = true
 
-      const { result } = renderHookWithStore(() => useAuthSessionRecovery(), { store: mockStore })
+      const { result } = renderHookWithStore(() => useAuthSessionRecovery(), {
+        store: mockStore,
+      })
 
       // Fast-forward time past the recovery timeout
       act(() => {
@@ -159,7 +163,9 @@ describe('useAuthSessionRecovery', () => {
       mockFirebaseAuth.walletAddress = '0x1234567890123456789012345678901234567890'
       mockUseAccount.mockReturnValue(createMockConnectedAccount('0x1234567890123456789012345678901234567890', 1))
 
-      const { result } = renderHookWithStore(() => useAuthSessionRecovery(), { store: mockStore })
+      const { result } = renderHookWithStore(() => useAuthSessionRecovery(), {
+        store: mockStore,
+      })
 
       const validation = result.current.validateSession()
 
@@ -177,7 +183,9 @@ describe('useAuthSessionRecovery', () => {
     it('should detect missing Firebase authentication', () => {
       mockUseAccount.mockReturnValue(createMockConnectedAccount('0x1234567890123456789012345678901234567890', 1))
 
-      const { result } = renderHookWithStore(() => useAuthSessionRecovery(), { store: mockStore })
+      const { result } = renderHookWithStore(() => useAuthSessionRecovery(), {
+        store: mockStore,
+      })
 
       const validation = result.current.validateSession()
 
@@ -190,7 +198,9 @@ describe('useAuthSessionRecovery', () => {
       mockFirebaseAuth.isAuthenticated = true
       mockFirebaseAuth.walletAddress = '0x1234567890123456789012345678901234567890'
 
-      const { result } = renderHookWithStore(() => useAuthSessionRecovery(), { store: mockStore })
+      const { result } = renderHookWithStore(() => useAuthSessionRecovery(), {
+        store: mockStore,
+      })
 
       const validation = result.current.validateSession()
 
@@ -215,7 +225,9 @@ describe('useAuthSessionRecovery', () => {
         status: 'reconnecting',
       })
 
-      const { result } = renderHookWithStore(() => useAuthSessionRecovery(), { store: mockStore })
+      const { result } = renderHookWithStore(() => useAuthSessionRecovery(), {
+        store: mockStore,
+      })
 
       const validation = result.current.validateSession()
 
@@ -241,7 +253,9 @@ describe('useAuthSessionRecovery', () => {
         status: 'reconnecting',
       })
 
-      const { result } = renderHookWithStore(() => useAuthSessionRecovery(), { store: mockStore })
+      const { result } = renderHookWithStore(() => useAuthSessionRecovery(), {
+        store: mockStore,
+      })
 
       const validation = result.current.validateSession()
 
@@ -266,7 +280,9 @@ describe('useAuthSessionRecovery', () => {
         status: 'reconnecting',
       })
 
-      const { result } = renderHookWithStore(() => useAuthSessionRecovery(), { store: mockStore })
+      const { result } = renderHookWithStore(() => useAuthSessionRecovery(), {
+        store: mockStore,
+      })
 
       const validation = result.current.validateSession()
 
@@ -282,7 +298,9 @@ describe('useAuthSessionRecovery', () => {
       mockFirebaseAuth.walletAddress = '0x1234567890123456789012345678901234567890'
       mockUseAccount.mockReturnValue(createMockConnectedAccount('0x1234567890123456789012345678901234567890', 1))
 
-      const { result } = renderHookWithStore(() => useAuthSessionRecovery(), { store: mockStore })
+      const { result } = renderHookWithStore(() => useAuthSessionRecovery(), {
+        store: mockStore,
+      })
 
       const recoveryResult = await act(async () => {
         return await result.current.triggerRecovery()
@@ -304,7 +322,9 @@ describe('useAuthSessionRecovery', () => {
       mockFirebaseAuth.walletAddress = '0x1234567890123456789012345678901234567890'
       // Wallet is not connected
 
-      const { result } = renderHookWithStore(() => useAuthSessionRecovery(), { store: mockStore })
+      const { result } = renderHookWithStore(() => useAuthSessionRecovery(), {
+        store: mockStore,
+      })
 
       const recoveryResult = await act(async () => {
         return await result.current.triggerRecovery()
@@ -320,7 +340,9 @@ describe('useAuthSessionRecovery', () => {
     it('should handle wallet connected but no Firebase auth', async () => {
       mockUseAccount.mockReturnValue(createMockConnectedAccount('0x1234567890123456789012345678901234567890', 1))
 
-      const { result } = renderHookWithStore(() => useAuthSessionRecovery(), { store: mockStore })
+      const { result } = renderHookWithStore(() => useAuthSessionRecovery(), {
+        store: mockStore,
+      })
 
       const recoveryResult = await act(async () => {
         return await result.current.triggerRecovery()
@@ -349,7 +371,9 @@ describe('useAuthSessionRecovery', () => {
         status: 'reconnecting',
       })
 
-      const { result } = renderHookWithStore(() => useAuthSessionRecovery(), { store: mockStore })
+      const { result } = renderHookWithStore(() => useAuthSessionRecovery(), {
+        store: mockStore,
+      })
 
       const recoveryResult = await act(async () => {
         return await result.current.triggerRecovery()
@@ -385,7 +409,9 @@ describe('useAuthSessionRecovery', () => {
         status: 'reconnecting',
       })
 
-      const { result } = renderHookWithStore(() => useAuthSessionRecovery(), { store: mockStore })
+      const { result } = renderHookWithStore(() => useAuthSessionRecovery(), {
+        store: mockStore,
+      })
 
       const recoveryResult = await act(async () => {
         return await result.current.triggerRecovery()
@@ -405,7 +431,9 @@ describe('useAuthSessionRecovery', () => {
     })
 
     it('should handle no authentication available', async () => {
-      const { result } = renderHookWithStore(() => useAuthSessionRecovery(), { store: mockStore })
+      const { result } = renderHookWithStore(() => useAuthSessionRecovery(), {
+        store: mockStore,
+      })
 
       const recoveryResult = await act(async () => {
         return await result.current.triggerRecovery()
@@ -437,7 +465,9 @@ describe('useAuthSessionRecovery', () => {
         status: 'reconnecting',
       })
 
-      const { result } = renderHookWithStore(() => useAuthSessionRecovery(), { store: mockStore })
+      const { result } = renderHookWithStore(() => useAuthSessionRecovery(), {
+        store: mockStore,
+      })
 
       const recoveryResult = await act(async () => {
         return await result.current.triggerRecovery()
@@ -457,7 +487,9 @@ describe('useAuthSessionRecovery', () => {
       mockFirebaseAuth.walletAddress = '0x1234567890123456789012345678901234567890'
       mockUseAccount.mockReturnValue(createMockConnectedAccount('0x1234567890123456789012345678901234567890', 1))
 
-      const { result } = renderHookWithStore(() => useAuthSessionRecovery(), { store: mockStore })
+      const { result } = renderHookWithStore(() => useAuthSessionRecovery(), {
+        store: mockStore,
+      })
 
       expect(result.current.isRecovering).toBe(false)
 
@@ -471,9 +503,11 @@ describe('useAuthSessionRecovery', () => {
     })
 
     it('should prevent multiple concurrent recoveries', async () => {
-      const { result } = renderHookWithStore(() => useAuthSessionRecovery(), { store: mockStore })
+      const { result } = renderHookWithStore(() => useAuthSessionRecovery(), {
+        store: mockStore,
+      })
 
-      let firstRecoveryPromise: any
+      let firstRecoveryPromise: Promise<void>
 
       // Test concurrent calls within act to capture the behavior
       await act(async () => {
@@ -500,7 +534,9 @@ describe('useAuthSessionRecovery', () => {
     })
 
     it('should update recovery state during manual recovery', async () => {
-      const { result } = renderHookWithStore(() => useAuthSessionRecovery(), { store: mockStore })
+      const { result } = renderHookWithStore(() => useAuthSessionRecovery(), {
+        store: mockStore,
+      })
 
       await act(async () => {
         const recoveryPromise = result.current.triggerRecovery()
@@ -523,7 +559,9 @@ describe('useAuthSessionRecovery', () => {
       mockFirebaseAuth.walletAddress = '0x1111111111111111111111111111111111111111'
       mockUseAccount.mockReturnValue(createMockConnectedAccount('0x2222222222222222222222222222222222222222', 1))
 
-      const { result } = renderHookWithStore(() => useAuthSessionRecovery(), { store: mockStore })
+      const { result } = renderHookWithStore(() => useAuthSessionRecovery(), {
+        store: mockStore,
+      })
 
       // The error is handled internally, so it should not throw but return error result
       const recoveryResult = await act(async () => {
@@ -547,7 +585,9 @@ describe('useAuthSessionRecovery', () => {
   describe('Automatic Recovery', () => {
     it('should trigger automatic recovery after delay', async () => {
       mockFirebaseAuth.isLoading = false
-      const { result } = renderHookWithStore(() => useAuthSessionRecovery(), { store: mockStore })
+      const { result } = renderHookWithStore(() => useAuthSessionRecovery(), {
+        store: mockStore,
+      })
 
       expect(result.current.recoveryAttempted).toBe(false)
 
@@ -576,7 +616,7 @@ describe('useAuthSessionRecovery', () => {
 
       expect(result.current.recoveryAttempted).toBe(true)
 
-      const devOnlyCalls = (mockDevOnly as jest.MockedFunction<any>).mock.calls.length
+      const devOnlyCalls = (mockDevOnly as jest.MockedFunction<(...args: unknown[]) => void>).mock.calls.length
 
       // Rerender to simulate component update
       rerender({})
@@ -587,13 +627,15 @@ describe('useAuthSessionRecovery', () => {
       })
 
       // Should not trigger again - devOnly call count should remain the same
-      expect((mockDevOnly as jest.MockedFunction<any>).mock.calls.length).toBe(devOnlyCalls)
+      expect((mockDevOnly as jest.MockedFunction<(...args: unknown[]) => void>).mock.calls.length).toBe(devOnlyCalls)
     })
 
     it('should cleanup timeout on unmount', () => {
       const clearTimeoutSpy = jest.spyOn(global, 'clearTimeout')
 
-      const { unmount } = renderHookWithStore(() => useAuthSessionRecovery(), { store: mockStore })
+      const { unmount } = renderHookWithStore(() => useAuthSessionRecovery(), {
+        store: mockStore,
+      })
 
       unmount()
 
@@ -619,7 +661,9 @@ describe('useAuthSessionRecovery', () => {
         status: 'reconnecting',
       })
 
-      const { result } = renderHookWithStore(() => useAuthSessionRecovery(), { store: mockStore })
+      const { result } = renderHookWithStore(() => useAuthSessionRecovery(), {
+        store: mockStore,
+      })
 
       const recoveryResult = await act(async () => {
         return await result.current.triggerRecovery()
@@ -631,7 +675,9 @@ describe('useAuthSessionRecovery', () => {
     })
 
     it('should handle null addresses gracefully', () => {
-      const { result } = renderHookWithStore(() => useAuthSessionRecovery(), { store: mockStore })
+      const { result } = renderHookWithStore(() => useAuthSessionRecovery(), {
+        store: mockStore,
+      })
 
       const validation = result.current.validateSession()
 
@@ -645,7 +691,9 @@ describe('useAuthSessionRecovery', () => {
       mockFirebaseAuth.isAuthenticated = true
       mockFirebaseAuth.walletAddress = '0x1234567890123456789012345678901234567890'
 
-      const { result } = renderHookWithStore(() => useAuthSessionRecovery(), { store: mockStore })
+      const { result } = renderHookWithStore(() => useAuthSessionRecovery(), {
+        store: mockStore,
+      })
 
       const validation = result.current.validateSession()
 

@@ -69,7 +69,11 @@ describe('RegularWalletStrategy', () => {
       })
 
       it('should return false for Safe connectors by ID', () => {
-        const safeConnector = { id: 'safe', name: 'Safe Wallet', type: 'safe' } as Connector
+        const safeConnector = {
+          id: 'safe',
+          name: 'Safe Wallet',
+          type: 'safe',
+        } as Connector
         expect(strategy.canHandle(safeConnector)).toBe(false)
       })
 
@@ -100,8 +104,20 @@ describe('RegularWalletStrategy', () => {
 
       it('should handle edge cases with connector properties', () => {
         expect(strategy.canHandle({ id: '', name: '', type: '' } as Connector)).toBe(true)
-        expect(strategy.canHandle({ id: null, name: null, type: 'test' } as any)).toBe(true)
-        expect(strategy.canHandle({ id: undefined, name: undefined, type: 'test' } as any)).toBe(true)
+        expect(
+          strategy.canHandle({
+            id: null,
+            name: null,
+            type: 'test',
+          } as unknown as Connector)
+        ).toBe(true)
+        expect(
+          strategy.canHandle({
+            id: undefined,
+            name: undefined,
+            type: 'test',
+          } as unknown as Connector)
+        ).toBe(true)
       })
     })
 
@@ -393,7 +409,7 @@ describe('RegularWalletStrategy', () => {
 
   describe('Error Handling and Edge Cases', () => {
     it('should handle null/undefined signature results', async () => {
-      mockSignatureFunctions.signMessageAsync.mockResolvedValue(null as any)
+      mockSignatureFunctions.signMessageAsync.mockResolvedValue(null as unknown as string)
       mockSignatureUtils.validateSignatureResult.mockReturnValue(false)
       mockSignatureUtils.isSafeWalletError.mockReturnValue(false)
 
@@ -401,7 +417,11 @@ describe('RegularWalletStrategy', () => {
     })
 
     it('should handle connector parameter in sign method', async () => {
-      const mockConnector = { id: 'test', name: 'Test', type: 'test' } as Connector
+      const mockConnector = {
+        id: 'test',
+        name: 'Test',
+        type: 'test',
+      } as Connector
       mockSignatureFunctions.signMessageAsync.mockResolvedValue('0x123')
 
       await strategy.sign(mockRequest, mockSignatureFunctions, mockConnector)
@@ -551,7 +571,7 @@ describe('RegularWalletStrategy', () => {
         return await promise
       })
 
-      mockSignatureUtils.validateSignatureResult.mockImplementation((sig) => {
+      mockSignatureUtils.validateSignatureResult.mockImplementation((_sig) => {
         callOrder.push('validateSignatureResult')
         return true
       })
@@ -588,7 +608,7 @@ describe('RegularWalletStrategy', () => {
 
     it('should have static timeout constants accessible', () => {
       // Access private static through any cast for testing
-      const strategyAny = strategy as any
+      const strategyAny = strategy as Record<string, unknown>
       const regularTimeout = strategyAny.constructor.TIMEOUT_MS
       const safeTimeout = strategyAny.constructor.SAFE_TIMEOUT_MS
 

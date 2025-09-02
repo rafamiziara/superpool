@@ -1,8 +1,8 @@
 import React from 'react'
 import { mockStorePresets, render, renderWithStore } from '../test-utils'
+import { AuthProgressIndicator } from './AuthProgressIndicator'
 import { LoadingSpinner } from './LoadingSpinner'
 import { ProgressIndicator } from './ProgressIndicator'
-import { AuthProgressIndicator } from './AuthProgressIndicator'
 
 describe('Component Snapshots', () => {
   describe('LoadingSpinner Snapshots', () => {

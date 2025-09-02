@@ -35,14 +35,14 @@ describe('AuthErrorRecoveryService', () => {
       reset: jest.fn(),
       acquireAuthLock: jest.fn(),
       releaseAuthLock: jest.fn(),
-    } as any
+    } as jest.Mocked<AuthenticationStore>
 
     mockWalletStore = {
       isConnected: false,
       address: null,
       chainId: null,
       disconnect: jest.fn(),
-    } as any
+    } as jest.Mocked<WalletStore>
 
     // Spy on console methods
     consoleLogSpy = jest.spyOn(console, 'log').mockImplementation()
@@ -64,10 +64,10 @@ describe('AuthErrorRecoveryService', () => {
 
     it('should be instantiable but not necessary (legacy class)', () => {
       // Legacy class can be instantiated but all methods are static
-      expect(() => new (AuthErrorRecoveryService as any)()).not.toThrow()
+      expect(() => new (AuthErrorRecoveryService as unknown as new () => unknown)()).not.toThrow()
 
       // Verify that it's primarily designed for static usage
-      const instance = new (AuthErrorRecoveryService as any)()
+      const instance = new (AuthErrorRecoveryService as unknown as new () => unknown)()
       expect(instance).toBeDefined()
     })
   })
@@ -87,8 +87,12 @@ describe('AuthErrorRecoveryService', () => {
     })
 
     it('should handle initialize with different store instances', () => {
-      const alternateAuthStore = { ...mockAuthStore } as any
-      const alternateWalletStore = { ...mockWalletStore } as any
+      const alternateAuthStore = {
+        ...mockAuthStore,
+      } as jest.Mocked<AuthenticationStore>
+      const alternateWalletStore = {
+        ...mockWalletStore,
+      } as jest.Mocked<WalletStore>
 
       AuthErrorRecoveryService.initialize(alternateAuthStore, alternateWalletStore)
 
@@ -109,7 +113,7 @@ describe('AuthErrorRecoveryService', () => {
     const mockAppError: AppError = {
       name: 'AuthenticationError',
       message: 'Authentication failed',
-      type: 'AUTHENTICATION_FAILED' as any,
+      type: 'AUTHENTICATION_FAILED' as AppError['type'],
       userFriendlyMessage: 'Please try again',
       timestamp: new Date(),
     }
@@ -176,7 +180,7 @@ describe('AuthErrorRecoveryService', () => {
       const differentAppError: AppError = {
         name: 'NetworkError',
         message: 'Network request failed',
-        type: 'NETWORK_ERROR' as any,
+        type: 'NETWORK_ERROR' as AppError['type'],
         userFriendlyMessage: 'Check your connection',
         timestamp: new Date(),
       }
@@ -204,7 +208,7 @@ describe('AuthErrorRecoveryService', () => {
     const mockAppError: AppError = {
       name: 'AuthenticationError',
       message: 'Authentication failed',
-      type: 'AUTHENTICATION_FAILED' as any,
+      type: 'AUTHENTICATION_FAILED' as AppError['type'],
       userFriendlyMessage: 'Please try again',
       timestamp: new Date(),
     }
@@ -228,21 +232,21 @@ describe('AuthErrorRecoveryService', () => {
         {
           name: 'NetworkError',
           message: 'Network failed',
-          type: 'NETWORK_ERROR' as any,
+          type: 'NETWORK_ERROR' as AppError['type'],
           userFriendlyMessage: 'Check connection',
           timestamp: new Date(),
         },
         {
           name: 'ValidationError',
           message: 'Validation failed',
-          type: 'VALIDATION_ERROR' as any,
+          type: 'VALIDATION_ERROR' as AppError['type'],
           userFriendlyMessage: 'Invalid input',
           timestamp: new Date(),
         },
         {
           name: 'TimeoutError',
           message: 'Request timeout',
-          type: 'TIMEOUT_ERROR' as any,
+          type: 'TIMEOUT_ERROR' as AppError['type'],
           userFriendlyMessage: 'Request timed out',
           timestamp: new Date(),
         },
@@ -350,7 +354,7 @@ describe('AuthErrorRecoveryService', () => {
 
     it('should return the promise from ErrorRecoveryService', async () => {
       const customResult = { cleanup: 'completed' }
-      mockErrorRecoveryService.handleFirebaseCleanup.mockResolvedValue(customResult as any)
+      mockErrorRecoveryService.handleFirebaseCleanup.mockResolvedValue(customResult as unknown)
 
       const result = await AuthErrorRecoveryService.handleFirebaseCleanup('test')
 
@@ -426,7 +430,7 @@ describe('AuthErrorRecoveryService', () => {
       const methods = ['initialize', 'handleAuthenticationError', 'showErrorFeedback', 'handleFirebaseCleanup']
 
       methods.forEach((method) => {
-        expect(typeof (AuthErrorRecoveryService as any)[method]).toBe('function')
+        expect(typeof (AuthErrorRecoveryService as Record<string, unknown>)[method]).toBe('function')
       })
     })
 
@@ -438,7 +442,7 @@ describe('AuthErrorRecoveryService', () => {
       const mockAppError: AppError = {
         name: 'AuthError',
         message: 'Auth failed',
-        type: 'AUTHENTICATION_FAILED' as any,
+        type: 'AUTHENTICATION_FAILED' as AppError['type'],
         userFriendlyMessage: 'Try again',
         timestamp: new Date(),
       }
@@ -482,7 +486,7 @@ describe('AuthErrorRecoveryService', () => {
       const mockError: AppError = {
         name: 'TestError',
         message: 'Test',
-        type: 'TEST_ERROR' as any,
+        type: 'TEST_ERROR' as AppError['type'],
         userFriendlyMessage: 'Test',
         timestamp: new Date(),
       }

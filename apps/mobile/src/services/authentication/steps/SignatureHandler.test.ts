@@ -277,7 +277,7 @@ describe('SignatureHandler', () => {
       })
 
       it('should handle malformed signature service response', async () => {
-        mockSignatureService.requestSignature.mockResolvedValue(null as any)
+        mockSignatureService.requestSignature.mockResolvedValue(null as unknown as SignatureResult)
 
         const result = await signatureHandler.requestWalletSignature(mockContext, mockAuthMessage)
 
@@ -344,7 +344,7 @@ describe('SignatureHandler', () => {
       it('should handle undefined message in logs', async () => {
         const authMessageWithUndefinedMessage: GeneratedAuthMessage = {
           ...mockAuthMessage,
-          message: undefined as any,
+          message: undefined as unknown as string,
         }
 
         const mockSignatureResult: SignatureResult = {
@@ -447,7 +447,7 @@ describe('SignatureHandler', () => {
         for (const type of connectorTypes) {
           const connectorWithType = {
             ...mockConnector,
-            type: type as any,
+            type: type as Connector['type'],
             id: `${type}-connector`,
           }
 

@@ -10,7 +10,13 @@ jest.mock('../../../utils', () => ({
 describe('GenericErrorHandler', () => {
   let handler: GenericErrorHandler
   let mockDisconnectFunction: jest.Mock
-  let mockAppError: any
+  let mockAppError: {
+    name: string
+    message: string
+    type: ErrorType
+    userFriendlyMessage: string
+    originalError?: unknown
+  }
 
   beforeEach(() => {
     mockDisconnectFunction = jest.fn()
@@ -335,7 +341,9 @@ describe('GenericErrorHandler', () => {
 
         scenarios.forEach((scenario) => {
           isUserInitiatedError.mockReturnValue(scenario.userInitiated)
-          const context = createMockContext({ isConnected: scenario.connected })
+          const context = createMockContext({
+            isConnected: scenario.connected,
+          })
 
           const result = handler.handle(context)
 
@@ -379,7 +387,9 @@ describe('GenericErrorHandler', () => {
         const { isUserInitiatedError } = require('../../../utils')
         isUserInitiatedError.mockReturnValue(false)
 
-        const context = createMockContext({ appError: null as any })
+        const context = createMockContext({
+          appError: null as unknown as typeof mockAppError,
+        })
 
         // Should not throw
         const result = handler.handle(context)

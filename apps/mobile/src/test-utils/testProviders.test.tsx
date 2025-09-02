@@ -3,13 +3,13 @@
  * Tests TestStoreProvider component and withMockStore HOC
  */
 
+import { render } from '@testing-library/react-native'
 import React from 'react'
 import { Text, View } from 'react-native'
-import { render } from '@testing-library/react-native'
-import { TestStoreProvider, withMockStore } from './testProviders'
-import { StoreContext } from '../stores/StoreContext'
 import { RootStore } from '../stores/RootStore'
+import { StoreContext } from '../stores/StoreContext'
 import { createMockRootStore } from './mockStores'
+import { TestStoreProvider, withMockStore } from './testProviders'
 
 // Mock dependencies
 jest.mock('../stores/StoreContext')
@@ -99,7 +99,7 @@ describe('testProviders', () => {
     })
 
     it('should render multiple children correctly', () => {
-      const { getByTestId, getByText } = render(
+      const { getByTestId } = render(
         <TestStoreProvider>
           <TestChild />
           <Text testID="second-child">Second Child</Text>
@@ -150,8 +150,12 @@ describe('testProviders', () => {
     })
 
     it('should work with nested providers', () => {
-      const outerStore = { authenticationStore: { isAuthenticated: false } } as unknown as RootStore
-      const innerStore = { authenticationStore: { isAuthenticated: true } } as unknown as RootStore
+      const outerStore = {
+        authenticationStore: { isAuthenticated: false },
+      } as unknown as RootStore
+      const innerStore = {
+        authenticationStore: { isAuthenticated: true },
+      } as unknown as RootStore
 
       const { getByTestId } = render(
         <TestStoreProvider store={outerStore}>
@@ -249,8 +253,10 @@ describe('testProviders', () => {
     })
 
     it('should work with components that have optional props', () => {
-      const OptionalPropsComponent: React.FC<{ title?: string; visible?: boolean }> = ({ title = 'Default Title', visible = true }) =>
-        visible ? <Text testID="optional-props">{title}</Text> : null
+      const OptionalPropsComponent: React.FC<{
+        title?: string
+        visible?: boolean
+      }> = ({ title = 'Default Title', visible = true }) => (visible ? <Text testID="optional-props">{title}</Text> : null)
 
       const WrappedComponent = withMockStore(OptionalPropsComponent)
 
@@ -269,7 +275,10 @@ describe('testProviders', () => {
     })
 
     it('should preserve component functionality when wrapped', () => {
-      const InteractiveComponent: React.FC<{ onPress?: () => void; disabled?: boolean }> = ({ onPress, disabled = false }) => (
+      const InteractiveComponent: React.FC<{
+        onPress?: () => void
+        disabled?: boolean
+      }> = ({ onPress, disabled = false }) => (
         <Text testID="interactive" onPress={disabled ? undefined : onPress} style={{ opacity: disabled ? 0.5 : 1 }}>
           {disabled ? 'Disabled' : 'Enabled'}
         </Text>
@@ -291,7 +300,7 @@ describe('testProviders', () => {
 
       const WrappedComponent = withMockStore(StatefulComponent)
 
-      const { getByTestId, getByText, rerender } = render(<WrappedComponent initialCount={0} />)
+      const { getByText, rerender } = render(<WrappedComponent initialCount={0} />)
 
       expect(getByText('Count: 0')).toBeTruthy()
 

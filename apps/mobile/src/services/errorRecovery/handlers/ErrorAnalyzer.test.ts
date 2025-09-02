@@ -353,7 +353,7 @@ describe('ErrorAnalyzer', () => {
       })
 
       it('should handle circular reference objects', () => {
-        const circularObj: any = { message: 'test' }
+        const circularObj: Record<string, unknown> = { message: 'test' }
         circularObj.self = circularObj
 
         const result = ErrorAnalyzer.analyzeError(circularObj)
