@@ -7,19 +7,15 @@ import { act } from '@testing-library/react-native'
 import { runInAction } from 'mobx'
 import { useAuthentication } from './useAuthentication'
 import { createMockRootStore, renderHookWithStore } from '@mocks/factories/testFactory'
+import { createMockFirebaseAuthManager } from '@mocks/factories/serviceFactory'
 import { AuthStep } from '@superpool/types'
 import { AppError, ErrorType } from '../../utils/errorHandling'
 
-// Firebase auth hook mock - using inline since this is hook-specific state
-const mockFirebaseAuth = {
-  isAuthenticated: false,
-  isLoading: false,
-  walletAddress: null as string | null,
-  user: null,
-}
+// Create centralized Firebase auth manager mock
+const mockFirebaseAuthManager = createMockFirebaseAuthManager()
 
 jest.mock('./useFirebaseAuth', () => ({
-  useFirebaseAuth: () => mockFirebaseAuth,
+  useFirebaseAuth: () => mockFirebaseAuthManager.getCurrentState(),
 }))
 
 describe('useAuthentication', () => {
@@ -28,12 +24,12 @@ describe('useAuthentication', () => {
   beforeEach(() => {
     mockStore = createMockRootStore()
 
-    // Reset Firebase auth mock state
-    Object.assign(mockFirebaseAuth, {
-      isAuthenticated: false,
-      isLoading: false,
-      walletAddress: null,
+    // Reset Firebase auth manager mock
+    mockFirebaseAuthManager.getCurrentState.mockReturnValue({
       user: null,
+      isLoading: false,
+      isAuthenticated: false,
+      walletAddress: null,
     })
 
     // Reset auth store to initial state
@@ -154,13 +150,23 @@ describe('useAuthentication', () => {
           isLocked: false,
         }
       })
-      mockFirebaseAuth.isLoading = true
+      mockFirebaseAuthManager.getCurrentState.mockReturnValue({
+        user: null,
+        isLoading: true,
+        isAuthenticated: false,
+        walletAddress: null,
+      })
       rerender({})
 
       expect(result.current.isAuthenticating).toBe(true)
 
       // Both false
-      mockFirebaseAuth.isLoading = false
+      mockFirebaseAuthManager.getCurrentState.mockReturnValue({
+        user: null,
+        isLoading: false,
+        isAuthenticated: false,
+        walletAddress: null,
+      })
       rerender({})
 
       expect(result.current.isAuthenticating).toBe(false)
@@ -176,7 +182,12 @@ describe('useAuthentication', () => {
           walletAddress: '0x1111111111111111111111111111111111111111',
         }
       })
-      mockFirebaseAuth.walletAddress = '0x2222222222222222222222222222222222222222'
+      mockFirebaseAuthManager.getCurrentState.mockReturnValue({
+        user: null,
+        isLoading: false,
+        isAuthenticated: false,
+        walletAddress: '0x2222222222222222222222222222222222222222',
+      })
       rerender({})
 
       // Should return Firebase address
@@ -205,8 +216,12 @@ describe('useAuthentication', () => {
       expect(result.current.isFirebaseAuthenticated).toBe(false)
       expect(result.current.isFirebaseLoading).toBe(false)
 
-      mockFirebaseAuth.isAuthenticated = true
-      mockFirebaseAuth.isLoading = true
+      mockFirebaseAuthManager.getCurrentState.mockReturnValue({
+        user: null,
+        isLoading: true,
+        isAuthenticated: true,
+        walletAddress: null,
+      })
       rerender({})
 
       expect(result.current.isFirebaseAuthenticated).toBe(true)
@@ -512,8 +527,12 @@ describe('useAuthentication', () => {
           isLocked: false,
         }
       })
-      mockFirebaseAuth.isAuthenticated = true
-      mockFirebaseAuth.walletAddress = '0x1234567890123456789012345678901234567890'
+      mockFirebaseAuthManager.getCurrentState.mockReturnValue({
+        user: null,
+        isLoading: false,
+        isAuthenticated: true,
+        walletAddress: '0x1234567890123456789012345678901234567890',
+      })
       rerender({})
 
       expect(result.current.completedSteps.size).toBe(5) // +1 for initial connect-wallet
