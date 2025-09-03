@@ -38,7 +38,8 @@
     "demo:safe": "hardhat run scripts/demo-safe-workflow.ts --network localhost",
     "test:full": "npm run test:local && npm run test:safe",
     "lint": "solhint contracts/*.sol && cd ../.. && npx eslint packages/contracts/**/*.ts --config eslint.config.mjs",
-    "clean": "hardhat clean"
+    "clean": "hardhat clean",
+    "format": "prettier --write ."
   },
   "keywords": [
     "solidity",

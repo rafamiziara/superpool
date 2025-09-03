@@ -12,7 +12,8 @@
   "scripts": {
     "build": "tsup",
     "dev": "tsup --watch",
-    "type-check": "tsc --noEmit"
+    "type-check": "tsc --noEmit",
+    "format": "prettier --write ."
   },
   "exports": {
     ".": {

@@ -149,12 +149,12 @@ describe('verifySignatureAndLoginHandler', () => {
             thresholdCheck: false,
             safeVersionCompatibility: false,
             verificationMethod: 'fallback',
-            contractAddress: walletAddr
+            contractAddress: walletAddr,
           },
-          error: 'INVALID_SIGNATURE_FORMAT'
+          error: 'INVALID_SIGNATURE_FORMAT',
         }
       }
-      
+
       // Default successful verification for other cases
       return {
         isValid: true,
@@ -164,16 +164,16 @@ describe('verifySignatureAndLoginHandler', () => {
           thresholdCheck: true,
           safeVersionCompatibility: true,
           verificationMethod: 'eip1271',
-          contractAddress: walletAddr
+          contractAddress: walletAddr,
         },
-        warnings: []
+        warnings: [],
       }
     })
 
     // Mock ProviderService
     mockGetProvider.mockReturnValue({
       getNetwork: jest.fn(),
-      getBlockNumber: jest.fn()
+      getBlockNumber: jest.fn(),
     })
   })
 
@@ -504,7 +504,9 @@ describe('verifySignatureAndLoginHandler', () => {
     }
 
     // Act & Assert
-    await expect(verifySignatureAndLoginHandler(request)).rejects.toThrow('Signature verification failed: Safe wallet authentication failed: Safe wallet verification failed: INVALID_SIGNATURE_FORMAT')
+    await expect(verifySignatureAndLoginHandler(request)).rejects.toThrow(
+      'Signature verification failed: Safe wallet authentication failed: Safe wallet verification failed: INVALID_SIGNATURE_FORMAT'
+    )
     await expect(verifySignatureAndLoginHandler(request)).rejects.toHaveProperty('code', 'unauthenticated')
   })
 

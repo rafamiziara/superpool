@@ -71,11 +71,7 @@
       },
       "files": {
         "modified": [],
-        "created": [
-          "packages/backend/docs/TESTING_GUIDE.md",
-          "apps/landing/docs/TESTING_GUIDE.md",
-          "packages/ui/docs/TESTING_GUIDE.md"
-        ],
+        "created": ["packages/backend/docs/TESTING_GUIDE.md", "apps/landing/docs/TESTING_GUIDE.md", "packages/ui/docs/TESTING_GUIDE.md"],
         "analyzed": []
       },
       "outcome": {
@@ -100,14 +96,8 @@
         "tags": ["agent-config", "constraints", "history-tracking", "typescript-rules"]
       },
       "files": {
-        "modified": [
-          ".claude/agents/test-writer-fixer.md",
-          "CLAUDE.md"
-        ],
-        "created": [
-          ".claude/agents/history/README.md",
-          ".claude/agents/history/test-writer-fixer.md"
-        ],
+        "modified": [".claude/agents/test-writer-fixer.md", "CLAUDE.md"],
+        "created": [".claude/agents/history/README.md", ".claude/agents/history/test-writer-fixer.md"],
         "analyzed": []
       },
       "outcome": {

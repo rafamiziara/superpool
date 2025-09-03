@@ -15,7 +15,8 @@
   },
   "scripts": {
     "copy-to-landing": "mkdir -p ../../apps/landing/public/images/illustrations && cp images/illustrations/* ../../apps/landing/public/images/illustrations/",
-    "build": "pnpm run copy-to-landing"
+    "build": "pnpm run copy-to-landing",
+    "format": "prettier --write ."
   },
   "keywords": [
     "assets",

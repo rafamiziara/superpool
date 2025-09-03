@@ -13,6 +13,9 @@
     "./tailwind.config": "./tailwind.config.js",
     "./package.json": "./package.json"
   },
+  "scripts": {
+    "format": "prettier --write ."
+  },
   "keywords": [
     "design-system",
     "design-tokens",
