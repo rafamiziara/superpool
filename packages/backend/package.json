@@ -11,7 +11,8 @@
     "logs": "firebase functions:log --config-dir ../../config",
     "generateKey": "ts-node ../../scripts/generateKey.ts",
     "signMessage": "ts-node ../../scripts/signMessage.ts",
-    "test": "jest"
+    "test": "jest",
+    "format": "prettier --write ."
   },
   "engines": {
     "node": "22"

@@ -93,7 +93,7 @@ Your primary responsibilities:
 
 **Critical Constraints & Permissions**:
 
-- **NEVER modify implementation files** - Only work with test files (*.test.*, *.spec.*, test directories)
+- **NEVER modify implementation files** - Only work with test files (`*.test.*`, `*.spec.*`, test directories)
 - **NEVER modify dependencies** - Do not add, remove, or update package.json dependencies
 - **NEVER modify documentation** without explicit permission - Always ask before changing any .md files
 - **ALWAYS ask for permission** when implementation changes are needed to make tests pass
@@ -123,6 +123,7 @@ Your primary responsibilities:
 When working within specific parts of the SuperPool monorepo, you will automatically apply the appropriate testing standards and methodologies documented for that context:
 
 **Mobile App Context** (`apps/mobile/`):
+
 - **Standards**: Follow `apps/mobile/docs/TESTING_GUIDE.md` - Business logic priority (95% coverage), co-located tests, user-facing functionality focus
 - **Mock System**: Use centralized factory pattern from `apps/mobile/docs/MOCK_SYSTEM.md` - Import from `__mocks__/factories/`, avoid inline mocks
 - **TDD Workflow**: Apply `apps/mobile/docs/TDD_WORKFLOW.md` - Red-Green-Refactor cycle, business-driven development
@@ -130,41 +131,48 @@ When working within specific parts of the SuperPool monorepo, you will automatic
 - **Troubleshooting**: Reference `apps/mobile/docs/TROUBLESHOOTING.md` for common Jest, React Native Testing Library issues
 
 **Smart Contracts Context** (`packages/contracts/`):
+
 - **Testing Strategy**: Apply `packages/contracts/docs/HYBRID_TESTING_STRATEGY.md` - Local development for core logic, forked networks for Safe integration
 - **Security Focus**: Follow `packages/contracts/docs/SECURITY_CONSIDERATIONS.md` - Comprehensive edge case testing, reentrancy protection, access control validation
 - **Multi-sig Testing**: Use `packages/contracts/docs/MULTISIG_MANAGEMENT.md` - Safe SDK integration, signature simulation, ownership transfer patterns
 - **Emergency Procedures**: Reference `packages/contracts/docs/EMERGENCY_PROCEDURES.md` - Pause mechanisms, recovery scenarios, disaster testing
 
 **Backend Context** (`packages/backend/`):
+
 - **API Testing**: Focus on Firebase Cloud Functions, HTTP endpoints, error handling, authentication flows
 - **Integration Testing**: Database operations, external service calls, Firebase Auth integration
 - **Performance Testing**: Function execution time, cold starts, memory usage
 - **Security Testing**: Authentication validation, data sanitization, rate limiting
 
 **Landing Page Context** (`apps/landing/`):
+
 - **Component Testing**: Next.js 15.5.0 components, React 19 features, responsive design validation
 - **Performance Testing**: Page load times, Core Web Vitals, image optimization
 - **Accessibility Testing**: WCAG compliance, keyboard navigation, screen reader compatibility
 - **SEO Testing**: Meta tags, structured data, page structure validation
 
 **UI Components Context** (`packages/ui/`):
+
 - **Component Library Testing**: Storybook integration, component variants, prop validation
 - **Cross-Platform Compatibility**: React and React Native component testing
 - **Design System Testing**: Consistent styling, theme application, responsive behavior
 - **Accessibility Standards**: ARIA labels, keyboard interactions, color contrast
 
 **Types Context** (`packages/types/`):
+
 - **Type Validation Testing**: Runtime type checking, interface compliance, enum validation
 - **Integration Testing**: Cross-package type consistency, API contract validation
 - **Breaking Change Detection**: Type evolution testing, backward compatibility
 
 **Documentation Discovery**: Automatically detect and apply testing guidelines from:
+
 - `{context}/docs/` directories for package-specific standards
-- `{context}/README.md` for setup and testing instructions  
+- `{context}/README.md` for setup and testing instructions
 - `{context}/jest.config.js` for framework-specific configurations
 - Project root `CLAUDE.md` for general development guidelines
 
 **Context-Aware Decision Making**:
+
 - Detect current working context from file paths and apply appropriate standards
 - Use package-specific mock patterns and test utilities
 - Follow domain-appropriate coverage targets and testing strategies
@@ -197,7 +205,7 @@ When working within specific parts of the SuperPool monorepo, you will automatic
       "analyzed": ["AuthStore.ts"]
     },
     "outcome": {
-      "status": "success", 
+      "status": "success",
       "details": "Updated 12 tests to use new store API, all passing",
       "follow_up_needed": false
     },

@@ -21,7 +21,16 @@
     "lint": "pnpm run lint:ts && pnpm run lint:sol",
     "lint:ts": "eslint . --config eslint.config.mjs",
     "lint:sol": "pnpm --filter contracts lint",
-    "lint:fix": "eslint . --config eslint.config.mjs --fix && pnpm run lint:sol"
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "format:backend": "pnpm --filter backend format",
+    "format:contracts": "pnpm --filter contracts format",
+    "format:mobile": "pnpm --filter mobile format",
+    "format:landing": "pnpm --filter @superpool/landing format",
+    "format:ui": "pnpm --filter @superpool/ui format",
+    "format:types": "pnpm --filter @superpool/types format",
+    "format:assets": "pnpm --filter @superpool/assets format",
+    "format:design": "pnpm --filter @superpool/design format"
   },
   "keywords": [],
   "author": "",

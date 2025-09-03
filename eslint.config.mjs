@@ -4,6 +4,7 @@ import tsparser from '@typescript-eslint/parser'
 import prettier from 'eslint-config-prettier'
 import eslintPluginPrettierRecommended from 'eslint-plugin-prettier/recommended'
 import globals from 'globals'
+import customPrettier from './prettier.config.mjs'
 
 export default [
   eslintPluginPrettierRecommended,
@@ -152,18 +153,7 @@ export default [
 
   {
     rules: {
-      'prettier/prettier': [
-        'error',
-        {
-          printWidth: 140,
-          tabWidth: 2,
-          singleQuote: true,
-          trailingComma: 'es5',
-          arrowParens: 'always',
-          semi: false,
-          endOfLine: 'auto',
-        },
-      ],
+      'prettier/prettier': ['error', customPrettier],
     },
   },
 

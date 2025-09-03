@@ -5,6 +5,7 @@ This directory maintains a structured history of agent task executions across th
 ## Structure
 
 Each agent maintains its own JSON history file:
+
 - `test-writer-fixer.json` - Test creation, fixing, and maintenance tasks
 - `rapid-prototyper.json` - Rapid prototyping and MVP development tasks
 - `ui-designer.json` - UI design and interface tasks
@@ -21,6 +22,7 @@ Each agent maintains its own JSON history file:
 All history files follow the standardized schema defined in `schema.json`. Each entry includes:
 
 ### Required Fields
+
 - **timestamp**: ISO 8601 datetime when task was executed
 - **context**: Object with `package` (required) and optional `area`
 - **task**: Object with `type`, `description`, and optional `tags` array
@@ -28,6 +30,7 @@ All history files follow the standardized schema defined in `schema.json`. Each 
 - **outcome**: Object with `status` and optional `details`, `follow_up_needed`, `issues_found`
 
 ### Optional Fields
+
 - **metrics**: Object with `duration_minutes`, `tests_affected`, `coverage_impact`, `files_count`
 
 ## Usage Tools
@@ -50,21 +53,21 @@ node utils.js stats test-writer-fixer
 ### Programmatic Access
 
 ```javascript
-const AgentHistoryUtils = require('./utils.js');
-const utils = new AgentHistoryUtils();
+const AgentHistoryUtils = require('./utils.js')
+const utils = new AgentHistoryUtils()
 
 // Get all entries for an agent
-const history = utils.readHistory('test-writer-fixer');
+const history = utils.readHistory('test-writer-fixer')
 
 // Query with filters
 const mobileTests = utils.queryHistory('test-writer-fixer', {
   package: 'apps/mobile',
   taskType: 'fix',
-  since: '2025-01-01'
-});
+  since: '2025-01-01',
+})
 
 // Generate statistics
-const stats = utils.getStats('test-writer-fixer');
+const stats = utils.getStats('test-writer-fixer')
 ```
 
 ## Auditing Capabilities
@@ -72,6 +75,7 @@ const stats = utils.getStats('test-writer-fixer');
 The JSON format enables:
 
 ### Query Examples
+
 ```bash
 # Find all failed tasks across agents
 jq '.entries[] | select(.outcome.status == "failed")' *.json
@@ -87,6 +91,7 @@ jq '.entries[] | select(.metrics.duration_minutes) | {task: .task.description, d
 ```
 
 ### Metrics & Reporting
+
 - Track agent usage patterns by package, task type, and outcome
 - Measure agent effectiveness and impact on project
 - Identify areas requiring most maintenance or fixes
@@ -96,6 +101,7 @@ jq '.entries[] | select(.metrics.duration_minutes) | {task: .task.description, d
 ## Purpose
 
 This structured history system provides:
+
 - **Comprehensive audit trail** for all agent activities
 - **Programmatic analysis** of agent usage patterns and effectiveness
 - **Data-driven insights** for improving agent configurations

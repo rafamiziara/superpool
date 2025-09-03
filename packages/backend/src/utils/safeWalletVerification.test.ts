@@ -1,17 +1,13 @@
 import { Contract } from 'ethers'
+import { EIP1271_MAGIC_VALUE, SafeWalletVerificationError, SUPPORTED_SAFE_VERSIONS } from '../types/safeWalletTypes'
 import { SafeWalletVerificationService } from './safeWalletVerification'
-import {
-  EIP1271_MAGIC_VALUE,
-  SafeWalletVerificationError,
-  SUPPORTED_SAFE_VERSIONS
-} from '../types/safeWalletTypes'
 
 // Mock ethers Contract
 jest.mock('ethers', () => ({
   Contract: jest.fn(),
   isAddress: jest.fn(),
   keccak256: jest.fn(),
-  toUtf8Bytes: jest.fn()
+  toUtf8Bytes: jest.fn(),
 }))
 
 // Mock Firebase Functions logger
@@ -19,13 +15,13 @@ jest.mock('firebase-functions/v2', () => ({
   logger: {
     info: jest.fn(),
     warn: jest.fn(),
-    error: jest.fn()
-  }
+    error: jest.fn(),
+  },
 }))
 
 // Mock createAuthMessage utility
 jest.mock('.', () => ({
-  createAuthMessage: jest.fn()
+  createAuthMessage: jest.fn(),
 }))
 
 const mockContract = Contract as jest.MockedClass<typeof Contract>
@@ -35,7 +31,7 @@ const { createAuthMessage } = jest.requireMock('.')
 describe('SafeWalletVerificationService', () => {
   const mockProvider = {
     getNetwork: jest.fn(),
-    getBlockNumber: jest.fn()
+    getBlockNumber: jest.fn(),
   }
 
   const validWalletAddress = '0x1234567890123456789012345678901234567890'
@@ -84,7 +80,7 @@ describe('SafeWalletVerificationService', () => {
 
     it('should reject old format-only signatures for security', async () => {
       const oldFormatSignature = `safe-wallet:${validWalletAddress}:${validNonce}:${validTimestamp}`
-      
+
       const result = await SafeWalletVerificationService.verifySafeWalletSignature(
         validWalletAddress,
         oldFormatSignature,
@@ -104,9 +100,9 @@ describe('SafeWalletVerificationService', () => {
         isOwner: jest.fn(),
         getThreshold: jest.fn(),
         getOwners: jest.fn(),
-        isValidSignature: jest.fn()
+        isValidSignature: jest.fn(),
       }
-      
+
       mockContract.mockImplementation(() => mockContractInstance as any)
 
       const result = await SafeWalletVerificationService.verifySafeWalletSignature(
@@ -132,9 +128,9 @@ describe('SafeWalletVerificationService', () => {
         getThreshold: jest.fn().mockResolvedValue(BigInt(2)),
         getOwners: jest.fn().mockResolvedValue([validWalletAddress, '0xother']),
         isValidSignature: jest.fn().mockResolvedValue(EIP1271_MAGIC_VALUE),
-        target: validWalletAddress // Mock contract target property
+        target: validWalletAddress, // Mock contract target property
       }
-      
+
       mockContract.mockImplementation(() => mockContractInstance as any)
 
       const result = await SafeWalletVerificationService.verifySafeWalletSignature(
@@ -151,7 +147,7 @@ describe('SafeWalletVerificationService', () => {
       expect(result.verification.ownershipVerification).toBe(true)
       expect(result.verification.thresholdCheck).toBe(true)
       expect(result.verification.safeVersionCompatibility).toBe(true)
-      
+
       // Verify contract validation was performed
       expect(mockContractInstance.VERSION).toHaveBeenCalled()
       expect(mockContractInstance.getThreshold).toHaveBeenCalled()
@@ -165,9 +161,9 @@ describe('SafeWalletVerificationService', () => {
         getThreshold: jest.fn().mockResolvedValue(BigInt(2)),
         getOwners: jest.fn().mockResolvedValue([validWalletAddress]),
         isValidSignature: jest.fn().mockResolvedValue('0xwrongvalue'), // Wrong magic value
-        target: validWalletAddress
+        target: validWalletAddress,
       }
-      
+
       mockContract.mockImplementation(() => mockContractInstance as any)
 
       const result = await SafeWalletVerificationService.verifySafeWalletSignature(
@@ -189,9 +185,9 @@ describe('SafeWalletVerificationService', () => {
         getThreshold: jest.fn().mockResolvedValue(BigInt(2)),
         getOwners: jest.fn().mockResolvedValue(['0xother1', '0xother2']),
         isValidSignature: jest.fn().mockResolvedValue(EIP1271_MAGIC_VALUE),
-        target: validWalletAddress
+        target: validWalletAddress,
       }
-      
+
       mockContract.mockImplementation(() => mockContractInstance as any)
 
       const result = await SafeWalletVerificationService.verifySafeWalletSignature(
@@ -213,9 +209,9 @@ describe('SafeWalletVerificationService', () => {
         getThreshold: jest.fn().mockResolvedValue(BigInt(1)), // Single signature
         getOwners: jest.fn().mockResolvedValue([validWalletAddress]),
         isValidSignature: jest.fn().mockResolvedValue(EIP1271_MAGIC_VALUE),
-        target: validWalletAddress
+        target: validWalletAddress,
       }
-      
+
       mockContract.mockImplementation(() => mockContractInstance as any)
 
       const result = await SafeWalletVerificationService.verifySafeWalletSignature(
@@ -232,16 +228,16 @@ describe('SafeWalletVerificationService', () => {
 
     it('should handle enhanced signature format with actual signature data', async () => {
       const enhancedSignature = `safe-wallet:${validWalletAddress}:${validNonce}:${validTimestamp}:sig:0xactualsignaturedata`
-      
+
       const mockContractInstance = {
         VERSION: jest.fn().mockResolvedValue('1.4.1'),
         isOwner: jest.fn().mockResolvedValue(true),
         getThreshold: jest.fn().mockResolvedValue(BigInt(2)),
         getOwners: jest.fn().mockResolvedValue([validWalletAddress, '0xother']),
         isValidSignature: jest.fn().mockResolvedValue(EIP1271_MAGIC_VALUE),
-        target: validWalletAddress
+        target: validWalletAddress,
       }
-      
+
       mockContract.mockImplementation(() => mockContractInstance as any)
 
       const result = await SafeWalletVerificationService.verifySafeWalletSignature(
@@ -253,10 +249,7 @@ describe('SafeWalletVerificationService', () => {
       )
 
       expect(result.isValid).toBe(true)
-      expect(mockContractInstance.isValidSignature).toHaveBeenCalledWith(
-        '0xmockedhash',
-        '0xactualsignaturedata'
-      )
+      expect(mockContractInstance.isValidSignature).toHaveBeenCalledWith('0xmockedhash', '0xactualsignaturedata')
     })
 
     it('should use secure fallback verification on contract interaction errors', async () => {
@@ -265,9 +258,9 @@ describe('SafeWalletVerificationService', () => {
         isOwner: jest.fn(),
         getThreshold: jest.fn(),
         getOwners: jest.fn(),
-        isValidSignature: jest.fn()
+        isValidSignature: jest.fn(),
       }
-      
+
       mockContract.mockImplementation(() => mockContractInstance as any)
 
       const result = await SafeWalletVerificationService.verifySafeWalletSignature(
@@ -291,9 +284,9 @@ describe('SafeWalletVerificationService', () => {
         getThreshold: jest.fn().mockResolvedValue(BigInt(0)), // Invalid threshold (should be > 0)
         getOwners: jest.fn().mockResolvedValue([]), // Invalid empty owners array
         isValidSignature: jest.fn().mockResolvedValue(EIP1271_MAGIC_VALUE), // Returns magic value
-        target: validWalletAddress
+        target: validWalletAddress,
       }
-      
+
       mockContract.mockImplementation(() => mockMaliciousContract as any)
 
       const result = await SafeWalletVerificationService.verifySafeWalletSignature(
@@ -305,9 +298,9 @@ describe('SafeWalletVerificationService', () => {
       )
 
       // Should reject due to failed Safe contract validation
-      expect(result.isValid).toBe(false) 
+      expect(result.isValid).toBe(false)
       expect(result.verification.signatureValidation).toBe(false) // EIP-1271 should fail due to contract validation
-      
+
       // Verify that contract validation functions were called
       expect(mockMaliciousContract.getThreshold).toHaveBeenCalled()
       expect(mockMaliciousContract.getOwners).toHaveBeenCalled()
@@ -321,7 +314,7 @@ describe('SafeWalletVerificationService', () => {
         chainId: 80002,
         version: '1.4.1',
         threshold: 2,
-        owners: [validWalletAddress, '0xother']
+        owners: [validWalletAddress, '0xother'],
       }
 
       const result = SafeWalletVerificationService.validateSafeWalletConfig(validConfig)
@@ -335,7 +328,7 @@ describe('SafeWalletVerificationService', () => {
 
       const invalidConfig = {
         contractAddress: 'invalid-address',
-        chainId: 80002
+        chainId: 80002,
       }
 
       const result = SafeWalletVerificationService.validateSafeWalletConfig(invalidConfig)
@@ -347,7 +340,7 @@ describe('SafeWalletVerificationService', () => {
     it('should reject invalid chain ID', () => {
       const invalidConfig = {
         contractAddress: validWalletAddress,
-        chainId: -1 // Invalid chain ID
+        chainId: -1, // Invalid chain ID
       }
 
       const result = SafeWalletVerificationService.validateSafeWalletConfig(invalidConfig)
@@ -360,7 +353,7 @@ describe('SafeWalletVerificationService', () => {
       const invalidConfig = {
         contractAddress: validWalletAddress,
         chainId: 80002,
-        threshold: 0 // Invalid threshold
+        threshold: 0, // Invalid threshold
       }
 
       const result = SafeWalletVerificationService.validateSafeWalletConfig(invalidConfig)
@@ -373,7 +366,7 @@ describe('SafeWalletVerificationService', () => {
       const invalidConfig = {
         contractAddress: validWalletAddress,
         chainId: 80002,
-        owners: [] // Empty owners array
+        owners: [], // Empty owners array
       }
 
       const result = SafeWalletVerificationService.validateSafeWalletConfig(invalidConfig)
@@ -386,7 +379,7 @@ describe('SafeWalletVerificationService', () => {
   describe('supported versions', () => {
     it('should include all expected Safe versions', () => {
       const expectedVersions = ['1.0.0', '1.1.0', '1.2.0', '1.3.0', '1.4.0', '1.4.1', '1.5.0']
-      
+
       expect(SUPPORTED_SAFE_VERSIONS).toEqual(expectedVersions)
       expect(SUPPORTED_SAFE_VERSIONS.length).toBeGreaterThan(0)
     })

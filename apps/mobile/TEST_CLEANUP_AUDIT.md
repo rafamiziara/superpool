@@ -1,6 +1,7 @@
 # Mobile App Test Cleanup Audit
 
 ## 📊 Final Status (After Corrections)
+
 - **Total Test Files**: 54 (53 unit tests in src/ + 1 integration test in tests/)
 - **Target**: 40-45 test files → **REVISED TARGET**: 50-55 test files (more realistic)
 - **Reduction Achieved**: 64 → 54 files (16% reduction while preserving business value)
@@ -16,7 +17,7 @@ These files only test that exports exist, providing minimal business value:
    - No business logic testing
    - Test utilities don't need their own tests
 
-2. **`src/services/authentication/steps/index.test.ts`** - DELETE  
+2. **`src/services/authentication/steps/index.test.ts`** - DELETE
    - Only tests barrel exports of authentication steps
    - Individual step files already have comprehensive tests
    - Redundant with actual functionality tests
@@ -85,7 +86,7 @@ These files have excessive mocking or setup that can be reduced:
 These files test similar functionality and can be consolidated:
 
 16. **Auth Hook Tests** - MERGE INTO 2 FILES
-    - `useAuthenticationStateReadonly.test.ts` 
+    - `useAuthenticationStateReadonly.test.ts`
     - `useAuthSessionRecovery.test.ts`
     - `useAuthStateSynchronization.test.ts`
     - `useFirebaseAuth.test.ts`
@@ -93,7 +94,7 @@ These files test similar functionality and can be consolidated:
 
 17. **Error Recovery Handler Tests** - MERGE INTO 2 FILES
     - `ConnectorErrorHandler.test.ts`
-    - `GenericErrorHandler.test.ts` 
+    - `GenericErrorHandler.test.ts`
     - `SessionErrorHandler.test.ts`
     - `TimeoutErrorHandler.test.ts`
     - `FeedbackManager.test.ts`
@@ -105,34 +106,41 @@ These files test similar functionality and can be consolidated:
 The following tests should be preserved as they test actual business logic:
 
 **Components (4 files):**
+
 - `AuthProgressIndicator.test.tsx`
-- `LoadingSpinner.test.tsx` 
+- `LoadingSpinner.test.tsx`
 - `ProgressIndicator.test.tsx`
 - Integration tests (3 files in tests/integration/)
 
 **Core Business Logic (20+ files):**
+
 - All Store tests (6 files) - Core state management
 - Authentication service tests (5 files) - Critical business flow
 - Signature service tests (6 files) - Security critical
 - Key utility tests (ValidationUtils, errorHandling, etc.)
 
 **Configuration & Setup (3 files):**
+
 - `chains.test.ts` - Network configuration
-- `mobxConfig.test.ts` - Store configuration  
+- `mobxConfig.test.ts` - Store configuration
 - Config files that have dynamic logic
 
 ## 🎯 Cleanup Implementation Plan
 
 ### Phase 1: DELETE (Immediate - Low Risk)
+
 Remove 7 export/index/snapshot test files that provide minimal value.
 
-### Phase 2: MERGE (Medium Risk) 
+### Phase 2: MERGE (Medium Risk)
+
 Consolidate 12 files into 4 files by combining related functionality.
 
 ### Phase 3: SIMPLIFY (Medium Risk)
+
 Reduce 8 over-engineered tests to focus on essential business logic.
 
 ### Expected Results:
+
 - **Before**: 64 files
 - **After**: 43 files (33% reduction)
 - **Focus**: Business logic and user value
@@ -143,25 +151,28 @@ Reduce 8 over-engineered tests to focus on essential business logic.
 **Issue Identified**: Initial cleanup was overly aggressive and incorrectly categorized several tests.
 
 **✅ RESTORED Tests (9 files)** - These test specific implementations and provide business value:
+
 - `services/authentication/utils/circuitBreaker.test.ts` - Circuit breaker logic
 - `services/authentication/utils/retryPolicies.test.ts` - Retry policies
 - `services/errorRecovery/handlers/ConnectorErrorHandler.test.ts` - Specific error handler
 - `services/errorRecovery/handlers/FeedbackManager.test.ts` - User feedback logic
 - `services/errorRecovery/handlers/GenericErrorHandler.test.ts` - Generic error patterns
 - `services/errorRecovery/handlers/SessionErrorHandler.test.ts` - Session management
-- `services/errorRecovery/handlers/TimeoutErrorHandler.test.ts` - Timeout scenarios  
+- `services/errorRecovery/handlers/TimeoutErrorHandler.test.ts` - Timeout scenarios
 - `services/utils/AuthUtils.test.ts` - Authentication utility functions
 - `services/utils/TimeoutUtils.test.ts` - Timeout utilities
 
 **🔄 REORGANIZED Tests** - Proper unit vs integration categorization:
+
 - `AuthenticationOrchestrator.test.ts` - Moved back to `services/authentication/` (unit test)
 - `StoreContext.test.tsx` - Moved back to `stores/` (unit test)
 - `useAuthenticationIntegration.test.ts` - Moved back to `hooks/auth/` (unit test)
 - `useAuthenticationFlow.test.ts` - Moved TO `tests/integration/` (true integration test)
 
 ## ✅ **Revised Success Criteria**
+
 - [x] Maintain high test coverage on business logic
-- [x] Remove tests for exports/utilities testing themselves  
+- [x] Remove tests for exports/utilities testing themselves
 - [x] Proper unit vs integration test categorization
 - [x] Keep all tests that verify specific implementation logic
 - [x] Achieve focused, maintainable test organization

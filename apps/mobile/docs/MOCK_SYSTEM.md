@@ -45,12 +45,12 @@ apps/mobile/__mocks__/
 
 ```typescript
 // ✅ CORRECT: Import everything from the centralized system
-import { 
-  createMockRootStore, 
-  renderWithStore, 
+import {
+  createMockRootStore,
+  renderWithStore,
   renderHookWithStore,
   waitForMobX,
-  mockStorePresets 
+  mockStorePresets,
 } from '../__mocks__/factories/testFactory'
 
 // ✅ Also correct: Import specific factories
@@ -67,7 +67,7 @@ import { createMockRootStore } from '../test-utils'
 // ❌ WRONG: Don't create inline mocks
 const mockStore = {
   auth: { isAuthenticated: false },
-  wallet: { isConnected: false }
+  wallet: { isConnected: false },
 }
 ```
 
@@ -88,7 +88,7 @@ describe('MyComponent', () => {
   it('should render with authenticated user', () => {
     const store = mockStorePresets.authenticatedWithWallet()
     const { getByTestId } = renderWithStore(<MyComponent />, { store })
-    
+
     expect(getByTestId('user-info')).toBeTruthy()
   })
 })
@@ -102,9 +102,9 @@ import { renderHookWithStore, createMockRootStore } from '../__mocks__/factories
 describe('useMyHook', () => {
   it('should return correct state', () => {
     const store = createMockRootStore({
-      authenticationStore: { isAuthenticated: true }
+      authenticationStore: { isAuthenticated: true },
     })
-    
+
     const { result } = renderHookWithStore(() => useMyHook(), { store })
     expect(result.current.isAuthenticated).toBe(true)
   })
@@ -128,13 +128,13 @@ const authenticatedStore = createMockRootStore({
   authenticationStore: {
     currentStep: 'firebase-auth',
     completedSteps: new Set(['connect-wallet', 'generate-message']),
-    isProgressComplete: false
+    isProgressComplete: false,
   },
   walletStore: {
     isConnected: true,
     address: '0x1234567890123456789012345678901234567890',
-    chainId: 137
-  }
+    chainId: 137,
+  },
 })
 ```
 
@@ -150,8 +150,8 @@ const authManager = createMockFirebaseAuthManager({
   getCurrentState: jest.fn(() => ({
     isAuthenticated: true,
     user: { uid: 'test-user' },
-    walletAddress: '0x123...'
-  }))
+    walletAddress: '0x123...',
+  })),
 })
 ```
 
