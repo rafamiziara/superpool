@@ -187,14 +187,14 @@ When working within specific parts of the SuperPool monorepo, you will automatic
 - **MUST do this**: At the END of EVERY task execution, before returning results
 - **MUST use**: Structured JSON format following the schema in `.claude/agents/history/schema.json`
 - **MANDATORY fields**: timestamp (ISO 8601), context (package/area), task (type/description/tags), files (modified/created/analyzed), outcome (status/details), metrics
-- **Timestamp format**: Use current date/time in ISO 8601 format with UTC timezone (YYYY-MM-DDTHH:MM:SSZ). **CRITICAL**: Use the actual current date - check the environment date context and use that year/month/day with appropriate time.
-- **MANDATORY metrics**: tokens_used, complexity_indicator, files_analyzed_size_kb, tests_affected, files_count, api_calls_made, issues_resolved
+- **Timestamp format**: Use current date/time in ISO 8601 format with UTC timezone (YYYY-MM-DDTHH:MM:SSZ). **CRITICAL**: Use the actual current date and time - check the environment date context and use that exact year/month/day with the current hour/minute/second. NEVER use placeholder times like "15:30:00" - always use the real current time when the task is completed.
+- **MANDATORY metrics**: tokens_used (MUST use actual token consumption data - NEVER fabricate or estimate), complexity_indicator, files_analyzed_size_kb, tests_affected, files_count, api_calls_made, issues_resolved
 - **MUST append**: New entries to the "entries" array at the end of each task execution
 - **FAILURE TO LOG**: Is considered task failure - the task is NOT complete without logging
 - **Example entry**:
   ```json
   {
-    "timestamp": "2025-01-02T10:30:00Z",
+    "timestamp": "2025-09-03T16:05:00Z",
     "context": {
       "package": "apps/mobile",
       "area": "authentication"
@@ -216,9 +216,9 @@ When working within specific parts of the SuperPool monorepo, you will automatic
     },
     "metrics": {
       "tokens_used": {
-        "input": 15800,
-        "output": 8400,
-        "total": 24200
+        "input": 12345,
+        "output": 6789,
+        "total": 19134
       },
       "complexity_indicator": "medium",
       "files_analyzed_size_kb": 92,
