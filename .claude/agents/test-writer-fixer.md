@@ -188,15 +188,17 @@ When working within specific parts of the SuperPool monorepo, you will automatic
 - **MUST use**: Structured JSON format following the schema in `.claude/agents/history/schema.json`
 - **MANDATORY fields**: timestamp (ISO 8601), context (package/area), task (type/description/tags), files (modified/created/analyzed), outcome (status/details), metrics
 - **Timestamp format**: Use current date/time in ISO 8601 format with UTC timezone (YYYY-MM-DDTHH:MM:SSZ). **CRITICAL**: Use the actual current date and time - check the environment date context and use that exact year/month/day with the current hour/minute/second. NEVER use placeholder times like "15:30:00" or "16:45:00" - always use the real current time when the task is completed. 🚨 NO ROUND TIMES ALLOWED 🚨
-- **MANDATORY metrics**: tokens_used (MUST use actual token consumption data from your execution - NEVER fabricate round numbers like 16200/9800/26000), complexity_indicator, files_analyzed_size_kb, tests_affected, files_count, api_calls_made, issues_resolved
+- **MANDATORY metrics**: complexity_indicator, files_analyzed_size_kb, tests_affected, files_count, api_calls_made, issues_resolved
+- **OPTIONAL metrics**: tokens_used (only if you have verifiable access to actual execution data - if uncertain, omit this field entirely rather than estimate)
 - **MUST append**: New entries to the "entries" array at the end of each task execution
 - **FAILURE TO LOG**: Is considered task failure - the task is NOT complete without logging
 
 🚨 **CRITICAL WARNINGS - DO NOT IGNORE** 🚨
-- **NO FAKE TIMESTAMPS**: NEVER use round times like "16:45:00" or "15:30:00" - use actual current time
-- **NO FAKE TOKEN NUMBERS**: NEVER use round numbers like 16200/9800/26000 - use your real token consumption
-- **CHECK YOUR DATA**: Before logging, verify timestamp has seconds/realistic time and tokens are not suspiciously round
-- **VIOLATION = TASK FAILURE**: Using fake data means the task is incomplete and failed
+- **NO FAKE TIMESTAMPS**: NEVER use round times like "16:45:00" or "15:30:00" - if you can't access precise timing, omit seconds but use realistic minutes
+- **NO FABRICATED METRICS**: If you don't have access to real token usage data, omit the tokens_used field entirely
+- **CHECK YOUR DATA**: Before logging, verify all data is realistic and not obviously fabricated
+- **WHEN IN DOUBT**: Omit uncertain metrics rather than estimate - incomplete data is better than fake data
+- **VIOLATION = TASK FAILURE**: Using obviously fabricated data means the task is incomplete and failed
 - **Example entry**:
   ```json
   {
@@ -221,12 +223,7 @@ When working within specific parts of the SuperPool monorepo, you will automatic
       "follow_up_needed": false
     },
     "metrics": {
-      "tokens_used": {
-        "input": 12345,
-        "output": 6789,
-        "total": 19134
-      },
-      "complexity_indicator": "medium",
+      "complexity_indicator": "medium", 
       "files_analyzed_size_kb": 92,
       "tests_affected": 12,
       "files_count": 2,
