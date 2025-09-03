@@ -9,6 +9,7 @@ module.exports = {
   moduleNameMapper: {
     '^@/(.*)$': '<rootDir>/src/$1',
     '^@superpool/(.*)$': '<rootDir>/../../packages/$1/src',
+    '^@mocks/(.*)$': '<rootDir>/__mocks__/$1',
   },
   moduleDirectories: ['node_modules', '<rootDir>/src'],
   collectCoverageFrom: [
