@@ -31,7 +31,7 @@ All history files follow the standardized schema defined in `schema.json`. Each 
 
 ### Optional Fields
 
-- **metrics**: Object with `duration_minutes`, `tests_affected`, `coverage_impact`, `files_count`
+- **metrics**: Object with `tokens_used`, `complexity_indicator`, `tests_affected`, `coverage_impact`, `files_count`, `api_calls_made`, `files_analyzed_size_kb`
 
 ## Usage Tools
 
@@ -86,17 +86,21 @@ jq '.entries[] | select(.context.package == "apps/mobile" and (.timestamp | from
 # Coverage impact analysis
 jq '.entries[] | select(.metrics.coverage_impact) | {task: .task.description, impact: .metrics.coverage_impact}' *.json
 
-# Most time-consuming tasks
-jq '.entries[] | select(.metrics.duration_minutes) | {task: .task.description, duration: .metrics.duration_minutes}' *.json | jq -s 'sort_by(.duration) | reverse'
+# Most token-intensive tasks
+jq '.entries[] | select(.metrics.tokens_used) | {task: .task.description, tokens: .metrics.tokens_used.total, complexity: .metrics.complexity_indicator}' *.json | jq -s 'sort_by(.tokens) | reverse'
+
+# Tasks by complexity level
+jq '.entries[] | select(.metrics.complexity_indicator) | {task: .task.description, complexity: .metrics.complexity_indicator, tokens: .metrics.tokens_used.total}' *.json
 ```
 
 ### Metrics & Reporting
 
 - Track agent usage patterns by package, task type, and outcome
-- Measure agent effectiveness and impact on project
-- Identify areas requiring most maintenance or fixes
-- Generate time-based usage reports
-- Monitor test coverage trends
+- Measure agent effectiveness and resource consumption via token usage
+- Identify high-complexity tasks and resource-intensive operations
+- Analyze task complexity distribution across different packages
+- Monitor test coverage trends and API call efficiency
+- Generate reports on token consumption and cost analysis
 
 ## Purpose
 

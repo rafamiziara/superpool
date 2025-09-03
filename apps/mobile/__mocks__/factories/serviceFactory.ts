@@ -104,3 +104,157 @@ export const createMockSignatureService = (
   verifySignature: jest.fn().mockResolvedValue(true),
   ...overrides,
 })
+
+/**
+ * Authentication Step Executor Factory
+ * Mocks the step executor for authentication flow
+ */
+export const createMockAuthenticationStepExecutor = (
+  overrides: Partial<{
+    executeStep: jest.Mock
+    executeLockStep: jest.Mock
+    executeInternalStep: jest.Mock
+  }> = {}
+) => ({
+  executeStep: jest.fn().mockImplementation(async (stepName: string, stepFunction: () => Promise<any>) => {
+    // Actually call the step function to ensure coverage
+    return await stepFunction()
+  }),
+  executeLockStep: jest.fn().mockImplementation(async (stepFunction: () => Promise<any>) => {
+    // Actually call the step function to ensure coverage
+    return await stepFunction()
+  }),
+  executeInternalStep: jest.fn(),
+  ...overrides,
+})
+
+/**
+ * Authentication Validator Factory
+ * Mocks validation services for authentication
+ */
+export const createMockAuthenticationValidator = (
+  overrides: Partial<{
+    validatePreConditions: jest.Mock
+    validateStateConsistency: jest.Mock
+    checkAuthenticationAborted: jest.Mock
+    captureConnectionState: jest.Mock
+  }> = {}
+) => ({
+  validatePreConditions: jest.fn(),
+  validateStateConsistency: jest.fn().mockReturnValue(true),
+  checkAuthenticationAborted: jest.fn().mockReturnValue(false),
+  captureConnectionState: jest.fn().mockReturnValue({
+    address: '0x742d35Cc6634C0532925a3b8D238a5D2DD8dC5b8',
+    chainId: 137,
+    isConnected: true,
+    timestamp: Date.now(),
+    sequenceNumber: 1,
+  }),
+  ...overrides,
+})
+
+/**
+ * Firebase Authenticator Factory
+ * Mocks Firebase authentication services
+ */
+export const createMockFirebaseAuthenticator = (
+  overrides: Partial<{
+    verifySignatureAndGetToken: jest.Mock
+    signInWithFirebase: jest.Mock
+  }> = {}
+) => ({
+  verifySignatureAndGetToken: jest.fn().mockResolvedValue('mock-firebase-token'),
+  signInWithFirebase: jest.fn().mockResolvedValue(undefined),
+  ...overrides,
+})
+
+/**
+ * Message Generator Factory
+ * Mocks authentication message generation
+ */
+export const createMockMessageGenerator = (
+  overrides: Partial<{
+    generateAuthenticationMessage: jest.Mock
+  }> = {}
+) => ({
+  generateAuthenticationMessage: jest.fn().mockResolvedValue({
+    message: 'Mock auth message',
+    nonce: 'mock-nonce',
+    timestamp: Date.now(),
+  }),
+  ...overrides,
+})
+
+/**
+ * Signature Handler Factory
+ * Mocks signature request handling
+ */
+export const createMockSignatureHandler = (
+  overrides: Partial<{
+    requestWalletSignature: jest.Mock
+  }> = {}
+) => ({
+  requestWalletSignature: jest.fn().mockResolvedValue({
+    signature: 'mock-signature',
+    signatureType: 'personal-sign',
+    walletAddress: '0x742d35Cc6634C0532925a3b8D238a5D2DD8dC5b8',
+  }),
+  ...overrides,
+})
+
+/**
+ * Auth Error Recovery Service Factory
+ * Mocks error recovery services
+ */
+export const createMockAuthErrorRecoveryService = (
+  overrides: Partial<{
+    initialize: jest.Mock
+    handleAuthenticationError: jest.Mock
+    showErrorFeedback: jest.Mock
+    handleFirebaseCleanup: jest.Mock
+  }> = {}
+) => ({
+  initialize: jest.fn(),
+  handleAuthenticationError: jest.fn().mockResolvedValue({
+    appError: new Error('Mock error'),
+    recoveryResult: {
+      shouldDisconnect: false,
+      shouldShowError: true,
+      errorDelay: 0,
+      cleanupPerformed: false,
+    },
+  }),
+  showErrorFeedback: jest.fn(),
+  handleFirebaseCleanup: jest.fn(),
+  ...overrides,
+})
+
+/**
+ * Session Manager Factory
+ * Mocks session management utilities
+ */
+export const createMockSessionManager = (
+  overrides: Partial<{
+    getSessionDebugInfo: jest.Mock
+  }> = {}
+) => ({
+  getSessionDebugInfo: jest.fn().mockResolvedValue({
+    totalKeys: 5,
+    walletConnectKeys: ['key1', 'key2'],
+    sessionData: {},
+  }),
+  ...overrides,
+})
+
+/**
+ * Router Factory
+ * Mocks router navigation
+ */
+export const createMockRouter = (
+  overrides: Partial<{
+    replace: jest.Mock
+  }> = {}
+) => ({
+  replace: jest.fn(),
+  ...overrides,
+})

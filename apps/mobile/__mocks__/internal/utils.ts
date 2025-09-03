@@ -9,6 +9,7 @@ export const toast = {
   authToasts: {
     walletConnected: jest.fn(),
     authSuccess: jest.fn(),
+    success: jest.fn(),
     walletDisconnected: jest.fn(),
     connectionFailed: jest.fn(),
     signatureRejected: jest.fn(),
