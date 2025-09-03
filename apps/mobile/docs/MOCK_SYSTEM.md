@@ -592,6 +592,7 @@ describe('Mock System Integrity', () => {
 ## 🔗 **Related Documentation**
 
 - [Testing Guide](./TESTING_GUIDE.md) - Overall testing philosophy
+- [TDD Workflow](./TDD_WORKFLOW.md) - Test-driven development process
 - [Coverage Strategy](./COVERAGE_STRATEGY.md) - Coverage requirements
 - [Troubleshooting](./TROUBLESHOOTING.md) - Common mock issues
 

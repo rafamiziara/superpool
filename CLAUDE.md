@@ -502,11 +502,24 @@ The test-writer-fixer agent has comprehensive knowledge of all project-specific 
 
 ### **Code Quality Checks**
 
-**ALWAYS run the following commands before completing any task:**
+**ALWAYS execute the following commands IN ORDER before completing any task:**
 
-1. Automatically use the IDE's built-in diagnostics tool to check for linting and type errors:
-   - Run `mcp__ide__getDiagnostics` to check all files for diagnostics
-   - Fix any linting or type errors before considering the task complete
-   - Do this for any file you create or modify
+1. **TypeScript Type Checking** (MANDATORY):
+   - Run `pnpm type-check` in the specific package/app worked on
+   - Fix ALL TypeScript errors before proceeding
+   - NEVER use `any` or `unknown` types - always provide proper typing
 
-This is a CRITICAL step that must NEVER be skipped when working on any code-related task.
+2. **Code Formatting** (MANDATORY):
+   - Run `pnpm format` in the specific package/app worked on
+   - If working across multiple packages, run `pnpm format` from root
+   - Ensure all code follows consistent formatting standards
+
+3. **Linting** (MANDATORY):
+   - Run `pnpm lint` in the specific package/app worked on
+   - Fix ALL linting errors and warnings before proceeding
+   - Follow ESLint rules and project coding standards
+   - If any code was changed/fixed during linting, run step 2 (formatting) again to ensure proper formatting
+
+**CRITICAL TypeScript Rule**: NEVER use `any` or `unknown` types when working with TypeScript/JavaScript. Always provide proper, specific typing for variables, function parameters, return types, and object properties.
+
+These steps are MANDATORY and must NEVER be skipped when working on any code-related task.
