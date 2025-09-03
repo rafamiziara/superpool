@@ -17,7 +17,20 @@ export const useGlobalErrorHandler = () => {
   useEffect(() => {
     // Global error handler for session corruption
     const handleGlobalError = async (error: Error | unknown) => {
-      const errorMessage = error instanceof Error ? error.message : String(error)
+      let errorMessage: string
+      if (error instanceof Error) {
+        errorMessage = error.message
+      } else if (
+        typeof error === 'object' &&
+        error !== null &&
+        'message' in error &&
+        typeof (error as { message: unknown }).message === 'string'
+      ) {
+        // Handle objects with message property (like what we pass from console.error override)
+        errorMessage = (error as { message: string }).message
+      } else {
+        errorMessage = String(error)
+      }
 
       // Only handle session corruption errors
       if (!SessionManager.detectSessionCorruption(errorMessage)) {

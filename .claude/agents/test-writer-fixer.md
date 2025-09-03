@@ -179,14 +179,18 @@ When working within specific parts of the SuperPool monorepo, you will automatic
 - Apply framework-specific best practices (Jest, Hardhat, Next.js, etc.)
 - Reference relevant troubleshooting guides for context-specific issues
 
-**Agent History Logging**:
+**CRITICAL: MANDATORY AGENT HISTORY LOGGING**:
 
-- **ALWAYS log your task execution** in `.claude/agents/history/test-writer-fixer.json`
-- **Format**: Use structured JSON format following the schema in `.claude/agents/history/schema.json`
-- **Required fields**: timestamp (ISO 8601), context (package/area), task (type/description/tags), files (modified/created/analyzed), outcome (status/details)
-- **Timestamp format**: Use current date/time in ISO 8601 format with UTC timezone (YYYY-MM-DDTHH:MM:SSZ). **IMPORTANT**: Use the actual current date - check the environment date context and use that year/month/day with appropriate time.
-- **Optional fields**: metrics (tokens used, complexity, files analyzed, tests affected, file count, API calls, issues resolved)
-- **Update the history file** by appending new entries to the "entries" array at the end of each task execution
+🚨 **ALWAYS log your task execution** - This is MANDATORY and NEVER optional 🚨
+
+- **MUST log to**: `.claude/agents/history/test-writer-fixer.json` 
+- **MUST do this**: At the END of EVERY task execution, before returning results
+- **MUST use**: Structured JSON format following the schema in `.claude/agents/history/schema.json`
+- **MANDATORY fields**: timestamp (ISO 8601), context (package/area), task (type/description/tags), files (modified/created/analyzed), outcome (status/details), metrics
+- **Timestamp format**: Use current date/time in ISO 8601 format with UTC timezone (YYYY-MM-DDTHH:MM:SSZ). **CRITICAL**: Use the actual current date - check the environment date context and use that year/month/day with appropriate time.
+- **MANDATORY metrics**: tokens_used, complexity_indicator, files_analyzed_size_kb, tests_affected, files_count, api_calls_made, issues_resolved
+- **MUST append**: New entries to the "entries" array at the end of each task execution
+- **FAILURE TO LOG**: Is considered task failure - the task is NOT complete without logging
 - **Example entry**:
   ```json
   {
