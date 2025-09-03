@@ -10,7 +10,7 @@ jest.mock('../../../utils', () => ({
     preventiveSessionCleanup: jest.fn(),
   },
   authToasts: {
-    sessionError: jest.fn(),
+    sessionExpired: jest.fn(),
   },
 }))
 
@@ -100,11 +100,11 @@ describe('SessionErrorHandler', () => {
 
         // Initially no toast should be called
         const { authToasts } = require('../../../utils')
-        expect(authToasts.sessionError).not.toHaveBeenCalled()
+        expect(authToasts.sessionExpired).not.toHaveBeenCalled()
 
         // After 1500ms delay
         jest.advanceTimersByTime(1500)
-        expect(authToasts.sessionError).toHaveBeenCalled()
+        expect(authToasts.sessionExpired).toHaveBeenCalled()
       })
 
       it('should log appropriate messages during success', async () => {
@@ -293,14 +293,14 @@ describe('SessionErrorHandler', () => {
         await handler.handle(mockSessionContext)
 
         // Toast should not be called immediately
-        expect(authToasts.sessionError).not.toHaveBeenCalled()
+        expect(authToasts.sessionExpired).not.toHaveBeenCalled()
 
         // Should be called after 1500ms
         jest.advanceTimersByTime(1499)
-        expect(authToasts.sessionError).not.toHaveBeenCalled()
+        expect(authToasts.sessionExpired).not.toHaveBeenCalled()
 
         jest.advanceTimersByTime(1)
-        expect(authToasts.sessionError).toHaveBeenCalledTimes(1)
+        expect(authToasts.sessionExpired).toHaveBeenCalledTimes(1)
       })
 
       it('should not interfere with multiple simultaneous handlers', async () => {
@@ -314,7 +314,7 @@ describe('SessionErrorHandler', () => {
 
         // Both should schedule their own toasts
         jest.advanceTimersByTime(1500)
-        expect(authToasts.sessionError).toHaveBeenCalledTimes(2)
+        expect(authToasts.sessionExpired).toHaveBeenCalledTimes(2)
       })
     })
 

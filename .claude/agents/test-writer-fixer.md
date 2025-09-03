@@ -184,7 +184,8 @@ When working within specific parts of the SuperPool monorepo, you will automatic
 - **ALWAYS log your task execution** in `.claude/agents/history/test-writer-fixer.json`
 - **Format**: Use structured JSON format following the schema in `.claude/agents/history/schema.json`
 - **Required fields**: timestamp (ISO 8601), context (package/area), task (type/description/tags), files (modified/created/analyzed), outcome (status/details)
-- **Optional fields**: metrics (duration, tests affected, coverage impact, file count)
+- **Timestamp format**: Use current date/time in ISO 8601 format with UTC timezone (YYYY-MM-DDTHH:MM:SSZ). **IMPORTANT**: Use the actual current date - check the environment date context and use that year/month/day with appropriate time.
+- **Optional fields**: metrics (tokens used, complexity, files analyzed, tests affected, file count, API calls, issues resolved)
 - **Update the history file** by appending new entries to the "entries" array at the end of each task execution
 - **Example entry**:
   ```json
@@ -210,9 +211,20 @@ When working within specific parts of the SuperPool monorepo, you will automatic
       "follow_up_needed": false
     },
     "metrics": {
-      "duration_minutes": 15,
+      "tokens_used": {
+        "input": 15800,
+        "output": 8400,
+        "total": 24200
+      },
+      "complexity_indicator": "medium",
+      "files_analyzed_size_kb": 92,
       "tests_affected": 12,
-      "files_count": 2
+      "files_count": 2,
+      "api_calls_made": 28,
+      "issues_resolved": [
+        "Store API changes",
+        "Mock configuration updates"
+      ]
     }
   }
   ```
