@@ -236,6 +236,15 @@ export const createMockAuthErrorRecoveryService = (
 export const createMockSessionManager = (
   overrides: Partial<{
     getSessionDebugInfo: jest.Mock
+    detectSessionCorruption: jest.Mock
+    handleSessionCorruption: jest.Mock
+    clearAllWalletConnectSessions: jest.Mock
+    clearSpecificSession: jest.Mock
+    hasValidSession: jest.Mock
+    forceResetAllConnections: jest.Mock
+    clearQueryCache: jest.Mock
+    clearSessionByErrorId: jest.Mock
+    preventiveSessionCleanup: jest.Mock
   }> = {}
 ) => ({
   getSessionDebugInfo: jest.fn().mockResolvedValue({
@@ -243,6 +252,15 @@ export const createMockSessionManager = (
     walletConnectKeys: ['key1', 'key2'],
     sessionData: {},
   }),
+  detectSessionCorruption: jest.fn().mockReturnValue(false),
+  handleSessionCorruption: jest.fn().mockResolvedValue(undefined),
+  clearAllWalletConnectSessions: jest.fn().mockResolvedValue(undefined),
+  clearSpecificSession: jest.fn().mockResolvedValue(undefined),
+  hasValidSession: jest.fn().mockResolvedValue(false),
+  forceResetAllConnections: jest.fn().mockResolvedValue(undefined),
+  clearQueryCache: jest.fn().mockResolvedValue(undefined),
+  clearSessionByErrorId: jest.fn().mockResolvedValue(undefined),
+  preventiveSessionCleanup: jest.fn().mockResolvedValue(undefined),
   ...overrides,
 })
 
