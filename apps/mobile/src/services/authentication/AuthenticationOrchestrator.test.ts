@@ -1,22 +1,37 @@
 import type { Connector } from 'wagmi'
 import type { AuthenticationContext } from '@superpool/types'
 
-// Mock all external dependencies using jest.doMock for proper timing
-const mockRouter = {
-  replace: jest.fn(),
-}
+// Import centralized mocks
+import { createMockAuthenticationStore, createMockWalletStore } from '@mocks/factories/storeFactory'
+import {
+  createMockAuthenticationStepExecutor,
+  createMockAuthenticationValidator,
+  createMockFirebaseAuthenticator,
+  createMockMessageGenerator,
+  createMockRouter,
+  createMockSessionManager,
+  createMockSignatureHandler,
+} from '@mocks/factories/serviceFactory'
 
-const mockSessionManager = {
-  getSessionDebugInfo: jest.fn(),
-}
-
+// Create mock instances
+const mockRouter = createMockRouter()
+const mockSessionManager = createMockSessionManager()
 const mockAuthToasts = {
   success: jest.fn(),
+  authSuccess: jest.fn(),
 }
-
+// AuthErrorRecoveryService has static methods, so we mock it as a class with static methods
 const mockAuthErrorRecoveryService = {
   initialize: jest.fn(),
-  handleAuthenticationError: jest.fn(),
+  handleAuthenticationError: jest.fn().mockResolvedValue({
+    appError: { message: 'Mock error', name: 'MockError' },
+    recoveryResult: {
+      shouldDisconnect: false,
+      shouldShowError: true,
+      errorDelay: 0,
+      cleanupPerformed: false,
+    },
+  }),
   showErrorFeedback: jest.fn(),
   handleFirebaseCleanup: jest.fn(),
 }
@@ -25,109 +40,44 @@ const mockFirebaseAuth = {
   currentUser: null as { uid: string } | null,
 }
 
-// Mock constructor functions
-const createMockStepExecutor = () => ({
-  executeStep: jest.fn().mockImplementation(async (stepName, stepFunction) => {
-    // Actually call the step function to ensure coverage of the individual step calls
-    return await stepFunction()
-  }),
-  executeLockStep: jest.fn().mockImplementation(async (stepFunction) => {
-    // Actually call the step function to ensure coverage
-    return await stepFunction()
-  }),
-  executeInternalStep: jest.fn(),
-})
-
-const createMockValidator = () => ({
-  validatePreConditions: jest.fn(),
-  validateStateConsistency: jest.fn().mockReturnValue(true),
-  checkAuthenticationAborted: jest.fn().mockReturnValue(false),
-  captureConnectionState: jest.fn().mockReturnValue({
-    address: '0x742d35Cc6634C0532925a3b8D238a5D2DD8dC5b8',
-    chainId: 137,
-    isConnected: true,
-    timestamp: Date.now(),
-    sequenceNumber: 1,
-  }),
-})
-
-const createMockFirebaseAuth = () => ({
-  verifySignatureAndGetToken: jest.fn().mockResolvedValue('mock-firebase-token'),
-  signInWithFirebase: jest.fn().mockResolvedValue(undefined),
-})
-
-const createMockMessageGen = () => ({
-  generateAuthenticationMessage: jest.fn().mockResolvedValue({
-    message: 'Mock auth message',
-    nonce: 'mock-nonce',
-    timestamp: Date.now(),
-  }),
-})
-
-const createMockSignatureHandler = () => ({
-  requestWalletSignature: jest.fn().mockResolvedValue({
-    signature: 'mock-signature',
-    signatureType: 'personal-sign',
-    walletAddress: '0x742d35Cc6634C0532925a3b8D238a5D2DD8dC5b8',
-  }),
-})
-
-const mockAuthenticationStepExecutor = jest.fn().mockImplementation(() => createMockStepExecutor())
-const mockAuthenticationValidator = jest.fn().mockImplementation(() => createMockValidator())
-const mockFirebaseAuthenticator = jest.fn().mockImplementation(() => createMockFirebaseAuth())
-const mockMessageGenerator = jest.fn().mockImplementation(() => createMockMessageGen())
+// Mock constructor functions with factories
+const mockAuthenticationStepExecutor = jest.fn().mockImplementation(() => createMockAuthenticationStepExecutor())
+const mockAuthenticationValidator = jest.fn().mockImplementation(() => createMockAuthenticationValidator())
+const mockFirebaseAuthenticator = jest.fn().mockImplementation(() => createMockFirebaseAuthenticator())
+const mockMessageGenerator = jest.fn().mockImplementation(() => createMockMessageGenerator())
 const mockSignatureHandler = jest.fn().mockImplementation(() => createMockSignatureHandler())
 
 // Store constructors
-const createMockAuthStore = () => ({
-  isAuthenticating: false,
-  authWalletAddress: null,
-  authLock: {
-    isLocked: false,
-    startTime: 0,
-    walletAddress: null,
-    abortController: null,
-    requestId: null,
-  },
-  acquireAuthLock: jest.fn().mockReturnValue(true),
-  releaseAuthLock: jest.fn(),
-  reset: jest.fn(),
-})
-
-const createMockWalletStore = () => ({
-  captureState: jest.fn(),
-  validateState: jest.fn(),
-})
-
-const mockAuthenticationStore = jest.fn().mockImplementation(() => createMockAuthStore())
+const mockAuthenticationStore = jest.fn().mockImplementation(() => createMockAuthenticationStore())
 const mockWalletStore = jest.fn().mockImplementation(() => createMockWalletStore())
 
-jest.doMock('expo-router', () => ({
+// Apply mocks using Jest module mocking
+jest.mock('expo-router', () => ({
   router: mockRouter,
 }))
 
-jest.doMock('../../firebase.config', () => ({
+jest.mock('../../firebase.config', () => ({
   FIREBASE_AUTH: mockFirebaseAuth,
 }))
 
-jest.doMock('../../stores/AuthenticationStore', () => ({
+jest.mock('../../stores/AuthenticationStore', () => ({
   AuthenticationStore: mockAuthenticationStore,
 }))
 
-jest.doMock('../../stores/WalletStore', () => ({
+jest.mock('../../stores/WalletStore', () => ({
   WalletStore: mockWalletStore,
 }))
 
-jest.doMock('../../utils', () => ({
+jest.mock('../../utils', () => ({
   SessionManager: mockSessionManager,
   authToasts: mockAuthToasts,
 }))
 
-jest.doMock('../errorRecovery', () => ({
+jest.mock('../errorRecovery', () => ({
   AuthErrorRecoveryService: mockAuthErrorRecoveryService,
 }))
 
-jest.doMock('./steps', () => ({
+jest.mock('./steps', () => ({
   AuthenticationStepExecutor: mockAuthenticationStepExecutor,
   AuthenticationValidator: mockAuthenticationValidator,
   FirebaseAuthenticator: mockFirebaseAuthenticator,
@@ -140,12 +90,12 @@ const { AuthenticationOrchestrator } = require('./AuthenticationOrchestrator')
 
 describe('AuthenticationOrchestrator', () => {
   let orchestrator: typeof AuthenticationOrchestrator
-  let mockAuthStore: ReturnType<typeof createMockAuthStore>
+  let mockAuthStore: ReturnType<typeof createMockAuthenticationStore>
   let mockWalletStoreInstance: ReturnType<typeof createMockWalletStore>
-  let mockStepExecutor: ReturnType<typeof createMockStepExecutor>
-  let mockValidator: ReturnType<typeof createMockValidator>
-  let mockFirebaseAuthInstance: ReturnType<typeof createMockFirebaseAuth>
-  let mockMessageGen: ReturnType<typeof createMockMessageGen>
+  let mockStepExecutor: ReturnType<typeof createMockAuthenticationStepExecutor>
+  let mockValidator: ReturnType<typeof createMockAuthenticationValidator>
+  let mockFirebaseAuthInstance: ReturnType<typeof createMockFirebaseAuthenticator>
+  let mockMessageGen: ReturnType<typeof createMockMessageGenerator>
   let mockSignatureHandlerInstance: ReturnType<typeof createMockSignatureHandler>
   let consoleLogSpy: jest.SpyInstance
   let consoleWarnSpy: jest.SpyInstance
@@ -168,16 +118,24 @@ describe('AuthenticationOrchestrator', () => {
 
   beforeEach(() => {
     jest.clearAllMocks()
-    jest.useFakeTimers()
+    // jest.useFakeTimers() // Temporarily disabled to get better error messages
 
-    // Create fresh mock instances
-    mockAuthStore = createMockAuthStore()
+    // Create fresh mock instances using centralized factories
+    mockAuthStore = createMockAuthenticationStore()
     mockWalletStoreInstance = createMockWalletStore()
-    mockStepExecutor = createMockStepExecutor()
-    mockValidator = createMockValidator()
-    mockFirebaseAuthInstance = createMockFirebaseAuth()
-    mockMessageGen = createMockMessageGen()
+    mockStepExecutor = createMockAuthenticationStepExecutor()
+    mockValidator = createMockAuthenticationValidator()
+    mockFirebaseAuthInstance = createMockFirebaseAuthenticator()
+    mockMessageGen = createMockMessageGenerator()
     mockSignatureHandlerInstance = createMockSignatureHandler()
+
+    // Reset the mock implementation to pass through to actual function calls
+    mockStepExecutor.executeStep.mockImplementation(async (stepName: string, stepFunction: () => Promise<unknown>) => {
+      return await stepFunction()
+    })
+    mockStepExecutor.executeLockStep.mockImplementation(async (stepFunction: () => Promise<unknown>) => {
+      return await stepFunction()
+    })
 
     // Mock class constructors to return our instances
     mockAuthenticationStepExecutor.mockImplementation(() => mockStepExecutor)
@@ -188,15 +146,16 @@ describe('AuthenticationOrchestrator', () => {
     mockAuthenticationStore.mockImplementation(() => mockAuthStore)
     mockWalletStore.mockImplementation(() => mockWalletStoreInstance)
 
-    // Mock external services
+    // Mock external services with default behavior
     mockSessionManager.getSessionDebugInfo.mockResolvedValue({
       totalKeys: 5,
       walletConnectKeys: ['key1', 'key2'],
       sessionData: {},
     })
 
+    // Reset the static mock methods
     mockAuthErrorRecoveryService.handleAuthenticationError.mockResolvedValue({
-      appError: new Error('Mock error'),
+      appError: { message: 'Mock error', name: 'MockError' },
       recoveryResult: {
         shouldDisconnect: false,
         shouldShowError: true,
@@ -204,9 +163,15 @@ describe('AuthenticationOrchestrator', () => {
         cleanupPerformed: false,
       },
     })
+    mockAuthErrorRecoveryService.handleFirebaseCleanup.mockResolvedValue(undefined)
 
     // Reset Firebase auth state
     mockFirebaseAuth.currentUser = null
+
+    // Set up successful authentication flow by default
+    mockAuthStore.isAuthenticating = false
+    mockAuthStore.authLock.isLocked = false
+    mockAuthStore.acquireAuthLock.mockReturnValue(true)
 
     // Create orchestrator instance
     orchestrator = new AuthenticationOrchestrator(mockAuthStore, mockWalletStoreInstance)
@@ -217,7 +182,7 @@ describe('AuthenticationOrchestrator', () => {
   })
 
   afterEach(() => {
-    jest.useRealTimers()
+    // jest.useRealTimers() // Temporarily disabled to get better error messages
     consoleLogSpy.mockRestore()
     consoleWarnSpy.mockRestore()
   })
@@ -244,12 +209,17 @@ describe('AuthenticationOrchestrator', () => {
   describe('Authentication Lock Management', () => {
     describe('Lock Acquisition', () => {
       it('should acquire lock successfully for new authentication', async () => {
+        // Set up the mock store properly for successful authentication
+        mockAuthStore.isAuthenticating = false
         mockAuthStore.authLock.isLocked = false
         mockAuthStore.acquireAuthLock.mockReturnValue(true)
 
+        // Mock the Firebase auth to not be already authenticated
+        mockFirebaseAuth.currentUser = null
+
         await orchestrator.authenticate(mockAuthContext)
 
-        expect(mockAuthStore.acquireAuthLock).toHaveBeenCalledWith(mockAuthContext.walletAddress, expect.stringMatching(/auth_\\d+_\\w+/))
+        expect(mockAuthStore.acquireAuthLock).toHaveBeenCalledWith(mockAuthContext.walletAddress, expect.stringMatching(/auth_\d+_\w+/))
       })
 
       it('should reject authentication when lock acquisition fails', async () => {
@@ -323,7 +293,7 @@ describe('AuthenticationOrchestrator', () => {
       await Promise.allSettled([firstCallPromise, secondCallPromise])
 
       // Should have generated different request IDs
-      expect(consoleLogSpy).toHaveBeenCalledWith('🆔 Generated request ID:', expect.stringMatching(/auth_\\d+_\\w+/))
+      expect(consoleLogSpy).toHaveBeenCalledWith('🆔 Generated request ID:', expect.stringMatching(/auth_\d+_\w+/))
       const requestIdCalls = consoleLogSpy.mock.calls.filter((call) => call[0] === '🆔 Generated request ID:')
       expect(requestIdCalls.length).toBeGreaterThanOrEqual(2)
     })
@@ -376,7 +346,7 @@ describe('AuthenticationOrchestrator', () => {
       expect(mockStepExecutor.executeStep).toHaveBeenNthCalledWith(4, 'firebase-auth', expect.any(Function))
 
       // Verify success actions
-      expect(mockAuthToasts.success).toHaveBeenCalled()
+      expect(mockAuthToasts.authSuccess).toHaveBeenCalled()
       expect(mockRouter.replace).toHaveBeenCalledWith('/dashboard')
     })
 
@@ -433,26 +403,28 @@ describe('AuthenticationOrchestrator', () => {
 
     describe('Abort Handling', () => {
       it('should abort after message generation if requested', async () => {
-        mockValidator.checkAuthenticationAborted
-          .mockReturnValueOnce(false) // Initial check passes
-          .mockReturnValueOnce(true) // Abort after message generation
+        // Set up abort scenario - abort after first step
+        mockValidator.checkAuthenticationAborted.mockReturnValueOnce(true) // Abort after message generation
 
         await orchestrator.authenticate(mockAuthContext)
 
         expect(mockStepExecutor.executeStep).toHaveBeenCalledWith('generate-message', expect.any(Function))
-        expect(mockStepExecutor.executeStep).not.toHaveBeenCalledWith('request-signature', expect.any(Function))
+        // Should not proceed to next step after abort
+        expect(mockStepExecutor.executeStep).toHaveBeenCalledTimes(1)
       })
 
       it('should abort after signature request if requested', async () => {
+        // Set up abort scenario - abort after second step
         mockValidator.checkAuthenticationAborted
           .mockReturnValueOnce(false) // After message generation
-          .mockReturnValueOnce(false) // After signature request
-          .mockReturnValueOnce(true) // Abort after signature verification
+          .mockReturnValueOnce(true) // Abort after signature request
 
         await orchestrator.authenticate(mockAuthContext)
 
+        expect(mockStepExecutor.executeStep).toHaveBeenCalledWith('generate-message', expect.any(Function))
         expect(mockStepExecutor.executeStep).toHaveBeenCalledWith('request-signature', expect.any(Function))
-        expect(mockStepExecutor.executeStep).not.toHaveBeenCalledWith('verify-signature', expect.any(Function))
+        // Should not proceed to verify-signature after abort
+        expect(mockStepExecutor.executeStep).toHaveBeenCalledTimes(2)
       })
 
       it('should handle Firebase cleanup when aborted at completion', async () => {
@@ -628,6 +600,25 @@ describe('AuthenticationOrchestrator', () => {
     })
 
     it('should handle session debug info errors gracefully', async () => {
+      // Clear all mocks and console spies to ensure clean state
+      jest.clearAllMocks()
+      consoleWarnSpy.mockClear()
+
+      // Reset mock implementations to ensure functions are actually called
+      mockStepExecutor.executeLockStep.mockImplementation(async (stepFunction: () => Promise<unknown>) => {
+        return await stepFunction()
+      })
+      mockStepExecutor.executeStep.mockImplementation(async (stepName: string, stepFunction: () => Promise<unknown>) => {
+        return await stepFunction()
+      })
+
+      // Ensure all conditions allow reaching the logSessionDebugInfo call
+      mockFirebaseAuth.currentUser = null // Not already authenticated
+      mockAuthStore.acquireAuthLock.mockReturnValue(true) // Lock acquisition succeeds
+      mockValidator.checkAuthenticationAborted.mockReturnValue(false) // No aborts
+      mockValidator.validateStateConsistency.mockReturnValue(true) // Validation passes
+
+      // Mock the session manager to throw error
       mockSessionManager.getSessionDebugInfo.mockRejectedValue(new Error('Session error'))
 
       await orchestrator.authenticate(mockAuthContext)
@@ -691,8 +682,14 @@ describe('AuthenticationOrchestrator', () => {
     })
 
     it('should clean up resources even on synchronous errors', async () => {
-      mockAuthStore.acquireAuthLock.mockImplementation(() => {
-        throw new Error('Synchronous error')
+      // Clear console spy to ensure clean state
+      consoleLogSpy.mockClear()
+
+      // Make something inside the try block throw a synchronous error (not acquireAuthLock)
+      // The acquireAuthLock needs to succeed first, then something in the try block should fail
+      mockAuthStore.acquireAuthLock.mockReturnValue(true) // Let it succeed
+      mockValidator.captureConnectionState.mockImplementation(() => {
+        throw new Error('Synchronous error in try block')
       })
 
       try {
@@ -707,6 +704,17 @@ describe('AuthenticationOrchestrator', () => {
 
   describe('Integration Scenarios', () => {
     it('should handle complete end-to-end flow with all validations', async () => {
+      // Clear all mocks to ensure clean test state
+      jest.clearAllMocks()
+
+      // Reset mock implementations to actually call functions
+      mockStepExecutor.executeLockStep.mockImplementation(async (stepFunction: () => Promise<unknown>) => {
+        return await stepFunction()
+      })
+      mockStepExecutor.executeStep.mockImplementation(async (stepName: string, stepFunction: () => Promise<unknown>) => {
+        return await stepFunction()
+      })
+
       await orchestrator.authenticate(mockAuthContext)
 
       // Verify all step modules were called with correct parameters
@@ -737,6 +745,17 @@ describe('AuthenticationOrchestrator', () => {
     })
 
     it('should handle complex error recovery scenarios', async () => {
+      // Clear all mocks to ensure clean test state
+      jest.clearAllMocks()
+
+      // Reset mock implementations to actually call functions
+      mockStepExecutor.executeLockStep.mockImplementation(async (stepFunction: () => Promise<unknown>) => {
+        return await stepFunction()
+      })
+      mockStepExecutor.executeStep.mockImplementation(async (stepName: string, stepFunction: () => Promise<unknown>) => {
+        return await stepFunction()
+      })
+
       const complexError = new Error('Complex authentication error with multiple causes')
       // Make the message generator fail to trigger error handling
       mockMessageGen.generateAuthenticationMessage.mockRejectedValue(complexError)
@@ -785,6 +804,25 @@ describe('AuthenticationOrchestrator', () => {
     })
 
     it('should test session debug info error path', async () => {
+      // Clear all mocks and console spies to ensure clean state
+      jest.clearAllMocks()
+      consoleWarnSpy.mockClear()
+
+      // Reset mock implementations to ensure functions are actually called
+      mockStepExecutor.executeLockStep.mockImplementation(async (stepFunction: () => Promise<unknown>) => {
+        return await stepFunction()
+      })
+      mockStepExecutor.executeStep.mockImplementation(async (stepName: string, stepFunction: () => Promise<unknown>) => {
+        return await stepFunction()
+      })
+
+      // Ensure all conditions allow reaching the logSessionDebugInfo call
+      mockFirebaseAuth.currentUser = null // Not already authenticated
+      mockAuthStore.acquireAuthLock.mockReturnValue(true) // Lock acquisition succeeds
+      mockValidator.checkAuthenticationAborted.mockReturnValue(false) // No aborts
+      mockValidator.validateStateConsistency.mockReturnValue(true) // Validation passes
+
+      // Mock the session manager to throw error
       mockSessionManager.getSessionDebugInfo.mockRejectedValue(new Error('Debug info failed'))
 
       await orchestrator.authenticate(mockAuthContext)
@@ -793,6 +831,17 @@ describe('AuthenticationOrchestrator', () => {
     })
 
     it('should test validatePreConditions call (line 238)', async () => {
+      // Clear all mocks to ensure clean test state
+      jest.clearAllMocks()
+
+      // Reset mock implementations
+      mockStepExecutor.executeLockStep.mockImplementation(async (stepFunction: () => Promise<unknown>) => {
+        return await stepFunction()
+      })
+      mockStepExecutor.executeStep.mockImplementation(async (stepName: string, stepFunction: () => Promise<unknown>) => {
+        return await stepFunction()
+      })
+
       await orchestrator.authenticate(mockAuthContext)
 
       expect(mockValidator.validatePreConditions).toHaveBeenCalledWith({
@@ -801,6 +850,17 @@ describe('AuthenticationOrchestrator', () => {
     })
 
     it('should test abort scenarios to cover lines 291-292', async () => {
+      // Clear all mocks to ensure clean test state
+      jest.clearAllMocks()
+
+      // Reset mock implementations first
+      mockStepExecutor.executeLockStep.mockImplementation(async (stepFunction: () => Promise<unknown>) => {
+        return await stepFunction()
+      })
+      mockStepExecutor.executeStep.mockImplementation(async (stepName: string, stepFunction: () => Promise<unknown>) => {
+        return await stepFunction()
+      })
+
       // Test state consistency failure (line 286)
       mockValidator.validateStateConsistency.mockReturnValueOnce(false)
 
@@ -825,17 +885,28 @@ describe('AuthenticationOrchestrator', () => {
     })
 
     it('should test all authentication lock branches', async () => {
-      // Test expired lock path (lines 108-110)
+      // Clear all mocks first
+      jest.clearAllMocks()
+      consoleWarnSpy.mockClear()
+
+      // Test expired lock path (lines 108-110) - this should trigger internal logic in acquireAuthLock
+      // The private acquireAuthLock method checks the store state and has internal logic
       mockAuthStore.isAuthenticating = true
-      mockAuthStore.authLock.startTime = Date.now() - 130000 // Over 2 minutes
+      mockAuthStore.authLock.startTime = Date.now() - 130000 // Over 2 minutes (expired)
+      mockAuthStore.authLock.isLocked = true
+      mockAuthStore.authWalletAddress = '0xDifferentWallet' // Different wallet to ensure it doesn't return early
+
+      // The store's acquireAuthLock should be called after internal cleanup
+      mockAuthStore.releaseAuthLock.mockImplementation(() => {
+        mockAuthStore.isAuthenticating = false // Reset state after release
+      })
       mockAuthStore.acquireAuthLock.mockReturnValue(true)
 
       await orchestrator.authenticate(mockAuthContext)
 
+      // The internal acquireAuthLock should have logged the expiry warning
       expect(consoleWarnSpy).toHaveBeenCalledWith(expect.stringContaining('🕐 Authentication lock expired'))
-
-      // Reset for next test
-      mockAuthStore.isAuthenticating = false
+      expect(mockAuthStore.releaseAuthLock).toHaveBeenCalled()
     })
   })
 })

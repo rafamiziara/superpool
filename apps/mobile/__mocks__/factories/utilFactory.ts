@@ -62,17 +62,9 @@ export const createMockStorage = (
   ...overrides,
 })
 
-// Session Manager Factory
-export const createMockSessionManager = (
-  overrides: Partial<{
-    detectSessionCorruption: jest.Mock
-    handleSessionCorruption: jest.Mock
-  }> = {}
-) => ({
-  detectSessionCorruption: jest.fn(() => false),
-  handleSessionCorruption: jest.fn(() => Promise.resolve()),
-  ...overrides,
-})
+// Session Manager Factory - moved to serviceFactory.ts
+// Re-export for backward compatibility
+export { createMockSessionManager } from './serviceFactory'
 
 // Auth Toasts Factory
 export const createMockAuthToasts = (

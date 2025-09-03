@@ -112,11 +112,34 @@
           },
           "metrics": {
             "type": "object",
-            "description": "Optional metrics about task execution",
+            "description": "Measurable metrics about task execution",
             "properties": {
-              "duration_minutes": {
+              "tokens_used": {
+                "type": "object",
+                "description": "Token consumption for this task",
+                "properties": {
+                  "input": {
+                    "type": "number",
+                    "description": "Input tokens (context, prompts, files read)"
+                  },
+                  "output": {
+                    "type": "number", 
+                    "description": "Output tokens (generated content)"
+                  },
+                  "total": {
+                    "type": "number",
+                    "description": "Total tokens consumed (input + output)"
+                  }
+                }
+              },
+              "complexity_indicator": {
+                "type": "string",
+                "enum": ["low", "medium", "high", "very-high"],
+                "description": "Task complexity based on token usage and scope"
+              },
+              "files_analyzed_size_kb": {
                 "type": "number",
-                "description": "Estimated time spent on task in minutes"
+                "description": "Total size of files analyzed in kilobytes"
               },
               "tests_affected": {
                 "type": "number",
@@ -130,6 +153,10 @@
               "files_count": {
                 "type": "number",
                 "description": "Total number of files worked on"
+              },
+              "api_calls_made": {
+                "type": "number",
+                "description": "Number of tool/API calls made during execution"
               }
             }
           }

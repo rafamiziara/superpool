@@ -15,6 +15,8 @@ export const createMockAuthenticationStore = (
     failedStep: AuthStep | null
     isProgressComplete: boolean
     progressError: string | null
+    isAuthenticating: boolean
+    authWalletAddress: string | null
     authLock: {
       isLocked: boolean
       startTime: number
@@ -37,6 +39,8 @@ export const createMockAuthenticationStore = (
   failedStep: null,
   isProgressComplete: false,
   progressError: null,
+  isAuthenticating: false,
+  authWalletAddress: null,
   authLock: {
     isLocked: false,
     startTime: 0,
@@ -52,6 +56,8 @@ export const createMockAuthenticationStore = (
   failStep: jest.fn(),
   resetProgress: jest.fn(),
   reset: jest.fn(),
+  acquireAuthLock: jest.fn().mockReturnValue(true),
+  releaseAuthLock: jest.fn(),
   getStepStatus: jest.fn().mockImplementation((step: AuthStep) => {
     const completedSteps = overrides.completedSteps || new Set(['connect-wallet'])
     if (completedSteps.has(step)) return 'completed'
@@ -95,6 +101,8 @@ export const createMockWalletStore = (
   disconnect: jest.fn(),
   updateConnectionState: jest.fn(),
   setConnectionError: jest.fn(),
+  captureState: jest.fn(),
+  validateState: jest.fn(),
 
   // Apply overrides
   ...overrides,
