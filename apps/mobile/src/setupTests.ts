@@ -7,11 +7,6 @@
 
 import '@testing-library/jest-dom'
 import { configure } from 'mobx'
-import { firebaseApp, firebaseAuth, firebaseFunctions } from '@mocks/external/firebase'
-import asyncStorage from '@mocks/external/asyncStorage'
-import { expoApplication, expoSecureStore } from '@mocks/external/expo'
-import wagmi from '@mocks/external/wagmi'
-import { firebaseAuthManager, toast } from '@mocks/internal/utils'
 
 // Configure MobX for testing environment
 configure({
@@ -23,24 +18,55 @@ configure({
   isolateGlobalState: true, // Isolate test state
 })
 
-// Apply Firebase mocks using centralized definitions
-jest.mock('firebase/auth', () => firebaseAuth)
-jest.mock('firebase/functions', () => firebaseFunctions)
-jest.mock('firebase/app', () => firebaseApp)
+// Apply Firebase mocks using centralized definitions (imported inline to avoid Jest scoping issues)
+jest.mock('firebase/auth', () => require('@mocks/external/firebase').firebaseAuth)
+jest.mock('firebase/functions', () => require('@mocks/external/firebase').firebaseFunctions)
+jest.mock('firebase/app', () => require('@mocks/external/firebase').firebaseApp)
 
 // Apply AsyncStorage mock using centralized definition
-jest.mock('@react-native-async-storage/async-storage', () => asyncStorage)
+jest.mock('@react-native-async-storage/async-storage', () => require('@mocks/external/asyncStorage').default)
 
 // Apply Expo mocks using centralized definitions
-jest.mock('expo-secure-store', () => expoSecureStore)
-jest.mock('expo-application', () => expoApplication)
+jest.mock('expo-secure-store', () => require('@mocks/external/expo').expoSecureStore)
+jest.mock('expo-application', () => require('@mocks/external/expo').expoApplication)
 
 // Apply Wagmi mocks using centralized definitions
-jest.mock('wagmi', () => wagmi)
+jest.mock('wagmi', () => require('@mocks/external/wagmi').default)
 
 // Apply internal utility mocks using centralized definitions
-jest.mock('./utils/toast', () => toast)
-jest.mock('./utils/firebaseAuthManager', () => firebaseAuthManager)
+jest.mock('./utils/toast', () => require('@mocks/internal/utils').toast)
+jest.mock('./utils/firebaseAuthManager', () => require('@mocks/internal/utils').firebaseAuthManager)
+
+// Mock Expo runtime to prevent import meta registry errors
+jest.mock('expo/src/winter/runtime.native', () => ({
+  __esModule: true,
+  default: {},
+}))
+
+// Mock global Expo import meta registry
+Object.defineProperty(global, '__ExpoImportMetaRegistry', {
+  value: new Map(),
+  configurable: true,
+})
+
+// Mock TextDecoder for React Native compatibility
+if (typeof global.TextDecoder === 'undefined') {
+  global.TextDecoder = class TextDecoder {
+    readonly encoding: string = 'utf-8'
+    readonly fatal: boolean = false
+    readonly ignoreBOM: boolean = false
+
+    constructor() {
+      // Basic implementation for testing
+    }
+
+    decode(input?: BufferSource): string {
+      if (!input) return ''
+      const bytes = new Uint8Array(input as ArrayBuffer)
+      return String.fromCharCode.apply(null, Array.from(bytes))
+    }
+  }
+}
 
 // Global test timeout
 jest.setTimeout(10000)
