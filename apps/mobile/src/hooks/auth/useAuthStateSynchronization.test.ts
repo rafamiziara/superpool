@@ -4,7 +4,7 @@
  */
 
 import { act, waitFor } from '@testing-library/react-native'
-import { runInAction, observable } from 'mobx'
+import { observable, runInAction } from 'mobx'
 import { useAccount } from 'wagmi'
 import { createMockRootStore, renderHookWithStore } from '@mocks/factories/testFactory'
 import { createMockFirebaseAuthManager } from '@mocks/factories/utilFactory'
@@ -15,7 +15,7 @@ import { useAuthStateSynchronization, useAuthStateValidation } from './useAuthSt
 const mockUseAccount = useAccount as jest.MockedFunction<typeof useAccount>
 
 // Create centralized Firebase auth manager mock
-const mockFirebaseAuthManager = createMockFirebaseAuthManager()
+const _mockFirebaseAuthManager = createMockFirebaseAuthManager()
 
 // Create chain and account state helpers for testing
 const createMockChain = (id: number, name: string) => ({

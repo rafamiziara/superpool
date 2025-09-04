@@ -526,7 +526,7 @@ describe('SessionManager', () => {
       })
 
       it('should handle null and undefined inputs', () => {
-        expect(SessionManager.extractPeerInfo(null as any)).toEqual({})
+        expect(SessionManager.extractPeerInfo(null as unknown as { peer?: { metadata?: { name?: string; url?: string } } })).toEqual({})
         expect(SessionManager.extractPeerInfo(undefined as unknown as WalletConnectSession)).toEqual({})
       })
     })
@@ -600,7 +600,7 @@ describe('SessionManager', () => {
       })
 
       it('should handle null and undefined inputs', () => {
-        const nullResult = SessionManager.getSessionAge(null as any)
+        const nullResult = SessionManager.getSessionAge(null as unknown as { expiry?: number })
         const undefinedResult = SessionManager.getSessionAge(undefined as unknown as WalletConnectSession)
 
         expect(nullResult.ageMs).toBe(0)
@@ -615,7 +615,7 @@ describe('SessionManager', () => {
     describe('Session Cleanup Decision Logic', () => {
       it('should cleanup invalid sessions', () => {
         const invalidSession = null
-        const result = SessionManager.shouldCleanupSession(invalidSession as WalletConnectSession, 86400000)
+        const result = SessionManager.shouldCleanupSession(invalidSession as unknown as WalletConnectSession, 86400000)
         expect(result).toBe(true)
       })
 
@@ -716,7 +716,7 @@ describe('SessionManager', () => {
 
       it('should handle invalid sessions', () => {
         const invalidSession = null
-        const sanitized = SessionManager.sanitizeSessionForLogging(invalidSession as WalletConnectSession)
+        const sanitized = SessionManager.sanitizeSessionForLogging(invalidSession as unknown as WalletConnectSession)
 
         expect(sanitized).toEqual({
           invalid: true,

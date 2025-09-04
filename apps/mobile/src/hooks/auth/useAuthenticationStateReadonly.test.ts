@@ -3,7 +3,8 @@
  * Tests readonly state access and MobX reactivity
  */
 
-import { createMockAuthenticationStore, createMockRootStore, waitForMobX } from '@mocks/factories/testFactory'
+import { createMockRootStore, waitForMobX } from '@mocks/factories/testFactory'
+import { createMockAuthenticationStore } from '@mocks/factories/storeFactory'
 import { act, renderHook } from '@testing-library/react-native'
 import { AppError, ErrorType } from '../../utils/errorHandling'
 import { useAuthenticationStateReadonly } from './useAuthenticationStateReadonly'
@@ -33,13 +34,12 @@ jest.mock('../../stores', () => ({
   useAuthenticationStore: () => mockAuthenticationStore,
 }))
 
-// Helper function to update MobX state and trigger hook re-render
-const updateStoreAndRerender = async (updateFn: () => void, rerender: () => void) => {
+// Helper function to update MobX state
+const updateStore = async (updateFn: () => void) => {
   await act(async () => {
     runInAction(updateFn)
     await waitForMobX()
   })
-  rerender()
 }
 
 describe('useAuthenticationStateReadonly', () => {
@@ -109,7 +109,7 @@ describe('useAuthenticationStateReadonly', () => {
       })
 
       // Force a rerender to check for reactivity
-      rerender()
+      rerender({})
 
       console.log('After act and rerender, hook result:', result.current.authError)
       console.log('Store error after act:', mockStore.authenticationStore.authError)
@@ -120,35 +120,35 @@ describe('useAuthenticationStateReadonly', () => {
       const { result, rerender } = renderHook(() => useAuthenticationStateReadonly())
 
       // Set initial error
-      await updateStoreAndRerender(() => {
+      await updateStore(() => {
         mockStore.authenticationStore.authError = {
           name: 'AppError',
           message: 'Network error',
           type: ErrorType.NETWORK_ERROR,
           userFriendlyMessage: 'Network error',
         } as AppError
-      }, rerender)
+      })
       rerender()
 
       expect(result.current.authError).toBe('Network error')
 
       // Change error
-      await updateStoreAndRerender(() => {
+      await updateStore(() => {
         mockStore.authenticationStore.authError = {
           name: 'AppError',
           message: 'Signature rejected',
           type: ErrorType.SIGNATURE_REJECTED,
           userFriendlyMessage: 'Signature rejected',
         } as AppError
-      }, rerender)
+      })
       rerender()
 
       expect(result.current.authError).toBe('Signature rejected')
 
       // Clear error
-      await updateStoreAndRerender(() => {
+      await updateStore(() => {
         mockStore.authenticationStore.authError = null
-      }, rerender)
+      })
       rerender()
 
       expect(result.current.authError).toBeNull()
@@ -161,12 +161,13 @@ describe('useAuthenticationStateReadonly', () => {
 
       expect(result.current.isAuthenticating).toBe(false)
 
-      await updateStoreAndRerender(() => {
+      await updateStore(() => {
         mockStore.authenticationStore.authLock = {
           ...mockStore.authenticationStore.authLock,
           isLocked: true,
         }
-      }, rerender)
+      })
+      rerender()
 
       expect(result.current.isAuthenticating).toBe(true)
     })
@@ -178,30 +179,33 @@ describe('useAuthenticationStateReadonly', () => {
       expect(result.current.isAuthenticating).toBe(false)
 
       // Store authenticating
-      await updateStoreAndRerender(() => {
+      await updateStore(() => {
         mockStore.authenticationStore.authLock = {
           ...mockStore.authenticationStore.authLock,
           isLocked: true,
         }
-      }, rerender)
+      })
+      rerender()
 
       expect(result.current.isAuthenticating).toBe(true)
 
       // Store done but Firebase loading
-      await updateStoreAndRerender(() => {
+      await updateStore(() => {
         mockStore.authenticationStore.authLock = {
           ...mockStore.authenticationStore.authLock,
           isLocked: false,
         }
         mockFirebaseAuthState.isLoading = true
-      }, rerender)
+      })
+      rerender()
 
       expect(result.current.isAuthenticating).toBe(true)
 
       // Both done
-      await updateStoreAndRerender(() => {
+      await updateStore(() => {
         mockFirebaseAuthState.isLoading = false
-      }, rerender)
+      })
+      rerender()
 
       expect(result.current.isAuthenticating).toBe(false)
     })
@@ -214,12 +218,13 @@ describe('useAuthenticationStateReadonly', () => {
       expect(result.current.authWalletAddress).toBeNull()
 
       const walletAddress = '0x1234567890123456789012345678901234567890'
-      await updateStoreAndRerender(() => {
+      await updateStore(() => {
         mockStore.authenticationStore.authLock = {
           ...mockStore.authenticationStore.authLock,
           walletAddress,
         }
-      }, rerender)
+      })
+      rerender()
 
       expect(result.current.authWalletAddress).toBe(walletAddress)
     })
@@ -231,19 +236,21 @@ describe('useAuthenticationStateReadonly', () => {
       const firebaseAddress = '0x2222222222222222222222222222222222222222'
 
       // Set store address first
-      await updateStoreAndRerender(() => {
+      await updateStore(() => {
         mockStore.authenticationStore.authLock = {
           ...mockStore.authenticationStore.authLock,
           walletAddress: storeAddress,
         }
-      }, rerender)
+      })
+      rerender()
 
       expect(result.current.authWalletAddress).toBe(storeAddress)
 
       // Set Firebase address - should take priority
-      await updateStoreAndRerender(() => {
+      await updateStore(() => {
         mockFirebaseAuthState.walletAddress = firebaseAddress
-      }, rerender)
+      })
+      rerender()
 
       expect(result.current.authWalletAddress).toBe(firebaseAddress)
     })
@@ -253,13 +260,14 @@ describe('useAuthenticationStateReadonly', () => {
 
       const storeAddress = '0x1111111111111111111111111111111111111111'
 
-      await updateStoreAndRerender(() => {
+      await updateStore(() => {
         mockStore.authenticationStore.authLock = {
           ...mockStore.authenticationStore.authLock,
           walletAddress: storeAddress,
         }
         mockFirebaseAuthState.walletAddress = null
-      }, rerender)
+      })
+      rerender()
 
       expect(result.current.authWalletAddress).toBe(storeAddress)
     })
@@ -271,9 +279,10 @@ describe('useAuthenticationStateReadonly', () => {
 
       expect(result.current.isFirebaseAuthenticated).toBe(false)
 
-      await updateStoreAndRerender(() => {
+      await updateStore(() => {
         mockFirebaseAuthState.isAuthenticated = true
-      }, rerender)
+      })
+      rerender()
 
       expect(result.current.isFirebaseAuthenticated).toBe(true)
     })
@@ -283,9 +292,10 @@ describe('useAuthenticationStateReadonly', () => {
 
       expect(result.current.isFirebaseLoading).toBe(false)
 
-      await updateStoreAndRerender(() => {
+      await updateStore(() => {
         mockFirebaseAuthState.isLoading = true
-      }, rerender)
+      })
+      rerender()
 
       expect(result.current.isFirebaseLoading).toBe(true)
     })
@@ -297,12 +307,13 @@ describe('useAuthenticationStateReadonly', () => {
 
       expect(result.current._debug).toBeNull()
 
-      await updateStoreAndRerender(() => {
+      await updateStore(() => {
         mockStore.authenticationStore.authLock = {
           ...mockStore.authenticationStore.authLock,
           walletAddress: '0x1234567890123456789012345678901234567890',
         }
-      }, rerender)
+      })
+      rerender()
 
       expect(result.current._debug).toEqual({ hasWalletAddress: true })
     })
@@ -311,22 +322,24 @@ describe('useAuthenticationStateReadonly', () => {
       const { result, rerender } = renderHook(() => useAuthenticationStateReadonly())
 
       // Set address first
-      await updateStoreAndRerender(() => {
+      await updateStore(() => {
         mockStore.authenticationStore.authLock = {
           ...mockStore.authenticationStore.authLock,
           walletAddress: '0x1234567890123456789012345678901234567890',
         }
-      }, rerender)
+      })
+      rerender()
 
       expect(result.current._debug).toEqual({ hasWalletAddress: true })
 
       // Clear address
-      await updateStoreAndRerender(() => {
+      await updateStore(() => {
         mockStore.authenticationStore.authLock = {
           ...mockStore.authenticationStore.authLock,
           walletAddress: null,
         }
-      }, rerender)
+      })
+      rerender()
 
       expect(result.current._debug).toBeNull()
     })
@@ -342,7 +355,7 @@ describe('useAuthenticationStateReadonly', () => {
       expect(result.current.authWalletAddress).toBeNull()
 
       // First change batch
-      await updateStoreAndRerender(() => {
+      await updateStore(() => {
         mockStore.authenticationStore.authLock = {
           ...mockStore.authenticationStore.authLock,
           isLocked: true,
@@ -353,19 +366,21 @@ describe('useAuthenticationStateReadonly', () => {
           type: ErrorType.NETWORK_ERROR,
           userFriendlyMessage: 'Network error',
         } as AppError
-      }, rerender)
+      })
+      rerender()
 
       expect(result.current.isAuthenticating).toBe(true)
       expect(result.current.authError).toBe('Network error')
 
       // Second change batch
-      await updateStoreAndRerender(() => {
+      await updateStore(() => {
         mockStore.authenticationStore.authLock = {
           ...mockStore.authenticationStore.authLock,
           walletAddress: '0x1234567890123456789012345678901234567890',
         }
         mockStore.authenticationStore.authError = null
-      }, rerender)
+      })
+      rerender()
 
       expect(result.current.authWalletAddress).toBe('0x1234567890123456789012345678901234567890')
       expect(result.current.authError).toBeNull()
@@ -377,7 +392,7 @@ describe('useAuthenticationStateReadonly', () => {
 
       // Rapid state changes
       for (let i = 0; i < 5; i++) {
-        await updateStoreAndRerender(() => {
+        await updateStore(() => {
           mockStore.authenticationStore.authLock = {
             ...mockStore.authenticationStore.authLock,
             isLocked: i % 2 === 0,
@@ -391,7 +406,8 @@ describe('useAuthenticationStateReadonly', () => {
                   userFriendlyMessage: `Error ${i}`,
                 } as AppError)
               : null
-        }, rerender)
+        })
+        rerender()
 
         expect(result.current.isAuthenticating).toBe(i % 2 === 0)
         expect(result.current.authError).toEqual(i % 2 === 0 ? `Error ${i}` : null)
@@ -424,19 +440,20 @@ describe('useAuthenticationStateReadonly', () => {
       const { result, rerender } = renderHook(() => useAuthenticationStateReadonly())
 
       // Start authentication
-      await updateStoreAndRerender(() => {
+      await updateStore(() => {
         mockStore.authenticationStore.authLock = {
           ...mockStore.authenticationStore.authLock,
           isLocked: true,
         }
         mockStore.authenticationStore.authError = null
-      }, rerender)
+      })
+      rerender()
 
       expect(result.current.isAuthenticating).toBe(true)
       expect(result.current.authError).toBeNull()
 
       // Authentication success
-      await updateStoreAndRerender(() => {
+      await updateStore(() => {
         mockStore.authenticationStore.authLock = {
           ...mockStore.authenticationStore.authLock,
           isLocked: false,
@@ -444,7 +461,8 @@ describe('useAuthenticationStateReadonly', () => {
         }
         mockFirebaseAuthState.isAuthenticated = true
         mockFirebaseAuthState.walletAddress = '0x1234567890123456789012345678901234567890'
-      }, rerender)
+      })
+      rerender()
 
       expect(result.current.isAuthenticating).toBe(false)
       expect(result.current.authError).toBeNull()
@@ -457,21 +475,22 @@ describe('useAuthenticationStateReadonly', () => {
       const { result, rerender } = renderHook(() => useAuthenticationStateReadonly())
 
       // Start with authenticated state
-      await updateStoreAndRerender(() => {
+      await updateStore(() => {
         mockStore.authenticationStore.authLock = {
           ...mockStore.authenticationStore.authLock,
           walletAddress: '0x1234567890123456789012345678901234567890',
         }
         mockFirebaseAuthState.isAuthenticated = true
         mockFirebaseAuthState.walletAddress = '0x1234567890123456789012345678901234567890'
-      }, rerender)
+      })
+      rerender()
 
       expect(result.current.authWalletAddress).toBe('0x1234567890123456789012345678901234567890')
       expect(result.current.isFirebaseAuthenticated).toBe(true)
       expect(result.current._debug).toEqual({ hasWalletAddress: true })
 
       // Logout - clear all state
-      await updateStoreAndRerender(() => {
+      await updateStore(() => {
         mockStore.authenticationStore.authLock = {
           ...mockStore.authenticationStore.authLock,
           walletAddress: null,
@@ -479,7 +498,8 @@ describe('useAuthenticationStateReadonly', () => {
         mockStore.authenticationStore.authError = null
         mockFirebaseAuthState.isAuthenticated = false
         mockFirebaseAuthState.walletAddress = null
-      }, rerender)
+      })
+      rerender()
 
       expect(result.current.authWalletAddress).toBeNull()
       expect(result.current.isFirebaseAuthenticated).toBe(false)
@@ -494,14 +514,15 @@ describe('useAuthenticationStateReadonly', () => {
       const { result, rerender } = renderHook(() => useAuthenticationStateReadonly())
 
       // Set to undefined/null explicitly
-      await updateStoreAndRerender(() => {
+      await updateStore(() => {
         mockStore.authenticationStore.authError = null
         mockStore.authenticationStore.authLock = {
           ...mockStore.authenticationStore.authLock,
           walletAddress: null,
         }
         mockFirebaseAuthState.walletAddress = null
-      }, rerender)
+      })
+      rerender()
 
       expect(result.current.authError).toBeNull()
       expect(result.current.authWalletAddress).toBeNull()
@@ -510,12 +531,13 @@ describe('useAuthenticationStateReadonly', () => {
     it('should handle empty string addresses', async () => {
       const { result, rerender } = renderHook(() => useAuthenticationStateReadonly())
 
-      await updateStoreAndRerender(() => {
+      await updateStore(() => {
         mockStore.authenticationStore.authLock = {
           ...mockStore.authenticationStore.authLock,
           walletAddress: '',
         }
-      }, rerender)
+      })
+      rerender()
 
       expect(result.current.authWalletAddress).toBe('')
       expect(result.current._debug).toBeNull() // Empty string is falsy
@@ -524,13 +546,14 @@ describe('useAuthenticationStateReadonly', () => {
     it('should prioritize truthy Firebase address over falsy store address', async () => {
       const { result, rerender } = renderHook(() => useAuthenticationStateReadonly())
 
-      await updateStoreAndRerender(() => {
+      await updateStore(() => {
         mockStore.authenticationStore.authLock = {
           ...mockStore.authenticationStore.authLock,
           walletAddress: '',
         }
         mockFirebaseAuthState.walletAddress = '0x1234567890123456789012345678901234567890'
-      }, rerender)
+      })
+      rerender()
 
       expect(result.current.authWalletAddress).toBe('0x1234567890123456789012345678901234567890')
     })

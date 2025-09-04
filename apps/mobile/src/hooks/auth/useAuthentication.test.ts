@@ -182,7 +182,7 @@ describe('useAuthentication', () => {
           walletAddress: '0x1111111111111111111111111111111111111111',
         }
       })
-      mockFirebaseAuthManager.getCurrentState.mockReturnValue({
+      ;(mockFirebaseAuthManager.getCurrentState as jest.Mock).mockReturnValue({
         user: null,
         isLoading: false,
         isAuthenticated: false,
@@ -527,7 +527,7 @@ describe('useAuthentication', () => {
           isLocked: false,
         }
       })
-      mockFirebaseAuthManager.getCurrentState.mockReturnValue({
+      ;(mockFirebaseAuthManager.getCurrentState as jest.Mock).mockReturnValue({
         user: null,
         isLoading: false,
         isAuthenticated: true,

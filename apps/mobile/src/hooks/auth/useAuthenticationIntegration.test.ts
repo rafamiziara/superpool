@@ -82,7 +82,7 @@ const mockSignTypedDataAsync = jest.fn().mockResolvedValue('0xmockedsignature')
 const mockDisconnect = jest.fn().mockResolvedValue(undefined)
 
 // Mock references
-const AuthenticationOrchestratorMock = require('../../services/authentication').AuthenticationOrchestrator as jest.MockedFunction<
+const AuthenticationOrchestratorMock = require('../../services/authentication').AuthenticationOrchestrator as jest.MockedClass<
   new (
     authStore: import('../../stores/AuthenticationStore').AuthenticationStore,
     walletStore: import('../../stores/WalletStore').WalletStore
@@ -124,7 +124,7 @@ describe('useAuthenticationIntegration', () => {
       failureCount: 0,
       failureReason: null,
       signMessage: jest.fn(),
-    } as any)
+    })
     mockUseSignTypedData.mockReturnValue({
       signTypedDataAsync: mockSignTypedDataAsync,
       error: null,
@@ -140,7 +140,7 @@ describe('useAuthenticationIntegration', () => {
       failureCount: 0,
       failureReason: null,
       signTypedData: jest.fn(),
-    } as any)
+    })
     mockUseDisconnect.mockReturnValue({
       disconnect: mockDisconnect,
       error: null,
@@ -156,7 +156,7 @@ describe('useAuthenticationIntegration', () => {
       failureCount: 0,
       failureReason: null,
       disconnectAsync: mockDisconnect,
-    } as any)
+    })
 
     mockUseAccount.mockReturnValue(createMockDisconnectedAccount())
 
@@ -201,8 +201,8 @@ describe('useAuthenticationIntegration', () => {
     it('should reuse orchestrator instance', () => {
       const { result } = renderHookWithStore(() => useAuthenticationIntegration(), { store: mockStore })
 
-      let orchestrator1: ReturnType<typeof result.current.getOrchestrator>
-      let orchestrator2: ReturnType<typeof result.current.getOrchestrator>
+      let orchestrator1: ReturnType<typeof result.current.getOrchestrator> | undefined
+      let orchestrator2: ReturnType<typeof result.current.getOrchestrator> | undefined
 
       act(() => {
         orchestrator1 = result.current.getOrchestrator()
@@ -515,7 +515,22 @@ describe('useAuthenticationIntegration', () => {
         onChainChanged: jest.fn(),
         onConnect: jest.fn(),
         onDisconnect: jest.fn(),
-        emitter: {} as any,
+        emitter: {
+          on: jest.fn(),
+          off: jest.fn(),
+          emit: jest.fn(),
+          once: jest.fn(),
+          removeListener: jest.fn(),
+          removeAllListeners: jest.fn(),
+          listenerCount: jest.fn(),
+          listeners: jest.fn(),
+          prependListener: jest.fn(),
+          prependOnceListener: jest.fn(),
+          getMaxListeners: jest.fn(),
+          setMaxListeners: jest.fn(),
+          rawListeners: jest.fn(),
+          eventNames: jest.fn(),
+        },
         uid: 'mock-uid',
       } as unknown as Connector
 
@@ -582,8 +597,9 @@ describe('useAuthenticationIntegration', () => {
 
       // Verify that signature functions are callable (structure test only)
       if (capturedContext) {
-        expect(typeof capturedContext.signatureFunctions.signMessageAsync).toBe('function')
-        expect(typeof capturedContext.signatureFunctions.signTypedDataAsync).toBe('function')
+        const context = capturedContext as import('@superpool/types').AuthenticationContext
+        expect(typeof context.signatureFunctions.signMessageAsync).toBe('function')
+        expect(typeof context.signatureFunctions.signTypedDataAsync).toBe('function')
       }
     })
 
@@ -612,10 +628,11 @@ describe('useAuthenticationIntegration', () => {
 
       // Call the signature function directly to achieve code coverage
       if (capturedContext) {
-        await capturedContext.signatureFunctions.signTypedDataAsync(testData)
+        const context = capturedContext as import('@superpool/types').AuthenticationContext
+        await context.signatureFunctions.signTypedDataAsync(testData)
 
         // Verify the signature function exists and is callable
-        expect(typeof capturedContext.signatureFunctions.signTypedDataAsync).toBe('function')
+        expect(typeof context.signatureFunctions.signTypedDataAsync).toBe('function')
       }
     })
 
@@ -644,10 +661,11 @@ describe('useAuthenticationIntegration', () => {
 
       // Call the signature function directly to achieve code coverage
       if (capturedContext) {
-        await capturedContext.signatureFunctions.signTypedDataAsync(testData)
+        const context = capturedContext as import('@superpool/types').AuthenticationContext
+        await context.signatureFunctions.signTypedDataAsync(testData)
 
         // Verify the signature function exists and is callable
-        expect(typeof capturedContext.signatureFunctions.signTypedDataAsync).toBe('function')
+        expect(typeof context.signatureFunctions.signTypedDataAsync).toBe('function')
       }
     })
 
@@ -676,10 +694,11 @@ describe('useAuthenticationIntegration', () => {
 
       // Call the signature function directly to achieve code coverage
       if (capturedContext) {
-        await capturedContext.signatureFunctions.signTypedDataAsync(testData)
+        const context = capturedContext as import('@superpool/types').AuthenticationContext
+        await context.signatureFunctions.signTypedDataAsync(testData)
 
         // Verify the signature function exists and is callable
-        expect(typeof capturedContext.signatureFunctions.signTypedDataAsync).toBe('function')
+        expect(typeof context.signatureFunctions.signTypedDataAsync).toBe('function')
       }
     })
 
@@ -708,10 +727,11 @@ describe('useAuthenticationIntegration', () => {
 
       // Call the signature function directly to achieve code coverage
       if (capturedContext) {
-        await capturedContext.signatureFunctions.signTypedDataAsync(testData)
+        const context = capturedContext as import('@superpool/types').AuthenticationContext
+        await context.signatureFunctions.signTypedDataAsync(testData)
 
         // Verify the signature function exists and is callable
-        expect(typeof capturedContext.signatureFunctions.signTypedDataAsync).toBe('function')
+        expect(typeof context.signatureFunctions.signTypedDataAsync).toBe('function')
       }
     })
 
@@ -740,10 +760,11 @@ describe('useAuthenticationIntegration', () => {
 
       // Call the signature function directly to achieve code coverage
       if (capturedContext) {
-        await capturedContext.signatureFunctions.signTypedDataAsync(testData)
+        const context = capturedContext as import('@superpool/types').AuthenticationContext
+        await context.signatureFunctions.signTypedDataAsync(testData)
 
         // Verify the signature function exists and is callable
-        expect(typeof capturedContext.signatureFunctions.signTypedDataAsync).toBe('function')
+        expect(typeof context.signatureFunctions.signTypedDataAsync).toBe('function')
       }
     })
 
@@ -772,10 +793,11 @@ describe('useAuthenticationIntegration', () => {
 
       // Call the signature function directly to achieve code coverage
       if (capturedContext) {
-        await capturedContext.signatureFunctions.signTypedDataAsync(testData)
+        const context = capturedContext as import('@superpool/types').AuthenticationContext
+        await context.signatureFunctions.signTypedDataAsync(testData)
 
         // Verify the signature function exists and is callable
-        expect(typeof capturedContext.signatureFunctions.signTypedDataAsync).toBe('function')
+        expect(typeof context.signatureFunctions.signTypedDataAsync).toBe('function')
       }
     })
 
@@ -803,10 +825,11 @@ describe('useAuthenticationIntegration', () => {
 
       // Call the signature function directly to achieve code coverage
       if (capturedContext) {
-        await capturedContext.signatureFunctions.signMessageAsync(messageParams)
+        const context = capturedContext as import('@superpool/types').AuthenticationContext
+        await context.signatureFunctions.signMessageAsync(messageParams)
 
         // Verify the signature function exists and is callable
-        expect(typeof capturedContext.signatureFunctions.signMessageAsync).toBe('function')
+        expect(typeof context.signatureFunctions.signMessageAsync).toBe('function')
       }
     })
 
@@ -827,10 +850,11 @@ describe('useAuthenticationIntegration', () => {
 
       // Test all progress callback functions
       if (capturedContext) {
+        const context = capturedContext as import('@superpool/types').AuthenticationContext
         act(() => {
-          capturedContext.progressCallbacks.onStepStart('connect-wallet')
-          capturedContext.progressCallbacks.onStepComplete('connect-wallet')
-          capturedContext.progressCallbacks.onStepFail('connect-wallet', 'Test error')
+          context.progressCallbacks?.onStepStart?.('connect-wallet')
+          context.progressCallbacks?.onStepComplete?.('connect-wallet')
+          context.progressCallbacks?.onStepFail?.('connect-wallet', 'Test error')
         })
       }
 
