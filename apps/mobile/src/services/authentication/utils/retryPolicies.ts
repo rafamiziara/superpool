@@ -165,13 +165,13 @@ export class ErrorCategorizer {
       return ErrorCategory.RATE_LIMIT
     }
 
+    // Timeout errors (check before network to avoid false positive)
+    if (errorMessage.includes('timeout')) {
+      return ErrorCategory.TIMEOUT
+    }
+
     // Network-related errors
-    if (
-      errorMessage.includes('network') ||
-      errorMessage.includes('connection') ||
-      errorMessage.includes('timeout') ||
-      errorMessage.includes('offline')
-    ) {
+    if (errorMessage.includes('network') || errorMessage.includes('connection') || errorMessage.includes('offline')) {
       return ErrorCategory.NETWORK
     }
 
@@ -254,8 +254,10 @@ export class RetryExecutor {
   ): Promise<RetryResult<T>> {
     const startTime = Date.now()
     let lastError: Error = new Error('Unknown error')
+    let actualAttempts = 0
 
     for (let attempt = 1; attempt <= policy.maxRetries + 1; attempt++) {
+      actualAttempts = attempt
       // Check for abort signal
       if (context?.signal?.aborted) {
         throw new Error('Operation aborted')
@@ -305,7 +307,7 @@ export class RetryExecutor {
     return {
       success: false,
       error: lastError,
-      attemptsMade: policy.maxRetries + 1,
+      attemptsMade: actualAttempts,
       totalTime: Date.now() - startTime,
       policyUsed: policy.name,
     }

@@ -125,7 +125,7 @@ const mockFirebaseAuth = {
   user: null,
 }
 
-jest.mock('./useFirebaseAuth', () => ({
+jest.mock('../../src/hooks/auth/useFirebaseAuth', () => ({
   useFirebaseAuth: () => mockFirebaseAuth,
 }))
 

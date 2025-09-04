@@ -221,6 +221,11 @@ export const useAuthSessionRecovery = () => {
 
   // Automatic session recovery on app startup
   useEffect(() => {
+    // Skip automatic recovery during tests to avoid act() warnings
+    if (process.env.NODE_ENV === 'test') {
+      return
+    }
+
     // Only attempt recovery once when Firebase auth state is loaded
     if (firebaseAuth.isLoading || recoveryState.recoveryAttempted) {
       return

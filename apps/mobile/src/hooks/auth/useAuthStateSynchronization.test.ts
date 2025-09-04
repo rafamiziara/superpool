@@ -4,7 +4,7 @@
  */
 
 import { act, waitFor } from '@testing-library/react-native'
-import { runInAction } from 'mobx'
+import { runInAction, observable } from 'mobx'
 import { useAccount } from 'wagmi'
 import { createMockRootStore, renderHookWithStore } from '@mocks/factories/testFactory'
 import { createMockFirebaseAuthManager } from '@mocks/factories/utilFactory'
@@ -70,13 +70,13 @@ jest.mock('../../utils', () => ({
   devOnly: jest.fn(),
 }))
 
-// Mock Firebase auth hook using centralized factory
-const mockFirebaseAuth = {
+// Mock Firebase auth hook using centralized factory - make it observable
+const mockFirebaseAuth = observable({
   isAuthenticated: false,
   isLoading: false,
   walletAddress: null as string | null,
   user: null,
-}
+})
 
 jest.mock('./useFirebaseAuth', () => ({
   useFirebaseAuth: () => mockFirebaseAuth,
@@ -94,11 +94,11 @@ describe('useAuthStateSynchronization', () => {
     jest.clearAllMocks()
 
     // Reset mock states before creating store
-    Object.assign(mockFirebaseAuth, {
-      isAuthenticated: false,
-      isLoading: false,
-      walletAddress: null,
-      user: null,
+    runInAction(() => {
+      mockFirebaseAuth.isAuthenticated = false
+      mockFirebaseAuth.isLoading = false
+      mockFirebaseAuth.walletAddress = null
+      mockFirebaseAuth.user = null
     })
 
     mockUseAccount.mockReturnValue(createMockDisconnectedAccount())
@@ -487,11 +487,11 @@ describe('useAuthStateValidation', () => {
     mockStore = createMockRootStore()
 
     // Reset mock states
-    Object.assign(mockFirebaseAuth, {
-      isAuthenticated: false,
-      isLoading: false,
-      walletAddress: null,
-      user: null,
+    runInAction(() => {
+      mockFirebaseAuth.isAuthenticated = false
+      mockFirebaseAuth.isLoading = false
+      mockFirebaseAuth.walletAddress = null
+      mockFirebaseAuth.user = null
     })
 
     mockUseAccount.mockReturnValue(createMockDisconnectedAccount())
@@ -500,8 +500,10 @@ describe('useAuthStateValidation', () => {
   describe('Consistency Validation', () => {
     it('should detect consistent state when everything matches', () => {
       // Set up consistent state
-      mockFirebaseAuth.isAuthenticated = true
-      mockFirebaseAuth.walletAddress = '0x1234567890123456789012345678901234567890'
+      runInAction(() => {
+        mockFirebaseAuth.isAuthenticated = true
+        mockFirebaseAuth.walletAddress = '0x1234567890123456789012345678901234567890'
+      })
 
       mockUseAccount.mockReturnValue(createMockConnectedAccount('0x1234567890123456789012345678901234567890', 1))
 
@@ -536,8 +538,10 @@ describe('useAuthStateValidation', () => {
     })
 
     it('should detect Firebase authenticated but wallet not connected', () => {
-      mockFirebaseAuth.isAuthenticated = true
-      mockFirebaseAuth.walletAddress = '0x1234567890123456789012345678901234567890'
+      runInAction(() => {
+        mockFirebaseAuth.isAuthenticated = true
+        mockFirebaseAuth.walletAddress = '0x1234567890123456789012345678901234567890'
+      })
 
       const { result } = renderHookWithStore(() => useAuthStateValidation(), {
         store: mockStore,
@@ -550,8 +554,10 @@ describe('useAuthStateValidation', () => {
     })
 
     it('should detect wallet address mismatch', () => {
-      mockFirebaseAuth.isAuthenticated = true
-      mockFirebaseAuth.walletAddress = '0x1111111111111111111111111111111111111111'
+      runInAction(() => {
+        mockFirebaseAuth.isAuthenticated = true
+        mockFirebaseAuth.walletAddress = '0x1111111111111111111111111111111111111111'
+      })
 
       mockUseAccount.mockReturnValue(createMockConnectedAccount('0x2222222222222222222222222222222222222222', 1))
 
@@ -566,8 +572,10 @@ describe('useAuthStateValidation', () => {
     })
 
     it('should detect authentication in progress but already authenticated', () => {
-      mockFirebaseAuth.isAuthenticated = true
-      mockFirebaseAuth.walletAddress = '0x1234567890123456789012345678901234567890'
+      runInAction(() => {
+        mockFirebaseAuth.isAuthenticated = true
+        mockFirebaseAuth.walletAddress = '0x1234567890123456789012345678901234567890'
+      })
 
       mockStore.authenticationStore.authLock = {
         ...mockStore.authenticationStore.authLock,
@@ -585,8 +593,10 @@ describe('useAuthStateValidation', () => {
     })
 
     it('should handle case-insensitive address validation', () => {
-      mockFirebaseAuth.isAuthenticated = true
-      mockFirebaseAuth.walletAddress = '0x1234567890123456789012345678901234567890'
+      runInAction(() => {
+        mockFirebaseAuth.isAuthenticated = true
+        mockFirebaseAuth.walletAddress = '0x1234567890123456789012345678901234567890'
+      })
 
       mockUseAccount.mockReturnValue(createMockConnectedAccount('0x1234567890123456789012345678901234567890', 1))
 
