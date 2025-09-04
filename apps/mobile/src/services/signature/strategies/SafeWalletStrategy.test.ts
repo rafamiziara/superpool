@@ -573,9 +573,9 @@ describe('SafeWalletStrategy', () => {
     })
 
     it('should have static timeout constant accessible', () => {
-      // Access private static through any cast for testing
-      const strategyAny = strategy as Record<string, unknown>
-      const timeout = strategyAny.constructor.TIMEOUT_MS
+      // Access private static through constructor cast for testing
+      const StrategyConstructor = SafeWalletStrategy as unknown as { TIMEOUT_MS: number }
+      const timeout = StrategyConstructor.TIMEOUT_MS
 
       expect(timeout).toBe(20000)
     })
