@@ -244,9 +244,9 @@ describe('AuthenticationOrchestrator', () => {
       })
 
       it('should handle duplicate authentication attempts for same wallet', async () => {
-        mockAuthStore.isAuthenticating = true
+        // Set up the auth lock state properly - these are computed properties based on authLock state
         mockAuthStore.authLock.isLocked = true
-        mockAuthStore.authWalletAddress = mockAuthContext.walletAddress
+        mockAuthStore.authLock.walletAddress = mockAuthContext.walletAddress
         mockAuthStore.authLock.startTime = Date.now() - 1000 // 1 second ago
 
         await orchestrator.authenticate(mockAuthContext)
@@ -629,8 +629,9 @@ describe('AuthenticationOrchestrator', () => {
 
   describe('Authentication Status and Cleanup', () => {
     it('should return current authentication status', () => {
-      mockAuthStore.isAuthenticating = true
-      mockAuthStore.authWalletAddress = '0x123'
+      // Set up the auth lock state properly - isAuthenticating and authWalletAddress are computed from authLock
+      mockAuthStore.authLock.isLocked = true
+      mockAuthStore.authLock.walletAddress = '0x123'
 
       const status = orchestrator.getAuthenticationStatus()
 
