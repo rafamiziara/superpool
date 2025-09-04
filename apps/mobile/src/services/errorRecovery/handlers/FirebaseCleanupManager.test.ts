@@ -16,11 +16,11 @@ jest.mock('../../../firebase.config', () => ({
 
 describe('FirebaseCleanupManager', () => {
   let mockSignOut: jest.Mock
-  let mockFirebaseAuth: Record<string, unknown>
+  let mockFirebaseAuth: { currentUser: unknown }
 
   beforeEach(() => {
     mockSignOut = signOut as jest.Mock
-    mockFirebaseAuth = FIREBASE_AUTH as Record<string, unknown>
+    mockFirebaseAuth = FIREBASE_AUTH as unknown as { currentUser: unknown }
 
     jest.clearAllMocks()
 

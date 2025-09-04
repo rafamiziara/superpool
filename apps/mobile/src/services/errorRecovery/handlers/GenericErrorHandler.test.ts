@@ -16,6 +16,7 @@ describe('GenericErrorHandler', () => {
     type: ErrorType
     userFriendlyMessage: string
     originalError?: unknown
+    timestamp: Date
   }
 
   beforeEach(() => {
@@ -27,6 +28,7 @@ describe('GenericErrorHandler', () => {
       message: 'Test error message',
       type: ErrorType.AUTHENTICATION_FAILED,
       userFriendlyMessage: 'Authentication failed. Please try connecting your wallet again.',
+      timestamp: new Date(),
     }
 
     jest.clearAllMocks()
@@ -285,7 +287,7 @@ describe('GenericErrorHandler', () => {
         isUserInitiatedError.mockReturnValue(false)
 
         const context: GenericErrorContext = {
-          appError: mockAppError,
+          appError: { ...mockAppError, timestamp: new Date() },
           isConnected: true,
           originalError: new Error('Original'),
         }
@@ -301,7 +303,7 @@ describe('GenericErrorHandler', () => {
         isUserInitiatedError.mockReturnValue(false)
 
         const context: GenericErrorContext = {
-          appError: mockAppError,
+          appError: { ...mockAppError, timestamp: new Date() },
           isConnected: false,
           originalError: undefined,
         }
@@ -318,6 +320,7 @@ describe('GenericErrorHandler', () => {
         const differentAppError = {
           ...mockAppError,
           type: ErrorType.SIGNATURE_REJECTED,
+          timestamp: new Date(),
         }
 
         const context = createMockContext({ appError: differentAppError })
@@ -437,6 +440,7 @@ describe('GenericErrorHandler', () => {
           ...mockAppError,
           message: longMessage,
           userFriendlyMessage: longMessage,
+          timestamp: new Date(),
         }
 
         const context = createMockContext({ appError: longAppError })
@@ -466,7 +470,7 @@ describe('GenericErrorHandler', () => {
 
         const contexts = Array.from({ length: 1000 }, (_, i) =>
           createMockContext({
-            appError: { ...mockAppError, message: `Error ${i}` },
+            appError: { ...mockAppError, message: `Error ${i}`, timestamp: new Date() },
             isConnected: i % 2 === 0,
           })
         )
@@ -570,7 +574,7 @@ describe('GenericErrorHandler', () => {
       isUserInitiatedError.mockReturnValue(false)
 
       const context: GenericErrorContext = {
-        appError: mockAppError,
+        appError: { ...mockAppError, timestamp: new Date() },
         isConnected: true,
         originalError: new Error('Test'),
       }
