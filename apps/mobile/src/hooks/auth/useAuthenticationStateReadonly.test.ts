@@ -3,8 +3,8 @@
  * Tests readonly state access and MobX reactivity
  */
 
-import { createMockRootStore, waitForMobX } from '@mocks/factories/testFactory'
 import { createMockAuthenticationStore } from '@mocks/factories/storeFactory'
+import { createMockRootStore, waitForMobX } from '@mocks/factories/testFactory'
 import { act, renderHook } from '@testing-library/react-native'
 import { AppError, ErrorType } from '../../utils/errorHandling'
 import { useAuthenticationStateReadonly } from './useAuthenticationStateReadonly'
@@ -128,7 +128,7 @@ describe('useAuthenticationStateReadonly', () => {
           userFriendlyMessage: 'Network error',
         } as AppError
       })
-      rerender()
+      rerender({})
 
       expect(result.current.authError).toBe('Network error')
 
@@ -141,7 +141,7 @@ describe('useAuthenticationStateReadonly', () => {
           userFriendlyMessage: 'Signature rejected',
         } as AppError
       })
-      rerender()
+      rerender({})
 
       expect(result.current.authError).toBe('Signature rejected')
 
@@ -149,7 +149,7 @@ describe('useAuthenticationStateReadonly', () => {
       await updateStore(() => {
         mockStore.authenticationStore.authError = null
       })
-      rerender()
+      rerender({})
 
       expect(result.current.authError).toBeNull()
     })
@@ -167,7 +167,7 @@ describe('useAuthenticationStateReadonly', () => {
           isLocked: true,
         }
       })
-      rerender()
+      rerender({})
 
       expect(result.current.isAuthenticating).toBe(true)
     })
@@ -185,7 +185,7 @@ describe('useAuthenticationStateReadonly', () => {
           isLocked: true,
         }
       })
-      rerender()
+      rerender({})
 
       expect(result.current.isAuthenticating).toBe(true)
 
@@ -197,7 +197,7 @@ describe('useAuthenticationStateReadonly', () => {
         }
         mockFirebaseAuthState.isLoading = true
       })
-      rerender()
+      rerender({})
 
       expect(result.current.isAuthenticating).toBe(true)
 
@@ -205,7 +205,7 @@ describe('useAuthenticationStateReadonly', () => {
       await updateStore(() => {
         mockFirebaseAuthState.isLoading = false
       })
-      rerender()
+      rerender({})
 
       expect(result.current.isAuthenticating).toBe(false)
     })
@@ -224,7 +224,7 @@ describe('useAuthenticationStateReadonly', () => {
           walletAddress,
         }
       })
-      rerender()
+      rerender({})
 
       expect(result.current.authWalletAddress).toBe(walletAddress)
     })
@@ -242,7 +242,7 @@ describe('useAuthenticationStateReadonly', () => {
           walletAddress: storeAddress,
         }
       })
-      rerender()
+      rerender({})
 
       expect(result.current.authWalletAddress).toBe(storeAddress)
 
@@ -250,7 +250,7 @@ describe('useAuthenticationStateReadonly', () => {
       await updateStore(() => {
         mockFirebaseAuthState.walletAddress = firebaseAddress
       })
-      rerender()
+      rerender({})
 
       expect(result.current.authWalletAddress).toBe(firebaseAddress)
     })
@@ -267,7 +267,7 @@ describe('useAuthenticationStateReadonly', () => {
         }
         mockFirebaseAuthState.walletAddress = null
       })
-      rerender()
+      rerender({})
 
       expect(result.current.authWalletAddress).toBe(storeAddress)
     })
@@ -282,7 +282,7 @@ describe('useAuthenticationStateReadonly', () => {
       await updateStore(() => {
         mockFirebaseAuthState.isAuthenticated = true
       })
-      rerender()
+      rerender({})
 
       expect(result.current.isFirebaseAuthenticated).toBe(true)
     })
@@ -295,7 +295,7 @@ describe('useAuthenticationStateReadonly', () => {
       await updateStore(() => {
         mockFirebaseAuthState.isLoading = true
       })
-      rerender()
+      rerender({})
 
       expect(result.current.isFirebaseLoading).toBe(true)
     })
@@ -313,7 +313,7 @@ describe('useAuthenticationStateReadonly', () => {
           walletAddress: '0x1234567890123456789012345678901234567890',
         }
       })
-      rerender()
+      rerender({})
 
       expect(result.current._debug).toEqual({ hasWalletAddress: true })
     })
@@ -328,7 +328,7 @@ describe('useAuthenticationStateReadonly', () => {
           walletAddress: '0x1234567890123456789012345678901234567890',
         }
       })
-      rerender()
+      rerender({})
 
       expect(result.current._debug).toEqual({ hasWalletAddress: true })
 
@@ -339,7 +339,7 @@ describe('useAuthenticationStateReadonly', () => {
           walletAddress: null,
         }
       })
-      rerender()
+      rerender({})
 
       expect(result.current._debug).toBeNull()
     })
@@ -367,7 +367,7 @@ describe('useAuthenticationStateReadonly', () => {
           userFriendlyMessage: 'Network error',
         } as AppError
       })
-      rerender()
+      rerender({})
 
       expect(result.current.isAuthenticating).toBe(true)
       expect(result.current.authError).toBe('Network error')
@@ -380,7 +380,7 @@ describe('useAuthenticationStateReadonly', () => {
         }
         mockStore.authenticationStore.authError = null
       })
-      rerender()
+      rerender({})
 
       expect(result.current.authWalletAddress).toBe('0x1234567890123456789012345678901234567890')
       expect(result.current.authError).toBeNull()
@@ -407,7 +407,7 @@ describe('useAuthenticationStateReadonly', () => {
                 } as AppError)
               : null
         })
-        rerender()
+        rerender({})
 
         expect(result.current.isAuthenticating).toBe(i % 2 === 0)
         expect(result.current.authError).toEqual(i % 2 === 0 ? `Error ${i}` : null)
@@ -447,7 +447,7 @@ describe('useAuthenticationStateReadonly', () => {
         }
         mockStore.authenticationStore.authError = null
       })
-      rerender()
+      rerender({})
 
       expect(result.current.isAuthenticating).toBe(true)
       expect(result.current.authError).toBeNull()
@@ -462,7 +462,7 @@ describe('useAuthenticationStateReadonly', () => {
         mockFirebaseAuthState.isAuthenticated = true
         mockFirebaseAuthState.walletAddress = '0x1234567890123456789012345678901234567890'
       })
-      rerender()
+      rerender({})
 
       expect(result.current.isAuthenticating).toBe(false)
       expect(result.current.authError).toBeNull()
@@ -483,7 +483,7 @@ describe('useAuthenticationStateReadonly', () => {
         mockFirebaseAuthState.isAuthenticated = true
         mockFirebaseAuthState.walletAddress = '0x1234567890123456789012345678901234567890'
       })
-      rerender()
+      rerender({})
 
       expect(result.current.authWalletAddress).toBe('0x1234567890123456789012345678901234567890')
       expect(result.current.isFirebaseAuthenticated).toBe(true)
@@ -499,7 +499,7 @@ describe('useAuthenticationStateReadonly', () => {
         mockFirebaseAuthState.isAuthenticated = false
         mockFirebaseAuthState.walletAddress = null
       })
-      rerender()
+      rerender({})
 
       expect(result.current.authWalletAddress).toBeNull()
       expect(result.current.isFirebaseAuthenticated).toBe(false)
@@ -522,7 +522,7 @@ describe('useAuthenticationStateReadonly', () => {
         }
         mockFirebaseAuthState.walletAddress = null
       })
-      rerender()
+      rerender({})
 
       expect(result.current.authError).toBeNull()
       expect(result.current.authWalletAddress).toBeNull()
@@ -537,7 +537,7 @@ describe('useAuthenticationStateReadonly', () => {
           walletAddress: '',
         }
       })
-      rerender()
+      rerender({})
 
       expect(result.current.authWalletAddress).toBe('')
       expect(result.current._debug).toBeNull() // Empty string is falsy
@@ -553,7 +553,7 @@ describe('useAuthenticationStateReadonly', () => {
         }
         mockFirebaseAuthState.walletAddress = '0x1234567890123456789012345678901234567890'
       })
-      rerender()
+      rerender({})
 
       expect(result.current.authWalletAddress).toBe('0x1234567890123456789012345678901234567890')
     })

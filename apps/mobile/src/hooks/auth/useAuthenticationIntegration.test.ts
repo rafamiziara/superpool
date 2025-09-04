@@ -116,7 +116,13 @@ describe('useAuthenticationIntegration', () => {
       status: 'success' as const,
       reset: jest.fn(),
       isPaused: false,
-      variables: undefined,
+      variables: {
+        account: undefined,
+        message: 'test message',
+        connector: undefined,
+      },
+      context: undefined,
+      submittedAt: 0,
       isError: false,
       isIdle: false,
       isPending: false,
@@ -132,7 +138,16 @@ describe('useAuthenticationIntegration', () => {
       status: 'success' as const,
       reset: jest.fn(),
       isPaused: false,
-      variables: undefined,
+      variables: {
+        types: { Message: [{ name: 'content', type: 'string' }] },
+        primaryType: 'Message' as const,
+        message: { content: 'Test message' },
+        account: undefined,
+        connector: undefined,
+        domain: undefined,
+      },
+      context: undefined,
+      submittedAt: 0,
       isError: false,
       isIdle: false,
       isPending: false,
@@ -148,7 +163,9 @@ describe('useAuthenticationIntegration', () => {
       status: 'success' as const,
       reset: jest.fn(),
       isPaused: false,
-      variables: undefined,
+      variables: {
+        connector: undefined,
+      },
       isError: false,
       isIdle: false,
       isPending: false,
@@ -156,6 +173,9 @@ describe('useAuthenticationIntegration', () => {
       failureCount: 0,
       failureReason: null,
       disconnectAsync: mockDisconnect,
+      context: undefined,
+      submittedAt: 0,
+      connectors: [],
     })
 
     mockUseAccount.mockReturnValue(createMockDisconnectedAccount())
@@ -913,15 +933,15 @@ describe('useAuthenticationIntegration', () => {
     it('should maintain orchestrator instance across rerenders', () => {
       const { result, rerender } = renderHookWithStore(() => useAuthenticationIntegration(), { store: mockStore })
 
-      let orchestrator1: ReturnType<typeof result.current.getOrchestrator>
-      let orchestrator2: ReturnType<typeof result.current.getOrchestrator>
+      let orchestrator1: ReturnType<typeof result.current.getOrchestrator> | undefined
+      let orchestrator2: ReturnType<typeof result.current.getOrchestrator> | undefined
 
       act(() => {
         orchestrator1 = result.current.getOrchestrator()
       })
 
       // Re-render the hook with the same store (should not create new orchestrator)
-      rerender()
+      rerender({})
 
       act(() => {
         orchestrator2 = result.current.getOrchestrator()
