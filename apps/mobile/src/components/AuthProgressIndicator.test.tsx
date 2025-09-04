@@ -121,7 +121,7 @@ describe('AuthProgressIndicator', () => {
     it('should update when store state changes', async () => {
       const mockStore = createMockRootStore()
       // Start with one completed step
-      mockStore.authenticationStore.completedSteps = observable(new Set(['connect-wallet']))
+      mockStore.authenticationStore.completedSteps = observable(new Set<AuthStep>(['connect-wallet']))
       mockStore.authenticationStore.currentStep = null
 
       mockStore.authenticationStore.getStepInfo = jest.fn().mockImplementation((step: AuthStep) => {
@@ -205,7 +205,7 @@ describe('AuthProgressIndicator', () => {
         { step: 'connect-wallet', title: 'Connect Wallet', description: 'Connect your wallet to continue' },
         { step: 'generate-message', title: 'Generate Message', description: 'Generate authentication message' },
       ])
-      mockStore.authenticationStore.completedSteps = observable(new Set(['connect-wallet']))
+      mockStore.authenticationStore.completedSteps = observable(new Set<AuthStep>(['connect-wallet']))
       mockStore.authenticationStore.isProgressComplete = false
       mockStore.authenticationStore.currentStep = null
 
@@ -239,7 +239,9 @@ describe('AuthProgressIndicator', () => {
         { step: 'request-signature', title: 'Request Signature', description: 'Sign message in your wallet app' },
         { step: 'verify-signature', title: 'Verify Signature', description: 'Verifying your signature' },
       ])
-      mockStore.authenticationStore.completedSteps = observable(new Set(['connect-wallet', 'generate-message', 'request-signature']))
+      mockStore.authenticationStore.completedSteps = observable(
+        new Set<AuthStep>(['connect-wallet', 'generate-message', 'request-signature'])
+      )
       mockStore.authenticationStore.currentStep = null
 
       const { getByTestId } = renderWithStore(<AuthProgressIndicator />, { store: mockStore })

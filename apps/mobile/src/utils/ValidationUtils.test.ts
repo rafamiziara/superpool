@@ -96,8 +96,8 @@ describe('ValidationUtils', () => {
       })
 
       it('should return false for null, undefined, and empty values', () => {
-        expect(ValidationUtils.isValidWalletAddress(null as any)).toBe(false)
-        expect(ValidationUtils.isValidWalletAddress(undefined as any)).toBe(false)
+        expect(ValidationUtils.isValidWalletAddress(null as unknown as string)).toBe(false)
+        expect(ValidationUtils.isValidWalletAddress(undefined as unknown as string)).toBe(false)
         expect(ValidationUtils.isValidWalletAddress('')).toBe(false)
         expect(ValidationUtils.isValidWalletAddress('   ')).toBe(false)
       })
@@ -134,8 +134,8 @@ describe('ValidationUtils', () => {
       it('should return false for empty or null nonces', () => {
         expect(ValidationUtils.isValidNonce('')).toBe(false)
         expect(ValidationUtils.isValidNonce('   ')).toBe(false)
-        expect(ValidationUtils.isValidNonce(null as any)).toBe(false)
-        expect(ValidationUtils.isValidNonce(undefined as any)).toBe(false)
+        expect(ValidationUtils.isValidNonce(null as unknown as string)).toBe(false)
+        expect(ValidationUtils.isValidNonce(undefined as unknown as string)).toBe(false)
       })
 
       it('should return false for nonces exceeding max length', () => {
@@ -199,7 +199,7 @@ describe('ValidationUtils', () => {
         const invalidTimestamps = [0, -1, -1000, null, undefined, NaN, Infinity, -Infinity]
 
         invalidTimestamps.forEach((timestamp) => {
-          expect(ValidationUtils.isValidTimestamp(timestamp as any)).toBe(false)
+          expect(ValidationUtils.isValidTimestamp(timestamp as unknown as number)).toBe(false)
         })
       })
     })
@@ -239,8 +239,8 @@ describe('ValidationUtils', () => {
       it('should return false for empty or null messages', () => {
         expect(ValidationUtils.isValidAuthMessage('')).toBe(false)
         expect(ValidationUtils.isValidAuthMessage('   ')).toBe(false)
-        expect(ValidationUtils.isValidAuthMessage(null as any)).toBe(false)
-        expect(ValidationUtils.isValidAuthMessage(undefined as any)).toBe(false)
+        expect(ValidationUtils.isValidAuthMessage(null as unknown as string)).toBe(false)
+        expect(ValidationUtils.isValidAuthMessage(undefined as unknown as string)).toBe(false)
       })
 
       it('should return false for messages exceeding max length', () => {
@@ -283,11 +283,11 @@ describe('ValidationUtils', () => {
           NaN,
           Infinity,
           -Infinity,
-          '1' as any, // String instead of number
+          '1' as unknown as number, // String instead of number
         ]
 
         invalidChainIds.forEach((chainId) => {
-          expect(ValidationUtils.isValidChainId(chainId as any)).toBe(false)
+          expect(ValidationUtils.isValidChainId(chainId as unknown as number)).toBe(false)
         })
       })
     })
@@ -351,8 +351,8 @@ describe('ValidationUtils', () => {
       })
 
       it('should return false for null and undefined values', () => {
-        expect(ValidationUtils.isValidSignatureFormat(null as any)).toBe(false)
-        expect(ValidationUtils.isValidSignatureFormat(undefined as any)).toBe(false)
+        expect(ValidationUtils.isValidSignatureFormat(null as unknown as string)).toBe(false)
+        expect(ValidationUtils.isValidSignatureFormat(undefined as unknown as string)).toBe(false)
       })
     })
   })
@@ -496,8 +496,12 @@ describe('ValidationUtils', () => {
       })
 
       it('should handle null and undefined request', () => {
-        const nullResult = ValidationUtils.validateAuthRequest({} as any)
-        const undefinedParamsResult = ValidationUtils.validateAuthRequest({} as any)
+        const nullResult = ValidationUtils.validateAuthRequest(
+          {} as unknown as { address: string; nonce: string; timestamp: number; chainId: number; signature: string }
+        )
+        const undefinedParamsResult = ValidationUtils.validateAuthRequest(
+          {} as unknown as { address: string; nonce: string; timestamp: number; chainId: number; signature: string }
+        )
 
         expect(nullResult.isValid).toBe(false)
         expect(nullResult.errors.length).toBeGreaterThan(0)
@@ -578,7 +582,7 @@ describe('ValidationUtils', () => {
       expect(ValidationUtils.prototype.constructor).toBe(ValidationUtils)
 
       // Try to instantiate - this should work with 'as any' but we can check it exists
-      const instance = new (ValidationUtils as any)()
+      const instance = new (ValidationUtils as unknown as new () => ValidationUtils)()
       expect(instance).toBeInstanceOf(ValidationUtils)
 
       // The key test is that all methods should be static (not on prototype)

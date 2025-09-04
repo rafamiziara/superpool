@@ -1,7 +1,7 @@
 import { EventEmitter } from 'events'
 import { useAccount } from 'wagmi'
 import { createMockRootStore, renderHookWithStore, waitForMobX } from '@mocks/factories/testFactory'
-import { createMockAuthToasts } from '@mocks/factories/utilFactory'
+import { createMockAuthToasts as _createMockAuthToasts } from '@mocks/factories/utilFactory'
 
 // Mock the toast module BEFORE importing the hook with inline mock functions
 jest.mock('../../utils/toast', () => ({

@@ -180,14 +180,27 @@ describe('Authentication Flow Integration Tests', () => {
 
       // Mock orchestrator to throw error
       const mockError = new Error('Authentication failed')
-      jest.spyOn(authIntegration.current, 'getOrchestrator').mockImplementation(
-        () =>
-          ({
-            authenticate: jest.fn().mockRejectedValue(mockError),
-          }) as {
-            authenticate: jest.MockedFunction<(context: import('@superpool/types').AuthenticationContext) => Promise<void>>
-          }
-      )
+      const mockOrchestrator = {
+        authenticate: jest.fn().mockRejectedValue(mockError),
+        stepExecutor: {},
+        messageGenerator: {},
+        signatureHandler: {},
+        firebaseAuthenticator: {},
+        validator: {},
+        authStore: {},
+        walletStore: {},
+        initializeStepExecutor: jest.fn(),
+        acquireLock: jest.fn(),
+        releaseLock: jest.fn(),
+        cleanupFailedAuth: jest.fn(),
+        checkExistingLock: jest.fn(),
+        generateRequestId: jest.fn(),
+        executeStepWithRetry: jest.fn(),
+        validateAuthenticatedState: jest.fn(),
+        handleLockTimeout: jest.fn(),
+        handleAuthError: jest.fn(),
+      }
+      jest.spyOn(authIntegration.current, 'getOrchestrator').mockImplementation(() => mockOrchestrator)
 
       const testWalletAddress = '0x1234567890123456789012345678901234567890'
 

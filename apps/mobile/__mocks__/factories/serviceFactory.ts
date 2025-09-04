@@ -5,14 +5,16 @@
  * Includes authentication services, API clients, and other business logic services.
  */
 
+type MockFn<TArgs extends unknown[] = unknown[], TReturn = unknown> = jest.Mock<TReturn, TArgs>
+
 /**
  * Authentication Orchestrator Factory
  * Mocks the main authentication service that coordinates the auth flow
  */
 export const createMockAuthenticationOrchestrator = (
   overrides: Partial<{
-    authenticate: jest.Mock
-    handleDisconnection: jest.Mock
+    authenticate: MockFn<[context: unknown], Promise<void>>
+    handleDisconnection: MockFn<[], Promise<void>>
   }> = {}
 ) => ({
   authenticate: jest.fn().mockResolvedValue({ success: true }),
@@ -111,16 +113,16 @@ export const createMockSignatureService = (
  */
 export const createMockAuthenticationStepExecutor = (
   overrides: Partial<{
-    executeStep: jest.Mock
-    executeLockStep: jest.Mock
-    executeInternalStep: jest.Mock
+    executeStep: MockFn<[stepName: string, stepFunction: () => Promise<void>], Promise<void>>
+    executeLockStep: MockFn<[stepFunction: () => Promise<void>], Promise<void>>
+    executeInternalStep: MockFn<[], void>
   }> = {}
 ) => ({
-  executeStep: jest.fn().mockImplementation(async (stepName: string, stepFunction: () => Promise<any>) => {
+  executeStep: jest.fn().mockImplementation(async (stepName: string, stepFunction: () => Promise<void>): Promise<void> => {
     // Actually call the step function to ensure coverage
     return await stepFunction()
   }),
-  executeLockStep: jest.fn().mockImplementation(async (stepFunction: () => Promise<any>) => {
+  executeLockStep: jest.fn().mockImplementation(async (stepFunction: () => Promise<void>): Promise<void> => {
     // Actually call the step function to ensure coverage
     return await stepFunction()
   }),

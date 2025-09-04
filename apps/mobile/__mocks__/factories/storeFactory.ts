@@ -7,6 +7,20 @@
 
 import { AuthStep } from '@superpool/types'
 import { observable } from 'mobx'
+import { AppError } from '../../src/utils/errorHandling'
+import { AuthenticationLock } from '../../src/services/authentication/AuthenticationOrchestrator'
+
+// Define the mock store interface
+interface MockRootStore {
+  authenticationStore: ReturnType<typeof createMockAuthenticationStore>
+  walletStore: ReturnType<typeof createMockWalletStore>
+  poolManagementStore: ReturnType<typeof createMockPoolManagementStore>
+  uiStore: ReturnType<typeof createMockUIStore>
+  auth?: ReturnType<typeof createMockAuthenticationStore>
+  wallet?: ReturnType<typeof createMockWalletStore>
+  pools?: ReturnType<typeof createMockPoolManagementStore>
+  ui?: ReturnType<typeof createMockUIStore>
+}
 
 // Authentication Store Factory - Enhanced with full store interface
 export const createMockAuthenticationStore = (
@@ -25,13 +39,7 @@ export const createMockAuthenticationStore = (
       abortController: AbortController | null
       requestId: string | null
     }
-    authError: {
-      name: string
-      message: string
-      type: string
-      userFriendlyMessage: string
-      timestamp: Date
-    } | null
+    authError: AppError | null
   }> = {}
 ) => {
   // Create observable auth store state
@@ -48,7 +56,7 @@ export const createMockAuthenticationStore = (
       abortController: null as AbortController | null,
       requestId: null as string | null,
     },
-    authError: null as any,
+    authError: null as AppError | null,
 
     // Apply overrides
     ...overrides,
@@ -94,14 +102,14 @@ export const createMockAuthenticationStore = (
     get authLock() {
       return storeState.authLock
     },
-    set authLock(value: any) {
+    set authLock(value: Partial<AuthenticationLock>) {
       Object.assign(storeState.authLock, value)
     },
 
     get authError() {
       return storeState.authError
     },
-    set authError(value: any) {
+    set authError(value: AppError | null) {
       storeState.authError = value
     },
 
@@ -124,9 +132,9 @@ export const createMockAuthenticationStore = (
         storeState.currentStep = null
       }
     }),
-    failStep: jest.fn().mockImplementation((step: AuthStep, error?: any) => {
+    failStep: jest.fn().mockImplementation((step: AuthStep, error?: string | Error) => {
       storeState.failedStep = step
-      storeState.progressError = error || null
+      storeState.progressError = typeof error === 'string' ? error : error?.message || null
       if (storeState.currentStep === step) {
         storeState.currentStep = null
       }
@@ -184,10 +192,10 @@ export const createMockAuthenticationStore = (
     getCompletedStepsCount: jest.fn().mockImplementation(() => {
       return storeState.completedSteps.size
     }),
-    setAuthLock: jest.fn().mockImplementation((authLock: any) => {
+    setAuthLock: jest.fn().mockImplementation((authLock: Partial<AuthenticationLock>) => {
       Object.assign(storeState.authLock, authLock)
     }),
-    setAuthError: jest.fn().mockImplementation((error: any) => {
+    setAuthError: jest.fn().mockImplementation((error: AppError | null) => {
       storeState.authError = error
     }),
   }
@@ -378,10 +386,10 @@ export const createMockRootStore = (
 ) =>
   ({
     // Store instances using consistent naming
-    authenticationStore: createMockAuthenticationStore((overrides.authenticationStore as any) || (overrides.auth as any)),
-    walletStore: createMockWalletStore((overrides.walletStore as any) || (overrides.wallet as any)),
-    poolManagementStore: createMockPoolManagementStore((overrides.poolManagementStore as any) || (overrides.pools as any)),
-    uiStore: createMockUIStore((overrides.uiStore as any) || (overrides.ui as any)),
+    authenticationStore: createMockAuthenticationStore(overrides.authenticationStore || overrides.auth || {}),
+    walletStore: createMockWalletStore(overrides.walletStore || overrides.wallet || {}),
+    poolManagementStore: createMockPoolManagementStore(overrides.poolManagementStore || overrides.pools || {}),
+    uiStore: createMockUIStore(overrides.uiStore || overrides.ui || {}),
 
     // Backward compatibility aliases
     auth: undefined, // Will be set below
@@ -391,10 +399,10 @@ export const createMockRootStore = (
 
     // Apply any direct overrides
     ...overrides,
-  }) as any
+  }) as MockRootStore
 
 // Set up aliases for backward compatibility
-const setupAliases = (store: any) => {
+const setupAliases = (store: MockRootStore) => {
   store.auth = store.authenticationStore
   store.wallet = store.walletStore
   store.pools = store.poolManagementStore
@@ -403,7 +411,7 @@ const setupAliases = (store: any) => {
 }
 
 // Export enhanced root store factory
-export const createEnhancedMockRootStore = (overrides: any = {}) => {
+export const createEnhancedMockRootStore = (overrides: Partial<MockRootStore> = {}) => {
   return setupAliases(createMockRootStore(overrides))
 }
 
