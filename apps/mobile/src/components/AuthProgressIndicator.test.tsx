@@ -1,7 +1,8 @@
+import { createMockRootStore, renderWithStore, waitForMobX } from '@mocks/factories/testFactory'
 import { AuthStep } from '@superpool/types'
 import { act } from '@testing-library/react-native'
+import { observable } from 'mobx'
 import React from 'react'
-import { createMockRootStore, renderWithStore, waitForMobX } from '@mocks/factories/testFactory'
 import { AuthProgressIndicator } from './AuthProgressIndicator'
 
 describe('AuthProgressIndicator', () => {
@@ -17,15 +18,9 @@ describe('AuthProgressIndicator', () => {
     })
 
     it('should render null when no steps are available', async () => {
-      const mockStore = createMockRootStore({
-        auth: {
-          getAllSteps: jest.fn().mockReturnValue([]),
-          getCurrentStepInfo: jest.fn().mockReturnValue(null),
-          isProgressComplete: false,
-          progressError: null,
-          getCompletedStepsCount: jest.fn().mockReturnValue(0),
-        },
-      })
+      const mockStore = createMockRootStore()
+      // Override the getAllSteps method to return an empty array
+      mockStore.authenticationStore.getAllSteps = jest.fn().mockReturnValue([])
 
       const { queryByTestId } = renderWithStore(<AuthProgressIndicator />, { store: mockStore })
 
@@ -36,17 +31,17 @@ describe('AuthProgressIndicator', () => {
 
   describe('MobX Store Integration', () => {
     it('should display current step information', async () => {
-      const mockStore = createMockRootStore({
-        auth: {
-          getAllSteps: jest.fn().mockReturnValue(['connect-wallet', 'generate-message', 'request-signature']),
-          getCurrentStepInfo: jest.fn().mockReturnValue({
+      const mockStore = createMockRootStore()
+      // Set up the store to have a current step with info
+      mockStore.authenticationStore.currentStep = 'generate-message'
+      mockStore.authenticationStore.getStepInfo = jest.fn().mockImplementation((step: AuthStep) => {
+        if (step === 'generate-message') {
+          return {
             title: 'Generate Auth Message',
             description: 'Creating authentication challenge',
-          }),
-          isProgressComplete: false,
-          progressError: null,
-          getCompletedStepsCount: jest.fn().mockReturnValue(1),
-        },
+          }
+        }
+        return null
       })
 
       const { getByTestId } = renderWithStore(<AuthProgressIndicator />, { store: mockStore })
@@ -124,17 +119,19 @@ describe('AuthProgressIndicator', () => {
 
   describe('Reactive Updates', () => {
     it('should update when store state changes', async () => {
-      let completedCount = 1
-      const mockStore = createMockRootStore({
-        auth: {
-          getAllSteps: jest
-            .fn()
-            .mockReturnValue(['connect-wallet', 'generate-message', 'request-signature', 'verify-signature', 'firebase-auth']),
-          getCurrentStepInfo: jest.fn().mockReturnValue(null),
-          isProgressComplete: false,
-          progressError: null,
-          getCompletedStepsCount: jest.fn().mockImplementation(() => completedCount),
-        },
+      const mockStore = createMockRootStore()
+      // Start with one completed step
+      mockStore.authenticationStore.completedSteps = observable(new Set(['connect-wallet']))
+      mockStore.authenticationStore.currentStep = null
+
+      mockStore.authenticationStore.getStepInfo = jest.fn().mockImplementation((step: AuthStep) => {
+        if (step === 'generate-message') {
+          return {
+            title: 'Generate Auth Message',
+            description: 'Creating authentication challenge',
+          }
+        }
+        return null
       })
 
       const { getByTestId } = renderWithStore(<AuthProgressIndicator />, { store: mockStore })
@@ -142,13 +139,10 @@ describe('AuthProgressIndicator', () => {
       let progressStats = getByTestId('progress-stats')
       expect(progressStats.props.children).toEqual([1, ' of ', 5, ' completed'])
 
-      // Update completed count and getCurrentStepInfo
+      // Update completed count and current step
       act(() => {
-        completedCount = 2
-        mockStore.auth.getCurrentStepInfo.mockReturnValue({
-          title: 'Generate Auth Message',
-          description: 'Creating authentication challenge',
-        })
+        mockStore.authenticationStore.completedSteps.add('generate-message')
+        mockStore.authenticationStore.currentStep = 'generate-message'
       })
 
       await waitForMobX()
@@ -158,8 +152,8 @@ describe('AuthProgressIndicator', () => {
 
       // Complete the step
       act(() => {
-        completedCount = 3
-        mockStore.auth.getCurrentStepInfo.mockReturnValue(null)
+        mockStore.authenticationStore.completedSteps.add('request-signature')
+        mockStore.authenticationStore.currentStep = null
       })
 
       await waitForMobX()
@@ -169,17 +163,22 @@ describe('AuthProgressIndicator', () => {
     })
 
     it('should update progress indicator when currentStep changes', async () => {
-      const mockStore = createMockRootStore({
-        auth: {
-          getAllSteps: jest.fn().mockReturnValue(['connect-wallet', 'generate-message', 'request-signature']),
-          getCurrentStepInfo: jest.fn().mockReturnValue({
+      const mockStore = createMockRootStore()
+      mockStore.authenticationStore.currentStep = 'generate-message'
+      mockStore.authenticationStore.getStepInfo = jest.fn().mockImplementation((step: AuthStep) => {
+        if (step === 'generate-message') {
+          return {
             title: 'Generate Auth Message',
             description: 'Creating authentication challenge',
-          }),
-          isProgressComplete: false,
-          progressError: null,
-          getCompletedStepsCount: jest.fn().mockReturnValue(1),
-        },
+          }
+        }
+        if (step === 'request-signature') {
+          return {
+            title: 'Request Signature',
+            description: 'Requesting wallet signature',
+          }
+        }
+        return null
       })
 
       const { getByTestId } = renderWithStore(<AuthProgressIndicator />, { store: mockStore })
@@ -191,10 +190,7 @@ describe('AuthProgressIndicator', () => {
 
       // Move to next step
       act(() => {
-        mockStore.auth.getCurrentStepInfo.mockReturnValue({
-          title: 'Request Signature',
-          description: 'Requesting wallet signature',
-        })
+        mockStore.authenticationStore.currentStep = 'request-signature'
       })
 
       await waitForMobX()
@@ -204,15 +200,14 @@ describe('AuthProgressIndicator', () => {
     })
 
     it('should show completion status when progress is complete', async () => {
-      const mockStore = createMockRootStore({
-        auth: {
-          getAllSteps: jest.fn().mockReturnValue(['connect-wallet', 'generate-message']),
-          getCurrentStepInfo: jest.fn().mockReturnValue(null),
-          isProgressComplete: false,
-          progressError: null,
-          getCompletedStepsCount: jest.fn().mockReturnValue(1),
-        },
-      })
+      const mockStore = createMockRootStore()
+      mockStore.authenticationStore.getAllSteps = jest.fn().mockReturnValue([
+        { step: 'connect-wallet', title: 'Connect Wallet', description: 'Connect your wallet to continue' },
+        { step: 'generate-message', title: 'Generate Message', description: 'Generate authentication message' },
+      ])
+      mockStore.authenticationStore.completedSteps = observable(new Set(['connect-wallet']))
+      mockStore.authenticationStore.isProgressComplete = false
+      mockStore.authenticationStore.currentStep = null
 
       const { getByTestId, queryByTestId } = renderWithStore(<AuthProgressIndicator />, { store: mockStore })
 
@@ -224,8 +219,8 @@ describe('AuthProgressIndicator', () => {
 
       // Complete all steps
       act(() => {
-        mockStore.auth.isProgressComplete = true
-        mockStore.auth.getCompletedStepsCount.mockReturnValue(2)
+        mockStore.authenticationStore.isProgressComplete = true
+        mockStore.authenticationStore.completedSteps.add('generate-message')
       })
 
       await waitForMobX()
@@ -237,15 +232,15 @@ describe('AuthProgressIndicator', () => {
 
   describe('Progress Statistics', () => {
     it('should display correct completed steps count', async () => {
-      const mockStore = createMockRootStore({
-        auth: {
-          getAllSteps: jest.fn().mockReturnValue(['connect-wallet', 'generate-message', 'request-signature', 'verify-signature']),
-          getCurrentStepInfo: jest.fn().mockReturnValue(null),
-          isProgressComplete: false,
-          progressError: null,
-          getCompletedStepsCount: jest.fn().mockReturnValue(3),
-        },
-      })
+      const mockStore = createMockRootStore()
+      mockStore.authenticationStore.getAllSteps = jest.fn().mockReturnValue([
+        { step: 'connect-wallet', title: 'Connect Wallet', description: 'Connect your wallet to continue' },
+        { step: 'generate-message', title: 'Generate Message', description: 'Generate authentication message' },
+        { step: 'request-signature', title: 'Request Signature', description: 'Sign message in your wallet app' },
+        { step: 'verify-signature', title: 'Verify Signature', description: 'Verifying your signature' },
+      ])
+      mockStore.authenticationStore.completedSteps = observable(new Set(['connect-wallet', 'generate-message', 'request-signature']))
+      mockStore.authenticationStore.currentStep = null
 
       const { getByTestId } = renderWithStore(<AuthProgressIndicator />, { store: mockStore })
 
@@ -265,15 +260,17 @@ describe('AuthProgressIndicator', () => {
         'firebase-auth',
       ]
 
-      const mockStore = createMockRootStore({
-        auth: {
-          getAllSteps: jest.fn().mockReturnValue(allSteps),
-          getCurrentStepInfo: jest.fn().mockReturnValue(null),
-          isProgressComplete: true,
-          progressError: null,
-          getCompletedStepsCount: jest.fn().mockReturnValue(6),
-        },
-      })
+      const mockStore = createMockRootStore()
+      mockStore.authenticationStore.getAllSteps = jest.fn().mockReturnValue(
+        allSteps.map((step) => ({
+          step,
+          title: step.replace('-', ' ').replace(/\b\w/g, (l) => l.toUpperCase()),
+          description: `${step} description`,
+        }))
+      )
+      mockStore.authenticationStore.completedSteps = observable(new Set(allSteps))
+      mockStore.authenticationStore.isProgressComplete = true
+      mockStore.authenticationStore.currentStep = null
 
       const { getByTestId } = renderWithStore(<AuthProgressIndicator />, { store: mockStore })
 
@@ -313,17 +310,16 @@ describe('AuthProgressIndicator', () => {
     })
 
     it('should handle missing step info gracefully', async () => {
-      const mockStore = createMockRootStore({
-        auth: {
-          getAllSteps: jest.fn().mockReturnValue(['connect-wallet', 'generate-message']),
-          getCurrentStepInfo: jest.fn().mockReturnValue({
+      const mockStore = createMockRootStore()
+      mockStore.authenticationStore.currentStep = 'generate-message'
+      mockStore.authenticationStore.getStepInfo = jest.fn().mockImplementation((step: AuthStep) => {
+        if (step === 'generate-message') {
+          return {
             title: undefined,
             description: undefined,
-          }),
-          isProgressComplete: false,
-          progressError: null,
-          getCompletedStepsCount: jest.fn().mockReturnValue(1),
-        },
+          }
+        }
+        return null
       })
 
       const { getByTestId } = renderWithStore(<AuthProgressIndicator />, { store: mockStore })

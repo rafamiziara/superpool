@@ -3,15 +3,13 @@
  * Tests readonly state access and MobX reactivity
  */
 
-import React from 'react'
-import { useAuthenticationStateReadonly } from './useAuthenticationStateReadonly'
 import { createMockRootStore, waitForMobX } from '@mocks/factories/testFactory'
+import { act, renderHook } from '@testing-library/react-native'
 import { AppError, ErrorType } from '../../utils/errorHandling'
-import { renderHook, act } from '@testing-library/react-native'
+import { useAuthenticationStateReadonly } from './useAuthenticationStateReadonly'
 
-import { runInAction, observable } from 'mobx'
-import { observer } from 'mobx-react-lite'
 import type { FirebaseAuthState } from '@superpool/types'
+import { runInAction } from 'mobx'
 
 // Create a mock Firebase auth state that can be controlled from tests
 let mockFirebaseAuthState: FirebaseAuthState = {
