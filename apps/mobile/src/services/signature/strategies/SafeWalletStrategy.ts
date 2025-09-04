@@ -14,7 +14,14 @@ export class SafeWalletStrategy implements SignatureStrategy {
   canHandle(connector?: Connector): boolean {
     if (!connector) return false
 
-    return connector.id === 'safe' || connector.name?.toLowerCase().includes('safe') || connector.id?.toLowerCase().includes('safe')
+    const id = connector.id
+    const name = connector.name
+
+    // Check if ID or name contains 'safe' (case insensitive)
+    const hasIdSafe = id && typeof id === 'string' && id.toLowerCase().includes('safe')
+    const hasNameSafe = name && typeof name === 'string' && name.toLowerCase().includes('safe')
+
+    return Boolean(hasIdSafe || hasNameSafe)
   }
 
   getStrategyName(): string {
