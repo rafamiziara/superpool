@@ -79,15 +79,18 @@ describe('ErrorCategorizer', () => {
     })
 
     it('should categorize network errors', () => {
-      const networkErrors = [
-        new Error('network connection failed'),
-        new Error('timeout occurred'),
-        new Error('connection refused'),
-        new Error('offline mode'),
-      ]
+      const networkErrors = [new Error('network connection failed'), new Error('connection refused'), new Error('offline mode')]
 
       networkErrors.forEach((error) => {
         expect(ErrorCategorizer.categorizeError(error)).toBe(ErrorCategory.NETWORK)
+      })
+    })
+
+    it('should categorize timeout errors', () => {
+      const timeoutErrors = [new Error('timeout occurred'), new Error('request timeout'), new Error('operation timeout')]
+
+      timeoutErrors.forEach((error) => {
+        expect(ErrorCategorizer.categorizeError(error)).toBe(ErrorCategory.TIMEOUT)
       })
     })
 
@@ -262,7 +265,10 @@ describe('RetryExecutor', () => {
       const resultPromise = RetryExecutor.executeWithRetry(mockFn, testPolicy, {
         onRetry: onRetrySpy,
       })
-      jest.runAllTimers()
+
+      // Advance timers for retry delay
+      await jest.advanceTimersByTimeAsync(100)
+
       await resultPromise
 
       expect(onRetrySpy).toHaveBeenCalledTimes(1)

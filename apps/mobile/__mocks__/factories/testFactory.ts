@@ -98,10 +98,10 @@ export const renderWithStore = (ui: ReactElement, options: CustomRenderOptions =
 
   const Wrapper: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     if (CustomWrapper) {
-      return React.createElement(TestStoreProvider, { store }, React.createElement(CustomWrapper, null, children))
+      return React.createElement(TestStoreProvider, { store, children: React.createElement(CustomWrapper, { children }) })
     }
 
-    return React.createElement(TestStoreProvider, { store }, children)
+    return React.createElement(TestStoreProvider, { store, children })
   }
 
   return render(ui, { wrapper: Wrapper, ...renderOptions })
@@ -115,7 +115,7 @@ export const renderHookWithStore = <TResult>(hook: () => TResult, options: { sto
   const { store = createMockRootStore() } = options
 
   const Wrapper: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-    return React.createElement(TestStoreProvider, { store }, children)
+    return React.createElement(TestStoreProvider, { store, children })
   }
 
   return renderHook(() => hook(), { wrapper: Wrapper })
@@ -125,7 +125,8 @@ export const renderHookWithStore = <TResult>(hook: () => TResult, options: { sto
  * Higher-order component that wraps a component with TestStoreProvider
  */
 export const withMockStore = <P extends object>(Component: React.ComponentType<P>, store?: ReturnType<typeof createMockRootStore>) => {
-  const WrappedComponent: React.FC<P> = (props) => React.createElement(TestStoreProvider, { store }, React.createElement(Component, props))
+  const WrappedComponent: React.FC<P> = (props) =>
+    React.createElement(TestStoreProvider, { store, children: React.createElement(Component, props) })
 
   WrappedComponent.displayName = `withMockStore(${Component.displayName || Component.name})`
 

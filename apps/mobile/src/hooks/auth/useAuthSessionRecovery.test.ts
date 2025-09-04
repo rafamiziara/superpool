@@ -113,7 +113,10 @@ describe('useAuthSessionRecovery', () => {
   })
 
   afterEach(() => {
-    jest.runOnlyPendingTimers()
+    // Wrap timer execution in act to handle state updates
+    act(() => {
+      jest.runOnlyPendingTimers()
+    })
     jest.useRealTimers()
     jest.clearAllMocks()
   })
@@ -583,25 +586,31 @@ describe('useAuthSessionRecovery', () => {
 
   describe('Automatic Recovery', () => {
     it('should trigger automatic recovery after delay', async () => {
-      mockFirebaseAuth.isLoading = false
-      const { result } = renderHookWithStore(() => useAuthSessionRecovery(), {
-        store: mockStore,
-      })
+      // Temporarily set NODE_ENV to non-test to enable automatic recovery
+      const originalNodeEnv = process.env.NODE_ENV
+      process.env.NODE_ENV = 'development'
 
-      expect(result.current.recoveryAttempted).toBe(false)
+      try {
+        mockFirebaseAuth.isLoading = false
+        const { result } = renderHookWithStore(() => useAuthSessionRecovery(), {
+          store: mockStore,
+        })
 
-      // Fast-forward time past the recovery timeout
-      act(() => {
-        jest.advanceTimersByTime(1100)
-      })
+        expect(result.current.recoveryAttempted).toBe(false)
 
-      // Allow React to process the triggered effects
-      await act(async () => {
-        await Promise.resolve()
-      })
+        // Fast-forward time past the recovery timeout and wrap in act
+        await act(async () => {
+          jest.advanceTimersByTime(1100)
+          // Allow promises to resolve
+          await new Promise((resolve) => setTimeout(resolve, 0))
+        })
 
-      expect(result.current.recoveryAttempted).toBe(true)
-      expect(mockDevOnly).toHaveBeenCalledWith('🔄 Attempting session recovery...')
+        expect(result.current.recoveryAttempted).toBe(true)
+        expect(mockDevOnly).toHaveBeenCalledWith('🔄 Attempting session recovery...')
+      } finally {
+        // Restore original NODE_ENV
+        process.env.NODE_ENV = originalNodeEnv
+      }
     })
 
     it('should not trigger automatic recovery if already attempted', async () => {
