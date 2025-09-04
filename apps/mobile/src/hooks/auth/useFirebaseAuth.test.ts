@@ -1,27 +1,46 @@
 import { FirebaseAuthState } from '@superpool/types'
 import { renderHook } from '@testing-library/react-native'
 import { User } from 'firebase/auth'
-import { createMockFirebaseAuthManager } from '@mocks/factories/serviceFactory'
+
+// Mock the firebaseAuthManager module using manual mock
+jest.mock('../../utils/firebaseAuthManager')
+
+// Import the hook after mocking
 import { useFirebaseAuth } from './useFirebaseAuth'
+import { firebaseAuthManager } from '../../utils/firebaseAuthManager'
 
-// Create centralized mock
-const mockManager = createMockFirebaseAuthManager()
-
-// Mock the firebaseAuthManager module
-jest.doMock('../../utils/firebaseAuthManager', () => ({
-  firebaseAuthManager: mockManager,
-}))
+// Get typed references to the mocked functions
+const mockFirebaseAuthManager = firebaseAuthManager as jest.Mocked<typeof firebaseAuthManager>
 
 describe('useFirebaseAuth', () => {
   beforeEach(() => {
     jest.clearAllMocks()
+
+    // Reset mock implementation to default values
+    mockFirebaseAuthManager.getCurrentState.mockReturnValue({
+      user: null,
+      isLoading: false,
+      isAuthenticated: false,
+      walletAddress: null,
+    })
+
+    // Reset addListener to default behavior
+    mockFirebaseAuthManager.addListener.mockImplementation((callback) => {
+      callback({
+        user: null,
+        isLoading: false,
+        isAuthenticated: false,
+        walletAddress: null,
+      })
+      return jest.fn() // cleanup function
+    })
   })
 
   it('should return initial state from firebase auth manager', () => {
     const { result } = renderHook(() => useFirebaseAuth())
 
-    expect(mockManager.getCurrentState).toHaveBeenCalled()
-    expect(mockManager.addListener).toHaveBeenCalled()
+    expect(mockFirebaseAuthManager.getCurrentState).toHaveBeenCalled()
+    expect(mockFirebaseAuthManager.addListener).toHaveBeenCalled()
     expect(result.current).toEqual({
       user: null,
       isLoading: false,
@@ -42,7 +61,7 @@ describe('useFirebaseAuth', () => {
       walletAddress: '0x1234567890123456789012345678901234567890',
     }
 
-    mockManager.addListener.mockImplementation((callback) => {
+    mockFirebaseAuthManager.addListener.mockImplementation((callback) => {
       // Initial call with authenticated state
       callback(authenticatedState)
       return jest.fn()
@@ -55,11 +74,11 @@ describe('useFirebaseAuth', () => {
 
   it('should cleanup subscription on unmount', () => {
     const mockCleanup = jest.fn()
-    mockManager.addListener.mockReturnValue(mockCleanup)
+    mockFirebaseAuthManager.addListener.mockReturnValue(mockCleanup)
 
     const { unmount } = renderHook(() => useFirebaseAuth())
 
-    expect(mockManager.addListener).toHaveBeenCalled()
+    expect(mockFirebaseAuthManager.addListener).toHaveBeenCalled()
 
     unmount()
 
@@ -74,7 +93,13 @@ describe('useFirebaseAuth', () => {
       walletAddress: null,
     }
 
-    mockManager.getCurrentState.mockReturnValue(loadingState)
+    mockFirebaseAuthManager.getCurrentState.mockReturnValue(loadingState)
+
+    // Also update the addListener to call with the same state
+    mockFirebaseAuthManager.addListener.mockImplementation((callback) => {
+      callback(loadingState)
+      return jest.fn() // cleanup function
+    })
 
     const { result } = renderHook(() => useFirebaseAuth())
 
@@ -94,7 +119,13 @@ describe('useFirebaseAuth', () => {
       walletAddress: '0x1234567890123456789012345678901234567890',
     }
 
-    mockManager.getCurrentState.mockReturnValue(authState)
+    mockFirebaseAuthManager.getCurrentState.mockReturnValue(authState)
+
+    // Also update the addListener to call with the same state
+    mockFirebaseAuthManager.addListener.mockImplementation((callback) => {
+      callback(authState)
+      return jest.fn() // cleanup function
+    })
 
     const { result } = renderHook(() => useFirebaseAuth())
 
@@ -115,7 +146,13 @@ describe('useFirebaseAuth', () => {
       walletAddress: null, // Should be null due to invalid format
     }
 
-    mockManager.getCurrentState.mockReturnValue(invalidState)
+    mockFirebaseAuthManager.getCurrentState.mockReturnValue(invalidState)
+
+    // Also update the addListener to call with the same state
+    mockFirebaseAuthManager.addListener.mockImplementation((callback) => {
+      callback(invalidState)
+      return jest.fn() // cleanup function
+    })
 
     const { result } = renderHook(() => useFirebaseAuth())
 

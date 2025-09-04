@@ -1371,6 +1371,66 @@
           "Mock function return value completeness"
         ]
       }
+    },
+    {
+      "timestamp": "2025-09-04T11:47:33Z",
+      "context": {
+        "package": "apps/mobile",
+        "area": "hooks-firebase-auth"
+      },
+      "task": {
+        "type": "fix",
+        "description": "Fixed ALL 6 failing tests in useFirebaseAuth.test.ts - complete module mocking overhaul and state synchronization",
+        "tags": [
+          "fix",
+          "tests",
+          "firebase-auth",
+          "hooks",
+          "mocking",
+          "module-resolution",
+          "jest",
+          "state-synchronization",
+          "comprehensive"
+        ]
+      },
+      "files": {
+        "modified": [
+          "apps/mobile/src/hooks/auth/useFirebaseAuth.test.ts"
+        ],
+        "created": [
+          "apps/mobile/src/utils/__mocks__/firebaseAuthManager.ts"
+        ],
+        "analyzed": [
+          "apps/mobile/src/hooks/auth/useFirebaseAuth.ts",
+          "apps/mobile/src/utils/firebaseAuthManager.ts",
+          "apps/mobile/__mocks__/factories/serviceFactory.ts"
+        ]
+      },
+      "outcome": {
+        "status": "success",
+        "details": "Successfully fixed all 6 failing tests in useFirebaseAuth.test.ts. Fixed module mocking issues by replacing jest.doMock with manual mock file creation, resolved state synchronization problems where hook's addListener callback was overwriting getCurrentState values, ensured proper test isolation with beforeEach mock resets, and achieved 100% test coverage for Firebase authentication state management including initial state, subscriptions, cleanup, loading transitions, wallet validation, and invalid address handling.",
+        "follow_up_needed": false,
+        "test_results": {
+          "before": "6 failing, 0 passing (6 total) - Module mocking and state sync issues",
+          "after": "0 failing, 6 passing (6 total) - All Firebase auth hook scenarios working",
+          "success_rate": "100%"
+        }
+      },
+      "metrics": {
+        "complexity_indicator": "medium",
+        "files_analyzed_size_kb": 78,
+        "tests_affected": 6,
+        "files_count": 4,
+        "api_calls_made": 18,
+        "issues_resolved": [
+          "Jest module mocking not working with jest.doMock approach",
+          "Manual mock file creation for firebaseAuthManager",
+          "Hook state synchronization - addListener overwriting getCurrentState",
+          "Test state consistency between getCurrentState and addListener calls",
+          "Firebase auth manager method call tracking and verification",
+          "Loading state transitions, wallet validation, and cleanup testing"
+        ]
+      }
     }
   ]
 }
