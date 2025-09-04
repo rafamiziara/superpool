@@ -1,8 +1,6 @@
-import type { Connector } from 'wagmi'
-import type { AuthenticationContext } from '@superpool/types'
+import type { AuthenticationContext, WagmiConnector } from '@superpool/types'
 
 // Import centralized mocks
-import { createMockAuthenticationStore, createMockWalletStore } from '@mocks/factories/storeFactory'
 import {
   createMockAuthenticationStepExecutor,
   createMockAuthenticationValidator,
@@ -12,6 +10,7 @@ import {
   createMockSessionManager,
   createMockSignatureHandler,
 } from '@mocks/factories/serviceFactory'
+import { createMockAuthenticationStore, createMockWalletStore } from '@mocks/factories/storeFactory'
 
 // Create mock instances
 const mockRouter = createMockRouter()
@@ -100,14 +99,20 @@ describe('AuthenticationOrchestrator', () => {
   let consoleLogSpy: jest.SpyInstance
   let consoleWarnSpy: jest.SpyInstance
 
+  const mockWagmiConnector: WagmiConnector = {
+    id: 'mock-connector',
+    name: 'Mock Connector',
+    type: 'injected',
+  }
+
   const mockAuthContext: AuthenticationContext = {
     walletAddress: '0x742d35Cc6634C0532925a3b8D238a5D2DD8dC5b8',
     chainId: 137,
-    connector: 'mock-connector' as Connector,
+    connector: mockWagmiConnector,
     disconnect: jest.fn(),
     signatureFunctions: {
-      personalSign: jest.fn(),
-      signTypedData: jest.fn(),
+      signMessageAsync: jest.fn(),
+      signTypedDataAsync: jest.fn(),
     },
     progressCallbacks: {
       onStepStart: jest.fn(),
@@ -130,10 +135,10 @@ describe('AuthenticationOrchestrator', () => {
     mockSignatureHandlerInstance = createMockSignatureHandler()
 
     // Reset the mock implementation to pass through to actual function calls
-    mockStepExecutor.executeStep.mockImplementation(async (stepName: string, stepFunction: () => Promise<unknown>) => {
+    mockStepExecutor.executeStep.mockImplementation(async (stepName: string, stepFunction: () => Promise<void>) => {
       return await stepFunction()
     })
-    mockStepExecutor.executeLockStep.mockImplementation(async (stepFunction: () => Promise<unknown>) => {
+    mockStepExecutor.executeLockStep.mockImplementation(async (stepFunction: () => Promise<void>) => {
       return await stepFunction()
     })
 
@@ -169,7 +174,6 @@ describe('AuthenticationOrchestrator', () => {
     mockFirebaseAuth.currentUser = null
 
     // Set up successful authentication flow by default
-    mockAuthStore.isAuthenticating = false
     mockAuthStore.authLock.isLocked = false
     mockAuthStore.acquireAuthLock.mockReturnValue(true)
 
@@ -210,7 +214,6 @@ describe('AuthenticationOrchestrator', () => {
     describe('Lock Acquisition', () => {
       it('should acquire lock successfully for new authentication', async () => {
         // Set up the mock store properly for successful authentication
-        mockAuthStore.isAuthenticating = false
         mockAuthStore.authLock.isLocked = false
         mockAuthStore.acquireAuthLock.mockReturnValue(true)
 
@@ -232,7 +235,6 @@ describe('AuthenticationOrchestrator', () => {
       })
 
       it('should force release expired locks (>2 minutes)', async () => {
-        mockAuthStore.isAuthenticating = true
         mockAuthStore.authLock.isLocked = true
         mockAuthStore.authLock.startTime = Date.now() - 130000 // 130 seconds ago
         mockAuthStore.acquireAuthLock.mockReturnValue(true)
@@ -255,9 +257,8 @@ describe('AuthenticationOrchestrator', () => {
       })
 
       it('should abort current authentication for different wallet', async () => {
-        mockAuthStore.isAuthenticating = true
         mockAuthStore.authLock.isLocked = true
-        mockAuthStore.authWalletAddress = '0xDifferentWallet'
+        mockAuthStore.authLock.walletAddress = '0xDifferentWallet'
         mockAuthStore.authLock.startTime = Date.now() - 1000
         mockAuthStore.acquireAuthLock.mockReturnValue(true)
 
@@ -469,12 +470,13 @@ describe('AuthenticationOrchestrator', () => {
 
   describe('Connector Type Handling', () => {
     it('should handle Wagmi connector properly', async () => {
-      const wagmiConnector: Connector = {
+      const wagmiConnector = {
         id: 'mock-connector',
         name: 'Mock Connector',
+        type: 'injected',
         connect: jest.fn(),
         disconnect: jest.fn(),
-      } as Connector
+      }
 
       const contextWithWagmi = {
         ...mockAuthContext,
@@ -483,13 +485,10 @@ describe('AuthenticationOrchestrator', () => {
 
       await orchestrator.authenticate(contextWithWagmi)
 
-      expect(consoleLogSpy).toHaveBeenCalledWith(
-        'Wallet connector:',
-        expect.objectContaining({
-          connectorId: 'mock-connector',
-          connectorName: 'Mock Connector',
-        })
-      )
+      expect(consoleLogSpy).toHaveBeenCalledWith('Wallet connector:', {
+        connectorId: 'mock-connector',
+        connectorName: 'Mock Connector',
+      })
 
       // Verify connector was passed to signature handler
       expect(mockSignatureHandlerInstance.requestWalletSignature).toHaveBeenCalledWith(
@@ -509,13 +508,10 @@ describe('AuthenticationOrchestrator', () => {
 
       await orchestrator.authenticate(contextWithString)
 
-      expect(consoleLogSpy).toHaveBeenCalledWith(
-        'Wallet connector:',
-        expect.objectContaining({
-          connectorId: 'string-connector',
-          connectorName: 'string-connector',
-        })
-      )
+      expect(consoleLogSpy).toHaveBeenCalledWith('Wallet connector:', {
+        connectorId: 'string-connector',
+        connectorName: 'string-connector',
+      })
 
       // Verify undefined was passed to signature handler for non-Wagmi connector
       expect(mockSignatureHandlerInstance.requestWalletSignature).toHaveBeenCalledWith(
@@ -605,10 +601,10 @@ describe('AuthenticationOrchestrator', () => {
       consoleWarnSpy.mockClear()
 
       // Reset mock implementations to ensure functions are actually called
-      mockStepExecutor.executeLockStep.mockImplementation(async (stepFunction: () => Promise<unknown>) => {
+      mockStepExecutor.executeLockStep.mockImplementation(async (stepFunction: () => Promise<void>) => {
         return await stepFunction()
       })
-      mockStepExecutor.executeStep.mockImplementation(async (stepName: string, stepFunction: () => Promise<unknown>) => {
+      mockStepExecutor.executeStep.mockImplementation(async (stepName: string, stepFunction: () => Promise<void>) => {
         return await stepFunction()
       })
 
@@ -709,10 +705,10 @@ describe('AuthenticationOrchestrator', () => {
       jest.clearAllMocks()
 
       // Reset mock implementations to actually call functions
-      mockStepExecutor.executeLockStep.mockImplementation(async (stepFunction: () => Promise<unknown>) => {
+      mockStepExecutor.executeLockStep.mockImplementation(async (stepFunction: () => Promise<void>) => {
         return await stepFunction()
       })
-      mockStepExecutor.executeStep.mockImplementation(async (stepName: string, stepFunction: () => Promise<unknown>) => {
+      mockStepExecutor.executeStep.mockImplementation(async (stepName: string, stepFunction: () => Promise<void>) => {
         return await stepFunction()
       })
 
@@ -750,10 +746,10 @@ describe('AuthenticationOrchestrator', () => {
       jest.clearAllMocks()
 
       // Reset mock implementations to actually call functions
-      mockStepExecutor.executeLockStep.mockImplementation(async (stepFunction: () => Promise<unknown>) => {
+      mockStepExecutor.executeLockStep.mockImplementation(async (stepFunction: () => Promise<void>) => {
         return await stepFunction()
       })
-      mockStepExecutor.executeStep.mockImplementation(async (stepName: string, stepFunction: () => Promise<unknown>) => {
+      mockStepExecutor.executeStep.mockImplementation(async (stepName: string, stepFunction: () => Promise<void>) => {
         return await stepFunction()
       })
 
@@ -810,10 +806,10 @@ describe('AuthenticationOrchestrator', () => {
       consoleWarnSpy.mockClear()
 
       // Reset mock implementations to ensure functions are actually called
-      mockStepExecutor.executeLockStep.mockImplementation(async (stepFunction: () => Promise<unknown>) => {
+      mockStepExecutor.executeLockStep.mockImplementation(async (stepFunction: () => Promise<void>) => {
         return await stepFunction()
       })
-      mockStepExecutor.executeStep.mockImplementation(async (stepName: string, stepFunction: () => Promise<unknown>) => {
+      mockStepExecutor.executeStep.mockImplementation(async (stepName: string, stepFunction: () => Promise<void>) => {
         return await stepFunction()
       })
 
@@ -836,10 +832,10 @@ describe('AuthenticationOrchestrator', () => {
       jest.clearAllMocks()
 
       // Reset mock implementations
-      mockStepExecutor.executeLockStep.mockImplementation(async (stepFunction: () => Promise<unknown>) => {
+      mockStepExecutor.executeLockStep.mockImplementation(async (stepFunction: () => Promise<void>) => {
         return await stepFunction()
       })
-      mockStepExecutor.executeStep.mockImplementation(async (stepName: string, stepFunction: () => Promise<unknown>) => {
+      mockStepExecutor.executeStep.mockImplementation(async (stepName: string, stepFunction: () => Promise<void>) => {
         return await stepFunction()
       })
 
@@ -855,10 +851,10 @@ describe('AuthenticationOrchestrator', () => {
       jest.clearAllMocks()
 
       // Reset mock implementations first
-      mockStepExecutor.executeLockStep.mockImplementation(async (stepFunction: () => Promise<unknown>) => {
+      mockStepExecutor.executeLockStep.mockImplementation(async (stepFunction: () => Promise<void>) => {
         return await stepFunction()
       })
-      mockStepExecutor.executeStep.mockImplementation(async (stepName: string, stepFunction: () => Promise<unknown>) => {
+      mockStepExecutor.executeStep.mockImplementation(async (stepName: string, stepFunction: () => Promise<void>) => {
         return await stepFunction()
       })
 
@@ -892,14 +888,13 @@ describe('AuthenticationOrchestrator', () => {
 
       // Test expired lock path (lines 108-110) - this should trigger internal logic in acquireAuthLock
       // The private acquireAuthLock method checks the store state and has internal logic
-      mockAuthStore.isAuthenticating = true
       mockAuthStore.authLock.startTime = Date.now() - 130000 // Over 2 minutes (expired)
       mockAuthStore.authLock.isLocked = true
-      mockAuthStore.authWalletAddress = '0xDifferentWallet' // Different wallet to ensure it doesn't return early
+      mockAuthStore.authLock.walletAddress = '0xDifferentWallet' // Different wallet to ensure it doesn't return early
 
       // The store's acquireAuthLock should be called after internal cleanup
       mockAuthStore.releaseAuthLock.mockImplementation(() => {
-        mockAuthStore.isAuthenticating = false // Reset state after release
+        mockAuthStore.authLock.isLocked = false // Reset state after release
       })
       mockAuthStore.acquireAuthLock.mockReturnValue(true)
 
