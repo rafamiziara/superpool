@@ -598,11 +598,11 @@ describe('useAuthSessionRecovery', () => {
 
         expect(result.current.recoveryAttempted).toBe(false)
 
-        // Fast-forward time past the recovery timeout and wrap in act
+        // Fast-forward time past the recovery timeout and wait for async operations
         await act(async () => {
           jest.advanceTimersByTime(1100)
-          // Allow promises to resolve
-          await new Promise((resolve) => setTimeout(resolve, 0))
+          // Flush all pending timers and promises
+          await jest.runOnlyPendingTimersAsync()
         })
 
         expect(result.current.recoveryAttempted).toBe(true)
@@ -639,16 +639,27 @@ describe('useAuthSessionRecovery', () => {
     })
 
     it('should cleanup timeout on unmount', () => {
-      const clearTimeoutSpy = jest.spyOn(global, 'clearTimeout')
+      // Temporarily set NODE_ENV to non-test to enable timeout creation
+      const originalNodeEnv = process.env.NODE_ENV
+      process.env.NODE_ENV = 'development'
 
-      const { unmount } = renderHookWithStore(() => useAuthSessionRecovery(), {
-        store: mockStore,
-      })
+      try {
+        const clearTimeoutSpy = jest.spyOn(global, 'clearTimeout')
+        mockFirebaseAuth.isLoading = false
 
-      unmount()
+        const { unmount } = renderHookWithStore(() => useAuthSessionRecovery(), {
+          store: mockStore,
+        })
 
-      expect(clearTimeoutSpy).toHaveBeenCalled()
-      clearTimeoutSpy.mockRestore()
+        // Unmount the component which should trigger cleanup
+        unmount()
+
+        expect(clearTimeoutSpy).toHaveBeenCalled()
+        clearTimeoutSpy.mockRestore()
+      } finally {
+        // Restore original NODE_ENV
+        process.env.NODE_ENV = originalNodeEnv
+      }
     })
   })
 

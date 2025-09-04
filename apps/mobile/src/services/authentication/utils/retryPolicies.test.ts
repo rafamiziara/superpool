@@ -222,7 +222,9 @@ describe('RetryExecutor', () => {
         .mockResolvedValueOnce('success')
 
       const resultPromise = RetryExecutor.executeWithRetry(mockFn, testPolicy)
-      jest.runAllTimers()
+
+      // Use async timer advancement to properly handle delays in promises
+      await jest.runAllTimersAsync()
       const result = await resultPromise
 
       expect(result.success).toBe(true)
@@ -248,7 +250,9 @@ describe('RetryExecutor', () => {
       const mockFn = jest.fn().mockRejectedValue(new Error('network connection failed'))
 
       const resultPromise = RetryExecutor.executeWithRetry(mockFn, testPolicy)
-      jest.runAllTimers()
+
+      // Use async timer advancement to properly handle delays in promises
+      await jest.runAllTimersAsync()
       const result = await resultPromise
 
       expect(result.success).toBe(false)
