@@ -281,7 +281,20 @@ export const createMockWalletStore = (
       storeState.connectionError = null
       storeState.isConnecting = false
     }),
-    updateConnectionState: jest.fn(),
+    updateConnectionState: jest.fn().mockImplementation((isConnected: boolean, address?: string, chainId?: number) => {
+      storeState.isConnected = isConnected
+      storeState.address = address
+      storeState.chainId = chainId
+
+      // Return atomic state like the real implementation
+      return {
+        isConnected,
+        address,
+        chainId,
+        timestamp: Date.now(),
+        sequenceNumber: Math.floor(Math.random() * 1000), // Mock sequence number
+      }
+    }),
     setConnectionError: jest.fn(),
     captureState: jest.fn(),
     validateState: jest.fn(),
