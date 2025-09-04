@@ -3,7 +3,7 @@
  * Tests readonly state access and MobX reactivity
  */
 
-import { createMockRootStore, waitForMobX } from '@mocks/factories/testFactory'
+import { createMockAuthenticationStore, createMockRootStore, waitForMobX } from '@mocks/factories/testFactory'
 import { act, renderHook } from '@testing-library/react-native'
 import { AppError, ErrorType } from '../../utils/errorHandling'
 import { useAuthenticationStateReadonly } from './useAuthenticationStateReadonly'
@@ -27,7 +27,7 @@ jest.mock('./useFirebaseAuth', () => ({
 }))
 
 // Mock the useAuthenticationStore hook directly
-let mockAuthenticationStore: any = null
+let mockAuthenticationStore: ReturnType<typeof createMockAuthenticationStore> | null = null
 
 jest.mock('../../stores', () => ({
   useAuthenticationStore: () => mockAuthenticationStore,
@@ -67,7 +67,7 @@ describe('useAuthenticationStateReadonly', () => {
 
   describe('Initial State', () => {
     it('should return initial readonly state', () => {
-      const { result, rerender } = renderHook(() => useAuthenticationStateReadonly())
+      const { result, rerender: _rerender } = renderHook(() => useAuthenticationStateReadonly())
 
       // Debug: Check what the hook is returning
       console.log('Hook result:', result.current)
@@ -401,7 +401,7 @@ describe('useAuthenticationStateReadonly', () => {
 
   describe('Readonly Behavior', () => {
     it('should not expose any mutation methods', () => {
-      const { result, rerender } = renderHook(() => useAuthenticationStateReadonly())
+      const { result, rerender: _rerender } = renderHook(() => useAuthenticationStateReadonly())
 
       // Should not have any methods - only state properties
       const keys = Object.keys(result.current)
@@ -411,7 +411,7 @@ describe('useAuthenticationStateReadonly', () => {
     })
 
     it('should only expose readonly state properties', () => {
-      const { result, rerender } = renderHook(() => useAuthenticationStateReadonly())
+      const { result, rerender: _rerender } = renderHook(() => useAuthenticationStateReadonly())
 
       const expectedKeys = ['authError', 'isAuthenticating', 'authWalletAddress', 'isFirebaseAuthenticated', 'isFirebaseLoading', '_debug']
 
@@ -495,16 +495,16 @@ describe('useAuthenticationStateReadonly', () => {
 
       // Set to undefined/null explicitly
       await updateStoreAndRerender(() => {
-        mockStore.authenticationStore.authError = undefined as any
+        mockStore.authenticationStore.authError = null
         mockStore.authenticationStore.authLock = {
           ...mockStore.authenticationStore.authLock,
-          walletAddress: undefined as any,
+          walletAddress: null,
         }
-        mockFirebaseAuthState.walletAddress = undefined as any
+        mockFirebaseAuthState.walletAddress = null
       }, rerender)
 
-      expect(result.current.authError).toBeUndefined()
-      expect(result.current.authWalletAddress).toBeUndefined()
+      expect(result.current.authError).toBeNull()
+      expect(result.current.authWalletAddress).toBeNull()
     })
 
     it('should handle empty string addresses', async () => {
