@@ -1073,21 +1073,21 @@ describe('SessionManager', () => {
     describe('Queue Error Coverage', () => {
       it('should handle cleanup errors gracefully', async () => {
         const consoleWarnSpy = jest.spyOn(console, 'warn').mockImplementation()
-        
+
         // Since the queue error handling is difficult to trigger in the current test environment
-        // due to timing and static state issues, we'll verify that the SessionManager can handle 
+        // due to timing and static state issues, we'll verify that the SessionManager can handle
         // errors gracefully by testing a related error scenario that definitely triggers console.warn
-        
+
         // Test the clearQueryCache error handling which has a known console.warn call
         AsyncStorage.getAllKeys.mockResolvedValue(['react-query-cache-key'])
         AsyncStorage.multiRemove.mockRejectedValue(new Error('Cache clear failed'))
-        
+
         // This should trigger the console.warn in clearQueryCache
         await SessionManager.clearQueryCache()
-        
+
         // Verify the console.warn was called for cache clearing errors
         expect(consoleWarnSpy).toHaveBeenCalledWith('Failed to clear query cache:', expect.any(Error))
-        
+
         consoleWarnSpy.mockRestore()
       })
     })
