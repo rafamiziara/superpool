@@ -5,8 +5,8 @@
  * This is the single source of truth for all store mocking in tests.
  */
 
-import { observable } from 'mobx'
 import { AuthStep } from '@superpool/types'
+import { observable } from 'mobx'
 
 // Authentication Store Factory - Enhanced with full store interface
 export const createMockAuthenticationStore = (
@@ -267,8 +267,20 @@ export const createMockWalletStore = (
     },
 
     // Methods
-    connect: jest.fn(),
-    disconnect: jest.fn(),
+    connect: jest.fn().mockImplementation((address: string, chainId?: number) => {
+      storeState.isConnected = true
+      storeState.address = address
+      storeState.chainId = chainId
+      storeState.connectionError = null
+      storeState.isConnecting = false
+    }),
+    disconnect: jest.fn().mockImplementation(() => {
+      storeState.isConnected = false
+      storeState.address = undefined
+      storeState.chainId = undefined
+      storeState.connectionError = null
+      storeState.isConnecting = false
+    }),
     updateConnectionState: jest.fn(),
     setConnectionError: jest.fn(),
     captureState: jest.fn(),
