@@ -190,7 +190,7 @@ describe('mobxConfig', () => {
 
       it('should handle missing console.time gracefully', () => {
         ;(globalThis as GlobalWithDev).__DEV__ = true
-        console.time = undefined as typeof console.time
+        console.time = undefined as unknown as typeof console.time
 
         expect(() => mobxUtils.time('test-operation')).not.toThrow()
       })
@@ -231,7 +231,7 @@ describe('mobxConfig', () => {
 
       it('should handle missing console.timeEnd gracefully', () => {
         ;(globalThis as GlobalWithDev).__DEV__ = true
-        console.timeEnd = undefined as typeof console.timeEnd
+        console.timeEnd = undefined as unknown as typeof console.timeEnd
 
         expect(() => mobxUtils.timeEnd('test-operation')).not.toThrow()
       })

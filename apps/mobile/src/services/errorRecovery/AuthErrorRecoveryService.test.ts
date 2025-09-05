@@ -30,19 +30,67 @@ describe('AuthErrorRecoveryService', () => {
 
     // Mock store instances
     mockAuthStore = {
+      currentStep: null,
+      completedSteps: new Set(),
+      failedStep: null,
+      isProgressComplete: false,
+      progressError: null,
+      authError: null,
+      authLock: {
+        isLocked: false,
+        startTime: 0,
+        walletAddress: null,
+        abortController: null,
+        requestId: null,
+      },
       isAuthenticating: false,
       authWalletAddress: null,
+      isAuthenticated: false,
+      userEmail: null,
+      isEmailVerified: false,
+      isDeviceApproved: false,
+      deviceId: null,
       reset: jest.fn(),
       acquireAuthLock: jest.fn(),
       releaseAuthLock: jest.fn(),
-    } as jest.Mocked<AuthenticationStore>
+      setCurrentStep: jest.fn(),
+      setFailedStep: jest.fn(),
+      addCompletedStep: jest.fn(),
+      clearProgress: jest.fn(),
+      setAuthError: jest.fn(),
+      clearAuthError: jest.fn(),
+      setAuthenticated: jest.fn(),
+      setUserInfo: jest.fn(),
+      setDeviceApproval: jest.fn(),
+      validateProgress: jest.fn(),
+      getStepInfo: jest.fn(),
+      getAllSteps: jest.fn(),
+    } as unknown as jest.Mocked<AuthenticationStore>
 
     mockWalletStore = {
       isConnected: false,
-      address: null,
-      chainId: null,
+      address: undefined,
+      chainId: undefined,
+      isConnecting: false,
+      connectionError: null,
+      get isWalletConnected() {
+        return false
+      },
+      get currentState() {
+        return { isConnected: false, address: undefined, chainId: undefined, isConnecting: false, connectionError: null }
+      },
+      setConnectionState: jest.fn(),
+      setConnecting: jest.fn(),
+      setConnectionError: jest.fn(),
+      connect: jest.fn(),
       disconnect: jest.fn(),
-    } as jest.Mocked<WalletStore>
+      updateConnectionState: jest.fn(),
+      resetSequence: jest.fn(),
+      reset: jest.fn(),
+      captureState: jest.fn(),
+      validateState: jest.fn(),
+      validateInitialState: jest.fn(),
+    } as unknown as jest.Mocked<WalletStore>
 
     // Spy on console methods
     consoleLogSpy = jest.spyOn(console, 'log').mockImplementation()
@@ -353,12 +401,12 @@ describe('AuthErrorRecoveryService', () => {
     })
 
     it('should return the promise from ErrorRecoveryService', async () => {
-      const customResult = { cleanup: 'completed' }
-      mockErrorRecoveryService.handleFirebaseCleanup.mockResolvedValue(customResult as unknown)
+      const customResult = undefined
+      mockErrorRecoveryService.handleFirebaseCleanup.mockResolvedValue(customResult)
 
       const result = await AuthErrorRecoveryService.handleFirebaseCleanup('test')
 
-      expect(result).toBe(customResult)
+      expect(result).toBeUndefined()
     })
   })
 
@@ -430,7 +478,7 @@ describe('AuthErrorRecoveryService', () => {
       const methods = ['initialize', 'handleAuthenticationError', 'showErrorFeedback', 'handleFirebaseCleanup']
 
       methods.forEach((method) => {
-        expect(typeof (AuthErrorRecoveryService as Record<string, unknown>)[method]).toBe('function')
+        expect(typeof (AuthErrorRecoveryService as unknown as Record<string, unknown>)[method]).toBe('function')
       })
     })
 

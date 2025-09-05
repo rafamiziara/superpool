@@ -144,7 +144,7 @@ describe('secureLogger', () => {
         const textWithAddress = 'User wallet: 0x1234567890123456789012345678901234567890'
 
         // Manually test the sanitization logic
-        const sanitized = (SecureLogger as { sanitizeString: (str: string) => string }).sanitizeString(textWithAddress)
+        const sanitized = (SecureLogger as unknown as { sanitizeString: (str: string) => string }).sanitizeString(textWithAddress)
         expect(sanitized).toBe('User wallet: 0x1234...7890')
       })
 
@@ -152,7 +152,7 @@ describe('secureLogger', () => {
         const sensitiveObj = { privateKey: 'secret123' }
 
         // Directly test the sanitization method
-        const sanitized = (SecureLogger as { sanitizeObject: (obj: unknown) => unknown }).sanitizeObject(sensitiveObj)
+        const sanitized = (SecureLogger as unknown as { sanitizeObject: (obj: unknown) => unknown }).sanitizeObject(sensitiveObj)
         expect(sanitized).toEqual({ privateKey: '[REDACTED]' })
       })
 
@@ -165,7 +165,7 @@ describe('secureLogger', () => {
           normalData: 'this should not be sanitized',
         }
 
-        const sanitized = (SecureLogger as { sanitizeObject: (obj: unknown) => unknown }).sanitizeObject(sensitiveData)
+        const sanitized = (SecureLogger as unknown as { sanitizeObject: (obj: unknown) => unknown }).sanitizeObject(sensitiveData)
 
         expect(sanitized).toEqual({
           walletAddress: '0x1234...7890', // Wallet address truncated (hex string > 20 chars)
@@ -191,7 +191,7 @@ describe('secureLogger', () => {
           },
         }
 
-        const sanitized = (SecureLogger as { sanitizeObject: (obj: unknown) => unknown }).sanitizeObject(nestedData)
+        const sanitized = (SecureLogger as unknown as { sanitizeObject: (obj: unknown) => unknown }).sanitizeObject(nestedData)
 
         expect(sanitized).toEqual({
           user: {
@@ -215,7 +215,7 @@ describe('secureLogger', () => {
           { normalData: 'safe_data' },
         ]
 
-        const sanitized = (SecureLogger as { sanitizeData: (data: unknown) => unknown }).sanitizeData(arrayData)
+        const sanitized = (SecureLogger as unknown as { sanitizeData: (data: unknown) => unknown }).sanitizeData(arrayData)
 
         // Arrays are treated as objects in sanitizeData, so result is object with numeric keys
         expect(sanitized).toEqual({
@@ -270,7 +270,7 @@ describe('secureLogger', () => {
         ;(error as Error & Record<string, unknown>).walletAddress = '0x1234567890123456789012345678901234567890'
 
         // Test the sanitization method directly
-        const sanitized = (SecureLogger as { sanitizeObject: (obj: unknown) => unknown }).sanitizeObject(error)
+        const sanitized = (SecureLogger as unknown as { sanitizeObject: (obj: unknown) => unknown }).sanitizeObject(error)
 
         // Error objects don't have the message as an enumerable property when sanitized
         expect(sanitized).toEqual({

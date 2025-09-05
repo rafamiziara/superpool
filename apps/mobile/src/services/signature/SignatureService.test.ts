@@ -2,6 +2,7 @@ import { SignatureFunctions, SignatureRequest, SignatureResult } from '@superpoo
 import type { Connector } from 'wagmi'
 import { devOnly } from '../../utils'
 import { SignatureStrategyFactory, SignatureUtils } from './strategies'
+import type { SignatureStrategy } from './strategies/SignatureStrategy'
 import { SignatureService } from './SignatureService'
 
 // Jest utilities
@@ -58,20 +59,44 @@ describe('SignatureService', () => {
 
     // Mock signature functions
     mockSignatureFunctions = {
-      personalSign: jest.fn().mockResolvedValue('0xmocked-signature'),
-      signTypedData: jest.fn().mockResolvedValue('0xmocked-typed-signature'),
+      signTypedDataAsync: jest.fn().mockResolvedValue('0xmocked-typed-signature'),
+      signMessageAsync: jest.fn().mockResolvedValue('0xmocked-signature'),
     } as jest.Mocked<SignatureFunctions>
 
     // Mock connector
     mockConnector = {
       id: 'mock-connector',
       name: 'Mock Connector',
+      type: 'injected',
+      icon: undefined,
+      rdns: undefined,
+      supportsSimulation: true,
+      uid: 'mock-uid-123',
+      setup: jest.fn(),
       connect: jest.fn(),
       disconnect: jest.fn(),
-    } as jest.Mocked<Connector>
+      getAccounts: jest.fn(),
+      getChainId: jest.fn(),
+      getProvider: jest.fn(),
+      switchChain: jest.fn(),
+      isAuthorized: jest.fn(),
+      emitter: {
+        emit: jest.fn(),
+        listenerCount: jest.fn(),
+        listeners: jest.fn(),
+        off: jest.fn(),
+        on: jest.fn(),
+        once: jest.fn(),
+        removeAllListeners: jest.fn(),
+      },
+    } as unknown as jest.Mocked<Connector>
 
     // Mock strategy factory and utils
-    mockSignatureStrategyFactory.getStrategy.mockReturnValue(mockStrategy as jest.Mocked<typeof mockStrategy>)
+    const mockStrategyWithCanHandle = {
+      ...mockStrategy,
+      canHandle: jest.fn().mockReturnValue(true),
+    } as jest.Mocked<SignatureStrategy>
+    mockSignatureStrategyFactory.getStrategy.mockReturnValue(mockStrategyWithCanHandle)
     mockSignatureUtils.isValidSignatureFormat.mockReturnValue(true)
 
     // Spy on console methods
@@ -528,17 +553,39 @@ describe('SignatureService', () => {
 
     it('should handle connector without id or name', async () => {
       const minimalConnector = {
+        id: '',
+        name: '',
+        type: 'injected',
+        icon: undefined,
+        rdns: undefined,
+        supportsSimulation: true,
+        uid: 'minimal-uid-123',
+        setup: jest.fn(),
         connect: jest.fn(),
         disconnect: jest.fn(),
-      } as jest.Mocked<Connector>
+        getAccounts: jest.fn(),
+        getChainId: jest.fn(),
+        getProvider: jest.fn(),
+        switchChain: jest.fn(),
+        isAuthorized: jest.fn(),
+        emitter: {
+          emit: jest.fn(),
+          listenerCount: jest.fn(),
+          listeners: jest.fn(),
+          off: jest.fn(),
+          on: jest.fn(),
+          once: jest.fn(),
+          removeAllListeners: jest.fn(),
+        },
+      } as unknown as jest.Mocked<Connector>
 
       await SignatureService.requestSignature(validSignatureRequest, mockSignatureFunctions, minimalConnector)
 
       expect(consoleLogSpy).toHaveBeenCalledWith(
         '🔍 Signature request preview:',
         expect.objectContaining({
-          connectorId: undefined,
-          connectorName: undefined,
+          connectorId: '',
+          connectorName: '',
         })
       )
     })

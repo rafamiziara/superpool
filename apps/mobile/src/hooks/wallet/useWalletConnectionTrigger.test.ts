@@ -107,7 +107,11 @@ describe('useWalletConnectionTrigger', () => {
 
     // Use a custom implementation that can track state transitions
     let mockState = mockAccountConnected
-    let previousState = { isConnected: false, address: undefined, chainId: undefined }
+    let previousState: { isConnected: boolean; address: `0x${string}` | undefined; chainId: number | undefined } = {
+      isConnected: false,
+      address: undefined,
+      chainId: undefined,
+    }
 
     mockUseAccount.mockImplementation(() => {
       const current = mockState

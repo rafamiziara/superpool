@@ -509,7 +509,14 @@ describe('useAuthSessionRecovery', () => {
         store: mockStore,
       })
 
-      let firstRecoveryPromise: Promise<void>
+      let firstRecoveryPromise: Promise<
+        | {
+            success: boolean
+            error?: string
+            action?: string
+          }
+        | undefined
+      > = Promise.resolve(undefined)
 
       // Test concurrent calls within act to capture the behavior
       await act(async () => {
@@ -529,6 +536,8 @@ describe('useAuthSessionRecovery', () => {
 
       // First recovery should have completed with a result
       expect(firstRecoveryPromise).toBeDefined()
+      const firstResult = await firstRecoveryPromise
+      expect(firstResult).toBeDefined()
 
       // Either second call returns undefined (early return) or completes successfully
       // Both behaviors are acceptable as long as the final state is consistent

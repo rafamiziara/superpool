@@ -74,8 +74,8 @@ jest.mock('./RootStore', () => {
     },
     get allErrors() {
       const errors: string[] = []
-      if (this.authenticationStore.authError && this.authenticationStore.authError.message) {
-        errors.push(this.authenticationStore.authError.message)
+      if (this.authenticationStore.authError && (this.authenticationStore.authError as Error).message) {
+        errors.push((this.authenticationStore.authError as Error).message)
       }
       if (this.walletStore.connectionError) errors.push(this.walletStore.connectionError)
       if (this.poolManagementStore.error) errors.push(this.poolManagementStore.error)
