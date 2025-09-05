@@ -2,6 +2,13 @@
 const AsyncStorage = require('@react-native-async-storage/async-storage')
 
 import { SessionManager } from './sessionManager'
+import {
+  generateSessionId,
+  SESSION_KEY_PATTERNS,
+  setupAsyncStorageError,
+  setupAsyncStorageSuccess,
+} from '@mocks/utilities/asyncStorageSetup'
+import { setupConsoleMocks } from '@mocks/utilities/consoleMockSetup'
 
 // Type for WalletConnectSession to match the interface in sessionManager.ts
 type WalletConnectSession = {
@@ -39,13 +46,8 @@ describe('SessionManager', () => {
     // Reset all mocks before each test
     jest.clearAllMocks()
 
-    // Setup default AsyncStorage mock responses
-    AsyncStorage.getAllKeys.mockResolvedValue([])
-    AsyncStorage.multiGet.mockResolvedValue([])
-    AsyncStorage.multiRemove.mockResolvedValue()
-    AsyncStorage.getItem.mockResolvedValue(null)
-    AsyncStorage.removeItem.mockResolvedValue()
-    AsyncStorage.setItem.mockResolvedValue()
+    // Setup default AsyncStorage mock responses using utility
+    setupAsyncStorageSuccess()
 
     // Note: Private static properties cannot be reset in tests
   })
@@ -53,47 +55,50 @@ describe('SessionManager', () => {
   describe('clearSessionByErrorId', () => {
     describe('Valid Session ID Cleanup', () => {
       it('should extract and clear session with valid 64-char hex session ID', async () => {
-        const sessionId = 'a1b2c3d4e5f6789012345678901234567890123456789012345678901234abcd'
-        AsyncStorage.getAllKeys.mockResolvedValue(['reown_appkit_session', `wc@2:session_topic:${sessionId}`, 'other_key'])
-        AsyncStorage.multiRemove.mockResolvedValue()
+        const sessionId = generateSessionId(64)
+        setupAsyncStorageSuccess({
+          getAllKeys: ['reown_appkit_session', SESSION_KEY_PATTERNS.walletConnect(sessionId), 'other_key'],
+        })
 
         await SessionManager.clearSessionByErrorId(sessionId)
 
         expect(AsyncStorage.getAllKeys).toHaveBeenCalled()
-        expect(AsyncStorage.multiRemove).toHaveBeenCalledWith([`wc@2:session_topic:${sessionId}`])
+        expect(AsyncStorage.multiRemove).toHaveBeenCalledWith([SESSION_KEY_PATTERNS.walletConnect(sessionId)])
       })
 
       it('should handle multiple session-related keys', async () => {
-        const sessionId = '1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef'
-        AsyncStorage.getAllKeys.mockResolvedValue([
-          `wc@2:session_topic:${sessionId}`,
-          `wc@2:pairing_topic:${sessionId}`,
-          `session_data_${sessionId}`,
-          'unrelated_key',
-        ])
-        AsyncStorage.multiRemove.mockResolvedValue()
+        const sessionId = generateSessionId(64)
+        setupAsyncStorageSuccess({
+          getAllKeys: [
+            SESSION_KEY_PATTERNS.walletConnect(sessionId),
+            SESSION_KEY_PATTERNS.pairing(sessionId),
+            SESSION_KEY_PATTERNS.sessionData(sessionId),
+            'unrelated_key',
+          ],
+        })
 
         await SessionManager.clearSessionByErrorId(sessionId)
 
         expect(AsyncStorage.multiRemove).toHaveBeenCalledWith([
-          `wc@2:session_topic:${sessionId}`,
-          `wc@2:pairing_topic:${sessionId}`,
-          `session_data_${sessionId}`,
+          SESSION_KEY_PATTERNS.walletConnect(sessionId),
+          SESSION_KEY_PATTERNS.pairing(sessionId),
+          SESSION_KEY_PATTERNS.sessionData(sessionId),
         ])
       })
 
       it('should log session clearing activity', async () => {
-        const consoleSpy = jest.spyOn(console, 'log').mockImplementation()
-        const sessionId = 'abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890'
+        const consoleMocks = setupConsoleMocks(['log'])
+        const sessionId = generateSessionId(60)
 
-        AsyncStorage.getAllKeys.mockResolvedValue([`wc@2:session_topic:${sessionId}`])
-        AsyncStorage.multiRemove.mockResolvedValue()
+        setupAsyncStorageSuccess({
+          getAllKeys: [SESSION_KEY_PATTERNS.walletConnect(sessionId)],
+        })
 
         await SessionManager.clearSessionByErrorId(sessionId)
 
-        expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('🎯 Clearing sessions containing ID: ' + sessionId))
+        expect(console.log).toHaveBeenCalledWith(expect.stringContaining('🎯 Clearing sessions containing ID: ' + sessionId))
 
-        consoleSpy.mockRestore()
+        consoleMocks.restore()
       })
     })
 
@@ -126,30 +131,32 @@ describe('SessionManager', () => {
 
     describe('Error Handling', () => {
       it('should handle AsyncStorage.getAllKeys errors gracefully', async () => {
-        const sessionId = 'a1b2c3d4e5f6789012345678901234567890123456789012345678901234abcd'
-        const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation()
+        const sessionId = generateSessionId(64)
+        const consoleMocks = setupConsoleMocks(['error'])
 
-        AsyncStorage.getAllKeys.mockRejectedValue(new Error('Storage access failed'))
+        setupAsyncStorageError('Storage access failed')
 
         await expect(SessionManager.clearSessionByErrorId(sessionId)).rejects.toThrow()
 
-        expect(consoleErrorSpy).toHaveBeenCalledWith(expect.stringContaining('Failed to clear session'), expect.any(Error))
+        expect(console.error).toHaveBeenCalledWith(expect.stringContaining('Failed to clear session'), expect.any(Error))
 
-        consoleErrorSpy.mockRestore()
+        consoleMocks.restore()
       })
 
       it('should handle AsyncStorage.multiRemove errors gracefully', async () => {
-        const sessionId = 'a1b2c3d4e5f6789012345678901234567890123456789012345678901234abcd'
-        const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation()
+        const sessionId = generateSessionId(64)
+        const consoleMocks = setupConsoleMocks(['error'])
 
-        AsyncStorage.getAllKeys.mockResolvedValue([`wc@2:session_topic:${sessionId}`])
+        setupAsyncStorageSuccess({
+          getAllKeys: [SESSION_KEY_PATTERNS.walletConnect(sessionId)],
+        })
         AsyncStorage.multiRemove.mockRejectedValue(new Error('Remove failed'))
 
         await expect(SessionManager.clearSessionByErrorId(sessionId)).rejects.toThrow()
 
-        expect(consoleErrorSpy).toHaveBeenCalledWith(expect.stringContaining('Failed to clear session'), expect.any(Error))
+        expect(console.error).toHaveBeenCalledWith(expect.stringContaining('Failed to clear session'), expect.any(Error))
 
-        consoleErrorSpy.mockRestore()
+        consoleMocks.restore()
       })
     })
   })

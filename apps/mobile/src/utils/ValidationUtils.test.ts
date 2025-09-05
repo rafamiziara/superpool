@@ -14,12 +14,43 @@ jest.mock('../config/constants', () => {
 // Import these after the mock is set up for use in tests
 import { AUTH_VALIDATION, SUPPORTED_CHAIN_IDS } from '../config/constants'
 
+// Test data constants for better organization
+const TEST_CONSTANTS = {
+  FIXED_TIMESTAMP: 1000000,
+  VALID_ADDRESSES: [
+    '0x1234567890123456789012345678901234567890',
+    '0xabcdefabcdefabcdefabcdefabcdefabcdefabcd',
+    '0xABCDEFABCDEFABCDEFABCDEFABCDEFABCDEFABCD',
+    '0x0000000000000000000000000000000000000000',
+    '0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF',
+  ],
+  INVALID_ADDRESSES: {
+    wrongLength: [
+      '0x123456789012345678901234567890123456789', // Too short
+      '0x12345678901234567890123456789012345678901', // Too long
+      '0x123', // Much too short
+      '0x' + 'a'.repeat(41), // Too long
+    ],
+    noPrefix: [
+      '1234567890123456789012345678901234567890',
+      'abcdefabcdefabcdefabcdefabcdefabcdefabcd',
+      'x1234567890123456789012345678901234567890',
+    ],
+    invalidChars: [
+      '0x123456789012345678901234567890123456789g', // Contains 'g'
+      '0x123456789012345678901234567890123456789!', // Contains '!'
+      '0x123456789012345678901234567890123456789 ', // Contains space
+      '0xGHIJKLMNOPQRSTUVWXYZghijklmnopqrstuvwxyz', // Invalid hex chars
+    ],
+  },
+} as const
+
 describe('ValidationUtils', () => {
   let originalDateNow: typeof Date.now
 
   beforeEach(() => {
     originalDateNow = Date.now
-    Date.now = jest.fn(() => 1000000) // Fixed timestamp for consistent testing
+    Date.now = jest.fn(() => TEST_CONSTANTS.FIXED_TIMESTAMP)
   })
 
   afterEach(() => {
@@ -29,15 +60,7 @@ describe('ValidationUtils', () => {
   describe('isValidWalletAddress', () => {
     describe('Valid Addresses', () => {
       it('should return true for valid Ethereum addresses', () => {
-        const validAddresses = [
-          '0x1234567890123456789012345678901234567890',
-          '0xabcdefabcdefabcdefabcdefabcdefabcdefabcd',
-          '0xABCDEFABCDEFABCDEFABCDEFABCDEFABCDEFABCD',
-          '0x0000000000000000000000000000000000000000',
-          '0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF',
-        ]
-
-        validAddresses.forEach((address) => {
+        TEST_CONSTANTS.VALID_ADDRESSES.forEach((address) => {
           expect(ValidationUtils.isValidWalletAddress(address)).toBe(true)
         })
       })
@@ -50,39 +73,19 @@ describe('ValidationUtils', () => {
 
     describe('Invalid Addresses', () => {
       it('should return false for addresses with wrong length', () => {
-        const wrongLengthAddresses = [
-          '0x123456789012345678901234567890123456789', // Too short
-          '0x12345678901234567890123456789012345678901', // Too long
-          '0x123', // Much too short
-          '0x' + 'a'.repeat(41), // Too long
-        ]
-
-        wrongLengthAddresses.forEach((address) => {
+        TEST_CONSTANTS.INVALID_ADDRESSES.wrongLength.forEach((address) => {
           expect(ValidationUtils.isValidWalletAddress(address)).toBe(false)
         })
       })
 
       it('should return false for addresses without 0x prefix', () => {
-        const noPrefixAddresses = [
-          '1234567890123456789012345678901234567890',
-          'abcdefabcdefabcdefabcdefabcdefabcdefabcd',
-          'x1234567890123456789012345678901234567890',
-        ]
-
-        noPrefixAddresses.forEach((address) => {
+        TEST_CONSTANTS.INVALID_ADDRESSES.noPrefix.forEach((address) => {
           expect(ValidationUtils.isValidWalletAddress(address)).toBe(false)
         })
       })
 
       it('should return false for addresses with invalid characters', () => {
-        const invalidCharAddresses = [
-          '0x123456789012345678901234567890123456789g', // Contains 'g'
-          '0x123456789012345678901234567890123456789!', // Contains '!'
-          '0x123456789012345678901234567890123456789 ', // Contains space
-          '0xGHIJKLMNOPQRSTUVWXYZghijklmnopqrstuvwxyz', // Invalid hex chars
-        ]
-
-        invalidCharAddresses.forEach((address) => {
+        TEST_CONSTANTS.INVALID_ADDRESSES.invalidChars.forEach((address) => {
           expect(ValidationUtils.isValidWalletAddress(address)).toBe(false)
         })
       })
