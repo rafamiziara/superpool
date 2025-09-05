@@ -156,7 +156,8 @@ describe('ErrorRecoveryService', () => {
       const consoleSpy = jest.spyOn(console, 'log').mockImplementation()
 
       const disconnectFn = (ErrorRecoveryService as unknown as ErrorRecoveryServiceInternal).getDisconnectFunction() as (() => void) | null
-      disconnectFn()
+      expect(disconnectFn).not.toBeNull()
+      disconnectFn!()
 
       expect(consoleSpy).toHaveBeenCalledWith('🔌 Disconnecting wallet via MobX store...')
       expect(mockWalletStore.disconnect).toHaveBeenCalledTimes(1)
@@ -169,10 +170,10 @@ describe('ErrorRecoveryService', () => {
       const disconnectFn = (ErrorRecoveryService as unknown as ErrorRecoveryServiceInternal).getDisconnectFunction() as (() => void) | null
 
       // Clear wallet store
-      ;(ErrorRecoveryService as unknown as ErrorRecoveryServiceInternal).walletStore = null
+      ;(ErrorRecoveryService as unknown as ErrorRecoveryServiceInternal).walletStore = undefined
 
       // Should not throw when calling the function
-      expect(() => disconnectFn()).not.toThrow()
+      expect(() => disconnectFn?.()).not.toThrow()
     })
   })
 

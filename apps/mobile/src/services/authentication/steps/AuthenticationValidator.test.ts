@@ -33,10 +33,29 @@ describe('AuthenticationValidator', () => {
 
     // Mock WalletStore
     mockWalletStore = {
+      isConnected: false,
+      address: undefined,
+      chainId: undefined,
+      isConnecting: false,
+      connectionError: null,
+      get isWalletConnected() {
+        return false
+      },
+      get currentState() {
+        return { isConnected: false, address: undefined, chainId: undefined, isConnecting: false, connectionError: null }
+      },
+      setConnectionState: jest.fn(),
+      setConnecting: jest.fn(),
+      setConnectionError: jest.fn(),
+      connect: jest.fn(),
+      disconnect: jest.fn(),
+      updateConnectionState: jest.fn(),
+      resetSequence: jest.fn(),
+      reset: jest.fn(),
       captureState: jest.fn().mockReturnValue(mockAtomicState),
       validateState: jest.fn().mockReturnValue(true),
       validateInitialState: jest.fn().mockReturnValue({ isValid: true }),
-    } as jest.Mocked<WalletStore>
+    } as unknown as jest.Mocked<WalletStore>
 
     validator = new AuthenticationValidator(mockAuthStore, mockWalletStore)
 
@@ -61,7 +80,7 @@ describe('AuthenticationValidator', () => {
 
     it('should store references to auth and wallet stores', () => {
       // Access private members through type assertion to verify they're stored
-      const validatorAny = validator as {
+      const validatorAny = validator as unknown as {
         authStore: AuthenticationStore
         walletStore: WalletStore
       }

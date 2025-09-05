@@ -138,7 +138,7 @@ describe('FirebaseAuthenticator', () => {
           success: true,
           attemptsMade: 1,
           totalTime: 100,
-          policyUsed: policy.name,
+          policyUsed: (policy as { name: string }).name,
         }
       } catch (error) {
         // For error tests, we'll still throw but track attempts
@@ -147,7 +147,7 @@ describe('FirebaseAuthenticator', () => {
           error: error,
           attemptsMade: 1,
           totalTime: 100,
-          policyUsed: policy.name,
+          policyUsed: (policy as { name: string }).name,
         }
       }
     })

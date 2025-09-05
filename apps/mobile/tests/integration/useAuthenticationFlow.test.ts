@@ -10,6 +10,7 @@ import { useAuthentication } from '../../src/hooks/auth/useAuthentication'
 import { useAuthenticationIntegration } from '../../src/hooks/auth/useAuthenticationIntegration'
 import { useAuthSessionRecovery } from '../../src/hooks/auth/useAuthSessionRecovery'
 import { useAuthStateSynchronization } from '../../src/hooks/auth/useAuthStateSynchronization'
+import { AuthenticationOrchestrator } from '../../src/services/authentication/AuthenticationOrchestrator'
 
 // Mock dependencies
 jest.mock('../../src/firebase.config', () => ({
@@ -199,7 +200,16 @@ describe('Authentication Flow Integration Tests', () => {
         validateAuthenticatedState: jest.fn(),
         handleLockTimeout: jest.fn(),
         handleAuthError: jest.fn(),
-      }
+        // Add the missing properties that TypeScript expects
+        isWagmiConnector: jest.fn(),
+        isDuplicateRequest: jest.fn(),
+        trackRequest: jest.fn(),
+        cleanupRequest: jest.fn(),
+        acquireAuthLock: jest.fn(),
+        releaseAuthLock: jest.fn(),
+        getCurrentStepFromError: jest.fn(),
+        logSessionDebugInfo: jest.fn(),
+      } as unknown as AuthenticationOrchestrator
       jest.spyOn(authIntegration.current, 'getOrchestrator').mockImplementation(() => mockOrchestrator)
 
       const testWalletAddress = '0x1234567890123456789012345678901234567890'
