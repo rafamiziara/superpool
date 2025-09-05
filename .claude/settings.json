@@ -1,14 +1,14 @@
-{
-  "hooks": {
-    "Stop": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node .claude/hooks/check-quality.js"
-          }
-        ]
-      }
-    ]
-  }
-}
+// {
+//   "hooks": {
+//     "Stop": [
+//       {
+//         "hooks": [
+//           {
+//             "type": "command",
+//             "command": "node .claude/hooks/check-quality.js"
+//           }
+//         ]
+//       }
+//     ]
+//   }
+// }

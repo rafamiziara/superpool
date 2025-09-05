@@ -3,9 +3,10 @@
  * Tests session validation, automatic recovery, and state synchronization
  */
 
+import { createMockFirebaseAuthManager } from '@mocks/factories/serviceFactory'
+import { createMockRootStore, renderHookWithStore } from '@mocks/factories/testFactory'
 import { act } from '@testing-library/react-native'
 import { useAccount } from 'wagmi'
-import { createMockRootStore, renderHookWithStore } from '@mocks/factories/testFactory'
 import { useAuthSessionRecovery } from './useAuthSessionRecovery'
 
 // Create proper Chain type mock
@@ -51,13 +52,14 @@ const createMockDisconnectedAccount = () => ({
   status: 'connecting' as const, // Use connecting status for proper Wagmi compatibility
 })
 
-// Mock dependencies
-jest.mock('../../firebase.config', () => ({
-  FIREBASE_AUTH: {
-    currentUser: null,
-    signOut: jest.fn(() => Promise.resolve()),
-  },
-}))
+// Mock dependencies using centralized patterns
+jest.mock('../../firebase.config', () => {
+  const { createMockFirebaseAuthManager } = require('@mocks/factories/serviceFactory')
+  const mockFirebaseAuthManager = createMockFirebaseAuthManager()
+  return {
+    FIREBASE_AUTH: mockFirebaseAuthManager.auth,
+  }
+})
 
 jest.mock('../../utils', () => ({
   devOnly: jest.fn(),
@@ -68,7 +70,8 @@ jest.mock('../../utils', () => ({
 
 // wagmi hooks are already mocked in setupTests.ts
 
-// Mock Firebase auth hook
+// Use centralized Firebase auth manager mock for test methods
+const mockFirebaseAuthManager = createMockFirebaseAuthManager()
 const mockFirebaseAuth = {
   isAuthenticated: false,
   isLoading: false,
@@ -82,11 +85,14 @@ jest.mock('./useFirebaseAuth', () => ({
 
 // Mock devOnly to track calls
 const mockDevOnly = require('../../utils').devOnly as jest.MockedFunction<typeof import('../../utils').devOnly>
-const mockSignOut = require('../../firebase.config').FIREBASE_AUTH.signOut as jest.MockedFunction<() => Promise<void>>
+const mockSignOut = mockFirebaseAuthManager.auth.signOut as jest.MockedFunction<() => Promise<void>>
 const mockIsValidWalletAddress = require('../../utils').ValidationUtils.isValidWalletAddress as jest.MockedFunction<
   (address: string) => boolean
 >
 const mockUseAccount = useAccount as jest.MockedFunction<typeof useAccount>
+
+// Create a spy on FIREBASE_AUTH.signOut for the actual firebase config import
+let mockFirebaseAuthSignOut: jest.MockedFunction<() => Promise<void>>
 
 describe('useAuthSessionRecovery', () => {
   let mockStore: ReturnType<typeof createMockRootStore>
@@ -107,6 +113,11 @@ describe('useAuthSessionRecovery', () => {
 
     mockIsValidWalletAddress.mockReturnValue(true)
     mockSignOut.mockResolvedValue()
+
+    // Set up spy for the actual FIREBASE_AUTH.signOut that the hook uses
+    const { FIREBASE_AUTH } = require('../../firebase.config')
+    mockFirebaseAuthSignOut = FIREBASE_AUTH.signOut as jest.MockedFunction<() => Promise<void>>
+    mockFirebaseAuthSignOut.mockResolvedValue()
 
     // Create mock store AFTER clearing mocks
     mockStore = createMockRootStore()
@@ -381,7 +392,7 @@ describe('useAuthSessionRecovery', () => {
         return await result.current.triggerRecovery()
       })
 
-      expect(mockSignOut).toHaveBeenCalled()
+      expect(mockFirebaseAuthSignOut).toHaveBeenCalled()
       expect(recoveryResult).toEqual({
         success: false,
         error: 'Address mismatch resolved - authentication required',
@@ -419,7 +430,7 @@ describe('useAuthSessionRecovery', () => {
         return await result.current.triggerRecovery()
       })
 
-      expect(mockSignOut).toHaveBeenCalled()
+      expect(mockFirebaseAuthSignOut).toHaveBeenCalled()
       expect(recoveryResult).toEqual({
         success: false,
         error: 'Invalid authentication data cleared',
@@ -450,8 +461,8 @@ describe('useAuthSessionRecovery', () => {
 
     it('should handle recovery errors', async () => {
       const errorMessage = 'Test recovery error'
-      mockSignOut.mockRejectedValue(new Error(errorMessage))
 
+      // Set up Firebase auth to trigger signOut, but make it fail
       mockFirebaseAuth.isAuthenticated = true
       mockFirebaseAuth.walletAddress = '0x1111111111111111111111111111111111111111'
       mockUseAccount.mockReturnValue({
@@ -470,6 +481,9 @@ describe('useAuthSessionRecovery', () => {
       const { result } = renderHookWithStore(() => useAuthSessionRecovery(), {
         store: mockStore,
       })
+
+      // Set up the FIREBASE_AUTH signOut to reject in beforeEach setup
+      mockFirebaseAuthSignOut.mockRejectedValue(new Error(errorMessage))
 
       const recoveryResult = await act(async () => {
         return await result.current.triggerRecovery()
@@ -562,9 +576,6 @@ describe('useAuthSessionRecovery', () => {
     it('should handle manual recovery errors', async () => {
       const errorMessage = 'Manual recovery error'
 
-      // Mock an error during recovery by making signOut fail
-      mockSignOut.mockRejectedValueOnce(new Error(errorMessage))
-
       // Set up a scenario that would trigger Firebase signOut (address mismatch)
       mockFirebaseAuth.isAuthenticated = true
       mockFirebaseAuth.walletAddress = '0x1111111111111111111111111111111111111111'
@@ -573,6 +584,9 @@ describe('useAuthSessionRecovery', () => {
       const { result } = renderHookWithStore(() => useAuthSessionRecovery(), {
         store: mockStore,
       })
+
+      // Mock an error during recovery by making the actual FIREBASE_AUTH signOut fail
+      mockFirebaseAuthSignOut.mockRejectedValueOnce(new Error(errorMessage))
 
       // The error is handled internally, so it should not throw but return error result
       const recoveryResult = await act(async () => {

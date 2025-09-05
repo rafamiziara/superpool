@@ -18,61 +18,37 @@ import {
   useWalletStore,
 } from './StoreContext'
 
-// Mock RootStore to prevent actual instantiation
+// Use centralized store mocking to prevent actual instantiation
 jest.mock('./RootStore', () => {
-  const mockAuthStore = {
-    isAuthenticating: false,
-    startStep: jest.fn(),
-    completeStep: jest.fn(),
-    authError: null,
-    reset: jest.fn(),
-  }
+  // Import inside the mock to avoid hoisting issues
+  const { createMockRootStore } = require('@mocks/factories/storeFactory')
+  const mockRootStore = createMockRootStore()
 
-  const mockWalletStore = {
-    isConnected: false,
-    address: undefined,
-    connect: jest.fn(),
-    connectionError: null,
-    isConnecting: false,
-    reset: jest.fn(),
-  }
-
-  const mockPoolStore = {
-    pools: [],
-    loadPools: jest.fn(),
-    error: null,
-    loading: {},
-    reset: jest.fn(),
-    setUserAddress: jest.fn(),
-  }
-
-  const mockUIStore = {
-    onboardingCurrentIndex: 0,
-    setOnboardingIndex: jest.fn(),
-    resetOnboardingState: jest.fn(),
-  }
-
-  const mockRootStore = {
-    authenticationStore: mockAuthStore,
-    walletStore: mockWalletStore,
-    poolManagementStore: mockPoolStore,
-    uiStore: mockUIStore,
-    reset: jest.fn(),
-    setUserContext: jest.fn(),
-    get currentUserAddress() {
+  // Extend with additional computed properties that the real store has
+  Object.defineProperty(mockRootStore, 'currentUserAddress', {
+    get: function () {
       return this.walletStore.address || null
     },
-    get isLoading() {
+  })
+
+  Object.defineProperty(mockRootStore, 'isLoading', {
+    get: function () {
       return (
         this.authenticationStore.isAuthenticating ||
         this.walletStore.isConnecting ||
-        Object.values(this.poolManagementStore.loading).some((loading) => loading)
+        Object.values(this.poolManagementStore.loading).some((loading: unknown) => loading as boolean)
       )
     },
-    get hasErrors() {
+  })
+
+  Object.defineProperty(mockRootStore, 'hasErrors', {
+    get: function () {
       return !!(this.authenticationStore.authError || this.walletStore.connectionError || this.poolManagementStore.error)
     },
-    get allErrors() {
+  })
+
+  Object.defineProperty(mockRootStore, 'allErrors', {
+    get: function () {
       const errors: string[] = []
       if (this.authenticationStore.authError && (this.authenticationStore.authError as Error).message) {
         errors.push((this.authenticationStore.authError as Error).message)
@@ -81,7 +57,13 @@ jest.mock('./RootStore', () => {
       if (this.poolManagementStore.error) errors.push(this.poolManagementStore.error)
       return errors
     },
-  }
+  })
+
+  // Add missing methods that the real store has
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  ;(mockRootStore as any).reset = jest.fn()
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  ;(mockRootStore as any).setUserContext = jest.fn()
 
   return {
     RootStore: jest.fn().mockImplementation(() => mockRootStore),

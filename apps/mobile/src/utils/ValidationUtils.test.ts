@@ -1,26 +1,18 @@
 import { ValidationUtils } from './ValidationUtils'
-import { AUTH_VALIDATION, SUPPORTED_CHAIN_IDS } from '../config/constants'
 
-// Mock constants to control test behavior
-jest.mock('../config/constants', () => ({
-  AUTH_VALIDATION: {
-    MAX_NONCE_LENGTH: 100,
-    MAX_MESSAGE_LENGTH: 2000,
-    MAX_TIMESTAMP_AGE: 600000, // 10 minutes
-    MIN_SIGNATURE_LENGTH: 10,
-  },
-  SIGNATURE_FORMATS: {
-    SAFE_WALLET_PREFIX: 'safe-wallet:',
-    HEX_PREFIX: '0x',
-    SAFE_TOKEN_PARTS: 4,
-  },
-  SUPPORTED_CHAIN_IDS: [1, 137, 80002, 31337],
-  WALLET_ADDRESS_FORMAT: {
-    LENGTH: 42,
-    HEX_CHARS: 40,
-    PATTERN: /^0x[a-fA-F0-9]{40}$/,
-  },
-}))
+// Mock the constants module to return our mock configuration
+jest.mock('../config/constants', () => {
+  const mockValidationConfig = require('@mocks/factories/configFactory').configMockPresets.validation()
+  return {
+    AUTH_VALIDATION: mockValidationConfig.AUTH_VALIDATION,
+    SIGNATURE_FORMATS: mockValidationConfig.SIGNATURE_FORMATS,
+    SUPPORTED_CHAIN_IDS: mockValidationConfig.SUPPORTED_CHAIN_IDS,
+    WALLET_ADDRESS_FORMAT: mockValidationConfig.WALLET_ADDRESS_FORMAT,
+  }
+})
+
+// Import these after the mock is set up for use in tests
+import { AUTH_VALIDATION, SUPPORTED_CHAIN_IDS } from '../config/constants'
 
 describe('ValidationUtils', () => {
   let originalDateNow: typeof Date.now

@@ -31,6 +31,10 @@ export const createMockFirebaseAuthManager = (
     getCurrentState: jest.Mock
     addListener: jest.Mock
     signOut: jest.Mock
+    auth: {
+      currentUser: { uid: string } | null
+      signOut: jest.Mock
+    }
   }> = {}
 ) => ({
   getCurrentState: jest.fn(() => ({
@@ -49,6 +53,10 @@ export const createMockFirebaseAuthManager = (
     return jest.fn() // cleanup function
   }),
   signOut: jest.fn().mockResolvedValue(undefined),
+  auth: {
+    currentUser: null as { uid: string } | null,
+    signOut: jest.fn(() => Promise.resolve()),
+  },
   ...overrides,
 })
 
