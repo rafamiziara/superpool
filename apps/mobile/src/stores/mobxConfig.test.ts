@@ -1,6 +1,7 @@
 import { configure as mobxConfigure } from 'mobx'
 import { Platform } from 'react-native'
 import { configureMobX, mobxUtils } from './mobxConfig'
+import { setupConsoleMocks } from '@mocks/utilities/consoleMockSetup'
 
 // Type for globalThis with __DEV__
 type GlobalWithDev = typeof globalThis & { __DEV__: boolean }
@@ -26,22 +27,14 @@ const mockMobxConfigure = mobxConfigure as jest.MockedFunction<typeof mobxConfig
 const mockPlatform = Platform as jest.Mocked<typeof Platform>
 
 describe('mobxConfig', () => {
-  let originalConsoleLog: typeof console.log
-  let originalConsoleTime: typeof console.time
-  let originalConsoleTimeEnd: typeof console.timeEnd
+  let consoleMocks: ReturnType<typeof setupConsoleMocks>
   let originalDEV: boolean
 
   beforeEach(() => {
     jest.clearAllMocks()
 
-    // Mock console methods
-    originalConsoleLog = console.log
-    originalConsoleTime = console.time
-    originalConsoleTimeEnd = console.timeEnd
-
-    console.log = jest.fn()
-    console.time = jest.fn()
-    console.timeEnd = jest.fn()
+    // Setup console mocks using centralized utility
+    consoleMocks = setupConsoleMocks(['log', 'time', 'timeEnd'])
 
     // Store original __DEV__ value
     originalDEV = (globalThis as GlobalWithDev).__DEV__
@@ -49,9 +42,7 @@ describe('mobxConfig', () => {
 
   afterEach(() => {
     // Restore console methods
-    console.log = originalConsoleLog
-    console.time = originalConsoleTime
-    console.timeEnd = originalConsoleTimeEnd
+    consoleMocks.restore()
 
     // Restore __DEV__
     ;(globalThis as GlobalWithDev).__DEV__ = originalDEV

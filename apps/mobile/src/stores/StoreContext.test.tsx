@@ -18,21 +18,21 @@ import {
   useWalletStore,
 } from './StoreContext'
 
-// Use centralized store mocking to prevent actual instantiation
+// Use centralized store mocking with enhanced computed properties
 jest.mock('./RootStore', () => {
   // Import inside the mock to avoid hoisting issues
   const { createMockRootStore } = require('@mocks/factories/storeFactory')
   const mockRootStore = createMockRootStore()
 
-  // Extend with additional computed properties that the real store has
+  // Add computed properties with proper typing
   Object.defineProperty(mockRootStore, 'currentUserAddress', {
-    get: function () {
+    get: function (this: ReturnType<typeof createMockRootStore>): string | null {
       return this.walletStore.address || null
     },
   })
 
   Object.defineProperty(mockRootStore, 'isLoading', {
-    get: function () {
+    get: function (this: ReturnType<typeof createMockRootStore>): boolean {
       return (
         this.authenticationStore.isAuthenticating ||
         this.walletStore.isConnecting ||
@@ -42,13 +42,13 @@ jest.mock('./RootStore', () => {
   })
 
   Object.defineProperty(mockRootStore, 'hasErrors', {
-    get: function () {
+    get: function (this: ReturnType<typeof createMockRootStore>): boolean {
       return !!(this.authenticationStore.authError || this.walletStore.connectionError || this.poolManagementStore.error)
     },
   })
 
   Object.defineProperty(mockRootStore, 'allErrors', {
-    get: function () {
+    get: function (this: ReturnType<typeof createMockRootStore>): string[] {
       const errors: string[] = []
       if (this.authenticationStore.authError && (this.authenticationStore.authError as Error).message) {
         errors.push((this.authenticationStore.authError as Error).message)
@@ -59,11 +59,11 @@ jest.mock('./RootStore', () => {
     },
   })
 
-  // Add missing methods that the real store has
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  ;(mockRootStore as any).reset = jest.fn()
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  ;(mockRootStore as any).setUserContext = jest.fn()
+  // Add missing methods using consistent typing
+  Object.assign(mockRootStore, {
+    reset: jest.fn(),
+    setUserContext: jest.fn(),
+  })
 
   return {
     RootStore: jest.fn().mockImplementation(() => mockRootStore),
@@ -162,10 +162,10 @@ describe('StoreContext', () => {
     it('should handle React.Fragment children', () => {
       const { getByTestId } = render(
         <StoreProvider>
-          <>
+          <React.Fragment>
             <Text testID="fragment-child1">Fragment Child 1</Text>
             <Text testID="fragment-child2">Fragment Child 2</Text>
-          </>
+          </React.Fragment>
         </StoreProvider>
       )
 
