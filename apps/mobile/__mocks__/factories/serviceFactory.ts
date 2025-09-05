@@ -278,3 +278,165 @@ export const createMockRouter = (
   replace: jest.fn(),
   ...overrides,
 })
+
+/**
+ * Signature Strategy Factory
+ * Mocks the signature strategy factory
+ */
+export const createMockSignatureStrategyFactory = (
+  overrides: Partial<{
+    getStrategy: jest.Mock
+  }> = {}
+) => ({
+  getStrategy: jest.fn().mockReturnValue({
+    getStrategyName: jest.fn().mockReturnValue('mock-strategy'),
+    sign: jest.fn().mockResolvedValue({
+      signature: '0xmockedsignature',
+      signatureType: 'personal-sign',
+    }),
+    canHandle: jest.fn().mockReturnValue(true),
+  }),
+  ...overrides,
+})
+
+/**
+ * Signature Utils Factory
+ * Mocks signature utility functions
+ */
+export const createMockSignatureUtils = (
+  overrides: Partial<{
+    isValidSignatureFormat: jest.Mock
+  }> = {}
+) => ({
+  isValidSignatureFormat: jest.fn().mockReturnValue(true),
+  ...overrides,
+})
+
+/**
+ * Dev Utils Factory
+ * Mocks development utility functions
+ */
+export const createMockDevUtils = (
+  overrides: Partial<{
+    devOnly: jest.Mock
+  }> = {}
+) => ({
+  devOnly: jest.fn(),
+  ...overrides,
+})
+
+/**
+ * Connector Factory
+ * Mocks Wagmi connector instances
+ */
+export const createMockConnector = (
+  overrides: Partial<{
+    id: string
+    name: string
+    type: string
+    icon: string | undefined
+    rdns: string | undefined
+    supportsSimulation: boolean
+    uid: string
+    setup: jest.Mock
+    connect: jest.Mock
+    disconnect: jest.Mock
+    getAccounts: jest.Mock
+    getChainId: jest.Mock
+    getProvider: jest.Mock
+    switchChain: jest.Mock
+    isAuthorized: jest.Mock
+    emitter: {
+      emit: jest.Mock
+      listenerCount: jest.Mock
+      listeners: jest.Mock
+      off: jest.Mock
+      on: jest.Mock
+      once: jest.Mock
+      removeAllListeners: jest.Mock
+    }
+  }> = {}
+) => ({
+  id: 'mock-connector',
+  name: 'Mock Connector',
+  type: 'injected',
+  icon: undefined,
+  rdns: undefined,
+  supportsSimulation: true,
+  uid: 'mock-uid-123',
+  setup: jest.fn(),
+  connect: jest.fn(),
+  disconnect: jest.fn(),
+  getAccounts: jest.fn(),
+  getChainId: jest.fn(),
+  getProvider: jest.fn(),
+  switchChain: jest.fn(),
+  isAuthorized: jest.fn(),
+  emitter: {
+    emit: jest.fn(),
+    listenerCount: jest.fn(),
+    listeners: jest.fn(),
+    off: jest.fn(),
+    on: jest.fn(),
+    once: jest.fn(),
+    removeAllListeners: jest.fn(),
+  },
+  ...overrides,
+})
+
+/**
+ * Signature Functions Factory
+ * Mocks Wagmi signature functions
+ */
+export const createMockSignatureFunctions = (
+  overrides: Partial<{
+    signTypedDataAsync: jest.Mock
+    signMessageAsync: jest.Mock
+  }> = {}
+) => ({
+  signTypedDataAsync: jest.fn().mockResolvedValue('0xmocked-typed-signature'),
+  signMessageAsync: jest.fn().mockResolvedValue('0xmocked-signature'),
+  ...overrides,
+})
+
+/**
+ * Enhanced Auth Toasts Factory
+ * Mocks authentication toast notifications with additional success method
+ */
+export const createMockEnhancedAuthToasts = (
+  overrides: Partial<{
+    success: jest.Mock
+    authSuccess: jest.Mock
+    walletConnected: jest.Mock
+    walletDisconnected: jest.Mock
+    connectionFailed: jest.Mock
+    signatureRejected: jest.Mock
+    networkMismatch: jest.Mock
+    sessionRecovery: jest.Mock
+    sessionExpired: jest.Mock
+  }> = {}
+) => ({
+  success: jest.fn(),
+  authSuccess: jest.fn(),
+  walletConnected: jest.fn(),
+  walletDisconnected: jest.fn(),
+  connectionFailed: jest.fn(),
+  signatureRejected: jest.fn(),
+  networkMismatch: jest.fn(),
+  sessionRecovery: jest.fn(),
+  sessionExpired: jest.fn(),
+  ...overrides,
+})
+
+/**
+ * Firebase Auth Factory
+ * Mocks Firebase auth instance
+ */
+export const createMockFirebaseAuth = (
+  overrides: Partial<{
+    currentUser: { uid: string } | null
+  }> = {}
+) => ({
+  currentUser: null as { uid: string } | null,
+  ...overrides,
+})

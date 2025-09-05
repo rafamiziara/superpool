@@ -1,8 +1,9 @@
+import { createMockAuthenticationStore, createMockWalletStore } from '@mocks/factories/storeFactory'
 import { AuthenticationStore } from '../../stores/AuthenticationStore'
 import { WalletStore } from '../../stores/WalletStore'
 import { AppError } from '../../utils'
-import { ErrorRecoveryResult, ErrorRecoveryService, SessionErrorContext } from './handlers'
 import { AuthErrorRecoveryService } from './AuthErrorRecoveryService'
+import { ErrorRecoveryResult, ErrorRecoveryService, SessionErrorContext } from './handlers'
 
 // Mock the new ErrorRecoveryService that AuthErrorRecoveryService delegates to
 jest.mock('./handlers', () => ({
@@ -28,69 +29,9 @@ describe('AuthErrorRecoveryService', () => {
   beforeEach(() => {
     jest.clearAllMocks()
 
-    // Mock store instances
-    mockAuthStore = {
-      currentStep: null,
-      completedSteps: new Set(),
-      failedStep: null,
-      isProgressComplete: false,
-      progressError: null,
-      authError: null,
-      authLock: {
-        isLocked: false,
-        startTime: 0,
-        walletAddress: null,
-        abortController: null,
-        requestId: null,
-      },
-      isAuthenticating: false,
-      authWalletAddress: null,
-      isAuthenticated: false,
-      userEmail: null,
-      isEmailVerified: false,
-      isDeviceApproved: false,
-      deviceId: null,
-      reset: jest.fn(),
-      acquireAuthLock: jest.fn(),
-      releaseAuthLock: jest.fn(),
-      setCurrentStep: jest.fn(),
-      setFailedStep: jest.fn(),
-      addCompletedStep: jest.fn(),
-      clearProgress: jest.fn(),
-      setAuthError: jest.fn(),
-      clearAuthError: jest.fn(),
-      setAuthenticated: jest.fn(),
-      setUserInfo: jest.fn(),
-      setDeviceApproval: jest.fn(),
-      validateProgress: jest.fn(),
-      getStepInfo: jest.fn(),
-      getAllSteps: jest.fn(),
-    } as unknown as jest.Mocked<AuthenticationStore>
-
-    mockWalletStore = {
-      isConnected: false,
-      address: undefined,
-      chainId: undefined,
-      isConnecting: false,
-      connectionError: null,
-      get isWalletConnected() {
-        return false
-      },
-      get currentState() {
-        return { isConnected: false, address: undefined, chainId: undefined, isConnecting: false, connectionError: null }
-      },
-      setConnectionState: jest.fn(),
-      setConnecting: jest.fn(),
-      setConnectionError: jest.fn(),
-      connect: jest.fn(),
-      disconnect: jest.fn(),
-      updateConnectionState: jest.fn(),
-      resetSequence: jest.fn(),
-      reset: jest.fn(),
-      captureState: jest.fn(),
-      validateState: jest.fn(),
-      validateInitialState: jest.fn(),
-    } as unknown as jest.Mocked<WalletStore>
+    // Create mock store instances using centralized factories
+    mockAuthStore = createMockAuthenticationStore() as unknown as jest.Mocked<AuthenticationStore>
+    mockWalletStore = createMockWalletStore() as unknown as jest.Mocked<WalletStore>
 
     // Spy on console methods
     consoleLogSpy = jest.spyOn(console, 'log').mockImplementation()
@@ -135,12 +76,8 @@ describe('AuthErrorRecoveryService', () => {
     })
 
     it('should handle initialize with different store instances', () => {
-      const alternateAuthStore = {
-        ...mockAuthStore,
-      } as jest.Mocked<AuthenticationStore>
-      const alternateWalletStore = {
-        ...mockWalletStore,
-      } as jest.Mocked<WalletStore>
+      const alternateAuthStore = createMockAuthenticationStore() as unknown as jest.Mocked<AuthenticationStore>
+      const alternateWalletStore = createMockWalletStore() as unknown as jest.Mocked<WalletStore>
 
       AuthErrorRecoveryService.initialize(alternateAuthStore, alternateWalletStore)
 
