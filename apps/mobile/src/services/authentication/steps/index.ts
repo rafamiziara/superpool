@@ -1,4 +1,3 @@
-/* istanbul ignore file */
 // Authentication step modules for clean separation of concerns
 export { AuthenticationStepExecutor } from './AuthenticationStepExecutor'
 export { AuthenticationValidator } from './AuthenticationValidator'

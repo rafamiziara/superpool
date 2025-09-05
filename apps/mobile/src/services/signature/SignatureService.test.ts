@@ -10,7 +10,7 @@ import type { Connector } from 'wagmi'
 import { devOnly } from '../../utils'
 import { SignatureService } from './SignatureService'
 import { SignatureStrategyFactory, SignatureUtils } from './strategies'
-import type { SignatureStrategy } from './strategies/SignatureStrategy'
+import type { SignatureStrategy } from './strategies'
 
 // Jest utilities
 declare const fail: (message?: string) => never

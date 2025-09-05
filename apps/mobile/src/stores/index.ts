@@ -1,4 +1,3 @@
-/* istanbul ignore file */
 // MobX Stores
 import { AuthenticationStore } from './AuthenticationStore'
 import { PoolManagementStore } from './PoolManagementStore'

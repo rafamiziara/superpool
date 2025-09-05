@@ -1,4 +1,3 @@
-/* istanbul ignore file */
 // Signature service exports
 export { SignatureService } from './SignatureService'
 
