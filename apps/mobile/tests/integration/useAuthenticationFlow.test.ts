@@ -73,6 +73,14 @@ const mockAuthStore = {
   authError: null,
   isAuthenticating: false,
   authWalletAddress: null as string | null,
+  // Auth lock state (required by useAuthSessionRecovery)
+  authLock: {
+    isLocked: false,
+    startTime: 0,
+    walletAddress: null,
+    abortController: null,
+    requestId: null,
+  },
   // Auth progress state (now part of AuthenticationStore)
   currentStep: null,
   completedSteps: new Set(),
@@ -141,6 +149,13 @@ describe('Authentication Flow Integration Tests', () => {
       authError: null,
       isAuthenticating: false,
       authWalletAddress: null as string | null,
+      authLock: {
+        isLocked: false,
+        startTime: 0,
+        walletAddress: null,
+        abortController: null,
+        requestId: null,
+      },
       currentStep: null,
       failedStep: null,
       isProgressComplete: false,

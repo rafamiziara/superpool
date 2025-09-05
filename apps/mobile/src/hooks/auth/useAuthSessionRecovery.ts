@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useAccount } from 'wagmi'
+import { transaction } from 'mobx'
 import { FIREBASE_AUTH } from '../../firebase.config'
 import { useStores } from '../../stores'
 import { devOnly, ValidationUtils } from '../../utils'
+import { AppError, ErrorType } from '../../utils/errorHandling'
 import { useFirebaseAuth } from './useFirebaseAuth'
 
 interface SessionRecoveryState {
@@ -13,8 +15,31 @@ interface SessionRecoveryState {
 }
 
 /**
+ * Session state snapshot for validation and rollback
+ * SECURITY: Captures state at specific checkpoints for rollback mechanisms
+ */
+interface SessionStateSnapshot {
+  walletConnectionState: {
+    isConnected: boolean
+    address: string | null
+    chainId: number | undefined
+  }
+  authenticationState: {
+    isLocked: boolean
+    startTime: number
+    walletAddress: string | null
+    hasError: boolean
+    errorMessage: string | null
+  }
+  timestamp: number
+}
+
+/**
  * Session recovery hook that handles authentication state restoration on app startup
  * Validates and recovers authentication sessions across app restarts
+ *
+ * SECURITY: Implements atomic state management using MobX transactions to prevent
+ * race conditions and state desynchronization in concurrent recovery scenarios.
  */
 export const useAuthSessionRecovery = () => {
   const { authenticationStore, walletStore } = useStores()
@@ -98,16 +123,13 @@ export const useAuthSessionRecovery = () => {
       if (validation.isValid) {
         devOnly('✅ Session is already valid, no recovery needed')
 
-        // Ensure stores are synchronized with valid session
+        // SECURITY FIX: Atomic state synchronization with validation checkpoints
         if (validation.walletAddress && validation.firebaseAddress) {
-          walletStore.updateConnectionState(true, validation.walletAddress, chain?.id)
-          authenticationStore.setAuthLock({
-            isLocked: false,
-            startTime: 0,
-            walletAddress: validation.firebaseAddress,
-            abortController: null,
+          await synchronizeSessionState({
+            walletAddress: validation.walletAddress,
+            firebaseAddress: validation.firebaseAddress,
+            chainId: chain?.id,
           })
-          authenticationStore.setAuthError(null)
         }
 
         return { success: true, action: 'validated_existing_session' }
@@ -141,25 +163,36 @@ export const useAuthSessionRecovery = () => {
       // Case 3: Address mismatch - clear Firebase auth to force re-authentication
       if (issues.includes('Wallet address mismatch with Firebase auth')) {
         devOnly('🧹 Clearing Firebase auth due to address mismatch')
-        await FIREBASE_AUTH.signOut()
-        authenticationStore.reset()
-        return {
-          success: false,
-          error: 'Address mismatch resolved - authentication required',
-          action: 'cleared_mismatched_auth',
+
+        const snapshot = await createStateSnapshot()
+        try {
+          await clearMismatchedAuth()
+          return {
+            success: false,
+            error: 'Address mismatch resolved - authentication required',
+            action: 'cleared_mismatched_auth',
+          }
+        } catch (error) {
+          await rollbackToSnapshot(snapshot)
+          throw error
         }
       }
 
       // Case 4: Invalid address formats - clear everything
       if (issues.some((issue) => issue.includes('Invalid') && issue.includes('address'))) {
         devOnly('🧹 Clearing invalid authentication data')
-        await FIREBASE_AUTH.signOut()
-        authenticationStore.reset()
-        walletStore.disconnect()
-        return {
-          success: false,
-          error: 'Invalid authentication data cleared',
-          action: 'cleared_invalid_data',
+
+        const snapshot = await createStateSnapshot()
+        try {
+          await clearInvalidData()
+          return {
+            success: false,
+            error: 'Invalid authentication data cleared',
+            action: 'cleared_invalid_data',
+          }
+        } catch (error) {
+          await rollbackToSnapshot(snapshot)
+          throw error
         }
       }
 
@@ -177,12 +210,187 @@ export const useAuthSessionRecovery = () => {
   }, [validateSession, walletStore, authenticationStore, chain?.id])
 
   /**
+   * SECURITY: Create state snapshot for rollback capability
+   */
+  const createStateSnapshot = useCallback(async (): Promise<SessionStateSnapshot> => {
+    return {
+      walletConnectionState: {
+        isConnected: walletStore.isConnected,
+        address: walletStore.address || null,
+        chainId: walletStore.chainId,
+      },
+      authenticationState: {
+        isLocked: authenticationStore.authLock.isLocked,
+        startTime: authenticationStore.authLock.startTime,
+        walletAddress: authenticationStore.authLock.walletAddress,
+        hasError: authenticationStore.authError !== null,
+        errorMessage: authenticationStore.authError?.message || null,
+      },
+      timestamp: Date.now(),
+    }
+  }, [walletStore, authenticationStore])
+
+  /**
+   * SECURITY: Rollback to previous state snapshot on failure
+   */
+  const rollbackToSnapshot = useCallback(
+    async (snapshot: SessionStateSnapshot): Promise<void> => {
+      devOnly('🔄 Rolling back to state snapshot from:', new Date(snapshot.timestamp).toISOString())
+
+      // SECURITY: Use MobX transaction for atomic rollback
+      await new Promise<void>((resolve, reject) => {
+        transaction(() => {
+          try {
+            // Rollback wallet connection state
+            walletStore.updateConnectionState(
+              snapshot.walletConnectionState.isConnected,
+              snapshot.walletConnectionState.address || undefined,
+              snapshot.walletConnectionState.chainId
+            )
+
+            // Rollback authentication state
+            authenticationStore.setAuthLock({
+              isLocked: snapshot.authenticationState.isLocked,
+              startTime: snapshot.authenticationState.startTime,
+              walletAddress: snapshot.authenticationState.walletAddress,
+              abortController: null,
+            })
+
+            // Rollback error state
+            const errorMessage = snapshot.authenticationState.errorMessage
+            if (errorMessage) {
+              const appError: AppError = {
+                name: 'AppError',
+                message: errorMessage,
+                type: ErrorType.SESSION_CORRUPTION,
+                userFriendlyMessage: 'Session recovery failed',
+                timestamp: new Date(),
+              }
+              authenticationStore.setAuthError(appError)
+            } else {
+              authenticationStore.setAuthError(null)
+            }
+
+            devOnly('✅ State rollback completed successfully')
+            resolve()
+          } catch (error) {
+            devOnly('❌ State rollback failed:', error)
+            reject(error)
+          }
+        })
+      })
+    },
+    [walletStore, authenticationStore]
+  )
+
+  /**
+   * SECURITY: Atomic state synchronization with validation
+   */
+  const synchronizeSessionState = useCallback(
+    async (params: { walletAddress: string; firebaseAddress: string; chainId: number | undefined }): Promise<void> => {
+      const { walletAddress, firebaseAddress, chainId } = params
+
+      // SECURITY: Use MobX transaction for atomic state updates
+      await new Promise<void>((resolve, reject) => {
+        transaction(() => {
+          try {
+            // Validate addresses one more time before synchronization
+            if (
+              !ValidationUtils.isValidWalletAddress(walletAddress) ||
+              !ValidationUtils.isValidWalletAddress(firebaseAddress) ||
+              walletAddress.toLowerCase() !== firebaseAddress.toLowerCase()
+            ) {
+              throw new Error('Address validation failed during synchronization')
+            }
+
+            // Atomic state updates
+            walletStore.updateConnectionState(true, walletAddress, chainId)
+            authenticationStore.setAuthLock({
+              isLocked: false,
+              startTime: 0,
+              walletAddress: firebaseAddress,
+              abortController: null,
+            })
+            authenticationStore.setAuthError(null)
+
+            devOnly('✅ Session state synchronized atomically')
+            resolve()
+          } catch (error) {
+            devOnly('❌ Session state synchronization failed:', error)
+            reject(error)
+          }
+        })
+      })
+    },
+    [walletStore, authenticationStore]
+  )
+
+  /**
+   * SECURITY: Atomic auth mismatch clearing
+   */
+  const clearMismatchedAuth = useCallback(async (): Promise<void> => {
+    try {
+      // Clear Firebase auth first
+      await FIREBASE_AUTH.signOut()
+
+      // Reset authentication store atomically
+      await new Promise<void>((resolve, reject) => {
+        transaction(() => {
+          try {
+            authenticationStore.reset()
+            devOnly('✅ Mismatched authentication cleared atomically')
+            resolve()
+          } catch (error) {
+            devOnly('❌ Failed to clear mismatched auth:', error)
+            reject(error)
+          }
+        })
+      })
+    } catch (error) {
+      devOnly('❌ Failed to clear Firebase auth:', error)
+      throw error
+    }
+  }, [authenticationStore])
+
+  /**
+   * SECURITY: Atomic invalid data clearing
+   */
+  const clearInvalidData = useCallback(async (): Promise<void> => {
+    try {
+      // Clear Firebase auth first
+      await FIREBASE_AUTH.signOut()
+
+      // Clear all authentication data atomically
+      await new Promise<void>((resolve, reject) => {
+        transaction(() => {
+          try {
+            authenticationStore.reset()
+            walletStore.disconnect()
+            devOnly('✅ Invalid authentication data cleared atomically')
+            resolve()
+          } catch (error) {
+            devOnly('❌ Failed to clear invalid data:', error)
+            reject(error)
+          }
+        })
+      })
+    } catch (error) {
+      devOnly('❌ Failed to clear Firebase auth:', error)
+      throw error
+    }
+  }, [authenticationStore, walletStore])
+
+  /**
    * Manually trigger session recovery
+   * SECURITY: Atomic recovery state management with rollback on failure
    */
   const triggerRecovery = useCallback(async () => {
     if (recoveryState.isRecovering) {
       return
     }
+
+    // Create state snapshot before recovery attempt
+    const snapshot = await createStateSnapshot()
 
     setRecoveryState((prev) => ({
       ...prev,
@@ -207,6 +415,13 @@ export const useAuthSessionRecovery = () => {
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error)
 
+      // SECURITY: Rollback to snapshot on critical failure
+      try {
+        await rollbackToSnapshot(snapshot)
+      } catch (rollbackError) {
+        devOnly('⚠️ State rollback failed during recovery error handling:', rollbackError)
+      }
+
       setRecoveryState((prev) => ({
         ...prev,
         isRecovering: false,
@@ -217,7 +432,7 @@ export const useAuthSessionRecovery = () => {
 
       throw error
     }
-  }, [attemptSessionRecovery, recoveryState.isRecovering])
+  }, [attemptSessionRecovery, recoveryState.isRecovering, createStateSnapshot, rollbackToSnapshot])
 
   // Automatic session recovery on app startup
   useEffect(() => {

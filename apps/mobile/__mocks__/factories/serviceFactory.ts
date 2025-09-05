@@ -27,7 +27,18 @@ export const createMockAuthenticationOrchestrator = (
  * Mocks the Firebase authentication manager
  */
 export const createMockFirebaseAuthManager = (
-  overrides: Partial<{
+  walletAddressOrOverrides?:
+    | string
+    | Partial<{
+        getCurrentState: jest.Mock
+        addListener: jest.Mock
+        signOut: jest.Mock
+        auth: {
+          currentUser: { uid: string } | null
+          signOut: jest.Mock
+        }
+      }>,
+  additionalOverrides: Partial<{
     getCurrentState: jest.Mock
     addListener: jest.Mock
     signOut: jest.Mock
@@ -36,29 +47,41 @@ export const createMockFirebaseAuthManager = (
       signOut: jest.Mock
     }
   }> = {}
-) => ({
-  getCurrentState: jest.fn(() => ({
-    user: null,
-    isLoading: false,
-    isAuthenticated: false,
-    walletAddress: null,
-  })),
-  addListener: jest.fn((callback) => {
-    callback({
-      user: null,
+) => {
+  // Handle both signatures: (walletAddress, overrides) or (overrides)
+  const walletAddress = typeof walletAddressOrOverrides === 'string' ? walletAddressOrOverrides : null
+  const overrides = typeof walletAddressOrOverrides === 'string' ? additionalOverrides : walletAddressOrOverrides || {}
+
+  return {
+    getCurrentState: jest.fn(() => ({
+      user: walletAddress ? { uid: 'test-user' } : null,
       isLoading: false,
-      isAuthenticated: false,
-      walletAddress: null,
-    })
-    return jest.fn() // cleanup function
-  }),
-  signOut: jest.fn().mockResolvedValue(undefined),
-  auth: {
-    currentUser: null as { uid: string } | null,
-    signOut: jest.fn(() => Promise.resolve()),
-  },
-  ...overrides,
-})
+      isAuthenticated: !!walletAddress,
+      walletAddress: walletAddress,
+    })),
+    addListener: jest.fn((callback) => {
+      callback({
+        user: walletAddress ? { uid: 'test-user' } : null,
+        isLoading: false,
+        isAuthenticated: !!walletAddress,
+        walletAddress: walletAddress,
+      })
+      return jest.fn() // cleanup function
+    }),
+    signOut: jest.fn().mockResolvedValue(undefined),
+    auth: {
+      currentUser: walletAddress ? { uid: 'test-user' } : null,
+      signOut: jest.fn(() => Promise.resolve()),
+    },
+    // Direct properties for hook compatibility
+    isAuthenticated: !!walletAddress,
+    isLoading: false,
+    walletAddress: walletAddress,
+    user: walletAddress ? { uid: 'test-user' } : null,
+    error: null,
+    ...overrides,
+  }
+}
 
 /**
  * API Client Factory

@@ -285,7 +285,7 @@ describe('PoolFactory', function () {
     it('Should not have getAllPoolAddresses function (removed for DoS prevention)', async function () {
       // This function was removed to prevent DoS attacks
       // Use getPoolsRange() instead for safe pagination
-      expect((poolFactory as any).getAllPoolAddresses).to.be.undefined
+      expect((poolFactory as unknown as { getAllPoolAddresses?: unknown }).getAllPoolAddresses).to.be.undefined
     })
 
     it('Should return pools in range', async function () {

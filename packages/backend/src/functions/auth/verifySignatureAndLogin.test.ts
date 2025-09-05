@@ -41,7 +41,7 @@ const mockCollection = jest.fn((collectionName) => {
 const mockFirestore = { collection: mockCollection }
 
 jest.mock('firebase-admin/firestore', () => {
-  const actualFirestore = jest.requireActual('firebase-admin/firestore') as any
+  const actualFirestore = jest.requireActual('firebase-admin/firestore') as typeof import('firebase-admin/firestore')
 
   return {
     getFirestore: () => mockFirestore,
@@ -130,9 +130,9 @@ describe('verifySignatureAndLoginHandler', () => {
     mockUserDoc.get.mockResolvedValue(createMockDocumentSnapshot(true, { walletAddress, createdAt: timestamp }))
 
     // Set up the mocks for the other calls
-    mockSet.mockResolvedValue(null as any)
-    mockUpdate.mockResolvedValue(null as any)
-    mockDelete.mockResolvedValue(null as any)
+    mockSet.mockResolvedValue(undefined)
+    mockUpdate.mockResolvedValue(undefined)
+    mockDelete.mockResolvedValue(undefined)
 
     mockCreateAuthMessage.mockReturnValue(mockMessage)
     mockCreateCustomToken.mockResolvedValue(firebaseToken)

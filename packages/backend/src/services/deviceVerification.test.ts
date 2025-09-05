@@ -1,12 +1,26 @@
 import { jest } from '@jest/globals'
 
 // Mock Firebase services
-const mockGet = jest.fn() as jest.MockedFunction<() => Promise<any>>
-const mockSet = jest.fn() as jest.MockedFunction<(data: any) => Promise<void>>
-const mockUpdate = jest.fn() as jest.MockedFunction<(data: any) => Promise<void>>
+const mockGet = jest.fn() as jest.MockedFunction<
+  () => Promise<{
+    exists: boolean
+    data?: () => unknown
+    ref?: { update: jest.MockedFunction<(data: Record<string, unknown>) => Promise<void>> }
+  }>
+>
+const mockSet = jest.fn() as jest.MockedFunction<(data: Record<string, unknown>) => Promise<void>>
+const mockUpdate = jest.fn() as jest.MockedFunction<(data: Record<string, unknown>) => Promise<void>>
 const mockDelete = jest.fn() as jest.MockedFunction<() => Promise<void>>
-const mockCollection = jest.fn() as jest.MockedFunction<(name: string) => any>
-const mockDoc = jest.fn() as jest.MockedFunction<(id: string) => any>
+const mockCollection = jest.fn() as jest.MockedFunction<(name: string) => { doc: jest.MockedFunction<(id: string) => unknown> }>
+const mockDoc = jest.fn() as jest.MockedFunction<
+  (id: string) => {
+    get: jest.MockedFunction<() => Promise<unknown>>
+    set: jest.MockedFunction<(data: Record<string, unknown>) => Promise<void>>
+    update: jest.MockedFunction<(data: Record<string, unknown>) => Promise<void>>
+    delete: jest.MockedFunction<() => Promise<void>>
+    ref: { update: jest.MockedFunction<(data: Record<string, unknown>) => Promise<void>> }
+  }
+>
 
 mockCollection.mockReturnValue({ doc: mockDoc })
 mockDoc.mockReturnValue({
