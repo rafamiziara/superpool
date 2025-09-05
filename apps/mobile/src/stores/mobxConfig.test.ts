@@ -5,6 +5,11 @@ import { configureMobX, mobxUtils } from './mobxConfig'
 // Type for globalThis with __DEV__
 type GlobalWithDev = typeof globalThis & { __DEV__: boolean }
 
+// JUSTIFIED INLINE MOCKING: Testing low-level MobX and React Native configuration
+// This file tests the specific configuration behavior of MobX with React Native Platform,
+// requiring precise control over the mocked dependencies to verify configuration values.
+// Centralized mocking would not provide the fine-grained control needed for these tests.
+
 // Mock React Native Platform
 jest.mock('react-native', () => ({
   Platform: {

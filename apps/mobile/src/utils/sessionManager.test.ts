@@ -28,25 +28,11 @@ global.console = {
   warn: jest.fn(),
 }
 
-// Mock constants
-jest.mock('../config/constants', () => ({
-  SESSION_STORAGE_KEYS: {
-    REOWN_APPKIT: 'reown_appkit_session',
-    WALLETCONNECT_V2: 'walletconnect_v2_session',
-    AUTH_STATE: 'auth_state',
-    USER_PREFERENCES: 'user_preferences',
-  },
-  SESSION_ERROR_INDICATORS: ['session', 'relayer', 'pairing', 'expired', 'timeout', 'connection', 'failed'],
-  SESSION_ID_PATTERNS: [/^[a-f0-9]{64}$/i, /session:\s*([a-f0-9]{64})/i],
-  RELAYER_ERROR_INDICATORS: ['relayer connection failed', 'relayer timeout', 'relayer error', 'websocket', 'network'],
-  REOWN_APPKIT_SESSION_KEY: 'reown_appkit_session',
-  WALLETCONNECT_SESSION_KEY: 'walletconnect_session',
-  SESSION_TIMEOUTS: {
-    DEFAULT_MAX_AGE: 86400000,
-    CLEANUP_BATCH_SIZE: 10,
-    CLEANUP_DELAY: 100,
-  },
-}))
+// Use centralized configuration mock
+jest.mock('../config/constants', () => {
+  const { configMockPresets } = require('@mocks/factories/configFactory')
+  return configMockPresets.sessionManagement()
+})
 
 describe('SessionManager', () => {
   beforeEach(() => {
