@@ -1,6 +1,9 @@
 /**
  * Circuit breaker implementation for Firebase authentication
  * Prevents cascading failures and provides graceful degradation
+ *
+ * SECURITY: Implements atomic operations with mutex protection to prevent
+ * race conditions in concurrent request handling scenarios.
  */
 
 /* prettier-ignore */
@@ -42,6 +45,46 @@ export interface CircuitBreakerResult<T> {
  * Firebase Authentication Circuit Breaker
  * Monitors Firebase auth failures and prevents cascade failures
  */
+/**
+ * Mutex implementation for atomic operations
+ * Prevents race conditions in concurrent circuit breaker operations
+ */
+class Mutex {
+  private locked: boolean = false
+  private queue: Array<() => void> = []
+
+  async lock(): Promise<void> {
+    return new Promise<void>((resolve) => {
+      if (!this.locked) {
+        this.locked = true
+        resolve()
+      } else {
+        this.queue.push(resolve)
+      }
+    })
+  }
+
+  unlock(): void {
+    if (this.queue.length > 0) {
+      const next = this.queue.shift()
+      if (next) {
+        next()
+      }
+    } else {
+      this.locked = false
+    }
+  }
+
+  async withLock<T>(fn: () => Promise<T>): Promise<T> {
+    await this.lock()
+    try {
+      return await fn()
+    } finally {
+      this.unlock()
+    }
+  }
+}
+
 export class FirebaseAuthCircuitBreaker {
   private state: CircuitBreakerState = CircuitBreakerState.CLOSED
   private failureCount: number = 0
@@ -53,6 +96,9 @@ export class FirebaseAuthCircuitBreaker {
   private totalRequests: number = 0
   private monitoringWindowStart: number = Date.now()
 
+  // SECURITY: Mutex for atomic operations to prevent race conditions
+  private readonly mutex: Mutex = new Mutex()
+
   constructor(private config: CircuitBreakerConfig) {
     console.log(`🔌 Circuit breaker "${config.name}" initialized`, {
       failureThreshold: config.failureThreshold,
@@ -63,15 +109,19 @@ export class FirebaseAuthCircuitBreaker {
 
   /**
    * Execute function with circuit breaker protection
+   * SECURITY: Atomic operations prevent race conditions in request counting
    */
   async execute<T>(fn: () => Promise<T>): Promise<CircuitBreakerResult<T>> {
-    this.totalRequests++
+    // SECURITY: Atomic increment of total requests
+    await this.mutex.withLock(async () => {
+      this.totalRequests++
+    })
 
     // Reset monitoring window if expired
-    this.resetMonitoringWindowIfExpired()
+    await this.resetMonitoringWindowIfExpired()
 
-    // Check circuit state before execution
-    if (this.shouldRejectRequest()) {
+    // Check circuit state before execution (now async)
+    if (await this.shouldRejectRequest()) {
       return {
         success: false,
         error: new Error(`Circuit breaker is ${this.state}. Request rejected to prevent cascade failures.`),
@@ -83,7 +133,7 @@ export class FirebaseAuthCircuitBreaker {
     // Execute the function
     try {
       const result = await fn()
-      this.onSuccess()
+      await this.onSuccess()
 
       return {
         success: true,
@@ -92,7 +142,7 @@ export class FirebaseAuthCircuitBreaker {
         metrics: this.getMetrics(),
       }
     } catch (error) {
-      this.onFailure(error instanceof Error ? error : new Error(String(error)))
+      await this.onFailure(error instanceof Error ? error : new Error(String(error)))
 
       return {
         success: false,
@@ -105,8 +155,9 @@ export class FirebaseAuthCircuitBreaker {
 
   /**
    * Check if request should be rejected based on circuit state
+   * SECURITY: Uses atomic operations to prevent race conditions in half-open state
    */
-  private shouldRejectRequest(): boolean {
+  private async shouldRejectRequest(): Promise<boolean> {
     const now = Date.now()
 
     switch (this.state) {
@@ -116,18 +167,25 @@ export class FirebaseAuthCircuitBreaker {
       case CircuitBreakerState.OPEN:
         // Check if recovery timeout has passed
         if (this.lastStateChange + this.config.recoveryTimeout <= now) {
-          this.transitionTo(CircuitBreakerState.HALF_OPEN)
+          await this.mutex.withLock(async () => {
+            // Double-check state hasn't changed while waiting for lock
+            if (this.state === CircuitBreakerState.OPEN && this.lastStateChange + this.config.recoveryTimeout <= now) {
+              this.transitionTo(CircuitBreakerState.HALF_OPEN)
+            }
+          })
           return false
         }
         return true // Reject request
 
       case CircuitBreakerState.HALF_OPEN:
-        // Allow limited number of requests for testing
-        if (this.halfOpenRequests < this.config.halfOpenMaxRequests) {
-          this.halfOpenRequests++
-          return false
-        }
-        return true // Reject additional requests
+        // SECURITY FIX: Atomic check-and-increment to prevent race conditions
+        return await this.mutex.withLock(async () => {
+          if (this.halfOpenRequests < this.config.halfOpenMaxRequests) {
+            this.halfOpenRequests++
+            return false // Allow request
+          }
+          return true // Reject additional requests
+        })
 
       default:
         return false
@@ -136,52 +194,58 @@ export class FirebaseAuthCircuitBreaker {
 
   /**
    * Handle successful execution
+   * SECURITY: Atomic state updates to prevent race conditions
    */
-  private onSuccess(): void {
-    this.successCount++
-    this.lastSuccessTime = Date.now()
+  private async onSuccess(): Promise<void> {
+    await this.mutex.withLock(async () => {
+      this.successCount++
+      this.lastSuccessTime = Date.now()
 
-    switch (this.state) {
-      case CircuitBreakerState.HALF_OPEN:
-        // If we've had enough successful requests in half-open, close the circuit
-        if (this.halfOpenRequests >= this.config.halfOpenMaxRequests) {
-          this.transitionTo(CircuitBreakerState.CLOSED)
-        }
-        break
+      switch (this.state) {
+        case CircuitBreakerState.HALF_OPEN:
+          // If we've had enough successful requests in half-open, close the circuit
+          if (this.halfOpenRequests >= this.config.halfOpenMaxRequests) {
+            this.transitionTo(CircuitBreakerState.CLOSED)
+          }
+          break
 
-      case CircuitBreakerState.CLOSED:
-        // Reset failure count on success in closed state
-        this.failureCount = 0
-        break
-    }
+        case CircuitBreakerState.CLOSED:
+          // Reset failure count on success in closed state
+          this.failureCount = 0
+          break
+      }
+    })
   }
 
   /**
    * Handle failed execution
+   * SECURITY: Atomic state updates to prevent race conditions
    */
-  private onFailure(error: Error): void {
-    this.failureCount++
-    this.lastFailureTime = Date.now()
+  private async onFailure(error: Error): Promise<void> {
+    await this.mutex.withLock(async () => {
+      this.failureCount++
+      this.lastFailureTime = Date.now()
 
-    console.warn(`🔌 Circuit breaker "${this.config.name}" recorded failure`, {
-      error: error.message,
-      failureCount: this.failureCount,
-      threshold: this.config.failureThreshold,
-      currentState: this.state,
-    })
+      console.warn(`🔌 Circuit breaker "${this.config.name}" recorded failure`, {
+        error: error.message,
+        failureCount: this.failureCount,
+        threshold: this.config.failureThreshold,
+        currentState: this.state,
+      })
 
-    switch (this.state) {
-      case CircuitBreakerState.CLOSED:
-        if (this.failureCount >= this.config.failureThreshold) {
+      switch (this.state) {
+        case CircuitBreakerState.CLOSED:
+          if (this.failureCount >= this.config.failureThreshold) {
+            this.transitionTo(CircuitBreakerState.OPEN)
+          }
+          break
+
+        case CircuitBreakerState.HALF_OPEN:
+          // Any failure in half-open state immediately opens the circuit
           this.transitionTo(CircuitBreakerState.OPEN)
-        }
-        break
-
-      case CircuitBreakerState.HALF_OPEN:
-        // Any failure in half-open state immediately opens the circuit
-        this.transitionTo(CircuitBreakerState.OPEN)
-        break
-    }
+          break
+      }
+    })
   }
 
   /**
@@ -217,17 +281,20 @@ export class FirebaseAuthCircuitBreaker {
 
   /**
    * Reset monitoring window if expired
+   * SECURITY: Atomic window reset to prevent race conditions
    */
-  private resetMonitoringWindowIfExpired(): void {
-    const now = Date.now()
-    if (now - this.monitoringWindowStart >= this.config.monitoringWindow) {
-      this.monitoringWindowStart = now
-      // Reset counters for new monitoring window
-      if (this.state === CircuitBreakerState.CLOSED) {
-        this.failureCount = 0
-        this.successCount = 0
+  private async resetMonitoringWindowIfExpired(): Promise<void> {
+    await this.mutex.withLock(async () => {
+      const now = Date.now()
+      if (now - this.monitoringWindowStart >= this.config.monitoringWindow) {
+        this.monitoringWindowStart = now
+        // Reset counters for new monitoring window
+        if (this.state === CircuitBreakerState.CLOSED) {
+          this.failureCount = 0
+          this.successCount = 0
+        }
       }
-    }
+    })
   }
 
   /**

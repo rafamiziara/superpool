@@ -103,7 +103,7 @@ describe('SafeWalletVerificationService', () => {
         isValidSignature: jest.fn(),
       }
 
-      mockContract.mockImplementation(() => mockContractInstance as any)
+      mockContract.mockImplementation(() => mockContractInstance as unknown as InstanceType<typeof Contract>)
 
       const result = await SafeWalletVerificationService.verifySafeWalletSignature(
         validWalletAddress,
@@ -131,7 +131,7 @@ describe('SafeWalletVerificationService', () => {
         target: validWalletAddress, // Mock contract target property
       }
 
-      mockContract.mockImplementation(() => mockContractInstance as any)
+      mockContract.mockImplementation(() => mockContractInstance as unknown as InstanceType<typeof Contract>)
 
       const result = await SafeWalletVerificationService.verifySafeWalletSignature(
         validWalletAddress,
@@ -164,7 +164,7 @@ describe('SafeWalletVerificationService', () => {
         target: validWalletAddress,
       }
 
-      mockContract.mockImplementation(() => mockContractInstance as any)
+      mockContract.mockImplementation(() => mockContractInstance as unknown as InstanceType<typeof Contract>)
 
       const result = await SafeWalletVerificationService.verifySafeWalletSignature(
         validWalletAddress,
@@ -188,7 +188,7 @@ describe('SafeWalletVerificationService', () => {
         target: validWalletAddress,
       }
 
-      mockContract.mockImplementation(() => mockContractInstance as any)
+      mockContract.mockImplementation(() => mockContractInstance as unknown as InstanceType<typeof Contract>)
 
       const result = await SafeWalletVerificationService.verifySafeWalletSignature(
         validWalletAddress,
@@ -212,7 +212,7 @@ describe('SafeWalletVerificationService', () => {
         target: validWalletAddress,
       }
 
-      mockContract.mockImplementation(() => mockContractInstance as any)
+      mockContract.mockImplementation(() => mockContractInstance as unknown as InstanceType<typeof Contract>)
 
       const result = await SafeWalletVerificationService.verifySafeWalletSignature(
         validWalletAddress,
@@ -238,7 +238,7 @@ describe('SafeWalletVerificationService', () => {
         target: validWalletAddress,
       }
 
-      mockContract.mockImplementation(() => mockContractInstance as any)
+      mockContract.mockImplementation(() => mockContractInstance as unknown as InstanceType<typeof Contract>)
 
       const result = await SafeWalletVerificationService.verifySafeWalletSignature(
         validWalletAddress,
@@ -261,7 +261,7 @@ describe('SafeWalletVerificationService', () => {
         isValidSignature: jest.fn(),
       }
 
-      mockContract.mockImplementation(() => mockContractInstance as any)
+      mockContract.mockImplementation(() => mockContractInstance as unknown as InstanceType<typeof Contract>)
 
       const result = await SafeWalletVerificationService.verifySafeWalletSignature(
         validWalletAddress,
@@ -287,7 +287,7 @@ describe('SafeWalletVerificationService', () => {
         target: validWalletAddress,
       }
 
-      mockContract.mockImplementation(() => mockMaliciousContract as any)
+      mockContract.mockImplementation(() => mockMaliciousContract as unknown as InstanceType<typeof Contract>)
 
       const result = await SafeWalletVerificationService.verifySafeWalletSignature(
         validWalletAddress,
