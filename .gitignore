@@ -10,6 +10,7 @@ node_modules
 # Debug
 firebase-debug.log
 firestore-debug.log
+bash.exe.stackdump
 
 # Env Variables
 .env
