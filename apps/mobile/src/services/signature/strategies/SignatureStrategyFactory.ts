@@ -1,5 +1,5 @@
 import type { Connector } from 'wagmi'
-import type { SignatureStrategy } from './SignatureStrategy'
+import type { SignatureStrategy } from '../types'
 import { SafeWalletStrategy } from './SafeWalletStrategy'
 import { RegularWalletStrategy } from './RegularWalletStrategy'
 

@@ -1,4 +1,3 @@
-/* istanbul ignore file */
 // Error recovery service exports
 export { AuthErrorRecoveryService } from './AuthErrorRecoveryService'
 

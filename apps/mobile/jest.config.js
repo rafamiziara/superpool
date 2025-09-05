@@ -24,6 +24,8 @@ module.exports = {
     '!src/config/**', // Configuration directory
     '!src/globals.d.ts', // Type definitions
     '!src/assets/**', // Static assets
+    '!src/**/index.ts', // Barrel export files
+    '!src/**/types/**', // TypeScript interface definitions only
   ],
   coverageDirectory: '<rootDir>/../../coverage/mobile',
   coverageReporters: ['lcov', 'text'],
