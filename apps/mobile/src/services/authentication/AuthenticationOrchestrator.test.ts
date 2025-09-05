@@ -4,6 +4,9 @@ import type { AuthenticationContext, WagmiConnector } from '@superpool/types'
 import {
   createMockAuthenticationStepExecutor,
   createMockAuthenticationValidator,
+  createMockAuthErrorRecoveryService,
+  createMockEnhancedAuthToasts,
+  createMockFirebaseAuth,
   createMockFirebaseAuthenticator,
   createMockMessageGenerator,
   createMockRouter,
@@ -12,32 +15,12 @@ import {
 } from '@mocks/factories/serviceFactory'
 import { createMockAuthenticationStore, createMockWalletStore } from '@mocks/factories/storeFactory'
 
-// Create mock instances
+// Create mock instances using centralized factories
 const mockRouter = createMockRouter()
 const mockSessionManager = createMockSessionManager()
-const mockAuthToasts = {
-  success: jest.fn(),
-  authSuccess: jest.fn(),
-}
-// AuthErrorRecoveryService has static methods, so we mock it as a class with static methods
-const mockAuthErrorRecoveryService = {
-  initialize: jest.fn(),
-  handleAuthenticationError: jest.fn().mockResolvedValue({
-    appError: { message: 'Mock error', name: 'MockError' },
-    recoveryResult: {
-      shouldDisconnect: false,
-      shouldShowError: true,
-      errorDelay: 0,
-      cleanupPerformed: false,
-    },
-  }),
-  showErrorFeedback: jest.fn(),
-  handleFirebaseCleanup: jest.fn(),
-}
-
-const mockFirebaseAuth = {
-  currentUser: null as { uid: string } | null,
-}
+const mockAuthToasts = createMockEnhancedAuthToasts()
+const mockAuthErrorRecoveryService = createMockAuthErrorRecoveryService()
+const mockFirebaseAuth = createMockFirebaseAuth()
 
 // Mock constructor functions with factories
 const mockAuthenticationStepExecutor = jest.fn().mockImplementation(() => createMockAuthenticationStepExecutor())

@@ -1,41 +1,34 @@
+import {
+  createMockConnector,
+  createMockDevUtils,
+  createMockSignatureFunctions,
+  createMockSignatureStrategyFactory,
+  createMockSignatureUtils,
+} from '@mocks/factories/serviceFactory'
 import { SignatureFunctions, SignatureRequest, SignatureResult } from '@superpool/types'
 import type { Connector } from 'wagmi'
 import { devOnly } from '../../utils'
+import { SignatureService } from './SignatureService'
 import { SignatureStrategyFactory, SignatureUtils } from './strategies'
 import type { SignatureStrategy } from './strategies/SignatureStrategy'
-import { SignatureService } from './SignatureService'
 
 // Jest utilities
 declare const fail: (message?: string) => never
 
 // Mock dependencies
-jest.mock('../../utils', () => ({
-  devOnly: jest.fn(),
-}))
-jest.mock('./strategies', () => ({
-  SignatureStrategyFactory: {
-    getStrategy: jest.fn(),
-  },
-  SignatureUtils: {
-    isValidSignatureFormat: jest.fn(),
-  },
-}))
+jest.mock('../../utils')
+jest.mock('./strategies')
 
 const mockDevOnly = devOnly as jest.MockedFunction<typeof devOnly>
 const mockSignatureStrategyFactory = SignatureStrategyFactory as jest.Mocked<typeof SignatureStrategyFactory>
 const mockSignatureUtils = SignatureUtils as jest.Mocked<typeof SignatureUtils>
-
-// Mock strategy
-const mockStrategy = {
-  getStrategyName: jest.fn().mockReturnValue('mock-strategy'),
-  sign: jest.fn(),
-}
 
 describe('SignatureService', () => {
   let mockSignatureFunctions: SignatureFunctions
   let mockConnector: Connector
   let consoleLogSpy: jest.SpyInstance
   let consoleErrorSpy: jest.SpyInstance
+  let mockStrategy: jest.Mocked<SignatureStrategy>
 
   const validSignatureRequest: SignatureRequest = {
     message: 'Please sign this message to authenticate with SuperPool',
@@ -53,51 +46,28 @@ describe('SignatureService', () => {
   beforeEach(() => {
     jest.clearAllMocks()
 
-    // Reset strategy mock
-    mockStrategy.getStrategyName.mockReturnValue('mock-strategy')
-    mockStrategy.sign.mockResolvedValue(mockSignatureResult)
+    // Create mock instances using centralized factories
+    mockSignatureFunctions = createMockSignatureFunctions()
+    mockConnector = createMockConnector() as unknown as jest.Mocked<Connector>
 
-    // Mock signature functions
-    mockSignatureFunctions = {
-      signTypedDataAsync: jest.fn().mockResolvedValue('0xmocked-typed-signature'),
-      signMessageAsync: jest.fn().mockResolvedValue('0xmocked-signature'),
-    } as jest.Mocked<SignatureFunctions>
-
-    // Mock connector
-    mockConnector = {
-      id: 'mock-connector',
-      name: 'Mock Connector',
-      type: 'injected',
-      icon: undefined,
-      rdns: undefined,
-      supportsSimulation: true,
-      uid: 'mock-uid-123',
-      setup: jest.fn(),
-      connect: jest.fn(),
-      disconnect: jest.fn(),
-      getAccounts: jest.fn(),
-      getChainId: jest.fn(),
-      getProvider: jest.fn(),
-      switchChain: jest.fn(),
-      isAuthorized: jest.fn(),
-      emitter: {
-        emit: jest.fn(),
-        listenerCount: jest.fn(),
-        listeners: jest.fn(),
-        off: jest.fn(),
-        on: jest.fn(),
-        once: jest.fn(),
-        removeAllListeners: jest.fn(),
-      },
-    } as unknown as jest.Mocked<Connector>
-
-    // Mock strategy factory and utils
-    const mockStrategyWithCanHandle = {
-      ...mockStrategy,
+    // Create mock strategy
+    mockStrategy = {
+      getStrategyName: jest.fn().mockReturnValue('mock-strategy'),
+      sign: jest.fn().mockResolvedValue(mockSignatureResult),
       canHandle: jest.fn().mockReturnValue(true),
     } as jest.Mocked<SignatureStrategy>
-    mockSignatureStrategyFactory.getStrategy.mockReturnValue(mockStrategyWithCanHandle)
-    mockSignatureUtils.isValidSignatureFormat.mockReturnValue(true)
+
+    // Configure mock factories
+    const mockStrategyFactory = createMockSignatureStrategyFactory({
+      getStrategy: jest.fn().mockReturnValue(mockStrategy),
+    })
+    const mockUtils = createMockSignatureUtils()
+    const mockDev = createMockDevUtils()
+
+    // Apply mocks
+    Object.assign(mockSignatureStrategyFactory, mockStrategyFactory)
+    Object.assign(mockSignatureUtils, mockUtils)
+    Object.assign(mockDevOnly, mockDev.devOnly)
 
     // Spy on console methods
     consoleLogSpy = jest.spyOn(console, 'log').mockImplementation()
@@ -537,7 +507,7 @@ describe('SignatureService', () => {
       ]
 
       for (const connectorInfo of connectorTypes) {
-        const connector = { ...mockConnector, ...connectorInfo }
+        const connector = createMockConnector(connectorInfo) as unknown as jest.Mocked<Connector>
 
         await SignatureService.requestSignature(validSignatureRequest, mockSignatureFunctions, connector)
 
@@ -552,32 +522,11 @@ describe('SignatureService', () => {
     })
 
     it('should handle connector without id or name', async () => {
-      const minimalConnector = {
+      const minimalConnector = createMockConnector({
         id: '',
         name: '',
-        type: 'injected',
-        icon: undefined,
-        rdns: undefined,
-        supportsSimulation: true,
         uid: 'minimal-uid-123',
-        setup: jest.fn(),
-        connect: jest.fn(),
-        disconnect: jest.fn(),
-        getAccounts: jest.fn(),
-        getChainId: jest.fn(),
-        getProvider: jest.fn(),
-        switchChain: jest.fn(),
-        isAuthorized: jest.fn(),
-        emitter: {
-          emit: jest.fn(),
-          listenerCount: jest.fn(),
-          listeners: jest.fn(),
-          off: jest.fn(),
-          on: jest.fn(),
-          once: jest.fn(),
-          removeAllListeners: jest.fn(),
-        },
-      } as unknown as jest.Mocked<Connector>
+      }) as unknown as jest.Mocked<Connector>
 
       await SignatureService.requestSignature(validSignatureRequest, mockSignatureFunctions, minimalConnector)
 
