@@ -3,7 +3,7 @@ import { logger } from 'firebase-functions'
 import { ethers } from 'ethers'
 import { getFirestore } from 'firebase-admin/firestore'
 import { PoolFactoryABI } from '../../constants/abis'
-import { handleError, AppError } from '../../utils/errorHandling'
+import { AppError, handleError } from '../../utils/errorHandling'
 
 export interface PoolCreatedEvent {
   poolId: string

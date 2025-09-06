@@ -1,4 +1,4 @@
-import { ContractService, ContractServiceConfig, TransactionProposal, ContractCall, BatchTransactionRequest } from './ContractService'
+import { BatchTransactionRequest, ContractCall, ContractService, ContractServiceConfig, TransactionProposal } from './ContractService'
 import { AppError } from '../utils/errorHandling'
 import { jest } from '@jest/globals'
 

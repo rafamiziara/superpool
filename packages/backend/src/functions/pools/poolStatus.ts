@@ -1,8 +1,8 @@
-import { onCall, HttpsError, CallableRequest } from 'firebase-functions/v2/https'
+import { CallableRequest, HttpsError, onCall } from 'firebase-functions/v2/https'
 import { logger } from 'firebase-functions'
 import { ethers } from 'ethers'
 import { getFirestore } from 'firebase-admin/firestore'
-import { handleError, AppError } from '../../utils/errorHandling'
+import { AppError, handleError } from '../../utils/errorHandling'
 
 export interface PoolStatusRequest {
   transactionHash: string

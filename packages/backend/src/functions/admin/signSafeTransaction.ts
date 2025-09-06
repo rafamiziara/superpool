@@ -1,9 +1,9 @@
-import { onCall, HttpsError, CallableRequest } from 'firebase-functions/v2/https'
+import { CallableRequest, HttpsError, onCall } from 'firebase-functions/v2/https'
 import { logger } from 'firebase-functions'
 import { ethers } from 'ethers'
 import { getFirestore } from 'firebase-admin/firestore'
-import { signSafeTransaction as signSafeTransactionUtil, SafeSignature, getSafeOwners, isSafeOwner } from '../../utils/multisig'
-import { handleError, AppError } from '../../utils/errorHandling'
+import { getSafeOwners, isSafeOwner, SafeSignature, signSafeTransaction as signSafeTransactionUtil } from '../../utils/multisig'
+import { AppError, handleError } from '../../utils/errorHandling'
 
 export interface SignSafeTransactionRequest {
   transactionHash: string

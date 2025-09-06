@@ -1,4 +1,4 @@
-import { onCall, CallableRequest } from 'firebase-functions/v2/https'
+import { CallableRequest, onCall } from 'firebase-functions/v2/https'
 import { logger } from 'firebase-functions'
 import { getFirestore } from 'firebase-admin/firestore'
 import { handleError } from '../../utils/errorHandling'

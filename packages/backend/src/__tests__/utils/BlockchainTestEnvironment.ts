@@ -6,7 +6,7 @@
  * realistic blockchain interaction patterns.
  */
 
-import { JsonRpcProvider, Wallet, Contract } from 'ethers'
+import { Contract, JsonRpcProvider, Wallet } from 'ethers'
 import { jest } from '@jest/globals'
 import { ethersMock } from '../../__mocks__/blockchain/EthersMock'
 import { ContractMock } from '../../__mocks__/blockchain/ContractMock'

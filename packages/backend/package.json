@@ -12,7 +12,8 @@
     "generateKey": "ts-node ../../scripts/generateKey.ts",
     "signMessage": "ts-node ../../scripts/signMessage.ts",
     "test": "jest",
-    "format": "prettier --write ."
+    "format": "prettier --write .",
+    "type-check": "tsc --noEmit"
   },
   "engines": {
     "node": "22"

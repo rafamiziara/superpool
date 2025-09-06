@@ -6,17 +6,17 @@
  */
 
 import { jest } from '@jest/globals'
-import type { App, ServiceAccount, AppOptions } from 'firebase-admin/app'
+import type { App, AppOptions, ServiceAccount } from 'firebase-admin/app'
 import type { Auth, DecodedIdToken, UserRecord } from 'firebase-admin/auth'
 import type {
-  Firestore,
-  DocumentSnapshot,
-  QuerySnapshot,
-  DocumentReference,
   CollectionReference,
-  WriteBatch,
-  Transaction,
+  DocumentReference,
+  DocumentSnapshot,
   FieldValue,
+  Firestore,
+  QuerySnapshot,
+  Transaction,
+  WriteBatch,
 } from 'firebase-admin/firestore'
 
 export interface MockFirestoreDocument {

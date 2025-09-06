@@ -6,11 +6,11 @@
  * and state isolation between tests.
  */
 
-import { Firestore, connectFirestoreEmulator } from 'firebase/firestore'
-import { initializeApp, getApps, deleteApp } from 'firebase/app'
+import { connectFirestoreEmulator, Firestore } from 'firebase/firestore'
+import { deleteApp, getApps, initializeApp } from 'firebase/app'
 import { getFirestore } from 'firebase/firestore'
 import { EventEmitter } from 'events'
-import { spawn, ChildProcess } from 'child_process'
+import { ChildProcess, spawn } from 'child_process'
 
 // Database management configuration
 export interface TestDatabaseConfig {

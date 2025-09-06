@@ -1,11 +1,11 @@
 /**
  * Device Verification Comprehensive Tests
- * 
+ *
  * Complete test suite for SuperPool device verification and approval system
  * including App Check integration, device registration, and security validation.
  */
 
-import { describe, beforeEach, afterEach, it, expect, jest } from '@jest/globals'
+import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals'
 import { MockFactory, quickSetup, TestFixtures } from '../../__mocks__/index'
 import { performanceManager, startPerformanceTest } from '../../__tests__/utils/PerformanceTestUtilities'
 import { withTestIsolation } from '../../__tests__/utils/TestEnvironmentIsolation'
@@ -17,36 +17,36 @@ const DeviceVerification = {
   checkDeviceApproval: jest.fn(),
   generateDeviceId: jest.fn(),
   validateAppCheckToken: jest.fn(),
-  cleanupExpiredApprovals: jest.fn()
+  cleanupExpiredApprovals: jest.fn(),
 }
 
 // Mock App Check service
 const AppCheckService = {
   createCustomToken: jest.fn(),
   verifyToken: jest.fn(),
-  revokeToken: jest.fn()
+  revokeToken: jest.fn(),
 }
 
 describe('Device Verification - Comprehensive Tests', () => {
   let testEnvironment: any
   let mockFirestore: any
   let mockAuth: any
-  
+
   beforeEach(async () => {
     // Setup comprehensive test environment
     testEnvironment = MockFactory.createCloudFunctionEnvironment({
       withAuth: true,
       withFirestore: true,
-      withContracts: false
+      withContracts: false,
     })
-    
+
     mockFirestore = testEnvironment.mocks.firebase.firestore
     mockAuth = testEnvironment.mocks.firebase.auth
-    
+
     // Reset performance tracking
     performanceManager.clearAll()
   })
-  
+
   afterEach(async () => {
     MockFactory.resetAllMocks()
   })
@@ -59,39 +59,39 @@ describe('Device Verification - Comprehensive Tests', () => {
           const deviceId = 'test-device-12345'
           const walletAddress = TestFixtures.TestData.addresses.poolOwners[0]
           const userUid = TestFixtures.TestData.users.poolOwner.uid
-          
+
           // Setup Firestore mock for successful write
           const mockSet = jest.fn().mockResolvedValue(undefined)
           mockFirestore.collection.mockReturnValue({
-            doc: jest.fn().mockReturnValue({ set: mockSet })
+            doc: jest.fn().mockReturnValue({ set: mockSet }),
           })
-          
+
           // Setup Auth mock for user verification
           mockAuth.verifyIdToken.mockResolvedValue({
             uid: userUid,
-            wallet_address: walletAddress
+            wallet_address: walletAddress,
           })
-          
+
           // Act
           const measurement = startPerformanceTest('device-approval', 'device-verification')
-          
+
           DeviceVerification.approveDevice.mockResolvedValue({
             success: true,
             deviceId,
             walletAddress,
             approvedAt: new Date().toISOString(),
             expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(), // 7 days
-            appCheckToken: 'mock-app-check-token'
+            appCheckToken: 'mock-app-check-token',
           })
-          
+
           const result = await DeviceVerification.approveDevice({
             deviceId,
             walletAddress,
-            userUid
+            userUid,
           })
-          
+
           const metrics = measurement.end()
-          
+
           // Assert
           expect(result.success).toBe(true)
           expect(result.deviceId).toBe(deviceId)
@@ -99,10 +99,10 @@ describe('Device Verification - Comprehensive Tests', () => {
           expect(result.approvedAt).toBeDefined()
           expect(result.expiresAt).toBeDefined()
           expect(result.appCheckToken).toBeDefined()
-          
+
           // Performance assertion
           expect(metrics.executionTime).toBeLessThan(2000) // < 2 seconds
-          
+
           // Verify Firestore interaction
           expect(mockFirestore.collection).toHaveBeenCalledWith('approved_devices')
         })
@@ -113,25 +113,25 @@ describe('Device Verification - Comprehensive Tests', () => {
           // Arrange
           const deviceId = 'existing-device-456'
           const walletAddress = TestFixtures.TestData.addresses.poolOwners[0]
-          
+
           // Setup existing device in Firestore
           const existingDevice = {
             deviceId,
             walletAddress,
             approved: true,
             approvedAt: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(), // 1 day ago
-            expiresAt: new Date(Date.now() + 6 * 24 * 60 * 60 * 1000).toISOString() // 6 days from now
+            expiresAt: new Date(Date.now() + 6 * 24 * 60 * 60 * 1000).toISOString(), // 6 days from now
           }
-          
+
           mockFirestore.collection.mockReturnValue({
             doc: jest.fn().mockReturnValue({
               get: jest.fn().mockResolvedValue({
                 exists: true,
-                data: () => existingDevice
-              })
-            })
+                data: () => existingDevice,
+              }),
+            }),
           })
-          
+
           // Act
           DeviceVerification.approveDevice.mockResolvedValue({
             success: true,
@@ -140,14 +140,14 @@ describe('Device Verification - Comprehensive Tests', () => {
             alreadyApproved: true,
             approvedAt: existingDevice.approvedAt,
             expiresAt: existingDevice.expiresAt,
-            message: 'Device was already approved'
+            message: 'Device was already approved',
           })
-          
+
           const result = await DeviceVerification.approveDevice({
             deviceId,
-            walletAddress
+            walletAddress,
           })
-          
+
           // Assert
           expect(result.success).toBe(true)
           expect(result.alreadyApproved).toBe(true)
@@ -161,29 +161,29 @@ describe('Device Verification - Comprehensive Tests', () => {
           // Arrange
           const deviceId = 'expired-device-789'
           const walletAddress = TestFixtures.TestData.addresses.poolOwners[0]
-          
+
           // Setup expired device
           const expiredDevice = {
             deviceId,
             walletAddress,
             approved: true,
             approvedAt: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000).toISOString(), // 10 days ago
-            expiresAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString() // Expired 3 days ago
+            expiresAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(), // Expired 3 days ago
           }
-          
+
           mockFirestore.collection.mockReturnValue({
             doc: jest.fn().mockReturnValue({
               get: jest.fn().mockResolvedValue({
                 exists: true,
-                data: () => expiredDevice
+                data: () => expiredDevice,
               }),
-              set: jest.fn().mockResolvedValue(undefined)
-            })
+              set: jest.fn().mockResolvedValue(undefined),
+            }),
           })
-          
+
           // Act
           const measurement = startPerformanceTest('expired-device-refresh', 'device-verification')
-          
+
           DeviceVerification.approveDevice.mockResolvedValue({
             success: true,
             deviceId,
@@ -192,16 +192,16 @@ describe('Device Verification - Comprehensive Tests', () => {
             previousExpiry: expiredDevice.expiresAt,
             approvedAt: new Date().toISOString(),
             expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
-            appCheckToken: 'refreshed-app-check-token'
+            appCheckToken: 'refreshed-app-check-token',
           })
-          
+
           const result = await DeviceVerification.approveDevice({
             deviceId,
-            walletAddress
+            walletAddress,
           })
-          
+
           const metrics = measurement.end()
-          
+
           // Assert
           expect(result.success).toBe(true)
           expect(result.refreshed).toBe(true)
@@ -221,21 +221,21 @@ describe('Device Verification - Comprehensive Tests', () => {
             undefined,
             'short',
             'contains-invalid-chars!@#',
-            'x'.repeat(256) // Too long
+            'x'.repeat(256), // Too long
           ]
-          
+
           for (const deviceId of invalidDeviceIds) {
             DeviceVerification.approveDevice.mockResolvedValue({
               success: false,
               error: `Invalid device ID format: ${deviceId}`,
-              code: 'INVALID_DEVICE_ID'
+              code: 'INVALID_DEVICE_ID',
             })
-            
+
             const result = await DeviceVerification.approveDevice({
               deviceId,
-              walletAddress: TestFixtures.TestData.addresses.poolOwners[0]
+              walletAddress: TestFixtures.TestData.addresses.poolOwners[0],
             })
-            
+
             expect(result.success).toBe(false)
             expect(result.code).toBe('INVALID_DEVICE_ID')
           }
@@ -250,21 +250,21 @@ describe('Device Verification - Comprehensive Tests', () => {
             '0x123', // Too short
             '0x' + 'z'.repeat(40), // Invalid hex
             TestFixtures.TestData.addresses.invalid.zero,
-            TestFixtures.TestData.addresses.invalid.malformed
+            TestFixtures.TestData.addresses.invalid.malformed,
           ]
-          
+
           for (const walletAddress of invalidWalletAddresses) {
             DeviceVerification.approveDevice.mockResolvedValue({
               success: false,
               error: `Invalid wallet address format: ${walletAddress}`,
-              code: 'INVALID_WALLET_ADDRESS'
+              code: 'INVALID_WALLET_ADDRESS',
             })
-            
+
             const result = await DeviceVerification.approveDevice({
               deviceId: 'valid-device-123',
-              walletAddress
+              walletAddress,
             })
-            
+
             expect(result.success).toBe(false)
             expect(result.code).toBe('INVALID_WALLET_ADDRESS')
           }
@@ -283,21 +283,21 @@ describe('Device Verification - Comprehensive Tests', () => {
           walletAddress: TestFixtures.TestData.addresses.poolOwners[0],
           approved: true,
           approvedAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(), // 2 days ago
-          expiresAt: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString() // 5 days from now
+          expiresAt: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString(), // 5 days from now
         }
-        
+
         mockFirestore.collection.mockReturnValue({
           doc: jest.fn().mockReturnValue({
             get: jest.fn().mockResolvedValue({
               exists: true,
-              data: () => approvedDevice
-            })
-          })
+              data: () => approvedDevice,
+            }),
+          }),
         })
-        
+
         // Act
         const measurement = startPerformanceTest('device-status-check', 'device-verification')
-        
+
         DeviceVerification.checkDeviceApproval.mockResolvedValue({
           deviceId,
           approved: true,
@@ -305,18 +305,18 @@ describe('Device Verification - Comprehensive Tests', () => {
           approvedAt: approvedDevice.approvedAt,
           expiresAt: approvedDevice.expiresAt,
           daysUntilExpiry: 5,
-          needsRenewal: false
+          needsRenewal: false,
         })
-        
+
         const result = await DeviceVerification.checkDeviceApproval(deviceId)
         const metrics = measurement.end()
-        
+
         // Assert
         expect(result.approved).toBe(true)
         expect(result.deviceId).toBe(deviceId)
         expect(result.daysUntilExpiry).toBe(5)
         expect(result.needsRenewal).toBe(false)
-        
+
         // Should be very fast for read operations
         expect(metrics.executionTime).toBeLessThan(500)
       })
@@ -331,18 +331,18 @@ describe('Device Verification - Comprehensive Tests', () => {
           walletAddress: TestFixtures.TestData.addresses.poolOwners[0],
           approved: true,
           approvedAt: new Date(Date.now() - 6 * 24 * 60 * 60 * 1000).toISOString(), // 6 days ago
-          expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString() // 1 day from now
+          expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(), // 1 day from now
         }
-        
+
         mockFirestore.collection.mockReturnValue({
           doc: jest.fn().mockReturnValue({
             get: jest.fn().mockResolvedValue({
               exists: true,
-              data: () => soonExpiredDevice
-            })
-          })
+              data: () => soonExpiredDevice,
+            }),
+          }),
         })
-        
+
         // Act
         DeviceVerification.checkDeviceApproval.mockResolvedValue({
           deviceId,
@@ -352,11 +352,11 @@ describe('Device Verification - Comprehensive Tests', () => {
           expiresAt: soonExpiredDevice.expiresAt,
           daysUntilExpiry: 1,
           needsRenewal: true,
-          renewalThreshold: 2 // Renew if expiring within 2 days
+          renewalThreshold: 2, // Renew if expiring within 2 days
         })
-        
+
         const result = await DeviceVerification.checkDeviceApproval(deviceId)
-        
+
         // Assert
         expect(result.approved).toBe(true)
         expect(result.needsRenewal).toBe(true)
@@ -369,25 +369,25 @@ describe('Device Verification - Comprehensive Tests', () => {
       await withTestIsolation('nonexistent-device', 'device-verification', async (context) => {
         // Arrange
         const deviceId = 'nonexistent-device-123'
-        
+
         mockFirestore.collection.mockReturnValue({
           doc: jest.fn().mockReturnValue({
             get: jest.fn().mockResolvedValue({
-              exists: false
-            })
-          })
+              exists: false,
+            }),
+          }),
         })
-        
+
         // Act
         DeviceVerification.checkDeviceApproval.mockResolvedValue({
           deviceId,
           approved: false,
           exists: false,
-          message: 'Device not found in approved devices'
+          message: 'Device not found in approved devices',
         })
-        
+
         const result = await DeviceVerification.checkDeviceApproval(deviceId)
-        
+
         // Assert
         expect(result.approved).toBe(false)
         expect(result.exists).toBe(false)
@@ -402,7 +402,7 @@ describe('Device Verification - Comprehensive Tests', () => {
         // Arrange
         const deviceId = 'device-to-revoke'
         const walletAddress = TestFixtures.TestData.addresses.poolOwners[0]
-        
+
         // Setup existing approved device
         mockFirestore.collection.mockReturnValue({
           doc: jest.fn().mockReturnValue({
@@ -412,32 +412,32 @@ describe('Device Verification - Comprehensive Tests', () => {
                 deviceId,
                 walletAddress,
                 approved: true,
-                approvedAt: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
-              })
+                approvedAt: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
+              }),
             }),
-            update: jest.fn().mockResolvedValue(undefined)
-          })
+            update: jest.fn().mockResolvedValue(undefined),
+          }),
         })
-        
+
         // Act
         const measurement = startPerformanceTest('device-revocation', 'device-verification')
-        
+
         DeviceVerification.revokeDevice.mockResolvedValue({
           success: true,
           deviceId,
           walletAddress,
           revokedAt: new Date().toISOString(),
           previouslyApproved: true,
-          reason: 'User requested revocation'
+          reason: 'User requested revocation',
         })
-        
+
         const result = await DeviceVerification.revokeDevice({
           deviceId,
-          reason: 'User requested revocation'
+          reason: 'User requested revocation',
         })
-        
+
         const metrics = measurement.end()
-        
+
         // Assert
         expect(result.success).toBe(true)
         expect(result.deviceId).toBe(deviceId)
@@ -457,18 +457,18 @@ describe('Device Verification - Comprehensive Tests', () => {
           walletAddress: TestFixtures.TestData.addresses.poolOwners[0],
           approved: false,
           revokedAt: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
-          revocationReason: 'Security concern'
+          revocationReason: 'Security concern',
         }
-        
+
         mockFirestore.collection.mockReturnValue({
           doc: jest.fn().mockReturnValue({
             get: jest.fn().mockResolvedValue({
               exists: true,
-              data: () => revokedDevice
-            })
-          })
+              data: () => revokedDevice,
+            }),
+          }),
         })
-        
+
         // Act
         DeviceVerification.revokeDevice.mockResolvedValue({
           success: true,
@@ -476,11 +476,11 @@ describe('Device Verification - Comprehensive Tests', () => {
           alreadyRevoked: true,
           revokedAt: revokedDevice.revokedAt,
           revocationReason: revokedDevice.revocationReason,
-          message: 'Device was already revoked'
+          message: 'Device was already revoked',
         })
-        
+
         const result = await DeviceVerification.revokeDevice({ deviceId })
-        
+
         // Assert
         expect(result.success).toBe(true)
         expect(result.alreadyRevoked).toBe(true)
@@ -494,37 +494,37 @@ describe('Device Verification - Comprehensive Tests', () => {
         // Arrange
         const deviceIds = ['bulk-device-1', 'bulk-device-2', 'bulk-device-3']
         const walletAddress = TestFixtures.TestData.addresses.poolOwners[0]
-        
+
         // Setup batch Firestore operations
         const mockBatch = {
           update: jest.fn(),
-          commit: jest.fn().mockResolvedValue(undefined)
+          commit: jest.fn().mockResolvedValue(undefined),
         }
-        
+
         mockFirestore.batch.mockReturnValue(mockBatch)
-        
+
         // Act
         const measurement = startPerformanceTest('bulk-device-revocation', 'device-verification')
-        
+
         DeviceVerification.revokeDevice.mockImplementation(async ({ deviceIds: ids }) => {
           if (Array.isArray(ids)) {
             return {
               success: true,
-              revokedDevices: ids.map(id => ({
+              revokedDevices: ids.map((id) => ({
                 deviceId: id,
                 revokedAt: new Date().toISOString(),
-                walletAddress
+                walletAddress,
               })),
               totalRevoked: ids.length,
-              bulkOperation: true
+              bulkOperation: true,
             }
           }
           return { success: false, error: 'Invalid bulk operation' }
         })
-        
+
         const result = await DeviceVerification.revokeDevice({ deviceIds })
         const metrics = measurement.end()
-        
+
         // Assert
         expect(result.success).toBe(true)
         expect(result.bulkOperation).toBe(true)
@@ -541,17 +541,17 @@ describe('Device Verification - Comprehensive Tests', () => {
         // Arrange
         const deviceId = 'app-check-device'
         const walletAddress = TestFixtures.TestData.addresses.poolOwners[0]
-        
+
         // Mock App Check token creation
         AppCheckService.createCustomToken.mockResolvedValue({
           token: 'custom-app-check-token-12345',
           expiresIn: 3600, // 1 hour
-          issuedAt: Date.now()
+          issuedAt: Date.now(),
         })
-        
+
         // Act
         const measurement = startPerformanceTest('app-check-token-creation', 'app-check')
-        
+
         DeviceVerification.approveDevice.mockImplementation(async (params) => {
           // Create App Check token as part of approval
           const appCheckResult = await AppCheckService.createCustomToken({
@@ -559,27 +559,27 @@ describe('Device Verification - Comprehensive Tests', () => {
             walletAddress: params.walletAddress,
             customClaims: {
               wallet_address: params.walletAddress,
-              device_approved: true
-            }
+              device_approved: true,
+            },
           })
-          
+
           return {
             success: true,
             deviceId: params.deviceId,
             walletAddress: params.walletAddress,
             approvedAt: new Date().toISOString(),
             appCheckToken: appCheckResult.token,
-            tokenExpiresIn: appCheckResult.expiresIn
+            tokenExpiresIn: appCheckResult.expiresIn,
           }
         })
-        
+
         const result = await DeviceVerification.approveDevice({
           deviceId,
-          walletAddress
+          walletAddress,
         })
-        
+
         const metrics = measurement.end()
-        
+
         // Assert
         expect(result.success).toBe(true)
         expect(result.appCheckToken).toBeDefined()
@@ -589,8 +589,8 @@ describe('Device Verification - Comprehensive Tests', () => {
           walletAddress,
           customClaims: {
             wallet_address: walletAddress,
-            device_approved: true
-          }
+            device_approved: true,
+          },
         })
         expect(metrics.executionTime).toBeLessThan(2000)
       })
@@ -601,7 +601,7 @@ describe('Device Verification - Comprehensive Tests', () => {
         // Arrange
         const appCheckToken = 'valid-app-check-token-67890'
         const deviceId = 'token-validation-device'
-        
+
         AppCheckService.verifyToken.mockResolvedValue({
           valid: true,
           decoded: {
@@ -609,25 +609,25 @@ describe('Device Verification - Comprehensive Tests', () => {
             wallet_address: TestFixtures.TestData.addresses.poolOwners[0],
             device_approved: true,
             exp: Date.now() / 1000 + 3600, // Expires in 1 hour
-            iat: Date.now() / 1000
-          }
+            iat: Date.now() / 1000,
+          },
         })
-        
+
         // Act
         const measurement = startPerformanceTest('app-check-validation', 'app-check')
-        
+
         DeviceVerification.validateAppCheckToken.mockResolvedValue({
           valid: true,
           deviceId,
           walletAddress: TestFixtures.TestData.addresses.poolOwners[0],
           deviceApproved: true,
           expiresAt: new Date(Date.now() + 3600 * 1000).toISOString(),
-          remainingTimeMs: 3600 * 1000
+          remainingTimeMs: 3600 * 1000,
         })
-        
+
         const result = await DeviceVerification.validateAppCheckToken(appCheckToken)
         const metrics = measurement.end()
-        
+
         // Assert
         expect(result.valid).toBe(true)
         expect(result.deviceId).toBe(deviceId)
@@ -640,31 +640,25 @@ describe('Device Verification - Comprehensive Tests', () => {
     it('should handle invalid App Check tokens', async () => {
       await withTestIsolation('invalid-app-check-token', 'device-verification', async (context) => {
         // Arrange
-        const invalidTokens = [
-          'expired-token',
-          'malformed-token',
-          'revoked-token',
-          '',
-          null
-        ]
-        
+        const invalidTokens = ['expired-token', 'malformed-token', 'revoked-token', '', null]
+
         for (const token of invalidTokens) {
           AppCheckService.verifyToken.mockResolvedValue({
             valid: false,
             error: `Invalid token: ${token}`,
-            code: 'INVALID_TOKEN'
+            code: 'INVALID_TOKEN',
           })
-          
+
           DeviceVerification.validateAppCheckToken.mockResolvedValue({
             valid: false,
             error: `Invalid token: ${token}`,
             code: 'INVALID_TOKEN',
-            token
+            token,
           })
-          
+
           // Act
           const result = await DeviceVerification.validateAppCheckToken(token)
-          
+
           // Assert
           expect(result.valid).toBe(false)
           expect(result.code).toBe('INVALID_TOKEN')
@@ -682,36 +676,36 @@ describe('Device Verification - Comprehensive Tests', () => {
           userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 15_0 like Mac OS X)',
           platform: 'iOS',
           appVersion: '1.0.0',
-          timestamp: Date.now()
+          timestamp: Date.now(),
         }
-        
+
         // Act
         const measurement = startPerformanceTest('device-id-generation', 'device-verification')
-        
+
         const deviceIds = await Promise.all(
           Array.from({ length: 10 }, async (_, i) => {
             DeviceVerification.generateDeviceId.mockResolvedValue({
               deviceId: `device-${Date.now()}-${i}-${Math.random().toString(36).slice(2)}`,
               fingerprint: `fp-${i}`,
-              generated: true
+              generated: true,
             })
-            
+
             return DeviceVerification.generateDeviceId({
               ...deviceInfo,
-              uniqueData: `unique-${i}`
+              uniqueData: `unique-${i}`,
             })
           })
         )
-        
+
         const metrics = measurement.end()
-        
+
         // Assert uniqueness
-        const ids = deviceIds.map(result => result.deviceId)
+        const ids = deviceIds.map((result) => result.deviceId)
         const uniqueIds = new Set(ids)
-        
+
         expect(uniqueIds.size).toBe(10) // All IDs should be unique
-        expect(deviceIds.every(result => result.generated)).toBe(true)
-        expect(deviceIds.every(result => result.deviceId.length > 10)).toBe(true)
+        expect(deviceIds.every((result) => result.generated)).toBe(true)
+        expect(deviceIds.every((result) => result.deviceId.length > 10)).toBe(true)
         expect(metrics.executionTime).toBeLessThan(1000)
       })
     })
@@ -723,31 +717,33 @@ describe('Device Verification - Comprehensive Tests', () => {
           userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 15_0 like Mac OS X)',
           platform: 'iOS',
           appVersion: '1.0.0',
-          hardwareId: 'consistent-hardware-id-12345'
+          hardwareId: 'consistent-hardware-id-12345',
         }
-        
+
         // Act - Generate ID multiple times with same info
         DeviceVerification.generateDeviceId.mockImplementation(async (info) => {
           // Simulate consistent generation based on hardware ID
-          const consistentId = `device-${Buffer.from(info.hardwareId || '').toString('base64').slice(0, 16)}`
+          const consistentId = `device-${Buffer.from(info.hardwareId || '')
+            .toString('base64')
+            .slice(0, 16)}`
           return {
             deviceId: consistentId,
             fingerprint: info.hardwareId,
-            consistent: true
+            consistent: true,
           }
         })
-        
+
         const results = await Promise.all([
           DeviceVerification.generateDeviceId(deviceInfo),
           DeviceVerification.generateDeviceId(deviceInfo),
-          DeviceVerification.generateDeviceId(deviceInfo)
+          DeviceVerification.generateDeviceId(deviceInfo),
         ])
-        
+
         // Assert consistency
-        const ids = results.map(r => r.deviceId)
+        const ids = results.map((r) => r.deviceId)
         expect(ids[0]).toBe(ids[1])
         expect(ids[1]).toBe(ids[2])
-        expect(results.every(r => r.consistent)).toBe(true)
+        expect(results.every((r) => r.consistent)).toBe(true)
       })
     })
   })
@@ -760,49 +756,49 @@ describe('Device Verification - Comprehensive Tests', () => {
         const expiredDevices = [
           {
             deviceId: 'expired-1',
-            expiresAt: new Date(now - 24 * 60 * 60 * 1000).toISOString() // 1 day ago
+            expiresAt: new Date(now - 24 * 60 * 60 * 1000).toISOString(), // 1 day ago
           },
           {
-            deviceId: 'expired-2', 
-            expiresAt: new Date(now - 7 * 24 * 60 * 60 * 1000).toISOString() // 1 week ago
-          }
+            deviceId: 'expired-2',
+            expiresAt: new Date(now - 7 * 24 * 60 * 60 * 1000).toISOString(), // 1 week ago
+          },
         ]
-        
+
         const activeDevices = [
           {
             deviceId: 'active-1',
-            expiresAt: new Date(now + 24 * 60 * 60 * 1000).toISOString() // 1 day from now
-          }
+            expiresAt: new Date(now + 24 * 60 * 60 * 1000).toISOString(), // 1 day from now
+          },
         ]
-        
+
         // Setup Firestore query mock
         mockFirestore.collection.mockReturnValue({
           where: jest.fn().mockReturnThis(),
           get: jest.fn().mockResolvedValue({
-            docs: expiredDevices.map(device => ({
+            docs: expiredDevices.map((device) => ({
               id: device.deviceId,
               data: () => device,
               ref: {
-                delete: jest.fn().mockResolvedValue(undefined)
-              }
-            }))
-          })
+                delete: jest.fn().mockResolvedValue(undefined),
+              },
+            })),
+          }),
         })
-        
+
         // Act
         const measurement = startPerformanceTest('cleanup-expired-devices', 'maintenance')
-        
+
         DeviceVerification.cleanupExpiredApprovals.mockResolvedValue({
           success: true,
           expiredDevicesFound: expiredDevices.length,
           expiredDevicesRemoved: expiredDevices.length,
           activeDevicesCount: activeDevices.length,
-          cleanupTimestamp: new Date().toISOString()
+          cleanupTimestamp: new Date().toISOString(),
         })
-        
+
         const result = await DeviceVerification.cleanupExpiredApprovals()
         const metrics = measurement.end()
-        
+
         // Assert
         expect(result.success).toBe(true)
         expect(result.expiredDevicesFound).toBe(2)
@@ -818,20 +814,20 @@ describe('Device Verification - Comprehensive Tests', () => {
         mockFirestore.collection.mockReturnValue({
           where: jest.fn().mockReturnThis(),
           get: jest.fn().mockResolvedValue({
-            docs: [] // No expired devices
-          })
+            docs: [], // No expired devices
+          }),
         })
-        
+
         // Act
         DeviceVerification.cleanupExpiredApprovals.mockResolvedValue({
           success: true,
           expiredDevicesFound: 0,
           expiredDevicesRemoved: 0,
-          message: 'No expired devices found'
+          message: 'No expired devices found',
         })
-        
+
         const result = await DeviceVerification.cleanupExpiredApprovals()
-        
+
         // Assert
         expect(result.success).toBe(true)
         expect(result.expiredDevicesFound).toBe(0)
@@ -848,40 +844,38 @@ describe('Device Verification - Comprehensive Tests', () => {
         const concurrentRequests = 50
         const deviceRequests = Array.from({ length: concurrentRequests }, (_, i) => ({
           deviceId: `concurrent-device-${i}`,
-          walletAddress: TestFixtures.TestData.addresses.poolOwners[i % TestFixtures.TestData.addresses.poolOwners.length]
+          walletAddress: TestFixtures.TestData.addresses.poolOwners[i % TestFixtures.TestData.addresses.poolOwners.length],
         }))
-        
+
         // Mock successful approvals
         DeviceVerification.approveDevice.mockImplementation(async (params) => {
           // Simulate variable response time
-          await new Promise(resolve => setTimeout(resolve, Math.random() * 100))
-          
+          await new Promise((resolve) => setTimeout(resolve, Math.random() * 100))
+
           return {
             success: true,
             deviceId: params.deviceId,
             walletAddress: params.walletAddress,
-            approvedAt: new Date().toISOString()
+            approvedAt: new Date().toISOString(),
           }
         })
-        
+
         // Act
         const measurement = startPerformanceTest('high-frequency-device-approvals', 'load-testing')
-        
-        const results = await Promise.all(
-          deviceRequests.map(request => DeviceVerification.approveDevice(request))
-        )
-        
+
+        const results = await Promise.all(deviceRequests.map((request) => DeviceVerification.approveDevice(request)))
+
         const metrics = measurement.end()
-        
+
         // Assert
         expect(results).toHaveLength(concurrentRequests)
-        expect(results.every(r => r.success)).toBe(true)
-        
+        expect(results.every((r) => r.success)).toBe(true)
+
         // Performance assertions
         const throughput = concurrentRequests / (metrics.executionTime / 1000) // requests per second
         expect(throughput).toBeGreaterThan(10) // At least 10 requests per second
         expect(metrics.executionTime).toBeLessThan(10000) // Complete within 10 seconds
-        
+
         console.log(`Device approval load test: ${concurrentRequests} approvals in ${metrics.executionTime}ms`)
         console.log(`Throughput: ${throughput.toFixed(2)} approvals/second`)
       })
@@ -891,7 +885,7 @@ describe('Device Verification - Comprehensive Tests', () => {
       await withTestIsolation('status-check-benchmark', 'device-verification', async (context) => {
         // Arrange
         const deviceId = 'benchmark-device'
-        
+
         mockFirestore.collection.mockReturnValue({
           doc: jest.fn().mockReturnValue({
             get: jest.fn().mockResolvedValue({
@@ -900,12 +894,12 @@ describe('Device Verification - Comprehensive Tests', () => {
                 deviceId,
                 approved: true,
                 approvedAt: new Date().toISOString(),
-                expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
-              })
-            })
-          })
+                expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+              }),
+            }),
+          }),
         })
-        
+
         // Act - Benchmark status checks
         const benchmarkResult = await performanceManager.benchmark(
           'device-status-check',
@@ -914,19 +908,19 @@ describe('Device Verification - Comprehensive Tests', () => {
               deviceId,
               approved: true,
               walletAddress: TestFixtures.TestData.addresses.poolOwners[0],
-              daysUntilExpiry: 7
+              daysUntilExpiry: 7,
             })
-            
+
             return DeviceVerification.checkDeviceApproval(deviceId)
           },
           100 // 100 iterations
         )
-        
+
         // Assert performance benchmarks
         expect(benchmarkResult.timing.mean).toBeLessThan(100) // < 100ms average
         expect(benchmarkResult.timing.p95).toBeLessThan(200) // < 200ms for 95th percentile
         expect(benchmarkResult.timing.min).toBeGreaterThan(0)
-        
+
         console.log('Device Status Check Benchmark Results:')
         console.log(`  Average: ${benchmarkResult.timing.mean.toFixed(2)}ms`)
         console.log(`  P95: ${benchmarkResult.timing.p95.toFixed(2)}ms`)
