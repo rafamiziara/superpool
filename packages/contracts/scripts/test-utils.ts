@@ -91,8 +91,9 @@ export async function fundTestAccounts(amount: string = '100'): Promise<void> {
       })
       await tx.wait()
       console.log(`✅ Funded account ${i}: ${accounts[i].address}`)
-    } catch (error: any) {
-      console.log(`❌ Failed to fund account ${i}:`, error.message)
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+      console.log(`❌ Failed to fund account ${i}:`, errorMessage)
     }
   }
 }
@@ -143,8 +144,9 @@ export async function createSampleLoans(poolAddress: string, borrowers: HardhatE
       await tx.wait()
 
       console.log(`✅ Loan ${i + 1} created successfully`)
-    } catch (error: any) {
-      console.log(`❌ Failed to create loan ${i + 1}:`, error.message)
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+      console.log(`❌ Failed to create loan ${i + 1}:`, errorMessage)
     }
   }
 }
@@ -152,7 +154,19 @@ export async function createSampleLoans(poolAddress: string, borrowers: HardhatE
 /**
  * Get comprehensive pool information
  */
-export async function getPoolInfo(poolAddress: string): Promise<any> {
+export async function getPoolInfo(poolAddress: string): Promise<{
+  address: string
+  owner: string
+  config: unknown
+  balance: string
+  version: string
+  totalFunds: string
+  nextLoanId: string
+  maxLoanAmount: string
+  interestRate: number
+  loanDuration: number
+  isActive: boolean
+} | null> {
   const pool = await ethers.getContractAt('SampleLendingPool', poolAddress)
 
   try {
@@ -178,8 +192,9 @@ export async function getPoolInfo(poolAddress: string): Promise<any> {
       loanDuration: config.loanDuration,
       isActive: config.isActive,
     }
-  } catch (error: any) {
-    console.error(`Error getting pool info for ${poolAddress}:`, error.message)
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+    console.error(`Error getting pool info for ${poolAddress}:`, errorMessage)
     return null
   }
 }
@@ -216,7 +231,7 @@ export async function setupTestEnvironment(
   createPools: boolean = true,
   fundAccounts: boolean = true
 ): Promise<{
-  factory: any
+  factory: unknown
   pools: TestPool[]
   accounts: TestAccount[]
 }> {
@@ -281,8 +296,9 @@ export async function setupTestEnvironment(
 
           console.log(`✅ Created ${config.name} at ${decodedEvent.poolAddress}`)
         }
-      } catch (error: any) {
-        console.log(`❌ Failed to create pool ${config.name}:`, error.message)
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+        console.log(`❌ Failed to create pool ${config.name}:`, errorMessage)
       }
     }
   }

@@ -17,6 +17,7 @@ This package contains the smart contracts for the SuperPool decentralized micro-
 Currently using **Hardhat v2.22.18** for maximum stability and plugin compatibility. While Hardhat v3 is available, it's still in beta and some plugins (like OpenZeppelin Upgrades, gas reporter, and coverage tools) haven't been updated for full compatibility yet.
 
 **Migration to Hardhat v3 will be done when:**
+
 - All essential plugins support Hardhat v3
 - The ecosystem is fully stable
 - ESM migration is properly tested
@@ -24,6 +25,7 @@ Currently using **Hardhat v2.22.18** for maximum stability and plugin compatibil
 ## Solidity Version Configuration
 
 The project uses **Solidity 0.8.22** throughout for:
+
 - ✅ **Full compatibility** with latest OpenZeppelin contracts (v5.4.0)
 - ✅ **Simplified configuration** - single compiler version
 - ✅ **Modern language features** with excellent stability
@@ -102,16 +104,16 @@ pnpm verify <IMPLEMENTATION_ADDRESS>
 
 ## Available Scripts
 
-| Command | Description |
-|---------|-------------|
-| `pnpm compile` | Compile all Solidity contracts |
-| `pnpm test` | Run the complete test suite |
-| `pnpm test:gas` | Run tests with gas usage reporting |
-| `pnpm coverage` | Generate test coverage report |
-| `pnpm deploy:amoy` | Deploy contracts to Polygon Amoy testnet |
-| `pnpm verify` | Verify contracts using Etherscan API v2 (multichain) |
-| `pnpm lint` | Run Solidity and TypeScript linting |
-| `pnpm clean` | Clean compilation artifacts |
+| Command            | Description                                          |
+| ------------------ | ---------------------------------------------------- |
+| `pnpm compile`     | Compile all Solidity contracts                       |
+| `pnpm test`        | Run the complete test suite                          |
+| `pnpm test:gas`    | Run tests with gas usage reporting                   |
+| `pnpm coverage`    | Generate test coverage report                        |
+| `pnpm deploy:amoy` | Deploy contracts to Polygon Amoy testnet             |
+| `pnpm verify`      | Verify contracts using Etherscan API v2 (multichain) |
+| `pnpm lint`        | Run Solidity and TypeScript linting                  |
+| `pnpm clean`       | Clean compilation artifacts                          |
 
 ## Project Structure
 
@@ -155,11 +157,13 @@ A fully upgradeable lending pool contract that demonstrates the core functionali
 ## Network Configuration
 
 ### Polygon Amoy Testnet
+
 - **Chain ID**: 80002
 - **RPC URL**: https://rpc-amoy.polygon.technology/
 - **Explorer**: https://amoy.polygonscan.com/
 
 ### Polygon Mainnet
+
 - **Chain ID**: 137
 - **RPC URL**: https://polygon-rpc.com/
 - **Explorer**: https://polygonscan.com/

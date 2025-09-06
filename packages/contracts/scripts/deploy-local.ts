@@ -6,7 +6,12 @@ dotenv.config()
 /**
  * Verify a contract with retry logic (skips on localhost)
  */
-async function verifyContract(contractName: string, address: string, constructorArgs: any[] = [], maxRetries: number = 3): Promise<void> {
+async function verifyContract(
+  contractName: string,
+  address: string,
+  constructorArgs: unknown[] = [],
+  maxRetries: number = 3
+): Promise<void> {
   // Skip verification for local networks
   if (network.name === 'localhost' || network.name === 'hardhat' || network.name === 'hardhatFork') {
     console.log(`   ⏭️ Skipping verification for ${contractName} on local network`)
@@ -35,18 +40,19 @@ async function verifyContract(contractName: string, address: string, constructor
 
       console.log(`   ✅ ${contractName} verified successfully`)
       return
-    } catch (error: any) {
-      if (error.message.toLowerCase().includes('already verified')) {
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+      if (errorMessage.toLowerCase().includes('already verified')) {
         console.log(`   ✅ ${contractName} is already verified`)
         return
       }
 
       if (attempt === maxRetries) {
-        console.log(`   ❌ Failed to verify ${contractName}: ${error.message}`)
+        console.log(`   ❌ Failed to verify ${contractName}: ${errorMessage}`)
         return
       }
 
-      console.log(`   ⚠️ Attempt ${attempt} failed: ${error.message}`)
+      console.log(`   ⚠️ Attempt ${attempt} failed: ${errorMessage}`)
     }
   }
 }
@@ -191,8 +197,9 @@ async function main() {
         const fundTx = await poolWithOwner.depositFunds({ value: fundAmount })
         await fundTx.wait()
         console.log(`   ✅ ${pool.name} funded successfully`)
-      } catch (error: any) {
-        console.log(`   ⚠️  Could not fund ${pool.name}:`, error.message)
+      } catch (error: unknown) {
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+        console.log(`   ⚠️  Could not fund ${pool.name}:`, errorMessage)
       }
     }
 
