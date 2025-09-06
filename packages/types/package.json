@@ -1,0 +1,42 @@
+{
+  "name": "@superpool/types",
+  "version": "0.1.0",
+  "description": "SuperPool shared TypeScript types and interfaces",
+  "main": "dist/index.js",
+  "module": "dist/index.mjs",
+  "types": "src/index.ts",
+  "files": [
+    "dist/**/*",
+    "src/**/*"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "type-check": "tsc --noEmit",
+    "format": "prettier --write ."
+  },
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "devDependencies": {
+    "typescript": "^5.0.0",
+    "tsup": "^8.0.0"
+  },
+  "keywords": [
+    "typescript",
+    "types",
+    "interfaces",
+    "superpool"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/rafamiziara/superpool.git",
+    "directory": "packages/types"
+  },
+  "license": "MIT"
+}

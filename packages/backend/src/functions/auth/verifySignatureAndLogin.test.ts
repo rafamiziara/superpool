@@ -2,10 +2,16 @@ import { jest } from '@jest/globals'
 import { isAddress, verifyMessage } from 'ethers'
 import { AUTH_NONCES_COLLECTION, USERS_COLLECTION } from '../../constants'
 
+// Type definitions for Firebase Firestore mock functions
+type DeleteFunction = () => Promise<void>
+type UpdateFunction = () => Promise<void>
+type SetFunction = () => Promise<void>
+type CreateCustomTokenFunction = () => Promise<string>
+
 // Mock the delete method specifically for the nonce document
-const mockDelete = jest.fn<DeleteFunctionFirestore>()
-const mockUpdate = jest.fn<UpdateFunctionFirestore>()
-const mockSet = jest.fn<SetFunctionFirestore>()
+const mockDelete = jest.fn<DeleteFunction>()
+const mockUpdate = jest.fn<UpdateFunction>()
+const mockSet = jest.fn<SetFunction>()
 
 const mockNonceDoc = {
   get: jest.fn(() =>
@@ -35,7 +41,7 @@ const mockCollection = jest.fn((collectionName) => {
 const mockFirestore = { collection: mockCollection }
 
 jest.mock('firebase-admin/firestore', () => {
-  const actualFirestore = jest.requireActual('firebase-admin/firestore') as any
+  const actualFirestore = jest.requireActual('firebase-admin/firestore') as typeof import('firebase-admin/firestore')
 
   return {
     getFirestore: () => mockFirestore,
@@ -70,6 +76,22 @@ const mockApproveDevice = jest.fn() as jest.MockedFunction<
 jest.mock('../../services/deviceVerification', () => ({
   DeviceVerificationService: {
     approveDevice: mockApproveDevice,
+  },
+}))
+
+// Mock the SafeWalletVerificationService
+const mockSafeWalletVerification = jest.fn()
+jest.mock('../../utils/safeWalletVerification', () => ({
+  SafeWalletVerificationService: {
+    verifySafeWalletSignature: mockSafeWalletVerification,
+  },
+}))
+
+// Mock the ProviderService
+const mockGetProvider = jest.fn()
+jest.mock('../../services/providerService', () => ({
+  ProviderService: {
+    getProvider: mockGetProvider,
   },
 }))
 
@@ -108,12 +130,51 @@ describe('verifySignatureAndLoginHandler', () => {
     mockUserDoc.get.mockResolvedValue(createMockDocumentSnapshot(true, { walletAddress, createdAt: timestamp }))
 
     // Set up the mocks for the other calls
-    mockSet.mockResolvedValue(null as any)
-    mockUpdate.mockResolvedValue(null as any)
-    mockDelete.mockResolvedValue(null as any)
+    mockSet.mockResolvedValue(undefined)
+    mockUpdate.mockResolvedValue(undefined)
+    mockDelete.mockResolvedValue(undefined)
 
     mockCreateAuthMessage.mockReturnValue(mockMessage)
     mockCreateCustomToken.mockResolvedValue(firebaseToken)
+
+    // Mock SafeWalletVerificationService with conditional behavior
+    mockSafeWalletVerification.mockImplementation(async (walletAddr, signature) => {
+      // Check if signature format is invalid (for the specific test case)
+      if (signature === `safe-wallet:${walletAddr}:invalid:format`) {
+        return {
+          isValid: false,
+          verification: {
+            signatureValidation: false,
+            ownershipVerification: false,
+            thresholdCheck: false,
+            safeVersionCompatibility: false,
+            verificationMethod: 'fallback',
+            contractAddress: walletAddr,
+          },
+          error: 'INVALID_SIGNATURE_FORMAT',
+        }
+      }
+
+      // Default successful verification for other cases
+      return {
+        isValid: true,
+        verification: {
+          signatureValidation: true,
+          ownershipVerification: true,
+          thresholdCheck: true,
+          safeVersionCompatibility: true,
+          verificationMethod: 'eip1271',
+          contractAddress: walletAddr,
+        },
+        warnings: [],
+      }
+    })
+
+    // Mock ProviderService
+    mockGetProvider.mockReturnValue({
+      getNetwork: jest.fn(),
+      getBlockNumber: jest.fn(),
+    })
   })
 
   afterAll(() => {
@@ -339,12 +400,15 @@ describe('verifySignatureAndLoginHandler', () => {
 
     // Assert
     expect(mockApproveDevice).toHaveBeenCalledWith(deviceId, walletAddress, platform)
-    expect(loggerSpy).toHaveBeenCalledWith('Failed to approve device', expect.objectContaining({
-      error: expect.any(Error),
-      deviceId,
-      walletAddress,
-      signatureType: 'personal-sign'
-    }))
+    expect(loggerSpy).toHaveBeenCalledWith(
+      'Failed to approve device',
+      expect.objectContaining({
+        error: expect.any(Error),
+        deviceId,
+        walletAddress,
+        signatureType: 'personal-sign',
+      })
+    )
     expect(result).toEqual({ firebaseToken })
 
     loggerSpy.mockRestore()
@@ -440,7 +504,9 @@ describe('verifySignatureAndLoginHandler', () => {
     }
 
     // Act & Assert
-    await expect(verifySignatureAndLoginHandler(request)).rejects.toThrow('Invalid Safe wallet authentication token')
+    await expect(verifySignatureAndLoginHandler(request)).rejects.toThrow(
+      'Signature verification failed: Safe wallet authentication failed: Safe wallet verification failed: INVALID_SIGNATURE_FORMAT'
+    )
     await expect(verifySignatureAndLoginHandler(request)).rejects.toHaveProperty('code', 'unauthenticated')
   })
 
@@ -550,7 +616,7 @@ describe('verifySignatureAndLoginHandler', () => {
     // Arrange
     const request = { data: { walletAddress, signature } }
     const nonErrorObject = { code: 'CUSTOM_ERROR', details: 'Some custom error' }
-    
+
     jest.mocked(verifyMessage).mockImplementation(() => {
       throw nonErrorObject // Throw non-Error object
     })
@@ -565,7 +631,7 @@ describe('verifySignatureAndLoginHandler', () => {
     // Arrange
     const request = { data: { walletAddress, signature } }
     const stringError = 'Custom string error'
-    
+
     jest.mocked(verifyMessage).mockImplementation(() => {
       throw stringError // Throw string
     })
@@ -579,7 +645,7 @@ describe('verifySignatureAndLoginHandler', () => {
   it('should handle null thrown during signature verification', async () => {
     // Arrange
     const request = { data: { walletAddress, signature } }
-    
+
     jest.mocked(verifyMessage).mockImplementation(() => {
       throw null // Throw null
     })

@@ -1,6 +1,6 @@
 /* istanbul ignore file */
 import { jest } from '@jest/globals'
-import { DocumentData, DocumentReference, DocumentSnapshot, Firestore, Timestamp } from 'firebase-admin/firestore'
+import { CollectionReference, DocumentData, DocumentReference, DocumentSnapshot, Firestore, Timestamp } from 'firebase-admin/firestore'
 
 // Type for a mock Firestore instance
 const mockFirestoreInstance = {
@@ -17,7 +17,7 @@ const createMockDocumentReference = (id: string): DocumentReference => {
     id,
     firestore: mockFirestoreInstance, // Use a mocked Firestore instance
     path: `mock-collection/${id}`,
-    parent: {} as any, // Mock the parent property
+    parent: {} as CollectionReference, // Mock the parent property
     collection: jest.fn(),
     withConverter: jest.fn(),
     get: jest.fn(),
@@ -48,7 +48,7 @@ export const createMockDocumentSnapshot = (exists: boolean, data?: DocumentData)
     id: 'mock-id',
     ref: mockRef,
     data: mockData,
-    get: jest.fn((field) => (data as any)?.[field as any]),
+    get: jest.fn((field: string) => data?.[field]),
     isEqual: jest.fn(() => false),
     readTime: Timestamp.now(),
     createTime: Timestamp.now(),

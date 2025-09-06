@@ -1,50 +1,62 @@
 module.exports = {
-  preset: 'ts-jest',
+  preset: 'jest-expo',
+  testMatch: ['**/__tests__/**/*.(ts|tsx|js)', '**/*.(test|spec).(ts|tsx|js)'],
   testEnvironment: 'jsdom',
-  setupFilesAfterEnv: ['<rootDir>/src/setupTests.ts'],
-  
-  // File patterns
-  testPathIgnorePatterns: [
-    '/node_modules/',
-    '/android/',
-    '/ios/',
-    '/.expo/',
-    '/src/app/', // Exclude Expo Router app directory
+  transformIgnorePatterns: [
+    'node_modules/(?!(?:.pnpm/)?((jest-)?react-native|@react-native(-community)?|expo(nent)?|@expo(nent)?/.*|@expo-google-fonts/.*|react-navigation|@react-navigation/.*|@sentry/react-native|native-base|react-native-svg|@wagmi|wagmi|@tanstack|viem|@reown))',
   ],
-  
-  // TypeScript transformation
-  transform: {
-    '^.+\\.(ts|tsx)$': ['ts-jest', {
-      tsconfig: 'tsconfig.json',
-    }],
-    '^.+\\.(js|jsx)$': ['babel-jest', { configFile: './jest.babel.config.js' }],
+  setupFilesAfterEnv: ['<rootDir>/src/setupTests.ts'],
+  moduleNameMapper: {
+    '^@/(.*)$': '<rootDir>/src/$1',
+    '^@superpool/(.*)$': '<rootDir>/../../packages/$1/src',
+    '^@mocks/(.*)$': '<rootDir>/__mocks__/$1',
   },
-  
-  // File extensions
-  moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx', 'json', 'node'],
-  
-  // Coverage settings - exclude problematic files
+  moduleDirectories: ['node_modules', '<rootDir>/src'],
   collectCoverageFrom: [
     'src/**/*.{ts,tsx}',
     '!src/**/*.d.ts',
     '!src/setupTests.ts',
     '!src/**/*.test.{ts,tsx}',
     '!src/**/*.spec.{ts,tsx}',
-    '!src/app/**', // Exclude Expo Router app directory
-    '!src/**/+*.tsx', // Exclude Expo Router files like +not-found.tsx
-    '!src/firebase.config.ts', // Exclude Firebase config that imports Expo modules
-    '!src/utils/appCheckProvider.ts', // Exclude App Check provider that imports Expo modules
+    '!src/app/**', // App screens excluded for now
+    '!src/**/+*.tsx', // Expo router files
+    '!src/firebase.config.ts', // Configuration file
+    '!src/config/**', // Configuration directory
+    '!src/globals.d.ts', // Type definitions
+    '!src/assets/**', // Static assets
+    '!src/**/index.ts', // Barrel export files
+    '!src/**/types/**', // TypeScript interface definitions only
   ],
   coverageDirectory: '<rootDir>/../../coverage/mobile',
   coverageReporters: ['lcov', 'text'],
-  
-  // Module mapping for mocks
-  moduleNameMapper: {
-    '^@/(.*)$': '<rootDir>/src/$1',
+  coverageThreshold: {
+    global: {
+      branches: 90,
+      functions: 95,
+      lines: 95,
+      statements: 95,
+    },
+    // Specific thresholds for critical areas
+    'src/stores/**': {
+      branches: 95,
+      functions: 95,
+      lines: 95,
+      statements: 95,
+    },
+    'src/services/**': {
+      branches: 90,
+      functions: 95,
+      lines: 95,
+      statements: 95,
+    },
+    'src/hooks/**': {
+      branches: 90,
+      functions: 95,
+      lines: 95,
+      statements: 95,
+    },
   },
-  
-  // Ignore transform for certain files
-  transformIgnorePatterns: [
-    'node_modules/(?!(expo|@expo|expo-router|@react-native|react-native|@react-navigation)/)',
-  ],
-};
+  globals: {
+    __DEV__: true,
+  },
+}

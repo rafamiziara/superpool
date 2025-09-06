@@ -1,0 +1,58 @@
+@import 'tailwindcss';
+@import '@superpool/design/tokens.css';
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700&family=Space+Mono:wght@400;700&family=Geist:wght@300;400;500;600;700&display=swap');
+
+@theme inline {
+  /* SuperPool Design System Colors */
+  --color-primary: #2563eb;
+  --color-secondary: #0f172a;
+  --color-accent: #06b6d4;
+  --color-success: #10b981;
+  --color-warning: #f59e0b;
+  --color-error: #ef4444;
+
+  /* Background Colors */
+  --color-background: #ffffff;
+  --color-background-dark: #0f172a;
+  --color-foreground: #0f172a;
+  --color-foreground-muted: #64748b;
+
+  /* Typography - SuperPool Contemporary Tech */
+  --font-primary: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+  --font-secondary: 'Space Mono', 'Fira Code', monospace;
+  --font-accent: 'Geist', system-ui, -apple-system, sans-serif;
+  --font-sans: var(--font-primary);
+  --font-mono: var(--font-secondary);
+
+  /* Spacing & Layout */
+  --spacing-section: 3rem;
+  --radius: 0.5rem;
+
+  /* Shadows */
+  --shadow-sm: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
+  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+}
+
+@media (prefers-color-scheme: dark) {
+  @theme inline {
+    --color-background: var(--color-background-dark);
+    --color-foreground: #ffffff;
+    --color-foreground-muted: #94a3b8;
+  }
+}
+
+body {
+  background: var(--color-background);
+  color: var(--color-foreground);
+  font-family: var(--font-primary);
+  line-height: 1.6;
+}
+
+/* Smooth transitions for color scheme changes */
+* {
+  transition:
+    background-color 0.2s ease,
+    color 0.2s ease,
+    border-color 0.2s ease;
+}

@@ -19,3 +19,6 @@ try {
 export const auth = getAuth(adminApp)
 export const firestore = getFirestore(adminApp)
 export const appCheck = getAppCheck(adminApp)
+
+// Export provider service
+export { ProviderService } from './providerService'

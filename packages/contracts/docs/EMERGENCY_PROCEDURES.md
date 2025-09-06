@@ -12,7 +12,6 @@
    ```
 
 2. **Alert Team**
-
    - Notify all Safe signers immediately
    - Post in emergency Slack/Discord channel
    - Document the incident
@@ -160,7 +159,6 @@ safe-cli owners <SAFE_ADDRESS>
 ### After Emergency Pause
 
 1. **Investigation Complete**
-
    - Verify threat eliminated
    - Test fixes on testnet
    - Prepare recovery plan
@@ -194,7 +192,6 @@ safe-cli owners <SAFE_ADDRESS>
    ```
 
 2. **Assessment**
-
    - Determine if rollback needed
    - Check if previous version is safe
    - Prepare rollback implementation
@@ -247,13 +244,11 @@ safe-cli owners <SAFE_ADDRESS>
 ### Critical Actions from Mobile
 
 1. **Safe Mobile App**
-
    - Download and configure Safe mobile app
    - Add Safe wallet to mobile app
    - Test signature capability
 
 2. **Emergency Communication**
-
    - Slack mobile app configured
    - Discord mobile app ready
    - Contact list accessible offline

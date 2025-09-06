@@ -12,7 +12,7 @@ async function demoSafeWorkflow() {
   console.log()
 
   // Get signers (these would be the Safe owners in production)
-  const [deployer, owner1, owner2, owner3] = await ethers.getSigners()
+  const [deployer, owner1, owner2] = await ethers.getSigners()
 
   console.log('📋 Safe Configuration:')
   console.log(`Owners: ${[deployer.address, owner1.address, owner2.address].length}`)
@@ -105,7 +105,7 @@ async function demoSafeWorkflow() {
     console.log('Owner 1 Signature:', signature1.slice(0, 20) + '...')
     console.log('Owner 2 Signature:', signature2.slice(0, 20) + '...')
     console.log('✅ Threshold reached! Transaction ready for execution')
-  } catch (error) {
+  } catch {
     console.log('Signature demonstration (mock signatures generated)')
     console.log('✅ Threshold reached! Transaction ready for execution')
   }
