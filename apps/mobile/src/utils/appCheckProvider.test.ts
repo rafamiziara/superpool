@@ -1,48 +1,72 @@
-// Mock all dependencies FIRST before any imports
-jest.doMock('expo-application', () => ({
-  getAndroidId: jest.fn(),
-  getIosIdForVendorAsync: jest.fn(),
-}))
-
-jest.doMock('expo-secure-store', () => ({
-  getItemAsync: jest.fn(),
-  setItemAsync: jest.fn(),
-}))
-
-jest.doMock('react-native', () => ({
-  Platform: { OS: 'ios' },
-}))
-
-jest.doMock('uuid', () => ({
-  v4: jest.fn(),
-}))
-
-// Mock environment BEFORE importing the module
+// Mock environment BEFORE importing anything
 const originalEnv = process.env.EXPO_PUBLIC_CLOUD_FUNCTIONS_BASE_URL
 process.env.EXPO_PUBLIC_CLOUD_FUNCTIONS_BASE_URL = 'https://test-functions.firebase.com/'
 
-// Import after mocking - use require to ensure mocks are applied
-const { customAppCheckProviderFactory, getUniqueDeviceId } = require('./appCheckProvider')
-const mockApplication = require('expo-application')
-const mockSecureStore = require('expo-secure-store')
-const mockRN = require('react-native')
-const mockUuid = require('uuid')
+// Create mock functions
+const mockGetAndroidId = jest.fn()
+const mockGetIosIdForVendorAsync = jest.fn()
+const mockGetItemAsync = jest.fn()
+const mockSetItemAsync = jest.fn()
+const mockUuidv4 = jest.fn()
+
+// Store reference to actual modules before mocking
+jest.doMock('expo-application', () => ({
+  getAndroidId: mockGetAndroidId,
+  getIosIdForVendorAsync: mockGetIosIdForVendorAsync,
+}))
+
+jest.doMock('expo-secure-store', () => ({
+  getItemAsync: mockGetItemAsync,
+  setItemAsync: mockSetItemAsync,
+}))
+
+jest.doMock('uuid', () => ({
+  v4: mockUuidv4,
+}))
+
+jest.doMock('react-native-get-random-values', () => ({}))
+
+// Create mutable Platform mock
+const mockPlatform = { OS: 'ios' }
+jest.doMock('react-native', () => ({
+  Platform: mockPlatform,
+}))
+
+// Mock Firebase App Check
+jest.doMock('firebase/app-check', () => ({
+  CustomProvider: jest.fn().mockImplementation((config) => ({
+    getToken: config.getToken,
+  })),
+  AppCheckToken: {},
+}))
 
 // Mock fetch globally
 const mockFetch = jest.fn()
 global.fetch = mockFetch
 
+// Import the module under test
+const appCheckProvider = require('./appCheckProvider')
+
 describe('appCheckProvider', () => {
+  let getUniqueDeviceId: typeof appCheckProvider.getUniqueDeviceId
+  let customAppCheckProviderFactory: typeof appCheckProvider.customAppCheckProviderFactory
+
+  beforeAll(() => {
+    // Get the functions from the required module
+    getUniqueDeviceId = appCheckProvider.getUniqueDeviceId
+    customAppCheckProviderFactory = appCheckProvider.customAppCheckProviderFactory
+  })
+
   beforeEach(() => {
     jest.clearAllMocks()
 
     // Reset all mocks with default values
-    mockApplication.getAndroidId.mockReturnValue('default-android')
-    mockApplication.getIosIdForVendorAsync.mockResolvedValue('default-ios')
-    mockSecureStore.getItemAsync.mockResolvedValue('default-web')
-    mockSecureStore.setItemAsync.mockResolvedValue(undefined)
-    mockUuid.v4.mockReturnValue('default-uuid')
-    mockRN.Platform.OS = 'ios'
+    mockGetAndroidId.mockReturnValue('default-android')
+    mockGetIosIdForVendorAsync.mockResolvedValue('default-ios')
+    mockGetItemAsync.mockResolvedValue('default-web')
+    mockSetItemAsync.mockResolvedValue(undefined)
+    mockUuidv4.mockReturnValue('default-uuid')
+    mockPlatform.OS = 'ios'
   })
 
   afterAll(() => {
@@ -51,72 +75,72 @@ describe('appCheckProvider', () => {
 
   describe('getUniqueDeviceId', () => {
     it('should return Android ID when available', async () => {
-      mockRN.Platform.OS = 'android'
-      mockApplication.getAndroidId.mockReturnValue('android123')
+      mockPlatform.OS = 'android'
+      mockGetAndroidId.mockReturnValue('android123')
 
       const result = await getUniqueDeviceId()
       expect(result).toBe('android123')
     })
 
     it('should return UUID when Android ID is null', async () => {
-      mockRN.Platform.OS = 'android'
-      mockApplication.getAndroidId.mockReturnValue(null)
-      mockUuid.v4.mockReturnValue('fallback-uuid')
+      mockPlatform.OS = 'android'
+      mockGetAndroidId.mockReturnValue(null)
+      mockUuidv4.mockReturnValue('fallback-uuid')
 
       const result = await getUniqueDeviceId()
       expect(result).toBe('fallback-uuid')
     })
 
     it('should return iOS ID when available', async () => {
-      mockRN.Platform.OS = 'ios'
-      mockApplication.getIosIdForVendorAsync.mockResolvedValue('ios123')
+      mockPlatform.OS = 'ios'
+      mockGetIosIdForVendorAsync.mockResolvedValue('ios123')
 
       const result = await getUniqueDeviceId()
       expect(result).toBe('ios123')
     })
 
     it('should return UUID when iOS ID is null', async () => {
-      mockRN.Platform.OS = 'ios'
-      mockApplication.getIosIdForVendorAsync.mockResolvedValue(null)
-      mockUuid.v4.mockReturnValue('ios-fallback')
+      mockPlatform.OS = 'ios'
+      mockGetIosIdForVendorAsync.mockResolvedValue(null)
+      mockUuidv4.mockReturnValue('ios-fallback')
 
       const result = await getUniqueDeviceId()
       expect(result).toBe('ios-fallback')
     })
 
     it('should return existing web device ID', async () => {
-      mockRN.Platform.OS = 'web'
-      mockSecureStore.getItemAsync.mockResolvedValue('existing-web-id')
+      mockPlatform.OS = 'web'
+      mockGetItemAsync.mockResolvedValue('existing-web-id')
 
       const result = await getUniqueDeviceId()
       expect(result).toBe('existing-web-id')
     })
 
     it('should generate new web device ID', async () => {
-      mockRN.Platform.OS = 'web'
-      mockSecureStore.getItemAsync.mockResolvedValue(null)
-      mockSecureStore.setItemAsync.mockResolvedValue(undefined)
-      mockUuid.v4.mockReturnValue('new-web-id')
+      mockPlatform.OS = 'web'
+      mockGetItemAsync.mockResolvedValue(null)
+      mockSetItemAsync.mockResolvedValue(undefined)
+      mockUuidv4.mockReturnValue('new-web-id')
 
       const result = await getUniqueDeviceId()
       expect(result).toBe('new-web-id')
     })
 
     it('should handle errors gracefully', async () => {
-      mockRN.Platform.OS = 'android'
-      mockApplication.getAndroidId.mockImplementation(() => {
+      mockPlatform.OS = 'android'
+      mockGetAndroidId.mockImplementation(() => {
         throw new Error('Permission denied')
       })
-      mockUuid.v4.mockReturnValue('error-fallback')
+      mockUuidv4.mockReturnValue('error-fallback')
 
       const result = await getUniqueDeviceId()
       expect(result).toBe('error-fallback')
     })
 
     it('should handle unknown platform', async () => {
-      mockRN.Platform.OS = 'unknown'
-      mockSecureStore.getItemAsync.mockRejectedValue(new Error('SecureStore not available'))
-      mockUuid.v4.mockReturnValue('unknown-fallback')
+      mockPlatform.OS = 'unknown' as 'android' | 'ios' | 'web' | 'unknown'
+      mockGetItemAsync.mockRejectedValue(new Error('SecureStore not available'))
+      mockUuidv4.mockReturnValue('unknown-fallback')
 
       const result = await getUniqueDeviceId()
       expect(result).toBe('unknown-fallback')
@@ -131,8 +155,8 @@ describe('appCheckProvider', () => {
     })
 
     it('should fetch token successfully', async () => {
-      mockRN.Platform.OS = 'ios'
-      mockApplication.getIosIdForVendorAsync.mockResolvedValue('device123')
+      mockPlatform.OS = 'ios'
+      mockGetIosIdForVendorAsync.mockResolvedValue('device123')
       mockFetch.mockResolvedValue({
         ok: true,
         json: async () => ({
@@ -156,8 +180,8 @@ describe('appCheckProvider', () => {
     })
 
     it('should return dummy token on network failure', async () => {
-      mockRN.Platform.OS = 'ios'
-      mockApplication.getIosIdForVendorAsync.mockResolvedValue('device123')
+      mockPlatform.OS = 'ios'
+      mockGetIosIdForVendorAsync.mockResolvedValue('device123')
       mockFetch.mockRejectedValue(new Error('Network error'))
 
       const provider = customAppCheckProviderFactory()
@@ -167,8 +191,8 @@ describe('appCheckProvider', () => {
     })
 
     it('should return dummy token on HTTP error', async () => {
-      mockRN.Platform.OS = 'ios'
-      mockApplication.getIosIdForVendorAsync.mockResolvedValue('device123')
+      mockPlatform.OS = 'ios'
+      mockGetIosIdForVendorAsync.mockResolvedValue('device123')
       mockFetch.mockResolvedValue({
         ok: false,
         status: 500,
@@ -182,9 +206,9 @@ describe('appCheckProvider', () => {
     })
 
     it('should handle device ID failure with fallback', async () => {
-      mockRN.Platform.OS = 'ios'
-      mockApplication.getIosIdForVendorAsync.mockRejectedValue(new Error('Device error'))
-      mockUuid.v4.mockReturnValue('fallback-id')
+      mockPlatform.OS = 'ios'
+      mockGetIosIdForVendorAsync.mockRejectedValue(new Error('Device error'))
+      mockUuidv4.mockReturnValue('fallback-id')
       mockFetch.mockResolvedValue({
         ok: true,
         json: async () => ({
@@ -204,8 +228,8 @@ describe('appCheckProvider', () => {
       const originalFetch = global.fetch
       global.fetch = jest.fn().mockRejectedValue(new Error('Invalid URL'))
 
-      mockRN.Platform.OS = 'ios'
-      mockApplication.getIosIdForVendorAsync.mockResolvedValue('device123')
+      mockPlatform.OS = 'ios'
+      mockGetIosIdForVendorAsync.mockResolvedValue('device123')
 
       const provider = customAppCheckProviderFactory()
       const result = await provider.getToken()

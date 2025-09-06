@@ -22,6 +22,21 @@ export interface CircuitBreakerConfig {
   name: string                    // Circuit breaker identifier
 }
 
+/* prettier-ignore */
+export interface InstanceLifecycleConfig {
+  ttlMs: number                   // Time-to-live for inactive instances (default: 30 minutes)
+  maxInstances: number            // Maximum number of instances to keep in memory (default: 100)
+  cleanupIntervalMs: number       // Cleanup interval in milliseconds (default: 5 minutes)
+  inactivityThresholdMs: number   // Consider instance inactive after this time (default: 15 minutes)
+}
+
+interface InstanceMetadata {
+  instance: FirebaseAuthCircuitBreaker
+  lastAccessTime: number
+  createdTime: number
+  accessCount: number
+}
+
 export interface CircuitBreakerMetrics {
   totalRequests: number
   successfulRequests: number
@@ -31,6 +46,17 @@ export interface CircuitBreakerMetrics {
   lastSuccessTime: number | null
   currentState: CircuitBreakerState
   failureRate: number
+}
+
+export interface MemoryMetrics {
+  totalInstances: number
+  activeInstances: number
+  inactiveInstances: number
+  oldestInstanceAge: number
+  newestInstanceAge: number
+  totalAccessCount: number
+  lastCleanupTime: number
+  memoryPressureLevel: 'low' | 'medium' | 'high'
 }
 
 export interface CircuitBreakerResult<T> {
@@ -364,9 +390,23 @@ export class FirebaseAuthCircuitBreaker {
 
 /**
  * Pre-configured circuit breakers for different Firebase authentication scenarios
+ * Enhanced with lifecycle management to prevent memory leaks
  */
 export class FirebaseAuthCircuitBreakers {
-  private static instances = new Map<string, FirebaseAuthCircuitBreaker>()
+  private static instances = new Map<string, InstanceMetadata>()
+  private static cleanupTimer: NodeJS.Timeout | null = null
+  private static lastCleanupTime: number = Date.now()
+
+  // Default lifecycle configuration
+  /* prettier-ignore */
+  private static readonly DEFAULT_LIFECYCLE_CONFIG: InstanceLifecycleConfig = {
+    ttlMs: 30 * 60 * 1000,        // 30 minutes TTL
+    maxInstances: 100,            // Maximum 100 instances
+    cleanupIntervalMs: 5 * 60 * 1000, // Cleanup every 5 minutes
+    inactivityThresholdMs: 15 * 60 * 1000, // 15 minutes inactivity threshold
+  }
+
+  private static lifecycleConfig: InstanceLifecycleConfig = { ...FirebaseAuthCircuitBreakers.DEFAULT_LIFECYCLE_CONFIG }
 
   /**
    * Get circuit breaker for Firebase authentication
@@ -374,7 +414,8 @@ export class FirebaseAuthCircuitBreakers {
   static getFirebaseAuthCircuitBreaker(): FirebaseAuthCircuitBreaker {
     const key = 'firebase-auth'
 
-    if (!this.instances.has(key)) {
+    this.ensureCleanupTimer()
+    return this.getOrCreateInstance(key, () => {
       /* prettier-ignore */
       const config: CircuitBreakerConfig = {
         name: 'firebase-auth',
@@ -384,10 +425,8 @@ export class FirebaseAuthCircuitBreakers {
         halfOpenMaxRequests: 2      // Allow 2 test requests in half-open
       }
 
-      this.instances.set(key, new FirebaseAuthCircuitBreaker(config))
-    }
-
-    return this.instances.get(key)!
+      return new FirebaseAuthCircuitBreaker(config)
+    })
   }
 
   /**
@@ -396,7 +435,8 @@ export class FirebaseAuthCircuitBreakers {
   static getSafeWalletCircuitBreaker(): FirebaseAuthCircuitBreaker {
     const key = 'safe-wallet-auth'
 
-    if (!this.instances.has(key)) {
+    this.ensureCleanupTimer()
+    return this.getOrCreateInstance(key, () => {
       /* prettier-ignore */
       const config: CircuitBreakerConfig = {
         name: 'safe-wallet-auth',
@@ -406,10 +446,8 @@ export class FirebaseAuthCircuitBreakers {
         halfOpenMaxRequests: 1      // Only 1 test request
       }
 
-      this.instances.set(key, new FirebaseAuthCircuitBreaker(config))
-    }
-
-    return this.instances.get(key)!
+      return new FirebaseAuthCircuitBreaker(config)
+    })
   }
 
   /**
@@ -423,10 +461,144 @@ export class FirebaseAuthCircuitBreakers {
   }
 
   /**
+   * Get or create instance with lifecycle tracking
+   */
+  private static getOrCreateInstance(key: string, factory: () => FirebaseAuthCircuitBreaker): FirebaseAuthCircuitBreaker {
+    const now = Date.now()
+
+    if (this.instances.has(key)) {
+      const metadata = this.instances.get(key)!
+      metadata.lastAccessTime = now
+      metadata.accessCount++
+
+      console.log(`🔌 Circuit breaker "${key}" accessed (count: ${metadata.accessCount})`, {
+        age: now - metadata.createdTime,
+        lastAccess: now - metadata.lastAccessTime,
+      })
+
+      return metadata.instance
+    }
+
+    // Check memory pressure before creating new instance
+    this.enforceMemoryLimits()
+
+    const instance = factory()
+    const metadata: InstanceMetadata = {
+      instance,
+      lastAccessTime: now,
+      createdTime: now,
+      accessCount: 1,
+    }
+
+    this.instances.set(key, metadata)
+
+    console.log(`🔌 Circuit breaker "${key}" created (total instances: ${this.instances.size})`, {
+      totalInstances: this.instances.size,
+      memoryPressure: this.getMemoryPressureLevel(),
+    })
+
+    return instance
+  }
+
+  /**
+   * Enforce memory limits by cleaning up old instances if necessary
+   */
+  private static enforceMemoryLimits(): void {
+    if (this.instances.size < this.lifecycleConfig.maxInstances) {
+      return
+    }
+
+    console.warn(`🔌 Memory pressure detected: ${this.instances.size} instances, limit: ${this.lifecycleConfig.maxInstances}`, {
+      memoryPressure: 'high',
+      action: 'force_cleanup',
+    })
+
+    // Force cleanup of oldest inactive instances
+    this.performCleanup(true)
+  }
+
+  /**
+   * Start cleanup timer if not already running
+   */
+  private static ensureCleanupTimer(): void {
+    if (this.cleanupTimer) {
+      return
+    }
+
+    this.cleanupTimer = setInterval(() => {
+      this.performCleanup(false)
+    }, this.lifecycleConfig.cleanupIntervalMs)
+
+    console.log(`🔌 Cleanup timer started (interval: ${this.lifecycleConfig.cleanupIntervalMs}ms)`, {
+      ttlMs: this.lifecycleConfig.ttlMs,
+      maxInstances: this.lifecycleConfig.maxInstances,
+    })
+  }
+
+  /**
+   * Perform cleanup of expired or inactive instances
+   */
+  private static performCleanup(force: boolean): void {
+    const now = Date.now()
+    const initialCount = this.instances.size
+    let cleanedCount = 0
+    const itemsToDelete: string[] = []
+
+    for (const [key, metadata] of this.instances.entries()) {
+      const age = now - metadata.createdTime
+      const timeSinceAccess = now - metadata.lastAccessTime
+
+      const shouldCleanup = force
+        ? timeSinceAccess > this.lifecycleConfig.inactivityThresholdMs
+        : age > this.lifecycleConfig.ttlMs || timeSinceAccess > this.lifecycleConfig.inactivityThresholdMs
+
+      if (shouldCleanup) {
+        itemsToDelete.push(key)
+        cleanedCount++
+
+        console.log(`🔌 Cleaning up circuit breaker "${key}"`, {
+          age,
+          timeSinceAccess,
+          accessCount: metadata.accessCount,
+          reason: force ? 'memory_pressure' : 'ttl_expired',
+        })
+      }
+    }
+
+    // Remove items after iteration to avoid modifying during iteration
+    for (const key of itemsToDelete) {
+      this.instances.delete(key)
+    }
+
+    this.lastCleanupTime = now
+
+    if (cleanedCount > 0) {
+      console.log(`🔌 Cleanup completed: removed ${cleanedCount} instances`, {
+        before: initialCount,
+        after: this.instances.size,
+        memoryPressure: this.getMemoryPressureLevel(),
+        force,
+      })
+    }
+  }
+
+  /**
+   * Get current memory pressure level
+   */
+  private static getMemoryPressureLevel(): 'low' | 'medium' | 'high' {
+    const count = this.instances.size
+    const maxInstances = this.lifecycleConfig.maxInstances
+
+    if (count >= maxInstances) return 'high'
+    if (count >= maxInstances * 0.7) return 'medium'
+    return 'low'
+  }
+
+  /**
    * Reset all circuit breakers
    */
   static resetAll(): void {
-    this.instances.forEach((breaker) => breaker.reset())
+    this.instances.forEach((metadata) => metadata.instance.reset())
     console.log('🔌 All circuit breakers reset')
   }
 
@@ -436,10 +608,107 @@ export class FirebaseAuthCircuitBreakers {
   static getHealthStatus(): Record<string, CircuitBreakerMetrics> {
     const status: Record<string, CircuitBreakerMetrics> = {}
 
-    this.instances.forEach((breaker, key) => {
-      status[key] = breaker.getMetrics()
+    this.instances.forEach((metadata, key) => {
+      status[key] = metadata.instance.getMetrics()
     })
 
     return status
+  }
+
+  /**
+   * Get memory usage metrics and lifecycle information
+   */
+  static getMemoryMetrics(): MemoryMetrics {
+    const now = Date.now()
+    let oldestInstanceAge = 0
+    let newestInstanceAge = Number.MAX_SAFE_INTEGER
+    let totalAccessCount = 0
+    let activeInstances = 0
+
+    for (const metadata of this.instances.values()) {
+      const age = now - metadata.createdTime
+      const timeSinceAccess = now - metadata.lastAccessTime
+
+      if (timeSinceAccess < this.lifecycleConfig.inactivityThresholdMs) {
+        activeInstances++
+      }
+
+      oldestInstanceAge = Math.max(oldestInstanceAge, age)
+      newestInstanceAge = Math.min(newestInstanceAge, age)
+      totalAccessCount += metadata.accessCount
+    }
+
+    // Handle edge case when no instances exist
+    if (this.instances.size === 0) {
+      newestInstanceAge = 0
+    }
+
+    return {
+      totalInstances: this.instances.size,
+      activeInstances,
+      inactiveInstances: this.instances.size - activeInstances,
+      oldestInstanceAge,
+      newestInstanceAge,
+      totalAccessCount,
+      lastCleanupTime: this.lastCleanupTime,
+      memoryPressureLevel: this.getMemoryPressureLevel(),
+    }
+  }
+
+  /**
+   * Configure lifecycle management settings
+   */
+  static configureLifecycle(config: Partial<InstanceLifecycleConfig>): void {
+    const oldConfig = { ...this.lifecycleConfig }
+    this.lifecycleConfig = { ...this.lifecycleConfig, ...config }
+
+    console.log('🔌 Lifecycle configuration updated', {
+      oldConfig,
+      newConfig: this.lifecycleConfig,
+    })
+
+    // Restart cleanup timer with new interval if it changed
+    if (config.cleanupIntervalMs && config.cleanupIntervalMs !== oldConfig.cleanupIntervalMs) {
+      this.stopCleanupTimer()
+      this.ensureCleanupTimer()
+    }
+
+    // Perform immediate cleanup if limits were tightened
+    if ((config.maxInstances && config.maxInstances < oldConfig.maxInstances) || (config.ttlMs && config.ttlMs < oldConfig.ttlMs)) {
+      this.performCleanup(false)
+    }
+  }
+
+  /**
+   * Force immediate cleanup (useful for testing or memory pressure situations)
+   */
+  static forceCleanup(): void {
+    console.log('🔌 Forcing immediate cleanup of circuit breaker instances')
+    this.performCleanup(true)
+  }
+
+  /**
+   * Stop cleanup timer (useful for testing or shutdown)
+   */
+  static stopCleanupTimer(): void {
+    if (this.cleanupTimer) {
+      clearInterval(this.cleanupTimer)
+      this.cleanupTimer = null
+      console.log('🔌 Cleanup timer stopped')
+    }
+  }
+
+  /**
+   * Clear all instances and stop cleanup (for testing or complete reset)
+   */
+  static clearAll(): void {
+    this.stopCleanupTimer()
+    const count = this.instances.size
+    this.instances.clear()
+    this.lastCleanupTime = Date.now()
+
+    console.log(`🔌 All circuit breaker instances cleared (${count} instances removed)`, {
+      memoryPressure: 'low',
+    })
   }
 }

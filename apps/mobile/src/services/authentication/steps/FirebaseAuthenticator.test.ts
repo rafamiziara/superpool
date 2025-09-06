@@ -58,6 +58,12 @@ jest.doMock('../../../utils', () => ({
   devOnly: mockDevOnly,
 }))
 
+// Mock secure device ID generator
+const mockGenerateSecureDeviceId = jest.fn()
+jest.doMock('../../../utils/secureDeviceId', () => ({
+  generateSecureDeviceId: mockGenerateSecureDeviceId,
+}))
+
 jest.doMock('../utils/circuitBreaker', () => ({
   FirebaseAuthCircuitBreakers: {
     getCircuitBreakerForSignatureType: jest.fn(() => mockCircuitBreaker),
@@ -106,6 +112,9 @@ describe('FirebaseAuthenticator', () => {
 
     // Setup mock HttpsCallable
     mockHttpsCallable.mockReturnValue(mockVerifySignatureAndLogin)
+
+    // Setup secure device ID mock
+    mockGenerateSecureDeviceId.mockResolvedValue('secure-mobile-ios-1234567890000-abc123def456ghi789')
 
     // Setup circuit breaker mock to actually execute the provided function
     mockCircuitBreaker.execute.mockImplementation(async (fn) => {
@@ -207,18 +216,23 @@ describe('FirebaseAuthenticator', () => {
 
   describe('verifySignatureAndGetToken', () => {
     describe('Successful Verification', () => {
-      it('should verify regular wallet signature and return Firebase token', async () => {
+      it('should verify regular wallet signature and return Firebase token with secure device ID', async () => {
         mockPlatform.OS = 'ios'
 
         const result = await authenticator.verifySignatureAndGetToken(mockContext, mockSignatureResult)
 
         expect(result).toBe(mockFirebaseToken)
+        expect(mockGenerateSecureDeviceId).toHaveBeenCalledWith({
+          maxRetries: 3,
+          entropyLength: 16,
+          collisionCheck: expect.any(Function),
+        })
         expect(mockVerifySignatureAndLogin).toHaveBeenCalledWith({
           walletAddress: mockContext.walletAddress,
           signature: mockSignatureResult.signature,
           chainId: mockContext.chainId,
           signatureType: mockSignatureResult.signatureType,
-          deviceId: expect.stringMatching(/mobile-ios-\d+-\w+/),
+          deviceId: 'secure-mobile-ios-1234567890000-abc123def456ghi789',
           platform: 'ios',
         })
       })
@@ -247,14 +261,16 @@ describe('FirebaseAuthenticator', () => {
         })
       })
 
-      it('should handle different platforms (Android)', async () => {
+      it('should handle different platforms (Android) with secure device ID', async () => {
         mockPlatform.OS = 'android'
+        mockGenerateSecureDeviceId.mockResolvedValue('secure-mobile-android-1234567890000-xyz789abc123')
 
         await authenticator.verifySignatureAndGetToken(mockContext, mockSignatureResult)
 
+        expect(mockGenerateSecureDeviceId).toHaveBeenCalled()
         expect(mockVerifySignatureAndLogin).toHaveBeenCalledWith(
           expect.objectContaining({
-            deviceId: expect.stringMatching(/mobile-android-\d+-\w+/),
+            deviceId: 'secure-mobile-android-1234567890000-xyz789abc123',
             platform: 'android',
           })
         )
@@ -267,23 +283,28 @@ describe('FirebaseAuthenticator', () => {
         expect(consoleLogSpy).toHaveBeenCalledWith('✅ Backend verification successful')
       })
 
-      it('should log device info generation for mobile platforms', async () => {
+      it('should log secure device info generation for mobile platforms', async () => {
         mockPlatform.OS = 'ios'
 
         await authenticator.verifySignatureAndGetToken(mockContext, mockSignatureResult)
 
         expect(consoleLogSpy).toHaveBeenCalledWith(
-          '📱 Generated device info:',
+          '📱 Generated secure device info:',
           expect.objectContaining({
-            deviceId: expect.stringMatching(/mobile-ios-\d+-\w+/),
+            deviceId: 'secure-mobile-ios-12...', // Should log only prefix (20 chars + ...)
             platform: 'ios',
           })
         )
       })
     })
 
-    describe('Device Info Generation', () => {
-      it('should generate unique device IDs for each call', async () => {
+    describe('Secure Device Info Generation', () => {
+      it('should generate unique secure device IDs for each call', async () => {
+        // Setup different device IDs for each call
+        mockGenerateSecureDeviceId
+          .mockResolvedValueOnce('secure-mobile-ios-1234567890001-abc123def456')
+          .mockResolvedValueOnce('secure-mobile-ios-1234567890002-xyz789ghi012')
+
         const call1Promise = authenticator.verifySignatureAndGetToken(mockContext, mockSignatureResult)
         const call2Promise = authenticator.verifySignatureAndGetToken(mockContext, mockSignatureResult)
 
@@ -293,32 +314,24 @@ describe('FirebaseAuthenticator', () => {
         const call2Args = mockVerifySignatureAndLogin.mock.calls[1][0]
 
         expect(call1Args.deviceId).not.toBe(call2Args.deviceId)
+        expect(call1Args.deviceId).toBe('secure-mobile-ios-1234567890001-abc123def456')
+        expect(call2Args.deviceId).toBe('secure-mobile-ios-1234567890002-xyz789ghi012')
+        expect(mockGenerateSecureDeviceId).toHaveBeenCalledTimes(2)
       })
 
-      it('should handle device info generation errors with fallback', async () => {
-        // Mock Date.now to throw error first, then work for fallback
-        const originalDateNow = Date.now
-        let callCount = 0
-        Date.now = jest.fn(() => {
-          callCount++
-          if (callCount === 1) {
-            throw new Error('Date.now failed')
-          }
-          return 1234567890000 // Fixed timestamp for fallback
-        })
+      it('should handle secure device ID generation errors with enhanced fallback', async () => {
+        // Mock secure device ID generation to fail
+        mockGenerateSecureDeviceId.mockRejectedValue(new Error('Secure generation failed'))
 
         await authenticator.verifySignatureAndGetToken(mockContext, mockSignatureResult)
 
-        expect(consoleWarnSpy).toHaveBeenCalledWith('⚠️ Failed to get device info:', expect.any(Error))
+        expect(consoleWarnSpy).toHaveBeenCalledWith('⚠️ Failed to generate secure device ID:', expect.any(Error))
         expect(mockVerifySignatureAndLogin).toHaveBeenCalledWith(
           expect.objectContaining({
-            deviceId: 'fallback-device-1234567890000',
+            deviceId: expect.stringMatching(/^fallback-device-\d+-[a-z0-9]+$/),
             platform: 'ios',
           })
         )
-
-        // Restore Date.now
-        Date.now = originalDateNow
       })
 
       it('should use different device ID patterns for different platforms', async () => {
@@ -326,13 +339,77 @@ describe('FirebaseAuthenticator', () => {
 
         for (const platform of platforms) {
           mockPlatform.OS = platform
+          mockGenerateSecureDeviceId.mockResolvedValue(`secure-mobile-${platform}-1234567890000-xyz789abc123`)
 
           await authenticator.verifySignatureAndGetToken(mockContext, mockSignatureResult)
 
           const callArgs = mockVerifySignatureAndLogin.mock.calls[mockVerifySignatureAndLogin.mock.calls.length - 1][0]
-          expect(callArgs.deviceId).toMatch(new RegExp(`mobile-${platform}-\\d+-\\w+`))
+          expect(callArgs.deviceId).toBe(`secure-mobile-${platform}-1234567890000-xyz789abc123`)
           expect(callArgs.platform).toBe(platform)
         }
+      })
+
+      describe('Security Improvements', () => {
+        it('should use cryptographically secure device ID generation', async () => {
+          await authenticator.verifySignatureAndGetToken(mockContext, mockSignatureResult)
+
+          expect(mockGenerateSecureDeviceId).toHaveBeenCalledWith({
+            maxRetries: 3,
+            entropyLength: 16, // 128 bits of entropy
+            collisionCheck: expect.any(Function),
+          })
+        })
+
+        it('should not log full device IDs for security', async () => {
+          await authenticator.verifySignatureAndGetToken(mockContext, mockSignatureResult)
+
+          // Check that console.log doesn't contain the full device ID
+          const logCalls = consoleLogSpy.mock.calls.flat()
+          const hasFullDeviceId = logCalls.some(
+            (call) => typeof call === 'object' && call?.deviceId === 'secure-mobile-ios-1234567890000-abc123def456ghi789'
+          )
+
+          expect(hasFullDeviceId).toBe(false)
+
+          // Should log truncated version instead
+          expect(consoleLogSpy).toHaveBeenCalledWith(
+            '📱 Generated secure device info:',
+            expect.objectContaining({
+              deviceId: 'secure-mobile-ios-12...', // 20 characters + ...
+            })
+          )
+        })
+
+        it('should use enhanced fallback that avoids deprecated substr', async () => {
+          mockGenerateSecureDeviceId.mockRejectedValue(new Error('Secure generation failed'))
+
+          await authenticator.verifySignatureAndGetToken(mockContext, mockSignatureResult)
+
+          // Verify fallback uses substring (not substr) and has proper format
+          const deviceIdArg = mockVerifySignatureAndLogin.mock.calls[0][0].deviceId
+          expect(deviceIdArg).toMatch(/^fallback-device-\d+-[a-z0-9]{9}$/)
+        })
+
+        it('should handle collision detection in device ID generation', async () => {
+          await authenticator.verifySignatureAndGetToken(mockContext, mockSignatureResult)
+
+          const collisionCheckFn = mockGenerateSecureDeviceId.mock.calls[0][0].collisionCheck
+          expect(typeof collisionCheckFn).toBe('function')
+
+          // Should always return false for this use case (no external collision check)
+          const result = await collisionCheckFn('test-device-id')
+          expect(result).toBe(false)
+        })
+
+        it('should provide high entropy secure device IDs', async () => {
+          await authenticator.verifySignatureAndGetToken(mockContext, mockSignatureResult)
+
+          expect(mockGenerateSecureDeviceId).toHaveBeenCalledWith(
+            expect.objectContaining({
+              entropyLength: 16, // 128 bits of entropy
+            })
+          )
+        })
       })
     })
 

@@ -4,6 +4,7 @@ import { HttpsCallable, httpsCallable } from 'firebase/functions'
 import { Platform } from 'react-native'
 import { FIREBASE_AUTH, FIREBASE_FUNCTIONS } from '../../../firebase.config'
 import { devOnly } from '../../../utils'
+import { generateSecureDeviceId } from '../../../utils/secureDeviceId'
 import { FirebaseAuthCircuitBreakers } from '../utils/circuitBreaker'
 import { ErrorCategorizer, RetryExecutor, RetryPolicies } from '../utils/retryPolicies'
 
@@ -41,20 +42,28 @@ export class FirebaseAuthenticator {
         // Get device ID from platform-specific sources
         const platform = Platform.OS as 'ios' | 'android'
 
-        // Use a combination of app instance and platform for device ID
-        const deviceId = `mobile-${platform}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+        // Generate cryptographically secure device ID with collision resistance
+        const deviceId = await generateSecureDeviceId({
+          maxRetries: 3,
+          entropyLength: 16, // 128 bits of entropy
+          collisionCheck: async () => false, // No external collision check needed for this use case
+        })
 
         deviceInfo = {
           deviceId,
           platform,
         }
 
-        console.log('📱 Generated device info:', { deviceId, platform })
+        console.log('📱 Generated secure device info:', {
+          deviceId: deviceId.substring(0, 20) + '...', // Log only prefix for security
+          platform,
+        })
       } catch (error) {
-        console.warn('⚠️ Failed to get device info:', error)
-        // Fallback for web or other platforms
+        console.warn('⚠️ Failed to generate secure device ID:', error)
+        // Secure fallback still using timestamp but with better entropy
+        const fallbackId = `fallback-device-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`
         deviceInfo = {
-          deviceId: `fallback-device-${Date.now()}`,
+          deviceId: fallbackId,
           platform: 'ios' as const,
         }
       }

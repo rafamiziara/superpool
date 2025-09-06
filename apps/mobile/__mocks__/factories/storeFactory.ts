@@ -40,12 +40,17 @@ export const createMockAuthenticationStore = (
       requestId: string | null
     }
     authError: AppError | null
+    retryCount: number
+    isRetryDelayActive: boolean
+    isAppRefreshGracePeriod: boolean
+    maxRetries: number
+    isLoggingOut: boolean
   }> = {}
 ) => {
   // Create observable auth store state
   const storeState = observable({
     currentStep: null as AuthStep | null,
-    completedSteps: new Set<AuthStep>(['connect-wallet']),
+    completedSteps: observable.set<AuthStep>(['connect-wallet']),
     failedStep: null as AuthStep | null,
     isProgressComplete: false,
     progressError: null as string | null,
@@ -57,6 +62,19 @@ export const createMockAuthenticationStore = (
       requestId: null as string | null,
     },
     authError: null as AppError | null,
+
+    // Retry logic state (reactive)
+    retryCount: 0,
+    isRetryDelayActive: false,
+    isAppRefreshGracePeriod: true,
+    maxRetries: 3,
+
+    // Logout state (reactive)
+    isLoggingOut: false,
+
+    // Private reset flags (to prevent infinite loops in real store)
+    isResetting: false,
+    isResettingProgress: false,
 
     // Apply overrides
     ...overrides,
@@ -198,6 +216,86 @@ export const createMockAuthenticationStore = (
     setAuthError: jest.fn().mockImplementation((error: AppError | null) => {
       storeState.authError = error
     }),
+
+    // Additional properties for full compatibility
+    get retryCount() {
+      return storeState.retryCount
+    },
+    set retryCount(value: number) {
+      storeState.retryCount = value
+    },
+
+    get isRetryDelayActive() {
+      return storeState.isRetryDelayActive
+    },
+    set isRetryDelayActive(value: boolean) {
+      storeState.isRetryDelayActive = value
+    },
+
+    get isAppRefreshGracePeriod() {
+      return storeState.isAppRefreshGracePeriod
+    },
+    set isAppRefreshGracePeriod(value: boolean) {
+      storeState.isAppRefreshGracePeriod = value
+    },
+
+    get maxRetries() {
+      return storeState.maxRetries
+    },
+    set maxRetries(value: number) {
+      storeState.maxRetries = value
+    },
+
+    get isLoggingOut() {
+      return storeState.isLoggingOut
+    },
+    set isLoggingOut(value: boolean) {
+      storeState.isLoggingOut = value
+    },
+
+    // Computed getters for retry logic
+    get canRetry(): boolean {
+      return storeState.retryCount < storeState.maxRetries
+    },
+
+    get nextRetryDelay(): number {
+      const BASE_DELAY = 2000 // 2 seconds
+      return BASE_DELAY * Math.pow(2, storeState.retryCount - 1)
+    },
+
+    // Additional methods from real AuthenticationStore
+    setRetryCount: jest.fn().mockImplementation((count: number) => {
+      storeState.retryCount = Math.max(0, Math.min(count, storeState.maxRetries))
+    }),
+    setRetryDelayActive: jest.fn().mockImplementation((active: boolean) => {
+      storeState.isRetryDelayActive = active
+    }),
+    endGracePeriod: jest.fn().mockImplementation(() => {
+      storeState.isAppRefreshGracePeriod = false
+    }),
+    resetRetryState: jest.fn().mockImplementation(() => {
+      storeState.retryCount = 0
+      storeState.isRetryDelayActive = false
+      storeState.isAppRefreshGracePeriod = true
+    }),
+    startLogout: jest.fn().mockImplementation(() => {
+      storeState.isLoggingOut = true
+    }),
+    finishLogout: jest.fn().mockImplementation(() => {
+      storeState.isLoggingOut = false
+    }),
+    isAuthenticatingForWallet: jest.fn().mockImplementation((walletAddress: string) => {
+      return storeState.authLock.isLocked && storeState.authLock.walletAddress?.toLowerCase() === walletAddress.toLowerCase()
+    }),
+
+    // Private properties for type compatibility (read-only getters)
+    get isResetting() {
+      return storeState.isResetting
+    },
+
+    get isResettingProgress() {
+      return storeState.isResettingProgress
+    },
   }
 
   return mockStore
@@ -211,6 +309,7 @@ export const createMockWalletStore = (
     chainId: number | undefined
     connectionError: string | null
     isConnecting: boolean
+    _sequenceCounter: number
   }> = {}
 ) => {
   // Create observable store state
@@ -221,6 +320,9 @@ export const createMockWalletStore = (
     chainId: undefined as number | undefined,
     connectionError: null as string | null,
     isConnecting: false,
+
+    // Internal sequence tracking (private in real store)
+    _sequenceCounter: 0,
 
     // Apply overrides to state
     ...overrides,
@@ -290,6 +392,8 @@ export const createMockWalletStore = (
       storeState.isConnecting = false
     }),
     updateConnectionState: jest.fn().mockImplementation((isConnected: boolean, address?: string, chainId?: number) => {
+      const sequenceNumber = ++storeState._sequenceCounter
+
       storeState.isConnected = isConnected
       storeState.address = address
       storeState.chainId = chainId
@@ -300,12 +404,112 @@ export const createMockWalletStore = (
         address,
         chainId,
         timestamp: Date.now(),
-        sequenceNumber: Math.floor(Math.random() * 1000), // Mock sequence number
+        sequenceNumber,
       }
     }),
     setConnectionError: jest.fn(),
-    captureState: jest.fn(),
-    validateState: jest.fn(),
+    captureState: jest.fn().mockImplementation(() => {
+      return {
+        isConnected: storeState.isConnected,
+        address: storeState.address,
+        chainId: storeState.chainId,
+        timestamp: Date.now(),
+        sequenceNumber: storeState._sequenceCounter,
+      }
+    }),
+    validateState: jest
+      .fn()
+      .mockImplementation(
+        (
+          lockedState: { isConnected: boolean; address: string | undefined; chainId: number | undefined; sequenceNumber: number },
+          currentState: { isConnected: boolean; address: string | undefined; chainId: number | undefined; sequenceNumber: number },
+          checkPoint: string
+        ) => {
+          const isValid =
+            currentState.isConnected === lockedState.isConnected &&
+            currentState.address === lockedState.address &&
+            currentState.chainId === lockedState.chainId &&
+            currentState.sequenceNumber >= lockedState.sequenceNumber
+
+          if (!isValid) {
+            console.log(`❌ Connection state changed at ${checkPoint}:`, {
+              locked: lockedState,
+              current: currentState,
+              sequenceDrift: currentState.sequenceNumber - lockedState.sequenceNumber,
+            })
+          }
+
+          return isValid
+        }
+      ),
+    validateInitialState: jest.fn().mockImplementation((walletAddress: string) => {
+      if (!storeState.isConnected || !storeState.address) {
+        return {
+          isValid: false,
+          error: 'Wallet connection state invalid',
+        }
+      }
+      if (storeState.address.toLowerCase() !== walletAddress.toLowerCase()) {
+        return {
+          isValid: false,
+          error: 'Wallet address mismatch',
+        }
+      }
+      if (!storeState.chainId) {
+        return {
+          isValid: false,
+          error: 'ChainId not found',
+        }
+      }
+      return { isValid: true }
+    }),
+
+    // Additional properties for full compatibility (sequenceCounter is private in real store)
+    // We need to add it for type compatibility but it won't be directly accessible
+    get sequenceCounter() {
+      return storeState._sequenceCounter
+    },
+
+    // Computed getters from real WalletStore
+    get isWalletConnected(): boolean {
+      return storeState.isConnected && !!storeState.address
+    },
+
+    // Additional methods from real WalletStore
+    setConnectionState: jest.fn().mockImplementation(
+      (
+        state: Partial<{
+          isConnected: boolean
+          address: string | undefined
+          chainId: number | undefined
+          isConnecting: boolean
+          connectionError: string | null
+        }>
+      ) => {
+        if (state.isConnected !== undefined) storeState.isConnected = state.isConnected
+        if (state.address !== undefined) storeState.address = state.address
+        if (state.chainId !== undefined) storeState.chainId = state.chainId
+        if (state.isConnecting !== undefined) storeState.isConnecting = state.isConnecting
+        if (state.connectionError !== undefined) storeState.connectionError = state.connectionError
+      }
+    ),
+    setConnecting: jest.fn().mockImplementation((connecting: boolean) => {
+      storeState.isConnecting = connecting
+      if (connecting) {
+        storeState.connectionError = null
+      }
+    }),
+    resetSequence: jest.fn().mockImplementation(() => {
+      storeState._sequenceCounter = 0
+    }),
+    reset: jest.fn().mockImplementation(() => {
+      storeState.isConnected = false
+      storeState.address = undefined
+      storeState.chainId = undefined
+      storeState.isConnecting = false
+      storeState.connectionError = null
+      storeState._sequenceCounter++
+    }),
   }
 }
 

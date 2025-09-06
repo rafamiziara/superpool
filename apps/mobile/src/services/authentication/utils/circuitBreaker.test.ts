@@ -1,4 +1,10 @@
-import { CircuitBreakerConfig, CircuitBreakerState, FirebaseAuthCircuitBreaker, FirebaseAuthCircuitBreakers } from './circuitBreaker'
+import {
+  CircuitBreakerConfig,
+  CircuitBreakerState,
+  FirebaseAuthCircuitBreaker,
+  FirebaseAuthCircuitBreakers,
+  InstanceLifecycleConfig,
+} from './circuitBreaker'
 
 describe('FirebaseAuthCircuitBreaker', () => {
   let circuitBreaker: FirebaseAuthCircuitBreaker
@@ -289,8 +295,13 @@ describe('FirebaseAuthCircuitBreaker', () => {
 
 describe('FirebaseAuthCircuitBreakers', () => {
   beforeEach(() => {
-    // Reset singleton instances
-    FirebaseAuthCircuitBreakers.resetAll()
+    // Clear all instances and stop any running timers
+    FirebaseAuthCircuitBreakers.clearAll()
+  })
+
+  afterEach(() => {
+    // Ensure cleanup timer is stopped after each test
+    FirebaseAuthCircuitBreakers.stopCleanupTimer()
   })
 
   describe('getFirebaseAuthCircuitBreaker', () => {
@@ -393,6 +404,229 @@ describe('FirebaseAuthCircuitBreakers', () => {
       expect(healthStatus['firebase-auth'].totalRequests).toBe(1)
       expect(healthStatus['firebase-auth'].successfulRequests).toBe(1)
       expect(healthStatus['firebase-auth'].failedRequests).toBe(0)
+    })
+  })
+
+  describe('memory leak prevention', () => {
+    beforeEach(() => {
+      // Use shorter intervals for testing
+      const testConfig: Partial<InstanceLifecycleConfig> = {
+        ttlMs: 1000, // 1 second TTL for testing
+        maxInstances: 3, // Low limit for testing
+        cleanupIntervalMs: 100, // Fast cleanup for testing
+        inactivityThresholdMs: 500, // 500ms inactivity
+      }
+      FirebaseAuthCircuitBreakers.configureLifecycle(testConfig)
+    })
+
+    it('should track memory metrics correctly', () => {
+      const initialMetrics = FirebaseAuthCircuitBreakers.getMemoryMetrics()
+      expect(initialMetrics.totalInstances).toBe(0)
+      expect(initialMetrics.activeInstances).toBe(0)
+      expect(initialMetrics.memoryPressureLevel).toBe('low')
+
+      // Create instances
+      FirebaseAuthCircuitBreakers.getFirebaseAuthCircuitBreaker()
+      FirebaseAuthCircuitBreakers.getSafeWalletCircuitBreaker()
+
+      const metricsAfterCreation = FirebaseAuthCircuitBreakers.getMemoryMetrics()
+      expect(metricsAfterCreation.totalInstances).toBe(2)
+      expect(metricsAfterCreation.activeInstances).toBe(2)
+      expect(metricsAfterCreation.totalAccessCount).toBe(2) // Each created with 1 access
+    })
+
+    it('should enforce maximum instance limits', async () => {
+      // Configure very low limit with shorter inactivity threshold
+      FirebaseAuthCircuitBreakers.configureLifecycle({
+        maxInstances: 1,
+        inactivityThresholdMs: 100, // Very short inactivity threshold
+      })
+
+      // Create first instance - should succeed
+      const breaker1 = FirebaseAuthCircuitBreakers.getFirebaseAuthCircuitBreaker()
+      expect(breaker1).toBeDefined()
+
+      let metricsAfterFirst = FirebaseAuthCircuitBreakers.getMemoryMetrics()
+      expect(metricsAfterFirst.totalInstances).toBe(1)
+      expect(metricsAfterFirst.memoryPressureLevel).toBe('high')
+
+      // Wait for the first instance to become inactive
+      await new Promise((resolve) => setTimeout(resolve, 150))
+
+      // Try to create second instance - should trigger cleanup first
+      const breaker2 = FirebaseAuthCircuitBreakers.getSafeWalletCircuitBreaker()
+      expect(breaker2).toBeDefined()
+
+      let metricsAfterSecond = FirebaseAuthCircuitBreakers.getMemoryMetrics()
+      // Should have cleaned up the first one and created the second
+      expect(metricsAfterSecond.totalInstances).toBe(1)
+    })
+
+    it('should clean up inactive instances after TTL expires', (done) => {
+      // Create an instance
+      FirebaseAuthCircuitBreakers.getFirebaseAuthCircuitBreaker()
+
+      let initialMetrics = FirebaseAuthCircuitBreakers.getMemoryMetrics()
+      expect(initialMetrics.totalInstances).toBe(1)
+
+      // Wait for TTL to expire and cleanup to occur
+      setTimeout(() => {
+        const metricsAfterTTL = FirebaseAuthCircuitBreakers.getMemoryMetrics()
+        expect(metricsAfterTTL.totalInstances).toBe(0)
+        expect(metricsAfterTTL.inactiveInstances).toBe(0)
+        done()
+      }, 1500) // Wait longer than TTL (1000ms) + cleanup interval (100ms)
+    })
+
+    it('should keep active instances alive', async () => {
+      // Create an instance
+      FirebaseAuthCircuitBreakers.getFirebaseAuthCircuitBreaker()
+
+      let initialMetrics = FirebaseAuthCircuitBreakers.getMemoryMetrics()
+      expect(initialMetrics.totalInstances).toBe(1)
+
+      // Access the instance multiple times over the TTL period to keep it active
+      // This simulates regular usage that should prevent cleanup
+      for (let i = 0; i < 5; i++) {
+        await new Promise((resolve) => setTimeout(resolve, 300))
+        FirebaseAuthCircuitBreakers.getFirebaseAuthCircuitBreaker() // Access to update lastAccessTime
+      }
+
+      // After all the accesses, the instance should still exist
+      // since it was accessed recently
+      const metrics = FirebaseAuthCircuitBreakers.getMemoryMetrics()
+      expect(metrics.totalInstances).toBe(1)
+      expect(metrics.activeInstances).toBe(1)
+    })
+
+    it('should handle force cleanup correctly', async () => {
+      // Mock Date.now to work with fake timers
+      const realDateNow = Date.now
+      let fakeTime = realDateNow()
+      jest.spyOn(Date, 'now').mockImplementation(() => fakeTime)
+
+      try {
+        // Create multiple instances
+        FirebaseAuthCircuitBreakers.getFirebaseAuthCircuitBreaker()
+        FirebaseAuthCircuitBreakers.getSafeWalletCircuitBreaker()
+
+        let metrics = FirebaseAuthCircuitBreakers.getMemoryMetrics()
+        expect(metrics.totalInstances).toBe(2)
+
+        // Advance fake time to make instances inactive
+        fakeTime += 600 // Advance past inactivityThresholdMs: 500
+
+        // Force cleanup
+        FirebaseAuthCircuitBreakers.forceCleanup()
+
+        metrics = FirebaseAuthCircuitBreakers.getMemoryMetrics()
+        expect(metrics.totalInstances).toBe(0)
+      } finally {
+        // Restore Date.now
+        jest.restoreAllMocks()
+      }
+    })
+
+    it('should manage memory pressure levels correctly', () => {
+      // Configure limits for testing pressure levels
+      FirebaseAuthCircuitBreakers.configureLifecycle({ maxInstances: 10 })
+
+      // Low pressure (0 instances)
+      let metrics = FirebaseAuthCircuitBreakers.getMemoryMetrics()
+      expect(metrics.memoryPressureLevel).toBe('low')
+
+      // Create instances up to medium pressure (70% of max = 7 instances)
+      // But we only have 2 different types, so this will just test up to 2
+      FirebaseAuthCircuitBreakers.getFirebaseAuthCircuitBreaker()
+      FirebaseAuthCircuitBreakers.getSafeWalletCircuitBreaker()
+
+      metrics = FirebaseAuthCircuitBreakers.getMemoryMetrics()
+      expect(metrics.totalInstances).toBe(2)
+      expect(metrics.memoryPressureLevel).toBe('low') // Still low at 2/10
+
+      // Test high pressure by lowering the limit
+      FirebaseAuthCircuitBreakers.configureLifecycle({ maxInstances: 1 })
+      metrics = FirebaseAuthCircuitBreakers.getMemoryMetrics()
+      expect(metrics.memoryPressureLevel).toBe('high') // Now 2/1 is high
+    })
+
+    it('should update lifecycle configuration dynamically', () => {
+      const initialConfig = {
+        ttlMs: 2000,
+        maxInstances: 5,
+        cleanupIntervalMs: 200,
+        inactivityThresholdMs: 1000,
+      }
+
+      FirebaseAuthCircuitBreakers.configureLifecycle(initialConfig)
+
+      // Create an instance to test the new config
+      FirebaseAuthCircuitBreakers.getFirebaseAuthCircuitBreaker()
+
+      const metrics = FirebaseAuthCircuitBreakers.getMemoryMetrics()
+      expect(metrics.totalInstances).toBe(1)
+
+      // Update config with tighter limits
+      FirebaseAuthCircuitBreakers.configureLifecycle({
+        maxInstances: 1,
+        ttlMs: 500,
+      })
+
+      // Should still have the instance
+      const updatedMetrics = FirebaseAuthCircuitBreakers.getMemoryMetrics()
+      expect(updatedMetrics.totalInstances).toBe(1)
+      expect(updatedMetrics.memoryPressureLevel).toBe('high')
+    })
+
+    it('should start and stop cleanup timer correctly', () => {
+      // Timer should start automatically when accessing instances
+      FirebaseAuthCircuitBreakers.getFirebaseAuthCircuitBreaker()
+
+      // Stop the timer
+      FirebaseAuthCircuitBreakers.stopCleanupTimer()
+
+      // Create another instance - should restart timer
+      FirebaseAuthCircuitBreakers.getSafeWalletCircuitBreaker()
+
+      // Verify instances exist
+      const metrics = FirebaseAuthCircuitBreakers.getMemoryMetrics()
+      expect(metrics.totalInstances).toBe(2)
+    })
+
+    it('should handle concurrent access and cleanup safely', async () => {
+      // Create multiple instances concurrently
+      const promises = Array.from({ length: 10 }, () => Promise.resolve(FirebaseAuthCircuitBreakers.getFirebaseAuthCircuitBreaker()))
+
+      const results = await Promise.all(promises)
+
+      // All should return the same instance (singleton behavior)
+      results.forEach((result) => {
+        expect(result).toBe(results[0])
+      })
+
+      const metrics = FirebaseAuthCircuitBreakers.getMemoryMetrics()
+      expect(metrics.totalInstances).toBe(1)
+      expect(metrics.totalAccessCount).toBe(10) // 10 accesses total
+    })
+  })
+
+  describe('clearAll functionality', () => {
+    it('should clear all instances and stop timers', () => {
+      // Create instances
+      FirebaseAuthCircuitBreakers.getFirebaseAuthCircuitBreaker()
+      FirebaseAuthCircuitBreakers.getSafeWalletCircuitBreaker()
+
+      let metrics = FirebaseAuthCircuitBreakers.getMemoryMetrics()
+      expect(metrics.totalInstances).toBe(2)
+
+      // Clear all
+      FirebaseAuthCircuitBreakers.clearAll()
+
+      metrics = FirebaseAuthCircuitBreakers.getMemoryMetrics()
+      expect(metrics.totalInstances).toBe(0)
+      expect(metrics.activeInstances).toBe(0)
+      expect(metrics.inactiveInstances).toBe(0)
+      expect(metrics.memoryPressureLevel).toBe('low')
     })
   })
 })
@@ -572,13 +806,14 @@ describe('CircuitBreaker Security Integration Tests', () => {
 
   beforeEach(() => {
     jest.useFakeTimers()
-    FirebaseAuthCircuitBreakers.resetAll()
+    FirebaseAuthCircuitBreakers.clearAll()
     firebaseBreaker = FirebaseAuthCircuitBreakers.getFirebaseAuthCircuitBreaker()
     safeBreaker = FirebaseAuthCircuitBreakers.getSafeWalletCircuitBreaker()
   })
 
   afterEach(() => {
     jest.useRealTimers()
+    FirebaseAuthCircuitBreakers.stopCleanupTimer()
   })
 
   it('should handle concurrent operations across multiple circuit breaker instances', async () => {

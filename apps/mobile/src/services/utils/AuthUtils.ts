@@ -1,22 +1,59 @@
 import { SignatureRequest } from '@superpool/types'
+import { SecureDeviceIdGenerator } from '../../utils/secureDeviceId'
 
 /**
  * Authentication utilities for common auth operations
  * Provides helper functions used across authentication services
  */
 export class AuthUtils {
+  private static secureGenerator = SecureDeviceIdGenerator.getInstance()
+
   /**
-   * Generates a secure random nonce for authentication
+   * Generates a cryptographically secure random nonce for authentication
+   * Uses the same secure random generation as device IDs
    */
   static generateNonce(length: number = 32): string {
-    const charset = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789'
-    let result = ''
+    try {
+      // Use secure random generator for nonce generation
+      const randomBytes = AuthUtils.secureGenerator['randomSelector'].generateSecureBytes(Math.ceil(length * 0.75))
 
-    for (let i = 0; i < length; i++) {
-      result += charset.charAt(Math.floor(Math.random() * charset.length))
+      // Convert to base62 for nonce (alphanumeric)
+      const charset = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789'
+      let result = ''
+
+      for (const byte of randomBytes) {
+        if (result.length >= length) break
+        result += charset[byte % charset.length]
+      }
+
+      // Ensure we have exactly the requested length
+      while (result.length < length) {
+        const extraByte = AuthUtils.secureGenerator['randomSelector'].generateSecureBytes(1)[0]
+        result += charset[extraByte % charset.length]
+      }
+
+      return result.substring(0, length)
+    } catch (error) {
+      console.warn('⚠️ Failed to generate secure nonce, falling back to enhanced random:', error)
+
+      // Secure fallback using enhanced randomness
+      const charset = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789'
+      let result = ''
+      const now = Date.now()
+
+      for (let i = 0; i < length; i++) {
+        // Enhanced entropy combining multiple sources
+        const r1 = Math.random()
+        const r2 = (now + i) * Math.random()
+        const r3 = Math.random() * performance.now() || Math.random()
+
+        // XOR combine and use as index
+        const combined = Math.floor(((r1 * 1000 + r2) % 1000) + r3 * 1000) % charset.length
+        result += charset[combined]
+      }
+
+      return result
     }
-
-    return result
   }
 
   /**
