@@ -5,9 +5,9 @@ import { setGlobalOptions } from 'firebase-functions'
 dotenv.config()
 setGlobalOptions({ maxInstances: 10 })
 
-export { 
-  customAppCheckMinter, 
-  generateAuthMessage, 
+export {
+  customAppCheckMinter,
+  generateAuthMessage,
   verifySignatureAndLogin,
   createPool,
   poolStatus,
@@ -27,5 +27,5 @@ export {
   syncPoolEvents,
   processPoolEvents,
   syncHistoricalEvents,
-  estimateSyncProgress
+  estimateSyncProgress,
 } from './functions'

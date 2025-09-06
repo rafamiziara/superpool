@@ -7,7 +7,7 @@ Our backend coverage strategy balances **production reliability** with **develop
 ### **Coverage Principles**
 
 - **Serverless Reliability**: Focus on Cloud Function execution paths and error scenarios
-- **Blockchain Integration**: Prioritize contract interaction and transaction handling coverage  
+- **Blockchain Integration**: Prioritize contract interaction and transaction handling coverage
 - **Security First**: 100% coverage of authentication and validation logic
 - **Performance Aware**: Monitor function timeout and memory usage paths
 
@@ -81,11 +81,11 @@ collectCoverageFrom: [
   'src/**/*.ts',
 
   // Exclusions
-  '!src/**/*.d.ts',              // Type definitions
-  '!src/**/*.test.ts',           // Test files
-  '!src/constants/**',           // Configuration constants
-  '!src/index.ts',               // Firebase Functions index
-  '!lib/**',                     // Compiled output
+  '!src/**/*.d.ts', // Type definitions
+  '!src/**/*.test.ts', // Test files
+  '!src/constants/**', // Configuration constants
+  '!src/index.ts', // Firebase Functions index
+  '!lib/**', // Compiled output
 ]
 ```
 
@@ -103,7 +103,7 @@ collectCoverageFrom: [
 export const POOL_FACTORY_ADDRESS = '0x742d35Cc6634C0532925a3b8D238a5D2DD8dC5b8'
 export const CHAIN_IDS = {
   POLYGON: 137,
-  POLYGON_AMOY: 80002
+  POLYGON_AMOY: 80002,
 } as const
 // Testing this would just duplicate the values
 ```
@@ -143,7 +143,7 @@ describe('createPool Cloud Function', () => {
     mockFirestore.collection.mockResolvedValueOnce(mockCollection)
 
     const result = await createPoolHandler(validRequest)
-    
+
     expect(result.success).toBe(true) // Retry succeeded
     expect(mockFirestore.collection).toHaveBeenCalledTimes(2)
   })
@@ -151,9 +151,9 @@ describe('createPool Cloud Function', () => {
   it('should validate gas estimation before contract interaction', async () => {
     // Tests blockchain integration decision path
     mockContract.estimateGas.createPool.mockResolvedValue(BigInt('500000'))
-    
+
     await createPoolHandler(validRequest)
-    
+
     expect(mockContract.createPool).toHaveBeenCalledWith(
       expect.anything(),
       { gasLimit: expect.any(BigInt) } // Gas limit should be set
@@ -186,7 +186,7 @@ Branch coverage is **the most critical metric** for backend reliability.
 ### **Why Branch Coverage Matters Most**
 
 - **Error Handling**: Ensures all try/catch blocks are tested
-- **Authentication Paths**: Tests both authenticated and unauthenticated scenarios  
+- **Authentication Paths**: Tests both authenticated and unauthenticated scenarios
 - **Contract Interactions**: Covers success and failure paths for blockchain calls
 - **Input Validation**: Tests all validation decision points
 
@@ -217,15 +217,15 @@ export const createPoolHandler = async (request: CallableRequest<CreatePoolReque
     return {
       success: true,
       poolId: result.poolId,
-      transactionHash: result.transactionHash
+      transactionHash: result.transactionHash,
     }
   } catch (error) {
     // Branch 5: Firebase error handling
     if (error.code === 'deadline-exceeded') {
       throw new HttpsError('deadline-exceeded', 'Request timeout, please retry')
     }
-    
-    // Branch 6: Contract error handling  
+
+    // Branch 6: Contract error handling
     if (error.message.includes('execution reverted')) {
       throw new HttpsError('failed-precondition', 'Contract execution failed')
     }
@@ -281,7 +281,7 @@ describe('createPool Branch Coverage', () => {
 pnpm test --coverage
 
 # View detailed HTML report
-# Opens: ../../coverage/backend/lcov-report/index.html  
+# Opens: ../../coverage/backend/lcov-report/index.html
 start ../../coverage/backend/lcov-report/index.html
 
 # Coverage with threshold enforcement
@@ -308,7 +308,7 @@ coverage/backend/
 ### **CI/CD Integration**
 
 - **Threshold Enforcement**: Builds fail if coverage drops below targets
-- **PR Coverage Reports**: Automatic coverage analysis on pull requests  
+- **PR Coverage Reports**: Automatic coverage analysis on pull requests
 - **Coverage Diff**: Shows coverage changes for modified functions
 - **Firebase Deployment Gate**: Coverage check before Cloud Functions deployment
 
@@ -346,20 +346,19 @@ export const processLoanRequest = async (request: CallableRequest<LoanRequest>) 
 
 // ✅ Add test for uncovered branch
 it('should reject invalid loan actions', async () => {
-  const request = { 
-    data: { loanId: 'loan-123', action: 'invalid' }, 
-    auth: mockAuth 
+  const request = {
+    data: { loanId: 'loan-123', action: 'invalid' },
+    auth: mockAuth,
   }
-  
-  await expect(processLoanRequest(request))
-    .rejects.toThrow('Invalid action: invalid')
+
+  await expect(processLoanRequest(request)).rejects.toThrow('Invalid action: invalid')
 })
 ```
 
 ### **3. Prioritize Coverage Improvements**
 
 1. **Critical Cloud Functions**: Authentication, pool creation, transaction processing
-2. **Error Handling Paths**: Network failures, contract reverts, timeout scenarios  
+2. **Error Handling Paths**: Network failures, contract reverts, timeout scenarios
 3. **Security Validation**: Input sanitization, authorization checks
 4. **Contract Integration**: Gas estimation, transaction monitoring, event parsing
 
@@ -380,7 +379,7 @@ it('should call Firestore collection method', () => {
 // Good: Testing our business logic outcome
 it('should save pool data with correct structure', async () => {
   const result = await savePoolData(poolData)
-  
+
   expect(result.success).toBe(true)
   expect(result.poolId).toBeDefined()
 })
@@ -408,7 +407,7 @@ it('should validate ether amounts correctly', () => {
 ```typescript
 // Bad: So much mocking that nothing real is tested
 jest.mock('firebase-admin/firestore')
-jest.mock('firebase-admin/auth')  
+jest.mock('firebase-admin/auth')
 jest.mock('ethers')
 jest.mock('../services/ContractService')
 jest.mock('../utils/validation')
@@ -427,16 +426,15 @@ Focus on uncovered error handling branches:
 describe('Error Path Coverage', () => {
   it('should handle Firebase connection errors', async () => {
     mockFirestore.collection.mockRejectedValue(new Error('Connection failed'))
-    
-    await expect(createPool(validData))
-      .rejects.toThrow('Service temporarily unavailable')
+
+    await expect(createPool(validData)).rejects.toThrow('Service temporarily unavailable')
   })
 
   it('should handle contract gas estimation failures', async () => {
     mockContract.estimateGas.createPool.mockRejectedValue(new Error('Gas estimation failed'))
-    
+
     const result = await createPool(validData)
-    
+
     expect(result.gasLimit).toBe(DEFAULT_GAS_LIMIT) // Fallback used
   })
 })
@@ -450,23 +448,20 @@ Cover all authentication decision points:
 describe('Authentication Branch Coverage', () => {
   it('should handle missing authentication', async () => {
     const request = { data: validData, auth: null }
-    
-    await expect(secureFunction(request))
-      .rejects.toThrow('Authentication required')
+
+    await expect(secureFunction(request)).rejects.toThrow('Authentication required')
   })
 
   it('should handle invalid authentication tokens', async () => {
     const request = { data: validData, auth: { uid: null } }
-    
-    await expect(secureFunction(request))
-      .rejects.toThrow('Invalid authentication token')
+
+    await expect(secureFunction(request)).rejects.toThrow('Invalid authentication token')
   })
 
   it('should handle expired authentication', async () => {
     mockAuth.verifyIdToken.mockRejectedValue(new Error('Token expired'))
-    
-    await expect(secureFunction(validRequest))
-      .rejects.toThrow('Authentication expired')
+
+    await expect(secureFunction(validRequest)).rejects.toThrow('Authentication expired')
   })
 })
 ```
@@ -479,25 +474,23 @@ Cover all blockchain interaction paths:
 describe('Contract Interaction Coverage', () => {
   it('should handle successful contract deployment', async () => {
     mockContract.createPool.mockResolvedValue(mockSuccessTx)
-    
+
     const result = await deployPool(poolParams)
-    
+
     expect(result.success).toBe(true)
     expect(result.poolId).toBeDefined()
   })
 
   it('should handle contract deployment failures', async () => {
     mockContract.createPool.mockRejectedValue(new Error('execution reverted'))
-    
-    await expect(deployPool(poolParams))
-      .rejects.toThrow('Contract deployment failed')
+
+    await expect(deployPool(poolParams)).rejects.toThrow('Contract deployment failed')
   })
 
   it('should handle network connection issues', async () => {
     mockProvider.getNetwork.mockRejectedValue(new Error('Network error'))
-    
-    await expect(deployPool(poolParams))
-      .rejects.toThrow('Blockchain network unavailable')
+
+    await expect(deployPool(poolParams)).rejects.toThrow('Blockchain network unavailable')
   })
 })
 ```
@@ -546,7 +539,7 @@ firebase deploy --only functions
 - [Testing Guide](./TESTING_GUIDE.md) - Overall backend testing philosophy
 - [TDD Workflow](./TDD_WORKFLOW.md) - Test-driven development process
 - [Mock System Guide](./MOCK_SYSTEM.md) - Firebase and contract mocking
-- [Firebase Testing](./FIREBASE_TESTING.md) - Cloud Functions testing patterns  
+- [Firebase Testing](./FIREBASE_TESTING.md) - Cloud Functions testing patterns
 - [Contract Testing](./CONTRACT_TESTING.md) - Blockchain integration testing
 - [Troubleshooting](./TROUBLESHOOTING.md) - Common coverage issues
 

@@ -1,6 +1,6 @@
 /**
  * Blockchain Test Environment
- * 
+ *
  * This utility provides comprehensive blockchain testing infrastructure
  * for contract integration tests, supporting multiple networks and
  * realistic blockchain interaction patterns.
@@ -117,31 +117,31 @@ export const TEST_WALLETS: Record<string, TestWalletConfig> = {
 
 export class BlockchainTestEnvironment {
   private static instance: BlockchainTestEnvironment
-  
+
   public provider: JsonRpcProvider
   public wallets: Map<string, Wallet> = new Map()
   public contracts: Map<string, Contract> = new Map()
   public chainConfig: ChainConfig
-  
+
   // Test state tracking
   private initialBlockNumber: number = 0
   private transactionHistory: any[] = []
   private gasUsageHistory: { method: string; gas: bigint; timestamp: number }[] = []
   private performanceMetrics: { operation: string; duration: number; timestamp: number }[] = []
-  
+
   private constructor(private options: BlockchainTestOptions = {}) {
     this.chainConfig = TEST_CHAINS[options.chainName || 'local']
     this.initializeProvider()
     this.initializeWallets()
   }
-  
+
   static getInstance(options: BlockchainTestOptions = {}): BlockchainTestEnvironment {
     if (!BlockchainTestEnvironment.instance) {
       BlockchainTestEnvironment.instance = new BlockchainTestEnvironment(options)
     }
     return BlockchainTestEnvironment.instance
   }
-  
+
   private initializeProvider(): void {
     if (this.options.useRealProvider && this.chainConfig.rpcUrl.startsWith('http')) {
       // Use real provider for integration tests
@@ -149,13 +149,13 @@ export class BlockchainTestEnvironment {
     } else {
       // Use mock provider for unit tests
       this.provider = ethersMock.provider
-      
+
       // Configure mock for specific chain
       ethersMock.setNetwork(this.chainConfig.chainId, this.chainConfig.name)
       ethersMock.setGasPrice(this.chainConfig.gasPrice)
     }
   }
-  
+
   private initializeWallets(): void {
     Object.entries(TEST_WALLETS).forEach(([name, config]) => {
       if (this.options.useRealProvider) {
@@ -164,16 +164,13 @@ export class BlockchainTestEnvironment {
       } else {
         // Use mock wallet but set correct address
         this.wallets.set(name, ethersMock.wallet)
-        
+
         // Set balance in mock
-        ethersMock.setAccountBalance(
-          config.address, 
-          BigInt(Math.floor(parseFloat(config.balance) * 1e18))
-        )
+        ethersMock.setAccountBalance(config.address, BigInt(Math.floor(parseFloat(config.balance) * 1e18)))
       }
     })
   }
-  
+
   async setupContracts(): Promise<void> {
     const contractConfigs: ContractConfig[] = [
       {
@@ -185,19 +182,19 @@ export class BlockchainTestEnvironment {
         address: process.env.SAFE_ADDRESS_AMOY || '0x9876543210987654321098765432109876543210',
       },
     ]
-    
+
     for (const config of contractConfigs) {
       await this.setupContract(config)
     }
-    
+
     this.initialBlockNumber = await this.getCurrentBlockNumber()
   }
-  
+
   async setupContract(config: ContractConfig): Promise<void> {
     let contract: Contract
-    
+
     if (this.options.useRealProvider) {
-      const abi = config.abi || await this.loadContractABI(config.name)
+      const abi = config.abi || (await this.loadContractABI(config.name))
       const deployer = this.getWallet('deployer')
       contract = new Contract(config.address, abi, deployer)
     } else {
@@ -213,14 +210,14 @@ export class BlockchainTestEnvironment {
           contract = ContractMock.createContractMock(config.address)
       }
     }
-    
+
     this.contracts.set(config.name, contract)
   }
-  
+
   private async loadContractABI(contractName: string): Promise<any[]> {
     // In a real implementation, this would load ABIs from artifacts
     // For now, return minimal ABIs for testing
-    
+
     const minimalABIs: Record<string, string[]> = {
       PoolFactory: [
         'function createPool(address owner, uint256 maxLoanAmount, uint256 interestRate, uint256 duration, string name) returns (uint256)',
@@ -236,10 +233,10 @@ export class BlockchainTestEnvironment {
         'function getTransactionHash(address to, uint256 value, bytes data, uint8 operation, uint256 safeTxGas, uint256 baseGas, uint256 gasPrice, address gasToken, address refundReceiver, uint256 nonce) view returns (bytes32)',
       ],
     }
-    
+
     return minimalABIs[contractName] || []
   }
-  
+
   // Wallet management
   getWallet(name: string): Wallet {
     const wallet = this.wallets.get(name)
@@ -248,22 +245,22 @@ export class BlockchainTestEnvironment {
     }
     return wallet
   }
-  
+
   getWalletAddress(name: string): string {
     return TEST_WALLETS[name]?.address || ''
   }
-  
+
   async getWalletBalance(name: string): Promise<bigint> {
     const wallet = this.getWallet(name)
     const address = this.getWalletAddress(name)
-    
+
     if (this.options.useRealProvider) {
       return await this.provider.getBalance(address)
     } else {
       return ethersMock.provider.getBalance(address)
     }
   }
-  
+
   // Contract management
   getContract(name: string): Contract {
     const contract = this.contracts.get(name)
@@ -272,7 +269,7 @@ export class BlockchainTestEnvironment {
     }
     return contract
   }
-  
+
   // Blockchain operations
   async getCurrentBlockNumber(): Promise<number> {
     if (this.options.useRealProvider) {
@@ -281,25 +278,25 @@ export class BlockchainTestEnvironment {
       return await ethersMock.provider.getBlockNumber()
     }
   }
-  
+
   async waitForBlocks(count: number): Promise<void> {
     if (this.options.useRealProvider) {
       const startBlock = await this.getCurrentBlockNumber()
       const targetBlock = startBlock + count
-      
-      while (await this.getCurrentBlockNumber() < targetBlock) {
-        await new Promise(resolve => setTimeout(resolve, this.chainConfig.blockTime))
+
+      while ((await this.getCurrentBlockNumber()) < targetBlock) {
+        await new Promise((resolve) => setTimeout(resolve, this.chainConfig.blockTime))
       }
     } else {
       // Simulate block progression
-      await new Promise(resolve => setTimeout(resolve, count * this.chainConfig.blockTime / 10))
+      await new Promise((resolve) => setTimeout(resolve, (count * this.chainConfig.blockTime) / 10))
       ethersMock.setBlockNumber((await this.getCurrentBlockNumber()) + count)
     }
   }
-  
+
   async mineBlock(): Promise<void> {
     if (this.options.autoMineBlocks === false) return
-    
+
     if (this.options.useRealProvider && this.chainConfig.name === 'localhost') {
       // Mine block on local Hardhat network
       await this.provider.send('evm_mine', [])
@@ -307,22 +304,17 @@ export class BlockchainTestEnvironment {
       await this.waitForBlocks(1)
     }
   }
-  
+
   // Transaction helpers
-  async executeTransaction(
-    contractName: string,
-    methodName: string,
-    args: any[],
-    walletName: string = 'deployer'
-  ): Promise<any> {
+  async executeTransaction(contractName: string, methodName: string, args: any[], walletName: string = 'deployer'): Promise<any> {
     const startTime = performance.now()
-    
+
     const contract = this.getContract(contractName)
     const wallet = this.getWallet(walletName)
-    
+
     // Connect contract to wallet
     const connectedContract = contract.connect(wallet)
-    
+
     // Estimate gas if enabled
     let gasEstimate: bigint | undefined
     if (this.options.gasReporting) {
@@ -337,11 +329,11 @@ export class BlockchainTestEnvironment {
         console.warn(`Gas estimation failed for ${contractName}.${methodName}:`, error)
       }
     }
-    
+
     // Execute transaction
     const tx = await connectedContract[methodName](...args, gasEstimate ? { gasLimit: gasEstimate } : {})
     const receipt = await tx.wait()
-    
+
     // Record transaction
     this.transactionHistory.push({
       contractName,
@@ -352,7 +344,7 @@ export class BlockchainTestEnvironment {
       gasUsed: receipt.gasUsed,
       timestamp: Date.now(),
     })
-    
+
     // Record performance metrics
     if (this.options.performanceMonitoring) {
       const duration = performance.now() - startTime
@@ -362,10 +354,10 @@ export class BlockchainTestEnvironment {
         timestamp: Date.now(),
       })
     }
-    
+
     return { tx, receipt }
   }
-  
+
   // Test utilities
   async reset(): Promise<void> {
     if (this.options.useRealProvider && this.chainConfig.name === 'localhost') {
@@ -379,52 +371,48 @@ export class BlockchainTestEnvironment {
       ethersMock.resetAllMocks()
       ContractMock.resetAllState()
     }
-    
+
     // Clear test state
     this.transactionHistory = []
     this.gasUsageHistory = []
     this.performanceMetrics = []
   }
-  
+
   // Test reporting
   getTransactionHistory(): any[] {
     return [...this.transactionHistory]
   }
-  
+
   getGasUsageReport(): { method: string; gas: bigint; timestamp: number }[] {
     return [...this.gasUsageHistory]
   }
-  
+
   getPerformanceReport(): { operation: string; duration: number; timestamp: number }[] {
     return [...this.performanceMetrics]
   }
-  
+
   getTotalGasUsed(): bigint {
     return this.transactionHistory.reduce((total, tx) => total + (tx.gasUsed || BigInt(0)), BigInt(0))
   }
-  
+
   getAverageGasUsage(methodName?: string): bigint {
-    const relevantTxs = methodName 
-      ? this.transactionHistory.filter(tx => tx.methodName === methodName)
-      : this.transactionHistory
-    
+    const relevantTxs = methodName ? this.transactionHistory.filter((tx) => tx.methodName === methodName) : this.transactionHistory
+
     if (relevantTxs.length === 0) return BigInt(0)
-    
+
     const totalGas = relevantTxs.reduce((total, tx) => total + (tx.gasUsed || BigInt(0)), BigInt(0))
     return totalGas / BigInt(relevantTxs.length)
   }
-  
+
   getAverageExecutionTime(operation?: string): number {
-    const relevantMetrics = operation
-      ? this.performanceMetrics.filter(m => m.operation === operation)
-      : this.performanceMetrics
-    
+    const relevantMetrics = operation ? this.performanceMetrics.filter((m) => m.operation === operation) : this.performanceMetrics
+
     if (relevantMetrics.length === 0) return 0
-    
+
     const totalTime = relevantMetrics.reduce((total, m) => total + m.duration, 0)
     return totalTime / relevantMetrics.length
   }
-  
+
   // Validation helpers
   validateTransactionSuccess(receipt: any): void {
     expect(receipt).toBeDefined()
@@ -432,44 +420,44 @@ export class BlockchainTestEnvironment {
     expect(receipt.transactionHash).toBeValidTransactionHash()
     expect(Number(receipt.gasUsed)).toBeReasonableGasUsage()
   }
-  
+
   validateContractAddress(address: string): void {
     expect(address).toBeValidEthereumAddress()
     expect(address).not.toBe('0x0000000000000000000000000000000000000000')
   }
-  
+
   // Error simulation (for mock mode)
   simulateNetworkError(): void {
     if (!this.options.useRealProvider) {
       ethersMock.simulateNetworkError('Network connection failed')
     }
   }
-  
+
   simulateContractRevert(reason?: string): void {
     if (!this.options.useRealProvider) {
       ethersMock.simulateContractRevert(reason)
     }
   }
-  
+
   simulateTransactionFailure(): void {
     if (!this.options.useRealProvider) {
       ethersMock.simulateTransactionFailure()
     }
   }
-  
+
   restoreNormalOperation(): void {
     if (!this.options.useRealProvider) {
       ethersMock.restoreNormalOperation()
       ContractMock.resetAllState()
     }
   }
-  
+
   // Cleanup
   async cleanup(): Promise<void> {
     this.transactionHistory = []
     this.gasUsageHistory = []
     this.performanceMetrics = []
-    
+
     if (!this.options.useRealProvider) {
       ethersMock.restoreNormalOperation()
       ContractMock.resetAllState()

@@ -23,7 +23,7 @@ export interface PoolStatusResponse {
 
 /**
  * Cloud Function to check the status of a pool creation transaction
- * 
+ *
  * @param request - The callable request with transaction hash
  * @returns Transaction status and pool details if completed
  */
@@ -37,7 +37,7 @@ export const poolStatus = onCall(
   async (request: CallableRequest<PoolStatusRequest>): Promise<PoolStatusResponse> => {
     const functionName = 'poolStatus'
     logger.info(`${functionName}: Checking pool creation status`, {
-      transactionHash: request.data.transactionHash
+      transactionHash: request.data.transactionHash,
     })
 
     try {
@@ -56,7 +56,7 @@ export const poolStatus = onCall(
         logger.warn(`${functionName}: Transaction not found in database`, { txHash })
         return {
           transactionHash: txHash,
-          status: 'not_found'
+          status: 'not_found',
         }
       }
 
@@ -72,7 +72,7 @@ export const poolStatus = onCall(
           blockNumber: txData.blockNumber,
           gasUsed: txData.gasUsed,
           createdAt: txData.createdAt?.toDate(),
-          completedAt: txData.completedAt?.toDate()
+          completedAt: txData.completedAt?.toDate(),
         }
       }
 
@@ -82,23 +82,23 @@ export const poolStatus = onCall(
           transactionHash: txHash,
           status: 'failed',
           error: txData.error,
-          createdAt: txData.createdAt?.toDate()
+          createdAt: txData.createdAt?.toDate(),
         }
       }
 
       // 5. If pending, check blockchain status
       const chainId = txData.chainId || 80002
       const provider = new ethers.JsonRpcProvider(getProviderUrl(chainId))
-      
+
       try {
         const receipt = await provider.getTransactionReceipt(txHash)
-        
+
         if (!receipt) {
           // Transaction still pending
           return {
             transactionHash: txHash,
             status: 'pending',
-            createdAt: txData.createdAt?.toDate()
+            createdAt: txData.createdAt?.toDate(),
           }
         }
 
@@ -110,7 +110,7 @@ export const poolStatus = onCall(
             blockNumber: receipt.blockNumber,
             gasUsed: receipt.gasUsed.toString(),
             error: 'Transaction reverted',
-            completedAt: new Date()
+            completedAt: new Date(),
           })
 
           return {
@@ -120,7 +120,7 @@ export const poolStatus = onCall(
             blockNumber: receipt.blockNumber,
             gasUsed: receipt.gasUsed.toString(),
             createdAt: txData.createdAt?.toDate(),
-            completedAt: new Date()
+            completedAt: new Date(),
           }
         }
 
@@ -128,19 +128,21 @@ export const poolStatus = onCall(
         const poolFactory = new ethers.Contract(
           getPoolFactoryAddress(chainId),
           // Minimal ABI for event parsing
-          ['event PoolCreated(uint256 indexed poolId, address indexed poolAddress, address indexed poolOwner, string name, uint256 maxLoanAmount, uint256 interestRate, uint256 loanDuration)'],
+          [
+            'event PoolCreated(uint256 indexed poolId, address indexed poolAddress, address indexed poolOwner, string name, uint256 maxLoanAmount, uint256 interestRate, uint256 loanDuration)',
+          ],
           provider
         )
 
         const poolCreatedEvent = receipt.logs
-          .map(log => {
+          .map((log) => {
             try {
               return poolFactory.interface.parseLog(log)
             } catch {
               return null
             }
           })
-          .find(event => event && event.name === 'PoolCreated')
+          .find((event) => event && event.name === 'PoolCreated')
 
         if (!poolCreatedEvent) {
           throw new AppError('Pool creation event not found in receipt', 'EVENT_NOT_FOUND')
@@ -156,7 +158,7 @@ export const poolStatus = onCall(
           poolAddress,
           blockNumber: receipt.blockNumber,
           gasUsed: receipt.gasUsed.toString(),
-          completedAt: new Date()
+          completedAt: new Date(),
         })
 
         // 9. Also create/update pool document if not exists
@@ -175,14 +177,14 @@ export const poolStatus = onCall(
             createdBy: txData.createdBy,
             createdAt: txData.createdAt,
             transactionHash: txHash,
-            isActive: true
+            isActive: true,
           })
         }
 
         logger.info(`${functionName}: Pool creation confirmed`, {
           txHash,
           poolId,
-          poolAddress
+          poolAddress,
         })
 
         return {
@@ -193,27 +195,25 @@ export const poolStatus = onCall(
           blockNumber: receipt.blockNumber,
           gasUsed: receipt.gasUsed.toString(),
           createdAt: txData.createdAt?.toDate(),
-          completedAt: new Date()
+          completedAt: new Date(),
         }
-
       } catch (providerError) {
         logger.error(`${functionName}: Provider error`, {
           error: providerError instanceof Error ? providerError.message : String(providerError),
-          txHash
+          txHash,
         })
 
         // Return pending status if we can't check the blockchain
         return {
           transactionHash: txHash,
           status: 'pending',
-          createdAt: txData.createdAt?.toDate()
+          createdAt: txData.createdAt?.toDate(),
         }
       }
-
     } catch (error) {
       logger.error(`${functionName}: Error checking pool status`, {
         error: error instanceof Error ? error.message : String(error),
-        transactionHash: request.data.transactionHash
+        transactionHash: request.data.transactionHash,
       })
 
       return handleError(error, functionName)
@@ -227,11 +227,11 @@ export const poolStatus = onCall(
 function getProviderUrl(chainId: number): string {
   const envKey = chainId === 80002 ? 'POLYGON_AMOY_RPC_URL' : 'POLYGON_MAINNET_RPC_URL'
   const url = process.env[envKey]
-  
+
   if (!url) {
     throw new AppError(`RPC URL not configured for chain ID ${chainId}`, 'PROVIDER_NOT_CONFIGURED')
   }
-  
+
   return url
 }
 
@@ -241,10 +241,10 @@ function getProviderUrl(chainId: number): string {
 function getPoolFactoryAddress(chainId: number): string {
   const envKey = chainId === 80002 ? 'POOL_FACTORY_ADDRESS_AMOY' : 'POOL_FACTORY_ADDRESS_POLYGON'
   const address = process.env[envKey]
-  
+
   if (!address) {
     throw new AppError(`PoolFactory address not configured for chain ID ${chainId}`, 'CONTRACT_ADDRESS_NOT_CONFIGURED')
   }
-  
+
   return address
 }

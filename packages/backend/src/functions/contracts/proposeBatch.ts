@@ -29,7 +29,7 @@ export interface ProposeBatchResponse {
 
 /**
  * Cloud Function to propose a batch of transactions for Safe execution
- * 
+ *
  * @param request - The callable request with batch transaction details
  * @returns Batch transaction proposal details
  */
@@ -45,7 +45,7 @@ export const proposeBatch = onCall(
     logger.info(`${functionName}: Creating batch transaction proposal`, {
       uid: request.auth?.uid,
       batchSize: request.data.transactions?.length || 0,
-      description: request.data.description
+      description: request.data.description,
     })
 
     try {
@@ -71,7 +71,7 @@ export const proposeBatch = onCall(
       // 3. Validate each transaction in the batch
       for (let i = 0; i < request.data.transactions.length; i++) {
         const tx = request.data.transactions[i]
-        
+
         if (!tx.to || !tx.data || !tx.description) {
           throw new HttpsError('invalid-argument', `Transaction ${i + 1}: Missing required fields (to, data, description)`)
         }
@@ -93,31 +93,28 @@ export const proposeBatch = onCall(
       const contractService = createContractService(chainId)
 
       // 5. Convert request transactions to TransactionProposal format
-      const transactions: TransactionProposal[] = request.data.transactions.map(tx => ({
+      const transactions: TransactionProposal[] = request.data.transactions.map((tx) => ({
         to: tx.to,
         value: tx.value || '0',
         data: tx.data,
         operation: tx.operation || 0, // Default to CALL
-        description: tx.description
+        description: tx.description,
       }))
 
       // 6. Create batch transaction proposal
       const batchRequest: BatchTransactionRequest = {
         transactions,
         description: request.data.description,
-        metadata: request.data.metadata
+        metadata: request.data.metadata,
       }
 
-      const transactionStatus = await contractService.proposeBatchTransaction(
-        batchRequest,
-        request.auth.uid
-      )
+      const transactionStatus = await contractService.proposeBatchTransaction(batchRequest, request.auth.uid)
 
       logger.info(`${functionName}: Batch transaction proposed successfully`, {
         transactionId: transactionStatus.id,
         batchSize: transactions.length,
         requiredSignatures: transactionStatus.requiredSignatures,
-        description: transactionStatus.description
+        description: transactionStatus.description,
       })
 
       return {
@@ -128,14 +125,13 @@ export const proposeBatch = onCall(
         safeAddress: contractService['config'].safeAddress,
         batchSize: transactions.length,
         description: transactionStatus.description,
-        message: `Batch of ${transactions.length} transactions proposed successfully. Requires ${transactionStatus.requiredSignatures} signature(s) to execute.`
+        message: `Batch of ${transactions.length} transactions proposed successfully. Requires ${transactionStatus.requiredSignatures} signature(s) to execute.`,
       }
-
     } catch (error) {
       logger.error(`${functionName}: Error proposing batch transaction`, {
         error: error instanceof Error ? error.message : String(error),
         uid: request.auth?.uid,
-        batchSize: request.data.transactions?.length || 0
+        batchSize: request.data.transactions?.length || 0,
       })
 
       return handleError(error, functionName)

@@ -20,7 +20,7 @@ export interface ExecuteTransactionResponse {
 
 /**
  * Cloud Function to execute a Safe transaction once enough signatures are collected
- * 
+ *
  * @param request - The callable request with transaction ID
  * @returns Execution result details
  */
@@ -35,7 +35,7 @@ export const executeTransaction = onCall(
     const functionName = 'executeTransaction'
     logger.info(`${functionName}: Executing Safe transaction`, {
       uid: request.auth?.uid,
-      transactionId: request.data.transactionId
+      transactionId: request.data.transactionId,
     })
 
     try {
@@ -61,7 +61,7 @@ export const executeTransaction = onCall(
 
       // 4. Check transaction status before execution
       const transactionStatus = await contractService.getTransactionStatus(request.data.transactionId)
-      
+
       if (!transactionStatus) {
         throw new HttpsError('not-found', 'Transaction not found')
       }
@@ -74,9 +74,10 @@ export const executeTransaction = onCall(
         } else if (transactionStatus.status === 'expired') {
           throw new HttpsError('deadline-exceeded', 'Transaction has expired')
         } else {
-          throw new HttpsError('failed-precondition', 
+          throw new HttpsError(
+            'failed-precondition',
             `Transaction is not ready for execution. Status: ${transactionStatus.status}. ` +
-            `Signatures: ${transactionStatus.currentSignatures}/${transactionStatus.requiredSignatures}`
+              `Signatures: ${transactionStatus.currentSignatures}/${transactionStatus.requiredSignatures}`
           )
         }
       }
@@ -86,15 +87,13 @@ export const executeTransaction = onCall(
         transactionId: request.data.transactionId,
         currentSignatures: transactionStatus.currentSignatures,
         requiredSignatures: transactionStatus.requiredSignatures,
-        description: transactionStatus.description
+        description: transactionStatus.description,
       })
 
       const executionResult = await contractService.executeTransaction(request.data.transactionId)
 
       if (!executionResult.success) {
-        throw new HttpsError('internal', 
-          `Transaction execution failed: ${executionResult.error || 'Unknown error'}`
-        )
+        throw new HttpsError('internal', `Transaction execution failed: ${executionResult.error || 'Unknown error'}`)
       }
 
       logger.info(`${functionName}: Transaction executed successfully`, {
@@ -102,7 +101,7 @@ export const executeTransaction = onCall(
         executionTxHash: executionResult.transactionHash,
         blockNumber: executionResult.blockNumber,
         gasUsed: executionResult.gasUsed,
-        eventsCount: executionResult.events?.length || 0
+        eventsCount: executionResult.events?.length || 0,
       })
 
       return {
@@ -112,14 +111,13 @@ export const executeTransaction = onCall(
         blockNumber: executionResult.blockNumber,
         gasUsed: executionResult.gasUsed,
         events: executionResult.events,
-        message: `Transaction executed successfully. Execution hash: ${executionResult.transactionHash}`
+        message: `Transaction executed successfully. Execution hash: ${executionResult.transactionHash}`,
       }
-
     } catch (error) {
       logger.error(`${functionName}: Error executing transaction`, {
         error: error instanceof Error ? error.message : String(error),
         uid: request.auth?.uid,
-        transactionId: request.data.transactionId
+        transactionId: request.data.transactionId,
       })
 
       return handleError(error, functionName)

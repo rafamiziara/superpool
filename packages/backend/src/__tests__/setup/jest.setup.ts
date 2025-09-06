@@ -1,6 +1,6 @@
 /**
  * Global Jest Setup for SuperPool Backend Testing
- * 
+ *
  * This file is executed before all tests run and configures the testing environment
  * for Firebase Cloud Functions, blockchain integration, and mock systems.
  */
@@ -71,7 +71,7 @@ expect.extend({
       pass,
     }
   },
-  
+
   toBeValidEthereumAddress(received: string) {
     const pass = /^0x[a-fA-F0-9]{40}$/.test(received)
     return {
@@ -79,7 +79,7 @@ expect.extend({
       pass,
     }
   },
-  
+
   toBeReasonableGasUsage(received: number, max: number = 500000) {
     const pass = received > 21000 && received < max
     return {
@@ -87,14 +87,14 @@ expect.extend({
       pass,
     }
   },
-  
+
   toHaveFirebaseError(received: any, expectedCode: string) {
     const pass = received && received.code === expectedCode
     return {
       message: () => `Expected error to have Firebase code ${expectedCode}, got ${received?.code}`,
       pass,
     }
-  }
+  },
 })
 
 // Extend Jest timeout for blockchain operations
@@ -104,7 +104,7 @@ jest.setTimeout(30000) // 30 seconds
 beforeAll(async () => {
   // One-time setup that applies to all tests
   console.log('🧪 Starting SuperPool Backend Test Suite')
-  
+
   // Validate test environment
   if (!process.env.NODE_ENV || process.env.NODE_ENV !== 'test') {
     throw new Error('Tests must run with NODE_ENV=test')
@@ -114,7 +114,7 @@ beforeAll(async () => {
 afterAll(async () => {
   // Global cleanup
   console.log('✅ SuperPool Backend Test Suite Complete')
-  
+
   // Force garbage collection if available
   if (global.gc) {
     global.gc()
@@ -136,7 +136,7 @@ afterEach(() => {
   if (testDuration > 5000) {
     console.warn(`⚠️  Slow test detected: ${testDuration}ms (consider optimizing mocks)`)
   }
-  
+
   if (mockCallCount > 100) {
     console.warn(`⚠️  High mock usage: ${mockCallCount} calls (consider consolidating)`)
   }
@@ -145,29 +145,29 @@ afterEach(() => {
 // Export test utilities for use in individual tests
 export const testUtils = {
   timeout: DEFAULT_TIMEOUT,
-  
+
   // Helper for creating deterministic test data
   createTestData: (prefix: string, index?: number) => ({
     id: `${prefix}-${index || Date.now()}`,
     timestamp: Date.now(),
     address: `0x${prefix.padEnd(40, '0')}`,
   }),
-  
+
   // Helper for waiting in tests
-  wait: (ms: number) => new Promise(resolve => setTimeout(resolve, ms)),
-  
+  wait: (ms: number) => new Promise((resolve) => setTimeout(resolve, ms)),
+
   // Helper for incrementing mock call counter
   trackMockCall: () => {
     mockCallCount++
   },
-  
+
   // Helper for validating test environment
   validateTestEnvironment: () => {
     if (process.env.NODE_ENV !== 'test') {
       throw new Error('Invalid test environment')
     }
     return true
-  }
+  },
 }
 
 // Type augmentation for custom matchers
@@ -175,7 +175,7 @@ declare global {
   namespace jest {
     interface Matchers<R> {
       toBeValidTransactionHash(): R
-      toBeValidEthereumAddress(): R  
+      toBeValidEthereumAddress(): R
       toBeReasonableGasUsage(max?: number): R
       toHaveFirebaseError(expectedCode: string): R
     }

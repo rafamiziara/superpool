@@ -27,7 +27,7 @@ describe('createPool Cloud Function', () => {
       interestRate: 500,
       loanDuration: 86400,
       name: 'Test Pool',
-      description: 'A test lending pool'
+      description: 'A test lending pool',
     }
 
     const request = { data: poolData, auth: mockAuth() }
@@ -51,7 +51,7 @@ export const createPoolHandler = async (request: CallableRequest<any>) => {
   return {
     success: true,
     poolId: 'test-pool-123',
-    transactionHash: '0x1234567890123456789012345678901234567890123456789012345678901234'
+    transactionHash: '0x1234567890123456789012345678901234567890123456789012345678901234',
   }
 }
 
@@ -66,9 +66,7 @@ import { createPool } from './createPool'
 import { validatePoolCreationParams, sanitizePoolParams } from '../utils/validation'
 import { ContractService } from '../services/ContractService'
 
-export const createPoolHandler = async (
-  request: CallableRequest<CreatePoolRequest>
-) => {
+export const createPoolHandler = async (request: CallableRequest<CreatePoolRequest>) => {
   try {
     // Validate authentication
     if (!request.auth) {
@@ -92,7 +90,7 @@ export const createPoolHandler = async (
       success: true,
       poolId: result.poolId,
       transactionHash: result.transactionHash,
-      estimatedGas: result.gasUsed
+      estimatedGas: result.gasUsed,
     }
   } catch (error) {
     console.error('Pool creation failed:', error)
@@ -139,7 +137,7 @@ export const generateAuthMessageHandler = async (request: any) => {
   return {
     message: 'SuperPool Authentication: Please sign this message',
     nonce: 'test-nonce-123',
-    timestamp: Date.now()
+    timestamp: Date.now(),
   }
 }
 ```
@@ -152,9 +150,7 @@ import { v4 as uuidv4 } from 'uuid'
 import { getFirestore } from 'firebase-admin/firestore'
 import { createAuthMessage } from '../utils'
 
-export const generateAuthMessageHandler = async (
-  request: CallableRequest<{ walletAddress: string }>
-) => {
+export const generateAuthMessageHandler = async (request: CallableRequest<{ walletAddress: string }>) => {
   // Validate wallet address
   if (!isAddress(request.data.walletAddress)) {
     throw new HttpsError('invalid-argument', 'Invalid wallet address')
@@ -172,7 +168,7 @@ export const generateAuthMessageHandler = async (
     .set({
       nonce,
       timestamp,
-      expiresAt: timestamp + 10 * 60 * 1000 // 10 minutes
+      expiresAt: timestamp + 10 * 60 * 1000, // 10 minutes
     })
 
   // Create authentication message
@@ -195,7 +191,7 @@ describe('ContractService', () => {
       interestRate: 500,
       loanDuration: 86400,
       name: 'Test Pool',
-      description: 'Test pool deployment'
+      description: 'Test pool deployment',
     }
 
     mockContract.createPool.mockResolvedValue({
@@ -203,8 +199,8 @@ describe('ContractService', () => {
       wait: jest.fn().mockResolvedValue({
         status: 1,
         blockNumber: 12345,
-        logs: [mockPoolCreatedEvent]
-      })
+        logs: [mockPoolCreatedEvent],
+      }),
     })
 
     const contractService = new ContractService(mockConfig)
@@ -225,7 +221,7 @@ export class ContractService {
     return {
       success: true,
       poolId: 'test-pool-123',
-      transactionHash: '0xabc123def456'
+      transactionHash: '0xabc123def456',
     }
   }
 }
@@ -243,39 +239,33 @@ export class ContractService {
 
   constructor(private config: ContractServiceConfig) {
     this.provider = new ethers.JsonRpcProvider(config.rpcUrl)
-    this.contract = new ethers.Contract(
-      config.poolFactoryAddress,
-      PoolFactoryABI,
-      new ethers.Wallet(config.privateKey, this.provider)
-    )
+    this.contract = new ethers.Contract(config.poolFactoryAddress, PoolFactoryABI, new ethers.Wallet(config.privateKey, this.provider))
   }
 
   async createPool(params: CreatePoolParams): Promise<CreatePoolResult> {
     try {
       // Estimate gas
       const gasEstimate = await this.contract.estimateGas.createPool(params)
-      
+
       // Execute transaction
       const tx = await this.contract.createPool(params, {
-        gasLimit: gasEstimate * BigInt(120) / BigInt(100) // 20% buffer
+        gasLimit: (gasEstimate * BigInt(120)) / BigInt(100), // 20% buffer
       })
 
       // Wait for confirmation
       const receipt = await tx.wait()
 
       // Parse events to get pool ID
-      const poolCreatedEvent = receipt.logs.find(log =>
-        log.topics[0] === this.contract.interface.getEventTopic('PoolCreated')
-      )
+      const poolCreatedEvent = receipt.logs.find((log) => log.topics[0] === this.contract.interface.getEventTopic('PoolCreated'))
 
       const parsedEvent = this.contract.interface.parseLog(poolCreatedEvent)
-      
+
       return {
         success: true,
         poolId: parsedEvent.args.poolId.toString(),
         transactionHash: tx.hash,
         blockNumber: receipt.blockNumber,
-        gasUsed: receipt.gasUsed.toString()
+        gasUsed: receipt.gasUsed.toString(),
       }
     } catch (error) {
       console.error('Contract deployment failed:', error)
@@ -298,7 +288,7 @@ describe('validatePoolCreationParams', () => {
       interestRate: 500,
       loanDuration: 86400,
       name: 'Valid Pool',
-      description: 'A valid pool for testing purposes'
+      description: 'A valid pool for testing purposes',
     }
 
     const result = validatePoolCreationParams(validParams)
@@ -314,7 +304,7 @@ describe('validatePoolCreationParams', () => {
       interestRate: -5,
       loanDuration: 100,
       name: '',
-      description: ''
+      description: '',
     }
 
     const result = validatePoolCreationParams(invalidParams)
@@ -332,7 +322,7 @@ describe('validatePoolCreationParams', () => {
 export const validatePoolCreationParams = (params: any) => {
   return {
     isValid: true,
-    errors: []
+    errors: [],
   }
 }
 ```
@@ -342,9 +332,7 @@ export const validatePoolCreationParams = (params: any) => {
 ```typescript
 import { ethers } from 'ethers'
 
-export const validatePoolCreationParams = (
-  params: CreatePoolRequest
-): ValidationResult => {
+export const validatePoolCreationParams = (params: CreatePoolRequest): ValidationResult => {
   const errors: string[] = []
 
   // Validate wallet address
@@ -378,7 +366,7 @@ export const validatePoolCreationParams = (
 
   return {
     isValid: errors.length === 0,
-    errors
+    errors,
   }
 }
 ```
@@ -404,16 +392,16 @@ describe('getPoolStatus Cloud Function', () => {
         totalLiquidity: '1000',
         availableLiquidity: '800',
         totalLoans: 5,
-        activeLoans: 3
+        activeLoans: 3,
       }
 
       mockFirestore.collection.mockReturnValue({
         doc: jest.fn().mockReturnValue({
           get: jest.fn().mockResolvedValue({
             exists: true,
-            data: () => mockPoolData
-          })
-        })
+            data: () => mockPoolData,
+          }),
+        }),
       })
 
       const request = { data: { poolId }, auth: mockAuth() }
@@ -430,14 +418,13 @@ describe('getPoolStatus Cloud Function', () => {
     it('should return not found error', async () => {
       mockFirestore.collection.mockReturnValue({
         doc: jest.fn().mockReturnValue({
-          get: jest.fn().mockResolvedValue({ exists: false })
-        })
+          get: jest.fn().mockResolvedValue({ exists: false }),
+        }),
       })
 
       const request = { data: { poolId: 'nonexistent' }, auth: mockAuth() }
 
-      await expect(getPoolStatusHandler(request))
-        .rejects.toThrow('Pool not found')
+      await expect(getPoolStatusHandler(request)).rejects.toThrow('Pool not found')
     })
   })
 })
@@ -458,11 +445,11 @@ export const getPoolStatusHandler = async (request: any) => {
     success: true,
     pool: {
       name: 'Test Pool',
-      isActive: true
+      isActive: true,
     },
     statistics: {
-      utilizationRate: 20
-    }
+      utilizationRate: 20,
+    },
   }
 }
 ```
@@ -477,9 +464,7 @@ pnpm test getPoolStatus.test.ts
 **5. Add Real Implementation**
 
 ```typescript
-export const getPoolStatusHandler = async (
-  request: CallableRequest<{ poolId: string }>
-) => {
+export const getPoolStatusHandler = async (request: CallableRequest<{ poolId: string }>) => {
   if (!request.auth) {
     throw new HttpsError('unauthenticated', 'Authentication required')
   }
@@ -498,11 +483,10 @@ export const getPoolStatusHandler = async (
   }
 
   const poolData = poolDoc.data()
-  
+
   // Calculate utilization rate
-  const utilizationRate = poolData.totalLiquidity > 0
-    ? ((poolData.totalLiquidity - poolData.availableLiquidity) / poolData.totalLiquidity) * 100
-    : 0
+  const utilizationRate =
+    poolData.totalLiquidity > 0 ? ((poolData.totalLiquidity - poolData.availableLiquidity) / poolData.totalLiquidity) * 100 : 0
 
   return {
     success: true,
@@ -511,13 +495,13 @@ export const getPoolStatusHandler = async (
       name: poolData.name,
       isActive: poolData.isActive,
       totalLiquidity: poolData.totalLiquidity,
-      availableLiquidity: poolData.availableLiquidity
+      availableLiquidity: poolData.availableLiquidity,
     },
     statistics: {
       totalLoans: poolData.totalLoans || 0,
       activeLoans: poolData.activeLoans || 0,
-      utilizationRate: Math.round(utilizationRate * 100) / 100
-    }
+      utilizationRate: Math.round(utilizationRate * 100) / 100,
+    },
   }
 }
 ```
@@ -543,7 +527,7 @@ describe('verifySignatureAndLogin Bug Fix', () => {
     const result = await verifySignatureAndLogin({
       walletAddress,
       message,
-      signature: validSignature
+      signature: validSignature,
     })
 
     expect(result.success).toBe(true)
@@ -566,16 +550,13 @@ export const verifySignatureAndLogin = async (params: VerifyParams) => {
   try {
     // Bug fix: Handle both regular and EIP-712 signatures
     let recoveredAddress: string
-    
+
     try {
       // Try standard message verification first
       recoveredAddress = ethers.verifyMessage(params.message, params.signature)
     } catch (error) {
       // If standard verification fails, try EIP-712
-      recoveredAddress = ethers.utils.recoverAddress(
-        ethers.utils.hashMessage(params.message),
-        params.signature
-      )
+      recoveredAddress = ethers.utils.recoverAddress(ethers.utils.hashMessage(params.message), params.signature)
     }
 
     // Compare addresses (case-insensitive)
@@ -589,7 +570,7 @@ export const verifySignatureAndLogin = async (params: VerifyParams) => {
     return {
       success: true,
       customToken,
-      walletAddress: params.walletAddress
+      walletAddress: params.walletAddress,
     }
   } catch (error) {
     throw new HttpsError('invalid-argument', 'Signature verification failed')
@@ -653,11 +634,11 @@ export class PoolContractService {
     const contract = new ethers.Contract(/* ... */)
     const tx = await contract.createPool(params)
     const receipt = await tx.wait()
-    
+
     return {
       poolId: this.extractPoolId(receipt),
       transactionHash: tx.hash,
-      blockNumber: receipt.blockNumber
+      blockNumber: receipt.blockNumber,
     }
   }
 }
@@ -681,7 +662,7 @@ export const createPoolHandler = async (request: CallableRequest<any>) => {
   return {
     success: true,
     poolId: deploymentResult.poolId,
-    transactionHash: deploymentResult.transactionHash
+    transactionHash: deploymentResult.transactionHash,
   }
 }
 ```
@@ -704,9 +685,8 @@ pnpm test createPool
 describe('createPool Authentication', () => {
   it('should require authentication', async () => {
     const request = { data: validPoolData, auth: null }
-    
-    await expect(createPoolHandler(request))
-      .rejects.toThrow('Authentication required')
+
+    await expect(createPoolHandler(request)).rejects.toThrow('Authentication required')
   })
 })
 
@@ -719,12 +699,12 @@ describe('createPool Authentication', () => {
 // ✅ Good: Test Firestore operations
 it('should save pool data to correct collection', async () => {
   await createPoolHandler(validRequest)
-  
+
   expect(mockFirestore.collection).toHaveBeenCalledWith('pools')
   expect(mockFirestore.doc().set).toHaveBeenCalledWith(
     expect.objectContaining({
       name: validRequest.data.name,
-      createdAt: expect.any(Date)
+      createdAt: expect.any(Date),
     })
   )
 })
@@ -735,12 +715,9 @@ it('should save pool data to correct collection', async () => {
 ```typescript
 // ✅ Good: Test blockchain failure handling
 it('should handle contract revert gracefully', async () => {
-  mockContract.createPool.mockRejectedValue(
-    new Error('execution reverted: Insufficient balance')
-  )
+  mockContract.createPool.mockRejectedValue(new Error('execution reverted: Insufficient balance'))
 
-  await expect(createPoolHandler(validRequest))
-    .rejects.toThrow('Pool creation failed: Insufficient balance')
+  await expect(createPoolHandler(validRequest)).rejects.toThrow('Pool creation failed: Insufficient balance')
 })
 ```
 

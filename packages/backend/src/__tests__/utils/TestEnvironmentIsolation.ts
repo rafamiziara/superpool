@@ -1,6 +1,6 @@
 /**
  * Test Environment Isolation System
- * 
+ *
  * Comprehensive test isolation infrastructure ensuring clean, isolated
  * test environments for each test suite and individual test case.
  * Prevents test interference and ensures deterministic test results.
@@ -13,18 +13,18 @@ import { performanceManager } from './PerformanceTestUtilities'
 
 // Isolation scope levels
 export enum IsolationScope {
-  GLOBAL = 'global',           // Shared across entire test suite
-  SUITE = 'suite',            // Isolated per test suite
-  TEST_CASE = 'test-case',    // Isolated per individual test
-  FUNCTION = 'function'       // Isolated per function call
+  GLOBAL = 'global', // Shared across entire test suite
+  SUITE = 'suite', // Isolated per test suite
+  TEST_CASE = 'test-case', // Isolated per individual test
+  FUNCTION = 'function', // Isolated per function call
 }
 
 // Isolation strategies
 export enum IsolationStrategy {
-  SNAPSHOT = 'snapshot',       // Database/state snapshots
-  CONTAINER = 'container',     // Process/container isolation
-  MOCK = 'mock',              // Mock isolation
-  HYBRID = 'hybrid'           // Combination of strategies
+  SNAPSHOT = 'snapshot', // Database/state snapshots
+  CONTAINER = 'container', // Process/container isolation
+  MOCK = 'mock', // Mock isolation
+  HYBRID = 'hybrid', // Combination of strategies
 }
 
 // Resource types for isolation
@@ -34,7 +34,7 @@ export enum IsolatedResource {
   NETWORK = 'network',
   FILESYSTEM = 'filesystem',
   ENVIRONMENT = 'environment',
-  MOCKS = 'mocks'
+  MOCKS = 'mocks',
 }
 
 // Test environment configuration
@@ -99,13 +99,13 @@ export class TestEnvironmentIsolationManager extends EventEmitter {
   private activeEnvironments: Set<string> = new Set()
   private resourceManagers: Map<IsolatedResource, ResourceManager> = new Map()
   private config: TestEnvironmentConfig
-  
+
   private constructor(config: TestEnvironmentConfig) {
     super()
     this.config = config
     this.initializeResourceManagers()
   }
-  
+
   public static getInstance(config?: TestEnvironmentConfig): TestEnvironmentIsolationManager {
     if (!TestEnvironmentIsolationManager.instance) {
       if (!config) {
@@ -115,7 +115,7 @@ export class TestEnvironmentIsolationManager extends EventEmitter {
     }
     return TestEnvironmentIsolationManager.instance
   }
-  
+
   /**
    * Initialize resource managers for different isolation types
    */
@@ -127,7 +127,7 @@ export class TestEnvironmentIsolationManager extends EventEmitter {
     this.resourceManagers.set(IsolatedResource.ENVIRONMENT, new EnvironmentResourceManager())
     this.resourceManagers.set(IsolatedResource.MOCKS, new MockResourceManager())
   }
-  
+
   /**
    * Create isolated test environment
    */
@@ -139,9 +139,9 @@ export class TestEnvironmentIsolationManager extends EventEmitter {
     parentContext?: string
   ): Promise<TestEnvironmentContext> {
     const contextId = uuidv4()
-    
+
     console.log(`🔒 Creating isolated environment: ${name} (${scope})`)
-    
+
     const context: TestEnvironmentContext = {
       id: contextId,
       name,
@@ -154,54 +154,53 @@ export class TestEnvironmentIsolationManager extends EventEmitter {
         testCase,
         parentContext,
         childContexts: [],
-        tags: []
+        tags: [],
       },
-      cleanup: () => this.cleanupEnvironment(contextId)
+      cleanup: () => this.cleanupEnvironment(contextId),
     }
-    
+
     try {
       // Setup resource isolation
       await this.setupResourceIsolation(context)
-      
+
       // Register environment
       this.environments.set(contextId, context)
       this.activeEnvironments.add(contextId)
-      
+
       // Link to parent context if exists
       if (parentContext && this.environments.has(parentContext)) {
         this.environments.get(parentContext)!.metadata.childContexts.push(contextId)
       }
-      
+
       // Start monitoring if enabled
       if (this.config.monitoring.trackMemory || this.config.monitoring.trackPerformance) {
         this.startEnvironmentMonitoring(context)
       }
-      
+
       this.emit('environment-created', context)
       console.log(`✅ Environment ${name} created with ID: ${contextId}`)
-      
+
       return context
-      
     } catch (error) {
       console.error(`❌ Failed to create environment ${name}:`, error)
       throw error
     }
   }
-  
+
   /**
    * Setup resource isolation for the environment
    */
   private async setupResourceIsolation(context: TestEnvironmentContext): Promise<void> {
     for (const resourceType of this.config.resources) {
       const resourceManager = this.resourceManagers.get(resourceType)
-      
+
       if (!resourceManager) {
         console.warn(`⚠️  No resource manager found for ${resourceType}`)
         continue
       }
-      
+
       console.log(`   🔧 Setting up ${resourceType} isolation...`)
-      
+
       try {
         const resourceContext = await resourceManager.isolate(context)
         context.resources.set(resourceType, resourceContext)
@@ -211,26 +210,23 @@ export class TestEnvironmentIsolationManager extends EventEmitter {
       }
     }
   }
-  
+
   /**
    * Start monitoring for the environment
    */
   private startEnvironmentMonitoring(context: TestEnvironmentContext): void {
     if (this.config.monitoring.trackPerformance) {
-      const measurement = performanceManager.startMeasurement(
-        `env-${context.name}`,
-        'environment-isolation'
-      )
-      
+      const measurement = performanceManager.startMeasurement(`env-${context.name}`, 'environment-isolation')
+
       // Store measurement for cleanup
       context.metadata.tags.push(`perf-measurement:${measurement.id}`)
     }
-    
+
     if (this.config.monitoring.trackMemory) {
       this.trackMemoryUsage(context)
     }
   }
-  
+
   /**
    * Track memory usage for environment
    */
@@ -239,41 +235,41 @@ export class TestEnvironmentIsolationManager extends EventEmitter {
       const memUsage = process.memoryUsage()
       this.emit('memory-usage', context.id, memUsage)
     }, 5000) // Track every 5 seconds
-    
+
     context.metadata.tags.push(`memory-interval:${interval}`)
   }
-  
+
   /**
    * Cleanup isolated environment
    */
   async cleanupEnvironment(contextId: string): Promise<void> {
     const context = this.environments.get(contextId)
-    
+
     if (!context) {
       console.warn(`⚠️  Environment ${contextId} not found for cleanup`)
       return
     }
-    
+
     console.log(`🧹 Cleaning up environment: ${context.name}`)
-    
+
     try {
       // Cleanup child environments first
       for (const childId of context.metadata.childContexts) {
         await this.cleanupEnvironment(childId)
       }
-      
+
       // Cleanup resources
       await this.cleanupResources(context)
-      
+
       // Stop monitoring
       await this.stopEnvironmentMonitoring(context)
-      
+
       // Mark as completed
       context.endTime = Date.now()
-      
+
       // Remove from active environments
       this.activeEnvironments.delete(contextId)
-      
+
       // Remove from parent's child list
       if (context.metadata.parentContext) {
         const parent = this.environments.get(context.metadata.parentContext)
@@ -284,28 +280,27 @@ export class TestEnvironmentIsolationManager extends EventEmitter {
           }
         }
       }
-      
+
       this.emit('environment-cleaned', context)
       console.log(`✅ Environment ${context.name} cleaned up`)
-      
     } catch (error) {
       console.error(`❌ Failed to cleanup environment ${context.name}:`, error)
       throw error
     }
   }
-  
+
   /**
    * Cleanup resources for environment
    */
   private async cleanupResources(context: TestEnvironmentContext): Promise<void> {
     for (const [resourceType, resourceContext] of context.resources) {
       console.log(`   🧹 Cleaning up ${resourceType}...`)
-      
+
       try {
         await resourceContext.cleanup()
       } catch (error) {
         console.error(`❌ Failed to cleanup ${resourceType}:`, error)
-        
+
         if (this.config.cleanupStrategy.aggressive) {
           console.log(`⚡ Attempting aggressive cleanup for ${resourceType}`)
           // Implement aggressive cleanup strategies
@@ -313,7 +308,7 @@ export class TestEnvironmentIsolationManager extends EventEmitter {
       }
     }
   }
-  
+
   /**
    * Stop monitoring for environment
    */
@@ -327,90 +322,88 @@ export class TestEnvironmentIsolationManager extends EventEmitter {
       }
     }
   }
-  
+
   /**
    * Get environment by ID
    */
   getEnvironment(contextId: string): TestEnvironmentContext | null {
     return this.environments.get(contextId) || null
   }
-  
+
   /**
    * Get all active environments
    */
   getActiveEnvironments(): TestEnvironmentContext[] {
     return Array.from(this.activeEnvironments)
-      .map(id => this.environments.get(id))
+      .map((id) => this.environments.get(id))
       .filter(Boolean) as TestEnvironmentContext[]
   }
-  
+
   /**
    * Cleanup all environments
    */
   async cleanupAll(): Promise<void> {
     console.log('🧹 Cleaning up all test environments...')
-    
+
     const activeIds = Array.from(this.activeEnvironments)
-    
+
     for (const contextId of activeIds) {
       await this.cleanupEnvironment(contextId)
     }
-    
+
     console.log('✅ All environments cleaned up')
   }
-  
+
   /**
    * Generate isolation report
    */
   generateIsolationReport(): IsolationReport {
     const environments = Array.from(this.environments.values())
-    
+
     return {
       totalEnvironments: environments.length,
       activeEnvironments: this.activeEnvironments.size,
-      completedEnvironments: environments.filter(env => env.endTime).length,
+      completedEnvironments: environments.filter((env) => env.endTime).length,
       resourcesIsolated: this.calculateResourcesIsolated(environments),
       averageLifetime: this.calculateAverageLifetime(environments),
       isolationEfficiency: this.calculateIsolationEfficiency(environments),
-      timestamp: Date.now()
+      timestamp: Date.now(),
     }
   }
-  
+
   /**
    * Calculate resources isolated
    */
   private calculateResourcesIsolated(environments: TestEnvironmentContext[]): Record<IsolatedResource, number> {
     const resources: Record<IsolatedResource, number> = {} as Record<IsolatedResource, number>
-    
+
     for (const resource of Object.values(IsolatedResource)) {
-      resources[resource] = environments.filter(env => env.resources.has(resource)).length
+      resources[resource] = environments.filter((env) => env.resources.has(resource)).length
     }
-    
+
     return resources
   }
-  
+
   /**
    * Calculate average environment lifetime
    */
   private calculateAverageLifetime(environments: TestEnvironmentContext[]): number {
-    const completedEnvs = environments.filter(env => env.endTime)
-    
+    const completedEnvs = environments.filter((env) => env.endTime)
+
     if (completedEnvs.length === 0) return 0
-    
+
     const totalLifetime = completedEnvs.reduce((sum, env) => sum + (env.endTime! - env.startTime), 0)
     return totalLifetime / completedEnvs.length
   }
-  
+
   /**
    * Calculate isolation efficiency
    */
   private calculateIsolationEfficiency(environments: TestEnvironmentContext[]): number {
     if (environments.length === 0) return 0
-    
-    const successfulIsolations = environments.filter(env => 
-      env.endTime && env.resources.size === this.config.resources.length
-    ).length
-    
+
+    const successfulIsolations = environments.filter((env) => env.endTime && env.resources.size === this.config.resources.length).length
+
     return (successfulIsolations / environments.length) * 100
   }
 }
@@ -425,20 +418,17 @@ export class DatabaseResourceManager extends ResourceManager {
   async isolate(context: TestEnvironmentContext): Promise<ResourceContext> {
     // Get database manager
     const dbManager = TestDatabaseManager.getInstance()
-    
+
     // Create snapshot for isolation
-    const snapshotId = await dbManager.createSnapshot(
-      context.metadata.testSuite,
-      context.metadata.testCase || context.name
-    )
-    
+    const snapshotId = await dbManager.createSnapshot(context.metadata.testSuite, context.metadata.testCase || context.name)
+
     return {
       type: IsolatedResource.DATABASE,
       isolated: true,
       snapshotId,
       cleanup: async () => {
         await dbManager.restoreFromSnapshot(snapshotId)
-      }
+      },
     }
   }
 }
@@ -448,9 +438,9 @@ export class MemoryResourceManager extends ResourceManager {
   async isolate(context: TestEnvironmentContext): Promise<ResourceContext> {
     const originalState = {
       heapUsed: process.memoryUsage().heapUsed,
-      heapTotal: process.memoryUsage().heapTotal
+      heapTotal: process.memoryUsage().heapTotal,
     }
-    
+
     return {
       type: IsolatedResource.MEMORY,
       isolated: true,
@@ -460,7 +450,7 @@ export class MemoryResourceManager extends ResourceManager {
         if (global.gc) {
           global.gc()
         }
-      }
+      },
     }
   }
 }
@@ -470,13 +460,13 @@ export class NetworkResourceManager extends ResourceManager {
   async isolate(context: TestEnvironmentContext): Promise<ResourceContext> {
     // Network isolation would involve mocking network calls
     // or using network namespaces in containerized environments
-    
+
     return {
       type: IsolatedResource.NETWORK,
       isolated: true,
       cleanup: async () => {
         // Reset network mocks
-      }
+      },
     }
   }
 }
@@ -486,13 +476,13 @@ export class FilesystemResourceManager extends ResourceManager {
   async isolate(context: TestEnvironmentContext): Promise<ResourceContext> {
     // Filesystem isolation could involve creating temporary directories
     // or using filesystem snapshots
-    
+
     return {
       type: IsolatedResource.FILESYSTEM,
       isolated: true,
       cleanup: async () => {
         // Cleanup temporary files
-      }
+      },
     }
   }
 }
@@ -501,7 +491,7 @@ export class FilesystemResourceManager extends ResourceManager {
 export class EnvironmentResourceManager extends ResourceManager {
   async isolate(context: TestEnvironmentContext): Promise<ResourceContext> {
     const originalEnv = { ...process.env }
-    
+
     return {
       type: IsolatedResource.ENVIRONMENT,
       isolated: true,
@@ -509,7 +499,7 @@ export class EnvironmentResourceManager extends ResourceManager {
       cleanup: async () => {
         // Restore original environment variables
         process.env = originalEnv
-      }
+      },
     }
   }
 }
@@ -520,7 +510,7 @@ export class MockResourceManager extends ResourceManager {
     // Reset all mocks to ensure clean state
     jest.clearAllMocks()
     jest.resetAllMocks()
-    
+
     return {
       type: IsolatedResource.MOCKS,
       isolated: true,
@@ -528,7 +518,7 @@ export class MockResourceManager extends ResourceManager {
         jest.clearAllMocks()
         jest.resetAllMocks()
         jest.restoreAllMocks()
-      }
+      },
     }
   }
 }
@@ -548,11 +538,7 @@ export interface IsolationReport {
 export const DEFAULT_ISOLATION_CONFIG: TestEnvironmentConfig = {
   isolationScope: IsolationScope.TEST_CASE,
   isolationStrategy: IsolationStrategy.HYBRID,
-  resources: [
-    IsolatedResource.DATABASE,
-    IsolatedResource.MEMORY,
-    IsolatedResource.MOCKS
-  ],
+  resources: [IsolatedResource.DATABASE, IsolatedResource.MEMORY, IsolatedResource.MOCKS],
   parallel: true,
   maxConcurrency: 4,
   timeoutMs: 60000,
@@ -560,14 +546,14 @@ export const DEFAULT_ISOLATION_CONFIG: TestEnvironmentConfig = {
     automatic: true,
     onError: true,
     onSuccess: true,
-    aggressive: false
+    aggressive: false,
   },
   monitoring: {
     trackMemory: true,
     trackPerformance: true,
     trackResources: true,
-    generateReports: true
-  }
+    generateReports: true,
+  },
 }
 
 // Convenience functions
@@ -584,7 +570,7 @@ export const withIsolatedEnvironment = async <T>(
 ): Promise<T> => {
   const isolationManager = TestEnvironmentIsolationManager.getInstance()
   const context = await isolationManager.createIsolatedEnvironment(testName, scope, testSuite)
-  
+
   try {
     return await testFn(context)
   } finally {

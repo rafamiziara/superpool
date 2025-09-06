@@ -30,7 +30,7 @@ export interface GetTransactionStatusResponse {
 
 /**
  * Cloud Function to get the status of a Safe transaction
- * 
+ *
  * @param request - The callable request with transaction ID
  * @returns Detailed transaction status information
  */
@@ -45,7 +45,7 @@ export const getTransactionStatus = onCall(
     const functionName = 'getTransactionStatus'
     logger.info(`${functionName}: Getting transaction status`, {
       uid: request.auth?.uid,
-      transactionId: request.data.transactionId
+      transactionId: request.data.transactionId,
     })
 
     try {
@@ -72,12 +72,12 @@ export const getTransactionStatus = onCall(
       }
 
       // 4. Format response
-      const readyToExecute = transactionStatus.currentSignatures >= transactionStatus.requiredSignatures && 
-                           transactionStatus.status === 'ready_to_execute'
+      const readyToExecute =
+        transactionStatus.currentSignatures >= transactionStatus.requiredSignatures && transactionStatus.status === 'ready_to_execute'
 
-      const signatures = transactionStatus.signatures.map(sig => ({
+      const signatures = transactionStatus.signatures.map((sig) => ({
         signer: sig.signer,
-        timestamp: new Date().toISOString() // In real implementation, you'd track signature timestamps
+        timestamp: new Date().toISOString(), // In real implementation, you'd track signature timestamps
       }))
 
       let statusMessage = ''
@@ -109,7 +109,7 @@ export const getTransactionStatus = onCall(
         transactionId: request.data.transactionId,
         status: transactionStatus.status,
         currentSignatures: transactionStatus.currentSignatures,
-        requiredSignatures: transactionStatus.requiredSignatures
+        requiredSignatures: transactionStatus.requiredSignatures,
       })
 
       return {
@@ -126,14 +126,13 @@ export const getTransactionStatus = onCall(
         executionResult: transactionStatus.executionResult,
         signatures,
         metadata: transactionStatus.metadata,
-        message: statusMessage
+        message: statusMessage,
       }
-
     } catch (error) {
       logger.error(`${functionName}: Error getting transaction status`, {
         error: error instanceof Error ? error.message : String(error),
         uid: request.auth?.uid,
-        transactionId: request.data.transactionId
+        transactionId: request.data.transactionId,
       })
 
       return handleError(error, functionName)

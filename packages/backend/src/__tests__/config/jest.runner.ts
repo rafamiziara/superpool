@@ -1,6 +1,6 @@
 /**
  * Advanced Jest Test Runner Configuration
- * 
+ *
  * Comprehensive test execution management for SuperPool backend testing.
  * Provides parallel execution, test isolation, performance monitoring,
  * and intelligent test categorization.
@@ -12,7 +12,7 @@ import { performance } from 'perf_hooks'
 // Test execution strategies
 export enum TestStrategy {
   UNIT = 'unit',
-  INTEGRATION = 'integration', 
+  INTEGRATION = 'integration',
   E2E = 'e2e',
   PERFORMANCE = 'performance',
   SECURITY = 'security',
@@ -33,96 +33,73 @@ export class AdvancedTestRunner {
   private static instance: AdvancedTestRunner
   private testResults: Map<string, TestResult> = new Map()
   private performanceMetrics: Map<string, PerformanceData> = new Map()
-  
+
   public static getInstance(): AdvancedTestRunner {
     if (!AdvancedTestRunner.instance) {
       AdvancedTestRunner.instance = new AdvancedTestRunner()
     }
     return AdvancedTestRunner.instance
   }
-  
+
   /**
    * Get test configuration for specific strategy
    */
   getConfigForStrategy(strategy: TestStrategy): Partial<Config> {
     const baseConfig = this.getBaseConfig()
-    
+
     switch (strategy) {
       case TestStrategy.UNIT:
         return {
           ...baseConfig,
-          testMatch: [
-            '<rootDir>/src/**/*.test.ts',
-            '<rootDir>/src/**/__tests__/**/*.unit.test.ts'
-          ],
+          testMatch: ['<rootDir>/src/**/*.test.ts', '<rootDir>/src/**/__tests__/**/*.unit.test.ts'],
           testTimeout: 5000,
           maxWorkers: '75%',
           coverageThreshold: {
-            global: { branches: 95, functions: 95, lines: 95, statements: 95 }
-          }
+            global: { branches: 95, functions: 95, lines: 95, statements: 95 },
+          },
         }
-        
+
       case TestStrategy.INTEGRATION:
         return {
           ...baseConfig,
-          testMatch: [
-            '<rootDir>/src/**/__tests__/**/*.integration.test.ts'
-          ],
+          testMatch: ['<rootDir>/src/**/__tests__/**/*.integration.test.ts'],
           testTimeout: 30000,
           maxWorkers: '50%',
-          setupFilesAfterEnv: [
-            ...baseConfig.setupFilesAfterEnv || [],
-            '<rootDir>/src/__tests__/setup/integration.setup.ts'
-          ]
+          setupFilesAfterEnv: [...(baseConfig.setupFilesAfterEnv || []), '<rootDir>/src/__tests__/setup/integration.setup.ts'],
         }
-        
+
       case TestStrategy.E2E:
         return {
           ...baseConfig,
-          testMatch: [
-            '<rootDir>/src/**/__tests__/**/*.e2e.test.ts'
-          ],
+          testMatch: ['<rootDir>/src/**/__tests__/**/*.e2e.test.ts'],
           testTimeout: 60000,
           maxWorkers: 1, // Sequential execution for E2E
-          setupFilesAfterEnv: [
-            ...baseConfig.setupFilesAfterEnv || [],
-            '<rootDir>/src/__tests__/setup/e2e.setup.ts'
-          ]
+          setupFilesAfterEnv: [...(baseConfig.setupFilesAfterEnv || []), '<rootDir>/src/__tests__/setup/e2e.setup.ts'],
         }
-        
+
       case TestStrategy.PERFORMANCE:
         return {
           ...baseConfig,
-          testMatch: [
-            '<rootDir>/src/**/__tests__/**/*.performance.test.ts'
-          ],
+          testMatch: ['<rootDir>/src/**/__tests__/**/*.performance.test.ts'],
           testTimeout: 120000,
           maxWorkers: 1,
-          setupFilesAfterEnv: [
-            ...baseConfig.setupFilesAfterEnv || [],
-            '<rootDir>/src/__tests__/setup/performance.setup.ts'
-          ]
+          setupFilesAfterEnv: [...(baseConfig.setupFilesAfterEnv || []), '<rootDir>/src/__tests__/setup/performance.setup.ts'],
         }
-        
+
       case TestStrategy.SECURITY:
         return {
           ...baseConfig,
-          testMatch: [
-            '<rootDir>/src/**/__tests__/**/*.security.test.ts'
-          ],
+          testMatch: ['<rootDir>/src/**/__tests__/**/*.security.test.ts'],
           testTimeout: 30000,
           maxWorkers: '25%',
-          setupFilesAfterEnv: [
-            ...baseConfig.setupFilesAfterEnv || [],
-            '<rootDir>/src/__tests__/setup/security.setup.ts'
-          ]
+          setupFilesAfterEnv: [...(baseConfig.setupFilesAfterEnv || []), '<rootDir>/src/__tests__/setup/security.setup.ts'],
         }
-        
+
       default:
         return baseConfig
     }
   }
-  
+
   /**
    * Base Jest configuration
    */
@@ -133,9 +110,7 @@ export class AdvancedTestRunner {
       collectCoverage: true,
       coverageDirectory: '<rootDir>/../../coverage/backend',
       coverageReporters: ['lcov', 'text', 'text-summary', 'html', 'json'],
-      setupFilesAfterEnv: [
-        '<rootDir>/src/__tests__/setup/jest.setup.ts'
-      ],
+      setupFilesAfterEnv: ['<rootDir>/src/__tests__/setup/jest.setup.ts'],
       clearMocks: true,
       resetMocks: false,
       restoreMocks: false,
@@ -143,67 +118,66 @@ export class AdvancedTestRunner {
       cacheDirectory: '<rootDir>/.jest-cache',
     }
   }
-  
+
   /**
    * Execute tests with specific strategy
    */
   async executeWithStrategy(strategy: TestStrategy, options: TestExecutionOptions = {}): Promise<TestSuiteResult> {
     const startTime = performance.now()
     const config = this.getConfigForStrategy(strategy)
-    
+
     console.log(`🧪 Executing ${strategy} tests...`)
-    
+
     try {
       // Pre-execution setup
       await this.preExecutionSetup(strategy, options)
-      
+
       // Execute tests (in real implementation, this would integrate with Jest runner)
       const results = await this.runTestsWithConfig(config, options)
-      
+
       // Post-execution cleanup
       await this.postExecutionCleanup(strategy, options)
-      
+
       const endTime = performance.now()
       const duration = endTime - startTime
-      
+
       // Record performance metrics
       this.recordPerformanceMetrics(strategy, duration, results)
-      
+
       return {
         strategy,
         success: results.success,
         duration,
         testCount: results.testCount,
         coverage: results.coverage,
-        errors: results.errors
+        errors: results.errors,
       }
-      
     } catch (error) {
       console.error(`❌ ${strategy} tests failed:`, error)
       throw error
     }
   }
-  
+
   /**
    * Execute all test strategies in optimal order
    */
   async executeFullSuite(): Promise<FullSuiteResult> {
     const strategies = [
-      TestStrategy.UNIT,           // Fast feedback
-      TestStrategy.INTEGRATION,   // Medium complexity
-      TestStrategy.SECURITY,      // Security validation
-      TestStrategy.PERFORMANCE,   // Performance baseline
-      TestStrategy.E2E,          // Full system validation
+      TestStrategy.UNIT, // Fast feedback
+      TestStrategy.INTEGRATION, // Medium complexity
+      TestStrategy.SECURITY, // Security validation
+      TestStrategy.PERFORMANCE, // Performance baseline
+      TestStrategy.E2E, // Full system validation
     ]
-    
+
     const results: TestSuiteResult[] = []
     const overallStartTime = performance.now()
-    
+
     for (const strategy of strategies) {
       try {
         const result = await this.executeWithStrategy(strategy)
         results.push(result)
-        
+
         if (!result.success) {
           console.warn(`⚠️  ${strategy} tests failed, continuing with remaining strategies`)
         }
@@ -215,22 +189,22 @@ export class AdvancedTestRunner {
           duration: 0,
           testCount: 0,
           coverage: { total: 0 },
-          errors: [error as Error]
+          errors: [error as Error],
         })
       }
     }
-    
+
     const overallDuration = performance.now() - overallStartTime
-    const overallSuccess = results.every(r => r.success)
-    
+    const overallSuccess = results.every((r) => r.success)
+
     return {
       success: overallSuccess,
       duration: overallDuration,
       strategies: results,
-      summary: this.generateSummary(results)
+      summary: this.generateSummary(results),
     }
   }
-  
+
   /**
    * Pre-execution setup for test strategy
    */
@@ -240,24 +214,24 @@ export class AdvancedTestRunner {
         // Setup Firebase emulators, blockchain test network
         await this.setupIntegrationEnvironment()
         break
-        
+
       case TestStrategy.E2E:
         // Setup complete test environment
         await this.setupE2EEnvironment()
         break
-        
+
       case TestStrategy.PERFORMANCE:
         // Clear performance monitoring
         this.performanceMetrics.clear()
         break
-        
+
       case TestStrategy.SECURITY:
         // Setup security testing environment
         await this.setupSecurityEnvironment()
         break
     }
   }
-  
+
   /**
    * Post-execution cleanup
    */
@@ -266,21 +240,21 @@ export class AdvancedTestRunner {
       case TestStrategy.INTEGRATION:
         await this.cleanupIntegrationEnvironment()
         break
-        
+
       case TestStrategy.E2E:
         await this.cleanupE2EEnvironment()
         break
-        
+
       case TestStrategy.PERFORMANCE:
         await this.generatePerformanceReport()
         break
-        
+
       case TestStrategy.SECURITY:
         await this.cleanupSecurityEnvironment()
         break
     }
   }
-  
+
   /**
    * Mock test execution (in real implementation, integrates with Jest)
    */
@@ -290,10 +264,10 @@ export class AdvancedTestRunner {
       success: true,
       testCount: 42,
       coverage: { total: 95 },
-      errors: []
+      errors: [],
     }
   }
-  
+
   /**
    * Setup integration testing environment
    */
@@ -303,7 +277,7 @@ export class AdvancedTestRunner {
     // Blockchain test network setup
     // Database preparation
   }
-  
+
   /**
    * Setup E2E testing environment
    */
@@ -313,7 +287,7 @@ export class AdvancedTestRunner {
     // External service mocking
     // Complete data seeding
   }
-  
+
   /**
    * Setup security testing environment
    */
@@ -323,22 +297,22 @@ export class AdvancedTestRunner {
     // Vulnerability testing setup
     // Access control validation
   }
-  
+
   /**
    * Environment cleanup methods
    */
   private async cleanupIntegrationEnvironment(): Promise<void> {
     console.log('🧹 Cleaning up integration environment...')
   }
-  
+
   private async cleanupE2EEnvironment(): Promise<void> {
     console.log('🧹 Cleaning up E2E environment...')
   }
-  
+
   private async cleanupSecurityEnvironment(): Promise<void> {
     console.log('🧹 Cleaning up security environment...')
   }
-  
+
   /**
    * Record performance metrics
    */
@@ -348,10 +322,10 @@ export class AdvancedTestRunner {
       duration,
       testsPerSecond: results.testCount / (duration / 1000),
       memoryUsage: process.memoryUsage(),
-      timestamp: Date.now()
+      timestamp: Date.now(),
     })
   }
-  
+
   /**
    * Generate performance report
    */
@@ -359,29 +333,29 @@ export class AdvancedTestRunner {
     console.log('📊 Generating performance report...')
     // Create detailed performance analysis
   }
-  
+
   /**
    * Generate test suite summary
    */
   private generateSummary(results: TestSuiteResult[]): TestSuiteSummary {
     const totalTests = results.reduce((sum, r) => sum + r.testCount, 0)
     const totalDuration = results.reduce((sum, r) => sum + r.duration, 0)
-    const successfulStrategies = results.filter(r => r.success).length
-    const failedStrategies = results.filter(r => !r.success)
-    
+    const successfulStrategies = results.filter((r) => r.success).length
+    const failedStrategies = results.filter((r) => !r.success)
+
     return {
       totalTests,
       totalDuration,
       successfulStrategies,
-      failedStrategies: failedStrategies.map(r => r.strategy),
+      failedStrategies: failedStrategies.map((r) => r.strategy),
       overallCoverage: this.calculateOverallCoverage(results),
       performance: {
         testsPerSecond: totalTests / (totalDuration / 1000),
-        averageTestDuration: totalDuration / totalTests
-      }
+        averageTestDuration: totalDuration / totalTests,
+      },
     }
   }
-  
+
   /**
    * Calculate overall coverage from all strategies
    */
@@ -392,7 +366,7 @@ export class AdvancedTestRunner {
       branches: 94,
       functions: 96,
       lines: 95,
-      statements: 95
+      statements: 95,
     }
   }
 }

@@ -42,7 +42,7 @@ packages/backend/tests/
 │   ├── poolCreationFlow.test.ts      # Functions + Firebase + Contracts
 │   ├── authenticationFlow.test.ts    # Complete auth workflow
 │   └── eventSynchronization.test.ts  # Event listeners + Firestore
-├── e2e/                              # End-to-end user journeys  
+├── e2e/                              # End-to-end user journeys
 │   ├── completePoolCreation.test.ts  # API → Blockchain → Events
 │   └── userAuthJourney.test.ts       # Auth → Pool → Transactions
 ├── contract/                         # Blockchain integration tests
@@ -61,25 +61,25 @@ packages/backend/tests/
 
 **When**: Testing individual Cloud Functions, services, or utilities in isolation  
 **Focus**: Business logic, validation, error handling, edge cases  
-**Environment**: Jest with mocked dependencies  
+**Environment**: Jest with mocked dependencies
 
 ```typescript
 // ✅ Good Unit Test Example
 describe('validatePoolCreationParams', () => {
   it('should reject invalid Ethereum addresses', () => {
     const invalidParams = { ...validParams, poolOwner: 'invalid-address' }
-    
+
     const result = validatePoolCreationParams(invalidParams)
-    
+
     expect(result.isValid).toBe(false)
     expect(result.errors).toContain('Pool owner must be a valid Ethereum address')
   })
 
   it('should reject amounts exceeding maximum limit', () => {
     const invalidParams = { ...validParams, maxLoanAmount: '2000000' }
-    
+
     const result = validatePoolCreationParams(invalidParams)
-    
+
     expect(result.isValid).toBe(false)
     expect(result.errors).toContain('Max loan amount is too large (max: 1,000,000 POL)')
   })
@@ -90,7 +90,7 @@ describe('validatePoolCreationParams', () => {
 
 **When**: Testing how Cloud Functions, Firebase services, and contracts work together  
 **Focus**: Data flow, service communication, transaction workflows  
-**Environment**: Firebase emulators + mocked blockchain  
+**Environment**: Firebase emulators + mocked blockchain
 
 ```typescript
 // ✅ Good Integration Test Example
@@ -106,10 +106,12 @@ describe('Pool Creation Integration', () => {
 
     // Assert - Verify complete workflow
     expect(mockContract.createPool).toHaveBeenCalledWith(poolData)
-    expect(mockCollection.add).toHaveBeenCalledWith(expect.objectContaining({
-      poolId: result.poolId,
-      status: 'pending'
-    }))
+    expect(mockCollection.add).toHaveBeenCalledWith(
+      expect.objectContaining({
+        poolId: result.poolId,
+        status: 'pending',
+      })
+    )
     expect(result.success).toBe(true)
   })
 })
@@ -119,7 +121,7 @@ describe('Pool Creation Integration', () => {
 
 **When**: Testing real blockchain interactions with local/testnet contracts  
 **Focus**: Contract deployment, transaction execution, event parsing  
-**Environment**: Local blockchain (Hardhat) or testnet with real contracts  
+**Environment**: Local blockchain (Hardhat) or testnet with real contracts
 
 ```typescript
 // ✅ Good Contract Integration Test Example
@@ -141,18 +143,16 @@ describe('PoolFactory Contract Integration', () => {
       interestRate: 500, // 5%
       loanDuration: 86400, // 1 day
       name: 'Test Pool',
-      description: 'Integration test pool'
+      description: 'Integration test pool',
     }
 
     const tx = await poolFactory.createPool(poolParams)
     const receipt = await tx.wait()
 
     expect(receipt.status).toBe(1)
-    
-    const poolCreatedEvent = receipt.logs.find(log => 
-      log.topics[0] === poolFactory.interface.getEventTopic('PoolCreated')
-    )
-    
+
+    const poolCreatedEvent = receipt.logs.find((log) => log.topics[0] === poolFactory.interface.getEventTopic('PoolCreated'))
+
     expect(poolCreatedEvent).toBeDefined()
     const parsedEvent = poolFactory.interface.parseLog(poolCreatedEvent)
     expect(parsedEvent.args.name).toBe('Test Pool')
@@ -175,21 +175,17 @@ describe('createPool Cloud Function', () => {
     })
 
     const request = { data: validPoolData, auth: mockAuth }
-    
-    await expect(createPoolHandler(request))
-      .rejects.toThrow('Failed to save pool data. Please try again.')
+
+    await expect(createPoolHandler(request)).rejects.toThrow('Failed to save pool data. Please try again.')
   })
 
   it('should handle contract revert with user-friendly message', async () => {
     // Simulate contract revert
-    mockContract.createPool.mockRejectedValue(
-      new Error('execution reverted: Insufficient balance')
-    )
+    mockContract.createPool.mockRejectedValue(new Error('execution reverted: Insufficient balance'))
 
     const request = { data: validPoolData, auth: mockAuth }
-    
-    await expect(createPoolHandler(request))
-      .rejects.toThrow('Pool creation failed: Insufficient balance for transaction')
+
+    await expect(createPoolHandler(request)).rejects.toThrow('Pool creation failed: Insufficient balance for transaction')
   })
 })
 ```
@@ -200,17 +196,15 @@ describe('createPool Cloud Function', () => {
 describe('Pool Creation Authorization', () => {
   it('should reject unauthenticated requests', async () => {
     const request = { data: validPoolData, auth: null }
-    
-    await expect(createPoolHandler(request))
-      .rejects.toThrow('Authentication required')
+
+    await expect(createPoolHandler(request)).rejects.toThrow('Authentication required')
   })
 
   it('should validate user permissions for pool creation', async () => {
     const unauthorizedAuth = { uid: 'user123', token: { role: 'viewer' } }
     const request = { data: validPoolData, auth: unauthorizedAuth }
-    
-    await expect(createPoolHandler(request))
-      .rejects.toThrow('Insufficient permissions for pool creation')
+
+    await expect(createPoolHandler(request)).rejects.toThrow('Insufficient permissions for pool creation')
   })
 })
 ```
@@ -221,18 +215,18 @@ describe('Pool Creation Authorization', () => {
 describe('Gas Optimization', () => {
   it('should estimate gas before transaction execution', async () => {
     mockContract.estimateGas.createPool.mockResolvedValue(BigInt('150000'))
-    
+
     const result = await createPoolHandler({ data: validPoolData, auth: mockAuth })
-    
+
     expect(mockContract.estimateGas.createPool).toHaveBeenCalledWith(validPoolData)
     expect(result.estimatedGas).toBe('150000')
   })
 
   it('should use fallback gas limit when estimation fails', async () => {
     mockContract.estimateGas.createPool.mockRejectedValue(new Error('estimation failed'))
-    
+
     const result = await createPoolHandler({ data: validPoolData, auth: mockAuth })
-    
+
     expect(result.gasLimit).toBe(DEFAULT_GAS_LIMIT)
   })
 })
@@ -250,7 +244,7 @@ it('should call Firestore collection method', () => {
 // ✅ Good: Test business behavior
 it('should save pool data to database', async () => {
   const result = await createPoolHandler(request)
-  
+
   expect(result.poolId).toBeDefined()
   expect(result.status).toBe('created')
 })
@@ -279,12 +273,7 @@ it('should connect to configured contract', async () => {
 
 ```typescript
 // ✅ Import from centralized backend mocks
-import {
-  createMockFirestore,
-  createMockContract,
-  createMockTransaction,
-  mockFirebaseContext
-} from '../__mocks__/factories/testFactory'
+import { createMockFirestore, createMockContract, createMockTransaction, mockFirebaseContext } from '../__mocks__/factories/testFactory'
 
 describe('Pool Creation Service', () => {
   let mockDb: ReturnType<typeof createMockFirestore>
@@ -293,11 +282,11 @@ describe('Pool Creation Service', () => {
   beforeEach(() => {
     mockDb = createMockFirestore({
       pools: { exists: false },
-      transactions: { exists: false }
+      transactions: { exists: false },
     })
-    
+
     mockContract = createMockContract({
-      createPool: jest.fn().mockResolvedValue(mockTransactionResponse)
+      createPool: jest.fn().mockResolvedValue(mockTransactionResponse),
     })
   })
 })
@@ -310,15 +299,15 @@ describe('Pool Creation Service', () => {
 const mockCloudFunctionContext = mockFirebaseContext({
   auth: { uid: 'test-user-123', token: { role: 'admin' } },
   app: mockFirebaseApp(),
-  rawRequest: mockHttpRequest()
+  rawRequest: mockHttpRequest(),
 })
 
 // Mock Firestore operations
 const mockFirestoreWithData = createMockFirestore({
   'pools/pool-123': {
     exists: true,
-    data: () => ({ name: 'Test Pool', owner: '0x123...' })
-  }
+    data: () => ({ name: 'Test Pool', owner: '0x123...' }),
+  },
 })
 ```
 
@@ -329,7 +318,7 @@ const mockFirestoreWithData = createMockFirestore({
 ### **Coverage Targets**
 
 - **Global**: 95% lines/functions/statements, 90% branches
-- **Critical Services** (ContractService, auth): 95% across all metrics  
+- **Critical Services** (ContractService, auth): 95% across all metrics
 - **Cloud Functions**: 95% lines, focus on error handling paths
 - **Utilities**: 90% lines, comprehensive edge case testing
 
@@ -337,14 +326,14 @@ const mockFirestoreWithData = createMockFirestore({
 
 - Configuration files (`src/constants/`, `firebase.config.ts`)
 - Type definitions (`.d.ts` files)
-- Build outputs (`lib/`, compiled files)  
+- Build outputs (`lib/`, compiled files)
 - Test files (`*.test.ts`)
 - Index files that only re-export (`index.ts`)
 
 ### **Priority Coverage Areas**
 
 1. **Authentication & Authorization** - 95% all metrics
-2. **Pool Creation Workflow** - 95% all metrics  
+2. **Pool Creation Workflow** - 95% all metrics
 3. **Contract Interaction Layer** - 95% all metrics
 4. **Validation & Sanitization** - 95% all metrics
 5. **Error Handling & Recovery** - 90% branches minimum
@@ -395,7 +384,7 @@ pnpm test:integration
 describe('generateAuthMessage Cloud Function', () => {
   const mockRequest = {
     data: { walletAddress: '0x742d35Cc6634C0532925a3b8D238a5D2DD8dC5b8' },
-    auth: mockFirebaseContext().auth
+    auth: mockFirebaseContext().auth,
   }
 
   it('should generate authentication message with nonce', async () => {
@@ -407,7 +396,7 @@ describe('generateAuthMessage Cloud Function', () => {
     expect(result).toEqual({
       message: 'Sign this message: test-nonce-123',
       nonce: 'test-nonce-123',
-      timestamp: expect.any(Number)
+      timestamp: expect.any(Number),
     })
   })
 })
@@ -419,15 +408,15 @@ describe('generateAuthMessage Cloud Function', () => {
 describe('Pool Data Persistence', () => {
   it('should save pool data to Firestore with proper structure', async () => {
     const poolData = { name: 'Test Pool', owner: '0x123...' }
-    
+
     await savePoolToFirestore(poolData)
-    
+
     expect(mockFirestore.collection).toHaveBeenCalledWith('pools')
     expect(mockFirestore.doc).toHaveBeenCalledWith(expect.any(String))
     expect(mockFirestore.set).toHaveBeenCalledWith({
       ...poolData,
       createdAt: expect.any(Date),
-      status: 'active'
+      status: 'active',
     })
   })
 })
@@ -445,15 +434,15 @@ describe('ContractService', () => {
     const deploymentParams = {
       maxLoanAmount: ethers.parseEther('100'),
       interestRate: 500,
-      loanDuration: 86400
+      loanDuration: 86400,
     }
 
     mockContract.createPool.mockResolvedValue({
       hash: '0xabc123',
       wait: jest.fn().mockResolvedValue({
         status: 1,
-        logs: [mockPoolCreatedEvent]
-      })
+        logs: [mockPoolCreatedEvent],
+      }),
     })
 
     const result = await contractService.deployPool(deploymentParams)
@@ -470,13 +459,14 @@ describe('ContractService', () => {
 describe('Transaction Monitoring', () => {
   it('should track transaction status until confirmation', async () => {
     const txHash = '0xabc123'
-    
+
     // Mock pending transaction
     mockProvider.getTransactionReceipt
-      .mockResolvedValueOnce(null)  // First call - pending
-      .mockResolvedValueOnce({      // Second call - confirmed
+      .mockResolvedValueOnce(null) // First call - pending
+      .mockResolvedValueOnce({
+        // Second call - confirmed
         status: 1,
-        blockNumber: 12345
+        blockNumber: 12345,
       })
 
     const result = await monitorTransaction(txHash)
@@ -552,7 +542,7 @@ it('should validate ether amounts correctly', () => {
 ```typescript
 // ❌ Bad: Mocking everything
 jest.mock('./poolService')
-jest.mock('./contractService')  
+jest.mock('./contractService')
 jest.mock('./validationService')
 // What are we actually testing?
 

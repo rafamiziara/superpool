@@ -4,12 +4,5 @@ export { syncHistoricalEvents, estimateSyncProgress } from './syncHistoricalEven
 
 // Re-export types for external use
 export type { PoolCreatedEvent, EventSyncState } from './syncPoolEvents'
-export type { 
-  ProcessPoolEventsRequest, 
-  ProcessPoolEventsResponse, 
-  PoolDocument 
-} from './processPoolEvents'
-export type { 
-  SyncHistoricalEventsRequest, 
-  SyncHistoricalEventsResponse 
-} from './syncHistoricalEvents'
+export type { ProcessPoolEventsRequest, ProcessPoolEventsResponse, PoolDocument } from './processPoolEvents'
+export type { SyncHistoricalEventsRequest, SyncHistoricalEventsResponse } from './syncHistoricalEvents'

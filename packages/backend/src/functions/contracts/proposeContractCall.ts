@@ -28,7 +28,7 @@ export interface ProposeContractCallResponse {
 
 /**
  * Cloud Function to propose a contract function call through Safe
- * 
+ *
  * @param request - The callable request with contract call details
  * @returns Transaction proposal details for the contract call
  */
@@ -45,7 +45,7 @@ export const proposeContractCall = onCall(
       uid: request.auth?.uid,
       contractAddress: request.data.contractAddress,
       functionName: request.data.functionName,
-      description: request.data.description
+      description: request.data.description,
     })
 
     try {
@@ -85,7 +85,7 @@ export const proposeContractCall = onCall(
         functionName: request.data.functionName,
         abi: request.data.abi,
         args: request.data.args,
-        value: request.data.value
+        value: request.data.value,
       }
 
       const transactionStatus = await contractService.proposeContractCall(
@@ -99,7 +99,7 @@ export const proposeContractCall = onCall(
         transactionId: transactionStatus.id,
         contractAddress: request.data.contractAddress,
         functionName: request.data.functionName,
-        requiredSignatures: transactionStatus.requiredSignatures
+        requiredSignatures: transactionStatus.requiredSignatures,
       })
 
       return {
@@ -111,15 +111,14 @@ export const proposeContractCall = onCall(
         functionName: request.data.functionName,
         contractAddress: request.data.contractAddress,
         description: transactionStatus.description,
-        message: `Contract call "${request.data.functionName}" proposed successfully. Requires ${transactionStatus.requiredSignatures} signature(s) to execute.`
+        message: `Contract call "${request.data.functionName}" proposed successfully. Requires ${transactionStatus.requiredSignatures} signature(s) to execute.`,
       }
-
     } catch (error) {
       logger.error(`${functionName}: Error proposing contract call`, {
         error: error instanceof Error ? error.message : String(error),
         uid: request.auth?.uid,
         contractAddress: request.data.contractAddress,
-        functionName: request.data.functionName
+        functionName: request.data.functionName,
       })
 
       return handleError(error, functionName)

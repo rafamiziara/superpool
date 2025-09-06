@@ -1,6 +1,6 @@
 /**
  * Test Reporting and Analytics System
- * 
+ *
  * Comprehensive test reporting, analytics, and insights generation.
  * Provides detailed test execution analysis, trend tracking,
  * performance insights, and actionable recommendations.
@@ -16,7 +16,7 @@ export enum ReportFormat {
   JSON = 'json',
   XML = 'xml',
   PDF = 'pdf',
-  MARKDOWN = 'markdown'
+  MARKDOWN = 'markdown',
 }
 
 export enum ReportType {
@@ -25,7 +25,7 @@ export enum ReportType {
   PERFORMANCE = 'performance',
   COVERAGE = 'coverage',
   TRENDS = 'trends',
-  ANALYTICS = 'analytics'
+  ANALYTICS = 'analytics',
 }
 
 // Analytics metrics
@@ -181,14 +181,14 @@ export class TestReportingAnalytics extends EventEmitter {
   private executionHistory: TestExecution[] = []
   private analyticsHistory: TestAnalytics[] = []
   private reportOutputPath: string
-  
+
   private constructor(config: ReportingConfig) {
     super()
     this.config = config
     this.reportOutputPath = config.outputPath || './reports'
     this.ensureOutputDirectory()
   }
-  
+
   public static getInstance(config?: ReportingConfig): TestReportingAnalytics {
     if (!TestReportingAnalytics.instance) {
       if (!config) {
@@ -198,47 +198,47 @@ export class TestReportingAnalytics extends EventEmitter {
     }
     return TestReportingAnalytics.instance
   }
-  
+
   /**
    * Record test execution data
    */
   recordTestExecution(execution: TestExecution): void {
     this.executionHistory.push(execution)
     this.emit('test-recorded', execution)
-    
+
     // Auto-generate reports if configured
     if (this.config.autoGenerate && this.executionHistory.length % this.config.batchSize === 0) {
       this.generateReports()
     }
   }
-  
+
   /**
    * Generate comprehensive test analytics
    */
   generateAnalytics(): TestAnalytics {
     console.log('📊 Generating test analytics...')
-    
+
     const analytics: TestAnalytics = {
       executionMetrics: this.calculateExecutionMetrics(),
       qualityMetrics: this.calculateQualityMetrics(),
       performanceMetrics: this.calculatePerformanceMetrics(),
       trendsMetrics: this.calculateTrendsMetrics(),
       recommendations: this.generateRecommendations(),
-      timestamp: Date.now()
+      timestamp: Date.now(),
     }
-    
+
     // Store analytics history
     this.analyticsHistory.push(analytics)
-    
+
     // Keep only last N analytics records
     if (this.analyticsHistory.length > this.config.historyRetention) {
       this.analyticsHistory = this.analyticsHistory.slice(-this.config.historyRetention)
     }
-    
+
     this.emit('analytics-generated', analytics)
     return analytics
   }
-  
+
   /**
    * Calculate execution metrics
    */
@@ -246,24 +246,20 @@ export class TestReportingAnalytics extends EventEmitter {
     if (this.executionHistory.length === 0) {
       return this.getEmptyExecutionMetrics()
     }
-    
+
     const total = this.executionHistory.length
-    const successful = this.executionHistory.filter(e => e.status === 'passed').length
-    const failed = this.executionHistory.filter(e => e.status === 'failed').length
-    const skipped = this.executionHistory.filter(e => e.status === 'skipped').length
-    
-    const durations = this.executionHistory.map(e => e.duration)
+    const successful = this.executionHistory.filter((e) => e.status === 'passed').length
+    const failed = this.executionHistory.filter((e) => e.status === 'failed').length
+    const skipped = this.executionHistory.filter((e) => e.status === 'skipped').length
+
+    const durations = this.executionHistory.map((e) => e.duration)
     const totalDuration = durations.reduce((sum, d) => sum + d, 0)
     const avgDuration = totalDuration / total
-    
-    const fastestTest = this.executionHistory.reduce((fastest, current) => 
-      current.duration < fastest.duration ? current : fastest
-    )
-    
-    const slowestTest = this.executionHistory.reduce((slowest, current) => 
-      current.duration > slowest.duration ? current : slowest
-    )
-    
+
+    const fastestTest = this.executionHistory.reduce((fastest, current) => (current.duration < fastest.duration ? current : fastest))
+
+    const slowestTest = this.executionHistory.reduce((slowest, current) => (current.duration > slowest.duration ? current : slowest))
+
     return {
       totalTests: total,
       successfulTests: successful,
@@ -274,34 +270,34 @@ export class TestReportingAnalytics extends EventEmitter {
       averageTestDuration: avgDuration,
       fastestTest,
       slowestTest,
-      testDistribution: this.calculateTestDistribution()
+      testDistribution: this.calculateTestDistribution(),
     }
   }
-  
+
   /**
    * Calculate test distribution
    */
   private calculateTestDistribution(): TestDistribution {
     const byCategory: Record<string, number> = {}
-    const byDuration: Record<string, number> = { 'fast': 0, 'medium': 0, 'slow': 0 }
-    const byStatus: Record<string, number> = { 'passed': 0, 'failed': 0, 'skipped': 0 }
-    
+    const byDuration: Record<string, number> = { fast: 0, medium: 0, slow: 0 }
+    const byStatus: Record<string, number> = { passed: 0, failed: 0, skipped: 0 }
+
     for (const execution of this.executionHistory) {
       // By category
       byCategory[execution.category] = (byCategory[execution.category] || 0) + 1
-      
+
       // By duration
       if (execution.duration < 100) byDuration.fast++
       else if (execution.duration < 5000) byDuration.medium++
       else byDuration.slow++
-      
+
       // By status
       byStatus[execution.status] = (byStatus[execution.status] || 0) + 1
     }
-    
+
     return { byCategory, byDuration, byStatus }
   }
-  
+
   /**
    * Calculate quality metrics
    */
@@ -310,26 +306,26 @@ export class TestReportingAnalytics extends EventEmitter {
       codeQuality: this.calculateCodeQuality(),
       testQuality: this.calculateTestQuality(),
       coverage: this.calculateCoverage(),
-      maintainability: this.calculateMaintainability()
+      maintainability: this.calculateMaintainability(),
     }
   }
-  
+
   /**
    * Calculate performance metrics
    */
   private calculatePerformanceMetrics(): PerformanceAnalytics {
-    const responseTimes = this.executionHistory.map(e => e.duration)
-    
+    const responseTimes = this.executionHistory.map((e) => e.duration)
+
     return {
       responseTime: this.calculatePerformanceMetric(responseTimes),
       throughput: this.calculateThroughput(),
       memoryUsage: this.calculateMemoryMetric(),
       cpuUsage: this.calculateCpuMetric(),
       resourceUtilization: this.calculateResourceUtilization(),
-      bottlenecks: this.identifyBottlenecks()
+      bottlenecks: this.identifyBottlenecks(),
     }
   }
-  
+
   /**
    * Calculate trends metrics
    */
@@ -338,22 +334,22 @@ export class TestReportingAnalytics extends EventEmitter {
       executionTrends: this.calculateExecutionTrends(),
       performanceTrends: this.calculatePerformanceTrends(),
       qualityTrends: this.calculateQualityTrends(),
-      regressionAnalysis: this.analyzeRegressions()
+      regressionAnalysis: this.analyzeRegressions(),
     }
   }
-  
+
   /**
    * Generate actionable recommendations
    */
   private generateRecommendations(): Recommendation[] {
     const recommendations: Recommendation[] = []
-    
+
     // Performance recommendations
     const slowTests = this.executionHistory
-      .filter(e => e.duration > 5000)
+      .filter((e) => e.duration > 5000)
       .sort((a, b) => b.duration - a.duration)
       .slice(0, 5)
-    
+
     if (slowTests.length > 0) {
       recommendations.push({
         type: 'performance',
@@ -366,13 +362,13 @@ export class TestReportingAnalytics extends EventEmitter {
           'Profile slow tests to identify bottlenecks',
           'Consider breaking down complex tests',
           'Optimize database queries in tests',
-          'Use test doubles for external dependencies'
-        ]
+          'Use test doubles for external dependencies',
+        ],
       })
     }
-    
+
     // Quality recommendations
-    const failureRate = (this.executionHistory.filter(e => e.status === 'failed').length / this.executionHistory.length) * 100
+    const failureRate = (this.executionHistory.filter((e) => e.status === 'failed').length / this.executionHistory.length) * 100
     if (failureRate > 5) {
       recommendations.push({
         type: 'quality',
@@ -385,11 +381,11 @@ export class TestReportingAnalytics extends EventEmitter {
           'Analyze failed tests to identify patterns',
           'Fix flaky tests that fail intermittently',
           'Improve test data setup and cleanup',
-          'Review test environment stability'
-        ]
+          'Review test environment stability',
+        ],
       })
     }
-    
+
     // Maintainability recommendations
     const duplicatedTests = this.identifyDuplicatedTests()
     if (duplicatedTests.length > 0) {
@@ -404,27 +400,27 @@ export class TestReportingAnalytics extends EventEmitter {
           'Review and consolidate similar test cases',
           'Create reusable test utilities',
           'Implement parameterized tests where appropriate',
-          'Extract common test setup into fixtures'
-        ]
+          'Extract common test setup into fixtures',
+        ],
       })
     }
-    
+
     return recommendations
   }
-  
+
   /**
    * Generate reports in multiple formats
    */
   async generateReports(): Promise<ReportGenerationResult> {
     console.log('📋 Generating test reports...')
-    
+
     const analytics = this.generateAnalytics()
     const results: ReportGenerationResult = {
       reports: [],
       analytics,
-      timestamp: Date.now()
+      timestamp: Date.now(),
     }
-    
+
     for (const format of this.config.formats) {
       try {
         const report = await this.generateReport(format, analytics)
@@ -434,11 +430,11 @@ export class TestReportingAnalytics extends EventEmitter {
         console.error(`❌ Failed to generate ${format} report:`, error)
       }
     }
-    
+
     this.emit('reports-generated', results)
     return results
   }
-  
+
   /**
    * Generate individual report
    */
@@ -446,40 +442,40 @@ export class TestReportingAnalytics extends EventEmitter {
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-')
     const filename = `test-report-${timestamp}.${format}`
     const filePath = join(this.reportOutputPath, filename)
-    
+
     let content: string
-    
+
     switch (format) {
       case ReportFormat.HTML:
         content = this.generateHTMLReport(analytics)
         break
-        
+
       case ReportFormat.JSON:
         content = JSON.stringify(analytics, null, 2)
         break
-        
+
       case ReportFormat.XML:
         content = this.generateXMLReport(analytics)
         break
-        
+
       case ReportFormat.MARKDOWN:
         content = this.generateMarkdownReport(analytics)
         break
-        
+
       default:
         throw new Error(`Unsupported report format: ${format}`)
     }
-    
+
     writeFileSync(filePath, content, 'utf8')
-    
+
     return {
       format,
       filePath,
       size: Buffer.byteLength(content, 'utf8'),
-      generatedAt: Date.now()
+      generatedAt: Date.now(),
     }
   }
-  
+
   /**
    * Generate HTML report
    */
@@ -548,10 +544,14 @@ export class TestReportingAnalytics extends EventEmitter {
             <p><strong>Average Duration:</strong> ${analytics.executionMetrics.averageTestDuration.toFixed(1)}ms</p>
         </div>
         
-        ${analytics.recommendations.length > 0 ? `
+        ${
+          analytics.recommendations.length > 0
+            ? `
         <div class="recommendations">
             <h2>💡 Recommendations</h2>
-            ${analytics.recommendations.map(rec => `
+            ${analytics.recommendations
+              .map(
+                (rec) => `
             <div class="recommendation">
                 <h3>${rec.title} (${rec.priority.toUpperCase()} Priority)</h3>
                 <p><strong>Description:</strong> ${rec.description}</p>
@@ -559,12 +559,16 @@ export class TestReportingAnalytics extends EventEmitter {
                 <p><strong>Effort:</strong> ${rec.effort.toUpperCase()}</p>
                 <div class="actions">
                     <strong>Recommended Actions:</strong>
-                    <ul>${rec.actions.map(action => `<li>${action}</li>`).join('')}</ul>
+                    <ul>${rec.actions.map((action) => `<li>${action}</li>`).join('')}</ul>
                 </div>
             </div>
-            `).join('')}
+            `
+              )
+              .join('')}
         </div>
-        ` : ''}
+        `
+            : ''
+        }
         
         <div class="footer">
             <p>🤖 Generated with SuperPool Test Analytics System</p>
@@ -573,7 +577,7 @@ export class TestReportingAnalytics extends EventEmitter {
 </body>
 </html>`
   }
-  
+
   /**
    * Generate XML report
    */
@@ -589,21 +593,25 @@ export class TestReportingAnalytics extends EventEmitter {
         <averageTestDuration>${analytics.executionMetrics.averageTestDuration}</averageTestDuration>
     </executionMetrics>
     <recommendations>
-        ${analytics.recommendations.map(rec => `
+        ${analytics.recommendations
+          .map(
+            (rec) => `
         <recommendation priority="${rec.priority}" type="${rec.type}">
             <title>${rec.title}</title>
             <description>${rec.description}</description>
             <impact>${rec.impact}</impact>
             <effort>${rec.effort}</effort>
             <actions>
-                ${rec.actions.map(action => `<action>${action}</action>`).join('')}
+                ${rec.actions.map((action) => `<action>${action}</action>`).join('')}
             </actions>
         </recommendation>
-        `).join('')}
+        `
+          )
+          .join('')}
     </recommendations>
 </testReport>`
   }
-  
+
   /**
    * Generate Markdown report
    */
@@ -630,7 +638,9 @@ export class TestReportingAnalytics extends EventEmitter {
 
 ## 💡 Recommendations
 
-${analytics.recommendations.map(rec => `
+${analytics.recommendations
+  .map(
+    (rec) => `
 ### ${rec.title} (${rec.priority.toUpperCase()} Priority)
 
 **Description:** ${rec.description}
@@ -640,14 +650,16 @@ ${analytics.recommendations.map(rec => `
 **Effort Required:** ${rec.effort.toUpperCase()}
 
 **Recommended Actions:**
-${rec.actions.map(action => `- ${action}`).join('\n')}
-`).join('\n')}
+${rec.actions.map((action) => `- ${action}`).join('\n')}
+`
+  )
+  .join('\n')}
 
 ---
 
 *🤖 Generated with SuperPool Test Analytics System*`
   }
-  
+
   /**
    * Helper methods for calculations
    */
@@ -662,31 +674,31 @@ ${rec.actions.map(action => `- ${action}`).join('\n')}
       averageTestDuration: 0,
       fastestTest: { id: '', name: '', category: '', duration: 0, status: 'passed', metadata: {} as TestMetadata },
       slowestTest: { id: '', name: '', category: '', duration: 0, status: 'passed', metadata: {} as TestMetadata },
-      testDistribution: { byCategory: {}, byDuration: {}, byStatus: {} }
+      testDistribution: { byCategory: {}, byDuration: {}, byStatus: {} },
     }
   }
-  
+
   private calculateCodeQuality(): CodeQualityMetrics {
     // Placeholder implementation - would integrate with actual code quality tools
     return {
       complexity: 75,
       duplications: 5,
       maintainabilityIndex: 82,
-      technicalDebt: 2.5
+      technicalDebt: 2.5,
     }
   }
-  
+
   private calculateTestQuality(): TestQualityMetrics {
-    const successRate = (this.executionHistory.filter(e => e.status === 'passed').length / this.executionHistory.length) * 100
-    
+    const successRate = (this.executionHistory.filter((e) => e.status === 'passed').length / this.executionHistory.length) * 100
+
     return {
       testCoverage: 92,
       testComplexity: 45,
       testReliability: successRate,
-      testMaintainability: 78
+      testMaintainability: 78,
     }
   }
-  
+
   private calculateCoverage(): CoverageMetrics {
     // Placeholder - would integrate with actual coverage tools
     return {
@@ -694,159 +706,155 @@ ${rec.actions.map(action => `- ${action}`).join('\n')}
       branches: 88,
       functions: 95,
       statements: 94,
-      uncoveredLines: ['src/services/ContractService.ts:145', 'src/functions/pools/createPool.ts:67']
+      uncoveredLines: ['src/services/ContractService.ts:145', 'src/functions/pools/createPool.ts:67'],
     }
   }
-  
+
   private calculateMaintainability(): MaintainabilityMetrics {
     return {
       cyclomaticComplexity: 12,
       maintainabilityIndex: 82,
       linesOfCode: 2847,
-      duplicatedLines: 127
+      duplicatedLines: 127,
     }
   }
-  
+
   private calculatePerformanceMetric(values: number[]): PerformanceMetric {
     if (values.length === 0) {
       return { current: 0, average: 0, min: 0, max: 0, trend: 'stable' }
     }
-    
+
     return {
       current: values[values.length - 1],
       average: values.reduce((sum, v) => sum + v, 0) / values.length,
       min: Math.min(...values),
       max: Math.max(...values),
-      trend: this.calculateTrend(values)
+      trend: this.calculateTrend(values),
     }
   }
-  
+
   private calculateTrend(values: number[]): 'improving' | 'declining' | 'stable' {
     if (values.length < 2) return 'stable'
-    
+
     const recent = values.slice(-Math.min(5, values.length))
     const slope = this.calculateSlope(recent)
-    
+
     if (slope > 0.1) return 'declining' // Performance getting worse
     if (slope < -0.1) return 'improving' // Performance getting better
     return 'stable'
   }
-  
+
   private calculateSlope(values: number[]): number {
     // Simple linear regression slope calculation
     const n = values.length
     const x = Array.from({ length: n }, (_, i) => i)
     const xMean = x.reduce((sum, v) => sum + v, 0) / n
     const yMean = values.reduce((sum, v) => sum + v, 0) / n
-    
+
     const numerator = x.reduce((sum, xi, i) => sum + (xi - xMean) * (values[i] - yMean), 0)
     const denominator = x.reduce((sum, xi) => sum + Math.pow(xi - xMean, 2), 0)
-    
+
     return denominator === 0 ? 0 : numerator / denominator
   }
-  
+
   private calculateThroughput(): PerformanceMetric {
     // Tests per second calculation
-    const throughputValues = this.executionHistory.map(e => 1000 / e.duration) // tests per second
+    const throughputValues = this.executionHistory.map((e) => 1000 / e.duration) // tests per second
     return this.calculatePerformanceMetric(throughputValues)
   }
-  
+
   private calculateMemoryMetric(): PerformanceMetric {
     // Placeholder - would track actual memory usage
     const memoryValues = Array.from({ length: 10 }, () => Math.random() * 100 + 50)
     return this.calculatePerformanceMetric(memoryValues)
   }
-  
+
   private calculateCpuMetric(): PerformanceMetric {
     // Placeholder - would track actual CPU usage
     const cpuValues = Array.from({ length: 10 }, () => Math.random() * 80 + 20)
     return this.calculatePerformanceMetric(cpuValues)
   }
-  
+
   private calculateResourceUtilization(): ResourceUtilization {
     return {
       cpu: 65,
       memory: 78,
       disk: 34,
-      network: 12
+      network: 12,
     }
   }
-  
+
   private identifyBottlenecks(): Bottleneck[] {
     const bottlenecks: Bottleneck[] = []
-    
+
     // Identify slow tests as bottlenecks
-    const slowTests = this.executionHistory
-      .filter(e => e.duration > 5000)
-      .sort((a, b) => b.duration - a.duration)
-    
+    const slowTests = this.executionHistory.filter((e) => e.duration > 5000).sort((a, b) => b.duration - a.duration)
+
     if (slowTests.length > 0) {
       bottlenecks.push({
         type: 'cpu',
         severity: slowTests.length > 10 ? 'high' : 'medium',
         description: `${slowTests.length} tests are running slower than 5 seconds`,
         impact: slowTests.reduce((sum, t) => sum + t.duration, 0),
-        recommendation: 'Profile and optimize slow test cases'
+        recommendation: 'Profile and optimize slow test cases',
       })
     }
-    
+
     return bottlenecks
   }
-  
+
   private calculateExecutionTrends(): TrendData[] {
     // Placeholder trend data
     return Array.from({ length: 30 }, (_, i) => ({
       timestamp: Date.now() - (29 - i) * 24 * 60 * 60 * 1000,
       value: Math.random() * 100 + 50,
-      label: `Day ${i + 1}`
+      label: `Day ${i + 1}`,
     }))
   }
-  
+
   private calculatePerformanceTrends(): TrendData[] {
     return Array.from({ length: 30 }, (_, i) => ({
       timestamp: Date.now() - (29 - i) * 24 * 60 * 60 * 1000,
       value: Math.random() * 2000 + 1000,
-      label: `Day ${i + 1}`
+      label: `Day ${i + 1}`,
     }))
   }
-  
+
   private calculateQualityTrends(): TrendData[] {
     return Array.from({ length: 30 }, (_, i) => ({
       timestamp: Date.now() - (29 - i) * 24 * 60 * 60 * 1000,
       value: Math.random() * 20 + 80,
-      label: `Day ${i + 1}`
+      label: `Day ${i + 1}`,
     }))
   }
-  
+
   private analyzeRegressions(): RegressionAnalysis {
-    const recentFailures = this.executionHistory
-      .filter(e => e.status === 'failed')
-      .slice(-10)
-    
+    const recentFailures = this.executionHistory.filter((e) => e.status === 'failed').slice(-10)
+
     const isRegression = recentFailures.length > 3
-    
+
     return {
       isRegression,
       severity: isRegression ? (recentFailures.length > 7 ? 'high' : 'medium') : 'low',
-      affectedTests: recentFailures.map(f => f.name),
-      rootCause: isRegression ? 'Potential recent code changes causing test instability' : undefined
+      affectedTests: recentFailures.map((f) => f.name),
+      rootCause: isRegression ? 'Potential recent code changes causing test instability' : undefined,
     }
   }
-  
+
   private identifyDuplicatedTests(): string[] {
     // Simple duplication detection based on test names
     const nameCount = new Map<string, number>()
-    
+
     for (const execution of this.executionHistory) {
       const simplifiedName = execution.name.replace(/\s+/g, '').toLowerCase()
       nameCount.set(simplifiedName, (nameCount.get(simplifiedName) || 0) + 1)
     }
-    
+
     return Array.from(nameCount.entries())
       .filter(([, count]) => count > 1)
       .map(([name]) => name)
   }
-  
+
   /**
    * Ensure output directory exists
    */
@@ -855,22 +863,22 @@ ${rec.actions.map(action => `- ${action}`).join('\n')}
       mkdirSync(this.reportOutputPath, { recursive: true })
     }
   }
-  
+
   /**
    * Get analytics summary
    */
   getAnalyticsSummary(): AnalyticsSummary {
     const latest = this.analyticsHistory[this.analyticsHistory.length - 1]
-    
+
     return {
       totalExecutions: this.executionHistory.length,
       currentSuccessRate: latest?.executionMetrics.successRate || 0,
       averageDuration: latest?.executionMetrics.averageTestDuration || 0,
       lastAnalysis: latest?.timestamp || 0,
-      trendsAvailable: this.analyticsHistory.length > 1
+      trendsAvailable: this.analyticsHistory.length > 1,
     }
   }
-  
+
   /**
    * Clear history
    */
@@ -923,7 +931,7 @@ export const DEFAULT_REPORTING_CONFIG: ReportingConfig = {
   historyRetention: 100,
   includeRecommendations: true,
   includeMetrics: true,
-  includeTrends: true
+  includeTrends: true,
 }
 
 // Export singleton instance

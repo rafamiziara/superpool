@@ -28,7 +28,7 @@ export interface CreatePoolResponse {
 
 /**
  * Cloud Function to create a new lending pool via PoolFactory
- * 
+ *
  * @param request - The callable request with pool creation parameters
  * @returns Transaction hash and pool creation details
  */
@@ -44,7 +44,7 @@ export const createPool = onCall(
     const functionName = 'createPool'
     logger.info(`${functionName}: Starting pool creation request`, {
       uid: request.auth?.uid,
-      data: { ...request.data, maxLoanAmount: '***', poolOwner: '***' }
+      data: { ...request.data, maxLoanAmount: '***', poolOwner: '***' },
     })
 
     try {
@@ -67,7 +67,7 @@ export const createPool = onCall(
       const chainId = sanitizedParams.chainId || 80002 // Polygon Amoy
       const provider = new ethers.JsonRpcProvider(getProviderUrl(chainId))
       const wallet = new ethers.Wallet(getPrivateKey(), provider)
-      
+
       // 5. Get contract instance
       const poolFactoryAddress = getPoolFactoryAddress(chainId)
       const poolFactory = new ethers.Contract(poolFactoryAddress, PoolFactoryABI, wallet)
@@ -79,7 +79,7 @@ export const createPool = onCall(
         interestRate: sanitizedParams.interestRate,
         loanDuration: sanitizedParams.loanDuration,
         name: sanitizedParams.name,
-        description: sanitizedParams.description
+        description: sanitizedParams.description,
       }
 
       // 7. Estimate gas
@@ -87,19 +87,14 @@ export const createPool = onCall(
       logger.info(`${functionName}: Gas estimated`, { gasEstimate: gasEstimate.toString() })
 
       // 8. Execute transaction
-      const tx = await executeTransaction(
-        poolFactory,
-        'createPool',
-        [poolParams],
-        {
-          gasLimit: gasEstimate,
-          gasPrice: await provider.getFeeData().then(fees => fees.gasPrice || undefined)
-        }
-      )
+      const tx = await executeTransaction(poolFactory, 'createPool', [poolParams], {
+        gasLimit: gasEstimate,
+        gasPrice: await provider.getFeeData().then((fees) => fees.gasPrice || undefined),
+      })
 
-      logger.info(`${functionName}: Transaction submitted`, { 
+      logger.info(`${functionName}: Transaction submitted`, {
         txHash: tx.hash,
-        poolOwner: sanitizedParams.poolOwner
+        poolOwner: sanitizedParams.poolOwner,
       })
 
       // 9. Store transaction in Firestore for tracking
@@ -111,7 +106,7 @@ export const createPool = onCall(
         chainId,
         status: 'pending',
         createdAt: new Date(),
-        gasEstimate: gasEstimate.toString()
+        gasEstimate: gasEstimate.toString(),
       })
 
       // 10. Wait for confirmation and extract pool details
@@ -122,14 +117,14 @@ export const createPool = onCall(
 
       // 11. Parse events to get pool details
       const poolCreatedEvent = receipt.logs
-        .map(log => {
+        .map((log) => {
           try {
             return poolFactory.interface.parseLog(log)
           } catch {
             return null
           }
         })
-        .find(event => event && event.name === 'PoolCreated')
+        .find((event) => event && event.name === 'PoolCreated')
 
       if (!poolCreatedEvent) {
         throw new AppError('Pool creation event not found in transaction receipt', 'EVENT_NOT_FOUND')
@@ -145,7 +140,7 @@ export const createPool = onCall(
         poolAddress,
         blockNumber: receipt.blockNumber,
         gasUsed: receipt.gasUsed.toString(),
-        completedAt: new Date()
+        completedAt: new Date(),
       })
 
       // 13. Store pool information in pools collection
@@ -162,13 +157,13 @@ export const createPool = onCall(
         createdBy: request.auth.uid,
         createdAt: new Date(),
         transactionHash: tx.hash,
-        isActive: true
+        isActive: true,
       })
 
       logger.info(`${functionName}: Pool created successfully`, {
         poolId,
         poolAddress,
-        transactionHash: tx.hash
+        transactionHash: tx.hash,
       })
 
       return {
@@ -177,13 +172,12 @@ export const createPool = onCall(
         poolId,
         poolAddress,
         estimatedGas: gasEstimate.toString(),
-        message: `Pool "${sanitizedParams.name}" created successfully with ID ${poolId}`
+        message: `Pool "${sanitizedParams.name}" created successfully with ID ${poolId}`,
       }
-
     } catch (error) {
       logger.error(`${functionName}: Error creating pool`, {
         error: error instanceof Error ? error.message : String(error),
-        uid: request.auth?.uid
+        uid: request.auth?.uid,
       })
 
       return handleError(error, functionName)
@@ -197,11 +191,11 @@ export const createPool = onCall(
 function getProviderUrl(chainId: number): string {
   const envKey = chainId === 80002 ? 'POLYGON_AMOY_RPC_URL' : 'POLYGON_MAINNET_RPC_URL'
   const url = process.env[envKey]
-  
+
   if (!url) {
     throw new AppError(`RPC URL not configured for chain ID ${chainId}`, 'PROVIDER_NOT_CONFIGURED')
   }
-  
+
   return url
 }
 
@@ -210,11 +204,11 @@ function getProviderUrl(chainId: number): string {
  */
 function getPrivateKey(): string {
   const privateKey = process.env.PRIVATE_KEY
-  
+
   if (!privateKey) {
     throw new AppError('Private key not configured', 'PRIVATE_KEY_NOT_CONFIGURED')
   }
-  
+
   return privateKey
 }
 
@@ -224,10 +218,10 @@ function getPrivateKey(): string {
 function getPoolFactoryAddress(chainId: number): string {
   const envKey = chainId === 80002 ? 'POOL_FACTORY_ADDRESS_AMOY' : 'POOL_FACTORY_ADDRESS_POLYGON'
   const address = process.env[envKey]
-  
+
   if (!address) {
     throw new AppError(`PoolFactory address not configured for chain ID ${chainId}`, 'CONTRACT_ADDRESS_NOT_CONFIGURED')
   }
-  
+
   return address
 }

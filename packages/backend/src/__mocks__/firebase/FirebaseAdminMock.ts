@@ -1,26 +1,22 @@
 /**
  * Comprehensive Firebase Admin SDK Mock System
- * 
+ *
  * This mock provides complete Firebase Admin SDK simulation for testing
  * Cloud Functions, Firestore operations, and Authentication workflows.
  */
 
 import { jest } from '@jest/globals'
-import type { 
-  App,
-  ServiceAccount,
-  AppOptions
-} from 'firebase-admin/app'
+import type { App, ServiceAccount, AppOptions } from 'firebase-admin/app'
 import type { Auth, DecodedIdToken, UserRecord } from 'firebase-admin/auth'
-import type { 
-  Firestore, 
-  DocumentSnapshot, 
+import type {
+  Firestore,
+  DocumentSnapshot,
   QuerySnapshot,
   DocumentReference,
   CollectionReference,
   WriteBatch,
   Transaction,
-  FieldValue
+  FieldValue,
 } from 'firebase-admin/firestore'
 
 export interface MockFirestoreDocument {
@@ -48,30 +44,30 @@ export interface MockFirestoreCollection {
 
 export class FirebaseAdminMock {
   private static instance: FirebaseAdminMock
-  
+
   // Mock instances
   public app: jest.Mocked<App>
   public auth: jest.Mocked<Auth>
   public firestore: jest.Mocked<Firestore>
-  
+
   // Internal state for realistic mocking
   private mockDocuments = new Map<string, any>()
   private mockCollections = new Map<string, any[]>()
   private mockUsers = new Map<string, UserRecord>()
-  
+
   private constructor() {
     this.initializeAppMock()
     this.initializeAuthMock()
     this.initializeFirestoreMock()
   }
-  
+
   static getInstance(): FirebaseAdminMock {
     if (!FirebaseAdminMock.instance) {
       FirebaseAdminMock.instance = new FirebaseAdminMock()
     }
     return FirebaseAdminMock.instance
   }
-  
+
   private initializeAppMock(): void {
     this.app = {
       name: '[DEFAULT]',
@@ -82,7 +78,7 @@ export class FirebaseAdminMock {
       delete: jest.fn().mockResolvedValue(undefined),
     } as jest.Mocked<App>
   }
-  
+
   private initializeAuthMock(): void {
     this.auth = {
       // User management
@@ -95,9 +91,9 @@ export class FirebaseAdminMock {
         }
         return Promise.resolve(user)
       }),
-      
+
       getUserByEmail: jest.fn().mockImplementation((email: string) => {
-        const user = Array.from(this.mockUsers.values()).find(u => u.email === email)
+        const user = Array.from(this.mockUsers.values()).find((u) => u.email === email)
         if (!user) {
           const error = new Error(`There is no user record corresponding to the provided email: ${email}`)
           ;(error as any).code = 'auth/user-not-found'
@@ -105,7 +101,7 @@ export class FirebaseAdminMock {
         }
         return Promise.resolve(user)
       }),
-      
+
       createUser: jest.fn().mockImplementation((properties: any) => {
         const uid = properties.uid || `test-user-${Date.now()}`
         const user: UserRecord = {
@@ -125,11 +121,11 @@ export class FirebaseAdminMock {
           providerData: [],
           toJSON: () => ({ uid, email: properties.email }),
         } as UserRecord
-        
+
         this.mockUsers.set(uid, user)
         return Promise.resolve(user)
       }),
-      
+
       updateUser: jest.fn().mockImplementation((uid: string, properties: any) => {
         const existingUser = this.mockUsers.get(uid)
         if (!existingUser) {
@@ -137,12 +133,12 @@ export class FirebaseAdminMock {
           ;(error as any).code = 'auth/user-not-found'
           throw error
         }
-        
+
         const updatedUser = { ...existingUser, ...properties }
         this.mockUsers.set(uid, updatedUser)
         return Promise.resolve(updatedUser)
       }),
-      
+
       deleteUser: jest.fn().mockImplementation((uid: string) => {
         const deleted = this.mockUsers.delete(uid)
         if (!deleted) {
@@ -152,7 +148,7 @@ export class FirebaseAdminMock {
         }
         return Promise.resolve()
       }),
-      
+
       // Token verification
       verifyIdToken: jest.fn().mockImplementation((idToken: string, checkRevoked?: boolean) => {
         // Simulate token validation
@@ -161,13 +157,13 @@ export class FirebaseAdminMock {
           ;(error as any).code = 'auth/id-token-expired'
           throw error
         }
-        
+
         if (idToken === 'expired-token') {
           const error = new Error('Firebase ID token has expired')
           ;(error as any).code = 'auth/id-token-expired'
           throw error
         }
-        
+
         const decodedToken: DecodedIdToken = {
           uid: 'test-user-id',
           email: 'test@example.com',
@@ -187,28 +183,28 @@ export class FirebaseAdminMock {
             sign_in_provider: 'wallet',
           },
         }
-        
+
         return Promise.resolve(decodedToken)
       }),
-      
+
       createCustomToken: jest.fn().mockImplementation((uid: string, developerClaims?: any) => {
         const token = `mock-custom-token-${uid}-${Date.now()}`
         return Promise.resolve(token)
       }),
-      
+
       // User listing
       listUsers: jest.fn().mockImplementation((maxResults?: number, pageToken?: string) => {
         const users = Array.from(this.mockUsers.values())
         const startIndex = pageToken ? parseInt(pageToken) : 0
         const endIndex = maxResults ? Math.min(startIndex + maxResults, users.length) : users.length
         const pageUsers = users.slice(startIndex, endIndex)
-        
+
         return Promise.resolve({
           users: pageUsers,
           pageToken: endIndex < users.length ? endIndex.toString() : undefined,
         })
       }),
-      
+
       // Custom claims
       setCustomUserClaims: jest.fn().mockImplementation((uid: string, customUserClaims: any) => {
         const user = this.mockUsers.get(uid)
@@ -220,7 +216,7 @@ export class FirebaseAdminMock {
       }),
     } as unknown as jest.Mocked<Auth>
   }
-  
+
   private initializeFirestoreMock(): void {
     // Create mock document factory
     const createMockDocument = (id: string, data?: any): MockFirestoreDocument => ({
@@ -252,7 +248,7 @@ export class FirebaseAdminMock {
         return Promise.resolve()
       }),
     })
-    
+
     // Create mock collection factory
     const createMockCollection = (collectionId: string): MockFirestoreCollection => ({
       id: collectionId,
@@ -277,7 +273,7 @@ export class FirebaseAdminMock {
             const id = path.split('/').pop()!
             return createMockDocument(id, data)
           })
-        
+
         return Promise.resolve({
           empty: docs.length === 0,
           size: docs.length,
@@ -290,19 +286,19 @@ export class FirebaseAdminMock {
       limit: jest.fn().mockReturnThis(),
       offset: jest.fn().mockReturnThis(),
     })
-    
+
     this.firestore = {
       // Collection operations
       collection: jest.fn().mockImplementation((collectionPath: string) => {
         return createMockCollection(collectionPath)
       }),
-      
+
       doc: jest.fn().mockImplementation((documentPath: string) => {
         const data = this.mockDocuments.get(documentPath)
         const id = documentPath.split('/').pop()!
         return createMockDocument(id, data)
       }),
-      
+
       // Batch operations
       batch: jest.fn().mockImplementation(() => ({
         set: jest.fn(),
@@ -310,7 +306,7 @@ export class FirebaseAdminMock {
         delete: jest.fn(),
         commit: jest.fn().mockResolvedValue([]),
       })),
-      
+
       // Transaction operations
       runTransaction: jest.fn().mockImplementation(async (callback: any) => {
         const mockTransaction = {
@@ -325,14 +321,14 @@ export class FirebaseAdminMock {
           update: jest.fn(),
           delete: jest.fn(),
         }
-        
+
         return await callback(mockTransaction)
       }),
-      
+
       // Utility methods
       getAll: jest.fn().mockResolvedValue([]),
       listCollections: jest.fn().mockResolvedValue([]),
-      
+
       // Field values
       FieldValue: {
         serverTimestamp: jest.fn().mockReturnValue('MOCK_SERVER_TIMESTAMP'),
@@ -341,7 +337,7 @@ export class FirebaseAdminMock {
         arrayUnion: jest.fn((values) => `MOCK_ARRAY_UNION_${JSON.stringify(values)}`),
         arrayRemove: jest.fn((values) => `MOCK_ARRAY_REMOVE_${JSON.stringify(values)}`),
       } as any,
-      
+
       // Timestamps
       Timestamp: {
         now: jest.fn().mockReturnValue({
@@ -357,21 +353,21 @@ export class FirebaseAdminMock {
       } as any,
     } as unknown as jest.Mocked<Firestore>
   }
-  
+
   // Test utilities
   resetAllMocks(): void {
     jest.clearAllMocks()
-    
+
     // Clear internal state
     this.mockDocuments.clear()
     this.mockCollections.clear()
     this.mockUsers.clear()
-    
+
     // Reinitialize with fresh mocks
     this.initializeAuthMock()
     this.initializeFirestoreMock()
   }
-  
+
   // Data seeding for tests
   seedUser(user: Partial<UserRecord> & { uid: string }): void {
     const fullUser: UserRecord = {
@@ -391,39 +387,39 @@ export class FirebaseAdminMock {
       providerData: [],
       toJSON: () => ({ uid: user.uid, email: user.email }),
     } as UserRecord
-    
+
     this.mockUsers.set(user.uid, fullUser)
   }
-  
+
   seedDocument(path: string, data: any): void {
     this.mockDocuments.set(path, data)
   }
-  
+
   getDocument(path: string): any {
     return this.mockDocuments.get(path)
   }
-  
+
   getAllDocuments(): Map<string, any> {
     return new Map(this.mockDocuments)
   }
-  
+
   // Error simulation
   simulateFirestoreError(errorCode: string = 'unavailable', message?: string): void {
     const error = new Error(message || `Simulated Firestore error: ${errorCode}`)
     ;(error as any).code = errorCode
-    
+
     // Override collection method to throw error
     this.firestore.collection = jest.fn().mockRejectedValue(error)
     this.firestore.doc = jest.fn().mockRejectedValue(error)
   }
-  
+
   simulateAuthError(errorCode: string = 'invalid-argument', message?: string): void {
     const error = new Error(message || `Simulated Auth error: ${errorCode}`)
     ;(error as any).code = errorCode
-    
+
     this.auth.verifyIdToken = jest.fn().mockRejectedValue(error)
   }
-  
+
   // Restore normal operation after error simulation
   restoreNormalOperation(): void {
     this.initializeFirestoreMock()

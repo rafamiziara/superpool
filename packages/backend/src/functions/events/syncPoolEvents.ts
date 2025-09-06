@@ -32,7 +32,7 @@ export interface EventSyncState {
 
 /**
  * Scheduled Cloud Function to sync PoolCreated events from blockchain to Firestore
- * 
+ *
  * Runs every 2 minutes to scan for new PoolCreated events and sync them to Firestore.
  * Uses efficient block-range queries to avoid missing events and provides reliable
  * synchronization without WebSocket connection issues.
@@ -44,55 +44,48 @@ export const syncPoolEvents = onSchedule(
     timeZone: 'UTC',
     memory: '1GiB',
     timeoutSeconds: 540, // 9 minutes
-    region: 'us-central1'
+    region: 'us-central1',
   },
   async (event) => {
     const functionName = 'syncPoolEvents'
     const startTime = Date.now()
-    
+
     logger.info(`${functionName}: Starting scheduled pool events sync`, {
       scheduledTime: event.scheduleTime,
-      jobName: event.jobName
+      jobName: event.jobName,
     })
 
     try {
       // Get environment variables
       const chainId = parseInt(process.env.CHAIN_ID || '80002') // Default to Polygon Amoy
-      const rpcUrl = chainId === 80002 
-        ? process.env.POLYGON_AMOY_RPC_URL 
-        : process.env.POLYGON_MAINNET_RPC_URL
-      const poolFactoryAddress = chainId === 80002
-        ? process.env.POOL_FACTORY_ADDRESS_AMOY
-        : process.env.POOL_FACTORY_ADDRESS_POLYGON
+      const rpcUrl = chainId === 80002 ? process.env.POLYGON_AMOY_RPC_URL : process.env.POLYGON_MAINNET_RPC_URL
+      const poolFactoryAddress = chainId === 80002 ? process.env.POOL_FACTORY_ADDRESS_AMOY : process.env.POOL_FACTORY_ADDRESS_POLYGON
 
       if (!rpcUrl || !poolFactoryAddress) {
-        throw new AppError(
-          'Missing required environment variables',
-          'CONFIGURATION_ERROR'
-        )
+        throw new AppError('Missing required environment variables', 'CONFIGURATION_ERROR')
       }
 
       // Initialize blockchain connection
       const provider = new ethers.JsonRpcProvider(rpcUrl)
       const poolFactory = new ethers.Contract(poolFactoryAddress, PoolFactoryABI, provider)
-      
+
       // Get current block number
       const currentBlock = await provider.getBlockNumber()
-      
+
       logger.info(`${functionName}: Connected to blockchain`, {
         chainId,
         currentBlock,
-        poolFactoryAddress
+        poolFactoryAddress,
       })
 
       // Get last processed block from Firestore
       const db = getFirestore()
       const syncStateRef = db.collection('event_sync_state').doc(`poolFactory_${chainId}`)
       const syncStateDoc = await syncStateRef.get()
-      
+
       let lastProcessedBlock: number
       let syncState: EventSyncState
-      
+
       if (!syncStateDoc.exists) {
         // First time running - start from recent blocks (last 1000 blocks or 24 hours)
         const startBlock = Math.max(currentBlock - 1000, 0)
@@ -101,15 +94,15 @@ export const syncPoolEvents = onSchedule(
           chainId,
           lastProcessedBlock: startBlock,
           lastSyncAt: new Date(),
-          totalEventsProcessed: 0
+          totalEventsProcessed: 0,
         }
         lastProcessedBlock = startBlock
-        
+
         logger.info(`${functionName}: First sync - starting from block ${startBlock}`)
       } else {
         syncState = syncStateDoc.data() as EventSyncState
         lastProcessedBlock = syncState.lastProcessedBlock
-        
+
         logger.info(`${functionName}: Continuing sync from block ${lastProcessedBlock}`)
       }
 
@@ -121,33 +114,36 @@ export const syncPoolEvents = onSchedule(
         logger.info(`${functionName}: No new blocks to process`, {
           fromBlock,
           toBlock,
-          lastProcessedBlock
+          lastProcessedBlock,
         })
-        
+
         // Update last sync timestamp
-        await syncStateRef.set({
-          ...syncState,
-          lastSyncAt: new Date()
-        }, { merge: true })
-        
+        await syncStateRef.set(
+          {
+            ...syncState,
+            lastSyncAt: new Date(),
+          },
+          { merge: true }
+        )
+
         return
       }
 
       // Query for PoolCreated events in block range
       const eventFilter = poolFactory.filters.PoolCreated()
-      
+
       logger.info(`${functionName}: Querying events`, {
         fromBlock,
         toBlock,
-        blockRange: toBlock - fromBlock + 1
+        blockRange: toBlock - fromBlock + 1,
       })
 
       const events = await poolFactory.queryFilter(eventFilter, fromBlock, toBlock)
-      
+
       logger.info(`${functionName}: Found ${events.length} PoolCreated events`, {
         fromBlock,
         toBlock,
-        eventsFound: events.length
+        eventsFound: events.length,
       })
 
       let processedEvents = 0
@@ -181,7 +177,7 @@ export const syncPoolEvents = onSchedule(
             transactionHash: event.transactionHash,
             blockNumber: event.blockNumber,
             logIndex: event.index,
-            timestamp: block.timestamp
+            timestamp: block.timestamp,
           }
 
           // Create unique event ID for deduplication
@@ -206,8 +202,8 @@ export const syncPoolEvents = onSchedule(
             metadata: {
               eventId,
               logIndex: poolEvent.logIndex,
-              syncedAt: new Date()
-            }
+              syncedAt: new Date(),
+            },
           })
 
           // Add event log for audit trail
@@ -217,7 +213,7 @@ export const syncPoolEvents = onSchedule(
             contractAddress: poolFactoryAddress,
             chainId,
             ...poolEvent,
-            processedAt: new Date()
+            processedAt: new Date(),
           })
 
           processedEvents++
@@ -228,17 +224,16 @@ export const syncPoolEvents = onSchedule(
             poolOwner: poolEvent.poolOwner,
             name: poolEvent.name,
             blockNumber: event.blockNumber,
-            transactionHash: event.transactionHash
+            transactionHash: event.transactionHash,
           })
-
         } catch (error) {
           logger.error(`${functionName}: Error processing event`, {
             error: error instanceof Error ? error.message : String(error),
             eventBlockNumber: event.blockNumber,
             eventTxHash: event.transactionHash,
-            eventIndex: event.index
+            eventIndex: event.index,
           })
-          
+
           // Continue processing other events
           continue
         }
@@ -250,7 +245,7 @@ export const syncPoolEvents = onSchedule(
         lastProcessedBlock: toBlock,
         lastSyncAt: new Date(),
         totalEventsProcessed: syncState.totalEventsProcessed + processedEvents,
-        lastEventTimestamp: events.length > 0 ? new Date(events[events.length - 1].blockNumber * 1000) : syncState.lastEventTimestamp
+        lastEventTimestamp: events.length > 0 ? new Date(events[events.length - 1].blockNumber * 1000) : syncState.lastEventTimestamp,
       }
 
       // Add sync state update to batch
@@ -269,23 +264,21 @@ export const syncPoolEvents = onSchedule(
         eventsProcessed: processedEvents,
         totalEventsProcessed: updatedSyncState.totalEventsProcessed,
         duration: `${duration}ms`,
-        chainId
+        chainId,
       })
-
     } catch (error) {
       const duration = Date.now() - startTime
-      
+
       logger.error(`${functionName}: Failed to sync pool events`, {
         error: error instanceof Error ? error.message : String(error),
         duration: `${duration}ms`,
-        stack: error instanceof Error ? error.stack : undefined
+        stack: error instanceof Error ? error.stack : undefined,
       })
 
       // Re-throw to trigger retry mechanism
-      throw error instanceof AppError ? error : new AppError(
-        `Failed to sync pool events: ${error instanceof Error ? error.message : String(error)}`,
-        'SYNC_FAILED'
-      )
+      throw error instanceof AppError
+        ? error
+        : new AppError(`Failed to sync pool events: ${error instanceof Error ? error.message : String(error)}`, 'SYNC_FAILED')
     }
   }
 )

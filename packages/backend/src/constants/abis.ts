@@ -40,7 +40,7 @@ export const PoolFactoryABI = [
   'function pendingOwner() external view returns (address)',
   'function transferOwnership(address newOwner) external',
   'function acceptOwnership() external',
-  'function renounceOwnership() external'
+  'function renounceOwnership() external',
 ] as const
 
 export const SampleLendingPoolABI = [
@@ -61,7 +61,7 @@ export const SampleLendingPoolABI = [
   'function totalDeposits() external view returns (uint256)',
   'function availableFunds() external view returns (uint256)',
   'function loanCount() external view returns (uint256)',
-  
+
   // State-changing functions
   'function initialize(address _owner, uint256 _maxLoanAmount, uint256 _interestRate, uint256 _loanDuration) external',
   'function deposit() external payable',
@@ -69,5 +69,5 @@ export const SampleLendingPoolABI = [
   'function requestLoan(uint256 amount, uint256 duration) external',
   'function approveLoan(uint256 loanId) external',
   'function disburseLoan(uint256 loanId) external',
-  'function repayLoan(uint256 loanId) external payable'
+  'function repayLoan(uint256 loanId) external payable',
 ] as const

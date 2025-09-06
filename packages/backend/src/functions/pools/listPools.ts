@@ -38,7 +38,7 @@ export interface ListPoolsResponse {
 
 /**
  * Cloud Function to list pools with pagination and filtering
- * 
+ *
  * @param request - The callable request with filtering options
  * @returns Paginated list of pools
  */
@@ -52,7 +52,7 @@ export const listPools = onCall(
   async (request: CallableRequest<ListPoolsRequest>): Promise<ListPoolsResponse> => {
     const functionName = 'listPools'
     logger.info(`${functionName}: Listing pools`, {
-      params: request.data
+      params: request.data,
     })
 
     try {
@@ -65,8 +65,7 @@ export const listPools = onCall(
 
       // 2. Build Firestore query
       const db = getFirestore()
-      let query = db.collection('pools')
-        .where('chainId', '==', chainId)
+      let query = db.collection('pools').where('chainId', '==', chainId)
 
       // Add owner filter if specified
       if (ownerAddress) {
@@ -84,14 +83,10 @@ export const listPools = onCall(
 
       // 4. Apply pagination
       const offset = (page - 1) * limit
-      const poolsSnapshot = await query
-        .orderBy('createdAt', 'desc')
-        .offset(offset)
-        .limit(limit)
-        .get()
+      const poolsSnapshot = await query.orderBy('createdAt', 'desc').offset(offset).limit(limit).get()
 
       // 5. Transform results
-      const pools: PoolInfo[] = poolsSnapshot.docs.map(doc => {
+      const pools: PoolInfo[] = poolsSnapshot.docs.map((doc) => {
         const data = doc.data()
         return {
           poolId: data.poolId,
@@ -106,7 +101,7 @@ export const listPools = onCall(
           createdBy: data.createdBy,
           createdAt: data.createdAt?.toDate() || new Date(),
           transactionHash: data.transactionHash,
-          isActive: data.isActive
+          isActive: data.isActive,
         }
       })
 
@@ -117,7 +112,7 @@ export const listPools = onCall(
       logger.info(`${functionName}: Retrieved ${pools.length} pools`, {
         totalCount,
         page,
-        limit
+        limit,
       })
 
       return {
@@ -126,13 +121,12 @@ export const listPools = onCall(
         page,
         limit,
         hasNextPage,
-        hasPreviousPage
+        hasPreviousPage,
       }
-
     } catch (error) {
       logger.error(`${functionName}: Error listing pools`, {
         error: error instanceof Error ? error.message : String(error),
-        params: request.data
+        params: request.data,
       })
 
       return handleError(error, functionName)
