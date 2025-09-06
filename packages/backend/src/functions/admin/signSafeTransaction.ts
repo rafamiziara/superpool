@@ -24,7 +24,7 @@ export interface SignSafeTransactionResponse {
 
 /**
  * Cloud Function to sign a Safe multi-sig transaction
- * 
+ *
  * @param request - The callable request with transaction hash and optional signature
  * @returns Updated signature status
  */
@@ -39,7 +39,7 @@ export const signSafeTransaction = onCall(
     const functionName = 'signSafeTransaction'
     logger.info(`${functionName}: Processing signature request`, {
       uid: request.auth?.uid,
-      transactionHash: request.data.transactionHash
+      transactionHash: request.data.transactionHash,
     })
 
     try {
@@ -65,7 +65,7 @@ export const signSafeTransaction = onCall(
       }
 
       const txData = txDoc.data()!
-      
+
       // 4. Check if transaction is still pending signatures
       if (txData.status !== 'pending_signatures') {
         throw new HttpsError('failed-precondition', `Transaction status is ${txData.status}, cannot add signatures`)
@@ -75,7 +75,7 @@ export const signSafeTransaction = onCall(
       if (txData.expiresAt && txData.expiresAt.toDate() < new Date()) {
         await db.collection('safe_transactions').doc(transactionHash).update({
           status: 'expired',
-          updatedAt: new Date()
+          updatedAt: new Date(),
         })
         throw new HttpsError('deadline-exceeded', 'Transaction has expired')
       }
@@ -89,24 +89,22 @@ export const signSafeTransaction = onCall(
       // 7. Initialize blockchain connection and verify Safe ownership
       const provider = new ethers.JsonRpcProvider(getProviderUrl(chainId))
       const isOwner = await isSafeOwner(txData.safeAddress, userAddress, provider)
-      
+
       if (!isOwner) {
         throw new HttpsError('permission-denied', 'User is not a Safe owner')
       }
 
       // 8. Check if user has already signed
       const existingSignatures = txData.signatures || []
-      const existingSignature = existingSignatures.find((sig: SafeSignature) => 
-        sig.signer.toLowerCase() === userAddress.toLowerCase()
-      )
+      const existingSignature = existingSignatures.find((sig: SafeSignature) => sig.signer.toLowerCase() === userAddress.toLowerCase())
 
       if (existingSignature) {
         logger.info(`${functionName}: User has already signed`, {
           uid: request.auth.uid,
           userAddress,
-          transactionHash
+          transactionHash,
         })
-        
+
         return {
           success: true,
           transactionHash,
@@ -115,7 +113,7 @@ export const signSafeTransaction = onCall(
           requiredSignatures: txData.requiredSignatures,
           readyToExecute: existingSignatures.length >= txData.requiredSignatures,
           message: 'Transaction already signed by this address',
-          signatures: existingSignatures
+          signatures: existingSignatures,
         }
       }
 
@@ -125,13 +123,10 @@ export const signSafeTransaction = onCall(
       if (request.data.signature) {
         // Signature provided - verify it
         signature = request.data.signature
-        
+
         // Verify signature
-        const recoveredAddress = ethers.verifyMessage(
-          ethers.getBytes(transactionHash),
-          signature
-        )
-        
+        const recoveredAddress = ethers.verifyMessage(ethers.getBytes(transactionHash), signature)
+
         if (recoveredAddress.toLowerCase() !== userAddress.toLowerCase()) {
           throw new HttpsError('invalid-argument', 'Invalid signature')
         }
@@ -142,7 +137,7 @@ export const signSafeTransaction = onCall(
       // 10. Add signature
       const newSignature: SafeSignature = {
         signer: userAddress,
-        data: signature
+        data: signature,
       }
 
       const updatedSignatures = [...existingSignatures, newSignature]
@@ -152,7 +147,7 @@ export const signSafeTransaction = onCall(
       const updateData: any = {
         signatures: updatedSignatures,
         currentSignatures: updatedSignatures.length,
-        updatedAt: new Date()
+        updatedAt: new Date(),
       }
 
       if (readyToExecute) {
@@ -167,7 +162,7 @@ export const signSafeTransaction = onCall(
         signer: userAddress,
         currentSignatures: updatedSignatures.length,
         requiredSignatures: txData.requiredSignatures,
-        readyToExecute
+        readyToExecute,
       })
 
       return {
@@ -177,17 +172,16 @@ export const signSafeTransaction = onCall(
         currentSignatures: updatedSignatures.length,
         requiredSignatures: txData.requiredSignatures,
         readyToExecute,
-        message: readyToExecute 
+        message: readyToExecute
           ? 'Transaction has enough signatures and is ready to execute'
           : `Signature added. ${txData.requiredSignatures - updatedSignatures.length} more signature(s) needed.`,
-        signatures: updatedSignatures
+        signatures: updatedSignatures,
       }
-
     } catch (error) {
       logger.error(`${functionName}: Error processing signature`, {
         error: error instanceof Error ? error.message : String(error),
         uid: request.auth?.uid,
-        transactionHash: request.data.transactionHash
+        transactionHash: request.data.transactionHash,
       })
 
       return handleError(error, functionName)
@@ -201,11 +195,11 @@ export const signSafeTransaction = onCall(
 function getProviderUrl(chainId: number): string {
   const envKey = chainId === 80002 ? 'POLYGON_AMOY_RPC_URL' : 'POLYGON_MAINNET_RPC_URL'
   const url = process.env[envKey]
-  
+
   if (!url) {
     throw new AppError(`RPC URL not configured for chain ID ${chainId}`, 'PROVIDER_NOT_CONFIGURED')
   }
-  
+
   return url
 }
 
@@ -216,17 +210,17 @@ async function getUserWalletAddress(uid: string): Promise<string | null> {
   try {
     const db = getFirestore()
     const userDoc = await db.collection('users').doc(uid).get()
-    
+
     if (userDoc.exists) {
       const userData = userDoc.data()
       return userData?.walletAddress || null
     }
-    
+
     return null
   } catch (error) {
     logger.error('Error getting user wallet address', {
       uid,
-      error: error instanceof Error ? error.message : String(error)
+      error: error instanceof Error ? error.message : String(error),
     })
     return null
   }

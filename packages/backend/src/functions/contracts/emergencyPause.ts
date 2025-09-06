@@ -22,7 +22,7 @@ export interface EmergencyPauseResponse {
 
 /**
  * Cloud Function to create an emergency pause transaction for a contract
- * 
+ *
  * @param request - The callable request with contract address and pause reason
  * @returns Emergency pause transaction details
  */
@@ -38,7 +38,7 @@ export const emergencyPause = onCall(
     logger.warn(`${functionName}: Emergency pause requested`, {
       uid: request.auth?.uid,
       contractAddress: request.data.contractAddress,
-      reason: request.data.reason
+      reason: request.data.reason,
     })
 
     try {
@@ -68,11 +68,7 @@ export const emergencyPause = onCall(
       const contractService = createContractService(chainId)
 
       // 4. Create emergency pause transaction
-      const transactionStatus = await contractService.emergencyPause(
-        request.data.contractAddress,
-        request.auth.uid,
-        request.data.reason
-      )
+      const transactionStatus = await contractService.emergencyPause(request.data.contractAddress, request.auth.uid, request.data.reason)
 
       // 5. Log emergency action for audit trail
       logger.warn(`${functionName}: Emergency pause transaction created`, {
@@ -81,7 +77,7 @@ export const emergencyPause = onCall(
         reason: request.data.reason,
         createdBy: request.auth.uid,
         requiredSignatures: transactionStatus.requiredSignatures,
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
       })
 
       // 6. In a real implementation, you might want to:
@@ -98,17 +94,17 @@ export const emergencyPause = onCall(
         safeAddress: contractService['config'].safeAddress,
         contractAddress: request.data.contractAddress,
         reason: request.data.reason,
-        message: `Emergency pause transaction created for contract ${request.data.contractAddress}. ` +
-                 `Requires ${transactionStatus.requiredSignatures} signature(s) to execute. ` +
-                 `Transaction ID: ${transactionStatus.id}`
+        message:
+          `Emergency pause transaction created for contract ${request.data.contractAddress}. ` +
+          `Requires ${transactionStatus.requiredSignatures} signature(s) to execute. ` +
+          `Transaction ID: ${transactionStatus.id}`,
       }
-
     } catch (error) {
       logger.error(`${functionName}: Error creating emergency pause transaction`, {
         error: error instanceof Error ? error.message : String(error),
         uid: request.auth?.uid,
         contractAddress: request.data.contractAddress,
-        reason: request.data.reason
+        reason: request.data.reason,
       })
 
       return handleError(error, functionName)

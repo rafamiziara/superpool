@@ -19,8 +19,8 @@ export interface ProcessPoolEventsResponse {
   errorCount: number
   details: {
     processed: string[] // pool IDs
-    skipped: string[]   // pool IDs with reasons
-    errors: string[]    // pool IDs with error messages
+    skipped: string[] // pool IDs with reasons
+    errors: string[] // pool IDs with error messages
   }
   message: string
 }
@@ -40,7 +40,7 @@ export interface PoolDocument {
   blockNumber: number
   chainId: number
   isActive: boolean
-  
+
   // Pool statistics (updated by other functions)
   stats?: {
     totalLent: string
@@ -51,7 +51,7 @@ export interface PoolDocument {
     apr: number
     utilization: number
   }
-  
+
   // Metadata
   metadata: {
     eventId: string
@@ -60,7 +60,7 @@ export interface PoolDocument {
     lastUpdated?: Date
     version: number
   }
-  
+
   // Search and filtering
   tags?: string[]
   category?: string
@@ -70,7 +70,7 @@ export interface PoolDocument {
 
 /**
  * Cloud Function to process and validate PoolCreated events
- * 
+ *
  * This function can be called to:
  * 1. Process events in batches for better performance
  * 2. Validate event data before storing in Firestore
@@ -90,7 +90,7 @@ export const processPoolEvents = onCall(
       uid: request.auth?.uid,
       eventsCount: request.data.events.length,
       chainId: request.data.chainId,
-      skipValidation: request.data.skipValidation
+      skipValidation: request.data.skipValidation,
     })
 
     try {
@@ -106,24 +106,24 @@ export const processPoolEvents = onCall(
           skippedCount: 0,
           errorCount: 0,
           details: { processed: [], skipped: [], errors: [] },
-          message: 'No events to process'
+          message: 'No events to process',
         }
       }
 
       const chainId = request.data.chainId || 80002
       const skipValidation = request.data.skipValidation || false
-      
+
       const db = getFirestore()
       const batch = db.batch()
-      
+
       let processedCount = 0
       let skippedCount = 0
       let errorCount = 0
-      
+
       const details = {
         processed: [] as string[],
         skipped: [] as string[],
-        errors: [] as string[]
+        errors: [] as string[],
       }
 
       // Process each event
@@ -131,18 +131,18 @@ export const processPoolEvents = onCall(
         try {
           // Create unique event ID for deduplication
           const eventId = `${event.transactionHash}_${event.logIndex}`
-          
+
           // Check if event already processed
           const existingEventRef = db.collection('event_logs').doc(eventId)
           const existingEvent = await existingEventRef.get()
-          
+
           if (existingEvent.exists) {
             logger.info(`${functionName}: Event already processed, skipping`, {
               eventId,
               poolId: event.poolId,
-              transactionHash: event.transactionHash
+              transactionHash: event.transactionHash,
             })
-            
+
             skippedCount++
             details.skipped.push(`${event.poolId}: Already processed`)
             continue
@@ -155,9 +155,9 @@ export const processPoolEvents = onCall(
               logger.warn(`${functionName}: Event validation failed`, {
                 eventId,
                 poolId: event.poolId,
-                errors: validationErrors
+                errors: validationErrors,
               })
-              
+
               errorCount++
               details.errors.push(`${event.poolId}: ${validationErrors.join(', ')}`)
               continue
@@ -167,7 +167,7 @@ export const processPoolEvents = onCall(
           // Check if pool already exists
           const poolRef = db.collection('pools').doc(event.poolId)
           const existingPool = await poolRef.get()
-          
+
           if (existingPool.exists) {
             // Update existing pool if this event is newer
             const existingData = existingPool.data() as PoolDocument
@@ -175,9 +175,9 @@ export const processPoolEvents = onCall(
               logger.info(`${functionName}: Pool exists with newer or same block, skipping`, {
                 poolId: event.poolId,
                 existingBlock: existingData.blockNumber,
-                eventBlock: event.blockNumber
+                eventBlock: event.blockNumber,
               })
-              
+
               skippedCount++
               details.skipped.push(`${event.poolId}: Existing pool is newer`)
               continue
@@ -199,7 +199,7 @@ export const processPoolEvents = onCall(
             blockNumber: event.blockNumber,
             chainId,
             isActive: true,
-            
+
             // Initialize stats
             stats: {
               totalLent: '0',
@@ -208,21 +208,21 @@ export const processPoolEvents = onCall(
               completedLoans: 0,
               defaultedLoans: 0,
               apr: event.interestRate / 100, // Convert basis points to percentage
-              utilization: 0
+              utilization: 0,
             },
-            
+
             // Metadata
             metadata: {
               eventId,
               logIndex: event.logIndex,
               syncedAt: new Date(),
-              version: 1
+              version: 1,
             },
-            
+
             // Default values
             tags: ['lending', 'defi'],
             isVerified: false,
-            isFeatured: false
+            isFeatured: false,
           }
 
           // Add pool to batch
@@ -236,17 +236,21 @@ export const processPoolEvents = onCall(
             chainId,
             ...event,
             processedAt: new Date(),
-            processedBy: request.auth?.uid || 'system'
+            processedBy: request.auth?.uid || 'system',
           })
 
           // Add to pool owner index
           const ownerIndexRef = db.collection('pool_owners').doc(event.poolOwner)
-          batch.set(ownerIndexRef, {
-            address: event.poolOwner,
-            poolIds: FieldValue.arrayUnion(event.poolId),
-            lastPoolCreated: new Date(event.timestamp * 1000),
-            totalPools: FieldValue.increment(1)
-          }, { merge: true })
+          batch.set(
+            ownerIndexRef,
+            {
+              address: event.poolOwner,
+              poolIds: FieldValue.arrayUnion(event.poolId),
+              lastPoolCreated: new Date(event.timestamp * 1000),
+              totalPools: FieldValue.increment(1),
+            },
+            { merge: true }
+          )
 
           // Add to search index (for future search functionality)
           const searchRef = db.collection('pool_search').doc(event.poolId)
@@ -258,7 +262,7 @@ export const processPoolEvents = onCall(
             interestRate: event.interestRate,
             maxLoanAmount: parseFloat(ethers.formatEther(event.maxLoanAmount)),
             createdAt: new Date(event.timestamp * 1000),
-            chainId
+            chainId,
           })
 
           processedCount++
@@ -269,16 +273,15 @@ export const processPoolEvents = onCall(
             poolAddress: event.poolAddress,
             poolOwner: event.poolOwner,
             name: event.name,
-            eventId
+            eventId,
           })
-
         } catch (error) {
           logger.error(`${functionName}: Error processing individual event`, {
             error: error instanceof Error ? error.message : String(error),
             poolId: event.poolId,
-            transactionHash: event.transactionHash
+            transactionHash: event.transactionHash,
           })
-          
+
           errorCount++
           details.errors.push(`${event.poolId}: ${error instanceof Error ? error.message : String(error)}`)
         }
@@ -287,11 +290,11 @@ export const processPoolEvents = onCall(
       // Commit all changes
       if (processedCount > 0) {
         await batch.commit()
-        
+
         logger.info(`${functionName}: Batch committed successfully`, {
           processedCount,
           skippedCount,
-          errorCount
+          errorCount,
         })
       }
 
@@ -301,27 +304,23 @@ export const processPoolEvents = onCall(
         skippedCount,
         errorCount,
         details,
-        message: `Processed ${processedCount} events, skipped ${skippedCount}, errors ${errorCount}`
+        message: `Processed ${processedCount} events, skipped ${skippedCount}, errors ${errorCount}`,
       }
 
       logger.info(`${functionName}: Event processing completed`, response)
       return response
-
     } catch (error) {
       logger.error(`${functionName}: Failed to process events`, {
         error: error instanceof Error ? error.message : String(error),
         eventsCount: request.data.events.length,
-        stack: error instanceof Error ? error.stack : undefined
+        stack: error instanceof Error ? error.stack : undefined,
       })
 
       if (error instanceof HttpsError) {
         throw error
       }
 
-      throw new HttpsError(
-        'internal',
-        `Failed to process pool events: ${error instanceof Error ? error.message : String(error)}`
-      )
+      throw new HttpsError('internal', `Failed to process pool events: ${error instanceof Error ? error.message : String(error)}`)
     }
   }
 )
@@ -359,7 +358,8 @@ function validatePoolEvent(event: PoolCreatedEvent): string[] {
     if (amount <= 0) {
       errors.push('Max loan amount must be greater than 0')
     }
-    if (amount > BigInt('1000000000000000000000000')) { // 1M ETH
+    if (amount > BigInt('1000000000000000000000000')) {
+      // 1M ETH
       errors.push('Max loan amount is too large')
     }
   } catch {

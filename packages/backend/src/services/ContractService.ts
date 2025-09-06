@@ -1,14 +1,14 @@
 import { ethers } from 'ethers'
 import { logger } from 'firebase-functions'
 import { getFirestore } from 'firebase-admin/firestore'
-import { 
+import {
   getSafeAddresses,
   getSafeContract,
   createSafeTransactionHash,
   getSafeNonce,
   SafeTransaction,
   SafeSignature as SafeSignatureType,
-  executeSafeTransaction as executeSafeTransactionUtil
+  executeSafeTransaction as executeSafeTransactionUtil,
 } from '../utils/multisig'
 import { AppError } from '../utils/errorHandling'
 import { estimateGas, executeTransaction, getGasPrice } from '../utils/blockchain'
@@ -93,7 +93,7 @@ export interface TransactionStatus {
 
 /**
  * ContractService - Main service class for Safe wallet contract interactions
- * 
+ *
  * This service provides a high-level interface for:
  * - Creating and managing Safe multi-sig transactions
  * - Executing contract calls through Safe wallet
@@ -118,22 +118,19 @@ export class ContractService {
     logger.info('ContractService initialized', {
       chainId: config.chainId,
       safeAddress: config.safeAddress,
-      poolFactoryAddress: config.poolFactoryAddress
+      poolFactoryAddress: config.poolFactoryAddress,
     })
   }
 
   /**
    * Create a transaction proposal for Safe execution
    */
-  async proposeTransaction(
-    proposal: TransactionProposal,
-    createdBy: string
-  ): Promise<TransactionStatus> {
+  async proposeTransaction(proposal: TransactionProposal, createdBy: string): Promise<TransactionStatus> {
     try {
       logger.info('Creating transaction proposal', {
         to: proposal.to,
         description: proposal.description,
-        createdBy
+        createdBy,
       })
 
       // Get current Safe nonce
@@ -150,20 +147,14 @@ export class ContractService {
         gasPrice: '0',
         gasToken: ethers.ZeroAddress,
         refundReceiver: ethers.ZeroAddress,
-        nonce
+        nonce,
       }
 
       // Create transaction hash
-      const transactionHash = await createSafeTransactionHash(
-        this.config.safeAddress,
-        safeTransaction,
-        this.provider
-      )
+      const transactionHash = await createSafeTransactionHash(this.config.safeAddress, safeTransaction, this.provider)
 
       // Get Safe configuration
-      const [requiredSignatures] = await Promise.all([
-        this.safeContract.getThreshold()
-      ])
+      const [requiredSignatures] = await Promise.all([this.safeContract.getThreshold()])
 
       // Create transaction status record
       const transactionStatus: TransactionStatus = {
@@ -176,28 +167,31 @@ export class ContractService {
         createdAt: new Date(),
         updatedAt: new Date(),
         description: proposal.description,
-        metadata: proposal.metadata
+        metadata: proposal.metadata,
       }
 
       // Store in Firestore
-      await this.db.collection('contract_transactions').doc(transactionHash).set({
-        ...transactionStatus,
-        createdBy,
-        chainId: this.config.chainId,
-        safeAddress: this.config.safeAddress,
-        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) // 7 days
-      })
+      await this.db
+        .collection('contract_transactions')
+        .doc(transactionHash)
+        .set({
+          ...transactionStatus,
+          createdBy,
+          chainId: this.config.chainId,
+          safeAddress: this.config.safeAddress,
+          expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days
+        })
 
       logger.info('Transaction proposal created', {
         transactionHash,
-        requiredSignatures: transactionStatus.requiredSignatures
+        requiredSignatures: transactionStatus.requiredSignatures,
       })
 
       return transactionStatus
     } catch (error) {
       logger.error('Error creating transaction proposal', {
         error: error instanceof Error ? error.message : String(error),
-        proposal
+        proposal,
       })
       throw new AppError(
         `Failed to create transaction proposal: ${error instanceof Error ? error.message : String(error)}`,
@@ -209,32 +203,29 @@ export class ContractService {
   /**
    * Add signature to a pending transaction
    */
-  async addSignature(
-    transactionId: string,
-    signature: SafeSignatureType
-  ): Promise<TransactionStatus> {
+  async addSignature(transactionId: string, signature: SafeSignatureType): Promise<TransactionStatus> {
     try {
       logger.info('Adding signature to transaction', {
         transactionId,
-        signer: signature.signer
+        signer: signature.signer,
       })
 
       const txDoc = await this.db.collection('contract_transactions').doc(transactionId).get()
-      
+
       if (!txDoc.exists) {
         throw new AppError('Transaction not found', 'TRANSACTION_NOT_FOUND')
       }
 
       const txData = txDoc.data()!
-      
+
       if (txData.status !== 'pending_signatures') {
         throw new AppError(`Cannot add signature, transaction status is ${txData.status}`, 'INVALID_STATUS')
       }
 
       // Check if signer already signed
       const existingSignatures = txData.signatures || []
-      const existingSignature = existingSignatures.find((sig: SafeSignatureType) => 
-        sig.signer.toLowerCase() === signature.signer.toLowerCase()
+      const existingSignature = existingSignatures.find(
+        (sig: SafeSignatureType) => sig.signer.toLowerCase() === signature.signer.toLowerCase()
       )
 
       if (existingSignature) {
@@ -243,10 +234,7 @@ export class ContractService {
 
       // Verify signature
       const transactionHash = transactionId
-      const recoveredAddress = ethers.verifyMessage(
-        ethers.getBytes(transactionHash),
-        signature.data
-      )
+      const recoveredAddress = ethers.verifyMessage(ethers.getBytes(transactionHash), signature.data)
 
       if (recoveredAddress.toLowerCase() !== signature.signer.toLowerCase()) {
         throw new AppError('Invalid signature', 'INVALID_SIGNATURE')
@@ -259,7 +247,7 @@ export class ContractService {
       const updateData: any = {
         signatures: updatedSignatures,
         currentSignatures: updatedSignatures.length,
-        updatedAt: new Date()
+        updatedAt: new Date(),
       }
 
       if (readyToExecute) {
@@ -270,29 +258,26 @@ export class ContractService {
       await this.db.collection('contract_transactions').doc(transactionId).update(updateData)
 
       const updatedTxData = { ...txData, ...updateData }
-      
+
       logger.info('Signature added successfully', {
         transactionId,
         currentSignatures: updatedSignatures.length,
         requiredSignatures: txData.requiredSignatures,
-        readyToExecute
+        readyToExecute,
       })
 
       return this.mapToTransactionStatus(updatedTxData)
     } catch (error) {
       logger.error('Error adding signature', {
         error: error instanceof Error ? error.message : String(error),
-        transactionId
+        transactionId,
       })
-      
+
       if (error instanceof AppError) {
         throw error
       }
-      
-      throw new AppError(
-        `Failed to add signature: ${error instanceof Error ? error.message : String(error)}`,
-        'SIGNATURE_ADDITION_FAILED'
-      )
+
+      throw new AppError(`Failed to add signature: ${error instanceof Error ? error.message : String(error)}`, 'SIGNATURE_ADDITION_FAILED')
     }
   }
 
@@ -304,7 +289,7 @@ export class ContractService {
       logger.info('Executing Safe transaction', { transactionId })
 
       const txDoc = await this.db.collection('contract_transactions').doc(transactionId).get()
-      
+
       if (!txDoc.exists) {
         throw new AppError('Transaction not found', 'TRANSACTION_NOT_FOUND')
       }
@@ -322,7 +307,7 @@ export class ContractService {
       // Update status to executing
       await this.db.collection('contract_transactions').doc(transactionId).update({
         status: 'executing',
-        updatedAt: new Date()
+        updatedAt: new Date(),
       })
 
       // Execute the Safe transaction
@@ -344,7 +329,7 @@ export class ContractService {
         transactionHash: executionTx.hash,
         blockNumber: receipt.blockNumber,
         gasUsed: receipt.gasUsed.toString(),
-        events: this.parseTransactionEvents(receipt)
+        events: this.parseTransactionEvents(receipt),
       }
 
       // Update status
@@ -352,7 +337,7 @@ export class ContractService {
         status: executionResult.success ? 'completed' : 'failed',
         executedAt: new Date(),
         executionResult,
-        updatedAt: new Date()
+        updatedAt: new Date(),
       }
 
       if (!executionResult.success) {
@@ -364,27 +349,30 @@ export class ContractService {
       logger.info('Transaction executed successfully', {
         transactionId,
         executionTxHash: executionTx.hash,
-        success: executionResult.success
+        success: executionResult.success,
       })
 
       return executionResult
     } catch (error) {
       logger.error('Error executing transaction', {
         error: error instanceof Error ? error.message : String(error),
-        transactionId
+        transactionId,
       })
 
       // Update status to failed
       try {
-        await this.db.collection('contract_transactions').doc(transactionId).update({
-          status: 'failed',
-          executionResult: {
-            success: false,
-            transactionHash: '',
-            error: error instanceof Error ? error.message : String(error)
-          },
-          updatedAt: new Date()
-        })
+        await this.db
+          .collection('contract_transactions')
+          .doc(transactionId)
+          .update({
+            status: 'failed',
+            executionResult: {
+              success: false,
+              transactionHash: '',
+              error: error instanceof Error ? error.message : String(error),
+            },
+            updatedAt: new Date(),
+          })
       } catch (updateError) {
         logger.error('Failed to update transaction status', { updateError })
       }
@@ -393,27 +381,19 @@ export class ContractService {
         throw error
       }
 
-      throw new AppError(
-        `Transaction execution failed: ${error instanceof Error ? error.message : String(error)}`,
-        'EXECUTION_FAILED'
-      )
+      throw new AppError(`Transaction execution failed: ${error instanceof Error ? error.message : String(error)}`, 'EXECUTION_FAILED')
     }
   }
 
   /**
    * Create a contract function call proposal
    */
-  async proposeContractCall(
-    call: ContractCall,
-    description: string,
-    createdBy: string,
-    metadata?: any
-  ): Promise<TransactionStatus> {
+  async proposeContractCall(call: ContractCall, description: string, createdBy: string, metadata?: any): Promise<TransactionStatus> {
     try {
       logger.info('Creating contract call proposal', {
         contractAddress: call.contractAddress,
         functionName: call.functionName,
-        description
+        description,
       })
 
       // Encode function call
@@ -430,15 +410,15 @@ export class ContractService {
           ...metadata,
           functionName: call.functionName,
           args: call.args,
-          contractAddress: call.contractAddress
-        }
+          contractAddress: call.contractAddress,
+        },
       }
 
       return await this.proposeTransaction(proposal, createdBy)
     } catch (error) {
       logger.error('Error creating contract call proposal', {
         error: error instanceof Error ? error.message : String(error),
-        call
+        call,
       })
 
       throw new AppError(
@@ -451,22 +431,19 @@ export class ContractService {
   /**
    * Create a batch transaction proposal
    */
-  async proposeBatchTransaction(
-    batch: BatchTransactionRequest,
-    createdBy: string
-  ): Promise<TransactionStatus> {
+  async proposeBatchTransaction(batch: BatchTransactionRequest, createdBy: string): Promise<TransactionStatus> {
     try {
       logger.info('Creating batch transaction proposal', {
         transactionCount: batch.transactions.length,
-        description: batch.description
+        description: batch.description,
       })
 
       // Get MultiSend contract address
       const safeAddresses = getSafeAddresses(this.config.chainId)
-      
+
       // Encode batch transaction data
       const batchData = this.encodeBatchTransaction(batch.transactions)
-      
+
       const proposal: TransactionProposal = {
         to: safeAddresses.multiSend,
         value: '0',
@@ -476,15 +453,15 @@ export class ContractService {
         metadata: {
           ...batch.metadata,
           batchSize: batch.transactions.length,
-          transactions: batch.transactions
-        }
+          transactions: batch.transactions,
+        },
       }
 
       return await this.proposeTransaction(proposal, createdBy)
     } catch (error) {
       logger.error('Error creating batch transaction proposal', {
         error: error instanceof Error ? error.message : String(error),
-        batch
+        batch,
       })
 
       throw new AppError(
@@ -500,7 +477,7 @@ export class ContractService {
   async getTransactionStatus(transactionId: string): Promise<TransactionStatus | null> {
     try {
       const txDoc = await this.db.collection('contract_transactions').doc(transactionId).get()
-      
+
       if (!txDoc.exists) {
         return null
       }
@@ -509,7 +486,7 @@ export class ContractService {
     } catch (error) {
       logger.error('Error getting transaction status', {
         error: error instanceof Error ? error.message : String(error),
-        transactionId
+        transactionId,
       })
       return null
     }
@@ -518,14 +495,17 @@ export class ContractService {
   /**
    * List transactions with filtering and pagination
    */
-  async listTransactions(options: {
-    status?: string
-    limit?: number
-    offset?: number
-    createdBy?: string
-  } = {}): Promise<{ transactions: TransactionStatus[], total: number }> {
+  async listTransactions(
+    options: {
+      status?: string
+      limit?: number
+      offset?: number
+      createdBy?: string
+    } = {}
+  ): Promise<{ transactions: TransactionStatus[]; total: number }> {
     try {
-      let query: any = this.db.collection('contract_transactions')
+      let query: any = this.db
+        .collection('contract_transactions')
         .where('chainId', '==', this.config.chainId)
         .where('safeAddress', '==', this.config.safeAddress)
 
@@ -543,7 +523,7 @@ export class ContractService {
 
       // Apply pagination and ordering
       query = query.orderBy('createdAt', 'desc')
-      
+
       if (options.offset) {
         query = query.offset(options.offset)
       }
@@ -559,7 +539,7 @@ export class ContractService {
     } catch (error) {
       logger.error('Error listing transactions', {
         error: error instanceof Error ? error.message : String(error),
-        options
+        options,
       })
       throw new AppError(
         `Failed to list transactions: ${error instanceof Error ? error.message : String(error)}`,
@@ -571,22 +551,16 @@ export class ContractService {
   /**
    * Emergency pause functionality - creates an immediate pause transaction
    */
-  async emergencyPause(
-    contractAddress: string,
-    createdBy: string,
-    reason: string
-  ): Promise<TransactionStatus> {
+  async emergencyPause(contractAddress: string, createdBy: string, reason: string): Promise<TransactionStatus> {
     try {
       logger.warn('Emergency pause requested', {
         contractAddress,
         createdBy,
-        reason
+        reason,
       })
 
       // Encode pause function call
-      const pauseInterface = new ethers.Interface([
-        'function pause() external'
-      ])
+      const pauseInterface = new ethers.Interface(['function pause() external'])
       const pauseCallData = pauseInterface.encodeFunctionData('pause', [])
 
       const proposal: TransactionProposal = {
@@ -599,8 +573,8 @@ export class ContractService {
           emergency: true,
           reason,
           pausedContract: contractAddress,
-          timestamp: new Date().toISOString()
-        }
+          timestamp: new Date().toISOString(),
+        },
       }
 
       const transaction = await this.proposeTransaction(proposal, createdBy)
@@ -608,7 +582,7 @@ export class ContractService {
       logger.warn('Emergency pause transaction created', {
         transactionId: transaction.id,
         contractAddress,
-        reason
+        reason,
       })
 
       return transaction
@@ -616,7 +590,7 @@ export class ContractService {
       logger.error('Error creating emergency pause transaction', {
         error: error instanceof Error ? error.message : String(error),
         contractAddress,
-        reason
+        reason,
       })
 
       throw new AppError(
@@ -631,9 +605,7 @@ export class ContractService {
    */
 
   private encodeBatchTransaction(transactions: TransactionProposal[]): string {
-    const multiSendInterface = new ethers.Interface([
-      'function multiSend(bytes transactions) external'
-    ])
+    const multiSendInterface = new ethers.Interface(['function multiSend(bytes transactions) external'])
 
     // Encode each transaction
     let transactionsData = '0x'
@@ -662,7 +634,7 @@ export class ContractService {
           try {
             // Try to parse with various contract interfaces
             const poolFactoryInterface = new ethers.Interface([
-              'event PoolCreated(uint256 indexed poolId, address indexed poolAddress, address indexed poolOwner, string name, uint256 maxLoanAmount, uint256 interestRate, uint256 loanDuration)'
+              'event PoolCreated(uint256 indexed poolId, address indexed poolAddress, address indexed poolOwner, string name, uint256 maxLoanAmount, uint256 interestRate, uint256 loanDuration)',
             ])
 
             const parsed = poolFactoryInterface.parseLog(log)
@@ -670,7 +642,7 @@ export class ContractService {
               events.push({
                 name: parsed.name,
                 args: parsed.args,
-                address: log.address
+                address: log.address,
               })
             }
           } catch {
@@ -680,7 +652,7 @@ export class ContractService {
       }
     } catch (error) {
       logger.warn('Error parsing transaction events', {
-        error: error instanceof Error ? error.message : String(error)
+        error: error instanceof Error ? error.message : String(error),
       })
     }
 
@@ -700,7 +672,7 @@ export class ContractService {
       executedAt: data.executedAt?.toDate(),
       executionResult: data.executionResult,
       description: data.description,
-      metadata: data.metadata
+      metadata: data.metadata,
     }
   }
 }
@@ -747,6 +719,6 @@ function getContractServiceConfig(chainId: number): ContractServiceConfig {
     rpcUrl,
     safeAddress,
     privateKey,
-    poolFactoryAddress
+    poolFactoryAddress,
   }
 }

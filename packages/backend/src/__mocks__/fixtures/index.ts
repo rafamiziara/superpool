@@ -1,6 +1,6 @@
 /**
  * Test Fixtures Index
- * 
+ *
  * Central export point for all test fixtures, sample data, and test utilities
  * used across the SuperPool backend testing suite.
  */
@@ -9,7 +9,7 @@
 export * from './blockchain'
 export { default as BlockchainFixtures } from './blockchain'
 
-// Export Firebase fixtures  
+// Export Firebase fixtures
 export * from './firebase'
 export { default as FirebaseFixtures } from './firebase'
 
@@ -19,6 +19,7 @@ export {
   SAMPLE_POOL_PARAMS as PoolParams,
   SAMPLE_TRANSACTION_HASHES as TxHashes,
   SAMPLE_SIGNATURES as Signatures,
+  SAMPLE_SAFE_TRANSACTIONS,
   SAMPLE_GAS_USAGE as GasUsage,
   BlockchainFixtures as Blockchain,
 } from './blockchain'
@@ -68,7 +69,7 @@ export const TestData = {
       wrongChecksum: '0x742d35cc6670c74288c2e768dc1e574a0b7dbe7a',
     },
   },
-  
+
   // Firebase Auth data
   users: {
     poolOwner: {
@@ -78,14 +79,14 @@ export const TestData = {
       role: 'pool_owner',
     },
     borrower: {
-      uid: 'borrower-1', 
+      uid: 'borrower-1',
       email: 'borrower1@superpool.test',
       walletAddress: '0x15d34AAf54267DB7D7c367839AAf71A00a2C6A65',
       role: 'borrower',
     },
     lender: {
       uid: 'lender-1',
-      email: 'lender1@superpool.test', 
+      email: 'lender1@superpool.test',
       walletAddress: '0x14dC79964da2C08b23698B3D3cc7Ca32193d9955',
       role: 'lender',
     },
@@ -97,7 +98,7 @@ export const TestData = {
       isAdmin: true,
     },
   },
-  
+
   // Pool configurations
   pools: {
     basic: {
@@ -125,7 +126,7 @@ export const TestData = {
       name: 'Micro Lending Pool',
     },
   },
-  
+
   // Network configurations
   networks: {
     local: {
@@ -147,7 +148,7 @@ export const TestData = {
       gasPrice: '50000000000', // 50 Gwei
     },
   },
-  
+
   // Common error scenarios
   errors: {
     blockchain: {
@@ -178,38 +179,38 @@ export const TestHelpers = {
   /**
    * Wait for a specified amount of time
    */
-  wait: (ms: number): Promise<void> => new Promise(resolve => setTimeout(resolve, ms)),
-  
+  wait: (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms)),
+
   /**
    * Create a random test identifier
    */
   randomId: (prefix: string = 'test'): string => `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2)}`,
-  
+
   /**
    * Create a timestamp for testing
    */
   timestamp: (offsetMs: number = 0): number => Date.now() + offsetMs,
-  
+
   /**
    * Create a future date
    */
   futureDate: (offsetMs: number = 600000): Date => new Date(Date.now() + offsetMs), // Default 10 minutes
-  
+
   /**
    * Create a past date
    */
   pastDate: (offsetMs: number = 600000): Date => new Date(Date.now() - offsetMs), // Default 10 minutes ago
-  
+
   /**
    * Validate Ethereum address format
    */
   isValidAddress: (address: string): boolean => /^0x[a-fA-F0-9]{40}$/.test(address),
-  
+
   /**
    * Validate transaction hash format
    */
   isValidTxHash: (hash: string): boolean => /^0x[a-fA-F0-9]{64}$/.test(hash),
-  
+
   /**
    * Convert ETH to wei
    */
@@ -217,7 +218,7 @@ export const TestHelpers = {
     const ethValue = typeof eth === 'string' ? parseFloat(eth) : eth
     return (ethValue * 1e18).toString()
   },
-  
+
   /**
    * Convert wei to ETH
    */
@@ -225,7 +226,7 @@ export const TestHelpers = {
     const weiValue = typeof wei === 'string' ? BigInt(wei) : wei
     return (Number(weiValue) / 1e18).toString()
   },
-  
+
   /**
    * Create deterministic test data based on seed
    */
@@ -234,9 +235,9 @@ export const TestHelpers = {
     for (let i = 0; i < seed.length; i++) {
       hash = ((hash << 5) - hash + seed.charCodeAt(i)) & 0xffffffff
     }
-    
+
     const positiveHash = Math.abs(hash)
-    
+
     switch (type) {
       case 'address':
         return '0x' + positiveHash.toString(16).padStart(40, '0')
@@ -248,7 +249,7 @@ export const TestHelpers = {
         return positiveHash.toString()
     }
   },
-  
+
   /**
    * Create a complete test scenario with all necessary data
    */

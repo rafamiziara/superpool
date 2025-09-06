@@ -23,7 +23,7 @@ export interface ExecuteSafeTransactionResponse {
 /**
  * Cloud Function to execute a Safe multi-sig transaction
  * Only executes if enough signatures have been collected
- * 
+ *
  * @param request - The callable request with transaction hash
  * @returns Execution result
  */
@@ -38,7 +38,7 @@ export const executeSafeTransaction = onCall(
     const functionName = 'executeSafeTransaction'
     logger.info(`${functionName}: Processing execution request`, {
       uid: request.auth?.uid,
-      transactionHash: request.data.transactionHash
+      transactionHash: request.data.transactionHash,
     })
 
     try {
@@ -79,8 +79,7 @@ export const executeSafeTransaction = onCall(
       // 5. Verify we have enough signatures
       const signatures = txData.signatures || []
       if (signatures.length < txData.requiredSignatures) {
-        throw new HttpsError('failed-precondition', 
-          `Insufficient signatures: ${signatures.length}/${txData.requiredSignatures}`)
+        throw new HttpsError('failed-precondition', `Insufficient signatures: ${signatures.length}/${txData.requiredSignatures}`)
       }
 
       // 6. Initialize blockchain connection and signer
@@ -91,7 +90,7 @@ export const executeSafeTransaction = onCall(
         transactionHash,
         safeAddress: txData.safeAddress,
         signatureCount: signatures.length,
-        requiredSignatures: txData.requiredSignatures
+        requiredSignatures: txData.requiredSignatures,
       })
 
       // 7. Execute Safe transaction
@@ -116,7 +115,7 @@ export const executeSafeTransaction = onCall(
         transactionHash,
         executionTxHash: executionTx.hash,
         blockNumber: receipt.blockNumber,
-        gasUsed: receipt.gasUsed.toString()
+        gasUsed: receipt.gasUsed.toString(),
       })
 
       // 9. Parse results for pool creation transactions
@@ -127,10 +126,10 @@ export const executeSafeTransaction = onCall(
         try {
           // Parse PoolCreated event from the execution transaction
           const poolFactoryInterface = new ethers.Interface([
-            'event PoolCreated(uint256 indexed poolId, address indexed poolAddress, address indexed poolOwner, string name, uint256 maxLoanAmount, uint256 interestRate, uint256 loanDuration)'
+            'event PoolCreated(uint256 indexed poolId, address indexed poolAddress, address indexed poolOwner, string name, uint256 maxLoanAmount, uint256 interestRate, uint256 loanDuration)',
           ])
 
-          const poolCreatedLog = receipt.logs.find(log => {
+          const poolCreatedLog = receipt.logs.find((log) => {
             try {
               const parsed = poolFactoryInterface.parseLog(log)
               return parsed && parsed.name === 'PoolCreated'
@@ -160,19 +159,19 @@ export const executeSafeTransaction = onCall(
               transactionHash: executionTx.hash,
               safeTransactionHash: transactionHash,
               isActive: true,
-              createdViaSafe: true
+              createdViaSafe: true,
             })
 
             logger.info(`${functionName}: Pool created via Safe`, {
               poolId,
               poolAddress,
-              poolName: txData.poolParams.name
+              poolName: txData.poolParams.name,
             })
           }
         } catch (error) {
           logger.error(`${functionName}: Error parsing pool creation event`, {
             error: error instanceof Error ? error.message : String(error),
-            executionTxHash: executionTx.hash
+            executionTxHash: executionTx.hash,
           })
           // Don't throw - execution was successful even if we can't parse the event
         }
@@ -186,12 +185,13 @@ export const executeSafeTransaction = onCall(
         blockNumber: receipt.blockNumber,
         gasUsed: receipt.gasUsed.toString(),
         poolId,
-        poolAddress
+        poolAddress,
       })
 
-      const message = poolId && poolAddress 
-        ? `Pool "${txData.poolParams.name}" created successfully with ID ${poolId}`
-        : 'Safe transaction executed successfully'
+      const message =
+        poolId && poolAddress
+          ? `Pool "${txData.poolParams.name}" created successfully with ID ${poolId}`
+          : 'Safe transaction executed successfully'
 
       return {
         success: true,
@@ -200,24 +200,26 @@ export const executeSafeTransaction = onCall(
         safeAddress: txData.safeAddress,
         poolId,
         poolAddress,
-        message
+        message,
       }
-
     } catch (error) {
       logger.error(`${functionName}: Error executing Safe transaction`, {
         error: error instanceof Error ? error.message : String(error),
         uid: request.auth?.uid,
-        transactionHash: request.data.transactionHash
+        transactionHash: request.data.transactionHash,
       })
 
       // Update transaction status to failed if it exists
       try {
         const db = getFirestore()
-        await db.collection('safe_transactions').doc(request.data.transactionHash).update({
-          status: 'failed',
-          error: error instanceof Error ? error.message : String(error),
-          failedAt: new Date()
-        })
+        await db
+          .collection('safe_transactions')
+          .doc(request.data.transactionHash)
+          .update({
+            status: 'failed',
+            error: error instanceof Error ? error.message : String(error),
+            failedAt: new Date(),
+          })
       } catch (updateError) {
         logger.error(`${functionName}: Error updating transaction status`, { updateError })
       }
@@ -233,11 +235,11 @@ export const executeSafeTransaction = onCall(
 function getProviderUrl(chainId: number): string {
   const envKey = chainId === 80002 ? 'POLYGON_AMOY_RPC_URL' : 'POLYGON_MAINNET_RPC_URL'
   const url = process.env[envKey]
-  
+
   if (!url) {
     throw new AppError(`RPC URL not configured for chain ID ${chainId}`, 'PROVIDER_NOT_CONFIGURED')
   }
-  
+
   return url
 }
 
@@ -246,10 +248,10 @@ function getProviderUrl(chainId: number): string {
  */
 function getPrivateKey(): string {
   const privateKey = process.env.PRIVATE_KEY
-  
+
   if (!privateKey) {
     throw new AppError('Private key not configured', 'PRIVATE_KEY_NOT_CONFIGURED')
   }
-  
+
   return privateKey
 }

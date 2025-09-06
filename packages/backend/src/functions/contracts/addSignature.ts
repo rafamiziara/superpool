@@ -24,7 +24,7 @@ export interface AddSignatureResponse {
 
 /**
  * Cloud Function to add a signature to a pending Safe transaction
- * 
+ *
  * @param request - The callable request with transaction ID and signature
  * @returns Updated signature status
  */
@@ -39,7 +39,7 @@ export const addSignature = onCall(
     const functionName = 'addSignature'
     logger.info(`${functionName}: Adding signature to transaction`, {
       uid: request.auth?.uid,
-      transactionId: request.data.transactionId
+      transactionId: request.data.transactionId,
     })
 
     try {
@@ -68,7 +68,7 @@ export const addSignature = onCall(
       // 3. Get user's wallet address from Firestore
       const db = getFirestore()
       const userDoc = await db.collection('users').doc(request.auth.uid).get()
-      
+
       if (!userDoc.exists) {
         throw new HttpsError('failed-precondition', 'User profile not found')
       }
@@ -85,10 +85,7 @@ export const addSignature = onCall(
       let recoveredAddress: string
 
       try {
-        recoveredAddress = ethers.verifyMessage(
-          ethers.getBytes(transactionHash),
-          request.data.signature
-        )
+        recoveredAddress = ethers.verifyMessage(ethers.getBytes(transactionHash), request.data.signature)
       } catch (error) {
         throw new HttpsError('invalid-argument', 'Invalid signature format or unable to recover address')
       }
@@ -110,20 +107,17 @@ export const addSignature = onCall(
       // 6. Add signature to transaction
       const safeSignature: SafeSignature = {
         signer: userAddress,
-        data: request.data.signature
+        data: request.data.signature,
       }
 
-      const transactionStatus = await contractService.addSignature(
-        request.data.transactionId,
-        safeSignature
-      )
+      const transactionStatus = await contractService.addSignature(request.data.transactionId, safeSignature)
 
       logger.info(`${functionName}: Signature added successfully`, {
         transactionId: request.data.transactionId,
         signer: userAddress,
         currentSignatures: transactionStatus.currentSignatures,
         requiredSignatures: transactionStatus.requiredSignatures,
-        readyToExecute: transactionStatus.currentSignatures >= transactionStatus.requiredSignatures
+        readyToExecute: transactionStatus.currentSignatures >= transactionStatus.requiredSignatures,
       })
 
       return {
@@ -133,16 +127,16 @@ export const addSignature = onCall(
         requiredSignatures: transactionStatus.requiredSignatures,
         readyToExecute: transactionStatus.currentSignatures >= transactionStatus.requiredSignatures,
         signerAddress: userAddress,
-        message: transactionStatus.currentSignatures >= transactionStatus.requiredSignatures
-          ? 'Signature added. Transaction is ready to execute!'
-          : `Signature added. ${transactionStatus.requiredSignatures - transactionStatus.currentSignatures} more signature(s) needed.`
+        message:
+          transactionStatus.currentSignatures >= transactionStatus.requiredSignatures
+            ? 'Signature added. Transaction is ready to execute!'
+            : `Signature added. ${transactionStatus.requiredSignatures - transactionStatus.currentSignatures} more signature(s) needed.`,
       }
-
     } catch (error) {
       logger.error(`${functionName}: Error adding signature`, {
         error: error instanceof Error ? error.message : String(error),
         uid: request.auth?.uid,
-        transactionId: request.data.transactionId
+        transactionId: request.data.transactionId,
       })
 
       return handleError(error, functionName)
@@ -156,11 +150,11 @@ export const addSignature = onCall(
 function getProviderUrl(chainId: number): string {
   const envKey = chainId === 80002 ? 'POLYGON_AMOY_RPC_URL' : 'POLYGON_MAINNET_RPC_URL'
   const url = process.env[envKey]
-  
+
   if (!url) {
     throw new Error(`RPC URL not configured for chain ID ${chainId}`)
   }
-  
+
   return url
 }
 
@@ -170,10 +164,10 @@ function getProviderUrl(chainId: number): string {
 function getSafeAddress(chainId: number): string {
   const envKey = chainId === 80002 ? 'SAFE_ADDRESS_AMOY' : 'SAFE_ADDRESS_POLYGON'
   const address = process.env[envKey]
-  
+
   if (!address) {
     throw new Error(`Safe address not configured for chain ID ${chainId}`)
   }
-  
+
   return address
 }

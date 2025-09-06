@@ -1,6 +1,6 @@
 /**
  * Blockchain Test Fixtures
- * 
+ *
  * This file contains sample blockchain data, contract interactions,
  * and transaction patterns for comprehensive testing.
  */
@@ -13,31 +13,31 @@ export const SAMPLE_ADDRESSES = {
   POOL_OWNER_1: '0x742d35Cc6670C74288C2e768dC1E574a0B7DbE7a',
   POOL_OWNER_2: '0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC',
   POOL_OWNER_3: '0x90F79bf6EB2c4f870365E785982E1f101E93b906',
-  
+
   // Borrowers
   BORROWER_1: '0x15d34AAf54267DB7D7c367839AAf71A00a2C6A65',
   BORROWER_2: '0x9965507D1a55bcC2695C58ba16FB37d819B0A4dc',
   BORROWER_3: '0x976EA74026E726554dB657fA54763abd0C3a0aa9',
-  
+
   // Lenders
   LENDER_1: '0x14dC79964da2C08b23698B3D3cc7Ca32193d9955',
   LENDER_2: '0x23618e81E3f5cdF7f54C3d65f7FBc0aBf5B21E8f',
   LENDER_3: '0xa0Ee7A142d267C1f36714E4a8F75612F20a79720',
-  
+
   // Safe multi-sig owners
   SAFE_OWNER_1: '0xBcd4042DE499D14e55001CcbB24a551F3b954096',
   SAFE_OWNER_2: '0x71bE63f3384f5fb98995898A86B02Fb2426c5788',
   SAFE_OWNER_3: '0xFABB0ac9d68B0B445fB7357272Ff202C5651694a',
   SAFE_OWNER_4: '0x1CBd3b2770909D4e10f157cABC84C7264073C9Ec',
   SAFE_OWNER_5: '0xdF3e18d64BC6A983f673Ab319CCaE4f1a57C7097',
-  
+
   // Contracts
   POOL_FACTORY: '0x1234567890123456789012345678901234567890',
   SAFE_ADDRESS: '0x9876543210987654321098765432109876543210',
-  
+
   // Zero address for testing invalid scenarios
   ZERO_ADDRESS: '0x0000000000000000000000000000000000000000',
-  
+
   // Invalid addresses for testing validation
   INVALID_ADDRESS: '0xinvalid',
   INVALID_CHECKSUM: '0x742d35cc6670c74288c2e768dc1e574a0b7dbe7a', // lowercase
@@ -49,7 +49,7 @@ export const SAMPLE_TRANSACTION_HASHES = {
   POOL_CREATION_2: '0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef',
   SAFE_EXECUTION_1: '0xfedcba0987654321fedcba0987654321fedcba0987654321fedcba0987654321',
   FAILED_TRANSACTION: '0x0000000000000000000000000000000000000000000000000000000000000000',
-  
+
   // Multi-sig transaction hashes
   SAFE_TX_HASH_1: '0xabc1234567890123456789012345678901234567890123456789012345678901',
   SAFE_TX_HASH_2: '0xdef9876543210987654321098765432109876543210987654321098765432109',
@@ -65,7 +65,7 @@ export const SAMPLE_POOL_PARAMS = {
     name: 'Basic Lending Pool',
     description: 'A simple lending pool for testing basic functionality',
   },
-  
+
   HIGH_INTEREST_POOL: {
     poolOwner: SAMPLE_ADDRESSES.POOL_OWNER_2,
     maxLoanAmount: '500', // 500 ETH
@@ -74,7 +74,7 @@ export const SAMPLE_POOL_PARAMS = {
     name: 'High Interest Short Term Pool',
     description: 'Higher risk, higher reward short-term lending pool',
   },
-  
+
   LARGE_POOL: {
     poolOwner: SAMPLE_ADDRESSES.POOL_OWNER_3,
     maxLoanAmount: '10000', // 10,000 ETH
@@ -83,7 +83,7 @@ export const SAMPLE_POOL_PARAMS = {
     name: 'Large Enterprise Pool',
     description: 'Large pool for enterprise-level lending with competitive rates',
   },
-  
+
   MICRO_POOL: {
     poolOwner: SAMPLE_ADDRESSES.POOL_OWNER_1,
     maxLoanAmount: '10', // 10 ETH
@@ -92,7 +92,7 @@ export const SAMPLE_POOL_PARAMS = {
     name: 'Micro Lending Pool',
     description: 'Small pool for micro-loans and quick turnaround',
   },
-  
+
   // Invalid scenarios
   ZERO_AMOUNT_POOL: {
     poolOwner: SAMPLE_ADDRESSES.POOL_OWNER_1,
@@ -102,7 +102,7 @@ export const SAMPLE_POOL_PARAMS = {
     name: 'Invalid Zero Amount Pool',
     description: 'This should fail validation',
   },
-  
+
   INVALID_RATE_POOL: {
     poolOwner: SAMPLE_ADDRESSES.POOL_OWNER_1,
     maxLoanAmount: '1000',
@@ -111,7 +111,7 @@ export const SAMPLE_POOL_PARAMS = {
     name: 'Invalid High Rate Pool',
     description: 'This should fail with invalid interest rate',
   },
-  
+
   ZERO_DURATION_POOL: {
     poolOwner: SAMPLE_ADDRESSES.POOL_OWNER_1,
     maxLoanAmount: '1000',
@@ -120,7 +120,7 @@ export const SAMPLE_POOL_PARAMS = {
     name: 'Invalid Zero Duration Pool',
     description: 'This should fail with zero duration',
   },
-  
+
   INVALID_OWNER_POOL: {
     poolOwner: SAMPLE_ADDRESSES.ZERO_ADDRESS, // Invalid
     maxLoanAmount: '1000',
@@ -176,7 +176,7 @@ export const SAMPLE_SAFE_TRANSACTIONS = {
     refundReceiver: SAMPLE_ADDRESSES.ZERO_ADDRESS,
     nonce: BigInt(42),
   },
-  
+
   OWNERSHIP_TRANSFER_TX: {
     to: SAMPLE_ADDRESSES.POOL_FACTORY,
     value: BigInt(0),
@@ -193,19 +193,55 @@ export const SAMPLE_SAFE_TRANSACTIONS = {
 
 // Sample signatures for multi-sig testing
 export const SAMPLE_SIGNATURES = {
-  OWNER_1_SIG: '0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1b',
-  OWNER_2_SIG: '0xabcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890ab1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcd1c',
-  OWNER_3_SIG: '0xfedcba0987654321fedcba0987654321fedcba0987654321fedcba0987654321fedcba0987654321fedcba0987654321fedcba0987654321fedcba09871b',
-  
+  OWNER_1_SIG:
+    '0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1b',
+  OWNER_2_SIG:
+    '0xabcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890ab1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcd1c',
+  OWNER_3_SIG:
+    '0xfedcba0987654321fedcba0987654321fedcba0987654321fedcba0987654321fedcba0987654321fedcba0987654321fedcba0987654321fedcba09871b',
+
   // Combined signatures (concatenated)
-  TWO_SIGNATURES: '0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1babcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890ab1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcd1c',
-  
-  THREE_SIGNATURES: '0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1babcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890ab1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcd1cfedcba0987654321fedcba0987654321fedcba0987654321fedcba0987654321fedcba0987654321fedcba0987654321fedcba0987654321fedcba09871b',
-  
+  TWO_SIGNATURES:
+    '0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1babcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890ab1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcd1c',
+
+  THREE_SIGNATURES:
+    '0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1babcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890ab1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcd1cfedcba0987654321fedcba0987654321fedcba0987654321fedcba0987654321fedcba0987654321fedcba0987654321fedcba0987654321fedcba09871b',
+
   // Invalid signatures
   INVALID_SIG: '0xinvalid',
   SHORT_SIG: '0x1234567890',
   WRONG_LENGTH_SIG: '0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef12', // Too short
+}
+
+// Sample Safe transaction data
+export const SAMPLE_SAFE_TRANSACTIONS = {
+  POOL_CREATION_TX: {
+    to: '0x742d35Cc6670C74288C2e768dC1E574a0B7DbE7a',
+    data: '0x12345678',
+    value: '0',
+    operation: 0,
+    safeTxGas: 100000,
+    baseGas: 50000,
+    gasPrice: '0',
+    gasToken: '0x0000000000000000000000000000000000000000',
+    refundReceiver: '0x0000000000000000000000000000000000000000',
+    nonce: 0,
+    transactionHash: '0x' + 'safetx'.repeat(11) + '1',
+  },
+
+  OWNERSHIP_TRANSFER_TX: {
+    to: '0x742d35Cc6670C74288C2e768dC1E574a0B7DbE7a',
+    data: '0x87654321',
+    value: '0',
+    operation: 0,
+    safeTxGas: 75000,
+    baseGas: 25000,
+    gasPrice: '0',
+    gasToken: '0x0000000000000000000000000000000000000000',
+    refundReceiver: '0x0000000000000000000000000000000000000000',
+    nonce: 1,
+    transactionHash: '0x' + 'ownertx'.repeat(11) + '2',
+  },
 }
 
 // Sample gas usage data for performance testing
@@ -215,25 +251,25 @@ export const SAMPLE_GAS_USAGE = {
     actual: BigInt('423156'),
     method: 'createPool',
   },
-  
+
   SAFE_EXECUTION: {
     estimate: BigInt('200000'),
     actual: BigInt('187432'),
     method: 'execTransaction',
   },
-  
+
   OWNERSHIP_TRANSFER: {
     estimate: BigInt('50000'),
     actual: BigInt('47821'),
     method: 'transferOwnership',
   },
-  
+
   MEMBER_ADDITION: {
     estimate: BigInt('100000'),
     actual: BigInt('95234'),
     method: 'addMember',
   },
-  
+
   LOAN_REQUEST: {
     estimate: BigInt('180000'),
     actual: BigInt('167892'),
@@ -250,7 +286,7 @@ export const SAMPLE_BLOCKS = {
     gasLimit: BigInt('30000000'),
     gasUsed: BigInt('15678432'),
   },
-  
+
   PREVIOUS_BLOCK: {
     number: 1234566,
     hash: '0xdef9876543210987654321098765432109876543210987654321098765432109',
@@ -269,7 +305,7 @@ export const SAMPLE_NETWORKS = {
     blockTime: 2000, // 2 seconds
     gasPrice: BigInt('30000000000'), // 30 Gwei
   },
-  
+
   LOCAL_HARDHAT: {
     chainId: 31337,
     name: 'localhost',
@@ -277,7 +313,7 @@ export const SAMPLE_NETWORKS = {
     blockTime: 1000, // 1 second
     gasPrice: BigInt('20000000000'), // 20 Gwei
   },
-  
+
   POLYGON_MAINNET: {
     chainId: 137,
     name: 'polygon',
@@ -295,24 +331,24 @@ export const SAMPLE_ERRORS = {
     method: 'createPool',
     transaction: SAMPLE_TRANSACTION_HASHES.FAILED_TRANSACTION,
   },
-  
+
   INSUFFICIENT_GAS: {
     code: 'UNPREDICTABLE_GAS_LIMIT',
     reason: 'cannot estimate gas; transaction may fail or may require manual gas limit',
     method: 'createPool',
   },
-  
+
   NETWORK_ERROR: {
     code: 'NETWORK_ERROR',
     reason: 'could not detect network',
   },
-  
+
   INVALID_ADDRESS: {
     code: 'INVALID_ARGUMENT',
     reason: 'invalid address',
     value: SAMPLE_ADDRESSES.INVALID_ADDRESS,
   },
-  
+
   SAFE_THRESHOLD_NOT_MET: {
     code: 'CALL_EXCEPTION',
     reason: 'execution reverted: GS020: Threshold not met',
@@ -326,22 +362,18 @@ export class BlockchainFixtures {
    * Create a random Ethereum address for testing
    */
   static randomAddress(): string {
-    const hex = '0x' + Array.from({ length: 40 }, () => 
-      Math.floor(Math.random() * 16).toString(16)
-    ).join('')
+    const hex = '0x' + Array.from({ length: 40 }, () => Math.floor(Math.random() * 16).toString(16)).join('')
     return hex
   }
-  
+
   /**
    * Create a random transaction hash
    */
   static randomTxHash(): string {
-    const hex = '0x' + Array.from({ length: 64 }, () => 
-      Math.floor(Math.random() * 16).toString(16)
-    ).join('')
+    const hex = '0x' + Array.from({ length: 64 }, () => Math.floor(Math.random() * 16).toString(16)).join('')
     return hex
   }
-  
+
   /**
    * Create sample pool parameters with random values
    */
@@ -356,7 +388,7 @@ export class BlockchainFixtures {
       ...overrides,
     }
   }
-  
+
   /**
    * Create a sample pool event with realistic data
    */
@@ -372,7 +404,7 @@ export class BlockchainFixtures {
       ...overrides,
     }
   }
-  
+
   /**
    * Create sample transaction receipt
    */
@@ -390,17 +422,13 @@ export class BlockchainFixtures {
       ...overrides,
     }
   }
-  
+
   /**
    * Create sample Safe transaction signatures
    */
   static createSafeSignatures(count: number): string {
-    const sigs = [
-      SAMPLE_SIGNATURES.OWNER_1_SIG,
-      SAMPLE_SIGNATURES.OWNER_2_SIG,
-      SAMPLE_SIGNATURES.OWNER_3_SIG,
-    ].slice(0, count)
-    
+    const sigs = [SAMPLE_SIGNATURES.OWNER_1_SIG, SAMPLE_SIGNATURES.OWNER_2_SIG, SAMPLE_SIGNATURES.OWNER_3_SIG].slice(0, count)
+
     return sigs.join('').replace(/0x/g, '').replace(/^/, '0x')
   }
 }

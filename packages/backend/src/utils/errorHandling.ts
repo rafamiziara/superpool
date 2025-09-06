@@ -6,12 +6,7 @@ export class AppError extends Error {
   public readonly statusCode: number
   public readonly isOperational: boolean
 
-  constructor(
-    message: string,
-    code: string = 'INTERNAL_ERROR',
-    statusCode: number = 500,
-    isOperational: boolean = true
-  ) {
+  constructor(message: string, code: string = 'INTERNAL_ERROR', statusCode: number = 500, isOperational: boolean = true) {
     super(message)
     this.name = 'AppError'
     this.code = code
@@ -25,11 +20,7 @@ export class AppError extends Error {
 
 export class ValidationError extends AppError {
   constructor(message: string, field?: string) {
-    super(
-      field ? `Validation failed for ${field}: ${message}` : `Validation failed: ${message}`,
-      'VALIDATION_ERROR',
-      400
-    )
+    super(field ? `Validation failed for ${field}: ${message}` : `Validation failed: ${message}`, 'VALIDATION_ERROR', 400)
     this.name = 'ValidationError'
   }
 }
@@ -38,11 +29,7 @@ export class ContractError extends AppError {
   public readonly contractAddress?: string
   public readonly functionName?: string
 
-  constructor(
-    message: string,
-    contractAddress?: string,
-    functionName?: string
-  ) {
+  constructor(message: string, contractAddress?: string, functionName?: string) {
     super(message, 'CONTRACT_ERROR', 500)
     this.name = 'ContractError'
     this.contractAddress = contractAddress
@@ -54,11 +41,7 @@ export class TransactionError extends AppError {
   public readonly transactionHash?: string
   public readonly gasUsed?: string
 
-  constructor(
-    message: string,
-    transactionHash?: string,
-    gasUsed?: string
-  ) {
+  constructor(message: string, transactionHash?: string, gasUsed?: string) {
     super(message, 'TRANSACTION_ERROR', 500)
     this.name = 'TransactionError'
     this.transactionHash = transactionHash
@@ -76,17 +59,17 @@ export const ERROR_CODES = {
   INVALID_AMOUNT: 'invalid-argument',
   INVALID_DURATION: 'invalid-argument',
   INVALID_INTEREST_RATE: 'invalid-argument',
-  
+
   // Authentication errors
   UNAUTHORIZED: 'unauthenticated',
   INSUFFICIENT_PERMISSIONS: 'permission-denied',
-  
+
   // Contract errors
   CONTRACT_ERROR: 'internal',
   CONTRACT_NOT_FOUND: 'not-found',
   FUNCTION_NOT_FOUND: 'not-found',
   EXECUTION_REVERTED: 'internal',
-  
+
   // Transaction errors
   TRANSACTION_ERROR: 'internal',
   TRANSACTION_FAILED: 'internal',
@@ -95,25 +78,25 @@ export const ERROR_CODES = {
   GAS_ESTIMATION_FAILED: 'internal',
   NONCE_TOO_LOW: 'internal',
   UNDERPRICED_TRANSACTION: 'internal',
-  
+
   // Network errors
   PROVIDER_ERROR: 'unavailable',
   NETWORK_ERROR: 'unavailable',
   RPC_ERROR: 'unavailable',
-  
+
   // Configuration errors
   PRIVATE_KEY_NOT_CONFIGURED: 'internal',
   CONTRACT_ADDRESS_NOT_CONFIGURED: 'internal',
   PROVIDER_NOT_CONFIGURED: 'internal',
-  
+
   // Data errors
   NOT_FOUND: 'not-found',
   ALREADY_EXISTS: 'already-exists',
   DATA_CORRUPTION: 'internal',
-  
+
   // Generic errors
   INTERNAL_ERROR: 'internal',
-  UNKNOWN_ERROR: 'unknown'
+  UNKNOWN_ERROR: 'unknown',
 } as const
 
 /**
@@ -128,24 +111,27 @@ function getFirebaseErrorCode(appErrorCode: string): string {
  */
 export function handleError(error: unknown, functionName: string): any {
   logger.error(`${functionName}: Error occurred`, {
-    error: error instanceof Error ? {
-      name: error.name,
-      message: error.message,
-      stack: error.stack,
-      ...(error instanceof AppError && {
-        code: error.code,
-        statusCode: error.statusCode,
-        isOperational: error.isOperational
-      }),
-      ...(error instanceof ContractError && {
-        contractAddress: error.contractAddress,
-        functionName: error.functionName
-      }),
-      ...(error instanceof TransactionError && {
-        transactionHash: error.transactionHash,
-        gasUsed: error.gasUsed
-      })
-    } : String(error)
+    error:
+      error instanceof Error
+        ? {
+            name: error.name,
+            message: error.message,
+            stack: error.stack,
+            ...(error instanceof AppError && {
+              code: error.code,
+              statusCode: error.statusCode,
+              isOperational: error.isOperational,
+            }),
+            ...(error instanceof ContractError && {
+              contractAddress: error.contractAddress,
+              functionName: error.functionName,
+            }),
+            ...(error instanceof TransactionError && {
+              transactionHash: error.transactionHash,
+              gasUsed: error.gasUsed,
+            }),
+          }
+        : String(error),
   })
 
   // Handle known error types
@@ -157,7 +143,7 @@ export function handleError(error: unknown, functionName: string): any {
     const firebaseCode = getFirebaseErrorCode(error.code)
     throw new HttpsError(firebaseCode as any, error.message, {
       code: error.code,
-      original: error.message
+      original: error.message,
     })
   }
 
@@ -187,26 +173,25 @@ export function handleError(error: unknown, functionName: string): any {
   // Handle unknown errors
   const errorMessage = error instanceof Error ? error.message : String(error)
   logger.error(`${functionName}: Unhandled error`, { errorMessage })
-  
+
   throw new HttpsError('internal', 'An unexpected error occurred. Please try again.')
 }
 
 /**
  * Log error with context
  */
-export function logError(
-  error: unknown,
-  context: Record<string, any> = {},
-  functionName?: string
-): void {
+export function logError(error: unknown, context: Record<string, any> = {}, functionName?: string): void {
   const logData = {
     ...context,
     ...(functionName && { function: functionName }),
-    error: error instanceof Error ? {
-      name: error.name,
-      message: error.message,
-      stack: error.stack
-    } : String(error)
+    error:
+      error instanceof Error
+        ? {
+            name: error.name,
+            message: error.message,
+            stack: error.stack,
+          }
+        : String(error),
   }
 
   logger.error('Error logged', logData)
@@ -215,28 +200,21 @@ export function logError(
 /**
  * Create a standardized error response
  */
-export function createErrorResponse(
-  message: string,
-  code: string = 'UNKNOWN_ERROR',
-  details?: Record<string, any>
-): any {
+export function createErrorResponse(message: string, code: string = 'UNKNOWN_ERROR', details?: Record<string, any>): any {
   return {
     success: false,
     error: {
       message,
       code,
-      ...(details && { details })
-    }
+      ...(details && { details }),
+    },
   }
 }
 
 /**
  * Wrap async functions with error handling
  */
-export function withErrorHandling<T extends (...args: any[]) => Promise<any>>(
-  fn: T,
-  functionName: string
-): T {
+export function withErrorHandling<T extends (...args: any[]) => Promise<any>>(fn: T, functionName: string): T {
   return (async (...args: Parameters<T>) => {
     try {
       return await fn(...args)
@@ -249,11 +227,7 @@ export function withErrorHandling<T extends (...args: any[]) => Promise<any>>(
 /**
  * Validate and throw validation error if invalid
  */
-export function validateOrThrow(
-  condition: boolean,
-  message: string,
-  field?: string
-): void {
+export function validateOrThrow(condition: boolean, message: string, field?: string): void {
   if (!condition) {
     throw new ValidationError(message, field)
   }

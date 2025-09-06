@@ -1,6 +1,6 @@
 /**
  * Firebase Test Fixtures
- * 
+ *
  * This file contains sample Firebase data, user records, Firestore documents,
  * and authentication patterns for comprehensive backend testing.
  */
@@ -25,7 +25,7 @@ export const SAMPLE_USERS: Record<string, Partial<UserRecord>> = {
       lastSignInTime: new Date('2024-01-20T15:30:00Z').toUTCString(),
     },
   },
-  
+
   POOL_OWNER_2: {
     uid: 'pool-owner-2',
     email: 'poolowner2@superpool.test',
@@ -41,7 +41,7 @@ export const SAMPLE_USERS: Record<string, Partial<UserRecord>> = {
       lastSignInTime: new Date('2024-01-21T09:15:00Z').toUTCString(),
     },
   },
-  
+
   BORROWER_1: {
     uid: 'borrower-1',
     email: 'borrower1@superpool.test',
@@ -57,7 +57,7 @@ export const SAMPLE_USERS: Record<string, Partial<UserRecord>> = {
       lastSignInTime: new Date('2024-01-22T12:45:00Z').toUTCString(),
     },
   },
-  
+
   LENDER_1: {
     uid: 'lender-1',
     email: 'lender1@superpool.test',
@@ -73,7 +73,7 @@ export const SAMPLE_USERS: Record<string, Partial<UserRecord>> = {
       lastSignInTime: new Date('2024-01-23T08:20:00Z').toUTCString(),
     },
   },
-  
+
   SAFE_OWNER_1: {
     uid: 'safe-owner-1',
     email: 'safeowner1@superpool.test',
@@ -90,7 +90,7 @@ export const SAMPLE_USERS: Record<string, Partial<UserRecord>> = {
       lastSignInTime: new Date('2024-01-24T07:30:00Z').toUTCString(),
     },
   },
-  
+
   UNVERIFIED_USER: {
     uid: 'unverified-user',
     email: 'unverified@superpool.test',
@@ -103,7 +103,7 @@ export const SAMPLE_USERS: Record<string, Partial<UserRecord>> = {
       lastSignInTime: undefined,
     },
   },
-  
+
   DISABLED_USER: {
     uid: 'disabled-user',
     email: 'disabled@superpool.test',
@@ -144,7 +144,7 @@ export const SAMPLE_ID_TOKENS: Record<string, DecodedIdToken> = {
     walletAddress: SAMPLE_ADDRESSES.POOL_OWNER_1,
     role: 'pool_owner',
   },
-  
+
   EXPIRED_TOKEN: {
     uid: 'expired-user',
     email: 'expired@superpool.test',
@@ -162,7 +162,7 @@ export const SAMPLE_ID_TOKENS: Record<string, DecodedIdToken> = {
       sign_in_provider: 'wallet',
     },
   },
-  
+
   INVALID_AUDIENCE: {
     uid: 'invalid-aud-user',
     email: 'invalid@example.com',
@@ -218,7 +218,7 @@ export const SAMPLE_FIRESTORE_DOCS = {
         utilization: 0,
       },
     },
-    
+
     '2': {
       id: '2',
       address: '0x0000000000000000000000000000000000000002',
@@ -252,7 +252,7 @@ export const SAMPLE_FIRESTORE_DOCS = {
       },
     },
   },
-  
+
   // Auth nonces collection
   AUTH_NONCES: {
     'nonce-123': {
@@ -263,7 +263,7 @@ export const SAMPLE_FIRESTORE_DOCS = {
       used: false,
       createdAt: new Date(Date.now() - 300000),
     },
-    
+
     'nonce-456': {
       walletAddress: SAMPLE_ADDRESSES.BORROWER_1,
       nonce: 'fedcba0987654321fedcba0987654321fedcba0987654321fedcba0987654321',
@@ -272,7 +272,7 @@ export const SAMPLE_FIRESTORE_DOCS = {
       used: false,
       createdAt: new Date(Date.now() - 1200000),
     },
-    
+
     'nonce-789': {
       walletAddress: SAMPLE_ADDRESSES.LENDER_1,
       nonce: '1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef',
@@ -282,7 +282,7 @@ export const SAMPLE_FIRESTORE_DOCS = {
       createdAt: new Date(Date.now() - 100000),
     },
   },
-  
+
   // Users collection
   USERS: {
     'pool-owner-1': {
@@ -300,7 +300,7 @@ export const SAMPLE_FIRESTORE_DOCS = {
         language: 'en',
       },
     },
-    
+
     'borrower-1': {
       uid: 'borrower-1',
       walletAddress: SAMPLE_ADDRESSES.BORROWER_1,
@@ -319,7 +319,7 @@ export const SAMPLE_FIRESTORE_DOCS = {
       },
     },
   },
-  
+
   // Approved devices collection
   APPROVED_DEVICES: {
     'device-123': {
@@ -336,7 +336,7 @@ export const SAMPLE_FIRESTORE_DOCS = {
       isActive: true,
     },
   },
-  
+
   // Safe transactions collection
   SAFE_TRANSACTIONS: {
     'safe-tx-1': {
@@ -379,7 +379,7 @@ export const SAMPLE_FIRESTORE_DOCS = {
       type: 'pool_creation',
     },
   },
-  
+
   // Event logs collection
   EVENT_LOGS: {
     'pool-created-1-0': {
@@ -401,7 +401,7 @@ export const SAMPLE_FIRESTORE_DOCS = {
       validationPassed: true,
     },
   },
-  
+
   // Pool owners index
   POOL_OWNERS: {
     [SAMPLE_ADDRESSES.POOL_OWNER_1]: {
@@ -415,7 +415,7 @@ export const SAMPLE_FIRESTORE_DOCS = {
         successRate: 100,
       },
     },
-    
+
     [SAMPLE_ADDRESSES.POOL_OWNER_2]: {
       address: SAMPLE_ADDRESSES.POOL_OWNER_2,
       poolIds: ['2'],
@@ -432,12 +432,12 @@ export const SAMPLE_FIRESTORE_DOCS = {
 
 // Sample authentication messages for wallet signing
 export const SAMPLE_AUTH_MESSAGES = {
-  VALID_MESSAGE: (walletAddress: string, nonce: string, timestamp: number) => 
+  VALID_MESSAGE: (walletAddress: string, nonce: string, timestamp: number) =>
     `SuperPool Authentication\nWallet: ${walletAddress}\nNonce: ${nonce}\nTimestamp: ${timestamp}\nThis message will expire in 10 minutes.`,
-  
-  EXPIRED_MESSAGE: (walletAddress: string, nonce: string) => 
+
+  EXPIRED_MESSAGE: (walletAddress: string, nonce: string) =>
     `SuperPool Authentication\nWallet: ${walletAddress}\nNonce: ${nonce}\nTimestamp: ${Date.now() - 900000}\nThis message will expire in 10 minutes.`,
-  
+
   INVALID_FORMAT: 'Invalid authentication message format',
 }
 
@@ -447,37 +447,37 @@ export const SAMPLE_FIREBASE_ERRORS = {
     code: 'auth/id-token-expired',
     message: 'Firebase ID token has expired. Get a fresh token from your client app and try again.',
   },
-  
+
   AUTH_USER_NOT_FOUND: {
     code: 'auth/user-not-found',
     message: 'There is no user record corresponding to the provided identifier.',
   },
-  
+
   AUTH_INVALID_EMAIL: {
     code: 'auth/invalid-email',
     message: 'The email address is improperly formatted.',
   },
-  
+
   FIRESTORE_PERMISSION_DENIED: {
     code: 'permission-denied',
     message: 'Missing or insufficient permissions.',
   },
-  
+
   FIRESTORE_NOT_FOUND: {
     code: 'not-found',
     message: 'The document does not exist.',
   },
-  
+
   FIRESTORE_ALREADY_EXISTS: {
     code: 'already-exists',
     message: 'The document already exists.',
   },
-  
+
   FIRESTORE_UNAVAILABLE: {
     code: 'unavailable',
     message: 'The service is currently unavailable.',
   },
-  
+
   FIRESTORE_DEADLINE_EXCEEDED: {
     code: 'deadline-exceeded',
     message: 'The deadline expired before the operation could complete.',
@@ -504,16 +504,16 @@ export class FirebaseFixtures {
       providerData: [],
       toJSON: () => ({ uid: overrides.uid || `user-${Date.now()}` }),
     } as UserRecord
-    
+
     return { ...baseUser, ...overrides }
   }
-  
+
   /**
    * Create a sample decoded ID token
    */
   static createIdToken(overrides: Partial<DecodedIdToken> = {}): DecodedIdToken {
     const now = Math.floor(Date.now() / 1000)
-    
+
     return {
       uid: `user-${Date.now()}`,
       aud: 'superpool-test',
@@ -529,18 +529,16 @@ export class FirebaseFixtures {
       ...overrides,
     }
   }
-  
+
   /**
    * Create a sample nonce document
    */
   static createNonce(walletAddress: string, overrides: any = {}) {
     const timestamp = Date.now()
-    
+
     return {
       walletAddress,
-      nonce: Array.from({ length: 64 }, () => 
-        Math.floor(Math.random() * 16).toString(16)
-      ).join(''),
+      nonce: Array.from({ length: 64 }, () => Math.floor(Math.random() * 16).toString(16)).join(''),
       timestamp,
       expiresAt: new Date(timestamp + 600000), // 10 minutes
       used: false,
@@ -548,7 +546,7 @@ export class FirebaseFixtures {
       ...overrides,
     }
   }
-  
+
   /**
    * Create a sample pool document
    */

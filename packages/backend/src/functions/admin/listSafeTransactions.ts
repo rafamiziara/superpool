@@ -47,7 +47,7 @@ export interface ListSafeTransactionsResponse {
 
 /**
  * Cloud Function to list Safe multi-sig transactions
- * 
+ *
  * @param request - The callable request with filtering options
  * @returns Paginated list of Safe transactions
  */
@@ -62,7 +62,7 @@ export const listSafeTransactions = onCall(
     const functionName = 'listSafeTransactions'
     logger.info(`${functionName}: Listing Safe transactions`, {
       uid: request.auth?.uid,
-      params: request.data
+      params: request.data,
     })
 
     try {
@@ -81,7 +81,7 @@ export const listSafeTransactions = onCall(
       // 3. Get user's wallet address and check Safe ownership
       const userAddress = await getUserWalletAddress(request.auth.uid)
       let userIsSafeOwner = false
-      
+
       if (userAddress) {
         try {
           const provider = new ethers.JsonRpcProvider(getProviderUrl(chainId))
@@ -89,7 +89,7 @@ export const listSafeTransactions = onCall(
           userIsSafeOwner = await isSafeOwner(safeAddress, userAddress, provider)
         } catch (error) {
           logger.warn(`${functionName}: Error checking Safe ownership`, {
-            error: error instanceof Error ? error.message : String(error)
+            error: error instanceof Error ? error.message : String(error),
           })
         }
       }
@@ -102,7 +102,7 @@ export const listSafeTransactions = onCall(
       if (request.data.safeAddress) {
         queryRef = queryRef.where('safeAddress', '==', request.data.safeAddress)
       }
-      
+
       if (chainId) {
         queryRef = queryRef.where('chainId', '==', chainId)
       }
@@ -121,17 +121,13 @@ export const listSafeTransactions = onCall(
 
       // 6. Apply pagination and ordering
       const offset = (page - 1) * limit
-      const transactionsSnapshot = await queryRef
-        .orderBy('createdAt', 'desc')
-        .offset(offset)
-        .limit(limit)
-        .get()
+      const transactionsSnapshot = await queryRef.orderBy('createdAt', 'desc').offset(offset).limit(limit).get()
 
       // 7. Transform results
       const transactions: SafeTransactionInfo[] = transactionsSnapshot.docs.map((doc: any) => {
         const data = doc.data()
         const signatures = data.signatures || []
-        
+
         return {
           transactionHash: data.transactionHash,
           safeAddress: data.safeAddress,
@@ -141,7 +137,7 @@ export const listSafeTransactions = onCall(
           currentSignatures: signatures.length,
           signatures: signatures.map((sig: any) => ({
             signer: sig.signer,
-            signedAt: sig.signedAt?.toDate()
+            signedAt: sig.signedAt?.toDate(),
           })),
           createdBy: data.createdBy,
           createdAt: data.createdAt?.toDate() || new Date(),
@@ -149,7 +145,7 @@ export const listSafeTransactions = onCall(
           executionTxHash: data.executionTxHash,
           executedAt: data.executedAt?.toDate(),
           poolParams: data.poolParams,
-          readyToExecute: signatures.length >= data.requiredSignatures && data.status === 'ready_to_execute'
+          readyToExecute: signatures.length >= data.requiredSignatures && data.status === 'ready_to_execute',
         }
       })
 
@@ -161,7 +157,7 @@ export const listSafeTransactions = onCall(
         totalCount,
         page,
         limit,
-        userIsSafeOwner
+        userIsSafeOwner,
       })
 
       return {
@@ -172,13 +168,12 @@ export const listSafeTransactions = onCall(
         limit,
         hasNextPage,
         hasPreviousPage,
-        userIsSafeOwner
+        userIsSafeOwner,
       }
-
     } catch (error) {
       logger.error(`${functionName}: Error listing Safe transactions`, {
         error: error instanceof Error ? error.message : String(error),
-        uid: request.auth?.uid
+        uid: request.auth?.uid,
       })
 
       return handleError(error, functionName)
@@ -192,11 +187,11 @@ export const listSafeTransactions = onCall(
 function getProviderUrl(chainId: number): string {
   const envKey = chainId === 80002 ? 'POLYGON_AMOY_RPC_URL' : 'POLYGON_MAINNET_RPC_URL'
   const url = process.env[envKey]
-  
+
   if (!url) {
     throw new Error(`RPC URL not configured for chain ID ${chainId}`)
   }
-  
+
   return url
 }
 
@@ -206,11 +201,11 @@ function getProviderUrl(chainId: number): string {
 function getSafeAddress(chainId: number): string {
   const envKey = chainId === 80002 ? 'SAFE_ADDRESS_AMOY' : 'SAFE_ADDRESS_POLYGON'
   const address = process.env[envKey]
-  
+
   if (!address) {
     throw new Error(`Safe address not configured for chain ID ${chainId}`)
   }
-  
+
   return address
 }
 
@@ -221,17 +216,17 @@ async function getUserWalletAddress(uid: string): Promise<string | null> {
   try {
     const db = getFirestore()
     const userDoc = await db.collection('users').doc(uid).get()
-    
+
     if (userDoc.exists) {
       const userData = userDoc.data()
       return userData?.walletAddress || null
     }
-    
+
     return null
   } catch (error) {
     logger.error('Error getting user wallet address', {
       uid,
-      error: error instanceof Error ? error.message : String(error)
+      error: error instanceof Error ? error.message : String(error),
     })
     return null
   }

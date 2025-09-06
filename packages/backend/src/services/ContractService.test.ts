@@ -26,25 +26,25 @@ describe('ContractService', () => {
       rpcUrl: 'https://rpc-amoy.polygon.technology',
       safeAddress: '0x123456789abcdef',
       privateKey: '0xprivatekey123',
-      poolFactoryAddress: '0x987654321fedcba'
+      poolFactoryAddress: '0x987654321fedcba',
     }
 
     // Mock ethers components
     mockProvider = {
       waitForTransaction: jest.fn(),
       getFeeData: jest.fn(),
-      getTransactionReceipt: jest.fn()
+      getTransactionReceipt: jest.fn(),
     }
 
     mockSigner = {
       getAddress: jest.fn().mockResolvedValue('0xsigneraddress'),
-      signMessage: jest.fn()
+      signMessage: jest.fn(),
     }
 
     mockSafeContract = {
       getThreshold: jest.fn().mockResolvedValue(2),
       getOwners: jest.fn().mockResolvedValue(['0xowner1', '0xowner2', '0xowner3']),
-      nonce: jest.fn().mockResolvedValue(5)
+      nonce: jest.fn().mockResolvedValue(5),
     }
 
     // Mock Firestore
@@ -58,7 +58,7 @@ describe('ContractService', () => {
       orderBy: jest.fn().mockReturnThis(),
       offset: jest.fn().mockReturnThis(),
       limit: jest.fn().mockReturnThis(),
-      count: jest.fn().mockReturnThis()
+      count: jest.fn().mockReturnThis(),
     }
 
     // Mock ethers
@@ -67,7 +67,7 @@ describe('ContractService', () => {
     ethers.Wallet = jest.fn().mockReturnValue(mockSigner)
     ethers.Interface = jest.fn().mockReturnValue({
       encodeFunctionData: jest.fn().mockReturnValue('0xencodeddata'),
-      parseLog: jest.fn()
+      parseLog: jest.fn(),
     })
     ethers.ZeroAddress = '0x0000000000000000000000000000000000000000'
     ethers.verifyMessage = jest.fn().mockReturnValue('0xowner1')
@@ -106,11 +106,11 @@ describe('ContractService', () => {
         status: 1,
         blockNumber: 12345,
         gasUsed: { toString: () => '150000' },
-        logs: []
-      })
+        logs: [],
+      }),
     })
     multisig.getSafeAddresses = jest.fn().mockReturnValue({
-      multiSend: '0xmultisendaddress'
+      multiSend: '0xmultisendaddress',
     })
 
     // Mock Firestore
@@ -131,7 +131,7 @@ describe('ContractService', () => {
   describe('proposeTransaction', () => {
     it('should create a transaction proposal successfully', async () => {
       const mockDoc = {
-        exists: false
+        exists: false,
       }
       mockDb.get.mockResolvedValue(mockDoc)
 
@@ -141,7 +141,7 @@ describe('ContractService', () => {
         data: '0xdata123',
         operation: 0,
         description: 'Test transaction',
-        metadata: { test: true }
+        metadata: { test: true },
       }
 
       const result = await contractService.proposeTransaction(proposal, 'user123')
@@ -151,7 +151,7 @@ describe('ContractService', () => {
         status: 'pending_signatures',
         requiredSignatures: 2,
         currentSignatures: 0,
-        description: 'Test transaction'
+        description: 'Test transaction',
       })
 
       expect(mockDb.set).toHaveBeenCalledWith(
@@ -160,7 +160,7 @@ describe('ContractService', () => {
           status: 'pending_signatures',
           description: 'Test transaction',
           createdBy: 'user123',
-          chainId: 80002
+          chainId: 80002,
         })
       )
     })
@@ -173,18 +173,17 @@ describe('ContractService', () => {
         value: '0',
         data: '0xdata123',
         operation: 0,
-        description: 'Test transaction'
+        description: 'Test transaction',
       }
 
-      await expect(contractService.proposeTransaction(proposal, 'user123'))
-        .rejects.toThrow(AppError)
+      await expect(contractService.proposeTransaction(proposal, 'user123')).rejects.toThrow(AppError)
     })
   })
 
   describe('proposeContractCall', () => {
     it('should create a contract call proposal successfully', async () => {
       const mockDoc = {
-        exists: false
+        exists: false,
       }
       mockDb.get.mockResolvedValue(mockDoc)
 
@@ -193,26 +192,21 @@ describe('ContractService', () => {
         functionName: 'testFunction',
         abi: [{ name: 'testFunction', inputs: [] }],
         args: [],
-        value: '0'
+        value: '0',
       }
 
-      const result = await contractService.proposeContractCall(
-        contractCall,
-        'Test contract call',
-        'user123',
-        { test: true }
-      )
+      const result = await contractService.proposeContractCall(contractCall, 'Test contract call', 'user123', { test: true })
 
       expect(result).toMatchObject({
         id: '0xtxhash123',
         status: 'pending_signatures',
-        description: 'Test contract call'
+        description: 'Test contract call',
       })
 
       expect(result.metadata).toMatchObject({
         test: true,
         functionName: 'testFunction',
-        contractAddress: '0xcontractaddress'
+        contractAddress: '0xcontractaddress',
       })
     })
 
@@ -223,7 +217,7 @@ describe('ContractService', () => {
       const mockInterface = jest.fn().mockImplementation(() => ({
         encodeFunctionData: jest.fn().mockImplementation(() => {
           throw new Error('ABI encoding failed')
-        })
+        }),
       }))
       ethers.Interface = mockInterface
 
@@ -231,14 +225,10 @@ describe('ContractService', () => {
         contractAddress: '0xcontractaddress',
         functionName: 'testFunction',
         abi: [{ name: 'testFunction', inputs: [] }],
-        args: []
+        args: [],
       }
 
-      await expect(contractService.proposeContractCall(
-        contractCall,
-        'Test contract call',
-        'user123'
-      )).rejects.toThrow(AppError)
+      await expect(contractService.proposeContractCall(contractCall, 'Test contract call', 'user123')).rejects.toThrow(AppError)
 
       // Restore the original mock
       ethers.Interface = originalInterface
@@ -248,7 +238,7 @@ describe('ContractService', () => {
   describe('proposeBatchTransaction', () => {
     it('should create a batch transaction proposal successfully', async () => {
       const mockDoc = {
-        exists: false
+        exists: false,
       }
       mockDb.get.mockResolvedValue(mockDoc)
 
@@ -259,18 +249,18 @@ describe('ContractService', () => {
             value: '0',
             data: '0xdata1',
             operation: 0,
-            description: 'Transaction 1'
+            description: 'Transaction 1',
           },
           {
             to: '0xcontract2',
             value: '0',
             data: '0xdata2',
             operation: 0,
-            description: 'Transaction 2'
-          }
+            description: 'Transaction 2',
+          },
         ],
         description: 'Batch transaction test',
-        metadata: { batch: true }
+        metadata: { batch: true },
       }
 
       const result = await contractService.proposeBatchTransaction(batchRequest, 'user123')
@@ -278,37 +268,37 @@ describe('ContractService', () => {
       expect(result).toMatchObject({
         id: '0xtxhash123',
         status: 'pending_signatures',
-        description: 'Batch transaction test'
+        description: 'Batch transaction test',
       })
 
       expect(result.metadata).toMatchObject({
         batch: true,
-        batchSize: 2
+        batchSize: 2,
       })
     })
 
     it('should handle empty batch transactions', async () => {
       const mockDoc = {
-        exists: false
+        exists: false,
       }
       mockDb.get.mockResolvedValue(mockDoc)
 
       const batchRequest: BatchTransactionRequest = {
         transactions: [],
-        description: 'Empty batch'
+        description: 'Empty batch',
       }
 
       // The service allows empty batches - this is valid MultiSend behavior
       const result = await contractService.proposeBatchTransaction(batchRequest, 'user123')
-      
+
       expect(result).toMatchObject({
         id: '0xtxhash123',
         status: 'pending_signatures',
-        description: 'Empty batch'
+        description: 'Empty batch',
       })
 
       expect(result.metadata).toMatchObject({
-        batchSize: 0
+        batchSize: 0,
       })
     })
   })
@@ -324,8 +314,8 @@ describe('ContractService', () => {
           requiredSignatures: 2,
           currentSignatures: 0,
           safeTransaction: { to: '0xcontract', data: '0xdata' },
-          description: 'Test transaction'
-        })
+          description: 'Test transaction',
+        }),
       }
       mockDb.get.mockResolvedValue(mockTxDoc)
 
@@ -334,7 +324,7 @@ describe('ContractService', () => {
 
       const signature = {
         signer: '0xowner1',
-        data: '0xsignature123'
+        data: '0xsignature123',
       }
 
       const result = await contractService.addSignature('0xtxhash123', signature)
@@ -344,7 +334,7 @@ describe('ContractService', () => {
       expect(mockDb.update).toHaveBeenCalledWith(
         expect.objectContaining({
           signatures: [signature],
-          currentSignatures: 1
+          currentSignatures: 1,
         })
       )
     })
@@ -357,8 +347,8 @@ describe('ContractService', () => {
           status: 'pending_signatures',
           signatures: [{ signer: '0xowner1', data: '0xsig1' }],
           requiredSignatures: 2,
-          currentSignatures: 1
-        })
+          currentSignatures: 1,
+        }),
       }
       mockDb.get.mockResolvedValue(mockTxDoc)
 
@@ -367,7 +357,7 @@ describe('ContractService', () => {
 
       const signature = {
         signer: '0xowner2',
-        data: '0xsignature456'
+        data: '0xsignature456',
       }
 
       const result = await contractService.addSignature('0xtxhash123', signature)
@@ -377,7 +367,7 @@ describe('ContractService', () => {
       expect(mockDb.update).toHaveBeenCalledWith(
         expect.objectContaining({
           status: 'ready_to_execute',
-          readyAt: expect.any(Date)
+          readyAt: expect.any(Date),
         })
       )
     })
@@ -388,18 +378,17 @@ describe('ContractService', () => {
         data: () => ({
           status: 'pending_signatures',
           signatures: [{ signer: '0xowner1', data: '0xsig1' }],
-          requiredSignatures: 2
-        })
+          requiredSignatures: 2,
+        }),
       }
       mockDb.get.mockResolvedValue(mockTxDoc)
 
       const signature = {
         signer: '0xowner1',
-        data: '0xsignature123'
+        data: '0xsignature123',
       }
 
-      await expect(contractService.addSignature('0xtxhash123', signature))
-        .rejects.toThrow(AppError)
+      await expect(contractService.addSignature('0xtxhash123', signature)).rejects.toThrow(AppError)
     })
 
     it('should reject invalid signature format', async () => {
@@ -408,8 +397,8 @@ describe('ContractService', () => {
         data: () => ({
           status: 'pending_signatures',
           signatures: [],
-          requiredSignatures: 2
-        })
+          requiredSignatures: 2,
+        }),
       }
       mockDb.get.mockResolvedValue(mockTxDoc)
 
@@ -418,11 +407,10 @@ describe('ContractService', () => {
 
       const signature = {
         signer: '0xsigneraddress',
-        data: '0xsignature123'
+        data: '0xsignature123',
       }
 
-      await expect(contractService.addSignature('0xtxhash123', signature))
-        .rejects.toThrow(AppError)
+      await expect(contractService.addSignature('0xtxhash123', signature)).rejects.toThrow(AppError)
     })
   })
 
@@ -434,14 +422,14 @@ describe('ContractService', () => {
           status: 'ready_to_execute',
           signatures: [
             { signer: '0xowner1', data: '0xsig1' },
-            { signer: '0xowner2', data: '0xsig2' }
+            { signer: '0xowner2', data: '0xsig2' },
           ],
           requiredSignatures: 2,
           safeTransaction: {
             to: '0xcontract',
-            data: '0xdata'
-          }
-        })
+            data: '0xdata',
+          },
+        }),
       }
       mockDb.get.mockResolvedValue(mockTxDoc)
 
@@ -455,8 +443,8 @@ describe('ContractService', () => {
           status: 'completed',
           executionResult: expect.objectContaining({
             success: true,
-            transactionHash: '0xexecutiontxhash'
-          })
+            transactionHash: '0xexecutiontxhash',
+          }),
         })
       )
     })
@@ -467,13 +455,12 @@ describe('ContractService', () => {
         data: () => ({
           status: 'pending_signatures',
           signatures: [{ signer: '0xowner1', data: '0xsig1' }],
-          requiredSignatures: 2
-        })
+          requiredSignatures: 2,
+        }),
       }
       mockDb.get.mockResolvedValue(mockTxDoc)
 
-      await expect(contractService.executeTransaction('0xtxhash123'))
-        .rejects.toThrow(AppError)
+      await expect(contractService.executeTransaction('0xtxhash123')).rejects.toThrow(AppError)
     })
 
     it('should handle execution failures', async () => {
@@ -483,23 +470,22 @@ describe('ContractService', () => {
           status: 'ready_to_execute',
           signatures: [
             { signer: '0xowner1', data: '0xsig1' },
-            { signer: '0xowner2', data: '0xsig2' }
+            { signer: '0xowner2', data: '0xsig2' },
           ],
           requiredSignatures: 2,
-          safeTransaction: { to: '0xcontract', data: '0xdata' }
-        })
+          safeTransaction: { to: '0xcontract', data: '0xdata' },
+        }),
       }
       mockDb.get.mockResolvedValue(mockTxDoc)
 
       const multisig = require('../utils/multisig')
       multisig.executeSafeTransaction.mockRejectedValue(new Error('Execution failed'))
 
-      await expect(contractService.executeTransaction('0xtxhash123'))
-        .rejects.toThrow(AppError)
+      await expect(contractService.executeTransaction('0xtxhash123')).rejects.toThrow(AppError)
 
       expect(mockDb.update).toHaveBeenCalledWith(
         expect.objectContaining({
-          status: 'failed'
+          status: 'failed',
         })
       )
     })
@@ -518,8 +504,8 @@ describe('ContractService', () => {
           createdAt: { toDate: () => new Date('2023-01-01') },
           updatedAt: { toDate: () => new Date('2023-01-02') },
           description: 'Test transaction',
-          safeTransaction: { to: '0xcontract' }
-        })
+          safeTransaction: { to: '0xcontract' },
+        }),
       }
       mockDb.get.mockResolvedValue(mockTxDoc)
 
@@ -530,7 +516,7 @@ describe('ContractService', () => {
         status: 'pending_signatures',
         currentSignatures: 1,
         requiredSignatures: 2,
-        description: 'Test transaction'
+        description: 'Test transaction',
       })
     })
 
@@ -547,7 +533,7 @@ describe('ContractService', () => {
   describe('listTransactions', () => {
     it('should list transactions with pagination', async () => {
       const mockCountSnapshot = {
-        data: () => ({ count: 25 })
+        data: () => ({ count: 25 }),
       }
       const mockTransactions = [
         {
@@ -560,8 +546,8 @@ describe('ContractService', () => {
             createdAt: { toDate: () => new Date('2023-01-01') },
             updatedAt: { toDate: () => new Date('2023-01-01') },
             description: 'Transaction 1',
-            safeTransaction: { to: '0xcontract1' }
-          })
+            safeTransaction: { to: '0xcontract1' },
+          }),
         },
         {
           data: () => ({
@@ -574,9 +560,9 @@ describe('ContractService', () => {
             updatedAt: { toDate: () => new Date('2023-01-03') },
             executedAt: { toDate: () => new Date('2023-01-03') },
             description: 'Transaction 2',
-            safeTransaction: { to: '0xcontract2' }
-          })
-        }
+            safeTransaction: { to: '0xcontract2' },
+          }),
+        },
       ]
 
       mockDb.get.mockResolvedValueOnce(mockCountSnapshot)
@@ -584,7 +570,7 @@ describe('ContractService', () => {
 
       const result = await contractService.listTransactions({
         limit: 10,
-        offset: 0
+        offset: 0,
       })
 
       expect(result.transactions).toHaveLength(2)
@@ -595,13 +581,13 @@ describe('ContractService', () => {
 
     it('should apply status filter', async () => {
       const mockCountSnapshot = {
-        data: () => ({ count: 1 })
+        data: () => ({ count: 1 }),
       }
       mockDb.get.mockResolvedValueOnce(mockCountSnapshot)
       mockDb.get.mockResolvedValueOnce({ docs: [] })
 
       await contractService.listTransactions({
-        status: 'pending_signatures'
+        status: 'pending_signatures',
       })
 
       expect(mockDb.where).toHaveBeenCalledWith('status', '==', 'pending_signatures')
@@ -611,26 +597,22 @@ describe('ContractService', () => {
   describe('emergencyPause', () => {
     it('should create emergency pause transaction', async () => {
       const mockDoc = {
-        exists: false
+        exists: false,
       }
       mockDb.get.mockResolvedValue(mockDoc)
 
-      const result = await contractService.emergencyPause(
-        '0xcontractaddress',
-        'user123',
-        'Critical security vulnerability detected'
-      )
+      const result = await contractService.emergencyPause('0xcontractaddress', 'user123', 'Critical security vulnerability detected')
 
       expect(result).toMatchObject({
         id: '0xtxhash123',
         status: 'pending_signatures',
-        description: 'EMERGENCY PAUSE: Critical security vulnerability detected'
+        description: 'EMERGENCY PAUSE: Critical security vulnerability detected',
       })
 
       expect(result.metadata).toMatchObject({
         emergency: true,
         reason: 'Critical security vulnerability detected',
-        pausedContract: '0xcontractaddress'
+        pausedContract: '0xcontractaddress',
       })
     })
   })
@@ -644,11 +626,10 @@ describe('ContractService', () => {
         value: '0',
         data: '0xdata123',
         operation: 0,
-        description: 'Test transaction'
+        description: 'Test transaction',
       }
 
-      await expect(contractService.proposeTransaction(proposal, 'user123'))
-        .rejects.toThrow(AppError)
+      await expect(contractService.proposeTransaction(proposal, 'user123')).rejects.toThrow(AppError)
     })
 
     it('should preserve AppError instances', async () => {
@@ -660,11 +641,10 @@ describe('ContractService', () => {
         value: '0',
         data: '0xdata123',
         operation: 0,
-        description: 'Test transaction'
+        description: 'Test transaction',
       }
 
-      await expect(contractService.proposeTransaction(proposal, 'user123'))
-        .rejects.toThrow('Custom error')
+      await expect(contractService.proposeTransaction(proposal, 'user123')).rejects.toThrow('Custom error')
     })
   })
 })

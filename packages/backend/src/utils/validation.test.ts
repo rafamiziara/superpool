@@ -1,10 +1,6 @@
 import { expect } from '@jest/globals'
 import { jest } from '@jest/globals'
-import { 
-  validatePoolCreationParams, 
-  sanitizePoolParams,
-  ValidationResult 
-} from './validation'
+import { validatePoolCreationParams, sanitizePoolParams, ValidationResult } from './validation'
 import { CreatePoolRequest } from '../functions/pools/createPool'
 
 // Mock ethers module
@@ -21,8 +17,8 @@ jest.mock('ethers', () => ({
       if (isNaN(numValue)) throw new Error('Invalid number')
       // Allow negative parsing, validation logic will handle the check
       return BigInt(Math.floor(numValue * 1e18))
-    })
-  }
+    }),
+  },
 }))
 
 describe('validation utilities', () => {
@@ -34,12 +30,12 @@ describe('validation utilities', () => {
       loanDuration: 3600, // 1 hour (minimum)
       name: 'Test Pool',
       description: 'A test lending pool for comprehensive testing',
-      chainId: 80002
+      chainId: 80002,
     }
 
     it('should accept valid parameters', () => {
       const result = validatePoolCreationParams(validParams)
-      
+
       expect(result.isValid).toBe(true)
       expect(result.errors).toHaveLength(0)
     })
@@ -48,7 +44,7 @@ describe('validation utilities', () => {
       it('should reject invalid Ethereum addresses', () => {
         const invalidParams = { ...validParams, poolOwner: 'invalid-address' }
         const result = validatePoolCreationParams(invalidParams)
-        
+
         expect(result.isValid).toBe(false)
         expect(result.errors).toContain('Pool owner must be a valid Ethereum address')
       })
@@ -56,14 +52,14 @@ describe('validation utilities', () => {
       it('should reject zero address', () => {
         const invalidParams = { ...validParams, poolOwner: '0x0000000000000000000000000000000000000000' }
         const result = validatePoolCreationParams(invalidParams)
-        
+
         expect(result.isValid).toBe(true) // Note: The validation doesn't check for zero address specifically
       })
 
       it('should accept checksummed addresses', () => {
         const checksummedParams = { ...validParams, poolOwner: '0x742d35Cc6670C74288C2e768dC1E574a0B7DbE7a' }
         const result = validatePoolCreationParams(checksummedParams)
-        
+
         expect(result.isValid).toBe(true)
       })
     })
@@ -72,7 +68,7 @@ describe('validation utilities', () => {
       it('should reject non-numeric strings', () => {
         const invalidParams = { ...validParams, maxLoanAmount: 'not-a-number' }
         const result = validatePoolCreationParams(invalidParams)
-        
+
         expect(result.isValid).toBe(false)
         expect(result.errors).toContain('Max loan amount must be a valid number')
       })
@@ -80,7 +76,7 @@ describe('validation utilities', () => {
       it('should reject negative amounts', () => {
         const invalidParams = { ...validParams, maxLoanAmount: '-1' }
         const result = validatePoolCreationParams(invalidParams)
-        
+
         expect(result.isValid).toBe(false)
         expect(result.errors).toContain('Max loan amount must be greater than 0')
       })
@@ -88,7 +84,7 @@ describe('validation utilities', () => {
       it('should reject zero amounts', () => {
         const invalidParams = { ...validParams, maxLoanAmount: '0' }
         const result = validatePoolCreationParams(invalidParams)
-        
+
         expect(result.isValid).toBe(false)
         expect(result.errors).toContain('Max loan amount must be greater than 0')
       })
@@ -96,7 +92,7 @@ describe('validation utilities', () => {
       it('should reject amounts that are too large', () => {
         const invalidParams = { ...validParams, maxLoanAmount: '1000001' } // > 1,000,000 ETH
         const result = validatePoolCreationParams(invalidParams)
-        
+
         expect(result.isValid).toBe(false)
         expect(result.errors).toContain('Max loan amount is too large (max: 1,000,000 POL)')
       })
@@ -105,10 +101,10 @@ describe('validation utilities', () => {
         const validAmounts = [
           '0.001', // 0.001 ETH
           '1', // 1 ETH
-          '1000' // 1,000 ETH
+          '1000', // 1,000 ETH
         ]
 
-        validAmounts.forEach(amount => {
+        validAmounts.forEach((amount) => {
           const params = { ...validParams, maxLoanAmount: amount }
           const result = validatePoolCreationParams(params)
           expect(result.isValid).toBe(true)
@@ -120,7 +116,7 @@ describe('validation utilities', () => {
       it('should reject non-numeric interest rates', () => {
         const invalidParams = { ...validParams, interestRate: 'not-a-number' as any }
         const result = validatePoolCreationParams(invalidParams)
-        
+
         expect(result.isValid).toBe(false)
         expect(result.errors).toContain('Interest rate is required')
       })
@@ -128,7 +124,7 @@ describe('validation utilities', () => {
       it('should reject negative interest rates', () => {
         const invalidParams = { ...validParams, interestRate: -100 }
         const result = validatePoolCreationParams(invalidParams)
-        
+
         expect(result.isValid).toBe(false)
         expect(result.errors).toContain('Interest rate cannot be negative')
       })
@@ -136,7 +132,7 @@ describe('validation utilities', () => {
       it('should reject interest rates above 100%', () => {
         const invalidParams = { ...validParams, interestRate: 10001 } // 100.01%
         const result = validatePoolCreationParams(invalidParams)
-        
+
         expect(result.isValid).toBe(false)
         expect(result.errors).toContain('Interest rate cannot exceed 100% (10000 basis points)')
       })
@@ -144,7 +140,7 @@ describe('validation utilities', () => {
       it('should accept valid interest rates', () => {
         const validRates = [0, 100, 500, 1000, 10000] // 0%, 1%, 5%, 10%, 100%
 
-        validRates.forEach(rate => {
+        validRates.forEach((rate) => {
           const params = { ...validParams, interestRate: rate }
           const result = validatePoolCreationParams(params)
           expect(result.isValid).toBe(true)
@@ -156,7 +152,7 @@ describe('validation utilities', () => {
       it('should reject non-numeric durations', () => {
         const invalidParams = { ...validParams, loanDuration: 'not-a-number' as any }
         const result = validatePoolCreationParams(invalidParams)
-        
+
         expect(result.isValid).toBe(false)
         expect(result.errors).toContain('Loan duration is required')
       })
@@ -164,7 +160,7 @@ describe('validation utilities', () => {
       it('should reject durations less than 1 hour', () => {
         const invalidParams = { ...validParams, loanDuration: 3599 } // 59m 59s
         const result = validatePoolCreationParams(invalidParams)
-        
+
         expect(result.isValid).toBe(false)
         expect(result.errors).toContain('Loan duration must be at least 1 hour (3600 seconds)')
       })
@@ -172,7 +168,7 @@ describe('validation utilities', () => {
       it('should reject durations more than 1 year', () => {
         const invalidParams = { ...validParams, loanDuration: 31536001 } // 1 year + 1 second
         const result = validatePoolCreationParams(invalidParams)
-        
+
         expect(result.isValid).toBe(false)
         expect(result.errors).toContain('Loan duration cannot exceed 1 year (31536000 seconds)')
       })
@@ -183,10 +179,10 @@ describe('validation utilities', () => {
           86400, // 1 day
           604800, // 1 week
           2592000, // 30 days
-          31536000 // 1 year
+          31536000, // 1 year
         ]
 
-        validDurations.forEach(duration => {
+        validDurations.forEach((duration) => {
           const params = { ...validParams, loanDuration: duration }
           const result = validatePoolCreationParams(params)
           expect(result.isValid).toBe(true)
@@ -198,7 +194,7 @@ describe('validation utilities', () => {
       it('should reject empty names', () => {
         const invalidParams = { ...validParams, name: '' }
         const result = validatePoolCreationParams(invalidParams)
-        
+
         expect(result.isValid).toBe(false)
         expect(result.errors).toContain('Pool name is required')
       })
@@ -206,7 +202,7 @@ describe('validation utilities', () => {
       it('should reject names that are too short', () => {
         const invalidParams = { ...validParams, name: 'ab' }
         const result = validatePoolCreationParams(invalidParams)
-        
+
         expect(result.isValid).toBe(false)
         expect(result.errors).toContain('Pool name must be at least 3 characters long')
       })
@@ -214,7 +210,7 @@ describe('validation utilities', () => {
       it('should reject names that are too long', () => {
         const invalidParams = { ...validParams, name: 'a'.repeat(101) }
         const result = validatePoolCreationParams(invalidParams)
-        
+
         expect(result.isValid).toBe(false)
         expect(result.errors).toContain('Pool name cannot exceed 100 characters')
       })
@@ -222,7 +218,7 @@ describe('validation utilities', () => {
       it('should reject empty descriptions', () => {
         const invalidParams = { ...validParams, description: '' }
         const result = validatePoolCreationParams(invalidParams)
-        
+
         expect(result.isValid).toBe(false)
         expect(result.errors).toContain('Pool description is required')
       })
@@ -230,7 +226,7 @@ describe('validation utilities', () => {
       it('should reject descriptions that are too short', () => {
         const invalidParams = { ...validParams, description: 'short' }
         const result = validatePoolCreationParams(invalidParams)
-        
+
         expect(result.isValid).toBe(false)
         expect(result.errors).toContain('Pool description must be at least 10 characters long')
       })
@@ -238,7 +234,7 @@ describe('validation utilities', () => {
       it('should reject descriptions that are too long', () => {
         const invalidParams = { ...validParams, description: 'a'.repeat(1001) }
         const result = validatePoolCreationParams(invalidParams)
-        
+
         expect(result.isValid).toBe(false)
         expect(result.errors).toContain('Pool description cannot exceed 1000 characters')
       })
@@ -247,10 +243,10 @@ describe('validation utilities', () => {
         const validTestParams = {
           ...validParams,
           name: 'Valid Pool Name',
-          description: 'This is a valid pool description that provides useful information about the lending pool.'
+          description: 'This is a valid pool description that provides useful information about the lending pool.',
         }
         const result = validatePoolCreationParams(validTestParams)
-        
+
         expect(result.isValid).toBe(true)
       })
     })
@@ -259,7 +255,7 @@ describe('validation utilities', () => {
       it('should reject invalid chain IDs', () => {
         const invalidParams = { ...validParams, chainId: 999999 }
         const result = validatePoolCreationParams(invalidParams)
-        
+
         expect(result.isValid).toBe(false)
         expect(result.errors).toContain('Unsupported chain ID: 999999. Supported: 80002, 137')
       })
@@ -267,7 +263,7 @@ describe('validation utilities', () => {
       it('should accept valid chain IDs', () => {
         const validChainIds = [137, 80002]
 
-        validChainIds.forEach(chainId => {
+        validChainIds.forEach((chainId) => {
           const params = { ...validParams, chainId }
           const result = validatePoolCreationParams(params)
           expect(result.isValid).toBe(true)
@@ -277,7 +273,7 @@ describe('validation utilities', () => {
       it('should default to Polygon Amoy if not provided', () => {
         const paramsWithoutChain = { ...validParams }
         delete paramsWithoutChain.chainId
-        
+
         const result = validatePoolCreationParams(paramsWithoutChain)
         expect(result.isValid).toBe(true)
       })
@@ -291,11 +287,11 @@ describe('validation utilities', () => {
         loanDuration: 100,
         name: '',
         description: '',
-        chainId: 999999
+        chainId: 999999,
       }
-      
+
       const result = validatePoolCreationParams(invalidParams)
-      
+
       expect(result.isValid).toBe(false)
       expect(result.errors.length).toBeGreaterThan(5)
     })
@@ -309,11 +305,11 @@ describe('validation utilities', () => {
         interestRate: 500,
         loanDuration: 3600,
         name: 'Test Pool',
-        description: 'A test lending pool for testing purposes'
+        description: 'A test lending pool for testing purposes',
       }
 
       const sanitized = sanitizePoolParams(params)
-      
+
       expect(sanitized.poolOwner).toBe('0x742d35cc6670c74288c2e768dc1e574a0b7dbe7a')
     })
 
@@ -324,11 +320,11 @@ describe('validation utilities', () => {
         interestRate: 500,
         loanDuration: 3600,
         name: 'Test Pool',
-        description: 'A test lending pool for testing purposes'
+        description: 'A test lending pool for testing purposes',
       }
 
       const sanitized = sanitizePoolParams(params)
-      
+
       expect(sanitized.maxLoanAmount).toBe('1500000000000000000') // 1.5 ETH in wei
     })
 
@@ -339,11 +335,11 @@ describe('validation utilities', () => {
         interestRate: 500,
         loanDuration: 3600,
         name: '  Test Pool  ',
-        description: '  A test lending pool for testing purposes  '
+        description: '  A test lending pool for testing purposes  ',
       }
 
       const sanitized = sanitizePoolParams(params)
-      
+
       expect(sanitized.name).toBe('Test Pool')
       expect(sanitized.description).toBe('A test lending pool for testing purposes')
     })
@@ -355,11 +351,11 @@ describe('validation utilities', () => {
         interestRate: 500,
         loanDuration: 3600,
         name: 'Test Pool',
-        description: 'A test lending pool for testing purposes'
+        description: 'A test lending pool for testing purposes',
       }
 
       const sanitized = sanitizePoolParams(params)
-      
+
       expect(sanitized.chainId).toBe(80002) // Polygon Amoy default
     })
 
@@ -371,11 +367,11 @@ describe('validation utilities', () => {
         loanDuration: 3600,
         name: 'Test Pool',
         description: 'A test lending pool for testing purposes',
-        chainId: 137
+        chainId: 137,
       }
 
       const sanitized = sanitizePoolParams(params)
-      
+
       expect(sanitized.chainId).toBe(137)
     })
 
@@ -386,11 +382,11 @@ describe('validation utilities', () => {
         interestRate: 500.7,
         loanDuration: 3600.9,
         name: 'Test Pool',
-        description: 'A test lending pool for testing purposes'
+        description: 'A test lending pool for testing purposes',
       }
 
       const sanitized = sanitizePoolParams(params)
-      
+
       expect(sanitized.interestRate).toBe(500)
       expect(sanitized.loanDuration).toBe(3600)
     })

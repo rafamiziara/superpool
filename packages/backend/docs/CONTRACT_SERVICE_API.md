@@ -5,6 +5,7 @@ This document provides comprehensive documentation for the `ContractService` cla
 ## Overview
 
 The `ContractService` is a TypeScript class that provides a high-level interface for:
+
 - Creating and managing Safe multi-sig transactions
 - Executing contract calls through Safe wallet
 - Monitoring transaction status and recovery
@@ -20,6 +21,7 @@ Cloud Functions → ContractService → Safe Wallet → Smart Contracts
 ```
 
 The service acts as an abstraction layer between Firebase Cloud Functions and Safe wallet operations, providing:
+
 - **Type Safety**: Full TypeScript support with comprehensive interfaces
 - **State Management**: Firestore integration for transaction tracking
 - **Error Handling**: Structured error handling with recovery mechanisms
@@ -35,7 +37,7 @@ The service acts as an abstraction layer between Firebase Cloud Functions and Sa
 POLYGON_AMOY_RPC_URL=https://rpc-amoy.polygon.technology
 POLYGON_MAINNET_RPC_URL=https://polygon-mainnet.g.alchemy.com/v2/...
 SAFE_ADDRESS_AMOY=0x...     # Safe wallet address on Amoy
-SAFE_ADDRESS_POLYGON=0x...  # Safe wallet address on Mainnet  
+SAFE_ADDRESS_POLYGON=0x...  # Safe wallet address on Mainnet
 POOL_FACTORY_ADDRESS_AMOY=0x...    # PoolFactory contract on Amoy
 POOL_FACTORY_ADDRESS_POLYGON=0x... # PoolFactory contract on Mainnet
 PRIVATE_KEY=0x...           # Backend execution private key
@@ -55,7 +57,7 @@ const service = new ContractService({
   rpcUrl: 'https://rpc-amoy.polygon.technology',
   safeAddress: '0x...',
   privateKey: '0x...',
-  poolFactoryAddress: '0x...'
+  poolFactoryAddress: '0x...',
 })
 ```
 
@@ -67,11 +69,11 @@ Configuration interface for service initialization:
 
 ```typescript
 interface ContractServiceConfig {
-  chainId: number              // Network chain ID (80002 for Amoy, 137 for Polygon)
-  rpcUrl: string              // RPC endpoint URL
-  safeAddress: string         // Safe wallet address
-  privateKey: string          // Backend execution private key
-  poolFactoryAddress: string  // PoolFactory contract address
+  chainId: number // Network chain ID (80002 for Amoy, 137 for Polygon)
+  rpcUrl: string // RPC endpoint URL
+  safeAddress: string // Safe wallet address
+  privateKey: string // Backend execution private key
+  poolFactoryAddress: string // PoolFactory contract address
 }
 ```
 
@@ -81,12 +83,12 @@ Interface for basic transaction proposals:
 
 ```typescript
 interface TransactionProposal {
-  to: string          // Target contract address
-  value: string       // ETH value to send (in wei)
-  data: string        // Encoded function call data
-  operation: number   // 0 = CALL, 1 = DELEGATECALL
+  to: string // Target contract address
+  value: string // ETH value to send (in wei)
+  data: string // Encoded function call data
+  operation: number // 0 = CALL, 1 = DELEGATECALL
   description: string // Human-readable description
-  metadata?: any      // Optional metadata for tracking
+  metadata?: any // Optional metadata for tracking
 }
 ```
 
@@ -96,11 +98,11 @@ Interface for smart contract function calls:
 
 ```typescript
 interface ContractCall {
-  contractAddress: string  // Target contract address
-  functionName: string    // Function name to call
-  abi: any[]             // Contract ABI (function definitions)
-  args: any[]            // Function arguments
-  value?: string         // Optional ETH value
+  contractAddress: string // Target contract address
+  functionName: string // Function name to call
+  abi: any[] // Contract ABI (function definitions)
+  args: any[] // Function arguments
+  value?: string // Optional ETH value
 }
 ```
 
@@ -110,31 +112,31 @@ Interface for transaction state tracking:
 
 ```typescript
 interface TransactionStatus {
-  id: string                           // Transaction hash/ID
-  status: TransactionStatusType        // Current status
-  safeTransaction: SafeTransaction     // Safe transaction details
-  signatures: SafeSignature[]         // Collected signatures
-  requiredSignatures: number          // Signatures needed
-  currentSignatures: number           // Signatures collected
-  createdAt: Date                     // Creation timestamp
-  updatedAt: Date                     // Last update timestamp
-  executedAt?: Date                   // Execution timestamp
-  executionResult?: ExecutionResult   // Execution details
-  description: string                 // Transaction description
-  metadata?: any                      // Optional metadata
+  id: string // Transaction hash/ID
+  status: TransactionStatusType // Current status
+  safeTransaction: SafeTransaction // Safe transaction details
+  signatures: SafeSignature[] // Collected signatures
+  requiredSignatures: number // Signatures needed
+  currentSignatures: number // Signatures collected
+  createdAt: Date // Creation timestamp
+  updatedAt: Date // Last update timestamp
+  executedAt?: Date // Execution timestamp
+  executionResult?: ExecutionResult // Execution details
+  description: string // Transaction description
+  metadata?: any // Optional metadata
 }
 ```
 
 ### Status Types
 
 ```typescript
-type TransactionStatusType = 
-  | 'pending_signatures'  // Awaiting signatures
-  | 'ready_to_execute'   // Threshold met, ready for execution
-  | 'executing'          // Currently being executed
-  | 'completed'          // Successfully executed
-  | 'failed'            // Execution failed
-  | 'expired'           // Transaction expired
+type TransactionStatusType =
+  | 'pending_signatures' // Awaiting signatures
+  | 'ready_to_execute' // Threshold met, ready for execution
+  | 'executing' // Currently being executed
+  | 'completed' // Successfully executed
+  | 'failed' // Execution failed
+  | 'expired' // Transaction expired
 ```
 
 ## Class Methods
@@ -153,13 +155,16 @@ async proposeTransaction(
 ```
 
 **Parameters:**
+
 - `proposal`: Transaction details
 - `createdBy`: Firebase UID of the user creating the proposal
 
 **Returns:**
+
 - `TransactionStatus`: Created transaction with ID and signature requirements
 
 **Example:**
+
 ```typescript
 const proposal = {
   to: '0x742d35Cc6670C74288C2e768dC1E574a0B7DbE7a',
@@ -167,7 +172,7 @@ const proposal = {
   data: '0xa9059cbb000000000000000000000000742d35cc6670c74288c2e768dc1e574a0b7dbe7a0000000000000000000000000000000000000000000000000de0b6b3a7640000',
   operation: 0,
   description: 'Transfer 1 ETH to user',
-  metadata: { type: 'token_transfer' }
+  metadata: { type: 'token_transfer' },
 }
 
 const transaction = await contractService.proposeTransaction(proposal, 'user123')
@@ -188,40 +193,38 @@ async proposeContractCall(
 ```
 
 **Example:**
+
 ```typescript
 const poolCreation = {
-  contractAddress: '0x...',  // PoolFactory address
+  contractAddress: '0x...', // PoolFactory address
   functionName: 'createPool',
   abi: [
     {
-      "name": "createPool",
-      "type": "function",
-      "inputs": [
-        {"name": "poolOwner", "type": "address"},
-        {"name": "maxLoanAmount", "type": "uint256"},
-        {"name": "interestRate", "type": "uint256"},
-        {"name": "loanDuration", "type": "uint256"},
-        {"name": "name", "type": "string"},
-        {"name": "description", "type": "string"}
-      ]
-    }
+      name: 'createPool',
+      type: 'function',
+      inputs: [
+        { name: 'poolOwner', type: 'address' },
+        { name: 'maxLoanAmount', type: 'uint256' },
+        { name: 'interestRate', type: 'uint256' },
+        { name: 'loanDuration', type: 'uint256' },
+        { name: 'name', type: 'string' },
+        { name: 'description', type: 'string' },
+      ],
+    },
   ],
   args: [
     '0x742d35Cc6670C74288C2e768dC1E574a0B7DbE7a',
-    '1000000000000000000000',  // 1000 ETH
-    500,                       // 5%
-    2592000,                   // 30 days
+    '1000000000000000000000', // 1000 ETH
+    500, // 5%
+    2592000, // 30 days
     'Business Loans',
-    'SME lending pool'
-  ]
+    'SME lending pool',
+  ],
 }
 
-const transaction = await contractService.proposeContractCall(
-  poolCreation,
-  'Create Business Loans pool',
-  'admin123',
-  { poolType: 'business' }
-)
+const transaction = await contractService.proposeContractCall(poolCreation, 'Create Business Loans pool', 'admin123', {
+  poolType: 'business',
+})
 ```
 
 #### proposeBatchTransaction()
@@ -236,26 +239,27 @@ async proposeBatchTransaction(
 ```
 
 **Example:**
+
 ```typescript
 const batchRequest = {
   transactions: [
     {
       to: '0xPoolFactory',
       value: '0',
-      data: '0x...',  // createPool call data
+      data: '0x...', // createPool call data
       operation: 0,
-      description: 'Create pool 1'
+      description: 'Create pool 1',
     },
     {
-      to: '0xPoolFactory', 
+      to: '0xPoolFactory',
       value: '0',
-      data: '0x...',  // createPool call data  
+      data: '0x...', // createPool call data
       operation: 0,
-      description: 'Create pool 2'
-    }
+      description: 'Create pool 2',
+    },
   ],
   description: 'Create multiple lending pools',
-  metadata: { batchType: 'pool_creation' }
+  metadata: { batchType: 'pool_creation' },
 }
 
 const transaction = await contractService.proposeBatchTransaction(batchRequest, 'admin123')
@@ -275,10 +279,11 @@ async addSignature(
 ```
 
 **Example:**
+
 ```typescript
 const signature = {
   signer: '0x742d35Cc6670C74288C2e768dC1E574a0B7DbE7a',
-  data: '0x...'  // Signature data from wallet
+  data: '0x...', // Signature data from wallet
 }
 
 const status = await contractService.addSignature('0xtxhash123', signature)
@@ -299,9 +304,11 @@ async executeTransaction(transactionId: string): Promise<ExecutionResult>
 ```
 
 **Returns:**
+
 - `ExecutionResult`: Execution details including transaction hash and events
 
 **Example:**
+
 ```typescript
 const result = await contractService.executeTransaction('0xtxhash123')
 
@@ -323,6 +330,7 @@ async getTransactionStatus(transactionId: string): Promise<TransactionStatus | n
 ```
 
 **Example:**
+
 ```typescript
 const status = await contractService.getTransactionStatus('0xtxhash123')
 
@@ -341,22 +349,23 @@ Lists transactions with filtering and pagination.
 async listTransactions(options?: {
   status?: string
   limit?: number
-  offset?: number  
+  offset?: number
   createdBy?: string
 }): Promise<{ transactions: TransactionStatus[], total: number }>
 ```
 
 **Example:**
+
 ```typescript
 // Get pending transactions
 const { transactions, total } = await contractService.listTransactions({
   status: 'pending_signatures',
   limit: 10,
-  offset: 0
+  offset: 0,
 })
 
 console.log(`Found ${total} pending transactions`)
-transactions.forEach(tx => {
+transactions.forEach((tx) => {
   console.log(`${tx.description}: ${tx.currentSignatures}/${tx.requiredSignatures}`)
 })
 ```
@@ -376,6 +385,7 @@ async emergencyPause(
 ```
 
 **Example:**
+
 ```typescript
 const pauseTransaction = await contractService.emergencyPause(
   '0xPoolFactoryAddress',
@@ -475,6 +485,7 @@ The service uses Firestore for transaction state management:
 ### Firestore Indexes
 
 Required composite indexes:
+
 ```javascript
 // List transactions by chain and safe
 chainId ASC, safeAddress ASC, createdAt DESC
@@ -489,23 +500,27 @@ chainId ASC, safeAddress ASC, createdBy ASC, createdAt DESC
 ## Security Considerations
 
 ### Signature Verification
+
 - All signatures are cryptographically verified
 - Only Safe owners can sign transactions
 - Duplicate signatures are prevented
 - Signature replay attacks are mitigated
 
 ### Access Control
+
 - Only authenticated users can create transactions
 - Safe owner verification for signatures
 - Admin-only functions for emergency operations
 - Backend private key secured in environment
 
 ### Transaction Expiry
+
 - Transactions expire after 7 days
 - Expired transactions cannot be executed
 - Automatic cleanup of expired transactions
 
 ### Data Validation
+
 - All inputs are validated and sanitized
 - Ethereum address format validation
 - ABI and function call validation
@@ -514,16 +529,19 @@ chainId ASC, safeAddress ASC, createdBy ASC, createdAt DESC
 ## Performance Optimization
 
 ### Caching Strategy
+
 - Transaction status cached in Firestore
 - Safe configuration cached during service lifetime
 - ABI interfaces cached for repeated calls
 
 ### Batch Operations
+
 - Multiple signatures can be collected simultaneously
 - Batch transactions execute atomically
 - Optimized Firestore queries with pagination
 
 ### Gas Optimization
+
 - Gas estimation for all transactions
 - Dynamic gas price adjustment
 - Batch operations reduce individual transaction costs
@@ -531,6 +549,7 @@ chainId ASC, safeAddress ASC, createdBy ASC, createdAt DESC
 ## Monitoring & Logging
 
 ### Structured Logging
+
 All operations include structured logging:
 
 ```typescript
@@ -548,14 +567,17 @@ All operations include structured logging:
 ```
 
 ### Key Metrics
+
 - Transaction creation rate
 - Signature collection time
-- Execution success rate  
+- Execution success rate
 - Error frequencies
 - Gas usage patterns
 
 ### Alerting
+
 Recommended alerts:
+
 - Failed transaction executions
 - High error rates
 - Unusual signature patterns
@@ -565,6 +587,7 @@ Recommended alerts:
 ## Testing
 
 ### Unit Tests
+
 Comprehensive unit test coverage:
 
 ```bash
@@ -573,6 +596,7 @@ pnpm test src/services/ContractService.test.ts
 ```
 
 Test scenarios:
+
 - ✅ Transaction proposal creation
 - ✅ Signature addition and validation
 - ✅ Transaction execution
@@ -581,14 +605,16 @@ Test scenarios:
 - ✅ Emergency pause functionality
 
 ### Integration Tests
+
 Full workflow testing with actual Safe:
 
 ```bash
-cd packages/backend  
+cd packages/backend
 pnpm test:integration
 ```
 
 Integration scenarios:
+
 - Complete signature collection workflow
 - Multi-chain deployment testing
 - Safe contract interaction validation
@@ -598,6 +624,7 @@ Integration scenarios:
 ## Migration Guide
 
 ### From Direct Safe Integration
+
 If migrating from direct Safe wallet interactions:
 
 ```typescript
@@ -614,6 +641,7 @@ const result = await contractService.executeTransaction(...)
 ```
 
 ### Version Compatibility
+
 - Node.js 18+
 - TypeScript 4.5+
 - Firebase Functions 4.0+
@@ -621,22 +649,23 @@ const result = await contractService.executeTransaction(...)
 
 ## API Reference Summary
 
-| Method | Description | Auth Required | Returns |
-|--------|-------------|---------------|---------|
-| `proposeTransaction()` | Create basic transaction | Yes | `TransactionStatus` |
-| `proposeContractCall()` | Create contract call | Yes | `TransactionStatus` |  
-| `proposeBatchTransaction()` | Create batch transaction | Yes | `TransactionStatus` |
-| `addSignature()` | Add signature to transaction | Yes | `TransactionStatus` |
-| `executeTransaction()` | Execute ready transaction | Yes | `ExecutionResult` |
-| `getTransactionStatus()` | Get transaction status | Optional | `TransactionStatus` |
-| `listTransactions()` | List transactions | Optional | `TransactionStatus[]` |
-| `emergencyPause()` | Emergency pause contract | Yes | `TransactionStatus` |
+| Method                      | Description                  | Auth Required | Returns               |
+| --------------------------- | ---------------------------- | ------------- | --------------------- |
+| `proposeTransaction()`      | Create basic transaction     | Yes           | `TransactionStatus`   |
+| `proposeContractCall()`     | Create contract call         | Yes           | `TransactionStatus`   |
+| `proposeBatchTransaction()` | Create batch transaction     | Yes           | `TransactionStatus`   |
+| `addSignature()`            | Add signature to transaction | Yes           | `TransactionStatus`   |
+| `executeTransaction()`      | Execute ready transaction    | Yes           | `ExecutionResult`     |
+| `getTransactionStatus()`    | Get transaction status       | Optional      | `TransactionStatus`   |
+| `listTransactions()`        | List transactions            | Optional      | `TransactionStatus[]` |
+| `emergencyPause()`          | Emergency pause contract     | Yes           | `TransactionStatus`   |
 
 ## Troubleshooting
 
 ### Common Issues
 
 **Transaction Creation Fails**
+
 ```typescript
 // Check Safe configuration
 const threshold = await safeContract.getThreshold()
@@ -645,6 +674,7 @@ console.log(`Safe: ${owners.length} owners, ${threshold} threshold`)
 ```
 
 **Signature Rejection**
+
 ```typescript
 // Verify signature format and signer
 const recovered = ethers.verifyMessage(messageHash, signature)
@@ -652,6 +682,7 @@ console.log(`Recovered: ${recovered}, Expected: ${signerAddress}`)
 ```
 
 **Execution Failures**
+
 ```typescript
 // Check transaction status and signatures
 const status = await contractService.getTransactionStatus(txId)
@@ -659,6 +690,7 @@ console.log(`Status: ${status.status}, Sigs: ${status.currentSignatures}/${statu
 ```
 
 ### Debug Mode
+
 Enable detailed logging:
 
 ```bash

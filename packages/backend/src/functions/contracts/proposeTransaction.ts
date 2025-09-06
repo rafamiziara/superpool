@@ -25,7 +25,7 @@ export interface ProposeTransactionResponse {
 
 /**
  * Cloud Function to propose a new Safe transaction
- * 
+ *
  * @param request - The callable request with transaction details
  * @returns Transaction proposal details with ID for signature collection
  */
@@ -41,7 +41,7 @@ export const proposeTransaction = onCall(
     logger.info(`${functionName}: Creating transaction proposal`, {
       uid: request.auth?.uid,
       to: request.data.to,
-      description: request.data.description
+      description: request.data.description,
     })
 
     try {
@@ -77,18 +77,15 @@ export const proposeTransaction = onCall(
         data: request.data.data,
         operation: request.data.operation || 0, // Default to CALL
         description: request.data.description,
-        metadata: request.data.metadata
+        metadata: request.data.metadata,
       }
 
-      const transactionStatus = await contractService.proposeTransaction(
-        proposal,
-        request.auth.uid
-      )
+      const transactionStatus = await contractService.proposeTransaction(proposal, request.auth.uid)
 
       logger.info(`${functionName}: Transaction proposed successfully`, {
         transactionId: transactionStatus.id,
         requiredSignatures: transactionStatus.requiredSignatures,
-        description: transactionStatus.description
+        description: transactionStatus.description,
       })
 
       return {
@@ -98,13 +95,12 @@ export const proposeTransaction = onCall(
         currentSignatures: transactionStatus.currentSignatures,
         safeAddress: contractService['config'].safeAddress,
         description: transactionStatus.description,
-        message: `Transaction proposed successfully. Requires ${transactionStatus.requiredSignatures} signature(s) to execute.`
+        message: `Transaction proposed successfully. Requires ${transactionStatus.requiredSignatures} signature(s) to execute.`,
       }
-
     } catch (error) {
       logger.error(`${functionName}: Error proposing transaction`, {
         error: error instanceof Error ? error.message : String(error),
-        uid: request.auth?.uid
+        uid: request.auth?.uid,
       })
 
       return handleError(error, functionName)

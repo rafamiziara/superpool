@@ -28,13 +28,13 @@ export interface SyncHistoricalEventsResponse {
 
 /**
  * Cloud Function to sync historical PoolCreated events from blockchain
- * 
+ *
  * This function allows manual synchronization of historical events for:
  * 1. Initial blockchain data import
  * 2. Recovery from missed events
  * 3. Data migration and backfills
  * 4. Testing and development
- * 
+ *
  * Features:
  * - Configurable block ranges
  * - Batch processing to handle large ranges
@@ -51,13 +51,13 @@ export const syncHistoricalEvents = onCall(
   async (request: CallableRequest<SyncHistoricalEventsRequest>): Promise<SyncHistoricalEventsResponse> => {
     const functionName = 'syncHistoricalEvents'
     const startTime = Date.now()
-    
+
     logger.info(`${functionName}: Starting historical events sync`, {
       uid: request.auth?.uid,
       fromBlock: request.data.fromBlock,
       toBlock: request.data.toBlock,
       chainId: request.data.chainId,
-      batchSize: request.data.batchSize
+      batchSize: request.data.batchSize,
     })
 
     try {
@@ -76,12 +76,8 @@ export const syncHistoricalEvents = onCall(
       const skipProcessing = request.data.skipProcessing || false
 
       // Get environment variables
-      const rpcUrl = chainId === 80002 
-        ? process.env.POLYGON_AMOY_RPC_URL 
-        : process.env.POLYGON_MAINNET_RPC_URL
-      const poolFactoryAddress = chainId === 80002
-        ? process.env.POOL_FACTORY_ADDRESS_AMOY
-        : process.env.POOL_FACTORY_ADDRESS_POLYGON
+      const rpcUrl = chainId === 80002 ? process.env.POLYGON_AMOY_RPC_URL : process.env.POLYGON_MAINNET_RPC_URL
+      const poolFactoryAddress = chainId === 80002 ? process.env.POOL_FACTORY_ADDRESS_AMOY : process.env.POOL_FACTORY_ADDRESS_POLYGON
 
       if (!rpcUrl || !poolFactoryAddress) {
         throw new HttpsError('failed-precondition', 'Missing blockchain configuration')
@@ -90,7 +86,7 @@ export const syncHistoricalEvents = onCall(
       // Initialize blockchain connection
       const provider = new ethers.JsonRpcProvider(rpcUrl)
       const poolFactory = new ethers.Contract(poolFactoryAddress, PoolFactoryABI, provider)
-      
+
       // Get current block if toBlock not specified
       const currentBlock = await provider.getBlockNumber()
       const toBlock = request.data.toBlock || currentBlock
@@ -103,7 +99,7 @@ export const syncHistoricalEvents = onCall(
         chainId,
         currentBlock,
         poolFactoryAddress,
-        syncRange: `${request.data.fromBlock} - ${toBlock}`
+        syncRange: `${request.data.fromBlock} - ${toBlock}`,
       })
 
       const db = getFirestore()
@@ -114,11 +110,11 @@ export const syncHistoricalEvents = onCall(
       // Process in batches to avoid RPC limits and timeouts
       for (let fromBatch = request.data.fromBlock; fromBatch <= toBlock; fromBatch += batchSize) {
         const toBatch = Math.min(fromBatch + batchSize - 1, toBlock)
-        
+
         logger.info(`${functionName}: Processing batch`, {
           fromBlock: fromBatch,
           toBlock: toBatch,
-          batchSize: toBatch - fromBatch + 1
+          batchSize: toBatch - fromBatch + 1,
         })
 
         try {
@@ -129,7 +125,7 @@ export const syncHistoricalEvents = onCall(
           logger.info(`${functionName}: Found events in batch`, {
             fromBlock: fromBatch,
             toBlock: toBatch,
-            eventsFound: events.length
+            eventsFound: events.length,
           })
 
           // Process events in this batch
@@ -162,7 +158,7 @@ export const syncHistoricalEvents = onCall(
                 transactionHash: event.transactionHash,
                 blockNumber: event.blockNumber,
                 logIndex: event.index,
-                timestamp: block.timestamp
+                timestamp: block.timestamp,
               }
 
               allEvents.push(poolEvent)
@@ -173,16 +169,16 @@ export const syncHistoricalEvents = onCall(
                 try {
                   const processResult = await processPoolEvents.run({
                     data: { events: [...allEvents], chainId },
-                    auth: request.auth
+                    auth: request.auth,
                   } as any)
 
                   processedEvents += processResult.processedCount
-                  
+
                   logger.info(`${functionName}: Batch processed`, {
                     eventsInBatch: allEvents.length,
                     processedCount: processResult.processedCount,
                     skippedCount: processResult.skippedCount,
-                    errorCount: processResult.errorCount
+                    errorCount: processResult.errorCount,
                   })
 
                   // Clear the batch
@@ -190,19 +186,18 @@ export const syncHistoricalEvents = onCall(
                 } catch (error) {
                   logger.error(`${functionName}: Error processing event batch`, {
                     error: error instanceof Error ? error.message : String(error),
-                    batchSize: allEvents.length
+                    batchSize: allEvents.length,
                   })
-                  
+
                   // Clear the batch and continue
                   allEvents.length = 0
                 }
               }
-
             } catch (error) {
               logger.error(`${functionName}: Error processing individual event`, {
                 error: error instanceof Error ? error.message : String(error),
                 eventBlockNumber: event.blockNumber,
-                eventTxHash: event.transactionHash
+                eventTxHash: event.transactionHash,
               })
               continue
             }
@@ -210,16 +205,15 @@ export const syncHistoricalEvents = onCall(
 
           // Small delay between batches to avoid rate limiting
           if (toBatch < toBlock) {
-            await new Promise(resolve => setTimeout(resolve, 100))
+            await new Promise((resolve) => setTimeout(resolve, 100))
           }
-
         } catch (error) {
           logger.error(`${functionName}: Error processing batch`, {
             error: error instanceof Error ? error.message : String(error),
             fromBlock: fromBatch,
-            toBlock: toBatch
+            toBlock: toBatch,
           })
-          
+
           // Continue with next batch
           continue
         }
@@ -230,7 +224,7 @@ export const syncHistoricalEvents = onCall(
         try {
           const processResult = await processPoolEvents.run({
             data: { events: allEvents, chainId },
-            auth: request.auth
+            auth: request.auth,
           } as any)
 
           processedEvents += processResult.processedCount
@@ -239,12 +233,12 @@ export const syncHistoricalEvents = onCall(
             eventsInBatch: allEvents.length,
             processedCount: processResult.processedCount,
             skippedCount: processResult.skippedCount,
-            errorCount: processResult.errorCount
+            errorCount: processResult.errorCount,
           })
         } catch (error) {
           logger.error(`${functionName}: Error processing final batch`, {
             error: error instanceof Error ? error.message : String(error),
-            batchSize: allEvents.length
+            batchSize: allEvents.length,
           })
         }
       }
@@ -252,20 +246,23 @@ export const syncHistoricalEvents = onCall(
       // Update sync state if processing was successful
       if (!skipProcessing && processedEvents > 0) {
         const syncStateRef = db.collection('event_sync_state').doc(`poolFactory_${chainId}`)
-        await syncStateRef.set({
-          contractAddress: poolFactoryAddress,
-          chainId,
-          lastProcessedBlock: toBlock,
-          lastSyncAt: new Date(),
-          totalEventsProcessed: FieldValue.increment(processedEvents),
-          lastEventTimestamp: new Date(),
-          historicalSyncCompleted: true,
-          historicalSyncRange: `${request.data.fromBlock}-${toBlock}`
-        }, { merge: true })
+        await syncStateRef.set(
+          {
+            contractAddress: poolFactoryAddress,
+            chainId,
+            lastProcessedBlock: toBlock,
+            lastSyncAt: new Date(),
+            totalEventsProcessed: FieldValue.increment(processedEvents),
+            lastEventTimestamp: new Date(),
+            historicalSyncCompleted: true,
+            historicalSyncRange: `${request.data.fromBlock}-${toBlock}`,
+          },
+          { merge: true }
+        )
       }
 
       const duration = Date.now() - startTime
-      
+
       const response: SyncHistoricalEventsResponse = {
         success: true,
         totalEvents,
@@ -274,36 +271,32 @@ export const syncHistoricalEvents = onCall(
         toBlock,
         duration,
         chainId,
-        message: `Successfully synced ${totalEvents} historical events (${processedEvents} processed) from blocks ${request.data.fromBlock} to ${toBlock}`
+        message: `Successfully synced ${totalEvents} historical events (${processedEvents} processed) from blocks ${request.data.fromBlock} to ${toBlock}`,
       }
 
       logger.info(`${functionName}: Historical sync completed`, {
         ...response,
-        durationMs: duration
+        durationMs: duration,
       })
 
       return response
-
     } catch (error) {
       const duration = Date.now() - startTime
-      
+
       logger.error(`${functionName}: Historical sync failed`, {
         error: error instanceof Error ? error.message : String(error),
         duration,
         fromBlock: request.data.fromBlock,
         toBlock: request.data.toBlock,
         chainId: request.data.chainId,
-        stack: error instanceof Error ? error.stack : undefined
+        stack: error instanceof Error ? error.stack : undefined,
       })
 
       if (error instanceof HttpsError) {
         throw error
       }
 
-      throw new HttpsError(
-        'internal',
-        `Historical sync failed: ${error instanceof Error ? error.message : String(error)}`
-      )
+      throw new HttpsError('internal', `Historical sync failed: ${error instanceof Error ? error.message : String(error)}`)
     }
   }
 )
@@ -320,14 +313,12 @@ export const estimateSyncProgress = onCall(
   },
   async (request: CallableRequest<{ chainId?: number }>) => {
     const functionName = 'estimateSyncProgress'
-    
+
     try {
       const chainId = request.data.chainId || 80002
-      
+
       // Get RPC URL
-      const rpcUrl = chainId === 80002 
-        ? process.env.POLYGON_AMOY_RPC_URL 
-        : process.env.POLYGON_MAINNET_RPC_URL
+      const rpcUrl = chainId === 80002 ? process.env.POLYGON_AMOY_RPC_URL : process.env.POLYGON_MAINNET_RPC_URL
 
       if (!rpcUrl) {
         throw new HttpsError('failed-precondition', 'Missing RPC configuration')
@@ -354,7 +345,7 @@ export const estimateSyncProgress = onCall(
         blocksBehind: syncState ? currentBlock - syncState.lastProcessedBlock : currentBlock,
         estimatedSyncTime: 0,
         recommendedBatchSize: 5000,
-        riskOfMissedEvents: false
+        riskOfMissedEvents: false,
       }
 
       if (recommendations.blocksBehind > 1000) {
@@ -366,18 +357,17 @@ export const estimateSyncProgress = onCall(
         chainId,
         currentBlock,
         syncState,
-        recommendations
+        recommendations,
       })
 
       return {
         currentBlock,
         syncState,
-        recommendations
+        recommendations,
       }
-
     } catch (error) {
       logger.error(`${functionName}: Failed to estimate sync progress`, {
-        error: error instanceof Error ? error.message : String(error)
+        error: error instanceof Error ? error.message : String(error),
       })
 
       throw new HttpsError('internal', 'Failed to estimate sync progress')

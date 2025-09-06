@@ -9,7 +9,7 @@ import {
   isTransactionMined,
   getTransactionStatus,
   parseEventLogs,
-  validateContractAddress
+  validateContractAddress,
 } from './blockchain'
 
 // Mock ethers
@@ -17,8 +17,8 @@ jest.mock('ethers')
 jest.mock('firebase-functions', () => ({
   logger: {
     info: jest.fn(),
-    error: jest.fn()
-  }
+    error: jest.fn(),
+  },
 }))
 
 describe('blockchain utilities', () => {
@@ -31,18 +31,18 @@ describe('blockchain utilities', () => {
     mockContract = {
       target: '0x123456789',
       testFunction: {
-        estimateGas: jest.fn()
+        estimateGas: jest.fn(),
       },
       interface: {
-        parseLog: jest.fn()
-      }
+        parseLog: jest.fn(),
+      },
     }
 
     mockProvider = {
       waitForTransaction: jest.fn(),
       getFeeData: jest.fn(),
       getTransactionReceipt: jest.fn(),
-      getCode: jest.fn()
+      getCode: jest.fn(),
     }
   })
 
@@ -131,7 +131,7 @@ describe('blockchain utilities', () => {
       const mockReceipt = {
         status: 1,
         blockNumber: 12345,
-        gasUsed: BigInt('150000')
+        gasUsed: BigInt('150000'),
       }
 
       mockProvider.waitForTransaction.mockResolvedValue(mockReceipt)
@@ -170,7 +170,7 @@ describe('blockchain utilities', () => {
       const mockFeeData = {
         maxFeePerGas: BigInt('30000000000'),
         maxPriorityFeePerGas: BigInt('2000000000'),
-        gasPrice: BigInt('25000000000')
+        gasPrice: BigInt('25000000000'),
       }
 
       mockProvider.getFeeData.mockResolvedValue(mockFeeData)
@@ -184,7 +184,7 @@ describe('blockchain utilities', () => {
       const mockFeeData = {
         maxFeePerGas: null,
         maxPriorityFeePerGas: null,
-        gasPrice: BigInt('25000000000')
+        gasPrice: BigInt('25000000000'),
       }
 
       mockProvider.getFeeData.mockResolvedValue(mockFeeData)
@@ -198,7 +198,7 @@ describe('blockchain utilities', () => {
       mockProvider.getFeeData.mockResolvedValue({
         maxFeePerGas: null,
         maxPriorityFeePerGas: null,
-        gasPrice: null
+        gasPrice: null,
       })
 
       // Mock ethers.parseUnits
@@ -288,15 +288,11 @@ describe('blockchain utilities', () => {
 
   describe('parseEventLogs', () => {
     it('should parse matching event logs', () => {
-      const mockLogs = [
-        { topics: ['0xevent1'] },
-        { topics: ['0xevent2'] },
-        { topics: ['0xevent3'] }
-      ]
+      const mockLogs = [{ topics: ['0xevent1'] }, { topics: ['0xevent2'] }, { topics: ['0xevent3'] }]
 
       const mockParsedEvent = {
         name: 'TargetEvent',
-        args: { param1: 'value1' }
+        args: { param1: 'value1' },
       }
 
       mockContract.interface.parseLog
@@ -326,7 +322,7 @@ describe('blockchain utilities', () => {
       const mockLogs = [{ topics: ['0xevent1'] }]
 
       mockContract.interface.parseLog.mockReturnValue({
-        name: 'DifferentEvent'
+        name: 'DifferentEvent',
       })
 
       const result = parseEventLogs(mockContract, mockLogs as any, 'TargetEvent')

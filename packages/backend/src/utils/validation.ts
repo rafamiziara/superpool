@@ -87,7 +87,7 @@ export function validatePoolCreationParams(params: CreatePoolRequest): Validatio
 
   return {
     isValid: errors.length === 0,
-    errors
+    errors,
   }
 }
 
@@ -102,7 +102,7 @@ export function sanitizePoolParams(params: CreatePoolRequest): Required<CreatePo
     loanDuration: Math.floor(params.loanDuration), // Ensure integer
     name: params.name.trim(),
     description: params.description.trim(),
-    chainId: params.chainId || 80002 // Default to Polygon Amoy
+    chainId: params.chainId || 80002, // Default to Polygon Amoy
   }
 }
 
@@ -125,19 +125,19 @@ export function validateTransactionHash(hash: string): boolean {
  */
 export function sanitizeNumericInput(input: any, min?: number, max?: number): number {
   const num = Number(input)
-  
+
   if (isNaN(num)) {
     throw new Error('Invalid numeric input')
   }
-  
+
   if (min !== undefined && num < min) {
     throw new Error(`Value must be at least ${min}`)
   }
-  
+
   if (max !== undefined && num > max) {
     throw new Error(`Value cannot exceed ${max}`)
   }
-  
+
   return num
 }
 
@@ -148,16 +148,16 @@ export function sanitizeStringInput(input: string, minLength?: number, maxLength
   if (typeof input !== 'string') {
     throw new Error('Input must be a string')
   }
-  
+
   const sanitized = input.trim()
-  
+
   if (minLength !== undefined && sanitized.length < minLength) {
     throw new Error(`String must be at least ${minLength} characters long`)
   }
-  
+
   if (maxLength !== undefined && sanitized.length > maxLength) {
     throw new Error(`String cannot exceed ${maxLength} characters`)
   }
-  
+
   return sanitized
 }
