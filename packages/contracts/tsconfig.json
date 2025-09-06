@@ -19,19 +19,8 @@
     "tsBuildInfoFile": "./.tsbuildinfo",
     "types": ["node", "mocha"]
   },
-  "include": [
-    "./hardhat.config.ts",
-    "./scripts/**/*.ts",
-    "./test/**/*.ts",
-    "./typechain-types/**/*.ts"
-  ],
-  "exclude": [
-    "node_modules",
-    "dist",
-    "cache",
-    "artifacts",
-    "coverage"
-  ],
+  "include": ["./hardhat.config.ts", "./scripts/**/*.ts", "./test/**/*.ts", "./typechain-types/**/*.ts"],
+  "exclude": ["node_modules", "dist", "cache", "artifacts", "coverage"],
   "ts-node": {
     "transpileOnly": true,
     "files": true

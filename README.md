@@ -19,7 +19,8 @@ This project serves as a comprehensive portfolio piece demonstrating expertise a
 - **📱 Cross-Platform Mobile App:** React Native/Expo application with comprehensive user onboarding flow.
 - **🛡️ Robust Error Handling:** Advanced error categorization, user-friendly feedback, and graceful failure recovery.
 - **🔔 Toast Notification System:** Real-time user feedback for connection states, authentication progress, and error scenarios.
-- **⚙️ Global State Management:** Sophisticated wallet connection and logout state management with race condition prevention.
+- **⚙️ Reactive State Management:** MobX-powered reactive state management with centralized stores for authentication, wallet connection, and pool management.
+- **🔄 Advanced State Architecture:** Sophisticated wallet connection and logout state management with race condition prevention.
 
 #### 🚧 **Planned Features:**
 
@@ -40,11 +41,22 @@ This project serves as a comprehensive portfolio piece demonstrating expertise a
 - **OpenZeppelin Contracts:** Secure, community-audited smart contract libraries (ERC-20, UUPS Proxies, Ownable).
 - **Polygon (PoS):** Layer 2 scaling solution for low-cost, fast transactions.
 
-**Mobile Application (Frontend):**
+**Frontend Applications:**
+
+**Landing Page (Next.js 15.5.0):**
+
+- **Next.js 15.5.0:** Modern React framework with App Router and React 19 support.
+- **Tailwind CSS v4:** Utility-first styling with SuperPool design system integration.
+- **TypeScript:** Full type safety across all components and pages.
+- **Shared Components:** Reusable UI components from `@superpool/ui` package.
+
+**Mobile Application (React Native/Expo):**
 
 - **React Native / Expo:** Cross-platform framework for iOS and Android.
-- **TypeScript:** Type-safe JavaScript.
-- **Wagmi:** React Hooks for Ethereum.
+- **MobX:** Reactive state management with automatic UI updates and centralized stores.
+- **NativeWind:** Tailwind CSS for React Native with design system compatibility.
+- **TypeScript:** Type-safe JavaScript with shared interfaces.
+- **Wagmi:** React Hooks for Ethereum blockchain interactions.
 - **Viem:** TypeScript interface for Ethereum.
 - **Reown AppKit:** Multi-wallet connection with WalletConnect protocol support.
 - **Multi-Chain Support:** Mainnet, Polygon, Arbitrum, Base, BSC, and Polygon Amoy.
@@ -56,9 +68,14 @@ This project serves as a comprehensive portfolio piece demonstrating expertise a
 - **Firebase Firestore:** NoSQL database for off-chain data storage (e.g., user profiles, pool metadata, pending loan requests, AI assessment results).
 - **Firebase Authentication:** Wallet-based signature authentication with custom token generation.
 
-**Monorepo Management:**
+**Shared Package System & Monorepo Management:**
 
-- **pnpm Workspaces:** For managing dependencies and scripts across packages.
+- **`@superpool/design`:** Design system tokens, Tailwind configuration, and brand guidelines.
+- **`@superpool/assets`:** Shared brand assets, illustrations, icons, and media files.
+- **`@superpool/ui`:** Reusable React components with TypeScript and consistent styling.
+- **`@superpool/types`:** Comprehensive TypeScript interfaces for all applications.
+- **pnpm Workspaces:** Efficient dependency management and script execution across packages.
+- **TypeScript Project References:** Coordinated type checking and builds across the monorepo.
 - **Typechain:** Generates TypeScript bindings for smart contracts.
 
 ## 🏗️ Architecture Overview
@@ -66,23 +83,48 @@ This project serves as a comprehensive portfolio piece demonstrating expertise a
 The project is structured as a monorepo, allowing for seamless development and type-sharing across different layers.
 
 ```
-superpool-dapp/
+superpool/
 ├── apps/
-│ └── mobile/ # React Native / Expo application
+│ ├── mobile/           # React Native / Expo application
+│ └── landing/          # Next.js 15.5.0 landing page
 ├── packages/
-│ ├── contracts/ # Solidity smart contracts (PoolFactory, LendingPool)
-│ └── backend/ # Firebase Cloud Functions & backend logic
+│ ├── contracts/        # Solidity smart contracts (PoolFactory, LendingPool)
+│ ├── backend/          # Firebase Cloud Functions & backend logic
+│ ├── design/           # Design system tokens and configuration
+│ ├── assets/           # Shared brand assets and media
+│ ├── ui/               # Shared React components library
+│ └── types/            # Shared TypeScript interfaces
 ├── .gitignore
 ├── pnpm-workspace.yaml
+├── tsconfig.json
+├── tsconfig.base.json
 ├── README.md
+├── CLAUDE.md
 └── package.json (root)
 ```
 
-**Workflow:**
+**Shared Package Architecture:**
 
-1.  **Smart Contracts:** Deployed on Polygon, managing core lending logic, liquidity, and membership. The `PoolFactory` is controlled by a multi-sig Safe, which deploys upgradable `LendingPool` instances.
-2.  **Backend (Cloud Functions):** Acts as a bridge between the mobile app and smart contracts. It handles wallet-based authentication through signature verification, stores off-chain data, processes loan assessment requests (AI agent), sends notifications, and interacts with smart contracts for specific admin-controlled actions (via multi-sig).
-3.  **Mobile App:** Provides the user interface for interacting with the platform. Features a comprehensive wallet connection system supporting multiple providers (MetaMask, WalletConnect, Coinbase, etc.), signature-based authentication, multi-chain support, and robust error handling with user-friendly feedback.
+The monorepo now features a comprehensive shared package system for consistent branding and development across all applications:
+
+- **`@superpool/design`:** Design system with DeFi Blue color palette, Contemporary Tech typography (Plus Jakarta Sans, Space Mono, Geist), and Tailwind configuration
+- **`@superpool/assets`:** Shared brand assets including onboarding illustrations, logos, and UI icons
+- **`@superpool/ui`:** Reusable React components (Button, Card, Input) with consistent styling and TypeScript support
+- **`@superpool/types`:** Comprehensive TypeScript interfaces for authentication, lending, blockchain, and API interactions
+
+**Applications:**
+
+1.  **Landing Page (Next.js 15.5.0):** Modern marketing website showcasing SuperPool features with responsive design and shared component integration
+2.  **Mobile App (React Native/Expo):** Cross-platform application with wallet integration, using NativeWind for Tailwind CSS compatibility
+3.  **Smart Contracts:** Deployed on Polygon, managing core lending logic, liquidity, and membership. The `PoolFactory` is controlled by a multi-sig Safe, which deploys upgradable `LendingPool` instances
+4.  **Backend (Cloud Functions):** Acts as a bridge between applications and smart contracts, handling wallet-based authentication, off-chain data storage, and multi-sig interactions
+
+**Cross-Platform Benefits:**
+
+- ✅ **Brand Consistency:** Single design system across web and mobile
+- ✅ **Type Safety:** Shared TypeScript interfaces eliminate integration bugs
+- ✅ **Developer Experience:** Reusable components reduce code duplication
+- ✅ **Maintainability:** Update design tokens once, applies everywhere
 
 **Authentication Flow:**
 
@@ -257,18 +299,15 @@ The mobile app automatically supports localhost development:
 To run the backend functions locally, you need to provide the Firebase Admin SDK with credentials via a service account key.
 
 1.  **Generate a Service Account Key:**
-
     - Navigate to your Firebase Console.
     - Go to **Project settings > Service accounts**.
     - Click the **Generate new private key** button and download the JSON file.
 
 2.  **Add the Key to the Project:**
-
     - Rename the downloaded JSON file to `service-account-key.json`.
     - Place this file in the **`packages/backend/`** directory.
 
 3.  **Secure the Key:**
-
     - **Crucially**, add `service-account-key.json` to the `.gitignore` file in your `packages/backend` directory. This prevents sensitive credentials from being committed to the repository.
 
     ```
@@ -342,12 +381,10 @@ Here is the complete workflow to test your authentication functions:
 Before running the mobile app, you need to set up wallet connection capabilities:
 
 1. **Create a Reown Cloud Account:**
-
    - Visit [cloud.reown.com](https://cloud.reown.com) and create an account.
    - Create a new project and note your **Project ID**.
 
 2. **Update Environment Variables:**
-
    - Add your Reown Project ID to `apps/mobile/.env`:
 
    ```
@@ -392,6 +429,22 @@ This command will:
 - ✅ Launch ngrok tunnels for mobile device access
 - ✅ Automatically update mobile app environment variables with ngrok URLs
 - ✅ Start the Expo development server
+
+#### Landing Page Development
+
+To work on the Next.js landing page:
+
+```bash
+# Start the landing page (runs on port 3001)
+cd apps/landing
+pnpm dev
+
+# Or run alongside mobile app
+pnpm dev  # Mobile app (port 8081)
+cd apps/landing && pnpm dev  # Landing page (port 3001)
+```
+
+The landing page automatically uses the shared design system and showcases all four SuperPool features with responsive design.
 
 #### Smart Contract Development Workflow
 
@@ -463,11 +516,12 @@ The SuperPool app features a production-ready wallet authentication system that 
 
 ### 🔧 Technical Implementation Highlights
 
-- **Global State Management:** Centralized wallet connection and authentication state management
+- **Reactive State Management:** MobX-powered centralized stores with automatic UI updates and fine-grained reactivity
+- **Advanced State Architecture:** Eliminates complex useState/useEffect patterns with observable stores for authentication, wallet connection, and pool management
 - **Connection Trigger Logic:** Precise detection of wallet connection vs. disconnection events
 - **Multi-Layer Error Handling:** Defensive programming with error boundaries at multiple levels
-- **TypeScript Integration:** Full type safety across wallet interactions and error handling
-- **Modular Architecture:** Reusable hooks and components for wallet integration
+- **TypeScript Integration:** Full type safety across wallet interactions, state management, and error handling
+- **Modular Architecture:** Reusable hooks, stores, and components for scalable development
 
 ## 🛡️ Security Disclaimer
 

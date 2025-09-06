@@ -35,20 +35,20 @@ export const generateAuthMessageHandler = async (request: CallableRequest<AuthMe
   // The try/catch block ensures we handle any potential errors during the database write.
   try {
     await firestore.collection(AUTH_NONCES_COLLECTION).doc(walletAddress).set({ nonce, timestamp, expiresAt })
-  } catch (error) {
+  } catch {
     throw new HttpsError('internal', 'Failed to save authentication nonce.')
   }
 
   // Construct the message to be signed
   const message = createAuthMessage(walletAddress, nonce, timestamp)
 
-  logger.info('Generated auth message data', { 
-    message: message.substring(0, 50) + '...', 
-    nonce, 
+  logger.info('Generated auth message data', {
+    message: message.substring(0, 50) + '...',
+    nonce,
     timestamp,
-    walletAddress 
+    walletAddress,
   })
-  
+
   return { message, nonce, timestamp }
 }
 

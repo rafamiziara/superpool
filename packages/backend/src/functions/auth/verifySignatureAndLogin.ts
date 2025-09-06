@@ -2,10 +2,11 @@ import { isAddress, verifyMessage, verifyTypedData } from 'ethers'
 import { logger } from 'firebase-functions/v2'
 import { CallableRequest, HttpsError, onCall } from 'firebase-functions/v2/https'
 import { AUTH_NONCES_COLLECTION, USERS_COLLECTION } from '../../constants'
-import { auth, firestore } from '../../services'
+import { auth, firestore, ProviderService } from '../../services'
 import { DeviceVerificationService } from '../../services/deviceVerification'
 import { AuthNonce, UserProfile } from '../../types'
 import { createAuthMessage } from '../../utils'
+import { SafeWalletVerificationService } from '../../utils/safeWalletVerification'
 
 // Define the interface for your function's input
 interface VerifySignatureAndLoginRequest {
@@ -100,18 +101,59 @@ export const verifySignatureAndLoginHandler = async (request: CallableRequest<Ve
       recoveredAddress = verifyTypedData(domain, types, value, signature)
       logger.info('EIP-712 signature verification successful', { recoveredAddress })
     } else if (signatureType === 'safe-wallet') {
-      // Safe wallet verification - verify the signature format and extract address
-      const expectedSignature = `safe-wallet:${walletAddress}:${nonce}:${timestamp}`
-      if (signature !== expectedSignature) {
-        throw new Error('Invalid Safe wallet authentication token')
-      }
+      // Enhanced Safe wallet verification with cryptographic validation
+      logger.info('Starting enhanced Safe wallet verification', {
+        walletAddress,
+        chainId: chainId || 80002,
+      })
 
-      // For Safe wallets, we consider the wallet address as verified since:
-      // 1. The user is connected to the Safe wallet (proven by the connection)
-      // 2. Safe wallets have strict security controls
-      // 3. The nonce/timestamp prevents replay attacks
-      recoveredAddress = walletAddress
-      logger.info('Safe wallet verification successful', { walletAddress })
+      try {
+        // Get provider for the specified chain
+        const provider = ProviderService.getProvider(chainId || 80002)
+
+        // Perform comprehensive Safe wallet verification
+        const verificationResult = await SafeWalletVerificationService.verifySafeWalletSignature(
+          walletAddress,
+          signature,
+          nonce,
+          timestamp,
+          provider,
+          chainId
+        )
+
+        if (!verificationResult.isValid) {
+          logger.error('Safe wallet verification failed', {
+            walletAddress,
+            error: verificationResult.error,
+            verification: verificationResult.verification,
+          })
+          throw new Error(`Safe wallet verification failed: ${verificationResult.error || 'Invalid signature'}`)
+        }
+
+        // Log verification details and warnings
+        logger.info('Safe wallet verification successful', {
+          walletAddress,
+          verification: verificationResult.verification,
+          warnings: verificationResult.warnings,
+        })
+
+        // Log any warnings for monitoring
+        if (verificationResult.warnings && verificationResult.warnings.length > 0) {
+          logger.warn('Safe wallet verification warnings', {
+            walletAddress,
+            warnings: verificationResult.warnings,
+          })
+        }
+
+        recoveredAddress = walletAddress
+      } catch (error) {
+        logger.error('Safe wallet verification error', {
+          error: error instanceof Error ? error.message : String(error),
+          walletAddress,
+          chainId,
+        })
+        throw new Error(`Safe wallet authentication failed: ${error instanceof Error ? error.message : 'Verification error'}`)
+      }
     } else {
       // Personal message verification
       recoveredAddress = verifyMessage(message, signature)
@@ -163,12 +205,10 @@ export const verifySignatureAndLoginHandler = async (request: CallableRequest<Ve
   if (deviceId && platform) {
     try {
       logger.info('Approving device', { deviceId, walletAddress, platform, signatureType })
-      
+
       // For Safe wallets, use a stable device identifier based on wallet address
-      const finalDeviceId = signatureType === 'safe-wallet' ? 
-        `safe-wallet-${walletAddress.toLowerCase()}` : 
-        deviceId
-      
+      const finalDeviceId = signatureType === 'safe-wallet' ? `safe-wallet-${walletAddress.toLowerCase()}` : deviceId
+
       await DeviceVerificationService.approveDevice(finalDeviceId, walletAddress, platform)
       logger.info('Device approved successfully', { deviceId: finalDeviceId, walletAddress, signatureType })
     } catch (error) {
@@ -176,11 +216,11 @@ export const verifySignatureAndLoginHandler = async (request: CallableRequest<Ve
       logger.error('Failed to approve device', { error, deviceId, walletAddress, signatureType })
     }
   } else {
-    logger.info('Skipping device approval - no deviceId or platform provided', { 
-      deviceId, 
-      platform, 
+    logger.info('Skipping device approval - no deviceId or platform provided', {
+      deviceId,
+      platform,
       signatureType,
-      walletAddress 
+      walletAddress,
     })
   }
 

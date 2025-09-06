@@ -1,0 +1,11 @@
+# Github Workflows
+.github
+
+# Ignore artifacts
+build
+coverage
+lib
+.next
+
+# Ignore lock files
+pnpm-lock.yaml

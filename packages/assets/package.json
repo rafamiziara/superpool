@@ -1,0 +1,34 @@
+{
+  "name": "@superpool/assets",
+  "version": "0.1.0",
+  "description": "SuperPool shared brand assets and media",
+  "main": "index.js",
+  "files": [
+    "images/**/*",
+    "fonts/**/*",
+    "index.js"
+  ],
+  "exports": {
+    "./images/*": "./images/*",
+    "./fonts/*": "./fonts/*",
+    "./package.json": "./package.json"
+  },
+  "scripts": {
+    "copy-to-landing": "mkdir -p ../../apps/landing/public/images/illustrations && cp images/illustrations/* ../../apps/landing/public/images/illustrations/",
+    "build": "pnpm run copy-to-landing",
+    "format": "prettier --write ."
+  },
+  "keywords": [
+    "assets",
+    "images",
+    "illustrations",
+    "logos",
+    "superpool"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/rafamiziara/superpool.git",
+    "directory": "packages/assets"
+  },
+  "license": "MIT"
+}

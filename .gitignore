@@ -3,10 +3,14 @@ node_modules
 
 # IDE
 .vscode/
+!.vscode/settings.json
+!.vscode/tailwind.json
+!.vscode/README.md
 
 # Debug
 firebase-debug.log
 firestore-debug.log
+bash.exe.stackdump
 
 # Env Variables
 .env
@@ -16,10 +20,11 @@ firestore-debug.log
 # Ngrok config (contains personal authtoken)
 ngrok.yml
 
-# Claude Code files
-CLAUDE.md
-**/CLAUDE.md
-.claude/
+# Claude Code files - keep *.local.json ignored
+.claude/*.local.json
+
+# Personal documentation files
+.dev
 
 # SuperDesign files
 .superdesign/
@@ -38,6 +43,16 @@ packages/backend/service-account-key.json
 
 # Wallet information (contains private keys)
 wallet-info.json
+scripts/wallet-info.json
+
+# Development keys (never commit these!)
+scripts/privateKey.pem
+scripts/publicKey.pem
+
+# Build artifacts
+packages/*/dist/
+apps/*/dist/
+*.tsbuildinfo
 
 # Coverage reports (keep merge script and config files)
 coverage/

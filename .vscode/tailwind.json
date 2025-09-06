@@ -1,0 +1,59 @@
+{
+  "version": 1.1,
+  "atDirectives": [
+    {
+      "name": "@theme",
+      "description": "Define design tokens using Tailwind CSS v4 theme configuration",
+      "references": [
+        {
+          "name": "Tailwind CSS v4 @theme directive",
+          "url": "https://tailwindcss.com/docs/v4-beta#theme-directive"
+        }
+      ]
+    },
+    {
+      "name": "@import",
+      "description": "Import CSS files and other resources"
+    },
+    {
+      "name": "@tailwind",
+      "description": "Include Tailwind CSS utilities, components, and base styles",
+      "references": [
+        {
+          "name": "Tailwind CSS @tailwind directive",
+          "url": "https://tailwindcss.com/docs/functions-and-directives#tailwind"
+        }
+      ]
+    },
+    {
+      "name": "@apply",
+      "description": "Apply existing utility classes inline",
+      "references": [
+        {
+          "name": "Tailwind CSS @apply directive",
+          "url": "https://tailwindcss.com/docs/functions-and-directives#apply"
+        }
+      ]
+    },
+    {
+      "name": "@layer",
+      "description": "Define custom CSS within Tailwind layers",
+      "references": [
+        {
+          "name": "Tailwind CSS @layer directive",
+          "url": "https://tailwindcss.com/docs/functions-and-directives#layer"
+        }
+      ]
+    },
+    {
+      "name": "@config",
+      "description": "Define inline Tailwind configuration",
+      "references": [
+        {
+          "name": "Tailwind CSS @config directive",
+          "url": "https://tailwindcss.com/docs/functions-and-directives#config"
+        }
+      ]
+    }
+  ]
+}

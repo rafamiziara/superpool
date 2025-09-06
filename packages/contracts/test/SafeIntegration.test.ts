@@ -225,11 +225,6 @@ describe('Safe Integration Tests', function () {
     })
 
     it('Should reject ownership transfer from non-owner', async function () {
-      // Try to transfer ownership from non-owner account
-      // This should be caught by the script validation
-      const nonOwnerProvider = otherAccount.provider
-      const originalSigner = ethers.provider.getSigner(0)
-
       // This test would require mocking the signer, so we'll test the contract directly
       await expect(poolFactory.connect(otherAccount).transferOwnership(safeAddress))
         .to.be.revertedWithCustomError(poolFactory, 'OwnableUnauthorizedAccount')
@@ -257,6 +252,7 @@ describe('Safe Integration Tests', function () {
 
       // For testing, manually complete the transfer by calling acceptOwnership directly
       // In production, this would go through the Safe multi-sig process
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
       const safeContract = await ethers.getContractAt('Safe', safeAddress)
       // We'll simulate by having the Safe call acceptOwnership (this is simplified for testing)
     })

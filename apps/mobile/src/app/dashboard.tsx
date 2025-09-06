@@ -1,167 +1,70 @@
-import { AppKitButton } from '@reown/appkit-wagmi-react-native';
-import { router } from 'expo-router';
-import { StatusBar } from 'expo-status-bar';
-import { signOut } from 'firebase/auth';
-import { useEffect } from 'react';
-import { Alert, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { useAccount, useDisconnect } from 'wagmi';
-import { FIREBASE_AUTH } from '../firebase.config';
-import { getGlobalLogoutState } from '../hooks/useLogoutState';
+import { AppKitButton } from '@reown/appkit-wagmi-react-native'
+import { router } from 'expo-router'
+import { StatusBar } from 'expo-status-bar'
+import { signOut } from 'firebase/auth'
+import { observer } from 'mobx-react-lite'
+import { useEffect } from 'react'
+import { Text, View } from 'react-native'
+import { useAccount } from 'wagmi'
+import { FIREBASE_AUTH } from '../firebase.config'
+import { useStores } from '../stores'
 
-export default function DashboardScreen() {
-  const { address, chain, isConnected } = useAccount();
-  const { disconnect } = useDisconnect();
+const DashboardScreen = observer(function DashboardScreen() {
+  const { walletStore, authenticationStore } = useStores()
+  const { chain } = useAccount() // Keep for chain info since store doesn't track this yet
+  const { address, isConnected } = walletStore // Use MobX store for core connection state
 
   useEffect(() => {
     if (!isConnected) {
-      signOut(FIREBASE_AUTH).catch(console.error);
-      router.replace('/');
-    }
-  }, [isConnected]);
+      const handleAutoLogout = async () => {
+        try {
+          console.log('🔌 Wallet disconnected, automatically signing out from Firebase...')
+          authenticationStore.startLogout()
+          await signOut(FIREBASE_AUTH)
+          router.replace('/')
+        } catch (error) {
+          console.error('Auto logout error:', error)
+        } finally {
+          authenticationStore.finishLogout()
+        }
+      }
 
-  const handleLogout = async () => {
-    const { startLogout, finishLogout } = getGlobalLogoutState()
-    
-    try {
-      // Set logout state to prevent authentication hook from processing
-      startLogout()
-      
-      // Disconnect wallet first
-      disconnect();
-      
-      // Then sign out of Firebase
-      await signOut(FIREBASE_AUTH);
-      
-      router.replace('/');
-    } catch (error) {
-      console.error('Logout error:', error);
-      Alert.alert('Error', 'Failed to logout. Please try again.');
-    } finally {
-      // Always clear logout state
-      finishLogout()
+      handleAutoLogout()
     }
-  };
+  }, [isConnected, authenticationStore])
 
   if (!isConnected) {
-    return null;
+    return null
   }
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>Dashboard</Text>
-      
-      <View style={styles.infoContainer}>
-        <Text style={styles.welcomeText}>Welcome to SuperPool!</Text>
-        <Text style={styles.label}>Connected Wallet:</Text>
-        <Text style={styles.addressText}>{address}</Text>
-        
+    <View className="flex-1 bg-white items-center justify-center p-8">
+      <Text className="text-3xl mb-8 font-extrabold text-primary">Dashboard</Text>
+
+      <View className="items-center mb-8 bg-muted/10 p-5 rounded-xl w-full">
+        <Text className="text-xl font-semibold mb-6 text-primary">Welcome to SuperPool!</Text>
+        <Text className="text-sm font-semibold text-muted-foreground mt-4 mb-1">Connected Wallet:</Text>
+        <Text className="text-sm font-mono text-foreground text-center bg-muted/20 p-2 rounded-md w-full">{address}</Text>
+
         {chain && (
           <>
-            <Text style={styles.label}>Network:</Text>
-            <Text style={styles.networkText}>{chain.name}</Text>
+            <Text className="text-sm font-semibold text-muted-foreground mt-4 mb-1">Network:</Text>
+            <Text className="text-base font-medium text-blue-600 text-center">{chain.name}</Text>
           </>
         )}
       </View>
 
-      <View style={styles.buttonContainer}>
-        <AppKitButton balance='show' />
-        
-        <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
-          <Text style={styles.logoutButtonText}>Logout</Text>
-        </TouchableOpacity>
+      <View className="items-center gap-4 mb-8 w-full">
+        <AppKitButton balance="show" />
       </View>
 
-      <View style={styles.placeholderContainer}>
-        <Text style={styles.placeholderText}>
-          🚧 Coming Soon: Lending Pools, Loan Management, and More!
-        </Text>
+      <View className="bg-yellow-50 p-4 rounded-lg border border-yellow-200">
+        <Text className="text-sm text-yellow-800 text-center">🚧 Coming Soon: Lending Pools, Loan Management, and More!</Text>
       </View>
 
       <StatusBar style="auto" />
     </View>
-  );
-}
+  )
+})
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#fff',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 32
-  },
-  title: {
-    fontSize: 32,
-    marginBottom: 32,
-    fontWeight: '800',
-    color: '#333'
-  },
-  welcomeText: {
-    fontSize: 20,
-    fontWeight: '600',
-    marginBottom: 24,
-    color: '#333'
-  },
-  infoContainer: {
-    alignItems: 'center',
-    marginBottom: 32,
-    backgroundColor: '#f8f9fa',
-    padding: 20,
-    borderRadius: 12,
-    width: '100%'
-  },
-  label: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#666',
-    marginTop: 16,
-    marginBottom: 4
-  },
-  addressText: {
-    fontSize: 14,
-    fontFamily: 'monospace',
-    color: '#333',
-    textAlign: 'center',
-    backgroundColor: '#e9ecef',
-    padding: 8,
-    borderRadius: 6,
-    width: '100%'
-  },
-  networkText: {
-    fontSize: 16,
-    fontWeight: '500',
-    color: '#007bff',
-    textAlign: 'center'
-  },
-  buttonContainer: {
-    alignItems: 'center',
-    gap: 16,
-    marginBottom: 32,
-    width: '100%'
-  },
-  logoutButton: {
-    backgroundColor: '#dc3545',
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    borderRadius: 8,
-    alignSelf: 'stretch',
-    alignItems: 'center'
-  },
-  logoutButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600'
-  },
-  placeholderContainer: {
-    backgroundColor: '#fff3cd',
-    padding: 16,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#ffeaa7'
-  },
-  placeholderText: {
-    fontSize: 14,
-    color: '#856404',
-    textAlign: 'center'
-  }
-});
+export default DashboardScreen

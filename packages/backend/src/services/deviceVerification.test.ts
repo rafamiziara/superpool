@@ -1,24 +1,38 @@
 import { jest } from '@jest/globals'
 
 // Mock Firebase services
-const mockGet = jest.fn() as jest.MockedFunction<() => Promise<any>>
-const mockSet = jest.fn() as jest.MockedFunction<(data: any) => Promise<void>>
-const mockUpdate = jest.fn() as jest.MockedFunction<(data: any) => Promise<void>>
+const mockGet = jest.fn() as jest.MockedFunction<
+  () => Promise<{
+    exists: boolean
+    data?: () => unknown
+    ref?: { update: jest.MockedFunction<(data: Record<string, unknown>) => Promise<void>> }
+  }>
+>
+const mockSet = jest.fn() as jest.MockedFunction<(data: Record<string, unknown>) => Promise<void>>
+const mockUpdate = jest.fn() as jest.MockedFunction<(data: Record<string, unknown>) => Promise<void>>
 const mockDelete = jest.fn() as jest.MockedFunction<() => Promise<void>>
-const mockCollection = jest.fn() as jest.MockedFunction<(name: string) => any>
-const mockDoc = jest.fn() as jest.MockedFunction<(id: string) => any>
+const mockCollection = jest.fn() as jest.MockedFunction<(name: string) => { doc: jest.MockedFunction<(id: string) => unknown> }>
+const mockDoc = jest.fn() as jest.MockedFunction<
+  (id: string) => {
+    get: jest.MockedFunction<() => Promise<unknown>>
+    set: jest.MockedFunction<(data: Record<string, unknown>) => Promise<void>>
+    update: jest.MockedFunction<(data: Record<string, unknown>) => Promise<void>>
+    delete: jest.MockedFunction<() => Promise<void>>
+    ref: { update: jest.MockedFunction<(data: Record<string, unknown>) => Promise<void>> }
+  }
+>
 
 mockCollection.mockReturnValue({ doc: mockDoc })
-mockDoc.mockReturnValue({ 
-  get: mockGet, 
-  set: mockSet, 
-  update: mockUpdate, 
+mockDoc.mockReturnValue({
+  get: mockGet,
+  set: mockSet,
+  update: mockUpdate,
   delete: mockDelete,
-  ref: { update: mockUpdate }
+  ref: { update: mockUpdate },
 })
 
 jest.mock('./index', () => ({
-  firestore: { collection: mockCollection }
+  firestore: { collection: mockCollection },
 }))
 
 // Mock logger
@@ -27,11 +41,11 @@ const mockLoggerError = jest.fn()
 const mockLoggerWarn = jest.fn()
 
 jest.mock('firebase-functions/v2', () => ({
-  logger: { 
-    info: mockLoggerInfo, 
+  logger: {
+    info: mockLoggerInfo,
     error: mockLoggerError,
-    warn: mockLoggerWarn 
-  }
+    warn: mockLoggerWarn,
+  },
 }))
 
 import { DeviceVerificationService } from './deviceVerification'
@@ -58,7 +72,7 @@ describe('DeviceVerificationService', () => {
       // Arrange
       const mockDocSnapshot = {
         exists: true,
-        ref: { update: mockUpdate }
+        ref: { update: mockUpdate },
       }
       mockGet.mockResolvedValue(mockDocSnapshot)
 
@@ -112,7 +126,7 @@ describe('DeviceVerificationService', () => {
         walletAddress: testWalletAddress,
         approvedAt: mockTimestamp,
         platform: testPlatform,
-        lastUsed: mockTimestamp
+        lastUsed: mockTimestamp,
       }
 
       // Act
@@ -122,10 +136,10 @@ describe('DeviceVerificationService', () => {
       expect(mockCollection).toHaveBeenCalledWith(APPROVED_DEVICES_COLLECTION)
       expect(mockDoc).toHaveBeenCalledWith(testDeviceId)
       expect(mockSet).toHaveBeenCalledWith(expectedDevice)
-      expect(mockLoggerInfo).toHaveBeenCalledWith('Device approved successfully', { 
-        deviceId: testDeviceId, 
-        walletAddress: testWalletAddress, 
-        platform: testPlatform 
+      expect(mockLoggerInfo).toHaveBeenCalledWith('Device approved successfully', {
+        deviceId: testDeviceId,
+        walletAddress: testWalletAddress,
+        platform: testPlatform,
       })
     })
 
@@ -135,13 +149,14 @@ describe('DeviceVerificationService', () => {
       mockSet.mockRejectedValue(error)
 
       // Act & Assert
-      await expect(DeviceVerificationService.approveDevice(testDeviceId, testWalletAddress, testPlatform))
-        .rejects.toThrow('Failed to approve device')
-      
-      expect(mockLoggerError).toHaveBeenCalledWith('Error approving device', { 
-        error, 
-        deviceId: testDeviceId, 
-        walletAddress: testWalletAddress 
+      await expect(DeviceVerificationService.approveDevice(testDeviceId, testWalletAddress, testPlatform)).rejects.toThrow(
+        'Failed to approve device'
+      )
+
+      expect(mockLoggerError).toHaveBeenCalledWith('Error approving device', {
+        error,
+        deviceId: testDeviceId,
+        walletAddress: testWalletAddress,
       })
     })
   })
@@ -154,12 +169,12 @@ describe('DeviceVerificationService', () => {
         walletAddress: testWalletAddress,
         approvedAt: mockTimestamp,
         platform: testPlatform,
-        lastUsed: mockTimestamp
+        lastUsed: mockTimestamp,
       }
-      
+
       const mockDocSnapshot = {
         exists: true,
-        data: () => deviceData
+        data: () => deviceData,
       }
       mockGet.mockResolvedValue(mockDocSnapshot)
 
@@ -219,9 +234,8 @@ describe('DeviceVerificationService', () => {
       mockDelete.mockRejectedValue(error)
 
       // Act & Assert
-      await expect(DeviceVerificationService.revokeDeviceApproval(testDeviceId))
-        .rejects.toThrow('Failed to revoke device approval')
-      
+      await expect(DeviceVerificationService.revokeDeviceApproval(testDeviceId)).rejects.toThrow('Failed to revoke device approval')
+
       expect(mockLoggerError).toHaveBeenCalledWith('Error revoking device approval', { error, deviceId: testDeviceId })
     })
   })

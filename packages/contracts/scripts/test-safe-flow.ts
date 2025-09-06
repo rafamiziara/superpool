@@ -136,8 +136,9 @@ async function testSafeFlow() {
         name: 'Should Fail',
       })
       throw new Error('Individual Safe owner should not be able to create pools')
-    } catch (error: any) {
-      if (error.message.includes('OwnableUnauthorizedAccount')) {
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+      if (errorMessage.includes('OwnableUnauthorizedAccount')) {
         console.log('✅ Individual Safe owner correctly denied access')
       } else {
         throw error
@@ -175,8 +176,9 @@ async function testSafeFlow() {
         name: 'Should Fail - Original Owner',
       })
       throw new Error('Original owner should no longer have access')
-    } catch (error: any) {
-      if (error.message.includes('OwnableUnauthorizedAccount')) {
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+      if (errorMessage.includes('OwnableUnauthorizedAccount')) {
         console.log('✅ Original owner correctly denied access')
       } else {
         throw error
@@ -191,8 +193,9 @@ async function testSafeFlow() {
         name: 'Should Fail - Safe Owner Direct',
       })
       throw new Error('Individual Safe owner should not have direct access')
-    } catch (error: any) {
-      if (error.message.includes('OwnableUnauthorizedAccount')) {
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+      if (errorMessage.includes('OwnableUnauthorizedAccount')) {
         console.log('✅ Individual Safe owners correctly denied direct access')
       } else {
         throw error

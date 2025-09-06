@@ -1,28 +1,10 @@
 {
   "temp-dir": "./coverage/.nyc_output",
   "report-dir": "./coverage/merged",
-  "reporter": [
-    "lcov",
-    "text-summary",
-    "html"
-  ],
-  "include": [
-    "packages/*/src/**/*.ts",
-    "apps/*/src/**/*.{ts,tsx}"
-  ],
-  "exclude": [
-    "**/*.test.ts",
-    "**/*.test.tsx",
-    "**/*.spec.ts",
-    "**/*.spec.tsx",
-    "**/node_modules/**",
-    "**/coverage/**",
-    "**/*.d.ts"
-  ],
-  "extension": [
-    ".ts",
-    ".tsx"
-  ],
+  "reporter": ["lcov", "text-summary", "html"],
+  "include": ["packages/*/src/**/*.ts", "apps/*/src/**/*.{ts,tsx}"],
+  "exclude": ["**/*.test.ts", "**/*.test.tsx", "**/*.spec.ts", "**/*.spec.tsx", "**/node_modules/**", "**/coverage/**", "**/*.d.ts"],
+  "extension": [".ts", ".tsx"],
   "cache": true,
   "all": true,
   "check-coverage": false
