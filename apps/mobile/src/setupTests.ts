@@ -22,6 +22,18 @@ configure({
 jest.mock('firebase/auth', () => require('@mocks/external/firebase').firebaseAuth)
 jest.mock('firebase/functions', () => require('@mocks/external/firebase').firebaseFunctions)
 jest.mock('firebase/app', () => require('@mocks/external/firebase').firebaseApp)
+jest.mock('firebase/app-check', () => require('@mocks/external/firebase').firebaseAppCheck)
+jest.mock('firebase/firestore', () => require('@mocks/external/firebase').firebaseFirestore)
+
+// Mock firebase.config to prevent initialization errors
+jest.mock('./firebase.config', () => ({
+  FIREBASE_AUTH: 'mocked-firebase-auth',
+  FIREBASE_FUNCTIONS: 'mocked-firebase-functions',
+  FIREBASE_FIRESTORE: 'mocked-firebase-firestore',
+}))
+
+// Note: appCheckProvider is mocked individually in its test file
+// Global mock removed to avoid conflicts with specific test mocks
 
 // Apply AsyncStorage mock using centralized definition
 jest.mock('@react-native-async-storage/async-storage', () => require('@mocks/external/asyncStorage').default)
