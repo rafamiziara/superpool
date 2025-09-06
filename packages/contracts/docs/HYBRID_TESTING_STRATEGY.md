@@ -19,6 +19,7 @@ We use a **hybrid testing strategy** that provides:
 **Command**: `pnpm test:local`
 
 **Features**:
+
 - Runs on ephemeral Hardhat network
 - Uses regular EOA addresses instead of Safe contracts
 - Tests all core functionality: pool creation, lending, borrowing, access controls
@@ -26,6 +27,7 @@ We use a **hybrid testing strategy** that provides:
 - No external dependencies
 
 **Use Cases**:
+
 - Initial contract development
 - Bug fixing and debugging
 - Feature implementation
@@ -47,12 +49,14 @@ await poolFactory.createPool(poolParams) // Direct call, no multi-sig
 **Command**: `pnpm demo:safe`
 
 **Features**:
+
 - Conceptual walkthrough of multi-sig process
 - Shows transaction signing and validation
 - Demonstrates security benefits
 - No external dependencies required
 
 **Use Cases**:
+
 - Understanding Safe workflow
 - Team education
 - Documentation and presentations
@@ -65,11 +69,13 @@ await poolFactory.createPool(poolParams) // Direct call, no multi-sig
 **Purpose**: Full Safe integration testing
 
 **Requirements**:
+
 - Access to network with deployed Safe contracts
 - Proper RPC endpoints without rate limits
 - Test POL/ETH for gas fees
 
 **Features**:
+
 - Real Safe wallet deployment
 - Multi-signature transaction flow
 - Production-identical security model
@@ -127,12 +133,14 @@ polygonAmoyFork: {
 ## Environment Variables
 
 ### Required for All Testing
+
 ```bash
 # Core development (always required)
 PRIVATE_KEY=your_private_key_here
 ```
 
 ### Required for Safe Testing
+
 ```bash
 # Safe multi-sig configuration
 SAFE_OWNERS=0xOwner1,0xOwner2,0xOwner3
@@ -141,6 +149,7 @@ SAFE_SALT_NONCE=0x1234567890abcdef
 ```
 
 ### Required for Network Testing
+
 ```bash
 # RPC endpoints for forked testing
 POLYGON_AMOY_RPC_URL=https://your-alchemy-url
@@ -151,6 +160,7 @@ ETHERSCAN_API_KEY=your_api_key
 ## Development Workflow
 
 ### Phase 1: Local Development
+
 ```bash
 # Start local node
 pnpm node:local
@@ -163,6 +173,7 @@ pnpm deploy:local
 ```
 
 ### Phase 2: Safe Understanding
+
 ```bash
 # Learn Safe workflow
 pnpm demo:safe
@@ -172,6 +183,7 @@ pnpm demo:safe
 ```
 
 ### Phase 3: Production Preparation
+
 ```bash
 # Deploy to testnet
 pnpm deploy:amoy
@@ -186,18 +198,22 @@ pnpm transfer:ownership:amoy
 ## Safe Integration Points
 
 ### 1. Contract Deployment
+
 - Deploy PoolFactory with deployer as owner
 - Deploy Safe wallet with proper owners/threshold
 - Transfer PoolFactory ownership to Safe
 
 ### 2. Admin Operations
+
 All admin functions require Safe approval:
+
 - `createPool()` - Create new lending pools
 - `updatePoolParameters()` - Modify pool settings
 - `pausePool()` / `unpausePool()` - Emergency controls
 - `withdrawProtocolFees()` - Fee management
 
 ### 3. Multi-Sig Process
+
 1. **Propose** - Any owner proposes transaction
 2. **Review** - Other owners review transaction details
 3. **Sign** - Required owners sign transaction hash
@@ -206,17 +222,20 @@ All admin functions require Safe approval:
 ## Security Considerations
 
 ### Local Testing Security
+
 - Uses test private keys (safe for development)
 - No real funds at risk
 - Fast iteration without security overhead
 
 ### Production Security
+
 - Multi-signature approval required
 - No single point of failure
 - Transparent on-chain execution
 - Configurable threshold based on risk
 
 ### Best Practices
+
 1. Always test locally first
 2. Use Safe demo to understand workflow
 3. Deploy to testnet before mainnet
@@ -252,23 +271,27 @@ All admin functions require Safe approval:
 ## Benefits of Hybrid Approach
 
 ### Development Speed
+
 - Fast local iteration
 - Immediate feedback
 - No external dependencies
 - Reliable CI/CD
 
 ### Production Readiness
+
 - Real multi-sig workflow
 - Security validation
 - Network integration testing
 - Production-identical flow
 
 ### Cost Efficiency
+
 - Free local testing
 - Minimal testnet costs
 - No mainnet fees during development
 
 ### Flexibility
+
 - Easy mode switching
 - Environment-specific configuration
 - Gradual complexity increase

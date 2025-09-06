@@ -140,7 +140,6 @@ const safeConfig = {
    ```
 
 2. **Collect Signatures**
-
    - Transaction will be prepared in Safe
    - Required number of signers must approve
    - Use Safe web interface or CLI for signatures
@@ -242,21 +241,18 @@ safe-cli tx <SAFE_ADDRESS> <POOL_FACTORY_ADDRESS> "emergencyUnpause()"
 ### Incident Response Workflow
 
 1. **Immediate Response (0-1 hour)**
-
    - Identify threat/vulnerability
    - Execute emergency pause if needed
    - Notify all signers
    - Begin investigation
 
 2. **Assessment (1-4 hours)**
-
    - Analyze scope and impact
    - Determine remediation steps
    - Prepare response plan
    - Coordinate with team
 
 3. **Remediation (4-24 hours)**
-
    - Implement fixes
    - Deploy updates if needed
    - Test solutions
@@ -281,14 +277,12 @@ safe-cli tx <SAFE_ADDRESS> <POOL_FACTORY_ADDRESS> "emergencyUnpause()"
 ### Signer Management
 
 1. **Key Security**
-
    - Use hardware wallets for production
    - Never share private keys
    - Regular key rotation schedule
    - Secure backup procedures
 
 2. **Access Control**
-
    - Minimum required threshold
    - Geographic distribution of signers
    - Regular access reviews
@@ -303,7 +297,6 @@ safe-cli tx <SAFE_ADDRESS> <POOL_FACTORY_ADDRESS> "emergencyUnpause()"
 ### Transaction Verification
 
 1. **Before Signing**
-
    - Verify transaction details
    - Confirm contract addresses
    - Check parameters and values
@@ -318,7 +311,6 @@ safe-cli tx <SAFE_ADDRESS> <POOL_FACTORY_ADDRESS> "emergencyUnpause()"
 ### Operational Security
 
 1. **Regular Audits**
-
    - Quarterly Safe configuration review
    - Annual security assessment
    - Penetration testing
@@ -402,14 +394,12 @@ pnpm transfer:ownership verify <FACTORY_ADDRESS>
 #### Lost Signer Access
 
 1. **Immediate Steps**
-
    - Assess remaining signer capacity
    - Check if threshold still achievable
    - Document the incident
    - Notify other signers
 
 2. **Threshold Still Achievable**
-
    - Continue operations with remaining signers
    - Plan signer replacement
    - Update Safe configuration when possible
@@ -423,14 +413,12 @@ pnpm transfer:ownership verify <FACTORY_ADDRESS>
 #### Safe Compromise
 
 1. **Immediate Response**
-
    - Execute emergency pause
    - Isolate compromised components
    - Secure remaining assets
    - Document all activities
 
 2. **Assessment**
-
    - Determine scope of compromise
    - Identify affected systems
    - Assess potential damage

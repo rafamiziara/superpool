@@ -23,3 +23,6 @@ export const appCheck = getAppCheck(adminApp)
 // Export services
 export * from './ContractService'
 export * from './deviceVerification'
+
+// Export provider service
+export { ProviderService } from './providerService'

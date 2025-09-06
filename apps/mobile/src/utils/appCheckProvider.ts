@@ -8,24 +8,47 @@ import { v4 as uuidv4 } from 'uuid'
 const APP_CHECK_MINTER_URL = process.env.EXPO_PUBLIC_CLOUD_FUNCTIONS_BASE_URL + 'customAppCheckMinter'
 
 // A helper function to get a unique ID that is persistent across app updates
-const getUniqueDeviceId = async (): Promise<string | null> => {
-  if (Platform.OS === 'android') {
-    return Application.getAndroidId()
+export const getUniqueDeviceId = async (): Promise<string | null> => {
+  try {
+    if (Platform.OS === 'android') {
+      const androidId = Application.getAndroidId()
+      if (!androidId) {
+        return uuidv4()
+      }
+      return androidId
+    }
+
+    if (Platform.OS === 'ios') {
+      const iosId = await Application.getIosIdForVendorAsync()
+      if (!iosId) {
+        return uuidv4()
+      }
+      return iosId
+    }
+
+    // Fallback for web and unknown platforms: use a UUID stored in SecureStore
+    try {
+      let webId = await SecureStore.getItemAsync('web_device_id')
+
+      if (!webId) {
+        webId = uuidv4()
+        try {
+          await SecureStore.setItemAsync('web_device_id', webId)
+        } catch (storeError) {
+          console.warn('Failed to store web device ID:', storeError)
+          // Continue with the generated UUID even if storage fails
+        }
+      }
+
+      return webId
+    } catch (secureStoreError) {
+      console.warn('SecureStore access failed, using fallback UUID:', secureStoreError)
+      return uuidv4()
+    }
+  } catch (error) {
+    console.warn('Device ID retrieval failed, using fallback UUID:', error)
+    return uuidv4()
   }
-
-  if (Platform.OS === 'ios') {
-    return Application.getIosIdForVendorAsync()
-  }
-
-  // Fallback for web: use a UUID stored in SecureStore
-  let webId = await SecureStore.getItemAsync('web_device_id')
-
-  if (!webId) {
-    webId = uuidv4()
-    await SecureStore.setItemAsync('web_device_id', webId)
-  }
-
-  return webId
 }
 
 export const customAppCheckProviderFactory = (): CustomProvider => {

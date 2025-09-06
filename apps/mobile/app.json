@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "mobile",
-    "slug": "mobile",
+    "name": "SuperPool",
+    "slug": "superpool-mobile",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -36,10 +36,7 @@
       "favicon": "./assets/favicon.png",
       "bundler": "metro"
     },
-    "plugins": [
-      "expo-secure-store",
-      "expo-router"
-    ],
+    "plugins": ["expo-secure-store", "expo-router"],
     "scheme": "superpool"
   }
 }

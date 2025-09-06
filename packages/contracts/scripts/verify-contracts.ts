@@ -6,7 +6,7 @@ dotenv.config()
 interface ContractInfo {
   name: string
   address: string
-  constructorArgs?: any[]
+  constructorArgs?: unknown[]
   isProxy?: boolean
   implementationAddress?: string
 }
@@ -51,8 +51,9 @@ async function main() {
       await verifyContract(contract)
       console.log(`✅ ${contract.name} verified successfully`)
       successCount++
-    } catch (error: any) {
-      console.log(`❌ Failed to verify ${contract.name}:`, error.message)
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+      console.log(`❌ Failed to verify ${contract.name}:`, errorMessage)
       failureCount++
 
       // Provide manual verification command
@@ -106,8 +107,10 @@ async function verifyContract(contractInfo: ContractInfo, maxRetries: number = 3
       })
 
       return // Success
-    } catch (error: any) {
-      if (error.message.toLowerCase().includes('already verified')) {
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+
+      if (errorMessage.toLowerCase().includes('already verified')) {
         console.log(`   ✅ ${contractInfo.name} is already verified`)
         return
       }
@@ -116,7 +119,7 @@ async function verifyContract(contractInfo: ContractInfo, maxRetries: number = 3
         throw error // Re-throw on final attempt
       }
 
-      console.log(`   ⚠️ Attempt ${attempt} failed: ${error.message}`)
+      console.log(`   ⚠️ Attempt ${attempt} failed: ${errorMessage}`)
     }
   }
 }
@@ -157,30 +160,6 @@ async function getContractsToVerify(): Promise<ContractInfo[]> {
   }
 
   return contracts
-}
-
-/**
- * Helper function to check if a contract is already verified
- */
-async function isContractVerified(address: string): Promise<boolean> {
-  try {
-    await run('verify:verify', {
-      address: address,
-      constructorArguments: [],
-    })
-    return false
-  } catch (error: any) {
-    return error.message.toLowerCase().includes('already verified')
-  }
-}
-
-/**
- * Helper function to get constructor arguments for known contracts
- */
-function getConstructorArgs(contractName: string, network: string): any[] {
-  // This could be expanded to read from deployment files or configuration
-  // For now, return empty array - args should be provided via command line
-  return []
 }
 
 // Handle errors

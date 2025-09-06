@@ -1,0 +1,35 @@
+{
+  "name": "@superpool/design",
+  "version": "0.1.0",
+  "description": "SuperPool design system tokens and configuration",
+  "main": "tailwind.config.js",
+  "files": [
+    "tokens.css",
+    "tailwind.config.js",
+    "README.md"
+  ],
+  "exports": {
+    "./tokens.css": "./tokens.css",
+    "./tailwind.config": "./tailwind.config.js",
+    "./package.json": "./package.json"
+  },
+  "scripts": {
+    "format": "prettier --write ."
+  },
+  "keywords": [
+    "design-system",
+    "design-tokens",
+    "tailwind",
+    "css",
+    "superpool"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/rafamiziara/superpool.git",
+    "directory": "packages/design"
+  },
+  "license": "MIT",
+  "peerDependencies": {
+    "tailwindcss": "^3.0.0"
+  }
+}

@@ -3,8 +3,11 @@ import { isAddress } from 'ethers'
 import { AUTH_NONCES_COLLECTION } from '../../constants'
 import { createAuthMessage } from '../../utils'
 
+// Type definitions for Firebase Firestore mock functions
+type SetFunction = () => Promise<void>
+
 // Mock the Firebase Admin SDK dependencies
-const mockSet = jest.fn<SetFunctionFirestore>()
+const mockSet = jest.fn<SetFunction>()
 const mockDoc = jest.fn(() => ({ set: mockSet }))
 const mockCollection = jest.fn(() => ({ doc: mockDoc }))
 const mockFirestore = jest.fn(() => ({ collection: mockCollection }))

@@ -33,7 +33,7 @@ interface MultiSigSimulationConfig {
   safeAddress: string
   targetContract: string
   functionSignature: string
-  functionArgs: any[]
+  functionArgs: unknown[]
   value?: string
 }
 
@@ -161,8 +161,11 @@ async function simulateMultiSigApproval(config: MultiSigSimulationConfig): Promi
     // Wait for confirmation
     console.log('⏳ Waiting for confirmation...')
     let receipt
-    if (executeTxResponse.transactionResponse && typeof (executeTxResponse.transactionResponse as any).wait === 'function') {
-      receipt = await (executeTxResponse.transactionResponse as any).wait()
+    if (
+      executeTxResponse.transactionResponse &&
+      typeof (executeTxResponse.transactionResponse as { wait?: () => Promise<unknown> }).wait === 'function'
+    ) {
+      receipt = await (executeTxResponse.transactionResponse as { wait: () => Promise<unknown> }).wait()
     }
 
     console.log('✅ Multi-sig transaction executed successfully!')
@@ -191,7 +194,7 @@ async function simulateAcceptOwnership(safeAddress: string, poolFactoryAddress: 
 /**
  * Example: Simulate pool creation
  */
-async function simulatePoolCreation(safeAddress: string, poolFactoryAddress: string, poolParams: any): Promise<void> {
+async function simulatePoolCreation(safeAddress: string, poolFactoryAddress: string, poolParams: Record<string, unknown>): Promise<void> {
   console.log('🏊 Simulating pool creation...')
 
   await simulateMultiSigApproval({
@@ -256,13 +259,13 @@ async function runDemo(): Promise<void> {
         await simulateEmergencyPause(safeAddress, targetAddress)
         break
 
-      case 'createPool':
+      case 'createPool': {
         if (!targetAddress) {
           throw new Error('poolFactoryAddress required for createPool')
         }
 
         // Example pool parameters
-        const poolParams = {
+        const poolParams: Record<string, unknown> = {
           name: 'Demo Pool',
           description: 'Multi-sig simulation demo pool',
           maxMembers: 10,
@@ -276,7 +279,7 @@ async function runDemo(): Promise<void> {
 
         await simulatePoolCreation(safeAddress, targetAddress, poolParams)
         break
-
+      }
       default:
         throw new Error(`Unknown command: ${command}`)
     }
