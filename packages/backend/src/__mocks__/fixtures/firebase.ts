@@ -5,7 +5,7 @@
  * and authentication patterns for comprehensive backend testing.
  */
 
-import type { UserRecord, DecodedIdToken } from 'firebase-admin/auth'
+import type { DecodedIdToken, UserRecord } from 'firebase-admin/auth'
 import { SAMPLE_ADDRESSES } from './blockchain'
 
 // Sample user records for Firebase Auth testing

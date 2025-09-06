@@ -2,13 +2,13 @@ import { ethers } from 'ethers'
 import { logger } from 'firebase-functions'
 import { getFirestore } from 'firebase-admin/firestore'
 import {
+  createSafeTransactionHash,
+  executeSafeTransaction as executeSafeTransactionUtil,
   getSafeAddresses,
   getSafeContract,
-  createSafeTransactionHash,
   getSafeNonce,
-  SafeTransaction,
   SafeSignature as SafeSignatureType,
-  executeSafeTransaction as executeSafeTransactionUtil,
+  SafeTransaction,
 } from '../utils/multisig'
 import { AppError } from '../utils/errorHandling'
 import { estimateGas, executeTransaction, getGasPrice } from '../utils/blockchain'

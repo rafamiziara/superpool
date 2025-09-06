@@ -7,9 +7,9 @@
  */
 
 import { EventEmitter } from 'events'
-import { Worker, isMainThread, parentPort, workerData } from 'worker_threads'
+import { isMainThread, parentPort, Worker, workerData } from 'worker_threads'
 import { cpus } from 'os'
-import { TestEnvironmentIsolationManager, IsolationScope } from './TestEnvironmentIsolation'
+import { IsolationScope, TestEnvironmentIsolationManager } from './TestEnvironmentIsolation'
 import { performanceManager } from './PerformanceTestUtilities'
 
 // Execution strategy types

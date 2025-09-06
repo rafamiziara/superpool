@@ -1,8 +1,8 @@
-import { onCall, HttpsError, CallableRequest } from 'firebase-functions/v2/https'
+import { CallableRequest, HttpsError, onCall } from 'firebase-functions/v2/https'
 import { logger } from 'firebase-functions'
-import { getFirestore, FieldValue } from 'firebase-admin/firestore'
+import { FieldValue, getFirestore } from 'firebase-admin/firestore'
 import { ethers } from 'ethers'
-import { handleError, AppError } from '../../utils/errorHandling'
+import { AppError, handleError } from '../../utils/errorHandling'
 import { validateAddress } from '../../utils/validation'
 import type { PoolCreatedEvent } from './syncPoolEvents'
 

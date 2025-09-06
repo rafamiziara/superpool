@@ -1,6 +1,6 @@
 import { expect } from '@jest/globals'
 import { jest } from '@jest/globals'
-import { validatePoolCreationParams, sanitizePoolParams, ValidationResult } from './validation'
+import { sanitizePoolParams, validatePoolCreationParams, ValidationResult } from './validation'
 import { CreatePoolRequest } from '../functions/pools/createPool'
 
 // Mock ethers module

@@ -7,15 +7,15 @@
 
 import { jest } from '@jest/globals'
 import type {
-  JsonRpcProvider,
-  Wallet,
-  Contract,
-  TransactionResponse,
-  TransactionReceipt,
   Block,
-  Network,
+  Contract,
   FeeData,
+  JsonRpcProvider,
+  Network,
+  TransactionReceipt,
   TransactionRequest,
+  TransactionResponse,
+  Wallet,
 } from 'ethers'
 
 export interface MockTransactionResponse {

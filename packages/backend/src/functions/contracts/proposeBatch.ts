@@ -1,6 +1,6 @@
-import { onCall, HttpsError, CallableRequest } from 'firebase-functions/v2/https'
+import { CallableRequest, HttpsError, onCall } from 'firebase-functions/v2/https'
 import { logger } from 'firebase-functions'
-import { createContractService, BatchTransactionRequest, TransactionProposal } from '../../services/ContractService'
+import { BatchTransactionRequest, createContractService, TransactionProposal } from '../../services/ContractService'
 import { handleError } from '../../utils/errorHandling'
 
 export interface ProposeBatchRequest {

@@ -12,21 +12,21 @@
  * - Performance testing for pool creation workflows
  */
 
-import { describe, it, expect, beforeEach, afterEach, beforeAll, afterAll } from '@jest/globals'
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from '@jest/globals'
 import { ethers } from 'ethers'
 import {
-  MockFactory,
-  quickSetup,
   ContractMock,
-  TestFixtures,
+  detectMemoryLeaks,
   ethersMock,
   firebaseAdminMock,
-  performanceManager,
-  startPerformanceTest,
-  runBenchmark,
-  detectMemoryLeaks,
-  type PerformanceThresholds,
   type LoadTestConfig,
+  MockFactory,
+  performanceManager,
+  type PerformanceThresholds,
+  quickSetup,
+  runBenchmark,
+  startPerformanceTest,
+  TestFixtures,
 } from '../../__mocks__'
 import { createPool, CreatePoolRequest, CreatePoolResponse } from './createPool'
 import { HttpsError } from 'firebase-functions/v2/https'

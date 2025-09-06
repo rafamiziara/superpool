@@ -6,7 +6,7 @@
  * performance insights, and actionable recommendations.
  */
 
-import { writeFileSync, mkdirSync, existsSync } from 'fs'
+import { existsSync, mkdirSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { EventEmitter } from 'events'
 

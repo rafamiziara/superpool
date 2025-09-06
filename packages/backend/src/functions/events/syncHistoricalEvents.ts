@@ -1,10 +1,10 @@
-import { onCall, HttpsError, CallableRequest } from 'firebase-functions/v2/https'
+import { CallableRequest, HttpsError, onCall } from 'firebase-functions/v2/https'
 import { logger } from 'firebase-functions'
 import { ethers } from 'ethers'
-import { getFirestore, FieldValue } from 'firebase-admin/firestore'
+import { FieldValue, getFirestore } from 'firebase-admin/firestore'
 import { PoolFactoryABI } from '../../constants/abis'
-import { handleError, AppError } from '../../utils/errorHandling'
-import type { PoolCreatedEvent, EventSyncState } from './syncPoolEvents'
+import { AppError, handleError } from '../../utils/errorHandling'
+import type { EventSyncState, PoolCreatedEvent } from './syncPoolEvents'
 import { processPoolEvents } from './processPoolEvents'
 
 export interface SyncHistoricalEventsRequest {

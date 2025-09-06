@@ -1,17 +1,17 @@
-import { onCall, HttpsError, CallableRequest } from 'firebase-functions/v2/https'
+import { CallableRequest, HttpsError, onCall } from 'firebase-functions/v2/https'
 import { logger } from 'firebase-functions'
 import { ethers } from 'ethers'
 import { getFirestore } from 'firebase-admin/firestore'
-import { validatePoolCreationParams, sanitizePoolParams } from '../../utils/validation'
+import { sanitizePoolParams, validatePoolCreationParams } from '../../utils/validation'
 import {
-  prepareSafePoolCreationTransaction,
   createSafeTransactionHash,
-  SafeTransaction,
   getSafeOwners,
   getSafeThreshold,
   isSafeOwner,
+  prepareSafePoolCreationTransaction,
+  SafeTransaction,
 } from '../../utils/multisig'
-import { handleError, AppError } from '../../utils/errorHandling'
+import { AppError, handleError } from '../../utils/errorHandling'
 
 export interface CreatePoolSafeRequest {
   poolOwner: string

@@ -1,7 +1,7 @@
-import { onCall, HttpsError, CallableRequest } from 'firebase-functions/v2/https'
+import { CallableRequest, HttpsError, onCall } from 'firebase-functions/v2/https'
 import { logger } from 'firebase-functions'
 import { getFirestore } from 'firebase-admin/firestore'
-import { isSafeOwner, getSafeOwners } from '../../utils/multisig'
+import { getSafeOwners, isSafeOwner } from '../../utils/multisig'
 import { ethers } from 'ethers'
 import { handleError } from '../../utils/errorHandling'
 
