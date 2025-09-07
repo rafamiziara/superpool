@@ -172,8 +172,8 @@ describe('Authentication Security Tests', () => {
       // Create nonces for both wallets
       mockV4.mockReturnValueOnce(nonce1).mockReturnValueOnce(nonce2)
 
-      const request1 = FunctionsMock.createCallableRequest({ walletAddress: wallet1 } }
-      const request2 = FunctionsMock.createCallableRequest({ walletAddress: wallet2 } }
+      const request1 = FunctionsMock.createCallableRequest({ walletAddress: wallet1 })
+      const request2 = FunctionsMock.createCallableRequest({ walletAddress: wallet2 })
 
       await generateAuthMessageHandler(request1 as any)
       await generateAuthMessageHandler(request2 as any)
@@ -543,7 +543,7 @@ describe('Authentication Security Tests', () => {
       const promises = Array(invalidRequests)
         .fill(null)
         .map(() => {
-          const request = FunctionsMock.createCallableRequest({ walletAddress: 'invalid' } }
+          const request = FunctionsMock.createCallableRequest({ walletAddress: 'invalid' })
           return generateAuthMessageHandler(request as any).catch((error) => error)
         })
 
