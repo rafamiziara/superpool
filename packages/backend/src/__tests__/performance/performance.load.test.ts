@@ -7,7 +7,7 @@
  */
 
 import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals'
-import { MockFactory, quickSetup, TestFixtures } from '../../__mocks__/index'
+import { MockFactory, quickSetup, SAMPLE_TRANSACTION_HASHES, TestFixtures } from '../../__mocks__/index'
 import {
   detectMemoryLeaks,
   performanceManager,
@@ -15,7 +15,7 @@ import {
   runBenchmark,
   startPerformanceTest,
 } from '../utils/PerformanceTestUtilities'
-import { withTestIsolation } from '../utils/TestEnvironmentIsolation'
+import { TestEnvironmentContext, withTestIsolation } from '../utils/TestEnvironmentIsolation'
 import { ExecutionPriority, ParallelTestCase, ParallelTestExecutor, WorkloadCategory } from '../utils/ParallelTestExecution'
 
 // Mock all critical services for performance testing
@@ -67,7 +67,7 @@ describe('Performance and Load Tests - Critical Functions', () => {
   describe('Authentication Performance Tests', () => {
     describe('Load Testing', () => {
       it('should handle high-volume authentication requests', async () => {
-        await withTestIsolation('auth-load-test', 'performance', async (context) => {
+        await withTestIsolation('auth-load-test', 'performance', async (context: TestEnvironmentContext) => {
           // Arrange
           const concurrentUsers = 100
           const requestsPerUser = 5
@@ -89,7 +89,7 @@ describe('Performance and Load Tests - Critical Functions', () => {
           // Act
           const measurement = startPerformanceTest('auth-load-test', 'load-testing')
 
-          const loadTestResult = await performanceManager.runLoadTest(
+          const loadTestResult: any = await performanceManager.runLoadTest(
             'authentication-load',
             async () => {
               return PerformanceTestServices.authentication.generateAuthMessage(
@@ -105,8 +105,9 @@ describe('Performance and Load Tests - Critical Functions', () => {
             },
             {
               maxResponseTime: 2000, // 2 seconds max
-              minThroughput: 25, // 25 requests/second minimum
               maxMemoryUsage: 512 * 1024 * 1024, // 512MB max
+              maxCpuUsage: 80, // 80% max CPU usage
+              minSuccessRate: 95, // 95% minimum success rate
             }
           )
 
@@ -127,7 +128,7 @@ describe('Performance and Load Tests - Critical Functions', () => {
       })
 
       it('should benchmark signature verification performance', async () => {
-        await withTestIsolation('signature-verification-benchmark', 'performance', async (context) => {
+        await withTestIsolation('signature-verification-benchmark', 'performance', async (context: TestEnvironmentContext) => {
           // Arrange
           const testSignatures = Array.from({ length: 10 }, (_, i) => ({
             walletAddress: TestFixtures.TestData.addresses.poolOwners[i % TestFixtures.TestData.addresses.poolOwners.length],
@@ -136,7 +137,7 @@ describe('Performance and Load Tests - Critical Functions', () => {
             nonce: `nonce-${i}`,
           }))
 
-          PerformanceTestServices.authentication.verifySignatureAndLogin.mockImplementation(async ({ signature, nonce }) => {
+          PerformanceTestServices.authentication.verifySignatureAndLogin.mockImplementation(async ({ signature, nonce }: any) => {
             // Simulate cryptographic verification
             await new Promise((resolve) => setTimeout(resolve, Math.random() * 50 + 25)) // 25-75ms
 
@@ -149,7 +150,7 @@ describe('Performance and Load Tests - Critical Functions', () => {
           })
 
           // Act
-          const benchmarkResult = await runBenchmark(
+          const benchmarkResult: any = await runBenchmark(
             'signature-verification',
             async () => {
               const testSig = testSignatures[Math.floor(Math.random() * testSignatures.length)]
@@ -176,7 +177,7 @@ describe('Performance and Load Tests - Critical Functions', () => {
 
     describe('Stress Testing', () => {
       it('should handle authentication system under extreme load', async () => {
-        await withTestIsolation('auth-stress-test', 'performance', async (context) => {
+        await withTestIsolation('auth-stress-test', 'performance', async (context: TestEnvironmentContext) => {
           // Arrange
           const extremeLoad = {
             concurrentUsers: 500, // 5x normal load
@@ -222,7 +223,7 @@ describe('Performance and Load Tests - Critical Functions', () => {
             systemOverloaded = true
           }, 40000) // Overload at 40s
 
-          const stressTestResult = await performanceManager.runLoadTest(
+          const stressTestResult: any = await performanceManager.runLoadTest(
             'authentication-stress',
             async () => {
               return PerformanceTestServices.authentication.generateAuthMessage('stress-test-address')
@@ -254,7 +255,7 @@ describe('Performance and Load Tests - Critical Functions', () => {
   describe('Pool Management Performance Tests', () => {
     describe('Pool Creation Performance', () => {
       it('should benchmark pool creation end-to-end performance', async () => {
-        await withTestIsolation('pool-creation-benchmark', 'performance', async (context) => {
+        await withTestIsolation('pool-creation-benchmark', 'performance', async (context: TestEnvironmentContext) => {
           // Arrange
           const poolConfigurations = [
             TestFixtures.TestData.pools.basic,
@@ -281,14 +282,14 @@ describe('Performance and Load Tests - Critical Functions', () => {
             return {
               success: true,
               poolId: `pool-${Date.now()}-${Math.random()}`,
-              transactionHash: TestFixtures.SAMPLE_TRANSACTION_HASHES.POOL_CREATION,
+              transactionHash: SAMPLE_TRANSACTION_HASHES.POOL_CREATION_1,
               poolDetails: poolParams,
               createdAt: new Date().toISOString(),
             }
           })
 
           // Act
-          const benchmarkResult = await runBenchmark(
+          const benchmarkResult: any = await runBenchmark(
             'pool-creation-end-to-end',
             async () => {
               const randomPoolConfig = poolConfigurations[Math.floor(Math.random() * poolConfigurations.length)]
@@ -312,7 +313,7 @@ describe('Performance and Load Tests - Critical Functions', () => {
       })
 
       it('should test concurrent pool creation performance', async () => {
-        await withTestIsolation('concurrent-pool-creation', 'performance', async (context) => {
+        await withTestIsolation('concurrent-pool-creation', 'performance', async (context: TestEnvironmentContext) => {
           // Arrange
           const concurrentCreations = 20
           const poolOwners = TestFixtures.TestData.addresses.poolOwners
@@ -325,7 +326,7 @@ describe('Performance and Load Tests - Critical Functions', () => {
             return {
               success: true,
               poolId: `concurrent-pool-${Date.now()}-${Math.random()}`,
-              transactionHash: TestFixtures.SAMPLE_TRANSACTION_HASHES.POOL_CREATION,
+              transactionHash: SAMPLE_TRANSACTION_HASHES.POOL_CREATION_1,
               processingTime,
               concurrentRequest: true,
             }
@@ -367,7 +368,7 @@ describe('Performance and Load Tests - Critical Functions', () => {
 
     describe('Pool Query Performance', () => {
       it('should benchmark pool listing with pagination', async () => {
-        await withTestIsolation('pool-listing-benchmark', 'performance', async (context) => {
+        await withTestIsolation('pool-listing-benchmark', 'performance', async (context: TestEnvironmentContext) => {
           // Arrange
           const totalPools = 10000 // Simulate large dataset
           const pageSizes = [10, 25, 50, 100]
@@ -404,7 +405,7 @@ describe('Performance and Load Tests - Critical Functions', () => {
 
           // Act & Assert
           for (const pageSize of pageSizes) {
-            const benchmarkResult = await runBenchmark(
+            const benchmarkResult: any = await runBenchmark(
               `pool-listing-pagesize-${pageSize}`,
               async () => {
                 const randomPage = Math.floor(Math.random() * 10) + 1 // Random page 1-10
@@ -433,7 +434,7 @@ describe('Performance and Load Tests - Critical Functions', () => {
   describe('Contract Service Performance Tests', () => {
     describe('Transaction Processing Performance', () => {
       it('should benchmark transaction execution pipeline', async () => {
-        await withTestIsolation('transaction-execution-benchmark', 'performance', async (context) => {
+        await withTestIsolation('transaction-execution-benchmark', 'performance', async (context: TestEnvironmentContext) => {
           // Arrange
           const transactionTypes = [
             { type: 'pool_creation', gasLimit: 500000, complexity: 'high' },
@@ -465,7 +466,7 @@ describe('Performance and Load Tests - Critical Functions', () => {
 
             return {
               success: true,
-              transactionHash: TestFixtures.SAMPLE_TRANSACTION_HASHES.POOL_CREATION,
+              transactionHash: SAMPLE_TRANSACTION_HASHES.POOL_CREATION_1,
               gasUsed: txData.gasLimit * (0.8 + Math.random() * 0.2), // 80-100% of limit
               blockNumber: 12345 + Math.floor(Math.random() * 1000),
               pipeline: {
@@ -480,7 +481,7 @@ describe('Performance and Load Tests - Critical Functions', () => {
 
           // Act & Assert
           for (const txType of transactionTypes) {
-            const benchmarkResult = await runBenchmark(
+            const benchmarkResult: any = await runBenchmark(
               `transaction-${txType.type}`,
               async () => {
                 return PerformanceTestServices.contracts.executeTransaction({
@@ -515,7 +516,7 @@ describe('Performance and Load Tests - Critical Functions', () => {
       })
 
       it('should test batch transaction performance', async () => {
-        await withTestIsolation('batch-transaction-performance', 'performance', async (context) => {
+        await withTestIsolation('batch-transaction-performance', 'performance', async (context: TestEnvironmentContext) => {
           // Arrange
           const batchSizes = [5, 10, 20, 50]
 
@@ -557,7 +558,7 @@ describe('Performance and Load Tests - Critical Functions', () => {
               value: '0',
             }))
 
-            const result = await PerformanceTestServices.contracts.batchTransactions(transactions)
+            const result: any = await PerformanceTestServices.contracts.batchTransactions(transactions)
             const metrics = measurement.end()
 
             // Assert
@@ -582,7 +583,7 @@ describe('Performance and Load Tests - Critical Functions', () => {
   describe('Device Verification Performance Tests', () => {
     describe('Bulk Device Operations', () => {
       it('should benchmark bulk device approval performance', async () => {
-        await withTestIsolation('bulk-device-approval-benchmark', 'performance', async (context) => {
+        await withTestIsolation('bulk-device-approval-benchmark', 'performance', async (context: TestEnvironmentContext) => {
           // Arrange
           const bulkSizes = [10, 50, 100, 500]
 
@@ -620,7 +621,7 @@ describe('Performance and Load Tests - Critical Functions', () => {
               walletAddress: TestFixtures.TestData.addresses.poolOwners[i % TestFixtures.TestData.addresses.poolOwners.length],
             }))
 
-            const benchmarkResult = await runBenchmark(
+            const benchmarkResult: any = await runBenchmark(
               `bulk-device-approval-${bulkSize}`,
               async () => {
                 return PerformanceTestServices.deviceVerification.bulkApproveDevices(devices)
@@ -645,7 +646,7 @@ describe('Performance and Load Tests - Critical Functions', () => {
 
   describe('Memory Performance and Leak Detection', () => {
     it('should detect memory leaks in critical operations', async () => {
-      await withTestIsolation('memory-leak-detection', 'performance', async (context) => {
+      await withTestIsolation('memory-leak-detection', 'performance', async (context: TestEnvironmentContext) => {
         // Arrange
         const criticalOperations = [
           {
@@ -738,7 +739,7 @@ describe('Performance and Load Tests - Critical Functions', () => {
 
   describe('Performance Regression Detection', () => {
     it('should establish performance baselines and detect regressions', async () => {
-      await withTestIsolation('performance-regression-detection', 'performance', async (context) => {
+      await withTestIsolation('performance-regression-detection', 'performance', async (context: TestEnvironmentContext) => {
         // Arrange
         const performanceBaselines = {
           authGeneration: { baseline: 150, tolerance: 20 }, // 150ms ± 20%
@@ -779,7 +780,7 @@ describe('Performance and Load Tests - Critical Functions', () => {
         ]
 
         for (const test of performanceTests) {
-          const benchmarkResult = await runBenchmark(
+          const benchmarkResult: any = await runBenchmark(
             test.name,
             test.operation,
             50, // 50 iterations for statistical significance
@@ -807,7 +808,7 @@ describe('Performance and Load Tests - Critical Functions', () => {
 
   describe('Overall System Performance', () => {
     it('should benchmark complete user workflow performance', async () => {
-      await withTestIsolation('end-to-end-workflow-benchmark', 'performance', async (context) => {
+      await withTestIsolation('end-to-end-workflow-benchmark', 'performance', async (context: TestEnvironmentContext) => {
         // Arrange - Complete user workflow
         const userWorkflow = async () => {
           // 1. Generate auth message
@@ -816,7 +817,7 @@ describe('Performance and Load Tests - Critical Functions', () => {
           )
 
           // 2. Verify signature and login
-          const loginResult = await PerformanceTestServices.authentication.verifySignatureAndLogin({
+          const loginResult: any = await PerformanceTestServices.authentication.verifySignatureAndLogin({
             signature: '0x123',
             nonce: authMessage.nonce,
           })
@@ -870,7 +871,7 @@ describe('Performance and Load Tests - Critical Functions', () => {
         })
 
         // Act
-        const benchmarkResult = await runBenchmark(
+        const benchmarkResult: any = await runBenchmark(
           'complete-user-workflow',
           userWorkflow,
           20, // 20 iterations

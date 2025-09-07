@@ -6,9 +6,9 @@
  */
 
 import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals'
-import { MockFactory, quickSetup, TestFixtures } from '../../__mocks__/index'
+import { MockFactory, quickSetup, SAMPLE_TRANSACTION_HASHES, TestFixtures } from '../../__mocks__/index'
 import { performanceManager, startPerformanceTest } from '../utils/PerformanceTestUtilities'
-import { withTestIsolation } from '../utils/TestEnvironmentIsolation'
+import { TestEnvironmentContext, withTestIsolation } from '../utils/TestEnvironmentIsolation'
 
 // Mock all backend services for comprehensive error testing
 const ErrorTestServices = {
@@ -59,7 +59,7 @@ describe('Error Handling and Edge Cases - Comprehensive Tests', () => {
   describe('Firebase Service Errors', () => {
     describe('Firestore Error Handling', () => {
       it('should handle Firestore unavailable errors gracefully', async () => {
-        await withTestIsolation('firestore-unavailable', 'error-handling', async (context) => {
+        await withTestIsolation('firestore-unavailable', 'error-handling', async (context: TestEnvironmentContext) => {
           // Arrange
           errorScenarios.firebase.unavailable()
 
@@ -80,7 +80,7 @@ describe('Error Handling and Edge Cases - Comprehensive Tests', () => {
             }
           })
 
-          const authResult = await ErrorTestServices.authentication.generateAuthMessage(TestFixtures.TestData.addresses.poolOwners[0])
+          const authResult: any = await ErrorTestServices.authentication.generateAuthMessage(TestFixtures.TestData.addresses.poolOwners[0])
 
           expect(authResult.success).toBe(false)
           expect(authResult.code).toBe('FIRESTORE_UNAVAILABLE')
@@ -98,13 +98,13 @@ describe('Error Handling and Edge Cases - Comprehensive Tests', () => {
                 code: 'FIRESTORE_UNAVAILABLE',
                 retryable: true,
                 poolCreatedOnChain: true, // Blockchain succeeded but DB failed
-                transactionHash: TestFixtures.SAMPLE_TRANSACTION_HASHES.POOL_CREATION,
+                transactionHash: SAMPLE_TRANSACTION_HASHES.POOL_CREATION_1,
                 recoveryAction: 'Pool exists on blockchain, manual DB sync required',
               }
             }
           })
 
-          const poolResult = await ErrorTestServices.pools.createPool(TestFixtures.TestData.pools.basic)
+          const poolResult: any = await ErrorTestServices.pools.createPool(TestFixtures.TestData.pools.basic)
 
           expect(poolResult.success).toBe(false)
           expect(poolResult.poolCreatedOnChain).toBe(true)
@@ -113,7 +113,7 @@ describe('Error Handling and Edge Cases - Comprehensive Tests', () => {
       })
 
       it('should handle permission denied errors', async () => {
-        await withTestIsolation('permission-denied', 'error-handling', async (context) => {
+        await withTestIsolation('permission-denied', 'error-handling', async (context: TestEnvironmentContext) => {
           // Arrange
           errorScenarios.firebase.permissionDenied()
 
@@ -149,7 +149,7 @@ describe('Error Handling and Edge Cases - Comprehensive Tests', () => {
               suggestion: 'Contact administrator for proper permissions',
             }))
 
-            const result = await service[op.operation](op.params)
+            const result: any = await service[op.operation](op.params)
 
             expect(result.success).toBe(false)
             expect(result.code).toBe('PERMISSION_DENIED')
@@ -160,7 +160,7 @@ describe('Error Handling and Edge Cases - Comprehensive Tests', () => {
       })
 
       it('should handle Firestore rate limiting', async () => {
-        await withTestIsolation('rate-limiting', 'error-handling', async (context) => {
+        await withTestIsolation('rate-limiting', 'error-handling', async (context: TestEnvironmentContext) => {
           // Arrange
           let requestCount = 0
           const rateLimitThreshold = 5
@@ -198,13 +198,13 @@ describe('Error Handling and Edge Cases - Comprehensive Tests', () => {
           const metrics = measurement.end()
 
           // Assert
-          const successfulRequests = results.filter((r) => r.success)
-          const rateLimitedRequests = results.filter((r) => r.code === 'RATE_LIMITED')
+          const successfulRequests = results.filter((r: any) => r.success)
+          const rateLimitedRequests = results.filter((r: any) => r.code === 'RATE_LIMITED')
 
           expect(successfulRequests).toHaveLength(rateLimitThreshold)
           expect(rateLimitedRequests).toHaveLength(10 - rateLimitThreshold)
-          expect(rateLimitedRequests.every((r) => r.retryable)).toBe(true)
-          expect(rateLimitedRequests.every((r) => r.retryAfter > 0)).toBe(true)
+          expect(rateLimitedRequests.every((r: any) => r.retryable)).toBe(true)
+          expect(rateLimitedRequests.every((r: any) => r.retryAfter > 0)).toBe(true)
 
           console.log(`Rate limiting test: ${successfulRequests.length} succeeded, ${rateLimitedRequests.length} rate limited`)
         })
@@ -213,7 +213,7 @@ describe('Error Handling and Edge Cases - Comprehensive Tests', () => {
 
     describe('Firebase Auth Error Handling', () => {
       it('should handle expired authentication tokens', async () => {
-        await withTestIsolation('expired-auth-tokens', 'error-handling', async (context) => {
+        await withTestIsolation('expired-auth-tokens', 'error-handling', async (context: TestEnvironmentContext) => {
           // Arrange
           errorScenarios.firebase.authExpired()
 
@@ -231,7 +231,7 @@ describe('Error Handling and Edge Cases - Comprehensive Tests', () => {
               suggestion: 'Please re-authenticate with wallet signature',
             }))
 
-            const result = await ErrorTestServices.authentication.verifySignatureAndLogin({
+            const result: any = await ErrorTestServices.authentication.verifySignatureAndLogin({
               token,
               signature: 'test-signature',
             })
@@ -245,7 +245,7 @@ describe('Error Handling and Edge Cases - Comprehensive Tests', () => {
       })
 
       it('should handle authentication service downtime', async () => {
-        await withTestIsolation('auth-service-down', 'error-handling', async (context) => {
+        await withTestIsolation('auth-service-down', 'error-handling', async (context: TestEnvironmentContext) => {
           // Arrange
           const measurement = startPerformanceTest('auth-service-downtime', 'error-handling')
 
@@ -287,7 +287,7 @@ describe('Error Handling and Edge Cases - Comprehensive Tests', () => {
           // First 3 requests should fail and trigger circuit breaker
           for (let i = 0; i < maxFailures; i++) {
             try {
-              const result = await ErrorTestServices.authentication.verifySignatureAndLogin({})
+              const result: any = await ErrorTestServices.authentication.verifySignatureAndLogin({})
               results.push(result)
             } catch (error: any) {
               results.push({
@@ -303,7 +303,7 @@ describe('Error Handling and Edge Cases - Comprehensive Tests', () => {
           circuitOpen = true
 
           // Next request should be rejected by circuit breaker
-          const circuitBreakerResult = await ErrorTestServices.authentication.verifySignatureAndLogin({})
+          const circuitBreakerResult: any = await ErrorTestServices.authentication.verifySignatureAndLogin({})
           results.push(circuitBreakerResult)
 
           const metrics = measurement.end()
@@ -321,7 +321,7 @@ describe('Error Handling and Edge Cases - Comprehensive Tests', () => {
   describe('Blockchain Service Errors', () => {
     describe('Network Connection Errors', () => {
       it('should handle blockchain network outages', async () => {
-        await withTestIsolation('blockchain-network-outage', 'error-handling', async (context) => {
+        await withTestIsolation('blockchain-network-outage', 'error-handling', async (context: TestEnvironmentContext) => {
           // Arrange
           errorScenarios.blockchain.networkError('Network connection failed')
 
@@ -348,7 +348,7 @@ describe('Error Handling and Edge Cases - Comprehensive Tests', () => {
               }
             })
 
-            const result = await ErrorTestServices.contracts.executeTransaction({
+            const result: any = await ErrorTestServices.contracts.executeTransaction({
               to: TestFixtures.TestData.addresses.contracts.poolFactory,
               data: '0x123456',
             })
@@ -363,7 +363,7 @@ describe('Error Handling and Edge Cases - Comprehensive Tests', () => {
       })
 
       it('should implement retry logic with exponential backoff', async () => {
-        await withTestIsolation('retry-exponential-backoff', 'error-handling', async (context) => {
+        await withTestIsolation('retry-exponential-backoff', 'error-handling', async (context: TestEnvironmentContext) => {
           // Arrange
           let attemptCount = 0
           const maxRetries = 4
@@ -393,7 +393,7 @@ describe('Error Handling and Edge Cases - Comprehensive Tests', () => {
 
             return {
               success: true,
-              transactionHash: TestFixtures.SAMPLE_TRANSACTION_HASHES.POOL_CREATION,
+              transactionHash: SAMPLE_TRANSACTION_HASHES.POOL_CREATION_1,
               attempt: attemptCount,
               totalAttempts: attemptCount,
               retriesUsed: attemptCount - 1,
@@ -401,14 +401,14 @@ describe('Error Handling and Edge Cases - Comprehensive Tests', () => {
           })
 
           // Simulate retry loop
-          let result = await ErrorTestServices.contracts.executeTransaction({})
-          const retryDelays = []
+          let result = (await ErrorTestServices.contracts.executeTransaction({})) as any
+          const retryDelays: number[] = []
 
           while (!result.success && result.retryable && result.attempt < maxRetries) {
             retryDelays.push(result.retryAfter)
             // Simulate waiting
             await new Promise((resolve) => setTimeout(resolve, 50)) // Shortened for test speed
-            result = await ErrorTestServices.contracts.executeTransaction({})
+            result = (await ErrorTestServices.contracts.executeTransaction({})) as any
           }
 
           const metrics = measurement.end()
@@ -425,7 +425,7 @@ describe('Error Handling and Edge Cases - Comprehensive Tests', () => {
 
     describe('Transaction Failures', () => {
       it('should handle transaction revert with detailed error analysis', async () => {
-        await withTestIsolation('transaction-revert-analysis', 'error-handling', async (context) => {
+        await withTestIsolation('transaction-revert-analysis', 'error-handling', async (context: TestEnvironmentContext) => {
           // Arrange
           const revertScenarios = [
             {
@@ -469,7 +469,7 @@ describe('Error Handling and Edge Cases - Comprehensive Tests', () => {
                 : ['Review contract logic', 'Contact contract owner'],
             }))
 
-            const result = await ErrorTestServices.contracts.executeTransaction({})
+            const result: any = await ErrorTestServices.contracts.executeTransaction({})
 
             expect(result.success).toBe(false)
             expect(result.code).toBe(scenario.code)
@@ -482,7 +482,7 @@ describe('Error Handling and Edge Cases - Comprehensive Tests', () => {
       })
 
       it('should handle gas estimation failures', async () => {
-        await withTestIsolation('gas-estimation-failures', 'error-handling', async (context) => {
+        await withTestIsolation('gas-estimation-failures', 'error-handling', async (context: TestEnvironmentContext) => {
           // Arrange
           const gasEstimationScenarios = [
             {
@@ -518,7 +518,7 @@ describe('Error Handling and Edge Cases - Comprehensive Tests', () => {
               ],
             }))
 
-            const result = await ErrorTestServices.contracts.estimateGas('createPool', {})
+            const result: any = await ErrorTestServices.contracts.estimateGas('createPool', {})
 
             expect(result.success).toBe(false)
             expect(result.code).toBe(scenario.code)
@@ -530,19 +530,19 @@ describe('Error Handling and Edge Cases - Comprehensive Tests', () => {
       })
 
       it('should handle mempool congestion and stuck transactions', async () => {
-        await withTestIsolation('mempool-congestion', 'error-handling', async (context) => {
+        await withTestIsolation('mempool-congestion', 'error-handling', async (context: TestEnvironmentContext) => {
           // Arrange
           let transactionNonce = 100
-          const stuckTransactionHash = TestFixtures.SAMPLE_TRANSACTION_HASHES.POOL_CREATION
+          const stuckTransactionHash = SAMPLE_TRANSACTION_HASHES.POOL_CREATION_1
 
           // Act
           const measurement = startPerformanceTest('mempool-congestion-handling', 'error-handling')
 
-          ErrorTestServices.contracts.executeTransaction.mockImplementation(async (txData) => {
+          ErrorTestServices.contracts.executeTransaction.mockImplementation(async (txData: any) => {
             transactionNonce++
 
             // Simulate stuck transaction
-            if (!txData.gasPrice || parseInt(txData.gasPrice) < 30000000000) {
+            if (!txData.gasPrice || parseInt(txData.gasPrice as string) < 30000000000) {
               // < 30 Gwei
               return {
                 success: false,
@@ -566,8 +566,8 @@ describe('Error Handling and Edge Cases - Comprehensive Tests', () => {
             // Transaction succeeded with higher gas price
             return {
               success: true,
-              transactionHash: TestFixtures.SAMPLE_TRANSACTION_HASHES.POOL_CREATION.replace('1', '2'),
-              gasPrice: txData.gasPrice,
+              transactionHash: SAMPLE_TRANSACTION_HASHES.POOL_CREATION_1.replace('1', '2'),
+              gasPrice: txData.gasPrice as string,
               nonce: transactionNonce,
               replacedTransaction: stuckTransactionHash,
               strategy: 'gas_bump',
@@ -575,12 +575,12 @@ describe('Error Handling and Edge Cases - Comprehensive Tests', () => {
           })
 
           // First transaction gets stuck
-          const stuckResult = await ErrorTestServices.contracts.executeTransaction({
+          const stuckResult: any = await ErrorTestServices.contracts.executeTransaction({
             gasPrice: '20000000000', // Low gas price
           })
 
           // Replacement transaction with higher gas price
-          const replacementResult = await ErrorTestServices.contracts.executeTransaction({
+          const replacementResult: any = await ErrorTestServices.contracts.executeTransaction({
             gasPrice: '40000000000', // Higher gas price
           })
 
@@ -603,7 +603,7 @@ describe('Error Handling and Edge Cases - Comprehensive Tests', () => {
   describe('Edge Cases and Boundary Conditions', () => {
     describe('Input Validation Edge Cases', () => {
       it('should handle extreme input values gracefully', async () => {
-        await withTestIsolation('extreme-input-values', 'error-handling', async (context) => {
+        await withTestIsolation('extreme-input-values', 'error-handling', async (context: TestEnvironmentContext) => {
           // Arrange
           const extremeInputs = [
             {
@@ -639,7 +639,7 @@ describe('Error Handling and Edge Cases - Comprehensive Tests', () => {
               const poolParams = { ...TestFixtures.TestData.pools.basic, [input.field]: input.value }
 
               // Validate input
-              if (input.field === 'poolName' && input.value.length > 100) {
+              if (input.field === 'poolName' && typeof input.value === 'string' && input.value.length > 100) {
                 return {
                   success: false,
                   error: `Pool name too long: ${input.value.length} characters (max: 100)`,
@@ -650,7 +650,7 @@ describe('Error Handling and Edge Cases - Comprehensive Tests', () => {
                 }
               }
 
-              if (input.field === 'maxLoanAmount' && input.value > 1000000) {
+              if (input.field === 'maxLoanAmount' && typeof input.value === 'number' && input.value > 1000000) {
                 return {
                   success: false,
                   error: `Loan amount too large: ${input.value} (max: 1000000)`,
@@ -669,7 +669,7 @@ describe('Error Handling and Edge Cases - Comprehensive Tests', () => {
               }
             })
 
-            const result = await ErrorTestServices.pools.createPool({ [input.field]: input.value })
+            const result: any = await ErrorTestServices.pools.createPool({ [input.field]: input.value })
 
             // Should either succeed gracefully or fail with specific validation error
             if (!result.success) {
@@ -683,7 +683,7 @@ describe('Error Handling and Edge Cases - Comprehensive Tests', () => {
       })
 
       it('should handle malformed data structures', async () => {
-        await withTestIsolation('malformed-data-structures', 'error-handling', async (context) => {
+        await withTestIsolation('malformed-data-structures', 'error-handling', async (context: TestEnvironmentContext) => {
           // Arrange
           const malformedInputs = [
             {
@@ -758,7 +758,7 @@ describe('Error Handling and Edge Cases - Comprehensive Tests', () => {
               }
             })
 
-            const result = await ErrorTestServices.pools.createPool(input.data)
+            const result: any = await ErrorTestServices.pools.createPool(input.data)
 
             // Should handle malformed data gracefully
             expect(result).toBeDefined()
@@ -773,7 +773,7 @@ describe('Error Handling and Edge Cases - Comprehensive Tests', () => {
 
     describe('Concurrency and Race Conditions', () => {
       it('should handle concurrent operations on same resource', async () => {
-        await withTestIsolation('concurrent-resource-access', 'error-handling', async (context) => {
+        await withTestIsolation('concurrent-resource-access', 'error-handling', async (context: TestEnvironmentContext) => {
           // Arrange
           const poolId = 'concurrent-pool-123'
           let operationCount = 0
@@ -830,18 +830,18 @@ describe('Error Handling and Edge Cases - Comprehensive Tests', () => {
           const metrics = measurement.end()
 
           // Assert
-          const successfulOps = results.filter((r) => r.success)
-          const lockedOps = results.filter((r) => r.code === 'RESOURCE_LOCKED')
-          const failedOps = results.filter((r) => r.code === 'LOCK_ACQUISITION_FAILED')
+          const successfulOps = results.filter((r: any) => r.success)
+          const lockedOps = results.filter((r: any) => r.code === 'RESOURCE_LOCKED')
+          const failedOps = results.filter((r: any) => r.code === 'LOCK_ACQUISITION_FAILED')
 
           expect(successfulOps).toHaveLength(1) // Only one should succeed
           expect(lockedOps.length + failedOps.length).toBe(4) // Others should fail
-          expect(successfulOps[0].lockAcquired).toBe(true)
+          expect((successfulOps[0] as any).lockAcquired).toBe(true)
         })
       })
 
       it('should detect and handle deadlock scenarios', async () => {
-        await withTestIsolation('deadlock-detection', 'error-handling', async (context) => {
+        await withTestIsolation('deadlock-detection', 'error-handling', async (context: TestEnvironmentContext) => {
           // Arrange
           const resources = ['resource-A', 'resource-B']
           const lockTimeout = 2000 // 2 seconds
@@ -902,7 +902,7 @@ describe('Error Handling and Edge Cases - Comprehensive Tests', () => {
           const metrics = measurement.end()
 
           // Assert
-          expect([result1, result2].some((r) => r.code === 'DEADLOCK_DETECTED')).toBe(true)
+          expect([result1, result2].some((r: any) => r.code === 'DEADLOCK_DETECTED')).toBe(true)
           expect(metrics.executionTime).toBeGreaterThan(lockTimeout) // Should timeout
         })
       })
@@ -910,7 +910,7 @@ describe('Error Handling and Edge Cases - Comprehensive Tests', () => {
 
     describe('Memory and Resource Management', () => {
       it('should handle memory pressure gracefully', async () => {
-        await withTestIsolation('memory-pressure', 'error-handling', async (context) => {
+        await withTestIsolation('memory-pressure', 'error-handling', async (context: TestEnvironmentContext) => {
           // Arrange
           const initialMemory = process.memoryUsage()
           const memoryThreshold = initialMemory.heapUsed + 100 * 1024 * 1024 // +100MB
@@ -944,7 +944,7 @@ describe('Error Handling and Edge Cases - Comprehensive Tests', () => {
             }
           })
 
-          const result = await ErrorTestServices.pools.createPool(TestFixtures.TestData.pools.basic)
+          const result: any = await ErrorTestServices.pools.createPool(TestFixtures.TestData.pools.basic)
           const metrics = measurement.end()
 
           // Assert - Should handle memory pressure appropriately
@@ -960,9 +960,9 @@ describe('Error Handling and Edge Cases - Comprehensive Tests', () => {
       })
 
       it('should cleanup resources on operation failure', async () => {
-        await withTestIsolation('resource-cleanup', 'error-handling', async (context) => {
+        await withTestIsolation('resource-cleanup', 'error-handling', async (context: TestEnvironmentContext) => {
           // Arrange
-          const allocatedResources = []
+          const allocatedResources: any[] = []
 
           // Act
           const measurement = startPerformanceTest('resource-cleanup', 'resource-management')
@@ -977,11 +977,13 @@ describe('Error Handling and Edge Cases - Comprehensive Tests', () => {
               throw new Error('Operation failed')
             } catch (error: any) {
               // Cleanup allocated resources
-              const cleanedUp = []
+              const cleanedUp: string[] = []
               while (allocatedResources.length > 0) {
-                const resource = allocatedResources.pop()
-                resource.allocated = false
-                cleanedUp.push(resource.id)
+                const resource: any = allocatedResources.pop()
+                if (resource) {
+                  resource.allocated = false
+                  cleanedUp.push(resource.id)
+                }
               }
 
               return {
@@ -995,7 +997,7 @@ describe('Error Handling and Edge Cases - Comprehensive Tests', () => {
             }
           })
 
-          const result = await ErrorTestServices.contracts.executeTransaction({})
+          const result: any = await ErrorTestServices.contracts.executeTransaction({})
           const metrics = measurement.end()
 
           // Assert
@@ -1010,7 +1012,7 @@ describe('Error Handling and Edge Cases - Comprehensive Tests', () => {
 
   describe('Performance Under Stress', () => {
     it('should handle performance degradation gracefully', async () => {
-      await withTestIsolation('performance-degradation', 'error-handling', async (context) => {
+      await withTestIsolation('performance-degradation', 'error-handling', async (context: TestEnvironmentContext) => {
         // Arrange
         const performanceThresholds = {
           responseTime: 5000, // 5 seconds
@@ -1064,8 +1066,8 @@ describe('Error Handling and Edge Cases - Comprehensive Tests', () => {
         const metrics = measurement.end()
 
         // Assert
-        const successfulRequests = results.filter((r) => r.success)
-        const failedRequests = results.filter((r) => !r.success)
+        const successfulRequests = results.filter((r: any) => r.success)
+        const failedRequests = results.filter((r: any) => !r.success)
         const errorRate = failedRequests.length / results.length
 
         console.log(`Performance test: ${successfulRequests.length} successful, ${failedRequests.length} failed`)
@@ -1073,9 +1075,9 @@ describe('Error Handling and Edge Cases - Comprehensive Tests', () => {
         console.log(`Average response time: ${(metrics.executionTime / results.length).toFixed(2)}ms`)
 
         // Should handle degradation gracefully
-        if (errorRate > performanceThresholds.errorRate) {
-          expect(failedRequests.every((r) => r.code === 'PERFORMANCE_DEGRADED')).toBe(true)
-          expect(failedRequests.every((r) => r.recommendedAction)).toBeTruthy()
+        if (errorRate > (performanceThresholds as any).errorRate) {
+          expect(failedRequests.every((r: any) => r.code === 'PERFORMANCE_DEGRADED')).toBe(true)
+          expect(failedRequests.every((r: any) => r.recommendedAction)).toBeTruthy()
         }
       })
     })

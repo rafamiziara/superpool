@@ -37,28 +37,28 @@ describe('ContractService', () => {
     }
 
     mockSigner = {
-      getAddress: jest.fn().mockResolvedValue('0xsigneraddress'),
-      signMessage: jest.fn(),
+      getAddress: jest.fn<() => Promise<string>>().mockResolvedValue('0xsigneraddress'),
+      signMessage: jest.fn<(message: string) => Promise<string>>(),
     }
 
     mockSafeContract = {
-      getThreshold: jest.fn().mockResolvedValue(2),
-      getOwners: jest.fn().mockResolvedValue(['0xowner1', '0xowner2', '0xowner3']),
-      nonce: jest.fn().mockResolvedValue(5),
+      getThreshold: jest.fn<() => Promise<number>>().mockResolvedValue(2),
+      getOwners: jest.fn<() => Promise<string[]>>().mockResolvedValue(['0xowner1', '0xowner2', '0xowner3']),
+      nonce: jest.fn<() => Promise<number>>().mockResolvedValue(5),
     }
 
     // Mock Firestore
     mockDb = {
-      collection: jest.fn().mockReturnThis(),
-      doc: jest.fn().mockReturnThis(),
-      set: jest.fn().mockResolvedValue(undefined),
-      get: jest.fn(),
-      update: jest.fn().mockResolvedValue(undefined),
-      where: jest.fn().mockReturnThis(),
-      orderBy: jest.fn().mockReturnThis(),
-      offset: jest.fn().mockReturnThis(),
-      limit: jest.fn().mockReturnThis(),
-      count: jest.fn().mockReturnThis(),
+      collection: jest.fn<(path: string) => any>().mockReturnThis(),
+      doc: jest.fn<(id?: string) => any>().mockReturnThis(),
+      set: jest.fn<(data: any) => Promise<void>>().mockResolvedValue(undefined),
+      get: jest.fn<() => Promise<any>>(),
+      update: jest.fn<(data: any) => Promise<void>>().mockResolvedValue(undefined),
+      where: jest.fn<(field: string, operator: any, value: any) => any>().mockReturnThis(),
+      orderBy: jest.fn<(field: string, direction?: string) => any>().mockReturnThis(),
+      offset: jest.fn<(count: number) => any>().mockReturnThis(),
+      limit: jest.fn<(count: number) => any>().mockReturnThis(),
+      count: jest.fn<() => any>().mockReturnThis(),
     }
 
     // Mock ethers
@@ -73,13 +73,13 @@ describe('ContractService', () => {
     ethers.verifyMessage = jest.fn().mockReturnValue('0xowner1')
     ethers.getBytes = jest.fn()
     ethers.isAddress = jest.fn().mockReturnValue(true)
-    ethers.parseEther = jest.fn().mockImplementation((value) => BigInt(value) * BigInt(10 ** 18))
-    ethers.toBeHex = jest.fn().mockImplementation((value) => {
+    ethers.parseEther = jest.fn<(value: string) => bigint>().mockImplementation((value: string) => BigInt(value) * BigInt(10 ** 18))
+    ethers.toBeHex = jest.fn<(value: any) => string>().mockImplementation((value: any) => {
       if (value === undefined || value === null) return '0x0'
       if (typeof value === 'string') return value.startsWith('0x') ? value : `0x${value}`
       return `0x${value.toString(16)}`
     })
-    ethers.zeroPadValue = jest.fn().mockImplementation((value, length) => {
+    ethers.zeroPadValue = jest.fn<(value: any, length: number) => string>().mockImplementation((value: any, length: number) => {
       if (value === undefined || value === null) value = '0x0'
       let hex = typeof value === 'string' ? value : `0x${value.toString(16)}`
       if (!hex.startsWith('0x')) hex = `0x${hex}`
@@ -90,26 +90,26 @@ describe('ContractService', () => {
       }
       return hex
     })
-    ethers.dataLength = jest.fn().mockImplementation((data) => {
+    ethers.dataLength = jest.fn<(data: string) => number>().mockImplementation((data: string) => {
       if (!data || data === '0x') return 0
       return (data.length - 2) / 2
     })
 
     // Mock multisig utilities
     const multisig = require('../utils/multisig')
-    multisig.getSafeContract = jest.fn().mockReturnValue(mockSafeContract)
-    multisig.createSafeTransactionHash = jest.fn().mockResolvedValue('0xtxhash123')
-    multisig.getSafeNonce = jest.fn().mockResolvedValue(5)
-    multisig.executeSafeTransaction = jest.fn().mockResolvedValue({
+    multisig.getSafeContract = jest.fn<() => any>().mockReturnValue(mockSafeContract)
+    multisig.createSafeTransactionHash = jest.fn<(params: any) => Promise<string>>().mockResolvedValue('0xtxhash123')
+    multisig.getSafeNonce = jest.fn<() => Promise<number>>().mockResolvedValue(5)
+    multisig.executeSafeTransaction = jest.fn<(params: any) => Promise<any>>().mockResolvedValue({
       hash: '0xexecutiontxhash',
-      wait: jest.fn().mockResolvedValue({
+      wait: jest.fn<() => Promise<any>>().mockResolvedValue({
         status: 1,
         blockNumber: 12345,
         gasUsed: { toString: () => '150000' },
         logs: [],
       }),
     })
-    multisig.getSafeAddresses = jest.fn().mockReturnValue({
+    multisig.getSafeAddresses = jest.fn<() => any>().mockReturnValue({
       multiSend: '0xmultisendaddress',
     })
 

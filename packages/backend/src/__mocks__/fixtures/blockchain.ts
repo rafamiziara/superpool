@@ -377,7 +377,7 @@ export class BlockchainFixtures {
   /**
    * Create sample pool parameters with random values
    */
-  static randomPoolParams(overrides: Partial<any> = {}) {
+  static randomPoolParams(overrides: Partial<Record<string, unknown>> = {}) {
     return {
       poolOwner: this.randomAddress(),
       maxLoanAmount: (Math.floor(Math.random() * 10000) + 100).toString(),
@@ -408,7 +408,7 @@ export class BlockchainFixtures {
   /**
    * Create sample transaction receipt
    */
-  static createTransactionReceipt(txHash: string, overrides: any = {}) {
+  static createTransactionReceipt(txHash: string, overrides: Record<string, unknown> = {}) {
     return {
       transactionHash: txHash,
       blockNumber: SAMPLE_BLOCKS.CURRENT_BLOCK.number,

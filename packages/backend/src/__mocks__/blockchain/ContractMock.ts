@@ -243,11 +243,11 @@ export class ContractMock {
         data: string,
         operation: number,
         safeTxGas: bigint,
-        baseGas: bigint,
-        gasPrice: bigint,
-        gasToken: string,
-        refundReceiver: string,
-        nonce: bigint
+        _baseGas: bigint,
+        _gasPrice: bigint,
+        _gasToken: string,
+        _refundReceiver: string,
+        _nonce: bigint
       ) => {
         return `0x${[to, value.toString(), data, operation.toString(), safeTxGas.toString()].join('').slice(0, 64).padEnd(64, '0')}`
       }
@@ -260,16 +260,16 @@ export class ContractMock {
 
     mock.execTransaction = jest.fn(
       async (
-        to: string,
-        value: bigint,
-        data: string,
-        operation: number,
-        safeTxGas: bigint,
-        baseGas: bigint,
-        gasPrice: bigint,
-        gasToken: string,
-        refundReceiver: string,
-        signatures: string
+        _to: string,
+        _value: bigint,
+        _data: string,
+        _operation: number,
+        _safeTxGas: bigint,
+        _baseGas: bigint,
+        _gasPrice: bigint,
+        _gasToken: string,
+        _refundReceiver: string,
+        _signatures: string
       ) => {
         ContractMock.safeNonce++
 
@@ -377,6 +377,13 @@ export class ContractMock {
     ContractMock.poolCount = 0
     ContractMock.pools.clear()
     ContractMock.safeNonce = 42
+  }
+
+  /**
+   * Reset all state - alias for reset() for compatibility
+   */
+  static resetAllState(): void {
+    ContractMock.reset()
   }
 
   /**

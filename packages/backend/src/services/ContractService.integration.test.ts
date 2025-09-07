@@ -6,9 +6,9 @@
  */
 
 import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals'
-import { MockFactory, quickSetup, TestFixtures } from '../__mocks__/index'
+import { MockFactory, quickSetup, SAMPLE_TRANSACTION_HASHES, TestFixtures } from '../__mocks__/index'
 import { performanceManager, startPerformanceTest } from '../__tests__/utils/PerformanceTestUtilities'
-import { withTestIsolation } from '../__tests__/utils/TestEnvironmentIsolation'
+import { TestEnvironmentContext, withTestIsolation } from '../__tests__/utils/TestEnvironmentIsolation'
 import { BlockchainTestEnvironment } from '../__tests__/utils/BlockchainTestEnvironment'
 
 // Mock ContractService for testing
@@ -65,7 +65,7 @@ describe('ContractService - Integration Tests', () => {
           mockProvider.getGasPrice.mockResolvedValue('20000000000') // 20 Gwei
 
           mockContract.createPool.mockResolvedValue({
-            hash: TestFixtures.SAMPLE_TRANSACTION_HASHES.POOL_CREATION,
+            hash: SAMPLE_TRANSACTION_HASHES.POOL_CREATION_1,
             from: ownerAddress,
             to: TestFixtures.TestData.addresses.contracts.poolFactory,
             gasLimit: '500000',
@@ -109,7 +109,7 @@ describe('ContractService - Integration Tests', () => {
           ContractService.createPool.mockResolvedValue({
             success: true,
             poolId: '1',
-            transactionHash: TestFixtures.SAMPLE_TRANSACTION_HASHES.POOL_CREATION,
+            transactionHash: SAMPLE_TRANSACTION_HASHES.POOL_CREATION_1,
             blockNumber: 12346,
             gasUsed: '487123',
             eventLogs: [
@@ -164,7 +164,7 @@ describe('ContractService - Integration Tests', () => {
           })
 
           mockContract.createPool.mockResolvedValue({
-            hash: TestFixtures.SAMPLE_TRANSACTION_HASHES.POOL_CREATION,
+            hash: SAMPLE_TRANSACTION_HASHES.POOL_CREATION_1,
             wait: mockWait,
           })
 
@@ -202,7 +202,7 @@ describe('ContractService - Integration Tests', () => {
           }
 
           mockContract.createPool.mockResolvedValue({
-            hash: TestFixtures.SAMPLE_TRANSACTION_HASHES.POOL_CREATION,
+            hash: SAMPLE_TRANSACTION_HASHES.POOL_CREATION_1,
             gasLimit: (parseInt(estimatedGas) * 1.2).toString(), // 20% buffer
             wait: jest.fn().mockResolvedValue({
               status: 1,
@@ -222,7 +222,7 @@ describe('ContractService - Integration Tests', () => {
 
           ContractService.createPool.mockResolvedValue({
             success: true,
-            transactionHash: TestFixtures.SAMPLE_TRANSACTION_HASHES.POOL_CREATION,
+            transactionHash: SAMPLE_TRANSACTION_HASHES.POOL_CREATION_1,
             gasEstimated: estimatedGas,
             gasUsed: actualGasUsed,
             gasEfficiency: ((parseInt(actualGasUsed) / parseInt(estimatedGas)) * 100).toFixed(2) + '%',
@@ -332,7 +332,7 @@ describe('ContractService - Integration Tests', () => {
           }
 
           let txState = 'pending'
-          const txHash = TestFixtures.SAMPLE_TRANSACTION_HASHES.POOL_CREATION
+          const txHash = SAMPLE_TRANSACTION_HASHES.POOL_CREATION_1
 
           mockProvider.sendTransaction.mockResolvedValue({
             hash: txHash,
@@ -390,13 +390,13 @@ describe('ContractService - Integration Tests', () => {
         await withTestIsolation('tx-replacement', 'contract-service', async (context) => {
           // Arrange
           const originalTx = {
-            hash: TestFixtures.SAMPLE_TRANSACTION_HASHES.POOL_CREATION,
+            hash: SAMPLE_TRANSACTION_HASHES.POOL_CREATION_1,
             gasPrice: '20000000000',
             nonce: 42,
           }
 
           const replacementTx = {
-            hash: TestFixtures.SAMPLE_TRANSACTION_HASHES.POOL_CREATION.replace('1', '2'),
+            hash: SAMPLE_TRANSACTION_HASHES.POOL_CREATION_1.replace('1', '2'),
             gasPrice: '30000000000', // 50% higher
             nonce: 42, // Same nonce
           }
@@ -563,7 +563,7 @@ describe('ContractService - Integration Tests', () => {
               throw new Error('Network timeout')
             }
             return {
-              hash: TestFixtures.SAMPLE_TRANSACTION_HASHES.POOL_CREATION,
+              hash: SAMPLE_TRANSACTION_HASHES.POOL_CREATION_1,
               wait: jest.fn().mockResolvedValue({ status: 1 }),
             }
           })
@@ -725,7 +725,7 @@ describe('ContractService - Integration Tests', () => {
             gasUsageHistory.push(gasUsed)
 
             return {
-              hash: TestFixtures.SAMPLE_TRANSACTION_HASHES.POOL_CREATION,
+              hash: SAMPLE_TRANSACTION_HASHES.POOL_CREATION_1,
               wait: jest.fn().mockResolvedValue({
                 status: 1,
                 gasUsed: gasUsed.toString(),
@@ -738,7 +738,7 @@ describe('ContractService - Integration Tests', () => {
             ContractService.createPool.mockResolvedValue({
               success: true,
               poolId: `gas-test-${i}`,
-              transactionHash: TestFixtures.SAMPLE_TRANSACTION_HASHES.POOL_CREATION,
+              transactionHash: SAMPLE_TRANSACTION_HASHES.POOL_CREATION_1,
               gasUsed: gasUsageHistory[i]?.toString() || '450000',
               gasMetrics: {
                 averageGasUsed: gasUsageHistory.reduce((sum, gas) => sum + gas, 0) / Math.max(gasUsageHistory.length, 1),
