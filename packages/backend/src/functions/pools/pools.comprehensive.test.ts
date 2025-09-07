@@ -6,7 +6,7 @@
  */
 
 import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals'
-import { MockFactory, quickSetup, TestFixtures } from '../../__mocks__/index'
+import { FunctionsMock, MockFactory, quickSetup, TestFixtures } from '../../__mocks__/index'
 import { performanceManager, startPerformanceTest } from '../../__tests__/utils/PerformanceTestUtilities'
 import { withTestIsolation } from '../../__tests__/utils/TestEnvironmentIsolation'
 

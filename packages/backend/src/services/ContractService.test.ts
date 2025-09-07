@@ -2,10 +2,17 @@ import { BatchTransactionRequest, ContractCall, ContractService, ContractService
 import { AppError } from '../utils/errorHandling'
 import { jest } from '@jest/globals'
 
-// Mock dependencies
-jest.mock('ethers')
+// Import centralized mock system (MOCK_SYSTEM.md compliant)
+import { 
+  FunctionsMock, 
+  firebaseAdminMock, 
+  ethersMock,
+  ContractMock,
+  MockFactory 
+} from '../__mocks__'
+
+// Mock dependencies using centralized system
 jest.mock('firebase-functions')
-jest.mock('firebase-admin/firestore')
 jest.mock('../utils/multisig')
 jest.mock('../utils/blockchain')
 
@@ -18,6 +25,10 @@ describe('ContractService', () => {
   let mockDb: any
 
   beforeEach(() => {
+    // ✅ MOCK_SYSTEM.md Requirement: Use centralized mock resets
+    firebaseAdminMock.resetAllMocks()
+    ethersMock.resetAllMocks()
+    MockFactory.resetAllMocks()
     jest.clearAllMocks()
 
     // Mock configuration
@@ -29,51 +40,18 @@ describe('ContractService', () => {
       poolFactoryAddress: '0x987654321fedcba',
     }
 
-    // Mock ethers components
-    mockProvider = {
-      waitForTransaction: jest.fn(),
-      getFeeData: jest.fn(),
-      getTransactionReceipt: jest.fn(),
-    }
+    // Use centralized ethers mock system
+    mockProvider = ethersMock.provider
+    mockSigner = ethersMock.wallet
+    
+    // Setup Safe contract mock using centralized system
+    mockSafeContract = ContractMock.createSafeMock()
 
-    mockSigner = {
-      getAddress: jest.fn<() => Promise<string>>().mockResolvedValue('0xsigneraddress'),
-      signMessage: jest.fn<(message: string) => Promise<string>>(),
-    }
+    // Use centralized Firestore mock system
+    mockDb = firebaseAdminMock.firestore
 
-    mockSafeContract = {
-      getThreshold: jest.fn<() => Promise<number>>().mockResolvedValue(2),
-      getOwners: jest.fn<() => Promise<string[]>>().mockResolvedValue(['0xowner1', '0xowner2', '0xowner3']),
-      nonce: jest.fn<() => Promise<number>>().mockResolvedValue(5),
-    }
-
-    // Mock Firestore
-    mockDb = {
-      collection: jest.fn<(path: string) => any>().mockReturnThis(),
-      doc: jest.fn<(id?: string) => any>().mockReturnThis(),
-      set: jest.fn<(data: any) => Promise<void>>().mockResolvedValue(undefined),
-      get: jest.fn<() => Promise<any>>(),
-      update: jest.fn<(data: any) => Promise<void>>().mockResolvedValue(undefined),
-      where: jest.fn<(field: string, operator: any, value: any) => any>().mockReturnThis(),
-      orderBy: jest.fn<(field: string, direction?: string) => any>().mockReturnThis(),
-      offset: jest.fn<(count: number) => any>().mockReturnThis(),
-      limit: jest.fn<(count: number) => any>().mockReturnThis(),
-      count: jest.fn<() => any>().mockReturnThis(),
-    }
-
-    // Mock ethers
-    const ethers = require('ethers')
-    ethers.JsonRpcProvider = jest.fn().mockReturnValue(mockProvider)
-    ethers.Wallet = jest.fn().mockReturnValue(mockSigner)
-    ethers.Interface = jest.fn().mockReturnValue({
-      encodeFunctionData: jest.fn().mockReturnValue('0xencodeddata'),
-      parseLog: jest.fn(),
-    })
-    ethers.ZeroAddress = '0x0000000000000000000000000000000000000000'
-    ethers.verifyMessage = jest.fn().mockReturnValue('0xowner1')
-    ethers.getBytes = jest.fn()
-    ethers.isAddress = jest.fn().mockReturnValue(true)
-    ethers.parseEther = jest.fn<(value: string) => bigint>().mockImplementation((value: string) => BigInt(value) * BigInt(10 ** 18))
+    // Ethers mocks are handled by centralized ethersMock system
+    // Setup specific ethers functions used by ContractService
     ethers.toBeHex = jest.fn<(value: any) => string>().mockImplementation((value: any) => {
       if (value === undefined || value === null) return '0x0'
       if (typeof value === 'string') return value.startsWith('0x') ? value : `0x${value}`

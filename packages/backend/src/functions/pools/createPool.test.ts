@@ -19,6 +19,7 @@ import {
   detectMemoryLeaks,
   ethersMock,
   firebaseAdminMock,
+  FunctionsMock,
   type LoadTestConfig,
   MockFactory,
   performanceManager,
