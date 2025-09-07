@@ -21,12 +21,12 @@ import { createAuthMessage } from '../../utils'
 import { generateAuthMessageHandler } from './generateAuthMessage'
 import { verifySignatureAndLoginHandler } from './verifySignatureAndLogin'
 
-// Mock Firebase services
-const mockSet = jest.fn<() => Promise<void>>()
-const mockUpdate = jest.fn<() => Promise<void>>()
-const mockDelete = jest.fn<() => Promise<void>>()
-const mockGet = jest.fn()
-const mockCreateCustomToken = jest.fn<() => Promise<string>>()
+// Import centralized mock system (MOCK_SYSTEM.md compliant)
+import { 
+  FunctionsMock, 
+  firebaseAdminMock, 
+  ethersMock 
+} from '../../__mocks__'
 
 const mockDoc = jest.fn(() => ({
   set: mockSet,
@@ -99,16 +99,17 @@ describe('Authentication Security Tests', () => {
   const mockNonce = 'security-test-nonce'
 
   beforeEach(() => {
+    // ✅ MOCK_SYSTEM.md Requirement: Use centralized mock resets
+    firebaseAdminMock.resetAllMocks()
+    ethersMock.resetAllMocks()
     jest.clearAllMocks()
 
     // Mock Date to return predictable timestamp
     jest.spyOn(Date.prototype, 'getTime').mockReturnValue(mockTimestamp)
     jest.spyOn(Date, 'now').mockReturnValue(mockTimestamp)
 
-    // Setup default successful mocks
-    jest.mocked(isAddress).mockReturnValue(true)
-    jest.mocked(verifyMessage).mockReturnValue(validWalletAddress)
-    jest.mocked(verifyTypedData).mockReturnValue(validWalletAddress)
+    // Setup ethers mocks using centralized system
+    ethersMock.provider.getNetwork.mockResolvedValue({ chainId: 80002, name: 'polygon-amoy' })
 
     // Setup Firestore mocks
     mockSet.mockResolvedValue(undefined)
@@ -171,8 +172,8 @@ describe('Authentication Security Tests', () => {
       // Create nonces for both wallets
       mockV4.mockReturnValueOnce(nonce1).mockReturnValueOnce(nonce2)
 
-      const request1 = { data: { walletAddress: wallet1 } }
-      const request2 = { data: { walletAddress: wallet2 } }
+      const request1 = FunctionsMock.createCallableRequest({ walletAddress: wallet1 } }
+      const request2 = FunctionsMock.createCallableRequest({ walletAddress: wallet2 } }
 
       await generateAuthMessageHandler(request1 as any)
       await generateAuthMessageHandler(request2 as any)
@@ -488,9 +489,7 @@ describe('Authentication Security Tests', () => {
       for (const maliciousAddress of maliciousAddresses) {
         jest.mocked(isAddress).mockReturnValue(false)
 
-        const request = {
-          data: { walletAddress: maliciousAddress },
-        }
+        const request = FunctionsMock.createCallableRequest({ walletAddress: maliciousAddress })
 
         await expect(generateAuthMessageHandler(request as any)).rejects.toThrow()
       }
@@ -544,7 +543,7 @@ describe('Authentication Security Tests', () => {
       const promises = Array(invalidRequests)
         .fill(null)
         .map(() => {
-          const request = { data: { walletAddress: 'invalid' } }
+          const request = FunctionsMock.createCallableRequest({ walletAddress: 'invalid' } }
           return generateAuthMessageHandler(request as any).catch((error) => error)
         })
 
