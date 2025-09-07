@@ -24,8 +24,8 @@ const config: Config = {
     ],
   },
 
-  // Enable collection of test coverage
-  collectCoverage: true,
+  // Enable collection of test coverage (can be disabled in development)
+  collectCoverage: process.env.SKIP_COVERAGE !== 'true',
 
   // Specify where to collect coverage from
   collectCoverageFrom: [
@@ -123,8 +123,6 @@ const config: Config = {
   forceExit: false, // Let tests exit naturally
   logHeapUsage: process.env.DEBUG_MEMORY === 'true',
 
-  // Optimize coverage collection (can be disabled in development)
-  collectCoverage: process.env.SKIP_COVERAGE !== 'true',
 }
 
 export default config
