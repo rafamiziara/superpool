@@ -31,9 +31,7 @@ import { CloudFunctionTester } from '../__tests__/utils/CloudFunctionTester'
 import { BlockchainTestEnvironment } from '../__tests__/utils/BlockchainTestEnvironment'
 import TestFixtures, {
   SAMPLE_AUTH_MESSAGES,
-  SAMPLE_SAFE_EXECUTION_DATA,
   SAMPLE_SAFE_TRANSACTIONS,
-  SAMPLE_TRANSACTION_HASHES,
 } from './fixtures'
 import { FirebaseFixtures } from './fixtures/firebase'
 
@@ -65,7 +63,7 @@ export class MockFactory {
 
     const environment = {
       functionTester: new CloudFunctionTester(),
-      mocks: {} as any,
+      mocks: {} as Record<string, unknown>,
       fixtures: TestFixtures,
     }
 
@@ -86,7 +84,7 @@ export class MockFactory {
   /**
    * Create a pool creation test scenario with all necessary mocks
    */
-  static createPoolCreationScenario(poolParams?: any, userUid?: string) {
+  static createPoolCreationScenario(poolParams?: Record<string, unknown>, userUid?: string) {
     const environment = this.createCloudFunctionEnvironment()
 
     const defaultParams = TestFixtures.TestData.pools.basic
@@ -122,7 +120,7 @@ export class MockFactory {
   /**
    * Create a Safe multi-sig test scenario
    */
-  static createSafeTransactionScenario(txParams?: any, safeOwnerUid?: string) {
+  static createSafeTransactionScenario(txParams?: Record<string, unknown>, safeOwnerUid?: string) {
     const environment = this.createCloudFunctionEnvironment()
 
     const defaultParams = SAMPLE_SAFE_TRANSACTIONS.POOL_CREATION_TX
@@ -256,12 +254,12 @@ export const quickSetup = {
   /**
    * Quick pool creation test setup
    */
-  poolCreation: (params?: any, uid?: string) => MockFactory.createPoolCreationScenario(params, uid),
+  poolCreation: (params?: Record<string, unknown>, uid?: string) => MockFactory.createPoolCreationScenario(params, uid),
 
   /**
    * Quick Safe transaction test setup
    */
-  safeTransaction: (params?: any, uid?: string) => MockFactory.createSafeTransactionScenario(params, uid),
+  safeTransaction: (params?: Record<string, unknown>, uid?: string) => MockFactory.createSafeTransactionScenario(params, uid),
 
   /**
    * Quick authentication test setup
