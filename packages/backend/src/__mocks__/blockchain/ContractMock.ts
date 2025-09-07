@@ -3,12 +3,34 @@
  *
  * This system provides comprehensive mocking for SuperPool smart contracts
  * including PoolFactory, Safe multi-sig, and lending pool contracts.
+ * Completely rebuilt with proper TypeScript support and Jest compatibility.
  */
 
 import { jest } from '@jest/globals'
-import { ethersMock } from './EthersMock'
-import type { Contract } from 'ethers'
 
+// Core Ethers Types Simulation
+export interface MockTransactionReceipt {
+  transactionHash: string
+  blockNumber: number
+  status: number
+  gasUsed: bigint
+  logs: Array<{
+    address: string
+    topics: string[]
+    data: string
+  }>
+  events?: Array<{
+    event: string
+    args: Record<string, unknown>
+  }>
+}
+
+export interface MockTransactionResponse {
+  hash: string
+  wait: jest.MockedFunction<() => Promise<MockTransactionReceipt>>
+}
+
+// Pool Creation Event Interface
 export interface PoolCreatedEvent {
   poolId: bigint
   poolAddress: string
@@ -19,6 +41,7 @@ export interface PoolCreatedEvent {
   loanDuration: number
 }
 
+// Safe Transaction Data Interface
 export interface SafeTransactionData {
   to: string
   value: bigint
@@ -32,9 +55,48 @@ export interface SafeTransactionData {
   nonce: bigint
 }
 
+// Mock Contract Function Interface
+export interface MockContractFunction {
+  (...args: unknown[]): Promise<unknown>
+  staticCall: jest.MockedFunction<(...args: unknown[]) => Promise<unknown>>
+  estimateGas: jest.MockedFunction<(...args: unknown[]) => Promise<bigint>>
+}
+
+// Mock Contract Interface
+export interface MockContract {
+  target: string
+  interface: {
+    parseLog: jest.MockedFunction<(log: { topics: string[]; data: string }) => unknown>
+    encodeFunctionData: jest.MockedFunction<(fragment: string, values?: readonly unknown[]) => string>
+    getFunction: jest.MockedFunction<(key: string) => unknown>
+  }
+  getAddress: jest.MockedFunction<() => Promise<string>>
+  [functionName: string]: MockContractFunction | unknown
+}
+
+// Mock Provider Interface
+export interface MockProvider {
+  waitForTransaction: jest.MockedFunction<(hash: string, confirmations?: number, timeout?: number) => Promise<MockTransactionReceipt>>
+  getFeeData: jest.MockedFunction<() => Promise<{ gasPrice: bigint; maxFeePerGas: bigint; maxPriorityFeePerGas: bigint }>>
+  getTransactionReceipt: jest.MockedFunction<(hash: string) => Promise<MockTransactionReceipt | null>>
+  getCode: jest.MockedFunction<(address: string) => Promise<string>>
+  getNetwork: jest.MockedFunction<() => Promise<{ chainId: number; name: string }>>
+}
+
 export class ContractMock {
   private static poolCount = 0
-  private static pools = new Map<string, any>()
+  private static pools = new Map<
+    string,
+    {
+      id: bigint
+      address: string
+      owner: string
+      name: string
+      maxLoanAmount: bigint
+      interestRate: number
+      loanDuration: number
+    }
+  >()
   private static safeNonce = 42
   private static safeOwners = [
     '0x742d35Cc6670C74288C2e768dC1E574a0B7DbE7a',
@@ -46,129 +108,79 @@ export class ContractMock {
   /**
    * Create comprehensive PoolFactory contract mock
    */
-  static createPoolFactoryMock(contractAddress?: string): jest.Mocked<Contract> {
+  static createPoolFactoryMock(contractAddress?: string): MockContract {
     const address = contractAddress || '0x1234567890123456789012345678901234567890'
 
-    const poolFactoryMock = {
-      ...ethersMock.contract,
+    const mock: MockContract = {
       target: address,
-
-      // Read methods
-      poolCount: jest.fn().mockImplementation(async () => {
-        return BigInt(this.poolCount)
-      }),
-
-      pools: jest.fn().mockImplementation(async (...args: any[]) => {
-        const poolId = args[0] as bigint | number
-        const id = poolId.toString()
-        const pool = this.pools.get(id)
-
-        if (!pool) {
-          // Return default empty pool structure
-          return {
-            owner: '0x0000000000000000000000000000000000000000',
-            poolAddress: '0x0000000000000000000000000000000000000000',
-            name: '',
-            maxLoanAmount: BigInt(0),
-            interestRate: 0,
-            loanDuration: 0,
-            isActive: false,
+      interface: {
+        parseLog: jest.fn((log: { topics: string[]; data: string }) => {
+          // Mock parsing pool creation events
+          if (log.topics[0] === '0x123...poolcreated') {
+            return {
+              name: 'PoolCreated',
+              args: {
+                poolId: BigInt(++ContractMock.poolCount),
+                poolAddress: `0x${ContractMock.poolCount.toString().padStart(40, '0')}`,
+                poolOwner: '0x742d35Cc6670C74288C2e768dC1E574a0B7DbE7a',
+                name: 'Test Pool',
+                maxLoanAmount: BigInt('1000000000000000000'),
+                interestRate: 5,
+                loanDuration: 30,
+              },
+            }
           }
-        }
+          return null
+        }),
+        encodeFunctionData: jest.fn((fragment: string, values: readonly unknown[] = []) => {
+          return `0x${fragment.slice(0, 8)}${values.map(() => '0'.repeat(64)).join('')}`
+        }),
+        getFunction: jest.fn((key: string) => ({
+          name: key,
+          inputs: [],
+        })),
+      },
+      getAddress: jest.fn(async () => address),
+    }
 
-        return {
-          owner: pool.owner,
-          poolAddress: pool.poolAddress,
-          name: pool.name,
-          maxLoanAmount: pool.maxLoanAmount,
-          interestRate: pool.interestRate,
-          loanDuration: pool.loanDuration,
-          isActive: pool.isActive,
-        }
-      }),
+    // Add createPool function
+    const createPoolFunction: MockContractFunction = jest.fn(
+      async (name: string, maxLoanAmount: bigint, interestRate: number, loanDuration: number) => {
+        const poolId = BigInt(++ContractMock.poolCount)
+        const poolAddress = `0x${ContractMock.poolCount.toString().padStart(40, '0')}`
 
-      // Owner management
-      owner: jest.fn().mockResolvedValue('0x742d35Cc6670C74288C2e768dC1E574a0B7DbE7a'),
-      pendingOwner: jest.fn().mockResolvedValue('0x0000000000000000000000000000000000000000'),
-
-      // Contract state
-      paused: jest.fn().mockResolvedValue(false),
-
-      // Write methods
-      createPool: jest.fn().mockImplementation(async (...args: any[]) => {
-        const [poolOwner, maxLoanAmount, interestRate, loanDuration, name] = args as [string, bigint, number, number, string]
-        // Validate inputs
-        if (!poolOwner || poolOwner === '0x0000000000000000000000000000000000000000') {
-          const error = new Error('execution reverted: Invalid pool owner')
-          ;(error as any).code = 'CALL_EXCEPTION'
-          throw error
-        }
-
-        if (maxLoanAmount <= 0) {
-          const error = new Error('execution reverted: Invalid max loan amount')
-          ;(error as any).code = 'CALL_EXCEPTION'
-          throw error
-        }
-
-        if (interestRate < 0 || interestRate > 10000) {
-          const error = new Error('execution reverted: Invalid interest rate')
-          ;(error as any).code = 'CALL_EXCEPTION'
-          throw error
-        }
-
-        if (loanDuration <= 0) {
-          const error = new Error('execution reverted: Invalid loan duration')
-          ;(error as any).code = 'CALL_EXCEPTION'
-          throw error
-        }
-
-        // Create new pool
-        const newPoolId = ++this.poolCount
-        const poolAddress = `0x${'0'.repeat(39)}${newPoolId}`
-
-        const pool = {
-          id: newPoolId,
-          owner: poolOwner,
-          poolAddress,
+        // Store pool data
+        ContractMock.pools.set(poolAddress, {
+          id: poolId,
+          address: poolAddress,
+          owner: '0x742d35Cc6670C74288C2e768dC1E574a0B7DbE7a',
           name,
           maxLoanAmount,
           interestRate,
           loanDuration,
-          isActive: true,
-          createdAt: new Date(),
-        }
+        })
 
-        this.pools.set(newPoolId.toString(), pool)
-
-        // Create mock transaction
-        const transactionHash = `0xpool${newPoolId.toString().padStart(60, '0')}`
-
-        return {
-          hash: transactionHash,
-          from: ethersMock.wallet.address,
-          to: address,
-          wait: jest.fn().mockResolvedValue({
-            transactionHash,
-            blockNumber: ethersMock.provider.getBlockNumber(),
+        const mockTx: MockTransactionResponse = {
+          hash: `0x${'123'.repeat(21)}${ContractMock.poolCount}`,
+          wait: jest.fn(async () => ({
+            transactionHash: `0x${'123'.repeat(21)}${ContractMock.poolCount}`,
+            blockNumber: 12345000 + ContractMock.poolCount,
             status: 1,
-            gasUsed: BigInt('450000'),
+            gasUsed: BigInt('500000'),
             logs: [
               {
-                address: address,
-                topics: [
-                  '0x' + 'poolcreated'.padEnd(64, '0'), // PoolCreated event signature mock
-                  `0x${'0'.repeat(62)}${newPoolId.toString(16)}`, // poolId
-                ],
-                data: '0x' + 'eventdata'.padEnd(64, '0'), // Encoded event data
+                address: poolAddress,
+                topics: ['0x123...poolcreated', `0x${poolId.toString(16).padStart(64, '0')}`],
+                data: `0x${poolAddress.slice(2).padStart(64, '0')}`,
               },
             ],
             events: [
               {
                 event: 'PoolCreated',
                 args: {
-                  poolId: BigInt(newPoolId),
+                  poolId,
                   poolAddress,
-                  owner: poolOwner,
+                  poolOwner: '0x742d35Cc6670C74288C2e768dC1E574a0B7DbE7a',
                   name,
                   maxLoanAmount,
                   interestRate,
@@ -176,430 +188,210 @@ export class ContractMock {
                 },
               },
             ],
-          }),
-        }
-      }),
-
-      transferOwnership: jest.fn().mockImplementation(async (...args: any[]) => {
-        const newOwner = args[0] as string
-        if (!newOwner || newOwner === '0x0000000000000000000000000000000000000000') {
-          const error = new Error('execution reverted: Invalid new owner')
-          ;(error as any).code = 'CALL_EXCEPTION'
-          throw error
+          })),
         }
 
-        return {
-          hash: '0xownership' + Date.now().toString(16),
-          wait: jest.fn().mockResolvedValue({
-            status: 1,
-            gasUsed: BigInt('50000'),
-          }),
-        }
-      }),
+        return mockTx
+      }
+    ) as unknown as MockContractFunction
 
-      acceptOwnership: jest.fn().mockResolvedValue({
-        hash: '0xaccept' + Date.now().toString(16),
-        wait: jest.fn().mockResolvedValue({
-          status: 1,
-          gasUsed: BigInt('30000'),
-        }),
-      }),
+    createPoolFunction.staticCall = jest.fn(async () => BigInt(ContractMock.poolCount + 1))
+    createPoolFunction.estimateGas = jest.fn(async () => BigInt('500000'))
 
-      // Emergency functions
-      pause: jest.fn().mockResolvedValue({
-        hash: '0xpause' + Date.now().toString(16),
-        wait: jest.fn().mockResolvedValue({ status: 1 }),
-      }),
+    mock.createPool = createPoolFunction
 
-      unpause: jest.fn().mockResolvedValue({
-        hash: '0xunpause' + Date.now().toString(16),
-        wait: jest.fn().mockResolvedValue({ status: 1 }),
-      }),
+    // Add other PoolFactory functions
+    mock.getPool = jest.fn(async (poolId: bigint) => {
+      const pool = Array.from(ContractMock.pools.values()).find((p) => p.id === poolId)
+      return pool ? [pool.address, pool.owner, pool.name, pool.maxLoanAmount, pool.interestRate, pool.loanDuration] : null
+    })
 
-      // Gas estimation - dynamically create estimateGas object
-      estimateGas: {},
+    mock.poolCount = jest.fn(async () => BigInt(ContractMock.poolCount))
 
-      // Static calls for view functions - dynamically create staticCall object
-      staticCall: {},
-
-      // Event filtering
-      queryFilter: jest.fn().mockImplementation(async (event: any, fromBlock?: any, toBlock?: any) => {
-        if (event === 'PoolCreated' || (event && event.name === 'PoolCreated')) {
-          // Return mock PoolCreated events
-          return Array.from(this.pools.values()).map((pool, index) => ({
-            event: 'PoolCreated',
-            args: {
-              poolId: BigInt(pool.id),
-              poolAddress: pool.poolAddress,
-              owner: pool.owner,
-              name: pool.name,
-              maxLoanAmount: pool.maxLoanAmount,
-              interestRate: pool.interestRate,
-              loanDuration: pool.loanDuration,
-            },
-            blockNumber: 1234567 + index,
-            transactionHash: `0xevent${pool.id.toString().padStart(60, '0')}`,
-            address: address,
-          }))
-        }
-        return []
-      }),
-
-      // Event listeners
-      on: jest.fn(),
-      off: jest.fn(),
-      removeAllListeners: jest.fn(),
-
-      // Interface
-      interface: {
-        parseLog: jest.fn().mockImplementation((log: any) => ({
-          name: 'PoolCreated',
-          args: {
-            poolId: BigInt(1),
-            poolAddress: '0x0000000000000000000000000000000000000001',
-            owner: '0x742d35Cc6670C74288C2e768dC1E574a0B7DbE7a',
-          },
-        })),
-        getEvent: jest.fn(),
-        getFunction: jest.fn(),
-      },
-    } as unknown as jest.Mocked<Contract>
-
-    // Dynamically populate estimateGas methods
-    ;(poolFactoryMock.estimateGas as any).createPool = jest.fn().mockResolvedValue(BigInt('500000'))
-    ;(poolFactoryMock.estimateGas as any).transferOwnership = jest.fn().mockResolvedValue(BigInt('50000'))
-    ;(poolFactoryMock.estimateGas as any).acceptOwnership = jest.fn().mockResolvedValue(BigInt('30000'))
-    ;(poolFactoryMock.estimateGas as any).pause = jest.fn().mockResolvedValue(BigInt('30000'))
-    ;(poolFactoryMock.estimateGas as any).unpause = jest.fn().mockResolvedValue(BigInt('30000'))
-
-    // Dynamically populate staticCall methods (for view functions)
-    ;(poolFactoryMock.staticCall as any).pools = poolFactoryMock.pools
-    ;(poolFactoryMock.staticCall as any).poolCount = poolFactoryMock.poolCount
-    ;(poolFactoryMock.staticCall as any).owner = poolFactoryMock.owner
-    ;(poolFactoryMock.staticCall as any).paused = poolFactoryMock.paused
-
-    return poolFactoryMock
+    return mock
   }
 
   /**
-   * Create comprehensive Safe multi-sig contract mock
+   * Create comprehensive Safe contract mock
    */
-  static createSafeMock(contractAddress?: string): jest.Mocked<Contract> {
+  static createSafeMock(contractAddress?: string): MockContract {
     const address = contractAddress || '0x9876543210987654321098765432109876543210'
 
-    const safeMock = {
-      ...ethersMock.contract,
+    const mock: MockContract = {
       target: address,
-
-      // Safe read methods
-      getOwners: jest.fn().mockResolvedValue([...this.safeOwners]),
-
-      getThreshold: jest.fn().mockResolvedValue(BigInt(this.safeThreshold)),
-
-      isOwner: jest.fn().mockImplementation(async (address: string) => {
-        return this.safeOwners.includes(address.toLowerCase())
-      }),
-
-      nonce: jest.fn().mockImplementation(async () => {
-        return BigInt(this.safeNonce)
-      }),
-
-      // Safe transaction methods
-      getTransactionHash: jest
-        .fn()
-        .mockImplementation(
-          async (
-            to: string,
-            value: bigint,
-            data: string,
-            operation: number,
-            safeTxGas: bigint,
-            baseGas: bigint,
-            gasPrice: bigint,
-            gasToken: string,
-            refundReceiver: string,
-            nonce: bigint
-          ) => {
-            // Create deterministic transaction hash for testing
-            const txData = {
-              to,
-              value: value.toString(),
-              data,
-              operation,
-              safeTxGas: safeTxGas.toString(),
-              baseGas: baseGas.toString(),
-              gasPrice: gasPrice.toString(),
-              gasToken,
-              refundReceiver,
-              nonce: nonce.toString(),
-            }
-
-            const hash = ethersMock['createDeterministicHash'](JSON.stringify(txData))
-            return `0x${hash}`
-          }
-        ),
-
-      checkSignatures: jest.fn().mockImplementation(async (dataHash: string, data: string, signatures: string) => {
-        // Mock signature validation
-        const signatureCount = signatures.length > 2 ? (signatures.length - 2) / 130 : 0
-
-        if (signatureCount < this.safeThreshold) {
-          const error = new Error('execution reverted: GS020: Signatures not valid')
-          ;(error as any).code = 'CALL_EXCEPTION'
-          throw error
-        }
-
-        return true
-      }),
-
-      execTransaction: jest
-        .fn()
-        .mockImplementation(
-          async (
-            to: string,
-            value: bigint,
-            data: string,
-            operation: number,
-            safeTxGas: bigint,
-            baseGas: bigint,
-            gasPrice: bigint,
-            gasToken: string,
-            refundReceiver: string,
-            signatures: string
-          ) => {
-            // Validate signature count
-            const signatureCount = signatures.length > 2 ? (signatures.length - 2) / 130 : 0
-
-            if (signatureCount < this.safeThreshold) {
-              const error = new Error('execution reverted: GS020: Threshold not met')
-              ;(error as any).code = 'CALL_EXCEPTION'
-              throw error
-            }
-
-            // Increment nonce
-            this.safeNonce++
-
-            return {
-              hash: `0xsafeexec${Date.now().toString(16)}`,
-              wait: jest.fn().mockResolvedValue({
-                status: 1,
-                gasUsed: BigInt('200000'),
-                logs: [
-                  {
-                    address: address,
-                    topics: ['0x' + 'executionfrommodulesuccess'.padEnd(64, '0')],
-                    data: '0x' + 'success'.padEnd(64, '0'),
-                  },
-                ],
-              }),
-            }
-          }
-        ),
-
-      // Gas estimation
-      estimateGas: {
-        execTransaction: jest.fn().mockResolvedValue(BigInt('200000')),
-      },
-
-      // Static calls
-      staticCall: {},
-
-      // Event filtering
-      queryFilter: jest.fn().mockResolvedValue([]),
-
-      // Event listeners
-      on: jest.fn(),
-      off: jest.fn(),
-      removeAllListeners: jest.fn(),
-
-      // Interface
       interface: {
-        parseLog: jest.fn(),
-        getEvent: jest.fn(),
-        getFunction: jest.fn(),
+        parseLog: jest.fn(() => null),
+        encodeFunctionData: jest.fn(() => '0x123456'),
+        getFunction: jest.fn(() => ({ name: 'mockFunction' })),
       },
-    } as unknown as jest.Mocked<Contract>
-
-    // Populate static call methods
-    safeMock.staticCall.getOwners = safeMock.getOwners
-    safeMock.staticCall.getThreshold = safeMock.getThreshold
-    safeMock.staticCall.isOwner = safeMock.isOwner
-    safeMock.staticCall.nonce = safeMock.nonce
-
-    return safeMock
-  }
-
-  /**
-   * Create mock for a generic lending pool contract
-   */
-  static createLendingPoolMock(poolAddress: string, poolData?: any): jest.Mocked<Contract> {
-    const pool = poolData || {
-      owner: '0x742d35Cc6670C74288C2e768dC1E574a0B7DbE7a',
-      maxLoanAmount: BigInt('1000000000000000000000'),
-      interestRate: 500,
-      loanDuration: 2592000,
-      totalDeposited: BigInt('5000000000000000000000'),
-      totalBorrowed: BigInt('2000000000000000000000'),
-      isActive: true,
+      getAddress: jest.fn(async () => address),
     }
 
-    const lendingPoolMock = {
-      ...ethersMock.contract,
-      target: poolAddress,
+    // Safe-specific functions
+    mock.getThreshold = jest.fn(async () => BigInt(ContractMock.safeThreshold))
+    mock.getOwners = jest.fn(async () => ContractMock.safeOwners)
+    mock.nonce = jest.fn(async () => BigInt(ContractMock.safeNonce))
 
-      // Pool state
-      owner: jest.fn().mockResolvedValue(pool.owner),
-      maxLoanAmount: jest.fn().mockResolvedValue(pool.maxLoanAmount),
-      interestRate: jest.fn().mockResolvedValue(pool.interestRate),
-      loanDuration: jest.fn().mockResolvedValue(pool.loanDuration),
-      totalDeposited: jest.fn().mockResolvedValue(pool.totalDeposited),
-      totalBorrowed: jest.fn().mockResolvedValue(pool.totalBorrowed),
-      isActive: jest.fn().mockResolvedValue(pool.isActive),
+    mock.isOwner = jest.fn(async (address: string) => {
+      return ContractMock.safeOwners.includes(address)
+    })
 
-      // Member management
-      addMember: jest.fn().mockResolvedValue({
-        hash: `0xaddmember${Date.now().toString(16)}`,
-        wait: jest.fn().mockResolvedValue({ status: 1 }),
-      }),
+    mock.getTransactionHash = jest.fn(
+      async (
+        to: string,
+        value: bigint,
+        data: string,
+        operation: number,
+        safeTxGas: bigint,
+        baseGas: bigint,
+        gasPrice: bigint,
+        gasToken: string,
+        refundReceiver: string,
+        nonce: bigint
+      ) => {
+        return `0x${[to, value.toString(), data, operation.toString(), safeTxGas.toString()].join('').slice(0, 64).padEnd(64, '0')}`
+      }
+    )
 
-      removeMember: jest.fn().mockResolvedValue({
-        hash: `0xremovemember${Date.now().toString(16)}`,
-        wait: jest.fn().mockResolvedValue({ status: 1 }),
-      }),
+    mock.checkSignatures = jest.fn(async (dataHash: string, data: string, signatures: string) => {
+      // Simple validation - in real tests, this would validate actual signatures
+      return signatures.length >= ContractMock.safeThreshold * 130 // 65 bytes per signature * 2
+    })
 
-      isMember: jest.fn().mockResolvedValue(true),
+    mock.execTransaction = jest.fn(
+      async (
+        to: string,
+        value: bigint,
+        data: string,
+        operation: number,
+        safeTxGas: bigint,
+        baseGas: bigint,
+        gasPrice: bigint,
+        gasToken: string,
+        refundReceiver: string,
+        signatures: string
+      ) => {
+        ContractMock.safeNonce++
 
-      // Lending operations
-      deposit: jest.fn().mockResolvedValue({
-        hash: `0xdeposit${Date.now().toString(16)}`,
-        wait: jest.fn().mockResolvedValue({ status: 1 }),
-      }),
+        const mockTx: MockTransactionResponse = {
+          hash: `0x${'456'.repeat(21)}${ContractMock.safeNonce}`,
+          wait: jest.fn(async () => ({
+            transactionHash: `0x${'456'.repeat(21)}${ContractMock.safeNonce}`,
+            blockNumber: 12346000,
+            status: 1,
+            gasUsed: BigInt('150000'),
+            logs: [
+              {
+                address,
+                topics: ['0x456...executed'],
+                data: '0x123456',
+              },
+            ],
+          })),
+        }
 
-      withdraw: jest.fn().mockResolvedValue({
-        hash: `0xwithdraw${Date.now().toString(16)}`,
-        wait: jest.fn().mockResolvedValue({ status: 1 }),
-      }),
+        return mockTx
+      }
+    )
 
-      requestLoan: jest.fn().mockResolvedValue({
-        hash: `0xrequestloan${Date.now().toString(16)}`,
-        wait: jest.fn().mockResolvedValue({ status: 1 }),
-      }),
-
-      approveLoan: jest.fn().mockResolvedValue({
-        hash: `0xapproveloan${Date.now().toString(16)}`,
-        wait: jest.fn().mockResolvedValue({ status: 1 }),
-      }),
-
-      repayLoan: jest.fn().mockResolvedValue({
-        hash: `0xrepayloan${Date.now().toString(16)}`,
-        wait: jest.fn().mockResolvedValue({ status: 1 }),
-      }),
-
-      // Gas estimation
-      estimateGas: {
-        addMember: jest.fn().mockResolvedValue(BigInt('100000')),
-        deposit: jest.fn().mockResolvedValue(BigInt('150000')),
-        withdraw: jest.fn().mockResolvedValue(BigInt('120000')),
-        requestLoan: jest.fn().mockResolvedValue(BigInt('180000')),
-        approveLoan: jest.fn().mockResolvedValue(BigInt('200000')),
-        repayLoan: jest.fn().mockResolvedValue(BigInt('160000')),
-      },
-
-      // Event filtering
-      queryFilter: jest.fn().mockResolvedValue([]),
-
-      // Interface
-      interface: {
-        parseLog: jest.fn(),
-        getEvent: jest.fn(),
-        getFunction: jest.fn(),
-      },
-    } as unknown as jest.Mocked<Contract>
-
-    return lendingPoolMock
+    return mock
   }
 
   /**
-   * Generic contract factory for custom contracts
+   * Create LendingPool contract mock
    */
-  static createContractMock(address: string, customMethods: Record<string, any> = {}): jest.Mocked<Contract> {
-    const contractMock = {
-      ...ethersMock.contract,
+  static createLendingPoolMock(contractAddress?: string): MockContract {
+    const address = contractAddress || '0xabcdefabcdefabcdefabcdefabcdefabcdefabcd'
+
+    const mock: MockContract = {
       target: address,
-
-      // Add custom methods
-      ...customMethods,
-
-      // Default methods
-      estimateGas: customMethods.estimateGas || {},
-      staticCall: customMethods.staticCall || {},
-
-      // Event filtering
-      queryFilter: jest.fn().mockResolvedValue([]),
-
-      // Interface
       interface: {
-        parseLog: jest.fn(),
-        getEvent: jest.fn(),
-        getFunction: jest.fn(),
+        parseLog: jest.fn(() => null),
+        encodeFunctionData: jest.fn(() => '0x789abc'),
+        getFunction: jest.fn(() => ({ name: 'mockFunction' })),
       },
-    } as unknown as jest.Mocked<Contract>
+      getAddress: jest.fn(async () => address),
+    }
 
-    return contractMock
+    // LendingPool specific functions
+    mock.owner = jest.fn(async () => '0x742d35Cc6670C74288C2e768dC1E574a0B7DbE7a')
+    mock.name = jest.fn(async () => 'Test Pool')
+    mock.maxLoanAmount = jest.fn(async () => BigInt('1000000000000000000'))
+    mock.interestRate = jest.fn(async () => BigInt('5'))
+    mock.loanDuration = jest.fn(async () => BigInt('30'))
+    mock.isActive = jest.fn(async () => true)
+
+    mock.isMember = jest.fn(async (address: string) => {
+      // Mock member check
+      return address !== '0x0000000000000000000000000000000000000000'
+    })
+
+    return mock
   }
 
-  // Utility methods for test state management
-  static resetPoolState(): void {
-    this.poolCount = 0
-    this.pools.clear()
+  /**
+   * Create mock provider for blockchain interaction
+   */
+  static createProviderMock(): MockProvider {
+    return {
+      waitForTransaction: jest.fn(async (hash: string) => ({
+        transactionHash: hash,
+        blockNumber: 12345678,
+        status: 1,
+        gasUsed: BigInt('100000'),
+        logs: [],
+      })),
+
+      getFeeData: jest.fn(async () => ({
+        gasPrice: BigInt('20000000000'),
+        maxFeePerGas: BigInt('25000000000'),
+        maxPriorityFeePerGas: BigInt('2000000000'),
+      })),
+
+      getTransactionReceipt: jest.fn(async (hash: string) => ({
+        transactionHash: hash,
+        blockNumber: 12345678,
+        status: 1,
+        gasUsed: BigInt('100000'),
+        logs: [],
+      })),
+
+      getCode: jest.fn(async (address: string) => {
+        // Return empty for non-contract addresses
+        if (address === '0x0000000000000000000000000000000000000000') return '0x'
+        // Return mock bytecode for contract addresses
+        return '0x608060405234801561001057600080fd5b50...'
+      }),
+
+      getNetwork: jest.fn(async () => ({
+        chainId: 80002,
+        name: 'polygon-amoy',
+      })),
+    }
   }
 
-  static resetSafeState(): void {
-    this.safeNonce = 42
+  /**
+   * Reset all mock state (useful for test cleanup)
+   */
+  static reset(): void {
+    ContractMock.poolCount = 0
+    ContractMock.pools.clear()
+    ContractMock.safeNonce = 42
   }
 
-  static resetAllState(): void {
-    this.resetPoolState()
-    this.resetSafeState()
-  }
-
-  static setSafeOwners(owners: string[]): void {
-    this.safeOwners = [...owners]
-  }
-
-  static setSafeThreshold(threshold: number): void {
-    this.safeThreshold = threshold
-  }
-
-  static getPoolData(poolId: string): any {
-    return this.pools.get(poolId)
-  }
-
-  static getAllPools(): Map<string, any> {
-    return new Map(this.pools)
-  }
-
-  static simulateContractError(errorType: 'revert' | 'outofgas' | 'invalid', message?: string): Error {
-    switch (errorType) {
-      case 'revert':
-        const revertError = new Error(message || 'execution reverted')
-        ;(revertError as any).code = 'CALL_EXCEPTION'
-        return revertError
-
-      case 'outofgas':
-        const gasError = new Error(message || 'out of gas')
-        ;(gasError as any).code = 'UNPREDICTABLE_GAS_LIMIT'
-        return gasError
-
-      case 'invalid':
-        const invalidError = new Error(message || 'invalid opcode')
-        ;(invalidError as any).code = 'INVALID_ARGUMENT'
-        return invalidError
-
-      default:
-        return new Error(message || 'Contract error')
+  /**
+   * Get current mock state (useful for testing)
+   */
+  static getState() {
+    return {
+      poolCount: ContractMock.poolCount,
+      pools: Array.from(ContractMock.pools.entries()),
+      safeNonce: ContractMock.safeNonce,
+      safeOwners: [...ContractMock.safeOwners],
+      safeThreshold: ContractMock.safeThreshold,
     }
   }
 }
 
+// Export default instance
 export default ContractMock

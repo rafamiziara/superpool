@@ -5,6 +5,8 @@
  * for Firebase Cloud Functions, blockchain integration, and mock systems.
  */
 
+import { jest } from '@jest/globals'
+
 // Environment setup
 process.env.NODE_ENV = 'test'
 process.env.GCLOUD_PROJECT = 'superpool-test'
@@ -23,14 +25,14 @@ process.env.SAFE_ADDRESS_AMOY = '0x9876543210987654321098765432109876543210'
 global.TextEncoder = TextEncoder
 global.TextDecoder = TextDecoder
 
-// Mock fetch for Node.js environment
-global.fetch = jest.fn()
+// Mock fetch for Node.js environment with proper typing
+global.fetch = jest.fn() as jest.MockedFunction<typeof fetch>
 
 // Setup console filtering for cleaner test output
 const originalConsoleError = console.error
 const originalConsoleWarn = console.warn
 
-console.error = (...args: any[]) => {
+console.error = (...args: unknown[]) => {
   // Filter out expected Firebase warnings in test environment
   const message = args[0]
   if (typeof message === 'string') {
@@ -42,7 +44,7 @@ console.error = (...args: any[]) => {
   originalConsoleError(...args)
 }
 
-console.warn = (...args: any[]) => {
+console.warn = (...args: unknown[]) => {
   // Filter out expected warnings
   const message = args[0]
   if (typeof message === 'string') {
@@ -88,10 +90,16 @@ expect.extend({
     }
   },
 
-  toHaveFirebaseError(received: any, expectedCode: string) {
-    const pass = received && received.code === expectedCode
+  toHaveFirebaseError(received: unknown, expectedCode: string) {
+    const pass =
+      received &&
+      typeof received === 'object' &&
+      received !== null &&
+      'code' in received &&
+      (received as { code: string }).code === expectedCode
     return {
-      message: () => `Expected error to have Firebase code ${expectedCode}, got ${received?.code}`,
+      message: () =>
+        `Expected error to have Firebase code ${expectedCode}, got ${received && typeof received === 'object' && received !== null && 'code' in received ? (received as { code: string }).code : 'undefined'}`,
       pass,
     }
   },

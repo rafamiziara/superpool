@@ -23,6 +23,10 @@ export const SAMPLE_USERS: Record<string, Partial<UserRecord>> = {
     metadata: {
       creationTime: new Date('2024-01-15T10:00:00Z').toUTCString(),
       lastSignInTime: new Date('2024-01-20T15:30:00Z').toUTCString(),
+      toJSON: () => ({
+        creationTime: new Date('2024-01-15T10:00:00Z').toUTCString(),
+        lastSignInTime: new Date('2024-01-20T15:30:00Z').toUTCString(),
+      }),
     },
   },
 
@@ -39,6 +43,10 @@ export const SAMPLE_USERS: Record<string, Partial<UserRecord>> = {
     metadata: {
       creationTime: new Date('2024-01-16T11:00:00Z').toUTCString(),
       lastSignInTime: new Date('2024-01-21T09:15:00Z').toUTCString(),
+      toJSON: () => ({
+        creationTime: new Date('2024-01-16T11:00:00Z').toUTCString(),
+        lastSignInTime: new Date('2024-01-21T09:15:00Z').toUTCString(),
+      }),
     },
   },
 
@@ -55,6 +63,10 @@ export const SAMPLE_USERS: Record<string, Partial<UserRecord>> = {
     metadata: {
       creationTime: new Date('2024-01-17T14:00:00Z').toUTCString(),
       lastSignInTime: new Date('2024-01-22T12:45:00Z').toUTCString(),
+      toJSON: () => ({
+        creationTime: new Date('2024-01-17T14:00:00Z').toUTCString(),
+        lastSignInTime: new Date('2024-01-22T12:45:00Z').toUTCString(),
+      }),
     },
   },
 
@@ -71,6 +83,10 @@ export const SAMPLE_USERS: Record<string, Partial<UserRecord>> = {
     metadata: {
       creationTime: new Date('2024-01-18T16:00:00Z').toUTCString(),
       lastSignInTime: new Date('2024-01-23T08:20:00Z').toUTCString(),
+      toJSON: () => ({
+        creationTime: new Date('2024-01-18T16:00:00Z').toUTCString(),
+        lastSignInTime: new Date('2024-01-23T08:20:00Z').toUTCString(),
+      }),
     },
   },
 
@@ -88,6 +104,10 @@ export const SAMPLE_USERS: Record<string, Partial<UserRecord>> = {
     metadata: {
       creationTime: new Date('2024-01-10T09:00:00Z').toUTCString(),
       lastSignInTime: new Date('2024-01-24T07:30:00Z').toUTCString(),
+      toJSON: () => ({
+        creationTime: new Date('2024-01-10T09:00:00Z').toUTCString(),
+        lastSignInTime: new Date('2024-01-24T07:30:00Z').toUTCString(),
+      }),
     },
   },
 
@@ -100,7 +120,11 @@ export const SAMPLE_USERS: Record<string, Partial<UserRecord>> = {
     customClaims: {},
     metadata: {
       creationTime: new Date('2024-01-19T18:00:00Z').toUTCString(),
-      lastSignInTime: undefined,
+      lastSignInTime: new Date('2024-01-19T18:00:00Z').toUTCString(),
+      toJSON: () => ({
+        creationTime: new Date('2024-01-19T18:00:00Z').toUTCString(),
+        lastSignInTime: new Date('2024-01-19T18:00:00Z').toUTCString(),
+      }),
     },
   },
 
@@ -117,6 +141,10 @@ export const SAMPLE_USERS: Record<string, Partial<UserRecord>> = {
     metadata: {
       creationTime: new Date('2024-01-12T12:00:00Z').toUTCString(),
       lastSignInTime: new Date('2024-01-13T10:00:00Z').toUTCString(),
+      toJSON: () => ({
+        creationTime: new Date('2024-01-12T12:00:00Z').toUTCString(),
+        lastSignInTime: new Date('2024-01-13T10:00:00Z').toUTCString(),
+      }),
     },
   },
 }
@@ -490,7 +518,7 @@ export class FirebaseFixtures {
    * Create a sample user record with custom properties
    */
   static createUser(overrides: Partial<UserRecord> = {}): UserRecord {
-    const baseUser = {
+    const baseUser: UserRecord = {
       uid: `user-${Date.now()}`,
       email: `user-${Date.now()}@test.com`,
       emailVerified: true,
@@ -499,13 +527,17 @@ export class FirebaseFixtures {
       metadata: {
         creationTime: new Date().toUTCString(),
         lastSignInTime: new Date().toUTCString(),
+        toJSON: () => ({
+          creationTime: new Date().toUTCString(),
+          lastSignInTime: new Date().toUTCString(),
+        }),
       },
       customClaims: {},
       providerData: [],
       toJSON: () => ({ uid: overrides.uid || `user-${Date.now()}` }),
-    } as UserRecord
+    }
 
-    return { ...baseUser, ...overrides }
+    return { ...baseUser, ...overrides } as UserRecord
   }
 
   /**
@@ -533,7 +565,7 @@ export class FirebaseFixtures {
   /**
    * Create a sample nonce document
    */
-  static createNonce(walletAddress: string, overrides: any = {}) {
+  static createNonce(walletAddress: string, overrides: Record<string, unknown> = {}) {
     const timestamp = Date.now()
 
     return {
@@ -550,7 +582,7 @@ export class FirebaseFixtures {
   /**
    * Create a sample pool document
    */
-  static createPoolDocument(poolId: string, overrides: any = {}) {
+  static createPoolDocument(poolId: string, overrides: Record<string, unknown> = {}) {
     return {
       id: poolId,
       address: `0x${'0'.repeat(39)}${poolId}`,
