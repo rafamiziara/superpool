@@ -213,8 +213,8 @@ export const SAMPLE_SIGNATURES = {
   WRONG_LENGTH_SIG: '0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef12', // Too short
 }
 
-// Sample Safe transaction data
-export const SAMPLE_SAFE_TRANSACTIONS = {
+// Sample Safe transaction execution data
+export const SAMPLE_SAFE_EXECUTION_DATA = {
   POOL_CREATION_TX: {
     to: '0x742d35Cc6670C74288C2e768dC1E574a0B7DbE7a',
     data: '0x12345678',
@@ -439,6 +439,7 @@ export default {
   SAMPLE_POOL_PARAMS,
   SAMPLE_POOL_EVENTS,
   SAMPLE_SAFE_TRANSACTIONS,
+  SAMPLE_SAFE_EXECUTION_DATA,
   SAMPLE_SIGNATURES,
   SAMPLE_GAS_USAGE,
   SAMPLE_BLOCKS,

@@ -19,6 +19,14 @@ export { BlockchainTestEnvironment } from '../__tests__/utils/BlockchainTestEnvi
 export * from './fixtures'
 export { default as TestFixtures } from './fixtures'
 
+// Import the required modules for internal use
+import { firebaseAdminMock } from './firebase/FirebaseAdminMock'
+import { ethersMock } from './blockchain/EthersMock'
+import { ContractMock } from './blockchain/ContractMock'
+import { CloudFunctionTester } from '../__tests__/utils/CloudFunctionTester'
+import { BlockchainTestEnvironment } from '../__tests__/utils/BlockchainTestEnvironment'
+import TestFixtures from './fixtures'
+
 // Export types
 export type { MockFirestoreDocument, MockFirestoreCollection } from './firebase/FirebaseAdminMock'
 
@@ -149,7 +157,7 @@ export class MockFactory {
     const address = walletAddress || TestFixtures.TestData.addresses.poolOwners[0]
 
     // Create nonce
-    const nonce = TestFixtures.FirebaseFixtures.createNonce(address)
+    const nonce = TestFixtures.Firebase.createNonce(address)
     environment.mocks.firebase.seedDocument(`auth_nonces/${nonce.nonce}`, nonce)
 
     // Create auth message
