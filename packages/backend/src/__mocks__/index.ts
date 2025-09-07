@@ -19,13 +19,23 @@ export { BlockchainTestEnvironment } from '../__tests__/utils/BlockchainTestEnvi
 export * from './fixtures'
 export { default as TestFixtures } from './fixtures'
 
+// Export specific commonly used fixtures
+export { SAMPLE_SAFE_EXECUTION_DATA, SAMPLE_SAFE_TRANSACTIONS, SAMPLE_TRANSACTION_HASHES, SAMPLE_AUTH_MESSAGES } from './fixtures'
+export { FirebaseFixtures as Firebase } from './fixtures/firebase'
+
 // Import the required modules for internal use
 import { firebaseAdminMock } from './firebase/FirebaseAdminMock'
 import { ethersMock } from './blockchain/EthersMock'
 import { ContractMock } from './blockchain/ContractMock'
 import { CloudFunctionTester } from '../__tests__/utils/CloudFunctionTester'
 import { BlockchainTestEnvironment } from '../__tests__/utils/BlockchainTestEnvironment'
-import TestFixtures from './fixtures'
+import TestFixtures, {
+  SAMPLE_AUTH_MESSAGES,
+  SAMPLE_SAFE_EXECUTION_DATA,
+  SAMPLE_SAFE_TRANSACTIONS,
+  SAMPLE_TRANSACTION_HASHES,
+} from './fixtures'
+import { FirebaseFixtures } from './fixtures/firebase'
 
 // Export types
 export type { MockFirestoreDocument, MockFirestoreCollection } from './firebase/FirebaseAdminMock'
@@ -115,7 +125,7 @@ export class MockFactory {
   static createSafeTransactionScenario(txParams?: any, safeOwnerUid?: string) {
     const environment = this.createCloudFunctionEnvironment()
 
-    const defaultParams = TestFixtures.SAMPLE_SAFE_TRANSACTIONS.POOL_CREATION_TX
+    const defaultParams = SAMPLE_SAFE_TRANSACTIONS.POOL_CREATION_TX
     const params = { ...defaultParams, ...txParams }
     const uid = safeOwnerUid || TestFixtures.TestData.users.safeOwner.uid
 
@@ -157,11 +167,11 @@ export class MockFactory {
     const address = walletAddress || TestFixtures.TestData.addresses.poolOwners[0]
 
     // Create nonce
-    const nonce = TestFixtures.Firebase.createNonce(address)
+    const nonce = FirebaseFixtures.createNonce(address)
     environment.mocks.firebase.seedDocument(`auth_nonces/${nonce.nonce}`, nonce)
 
     // Create auth message
-    const message = TestFixtures.SAMPLE_AUTH_MESSAGES.VALID_MESSAGE(address, nonce.nonce, nonce.timestamp)
+    const message = SAMPLE_AUTH_MESSAGES.VALID_MESSAGE(address, nonce.nonce, nonce.timestamp)
 
     return {
       ...environment,
@@ -178,7 +188,7 @@ export class MockFactory {
   static resetAllMocks() {
     firebaseAdminMock.resetAllMocks()
     ethersMock.resetAllMocks()
-    ContractMock.resetAllState()
+    ContractMock.reset()
   }
 
   /**

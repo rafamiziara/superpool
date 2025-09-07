@@ -8,7 +8,7 @@
 import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals'
 import { MockFactory, quickSetup, TestFixtures } from '../../__mocks__/index'
 import { detectMemoryLeaks, performanceManager, startPerformanceTest } from '../utils/PerformanceTestUtilities'
-import { withTestIsolation } from '../utils/TestEnvironmentIsolation'
+import { TestEnvironmentContext, withTestIsolation } from '../utils/TestEnvironmentIsolation'
 
 // Mock security services for comprehensive testing
 const SecurityServices = {
@@ -66,7 +66,7 @@ describe('Security and Validation - Comprehensive Tests', () => {
   describe('Authentication Security', () => {
     describe('Signature Verification Security', () => {
       it('should prevent signature replay attacks', async () => {
-        await withTestIsolation('signature-replay-prevention', 'security', async (context) => {
+        await withTestIsolation('signature-replay-prevention', 'security', async (context: TestEnvironmentContext) => {
           // Arrange
           const walletAddress = TestFixtures.TestData.addresses.poolOwners[0]
           const message = 'Authenticate wallet for SuperPool access'
@@ -118,7 +118,7 @@ describe('Security and Validation - Comprehensive Tests', () => {
       })
 
       it('should validate signature format and prevent malicious signatures', async () => {
-        await withTestIsolation('malicious-signature-validation', 'security', async (context) => {
+        await withTestIsolation('malicious-signature-validation', 'security', async (context: TestEnvironmentContext) => {
           // Arrange
           const maliciousSignatures = [
             '', // Empty signature
@@ -189,7 +189,7 @@ describe('Security and Validation - Comprehensive Tests', () => {
               }
             })
 
-            const result = await SecurityServices.validation.validateSignature(signature)
+            const result: any = await SecurityServices.validation.validateSignature(signature)
 
             expect(result.valid).toBe(false)
             expect(result.code).toBeDefined()
@@ -199,7 +199,7 @@ describe('Security and Validation - Comprehensive Tests', () => {
       })
 
       it('should detect timing attacks on signature verification', async () => {
-        await withTestIsolation('timing-attack-detection', 'security', async (context) => {
+        await withTestIsolation('timing-attack-detection', 'security', async (context: TestEnvironmentContext) => {
           // Arrange
           const validSignature = '0x' + 'a'.repeat(130)
           const invalidSignatures = [
@@ -262,7 +262,7 @@ describe('Security and Validation - Comprehensive Tests', () => {
 
     describe('Nonce Security', () => {
       it('should generate cryptographically secure nonces', async () => {
-        await withTestIsolation('secure-nonce-generation', 'security', async (context) => {
+        await withTestIsolation('secure-nonce-generation', 'security', async (context: TestEnvironmentContext) => {
           // Arrange
           const nonceCount = 1000
           const nonces = new Set<string>()
@@ -314,7 +314,7 @@ describe('Security and Validation - Comprehensive Tests', () => {
       })
 
       it('should enforce nonce expiration and cleanup', async () => {
-        await withTestIsolation('nonce-expiration-enforcement', 'security', async (context) => {
+        await withTestIsolation('nonce-expiration-enforcement', 'security', async (context: TestEnvironmentContext) => {
           // Arrange
           const currentTime = Date.now()
           const validNonce = `${currentTime - 60000}-valid` // 1 minute ago
@@ -375,13 +375,13 @@ describe('Security and Validation - Comprehensive Tests', () => {
           })
 
           // Test valid nonce
-          const validResult = await SecurityServices.authentication.validateNonce(validNonce)
+          const validResult: any = await SecurityServices.authentication.validateNonce(validNonce)
 
           // Test expired nonce
-          const expiredResult = await SecurityServices.authentication.validateNonce(expiredNonce)
+          const expiredResult: any = await SecurityServices.authentication.validateNonce(expiredNonce)
 
           // Test future nonce
-          const futureResult = await SecurityServices.authentication.validateNonce(futureNonce)
+          const futureResult: any = await SecurityServices.authentication.validateNonce(futureNonce)
 
           const metrics = measurement.end()
 
@@ -408,7 +408,7 @@ describe('Security and Validation - Comprehensive Tests', () => {
   describe('Input Validation Security', () => {
     describe('SQL Injection Prevention', () => {
       it('should prevent NoSQL injection in Firestore queries', async () => {
-        await withTestIsolation('nosql-injection-prevention', 'security', async (context) => {
+        await withTestIsolation('nosql-injection-prevention', 'security', async (context: TestEnvironmentContext) => {
           // Arrange
           const maliciousInputs = [
             "'; DROP TABLE users; --",
@@ -441,7 +441,7 @@ describe('Security and Validation - Comprehensive Tests', () => {
               }
             })
 
-            const result = await SecurityServices.validation.sanitizeInput(maliciousInput, 'firestore_query')
+            const result: any = await SecurityServices.validation.sanitizeInput(maliciousInput, 'firestore_query')
 
             expect(result.isDangerous).toBe(true)
             expect(result.blocked).toBe(true)
@@ -454,7 +454,7 @@ describe('Security and Validation - Comprehensive Tests', () => {
 
     describe('Cross-Site Scripting (XSS) Prevention', () => {
       it('should sanitize user input to prevent XSS attacks', async () => {
-        await withTestIsolation('xss-prevention', 'security', async (context) => {
+        await withTestIsolation('xss-prevention', 'security', async (context: TestEnvironmentContext) => {
           // Arrange
           const xssPayloads = [
             '<script>alert("XSS")</script>',
@@ -492,7 +492,7 @@ describe('Security and Validation - Comprehensive Tests', () => {
               }
             })
 
-            const result = await SecurityServices.validation.sanitizeInput(payload)
+            const result: any = await SecurityServices.validation.sanitizeInput(payload)
 
             expect(result.isDangerous).toBe(true)
             expect(result.attackType).toBe('xss')
@@ -506,7 +506,7 @@ describe('Security and Validation - Comprehensive Tests', () => {
 
     describe('Ethereum Address Validation', () => {
       it('should validate Ethereum addresses and detect manipulation attempts', async () => {
-        await withTestIsolation('ethereum-address-validation', 'security', async (context) => {
+        await withTestIsolation('ethereum-address-validation', 'security', async (context: TestEnvironmentContext) => {
           // Arrange
           const testAddresses = [
             // Valid addresses
@@ -586,7 +586,7 @@ describe('Security and Validation - Comprehensive Tests', () => {
               }
             })
 
-            const result = await SecurityServices.validation.validateEthereumAddress(testCase.address)
+            const result: any = await SecurityServices.validation.validateEthereumAddress(testCase.address)
 
             expect(result.valid).toBe(testCase.valid)
             if (!testCase.valid) {
@@ -606,7 +606,7 @@ describe('Security and Validation - Comprehensive Tests', () => {
   describe('Authorization and Access Control', () => {
     describe('Role-Based Access Control', () => {
       it('should enforce proper role-based permissions', async () => {
-        await withTestIsolation('rbac-enforcement', 'security', async (context) => {
+        await withTestIsolation('rbac-enforcement', 'security', async (context: TestEnvironmentContext) => {
           // Arrange
           const roles = {
             admin: { permissions: ['create_pool', 'delete_pool', 'manage_users', 'view_analytics'] },
@@ -650,7 +650,7 @@ describe('Security and Validation - Comprehensive Tests', () => {
               }
             })
 
-            const result = await SecurityServices.authorization.checkUserPermissions(test.userRole, test.action)
+            const result: any = await SecurityServices.authorization.checkUserPermissions(test.userRole, test.action)
 
             expect(result.allowed).toBe(test.allowed)
             expect(result.userRole).toBe(test.userRole)
@@ -665,7 +665,7 @@ describe('Security and Validation - Comprehensive Tests', () => {
       })
 
       it('should prevent privilege escalation attacks', async () => {
-        await withTestIsolation('privilege-escalation-prevention', 'security', async (context) => {
+        await withTestIsolation('privilege-escalation-prevention', 'security', async (context: TestEnvironmentContext) => {
           // Arrange
           const escalationAttempts = [
             {
@@ -710,7 +710,11 @@ describe('Security and Validation - Comprehensive Tests', () => {
               }
             })
 
-            const result = await SecurityServices.authorization.checkUserPermissions(attempt.userRole, attempt.action, attempt.claimedRole)
+            const result: any = await SecurityServices.authorization.checkUserPermissions(
+              attempt.userRole,
+              attempt.action,
+              attempt.claimedRole
+            )
 
             expect(result.allowed).toBe(false)
             expect(result.code).toBe('PRIVILEGE_ESCALATION')
@@ -723,7 +727,7 @@ describe('Security and Validation - Comprehensive Tests', () => {
 
     describe('Resource Access Control', () => {
       it('should enforce ownership validation for protected resources', async () => {
-        await withTestIsolation('resource-ownership-validation', 'security', async (context) => {
+        await withTestIsolation('resource-ownership-validation', 'security', async (context: TestEnvironmentContext) => {
           // Arrange
           const resourceTests = [
             {
@@ -785,7 +789,7 @@ describe('Security and Validation - Comprehensive Tests', () => {
               }
             })
 
-            const result = await SecurityServices.authorization.checkResourceAccess(test.resourceType, test.resourceId, test.accessor)
+            const result: any = await SecurityServices.authorization.checkResourceAccess(test.resourceType, test.resourceId, test.accessor)
 
             expect(result.allowed).toBe(test.allowed)
             expect(result.accessor).toBe(test.accessor)
@@ -802,7 +806,7 @@ describe('Security and Validation - Comprehensive Tests', () => {
 
   describe('Rate Limiting and DDoS Protection', () => {
     it('should implement rate limiting per wallet address', async () => {
-      await withTestIsolation('wallet-rate-limiting', 'security', async (context) => {
+      await withTestIsolation('wallet-rate-limiting', 'security', async (context: TestEnvironmentContext) => {
         // Arrange
         const walletAddress = TestFixtures.TestData.addresses.poolOwners[0]
         const rateLimit = { requests: 10, window: 60000 } // 10 requests per minute
@@ -863,7 +867,7 @@ describe('Security and Validation - Comprehensive Tests', () => {
     })
 
     it('should implement progressive penalties for repeated violations', async () => {
-      await withTestIsolation('progressive-penalties', 'security', async (context) => {
+      await withTestIsolation('progressive-penalties', 'security', async (context: TestEnvironmentContext) => {
         // Arrange
         const violationLevels = [
           { violations: 1, penalty: 1000 }, // 1 second
@@ -898,7 +902,7 @@ describe('Security and Validation - Comprehensive Tests', () => {
             }
           })
 
-          const result = await SecurityServices.validation.checkRateLimit('test-address')
+          const result: any = await SecurityServices.validation.checkRateLimit('test-address')
 
           expect(result.allowed).toBe(false)
           expect(result.violationCount).toBe(violationCount)
@@ -919,7 +923,7 @@ describe('Security and Validation - Comprehensive Tests', () => {
 
   describe('Data Integrity and Cryptographic Security', () => {
     it('should verify data integrity using cryptographic hashes', async () => {
-      await withTestIsolation('data-integrity-verification', 'security', async (context) => {
+      await withTestIsolation('data-integrity-verification', 'security', async (context: TestEnvironmentContext) => {
         // Arrange
         const testData = [
           { data: 'sensitive user information', type: 'user_data' },
@@ -943,7 +947,7 @@ describe('Security and Validation - Comprehensive Tests', () => {
           })
 
           SecurityServices.cryptography.verifyIntegrity.mockImplementation(async (data, expectedHash) => {
-            const hashResult = await SecurityServices.cryptography.hashData(data)
+            const hashResult: any = await SecurityServices.cryptography.hashData(data)
             const isValid = hashResult.hash === expectedHash
 
             return {
@@ -957,7 +961,7 @@ describe('Security and Validation - Comprehensive Tests', () => {
           })
 
           // Generate hash
-          const hashResult = await SecurityServices.cryptography.hashData(test.data)
+          const hashResult: any = await SecurityServices.cryptography.hashData(test.data)
           expect(hashResult.hash).toBeDefined()
           expect(hashResult.algorithm).toBe('sha256')
 
@@ -975,7 +979,7 @@ describe('Security and Validation - Comprehensive Tests', () => {
     })
 
     it('should encrypt sensitive data before storage', async () => {
-      await withTestIsolation('sensitive-data-encryption', 'security', async (context) => {
+      await withTestIsolation('sensitive-data-encryption', 'security', async (context: TestEnvironmentContext) => {
         // Arrange
         const sensitiveData = [
           { data: 'user@email.com', type: 'email' },
@@ -1000,7 +1004,7 @@ describe('Security and Validation - Comprehensive Tests', () => {
             }
           })
 
-          const encryptionResult = await SecurityServices.cryptography.encryptSensitiveData(test.data, test.type)
+          const encryptionResult: any = await SecurityServices.cryptography.encryptSensitiveData(test.data, test.type)
 
           expect(encryptionResult.encrypted).toBeDefined()
           expect(encryptionResult.encrypted).not.toBe(test.data)
@@ -1014,7 +1018,7 @@ describe('Security and Validation - Comprehensive Tests', () => {
 
   describe('Security Performance and Memory Safety', () => {
     it('should detect memory leaks in security operations', async () => {
-      await withTestIsolation('security-memory-leaks', 'security', async (context) => {
+      await withTestIsolation('security-memory-leaks', 'security', async (context: TestEnvironmentContext) => {
         // Arrange
         const operationCount = 100
 
@@ -1058,7 +1062,7 @@ describe('Security and Validation - Comprehensive Tests', () => {
     })
 
     it('should maintain security performance under load', async () => {
-      await withTestIsolation('security-performance-load', 'security', async (context) => {
+      await withTestIsolation('security-performance-load', 'security', async (context: TestEnvironmentContext) => {
         // Arrange
         const concurrentOperations = 100
         const performanceThreshold = 1000 // 1 second average

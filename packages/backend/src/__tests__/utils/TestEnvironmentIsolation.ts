@@ -578,5 +578,8 @@ export const withIsolatedEnvironment = async <T>(
   }
 }
 
+// Convenience alias for the withIsolatedEnvironment function
+export const withTestIsolation = withIsolatedEnvironment
+
 // Export singleton instance
 export const isolationManager = TestEnvironmentIsolationManager.getInstance(DEFAULT_ISOLATION_CONFIG)

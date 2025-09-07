@@ -17,9 +17,10 @@ export { default as FirebaseFixtures } from './firebase'
 export {
   SAMPLE_ADDRESSES as Addresses,
   SAMPLE_POOL_PARAMS as PoolParams,
-  SAMPLE_TRANSACTION_HASHES as TxHashes,
+  SAMPLE_TRANSACTION_HASHES,
   SAMPLE_SIGNATURES as Signatures,
   SAMPLE_SAFE_TRANSACTIONS,
+  SAMPLE_SAFE_EXECUTION_DATA,
   SAMPLE_GAS_USAGE as GasUsage,
   BlockchainFixtures as Blockchain,
 } from './blockchain'
@@ -28,7 +29,7 @@ export {
   SAMPLE_USERS as Users,
   SAMPLE_ID_TOKENS as IdTokens,
   SAMPLE_FIRESTORE_DOCS as FirestoreDocs,
-  SAMPLE_AUTH_MESSAGES as AuthMessages,
+  SAMPLE_AUTH_MESSAGES,
   SAMPLE_FIREBASE_ERRORS as FirebaseErrors,
   FirebaseFixtures as Firebase,
 } from './firebase'
