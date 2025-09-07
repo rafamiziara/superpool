@@ -91,12 +91,13 @@ const config: Config = {
   // Test timeout settings
   testTimeout: 10000, // 10 seconds max per test
 
-  // Setup files
-  setupFilesAfterEnv: ['<rootDir>/src/__tests__/setup/jest.setup.ts'],
+  // Setup files - MOCK_SYSTEM.md compliant path
+  setupFilesAfterEnv: ['<rootDir>/src/__mocks__/jest.setup.ts'],
 
   // Module resolution
   moduleNameMapper: {
     '^@superpool/(.*)$': '<rootDir>/../../packages/$1/src',
+    '^@mocks/(.*)$': '<rootDir>/src/__mocks__/$1', // ✅ MOCK_SYSTEM.md requirement
   },
 
   // Handle ES6 modules
@@ -122,7 +123,6 @@ const config: Config = {
   detectOpenHandles: false, // Disable for faster execution
   forceExit: false, // Let tests exit naturally
   logHeapUsage: process.env.DEBUG_MEMORY === 'true',
-
 }
 
 export default config

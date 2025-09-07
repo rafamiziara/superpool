@@ -10,6 +10,7 @@
 export { FirebaseAdminMock, firebaseAdminMock } from './firebase/FirebaseAdminMock'
 export { EthersMock, ethersMock } from './blockchain/EthersMock'
 export { ContractMock } from './blockchain/ContractMock'
+export { FunctionsMock, CommonErrors } from './firebase/FunctionsMock'
 
 // Export test utilities
 export { CloudFunctionTester } from '../__tests__/utils/CloudFunctionTester'
@@ -29,10 +30,7 @@ import { ethersMock } from './blockchain/EthersMock'
 import { ContractMock } from './blockchain/ContractMock'
 import { CloudFunctionTester } from '../__tests__/utils/CloudFunctionTester'
 import { BlockchainTestEnvironment } from '../__tests__/utils/BlockchainTestEnvironment'
-import TestFixtures, {
-  SAMPLE_AUTH_MESSAGES,
-  SAMPLE_SAFE_TRANSACTIONS,
-} from './fixtures'
+import TestFixtures, { SAMPLE_AUTH_MESSAGES, SAMPLE_SAFE_TRANSACTIONS } from './fixtures'
 import { FirebaseFixtures } from './fixtures/firebase'
 
 // Export types
@@ -68,7 +66,7 @@ export class MockFactory {
     }
 
     if (withAuth || withFirestore) {
-      environment.mocks.firebase = firebaseAdminMock
+      ;(environment.mocks as any).firebase = firebaseAdminMock
       firebaseAdminMock.resetAllMocks()
     }
 
@@ -92,17 +90,17 @@ export class MockFactory {
     const uid = userUid || TestFixtures.TestData.users.poolOwner.uid
 
     // Setup user
-    environment.mocks.firebase.seedUser({
+    ;(environment.mocks as any).firebase?.seedUser({
       uid,
       email: TestFixtures.TestData.users.poolOwner.email,
-      customClaims: { walletAddress: params.poolOwner || TestFixtures.TestData.addresses.poolOwners[0] },
+      customClaims: { walletAddress: (params as any).poolOwner || TestFixtures.TestData.addresses.poolOwners[0] },
     })
 
     // Create authenticated request
     const request = environment.functionTester.createAuthenticatedRequest(params, uid)
 
     // Setup successful Firestore operations
-    environment.mocks.firebase.firestore.collection('pools').doc().set.mockResolvedValue(undefined)
+    ;(environment.mocks as any).firebase?.firestore.collection('pools').doc().set.mockResolvedValue(undefined)
 
     // Setup contract mock
     const poolFactory = ContractMock.createPoolFactoryMock()
@@ -128,7 +126,7 @@ export class MockFactory {
     const uid = safeOwnerUid || TestFixtures.TestData.users.safeOwner.uid
 
     // Setup Safe owner
-    environment.mocks.firebase.seedUser({
+    ;(environment.mocks as any).firebase?.seedUser({
       uid,
       email: TestFixtures.TestData.users.safeOwner.email,
       customClaims: {
@@ -145,7 +143,7 @@ export class MockFactory {
     environment.mocks.safeContract = safeContract
 
     // Setup Firestore for Safe transactions
-    environment.mocks.firebase.firestore.collection('safe_transactions').doc().set.mockResolvedValue(undefined)
+    ;(environment.mocks as any).firebase?.firestore.collection('safe_transactions').doc().set.mockResolvedValue(undefined)
 
     return {
       ...environment,
@@ -166,7 +164,7 @@ export class MockFactory {
 
     // Create nonce
     const nonce = FirebaseFixtures.createNonce(address)
-    environment.mocks.firebase.seedDocument(`auth_nonces/${nonce.nonce}`, nonce)
+    ;(environment.mocks as any).firebase?.seedDocument(`auth_nonces/${nonce.nonce}`, nonce)
 
     // Create auth message
     const message = SAMPLE_AUTH_MESSAGES.VALID_MESSAGE(address, nonce.nonce, nonce.timestamp)
