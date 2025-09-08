@@ -7,6 +7,7 @@
 
 /* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unused-vars */
 
+import { expect } from '@jest/globals'
 import type { CallableRequest, HttpsError } from 'firebase-functions/v2/https'
 import { firebaseAdminMock } from '../../__mocks__/firebase/FirebaseAdminMock'
 

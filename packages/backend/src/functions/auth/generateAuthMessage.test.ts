@@ -1,8 +1,8 @@
 import { jest } from '@jest/globals'
 import { isAddress } from 'ethers'
 import { AUTH_NONCES_COLLECTION } from '../../constants'
-import { createAuthMessage } from '../../utils'
 import { ethersMock, firebaseAdminMock, FunctionsMock } from '../../__mocks__'
+import { firestore } from '../../services'
 
 // Mock the uuid `v4` function
 const mockNonce = 'mock-uuid-nonce'
@@ -12,8 +12,21 @@ jest.mock('uuid', () => ({
 }))
 
 // Mock the createAuthMessage utility function
+const mockCreateAuthMessage = jest.fn()
 jest.mock('../../utils', () => ({
-  createAuthMessage: jest.fn(),
+  createAuthMessage: mockCreateAuthMessage,
+}))
+
+// Mock ethers module with Jest mock functions
+jest.mock('ethers', () => ({
+  isAddress: jest.fn(),
+}))
+
+// Mock the services module to use the centralized firestore mock
+jest.mock('../../services', () => ({
+  firestore: {
+    collection: jest.fn(),
+  },
 }))
 
 // Get the actual function handler to test
@@ -32,8 +45,18 @@ describe('generateAuthMessage', () => {
     firebaseAdminMock.resetAllMocks()
     ethersMock.resetAllMocks()
     jest.clearAllMocks()
-    jest.mocked(isAddress).mockReturnValue(true) // Default to a valid address
-    jest.mocked(createAuthMessage).mockReturnValue(mockMessage)
+
+    // Setup ethers mocks
+    ;(isAddress as jest.MockedFunction<typeof isAddress>).mockReturnValue(true) // Default to a valid address
+    mockCreateAuthMessage.mockReturnValue(mockMessage)
+
+    // Setup services mock
+    const mockFirestore = firestore as jest.Mocked<typeof firestore>
+    mockFirestore.collection.mockReturnValue({
+      doc: jest.fn().mockReturnValue({
+        set: jest.fn().mockResolvedValue(undefined),
+      }),
+    } as any)
   })
 
   afterAll(() => {
@@ -51,14 +74,14 @@ describe('generateAuthMessage', () => {
     // Assert
     expect(isAddress).toHaveBeenCalledWith(walletAddress)
     expect(mockV4).toHaveBeenCalled()
-    expect(firebaseAdminMock.firestore.collection).toHaveBeenCalledWith(AUTH_NONCES_COLLECTION)
-    expect(firebaseAdminMock.firestore.collection().doc).toHaveBeenCalledWith(walletAddress)
-    expect(firebaseAdminMock.firestore.collection().doc().set).toHaveBeenCalledWith({
+    expect(firestore.collection).toHaveBeenCalledWith(AUTH_NONCES_COLLECTION)
+    expect(firestore.collection().doc).toHaveBeenCalledWith(walletAddress)
+    expect(firestore.collection().doc().set).toHaveBeenCalledWith({
       nonce: mockNonce,
       timestamp: mockTimestamp,
       expiresAt: mockTimestamp + 10 * 60 * 1000,
     })
-    expect(createAuthMessage).toHaveBeenCalledWith(walletAddress, mockNonce, mockTimestamp)
+    expect(mockCreateAuthMessage).toHaveBeenCalledWith(walletAddress, mockNonce, mockTimestamp)
     expect(result).toEqual({ message: mockMessage, nonce: mockNonce, timestamp: mockTimestamp })
   })
 
@@ -78,7 +101,7 @@ describe('generateAuthMessage', () => {
     // Arrange
     const invalidAddress = 'invalid-eth-address'
     const request = FunctionsMock.createCallableRequest({ walletAddress: invalidAddress })
-    jest.mocked(isAddress).mockReturnValue(false)
+    ;(isAddress as jest.MockedFunction<typeof isAddress>).mockReturnValue(false)
 
     // Act & Assert
     await expect(generateAuthMessageHandler(request)).rejects.toThrow('Invalid Ethereum wallet address format.')
@@ -93,7 +116,12 @@ describe('generateAuthMessage', () => {
     const firestoreError = new Error('Firestore write failed')
 
     // Make the `set` method throw an error to simulate a failure
-    firebaseAdminMock.firestore.collection().doc().set.mockRejectedValue(firestoreError)
+    const mockFirestore = firestore as jest.Mocked<typeof firestore>
+    mockFirestore.collection.mockReturnValue({
+      doc: jest.fn().mockReturnValue({
+        set: jest.fn().mockRejectedValue(firestoreError),
+      }),
+    } as any)
 
     // Act & Assert
     await expect(generateAuthMessageHandler(request)).rejects.toThrow('Failed to save authentication nonce.')

@@ -33,12 +33,16 @@ export interface MockAuthData {
  * Enhanced CallableRequest interface with all required properties
  * Fixes TypeScript errors by including missing acceptsStreaming property
  */
-export interface MockCallableRequest<T = any> extends Partial<CallableRequest<T>> {
-  // eslint-disable-line @typescript-eslint/no-explicit-any
+export interface MockCallableRequest<T = Record<string, unknown>> extends Partial<CallableRequest<T>> {
   data: T
   auth?: MockAuthData | undefined
-  app?: any // eslint-disable-line @typescript-eslint/no-explicit-any
-  rawRequest?: any // eslint-disable-line @typescript-eslint/no-explicit-any
+  app?: unknown
+  rawRequest?: {
+    headers: Record<string, string>
+    method: string
+    url: string
+    body: string
+  }
   acceptsStreaming?: boolean // ✅ CRITICAL - Fixes 150+ TypeScript errors
 }
 
@@ -150,9 +154,14 @@ export class FunctionsMock {
    * Create properly typed HttpsError for testing error scenarios
    * Matches Firebase Functions HttpsError structure exactly
    */
-  static createHttpsError(code: string, message: string, details?: any): HttpsError {
-    // eslint-disable-line @typescript-eslint/no-explicit-any
-    const error = new Error(message) as any // eslint-disable-line @typescript-eslint/no-explicit-any
+  static createHttpsError(code: string, message: string, details?: Record<string, unknown>): HttpsError {
+    const error = new Error(message) as HttpsError & {
+      code: string
+      details?: Record<string, unknown>
+      httpErrorCode: number
+      name: string
+      status: number
+    }
     error.code = code
     error.details = details
     error.httpErrorCode = this.getHttpErrorCode(code)
@@ -323,34 +332,39 @@ export const CommonErrors = {
  * Automatically configures Jest mocks when this file is imported
  */
 jest.mock('firebase-functions/v2/https', () => ({
-  onCall: jest.fn((options: any, handler?: any) => {
-    // eslint-disable-line @typescript-eslint/no-explicit-any
-    // Return the handler function for direct testing
-    const actualHandler = handler || options
-    const wrappedHandler = async (request: CallableRequest<any>) => {
-      // eslint-disable-line @typescript-eslint/no-explicit-any
-      try {
-        return await actualHandler(request)
-      } catch (error: any) {
-        // eslint-disable-line @typescript-eslint/no-explicit-any
-        // Convert regular errors to HttpsError format for consistency
-        if (error && typeof error === 'object' && 'code' in error) {
-          return error
+  onCall: jest.fn(
+    (
+      options: Record<string, unknown> | ((request: CallableRequest<unknown>) => Promise<unknown>),
+      handler?: (request: CallableRequest<unknown>) => Promise<unknown>
+    ) => {
+      // Return the handler function for direct testing
+      const actualHandler = handler || options
+      const wrappedHandler = async (request: CallableRequest<unknown>) => {
+        try {
+          return await (actualHandler as (request: CallableRequest<unknown>) => Promise<unknown>)(request)
+        } catch (error: unknown) {
+          // Convert regular errors to HttpsError format for consistency
+          if (error && typeof error === 'object' && 'code' in error) {
+            return error
+          }
+          const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+          throw FunctionsMock.createHttpsError('internal', errorMessage)
         }
-        throw FunctionsMock.createHttpsError('internal', error?.message || 'Unknown error')
       }
+
+      // Add metadata for testing
+      ;(wrappedHandler as Record<string, unknown>).options = typeof options === 'object' ? options : {}
+      ;(wrappedHandler as Record<string, unknown>).originalHandler = actualHandler
+
+      return wrappedHandler
     }
-
-    // Add metadata for testing
-    ;(wrappedHandler as any).options = typeof options === 'object' ? options : {} // eslint-disable-line @typescript-eslint/no-explicit-any
-    ;(wrappedHandler as any).originalHandler = actualHandler // eslint-disable-line @typescript-eslint/no-explicit-any
-
-    return wrappedHandler
-  }),
+  ),
 
   HttpsError: jest
-    .fn<(code: string, message: string, details?: any) => HttpsError>() // eslint-disable-line @typescript-eslint/no-explicit-any
-    .mockImplementation((code: string, message: string, details?: any) => FunctionsMock.createHttpsError(code, message, details)), // eslint-disable-line @typescript-eslint/no-explicit-any
+    .fn<(code: string, message: string, details?: Record<string, unknown>) => HttpsError>()
+    .mockImplementation((code: string, message: string, details?: Record<string, unknown>) =>
+      FunctionsMock.createHttpsError(code, message, details)
+    ),
 
   // Export other Functions utilities that might be needed
   onRequest: jest.fn(),

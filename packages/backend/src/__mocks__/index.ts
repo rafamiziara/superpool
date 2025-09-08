@@ -90,18 +90,27 @@ export class MockFactory {
     const uid = userUid || TestFixtures.TestData.users.poolOwner.uid
 
     // Setup user
-    ;(environment.mocks as any).firebase?.seedUser({
-      // eslint-disable-line @typescript-eslint/no-explicit-any
+    const firebaseMock = (
+      environment.mocks as {
+        firebase?: { seedUser: (user: { uid: string; email: string; customClaims: Record<string, unknown> }) => void }
+      }
+    ).firebase
+    firebaseMock?.seedUser({
       uid,
       email: TestFixtures.TestData.users.poolOwner.email,
-      customClaims: { walletAddress: (params as any).poolOwner || TestFixtures.TestData.addresses.poolOwners[0] }, // eslint-disable-line @typescript-eslint/no-explicit-any
+      customClaims: { walletAddress: (params as { poolOwner?: string }).poolOwner || TestFixtures.TestData.addresses.poolOwners[0] },
     })
 
     // Create authenticated request
     const request = environment.functionTester.createAuthenticatedRequest(params, uid)
 
     // Setup successful Firestore operations
-    ;(environment.mocks as any).firebase?.firestore.collection('pools').doc().set.mockResolvedValue(undefined) // eslint-disable-line @typescript-eslint/no-explicit-any
+    const firestoreMock = (
+      environment.mocks as {
+        firebase?: { firestore: { collection: (name: string) => { doc: () => { set: { mockResolvedValue: (value: unknown) => void } } } } }
+      }
+    ).firebase?.firestore
+    firestoreMock?.collection('pools').doc().set.mockResolvedValue(undefined)
 
     // Setup contract mock
     const poolFactory = ContractMock.createPoolFactoryMock()
@@ -127,8 +136,12 @@ export class MockFactory {
     const uid = safeOwnerUid || TestFixtures.TestData.users.safeOwner.uid
 
     // Setup Safe owner
-    ;(environment.mocks as any).firebase?.seedUser({
-      // eslint-disable-line @typescript-eslint/no-explicit-any
+    const safeFirebaseMock = (
+      environment.mocks as {
+        firebase?: { seedUser: (user: { uid: string; email: string; customClaims: Record<string, unknown> }) => void }
+      }
+    ).firebase
+    safeFirebaseMock?.seedUser({
       uid,
       email: TestFixtures.TestData.users.safeOwner.email,
       customClaims: {
@@ -145,7 +158,12 @@ export class MockFactory {
     environment.mocks.safeContract = safeContract
 
     // Setup Firestore for Safe transactions
-    ;(environment.mocks as any).firebase?.firestore.collection('safe_transactions').doc().set.mockResolvedValue(undefined) // eslint-disable-line @typescript-eslint/no-explicit-any
+    const safeFirestoreMock = (
+      environment.mocks as {
+        firebase?: { firestore: { collection: (name: string) => { doc: () => { set: { mockResolvedValue: (value: unknown) => void } } } } }
+      }
+    ).firebase?.firestore
+    safeFirestoreMock?.collection('safe_transactions').doc().set.mockResolvedValue(undefined)
 
     return {
       ...environment,

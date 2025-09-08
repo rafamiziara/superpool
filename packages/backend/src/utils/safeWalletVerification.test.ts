@@ -1,7 +1,16 @@
 import { EIP1271_MAGIC_VALUE, SafeWalletVerificationError, SUPPORTED_SAFE_VERSIONS } from '../types/safeWalletTypes'
 import { SafeWalletVerificationService } from './safeWalletVerification'
-import { ethersMock, ContractMock, firebaseAdminMock, mockEthersUtils } from '../__mocks__'
-import { Contract } from 'ethers'
+import { ContractMock, ethersMock, firebaseAdminMock } from '../__mocks__'
+import { Contract, isAddress, keccak256, toUtf8Bytes } from 'ethers'
+
+// Mock ethers utilities
+jest.mock('ethers', () => ({
+  ...jest.requireActual('ethers'),
+  Contract: jest.fn(),
+  isAddress: jest.fn(),
+  keccak256: jest.fn(),
+  toUtf8Bytes: jest.fn(),
+}))
 
 // Mock createAuthMessage utility
 jest.mock('.', () => ({
@@ -10,6 +19,18 @@ jest.mock('.', () => ({
 
 const { createAuthMessage } = jest.requireMock('.')
 const MockedContract = jest.mocked(Contract)
+const mockIsAddress = jest.mocked(isAddress)
+const mockKeccak256 = jest.mocked(keccak256)
+const mockToUtf8Bytes = jest.mocked(toUtf8Bytes)
+
+// Define mock contract interface to avoid 'any' types
+interface MockSafeContract {
+  VERSION: jest.MockedFunction<() => Promise<string>>
+  isOwner: jest.MockedFunction<(address: string) => Promise<boolean>>
+  getThreshold: jest.MockedFunction<() => Promise<bigint>>
+  getOwners: jest.MockedFunction<() => Promise<string[]>>
+  isValidSignature: jest.MockedFunction<(hash: string, signature: string) => Promise<string>>
+}
 
 describe('SafeWalletVerificationService', () => {
   const validWalletAddress = '0x1234567890123456789012345678901234567890'
@@ -24,15 +45,15 @@ describe('SafeWalletVerificationService', () => {
     firebaseAdminMock.resetAllMocks()
 
     // Setup default mock behaviors
-    mockEthersUtils.isAddress.mockReturnValue(true)
-    mockEthersUtils.keccak256.mockReturnValue('0xmockedhash')
-    mockEthersUtils.toUtf8Bytes.mockReturnValue(new Uint8Array())
+    mockIsAddress.mockReturnValue(true)
+    mockKeccak256.mockReturnValue('0xmockedhash')
+    mockToUtf8Bytes.mockReturnValue(new Uint8Array())
     createAuthMessage.mockReturnValue('mocked auth message')
   })
 
   describe('verifySafeWalletSignature', () => {
     it('should reject invalid wallet addresses', async () => {
-      mockEthersUtils.isAddress.mockReturnValue(false)
+      mockIsAddress.mockReturnValue(false)
 
       const result = await SafeWalletVerificationService.verifySafeWalletSignature(
         'invalid-address',
@@ -85,7 +106,7 @@ describe('SafeWalletVerificationService', () => {
       mockSafeContract.getOwners = jest.fn()
       mockSafeContract.isValidSignature = jest.fn()
 
-      MockedContract.mockImplementation(() => mockSafeContract as any)
+      MockedContract.mockImplementation(() => mockSafeContract as MockSafeContract)
 
       const result = await SafeWalletVerificationService.verifySafeWalletSignature(
         validWalletAddress,
@@ -111,7 +132,7 @@ describe('SafeWalletVerificationService', () => {
       mockSafeContract.getOwners = jest.fn().mockResolvedValue([validWalletAddress, '0xother'])
       mockSafeContract.isValidSignature = jest.fn().mockResolvedValue(EIP1271_MAGIC_VALUE)
 
-      MockedContract.mockImplementation(() => mockSafeContract as any)
+      MockedContract.mockImplementation(() => mockSafeContract as MockSafeContract)
 
       const result = await SafeWalletVerificationService.verifySafeWalletSignature(
         validWalletAddress,
@@ -142,7 +163,7 @@ describe('SafeWalletVerificationService', () => {
       mockSafeContract.getOwners = jest.fn().mockResolvedValue([validWalletAddress])
       mockSafeContract.isValidSignature = jest.fn().mockResolvedValue('0xwrongvalue') // Wrong magic value
 
-      MockedContract.mockImplementation(() => mockSafeContract as any)
+      MockedContract.mockImplementation(() => mockSafeContract as MockSafeContract)
 
       const result = await SafeWalletVerificationService.verifySafeWalletSignature(
         validWalletAddress,
@@ -164,7 +185,7 @@ describe('SafeWalletVerificationService', () => {
       mockSafeContract.getOwners = jest.fn().mockResolvedValue(['0xother1', '0xother2'])
       mockSafeContract.isValidSignature = jest.fn().mockResolvedValue(EIP1271_MAGIC_VALUE)
 
-      MockedContract.mockImplementation(() => mockSafeContract as any)
+      MockedContract.mockImplementation(() => mockSafeContract as MockSafeContract)
 
       const result = await SafeWalletVerificationService.verifySafeWalletSignature(
         validWalletAddress,
@@ -188,7 +209,7 @@ describe('SafeWalletVerificationService', () => {
         target: validWalletAddress,
       }
 
-      MockedContract.mockImplementation(() => mockContractInstance as any)
+      MockedContract.mockImplementation(() => mockContractInstance as MockSafeContract)
 
       const result = await SafeWalletVerificationService.verifySafeWalletSignature(
         validWalletAddress,
@@ -214,7 +235,7 @@ describe('SafeWalletVerificationService', () => {
         target: validWalletAddress,
       }
 
-      MockedContract.mockImplementation(() => mockContractInstance as any)
+      MockedContract.mockImplementation(() => mockContractInstance as MockSafeContract)
 
       const result = await SafeWalletVerificationService.verifySafeWalletSignature(
         validWalletAddress,
@@ -237,7 +258,7 @@ describe('SafeWalletVerificationService', () => {
         isValidSignature: jest.fn(),
       }
 
-      MockedContract.mockImplementation(() => mockContractInstance as any)
+      MockedContract.mockImplementation(() => mockContractInstance as MockSafeContract)
 
       const result = await SafeWalletVerificationService.verifySafeWalletSignature(
         validWalletAddress,
@@ -263,7 +284,7 @@ describe('SafeWalletVerificationService', () => {
         target: validWalletAddress,
       }
 
-      MockedContract.mockImplementation(() => mockMaliciousContract as any)
+      MockedContract.mockImplementation(() => mockMaliciousContract as MockSafeContract)
 
       const result = await SafeWalletVerificationService.verifySafeWalletSignature(
         validWalletAddress,
@@ -300,7 +321,7 @@ describe('SafeWalletVerificationService', () => {
     })
 
     it('should reject invalid contract address', () => {
-      mockEthersUtils.isAddress.mockReturnValue(false)
+      mockIsAddress.mockReturnValue(false)
 
       const invalidConfig = {
         contractAddress: 'invalid-address',
