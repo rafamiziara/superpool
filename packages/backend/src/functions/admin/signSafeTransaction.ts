@@ -2,7 +2,7 @@ import { CallableRequest, HttpsError, onCall } from 'firebase-functions/v2/https
 import { logger } from 'firebase-functions'
 import { ethers } from 'ethers'
 import { getFirestore } from 'firebase-admin/firestore'
-import { getSafeOwners, isSafeOwner, SafeSignature, signSafeTransaction as signSafeTransactionUtil } from '../../utils/multisig'
+import { isSafeOwner, SafeSignature } from '../../utils/multisig'
 import { AppError, handleError } from '../../utils/errorHandling'
 
 export interface SignSafeTransactionRequest {
@@ -144,7 +144,7 @@ export const signSafeTransaction = onCall(
       const readyToExecute = updatedSignatures.length >= txData.requiredSignatures
 
       // 11. Update Firestore
-      const updateData: any = {
+      const updateData: Record<string, unknown> = {
         signatures: updatedSignatures,
         currentSignatures: updatedSignatures.length,
         updatedAt: new Date(),

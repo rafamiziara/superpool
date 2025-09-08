@@ -56,7 +56,7 @@ describe('generateAuthMessage', () => {
       doc: jest.fn().mockReturnValue({
         set: jest.fn().mockResolvedValue(undefined),
       }),
-    } as any)
+    } as unknown as ReturnType<typeof mockFirestore.collection>)
   })
 
   afterAll(() => {
@@ -121,7 +121,7 @@ describe('generateAuthMessage', () => {
       doc: jest.fn().mockReturnValue({
         set: jest.fn().mockRejectedValue(firestoreError),
       }),
-    } as any)
+    } as unknown as ReturnType<typeof mockFirestore.collection>)
 
     // Act & Assert
     await expect(generateAuthMessageHandler(request)).rejects.toThrow('Failed to save authentication nonce.')

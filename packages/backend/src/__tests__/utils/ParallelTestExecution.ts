@@ -10,7 +10,7 @@ import { EventEmitter } from 'events'
 import { isMainThread, parentPort, Worker, workerData } from 'worker_threads'
 import { cpus } from 'os'
 import { IsolationScope, TestEnvironmentIsolationManager } from './TestEnvironmentIsolation'
-import { performanceManager } from './PerformanceTestUtilities'
+// Performance manager available but not used in current implementation
 
 // Execution strategy types
 export enum ParallelStrategy {
@@ -315,7 +315,7 @@ export class ParallelTestExecutor extends EventEmitter {
   /**
    * Handle messages from workers
    */
-  private handleWorkerMessage(context: WorkerContext, message: any): void {
+  private handleWorkerMessage(context: WorkerContext, message: Record<string, unknown>): void {
     switch (message.type) {
       case 'test-completed':
         this.handleTestCompleted(context, message.result)
@@ -701,7 +701,7 @@ export class ParallelTestExecutor extends EventEmitter {
   /**
    * Helper methods
    */
-  private findTestById(testId: string): ParallelTestCase | null {
+  private findTestById(): ParallelTestCase | null {
     // Implementation would search through registered tests
     return null
   }
@@ -735,12 +735,12 @@ export class ParallelTestExecutor extends EventEmitter {
     }
   }
 
-  private updateWorkerPerformance(context: WorkerContext, metrics: any): void {
+  private updateWorkerPerformance(context: WorkerContext, metrics: Record<string, unknown>): void {
     // Update worker performance metrics
     context.performance = { ...context.performance, ...metrics }
   }
 
-  private trackResourceUsage(context: WorkerContext, usage: any): void {
+  private trackResourceUsage(context: WorkerContext, usage: Record<string, unknown>): void {
     // Track resource usage for worker
     context.performance.memoryUsage = usage.memory
   }
@@ -885,7 +885,7 @@ export const parallelExecutor = ParallelTestExecutor.getInstance(DEFAULT_PARALLE
 // Worker thread code
 if (!isMainThread) {
   // Worker thread implementation
-  const { workerId, config } = workerData
+  const { workerId } = workerData
 
   parentPort?.on('message', async (message) => {
     if (message.type === 'execute-test') {

@@ -130,8 +130,7 @@ describe('Authentication System - Comprehensive Test Suite', () => {
   const mockGet = jest.fn<() => Promise<MockDocumentSnapshot>>()
   const mockCreateCustomToken = jest.fn<() => Promise<string>>()
 
-  // Initialize CloudFunctionTester for proper CallableRequest creation
-  const functionTester = new CloudFunctionTester()
+  // CloudFunctionTester available if needed but not used in current tests
 
   const mockDoc = jest.fn<
     () => {
@@ -151,6 +150,7 @@ describe('Authentication System - Comprehensive Test Suite', () => {
     doc: mockDoc,
   }))
 
+  // Mock Firestore and Auth available if needed
   const mockFirestore = {
     collection: mockCollection,
   }
