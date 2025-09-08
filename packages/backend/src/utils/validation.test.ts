@@ -3,25 +3,26 @@ import { jest } from '@jest/globals'
 import { sanitizePoolParams, validatePoolCreationParams } from './validation'
 import { CreatePoolRequest } from '../functions/pools/createPool'
 
-// Mock ethers module
-jest.mock('ethers', () => ({
-  ethers: {
-    isAddress: jest.fn((address: string) => {
-      // Mock valid Ethereum address pattern
-      if (typeof address !== 'string') return false
-      if (address === 'invalid-address') return false
-      return /^0x[a-fA-F0-9]{40}$/.test(address)
-    }),
-    parseEther: jest.fn((value: string) => {
-      const numValue = parseFloat(value)
-      if (isNaN(numValue)) throw new Error('Invalid number')
-      // Allow negative parsing, validation logic will handle the check
-      return BigInt(Math.floor(numValue * 1e18))
-    }),
-  },
-}))
+// Mock ethers module with centralized system
+jest.mock('ethers', () => {
+  // Import mock utilities within the mock factory to avoid hoisting issues
+  const { mockEthersUtils } = jest.requireActual('../__mocks__/blockchain/EthersMock')
+
+  return {
+    ethers: {
+      isAddress: mockEthersUtils.isAddress,
+      parseEther: mockEthersUtils.parseEther,
+    },
+  }
+})
 
 describe('validation utilities', () => {
+  beforeEach(() => {
+    // Reset all mocks before each test
+    const { ethersMock } = jest.requireActual('../__mocks__/blockchain/EthersMock')
+    ethersMock.resetAllMocks()
+  })
+
   describe('validatePoolCreationParams', () => {
     const validParams: CreatePoolRequest = {
       poolOwner: '0x742d35Cc6670C74288C2e768dC1E574a0B7DbE7a',

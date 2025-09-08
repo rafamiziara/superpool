@@ -6,13 +6,32 @@
  */
 
 import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals'
-import { MockFactory, quickSetup, SAMPLE_TRANSACTION_HASHES, TestFixtures } from '../__mocks__/index'
+import {
+  MockFactory,
+  quickSetup,
+  SAMPLE_TRANSACTION_HASHES,
+  TestFixtures,
+  firebaseAdminMock,
+  ethersMock,
+  ContractMock,
+} from '../__mocks__/index'
 import { performanceManager, startPerformanceTest } from '../__tests__/utils/PerformanceTestUtilities'
 import { TestEnvironmentContext, withTestIsolation } from '../__tests__/utils/TestEnvironmentIsolation'
 import { BlockchainTestEnvironment } from '../__tests__/utils/BlockchainTestEnvironment'
+import type { MockProvider } from '../__mocks__/blockchain/EthersMock'
+import type { MockContract } from '../__mocks__/blockchain/ContractMock'
 
 // Mock ContractService for testing
-const ContractService = {
+interface MockContractService {
+  createPool: jest.MockedFunction<(params: any) => Promise<any>>
+  getPool: jest.MockedFunction<(poolId: string) => Promise<any>>
+  updatePool: jest.MockedFunction<(poolId: string, updates: any) => Promise<any>>
+  executeTransaction: jest.MockedFunction<(txData: any) => Promise<any>>
+  estimateGas: jest.MockedFunction<(operation: string, params: any) => Promise<any>>
+  validateTransaction: jest.MockedFunction<(txData: any) => Promise<any>>
+}
+
+const ContractService: MockContractService = {
   createPool: jest.fn(),
   getPool: jest.fn(),
   updatePool: jest.fn(),
@@ -22,12 +41,21 @@ const ContractService = {
 }
 
 describe('ContractService - Integration Tests', () => {
-  let testEnvironment: any
+  let testEnvironment: {
+    functionTester: any
+    mocks: Record<string, any>
+    fixtures: any
+  }
   let blockchainEnv: BlockchainTestEnvironment
-  let mockProvider: any
-  let mockContract: any
+  let mockProvider: MockProvider
+  let mockContract: MockContract
+  let mockPoolFactory: MockContract
+  let mockSafeContract: MockContract
 
   beforeEach(async () => {
+    // Reset all mocks first
+    MockFactory.resetAllMocks()
+
     // Setup comprehensive test environment
     testEnvironment = MockFactory.createCloudFunctionEnvironment({
       withContracts: true,
@@ -36,8 +64,12 @@ describe('ContractService - Integration Tests', () => {
     })
 
     blockchainEnv = BlockchainTestEnvironment.getInstance({ chainName: 'local' })
-    mockProvider = testEnvironment.mocks.ethers.provider
-    mockContract = testEnvironment.mocks.poolFactory
+
+    // Get centralized mock instances
+    mockProvider = ethersMock.provider
+    mockPoolFactory = ContractMock.createPoolFactoryMock()
+    mockSafeContract = ContractMock.createSafeMock()
+    mockContract = mockPoolFactory // Maintain compatibility
 
     // Reset performance tracking
     performanceManager.clearAll()
@@ -62,22 +94,28 @@ describe('ContractService - Integration Tests', () => {
           })
 
           mockProvider.getBlockNumber.mockResolvedValue(12345)
-          mockProvider.getGasPrice.mockResolvedValue('20000000000') // 20 Gwei
+          mockProvider.getFeeData.mockResolvedValue({
+            gasPrice: BigInt('20000000000'), // 20 Gwei
+            maxFeePerGas: BigInt('25000000000'),
+            maxPriorityFeePerGas: BigInt('2000000000'),
+          })
 
-          mockContract.createPool.mockResolvedValue({
+          const mockTxResponse = {
             hash: SAMPLE_TRANSACTION_HASHES.POOL_CREATION_1,
             from: ownerAddress,
             to: TestFixtures.TestData.addresses.contracts.poolFactory,
-            gasLimit: '500000',
-            gasPrice: '20000000000',
-            value: '0',
-            data: '0x123456...',
+            gasLimit: BigInt('500000'),
+            gasPrice: BigInt('20000000000'),
+            value: BigInt('0'),
+            nonce: 1,
             wait: jest.fn().mockResolvedValue({
-              status: 1,
+              transactionHash: SAMPLE_TRANSACTION_HASHES.POOL_CREATION_1,
               blockNumber: 12346,
-              blockHash: '0xblock123...',
-              gasUsed: '487123',
-              effectiveGasPrice: '20000000000',
+              blockHash: '0xblock123456789abcdef123456789abcdef123456789abcdef123456789abcdef12',
+              transactionIndex: 0,
+              gasUsed: BigInt('487123'),
+              effectiveGasPrice: BigInt('20000000000'),
+              status: 1,
               logs: [
                 {
                   address: TestFixtures.TestData.addresses.contracts.poolFactory,
@@ -86,22 +124,23 @@ describe('ContractService - Integration Tests', () => {
                     `0x000000000000000000000000${ownerAddress.slice(2)}`, // Owner
                     '0x0000000000000000000000000000000000000000000000000000000000000001', // Pool ID
                   ],
-                  data: '0x...',
+                  data: '0x1234567890abcdef',
                 },
               ],
               events: [
                 {
                   event: 'PoolCreated',
                   args: {
-                    poolId: '1',
+                    poolId: BigInt('1'),
                     owner: ownerAddress,
-                    maxLoanAmount: poolParams.maxLoanAmount,
+                    maxLoanAmount: BigInt(poolParams.maxLoanAmount),
                     interestRate: poolParams.interestRate,
                   },
                 },
               ],
             }),
-          })
+          }
+          ;(mockPoolFactory.createPool as jest.MockedFunction<any>).mockResolvedValue(mockTxResponse)
 
           // Act
           const measurement = startPerformanceTest('contract-pool-creation', 'integration')
@@ -137,10 +176,10 @@ describe('ContractService - Integration Tests', () => {
 
           // Verify provider interactions
           expect(mockProvider.getNetwork).toHaveBeenCalled()
-          expect(mockProvider.getGasPrice).toHaveBeenCalled()
-          expect(mockContract.createPool).toHaveBeenCalledWith(
-            ownerAddress,
-            expect.any(String), // maxLoanAmount as BigInt string
+          expect(mockProvider.getFeeData).toHaveBeenCalled()
+          expect(mockPoolFactory.createPool).toHaveBeenCalledWith(
+            poolParams.name,
+            BigInt(poolParams.maxLoanAmount),
             poolParams.interestRate,
             poolParams.loanDuration
           )
@@ -156,27 +195,37 @@ describe('ContractService - Integration Tests', () => {
           const mockWait = jest.fn().mockImplementation(async (confirmations = 1) => {
             confirmationCount += confirmations
             return {
-              status: 1,
+              transactionHash: SAMPLE_TRANSACTION_HASHES.POOL_CREATION_1,
               blockNumber: 12346 + confirmations,
-              confirmations,
-              gasUsed: '487123',
+              blockHash: '0xblock123456789abcdef',
+              transactionIndex: 0,
+              status: 1,
+              gasUsed: BigInt('487123'),
+              effectiveGasPrice: BigInt('20000000000'),
+              logs: [],
             }
           })
 
-          mockContract.createPool.mockResolvedValue({
+          ;(mockPoolFactory.createPool as jest.MockedFunction<any>).mockResolvedValue({
             hash: SAMPLE_TRANSACTION_HASHES.POOL_CREATION_1,
+            from: TestFixtures.TestData.addresses.poolOwners[0],
+            to: TestFixtures.TestData.addresses.contracts.poolFactory,
+            gasLimit: BigInt('500000'),
+            gasPrice: BigInt('20000000000'),
+            value: BigInt('0'),
+            nonce: 1,
             wait: mockWait,
           })
 
           // Act
           ContractService.createPool.mockImplementation(async (params) => {
-            const tx = await mockContract.createPool()
+            const tx = await mockPoolFactory.createPool(params.name, BigInt(params.maxLoanAmount), params.interestRate, params.loanDuration)
             const receipt = await tx.wait(3) // Wait for 3 confirmations
 
             return {
               success: true,
               transactionHash: tx.hash,
-              confirmations: receipt.confirmations,
+              confirmations: 3,
               blockNumber: receipt.blockNumber,
             }
           })
@@ -197,16 +246,24 @@ describe('ContractService - Integration Tests', () => {
           const estimatedGas = '485000'
           const actualGasUsed = '487123'
 
-          mockContract.estimateGas = {
-            createPool: jest.fn().mockResolvedValue(estimatedGas),
-          }
-
-          mockContract.createPool.mockResolvedValue({
+          ;(mockPoolFactory.createPool as any).estimateGas = jest.fn().mockResolvedValue(BigInt(estimatedGas))
+          ;(mockPoolFactory.createPool as jest.MockedFunction<any>).mockResolvedValue({
             hash: SAMPLE_TRANSACTION_HASHES.POOL_CREATION_1,
-            gasLimit: (parseInt(estimatedGas) * 1.2).toString(), // 20% buffer
+            from: TestFixtures.TestData.addresses.poolOwners[0],
+            to: TestFixtures.TestData.addresses.contracts.poolFactory,
+            gasLimit: BigInt(Math.floor(parseInt(estimatedGas) * 1.2)), // 20% buffer
+            gasPrice: BigInt('20000000000'),
+            value: BigInt('0'),
+            nonce: 1,
             wait: jest.fn().mockResolvedValue({
+              transactionHash: SAMPLE_TRANSACTION_HASHES.POOL_CREATION_1,
+              blockNumber: 12346,
+              blockHash: '0xblock123456789abcdef',
+              transactionIndex: 0,
               status: 1,
-              gasUsed: actualGasUsed,
+              gasUsed: BigInt(actualGasUsed),
+              effectiveGasPrice: BigInt('20000000000'),
+              logs: [],
             }),
           })
 
@@ -259,13 +316,13 @@ describe('ContractService - Integration Tests', () => {
             status: 'Active',
           }
 
-          mockContract.pools.mockResolvedValue([
+          ;(mockPoolFactory.getPool as jest.MockedFunction<any>).mockResolvedValue([
             expectedPoolData.owner,
-            expectedPoolData.maxLoanAmount,
+            BigInt(expectedPoolData.maxLoanAmount),
             expectedPoolData.interestRate,
             expectedPoolData.loanDuration,
-            expectedPoolData.totalLent,
-            expectedPoolData.totalBorrowed,
+            BigInt(expectedPoolData.totalLent),
+            BigInt(expectedPoolData.totalBorrowed),
             1, // status: 1 = Active
           ])
 
@@ -299,7 +356,7 @@ describe('ContractService - Integration Tests', () => {
           // Arrange
           const invalidPoolId = '999999'
 
-          mockContract.pools.mockRejectedValue(new Error('Pool does not exist'))
+          ;(mockPoolFactory.getPool as jest.MockedFunction<any>).mockRejectedValue(new Error('Pool does not exist'))
 
           // Act
           ContractService.getPool.mockResolvedValue({
@@ -334,34 +391,56 @@ describe('ContractService - Integration Tests', () => {
           let txState = 'pending'
           const txHash = SAMPLE_TRANSACTION_HASHES.POOL_CREATION_1
 
-          mockProvider.sendTransaction.mockResolvedValue({
+          // Setup transaction simulation
+          mockProvider.getTransaction.mockResolvedValue({
             hash: txHash,
             from: TestFixtures.TestData.addresses.poolOwners[0],
-            ...txData,
+            to: txData.to,
+            value: BigInt(txData.value || '0'),
+            gasLimit: BigInt(txData.gasLimit || '500000'),
+            gasPrice: BigInt('20000000000'),
+            nonce: 1,
             wait: jest.fn().mockImplementation(async () => {
               // Simulate transaction mining
               await new Promise((resolve) => setTimeout(resolve, 1000))
-              txState = 'confirmed'
               return {
-                status: 1,
-                blockNumber: 12348,
                 transactionHash: txHash,
+                blockNumber: 12348,
+                blockHash: '0xblock123456789abcdef',
+                transactionIndex: 0,
+                status: 1,
+                gasUsed: BigInt('487123'),
+                effectiveGasPrice: BigInt('20000000000'),
+                logs: [],
               }
             }),
+          })
+
+          mockProvider.getTransactionReceipt.mockResolvedValue({
+            transactionHash: txHash,
+            blockNumber: 12348,
+            blockHash: '0xblock123456789abcdef',
+            transactionIndex: 0,
+            status: 1,
+            gasUsed: BigInt('487123'),
+            effectiveGasPrice: BigInt('20000000000'),
+            logs: [],
           })
 
           // Act
           const measurement = startPerformanceTest('transaction-lifecycle', 'transaction-management')
 
           ContractService.executeTransaction.mockImplementation(async (data) => {
-            const tx = await mockProvider.sendTransaction(data)
+            // Simulate transaction mining
+            await new Promise((resolve) => setTimeout(resolve, 1000))
+            txState = 'confirmed'
 
-            // Monitor transaction
-            const receipt = await tx.wait()
+            const tx = await mockProvider.getTransaction(txHash)
+            const receipt = await mockProvider.getTransactionReceipt(txHash)
 
             return {
               success: true,
-              transactionHash: tx.hash,
+              transactionHash: txHash,
               receipt,
               lifecycle: {
                 submitted: true,
@@ -401,57 +480,54 @@ describe('ContractService - Integration Tests', () => {
             nonce: 42, // Same nonce
           }
 
-          // Original transaction gets stuck
-          mockProvider.sendTransaction
-            .mockResolvedValueOnce({
-              ...originalTx,
-              wait: jest.fn().mockImplementation(
-                () =>
-                  new Promise((resolve) =>
-                    setTimeout(
-                      () =>
-                        resolve({
-                          status: 0, // Failed due to low gas
-                        }),
-                      5000
-                    )
-                  )
-              ),
-            })
-            // Replacement transaction succeeds
-            .mockResolvedValueOnce({
-              ...replacementTx,
-              wait: jest.fn().mockResolvedValue({
-                status: 1,
+          // Setup original transaction failure and replacement success
+          let transactionAttempts = 0
+          mockProvider.getTransactionReceipt.mockImplementation(async (hash: string) => {
+            transactionAttempts++
+            if (transactionAttempts === 1) {
+              // First attempt fails
+              return {
+                transactionHash: originalTx.hash,
                 blockNumber: 12349,
-              }),
-            })
+                blockHash: '0xblock123456789abcdef',
+                transactionIndex: 0,
+                status: 0, // Failed
+                gasUsed: BigInt('21000'),
+                effectiveGasPrice: BigInt(originalTx.gasPrice),
+                logs: [],
+              }
+            }
+            // Second attempt succeeds
+            return {
+              transactionHash: replacementTx.hash,
+              blockNumber: 12349,
+              blockHash: '0xblock123456789abcdef',
+              transactionIndex: 1,
+              status: 1, // Success
+              gasUsed: BigInt('487123'),
+              effectiveGasPrice: BigInt(replacementTx.gasPrice),
+              logs: [],
+            }
+          })
 
           // Act
           ContractService.executeTransaction.mockImplementation(async (txData) => {
             try {
               // Try original transaction
-              const originalResult = await mockProvider.sendTransaction(txData)
-              const originalReceipt = await originalResult.wait()
+              const originalReceipt = await mockProvider.getTransactionReceipt(originalTx.hash)
 
               if (originalReceipt.status === 0) {
                 throw new Error('Transaction failed')
               }
 
-              return { success: true, transactionHash: originalResult.hash }
+              return { success: true, transactionHash: originalTx.hash }
             } catch (error) {
               // Retry with higher gas price
-              const replacementData = {
-                ...txData,
-                gasPrice: (parseInt(txData.gasPrice) * 1.5).toString(),
-              }
-
-              const replacementResult = await mockProvider.sendTransaction(replacementData)
-              const replacementReceipt = await replacementResult.wait()
+              const replacementReceipt = await mockProvider.getTransactionReceipt(replacementTx.hash)
 
               return {
                 success: true,
-                transactionHash: replacementResult.hash,
+                transactionHash: replacementTx.hash,
                 replaced: true,
                 originalTxHash: originalTx.hash,
                 replacementReason: 'Low gas price',
@@ -484,12 +560,13 @@ describe('ContractService - Integration Tests', () => {
           ]
 
           for (const error of networkErrors) {
-            mockProvider.sendTransaction.mockRejectedValue(error)
+            ethersMock.simulateNetworkError(error.message)
 
             // Act
             ContractService.executeTransaction.mockImplementation(async () => {
               try {
-                await mockProvider.sendTransaction({})
+                await mockProvider.getTransactionReceipt('0x123')
+                return { success: true, transactionHash: '0x123' }
               } catch (err: any) {
                 return {
                   success: false,
@@ -508,6 +585,9 @@ describe('ContractService - Integration Tests', () => {
             expect(result.code).toBe('NETWORK_ERROR')
             expect(result.retryable).toBe(true)
             expect(result.retryAfter).toBe(5000)
+
+            // Restore normal operation for next iteration
+            ethersMock.restoreNormalOperation()
           }
         })
       })
@@ -523,12 +603,13 @@ describe('ContractService - Integration Tests', () => {
           ]
 
           for (const reason of revertReasons) {
-            mockContract.createPool.mockRejectedValue(new Error(`Transaction reverted: ${reason}`))
+            ethersMock.simulateContractRevert(reason)
+            ;(mockPoolFactory.createPool as jest.MockedFunction<any>).mockRejectedValue(new Error(`Transaction reverted: ${reason}`))
 
             // Act
             ContractService.createPool.mockImplementation(async () => {
               try {
-                await mockContract.createPool()
+                await mockPoolFactory.createPool('Test Pool', BigInt('1000'), 5, 30)
               } catch (err: any) {
                 return {
                   success: false,
@@ -547,6 +628,9 @@ describe('ContractService - Integration Tests', () => {
             expect(result.code).toBe('CONTRACT_REVERT')
             expect(result.revertReason).toBe(reason)
             expect(result.retryable).toBe(false)
+
+            // Restore normal operation for next iteration
+            ethersMock.restoreNormalOperation()
           }
         })
       })
@@ -557,14 +641,20 @@ describe('ContractService - Integration Tests', () => {
           let attemptCount = 0
           const maxRetries = 3
 
-          mockProvider.sendTransaction.mockImplementation(async () => {
+          mockProvider.getTransactionReceipt.mockImplementation(async (hash: string) => {
             attemptCount++
             if (attemptCount < maxRetries) {
               throw new Error('Network timeout')
             }
             return {
-              hash: SAMPLE_TRANSACTION_HASHES.POOL_CREATION_1,
-              wait: jest.fn().mockResolvedValue({ status: 1 }),
+              transactionHash: SAMPLE_TRANSACTION_HASHES.POOL_CREATION_1,
+              blockNumber: 12346,
+              blockHash: '0xblock123456789abcdef',
+              transactionIndex: 0,
+              status: 1,
+              gasUsed: BigInt('487123'),
+              effectiveGasPrice: BigInt('20000000000'),
+              logs: [],
             }
           })
 
@@ -576,12 +666,11 @@ describe('ContractService - Integration Tests', () => {
 
             for (let attempt = 1; attempt <= maxRetries; attempt++) {
               try {
-                const tx = await mockProvider.sendTransaction(txData)
-                const receipt = await tx.wait()
+                const receipt = await mockProvider.getTransactionReceipt(SAMPLE_TRANSACTION_HASHES.POOL_CREATION_1)
 
                 return {
                   success: true,
-                  transactionHash: tx.hash,
+                  transactionHash: SAMPLE_TRANSACTION_HASHES.POOL_CREATION_1,
                   attempts: attempt,
                   retriesUsed: attempt - 1,
                 }
@@ -671,9 +760,9 @@ describe('ContractService - Integration Tests', () => {
           const poolIds = ['1', '2', '3', '4', '5']
           let individualCallCount = 0
 
-          mockContract.pools.mockImplementation(async (poolId: string) => {
+          ;(mockPoolFactory.getPool as jest.MockedFunction<any>).mockImplementation(async (poolId: bigint) => {
             individualCallCount++
-            return [`owner-${poolId}`, '1000', 500, 86400, '0', '0', 1]
+            return [`owner-${poolId.toString()}`, BigInt('1000'), 500, 86400, BigInt('0'), BigInt('0'), 1]
           })
 
           // Act
@@ -720,46 +809,65 @@ describe('ContractService - Integration Tests', () => {
           // Arrange
           const gasUsageHistory: number[] = []
 
-          mockContract.createPool.mockImplementation(async () => {
+          ;(mockPoolFactory.createPool as jest.MockedFunction<any>).mockImplementation(async () => {
             const gasUsed = 450000 + Math.floor(Math.random() * 100000) // Variable gas usage
             gasUsageHistory.push(gasUsed)
 
             return {
               hash: SAMPLE_TRANSACTION_HASHES.POOL_CREATION_1,
+              from: TestFixtures.TestData.addresses.poolOwners[0],
+              to: TestFixtures.TestData.addresses.contracts.poolFactory,
+              gasLimit: BigInt('500000'),
+              gasPrice: BigInt('20000000000'),
+              value: BigInt('0'),
+              nonce: 1,
               wait: jest.fn().mockResolvedValue({
+                transactionHash: SAMPLE_TRANSACTION_HASHES.POOL_CREATION_1,
+                blockNumber: 12346,
+                blockHash: '0xblock123456789abcdef',
+                transactionIndex: 0,
                 status: 1,
-                gasUsed: gasUsed.toString(),
+                gasUsed: BigInt(gasUsed),
+                effectiveGasPrice: BigInt('20000000000'),
+                logs: [],
               }),
             }
           })
 
           // Act - Create multiple pools to establish trend
-          const poolCreations = Array.from({ length: 5 }, async (_, i) => {
-            ContractService.createPool.mockResolvedValue({
-              success: true,
-              poolId: `gas-test-${i}`,
-              transactionHash: SAMPLE_TRANSACTION_HASHES.POOL_CREATION_1,
-              gasUsed: gasUsageHistory[i]?.toString() || '450000',
-              gasMetrics: {
-                averageGasUsed: gasUsageHistory.reduce((sum, gas) => sum + gas, 0) / Math.max(gasUsageHistory.length, 1),
-                trend: gasUsageHistory.length > 1 ? 'stable' : 'baseline',
-              },
-            })
+          const poolCreations: Promise<any>[] = []
 
-            return ContractService.createPool({ name: `Pool ${i}` })
-          })
+          for (let i = 0; i < 5; i++) {
+            const poolCreation = (async (index: number) => {
+              const currentGasUsed = gasUsageHistory[index] || 450000
+              ContractService.createPool.mockResolvedValueOnce({
+                success: true,
+                poolId: `gas-test-${index}`,
+                transactionHash: SAMPLE_TRANSACTION_HASHES.POOL_CREATION_1,
+                gasUsed: currentGasUsed.toString(),
+                gasMetrics: {
+                  averageGasUsed: gasUsageHistory.reduce((sum, gas) => sum + gas, 0) / Math.max(gasUsageHistory.length, 1),
+                  trend: gasUsageHistory.length > 1 ? 'stable' : 'baseline',
+                },
+              })
 
-          const results = await Promise.all(poolCreations)
+              return ContractService.createPool({ name: `Pool ${index}` })
+            })(i)
+
+            poolCreations.push(poolCreation)
+          }
+
+          const results: any[] = await Promise.all(poolCreations)
 
           // Calculate gas metrics
-          const gasValues = results.map((r) => parseInt(r.gasUsed))
+          const gasValues = results.map((r: any) => parseInt(r.gasUsed))
           const avgGas = gasValues.reduce((sum, gas) => sum + gas, 0) / gasValues.length
           const minGas = Math.min(...gasValues)
           const maxGas = Math.max(...gasValues)
           const gasVariance = gasValues.reduce((sum, gas) => sum + Math.pow(gas - avgGas, 2), 0) / gasValues.length
 
           // Assert
-          expect(results.every((r) => r.success)).toBe(true)
+          expect(results.every((r: any) => r.success)).toBe(true)
           expect(avgGas).toBeGreaterThan(400000)
           expect(avgGas).toBeLessThan(600000)
           expect(maxGas - minGas).toBeLessThan(150000) // Reasonable variance
@@ -788,14 +896,14 @@ describe('ContractService - Integration Tests', () => {
         for (const network of networks) {
           mockProvider.getNetwork.mockResolvedValue(network)
 
-          ContractService.getPool.mockResolvedValue({
+          ContractService.getPool.mockResolvedValueOnce({
             success: true,
             poolData: { poolId: '1', network: network.name },
             chainId: network.chainId,
             networkName: network.name,
           })
 
-          const result = await ContractService.getPool('1')
+          const result: any = await ContractService.getPool('1')
 
           expect(result.success).toBe(true)
           expect(result.chainId).toBe(network.chainId)

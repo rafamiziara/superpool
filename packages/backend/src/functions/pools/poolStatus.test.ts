@@ -13,26 +13,27 @@
 
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from '@jest/globals'
 import { ethers } from 'ethers'
-import {
-  ContractMock,
-  detectMemoryLeaks,
-  ethersMock,
-  firebaseAdminMock,
-  MockFactory,
-  performanceManager,
-  type PerformanceThresholds,
-  quickSetup,
-  runBenchmark,
-  startPerformanceTest,
-  TestFixtures,
-} from '../../__mocks__'
+
+// Mock ethers to use centralized mock system
+jest.mock('ethers', () => ({
+  ...jest.requireActual('ethers'),
+  Contract: jest.fn(),
+  JsonRpcProvider: jest.fn(),
+  parseUnits: jest.fn((value: string, unit: string) => {
+    if (unit === 'wei' || unit === 'gwei') {
+      return BigInt(value)
+    }
+    return BigInt(Math.floor(parseFloat(value) * Math.pow(10, 18)))
+  }),
+}))
+import { ContractMock, ethersMock, firebaseAdminMock, FunctionsMock, MockFactory, quickSetup, TestFixtures } from '../../__mocks__'
+import { detectMemoryLeaks, performanceManager, runBenchmark, startPerformanceTest } from '../../__tests__/utils/PerformanceTestUtilities'
 import { poolStatus, PoolStatusRequest, PoolStatusResponse } from './poolStatus'
 import { HttpsError } from 'firebase-functions/v2/https'
 import { AppError } from '../../utils/errorHandling'
 
 describe('poolStatus Cloud Function', () => {
   let testEnvironment: any
-  let mockProvider: any
 
   beforeAll(() => {
     performanceManager.clearAll()
@@ -41,12 +42,6 @@ describe('poolStatus Cloud Function', () => {
   beforeEach(() => {
     MockFactory.resetAllMocks()
     testEnvironment = quickSetup.poolCreation()
-
-    // Setup mock provider
-    mockProvider = {
-      getTransactionReceipt: jest.fn(),
-    }
-    ethersMock.JsonRpcProvider = jest.fn().mockReturnValue(mockProvider)
 
     // Setup environment variables
     process.env.POLYGON_AMOY_RPC_URL = 'https://rpc-amoy.polygon.technology'
@@ -100,7 +95,7 @@ describe('poolStatus Cloud Function', () => {
         }),
       })
 
-      const request = testEnvironment.functionTester.createUnauthenticatedRequest({
+      const request = FunctionsMock.createUnauthenticatedRequest({
         transactionHash: txHash,
       })
 
@@ -118,7 +113,7 @@ describe('poolStatus Cloud Function', () => {
       expect(result.completedAt).toBeInstanceOf(Date)
 
       // Should not call blockchain provider for cached data
-      expect(mockProvider.getTransactionReceipt).not.toHaveBeenCalled()
+      expect(ethersMock.provider.getTransactionReceipt).not.toHaveBeenCalled()
 
       // Performance validation
       expect(metrics.executionTime).toBeLessThan(500) // Should be very fast for cached data
@@ -146,7 +141,7 @@ describe('poolStatus Cloud Function', () => {
         }),
       })
 
-      const request = testEnvironment.functionTester.createUnauthenticatedRequest({
+      const request = FunctionsMock.createUnauthenticatedRequest({
         transactionHash: txHash,
       })
 
@@ -212,7 +207,7 @@ describe('poolStatus Cloud Function', () => {
         ],
       }
 
-      mockProvider.getTransactionReceipt.mockResolvedValue(mockReceipt)
+      ethersMock.provider.getTransactionReceipt.mockResolvedValue(mockReceipt)
 
       // Mock event parsing
       const mockPoolFactory = {
@@ -229,9 +224,10 @@ describe('poolStatus Cloud Function', () => {
         },
       }
 
-      ethersMock.Contract.mockReturnValue(mockPoolFactory)
+      // Setup contract mock to return the mockPoolFactory interface
+      // Contract mock will be handled by centralized system
 
-      const request = testEnvironment.functionTester.createUnauthenticatedRequest({
+      const request = FunctionsMock.createUnauthenticatedRequest({
         transactionHash: txHash,
       })
 
@@ -292,9 +288,9 @@ describe('poolStatus Cloud Function', () => {
         logs: [],
       }
 
-      mockProvider.getTransactionReceipt.mockResolvedValue(mockReceipt)
+      ethersMock.provider.getTransactionReceipt.mockResolvedValue(mockReceipt)
 
-      const request = testEnvironment.functionTester.createUnauthenticatedRequest({
+      const request = FunctionsMock.createUnauthenticatedRequest({
         transactionHash: txHash,
       })
 
@@ -338,9 +334,9 @@ describe('poolStatus Cloud Function', () => {
       })
 
       // Mock no receipt yet (still pending)
-      mockProvider.getTransactionReceipt.mockResolvedValue(null)
+      ethersMock.provider.getTransactionReceipt.mockResolvedValue(null)
 
-      const request = testEnvironment.functionTester.createUnauthenticatedRequest({
+      const request = FunctionsMock.createUnauthenticatedRequest({
         transactionHash: txHash,
       })
 
@@ -356,7 +352,7 @@ describe('poolStatus Cloud Function', () => {
 
   describe('Parameter Validation', () => {
     it('should reject missing transaction hash', async () => {
-      const request = testEnvironment.functionTester.createUnauthenticatedRequest({})
+      const request = FunctionsMock.createUnauthenticatedRequest({})
 
       const result = await poolStatus(request)
 
@@ -382,7 +378,7 @@ describe('poolStatus Cloud Function', () => {
           }),
         })
 
-        const request = testEnvironment.functionTester.createUnauthenticatedRequest({
+        const request = FunctionsMock.createUnauthenticatedRequest({
           transactionHash: txHash,
         })
 
@@ -419,9 +415,9 @@ describe('poolStatus Cloud Function', () => {
       process.env.POLYGON_MAINNET_RPC_URL = 'https://polygon-mainnet.rpc.url'
       process.env.POOL_FACTORY_ADDRESS_POLYGON = '0x' + 'b'.repeat(40)
 
-      mockProvider.getTransactionReceipt.mockResolvedValue(null) // Still pending
+      ethersMock.provider.getTransactionReceipt.mockResolvedValue(null) // Still pending
 
-      const request = testEnvironment.functionTester.createUnauthenticatedRequest({
+      const request = FunctionsMock.createUnauthenticatedRequest({
         transactionHash: txHash,
         chainId: 137,
       })
@@ -449,7 +445,7 @@ describe('poolStatus Cloud Function', () => {
         }),
       })
 
-      const request = testEnvironment.functionTester.createUnauthenticatedRequest({
+      const request = FunctionsMock.createUnauthenticatedRequest({
         transactionHash: txHash,
       })
 
@@ -481,9 +477,9 @@ describe('poolStatus Cloud Function', () => {
       })
 
       // Mock provider error
-      mockProvider.getTransactionReceipt.mockRejectedValue(new Error('Network connection failed'))
+      ethersMock.provider.getTransactionReceipt.mockRejectedValue(new Error('Network connection failed'))
 
-      const request = testEnvironment.functionTester.createUnauthenticatedRequest({
+      const request = FunctionsMock.createUnauthenticatedRequest({
         transactionHash: txHash,
       })
 
@@ -517,7 +513,7 @@ describe('poolStatus Cloud Function', () => {
         }),
       })
 
-      const request = testEnvironment.functionTester.createUnauthenticatedRequest({
+      const request = FunctionsMock.createUnauthenticatedRequest({
         transactionHash: txHash,
       })
 
@@ -557,7 +553,7 @@ describe('poolStatus Cloud Function', () => {
         logs: [], // No logs
       }
 
-      mockProvider.getTransactionReceipt.mockResolvedValue(mockReceipt)
+      ethersMock.provider.getTransactionReceipt.mockResolvedValue(mockReceipt)
 
       const mockPoolFactory = {
         interface: {
@@ -565,9 +561,10 @@ describe('poolStatus Cloud Function', () => {
         },
       }
 
-      ethersMock.Contract.mockReturnValue(mockPoolFactory)
+      // Setup contract mock to return the mockPoolFactory interface
+      // Contract mock will be handled by centralized system
 
-      const request = testEnvironment.functionTester.createUnauthenticatedRequest({
+      const request = FunctionsMock.createUnauthenticatedRequest({
         transactionHash: txHash,
       })
 
@@ -584,7 +581,7 @@ describe('poolStatus Cloud Function', () => {
       // Mock Firestore error
       firebaseAdminMock.simulateFirestoreError('unavailable')
 
-      const request = testEnvironment.functionTester.createUnauthenticatedRequest({
+      const request = FunctionsMock.createUnauthenticatedRequest({
         transactionHash: txHash,
       })
 
@@ -617,12 +614,12 @@ describe('poolStatus Cloud Function', () => {
         }),
       })
 
-      mockProvider.getTransactionReceipt.mockResolvedValue({
+      ethersMock.provider.getTransactionReceipt.mockResolvedValue({
         status: 1,
         logs: [],
       })
 
-      const request = testEnvironment.functionTester.createUnauthenticatedRequest({
+      const request = FunctionsMock.createUnauthenticatedRequest({
         transactionHash: txHash,
       })
 
@@ -657,9 +654,9 @@ describe('poolStatus Cloud Function', () => {
       })
 
       // Mock receipt that indicates reorganization
-      mockProvider.getTransactionReceipt.mockResolvedValue(null)
+      ethersMock.provider.getTransactionReceipt.mockResolvedValue(null)
 
-      const request = testEnvironment.functionTester.createUnauthenticatedRequest({
+      const request = FunctionsMock.createUnauthenticatedRequest({
         transactionHash: txHash,
       })
 
@@ -695,9 +692,9 @@ describe('poolStatus Cloud Function', () => {
         }),
       })
 
-      mockProvider.getTransactionReceipt.mockResolvedValue(null)
+      ethersMock.provider.getTransactionReceipt.mockResolvedValue(null)
 
-      const request = testEnvironment.functionTester.createUnauthenticatedRequest({
+      const request = FunctionsMock.createUnauthenticatedRequest({
         transactionHash: txHash,
       })
 
@@ -747,7 +744,7 @@ describe('poolStatus Cloud Function', () => {
         logs: [{ topics: [], data: '0x' }],
       }
 
-      mockProvider.getTransactionReceipt.mockResolvedValue(mockReceipt)
+      ethersMock.provider.getTransactionReceipt.mockResolvedValue(mockReceipt)
 
       const mockPoolFactory = {
         interface: {
@@ -758,9 +755,10 @@ describe('poolStatus Cloud Function', () => {
         },
       }
 
-      ethersMock.Contract.mockReturnValue(mockPoolFactory)
+      // Setup contract mock to return the mockPoolFactory interface
+      // Contract mock will be handled by centralized system
 
-      const request = testEnvironment.functionTester.createUnauthenticatedRequest({
+      const request = FunctionsMock.createUnauthenticatedRequest({
         transactionHash: txHash,
       })
 
@@ -809,9 +807,9 @@ describe('poolStatus Cloud Function', () => {
         logs: 'not-an-array', // Should be array
       }
 
-      mockProvider.getTransactionReceipt.mockResolvedValue(malformedReceipt)
+      ethersMock.provider.getTransactionReceipt.mockResolvedValue(malformedReceipt)
 
-      const request = testEnvironment.functionTester.createUnauthenticatedRequest({
+      const request = FunctionsMock.createUnauthenticatedRequest({
         transactionHash: txHash,
       })
 
@@ -857,7 +855,7 @@ describe('poolStatus Cloud Function', () => {
             }),
           })
 
-          const request = testEnvironment.functionTester.createUnauthenticatedRequest({
+          const request = FunctionsMock.createUnauthenticatedRequest({
             transactionHash: txHash,
           })
 
@@ -911,7 +909,7 @@ describe('poolStatus Cloud Function', () => {
             }),
           })
 
-          const request = testEnvironment.functionTester.createUnauthenticatedRequest({
+          const request = FunctionsMock.createUnauthenticatedRequest({
             transactionHash: txHash,
           })
 
@@ -954,9 +952,9 @@ describe('poolStatus Cloud Function', () => {
         }),
       })
 
-      mockProvider.getTransactionReceipt.mockResolvedValue(null) // Still pending
+      ethersMock.provider.getTransactionReceipt.mockResolvedValue(null) // Still pending
 
-      const request = testEnvironment.functionTester.createUnauthenticatedRequest({
+      const request = FunctionsMock.createUnauthenticatedRequest({
         transactionHash: txHash,
       })
 
@@ -1033,7 +1031,7 @@ describe('poolStatus Cloud Function', () => {
         ],
       }
 
-      mockProvider.getTransactionReceipt.mockResolvedValue(mockReceipt)
+      ethersMock.provider.getTransactionReceipt.mockResolvedValue(mockReceipt)
 
       const mockPoolFactory = {
         interface: {
@@ -1057,9 +1055,10 @@ describe('poolStatus Cloud Function', () => {
         },
       }
 
-      ethersMock.Contract.mockReturnValue(mockPoolFactory)
+      // Setup contract mock to return the mockPoolFactory interface
+      // Contract mock will be handled by centralized system
 
-      const request = testEnvironment.functionTester.createUnauthenticatedRequest({
+      const request = FunctionsMock.createUnauthenticatedRequest({
         transactionHash: txHash,
       })
 
@@ -1126,7 +1125,7 @@ describe('poolStatus Cloud Function', () => {
         logs: [{}],
       }
 
-      mockProvider.getTransactionReceipt.mockResolvedValue(mockReceipt)
+      ethersMock.provider.getTransactionReceipt.mockResolvedValue(mockReceipt)
 
       const mockPoolFactory = {
         interface: {
@@ -1137,9 +1136,10 @@ describe('poolStatus Cloud Function', () => {
         },
       }
 
-      ethersMock.Contract.mockReturnValue(mockPoolFactory)
+      // Setup contract mock to return the mockPoolFactory interface
+      // Contract mock will be handled by centralized system
 
-      const request = testEnvironment.functionTester.createUnauthenticatedRequest({
+      const request = FunctionsMock.createUnauthenticatedRequest({
         transactionHash: txHash,
       })
 

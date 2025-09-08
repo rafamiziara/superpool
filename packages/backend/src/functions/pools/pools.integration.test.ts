@@ -18,15 +18,14 @@ import {
   ContractMock,
   ethersMock,
   firebaseAdminMock,
+  FunctionsMock,
   type LoadTestConfig,
   MockFactory,
-  performanceManager,
   type PerformanceThresholds,
   quickSetup,
-  runBenchmark,
-  startPerformanceTest,
   TestFixtures,
 } from '../../__mocks__'
+import { detectMemoryLeaks, performanceManager, runBenchmark, startPerformanceTest } from '../../__tests__/utils/PerformanceTestUtilities'
 import { createPool, CreatePoolRequest, CreatePoolResponse } from './createPool'
 import { createPoolSafe, CreatePoolSafeRequest, CreatePoolSafeResponse } from './createPoolSafe'
 import { poolStatus, PoolStatusRequest, PoolStatusResponse } from './poolStatus'
@@ -45,11 +44,15 @@ describe('Pool Management Integration Tests', () => {
   })
 
   beforeEach(() => {
+    // Reset all mocks using centralized system
     MockFactory.resetAllMocks()
+
+    // Setup test environment using centralized factory
     testEnvironment = quickSetup.poolCreation()
     mockPoolFactory = testEnvironment.poolFactory
     mockSafeContract = ContractMock.createSafeMock()
 
+    // Setup centralized provider mock
     mockProvider = {
       getTransactionReceipt: jest.fn(),
     }
@@ -58,8 +61,8 @@ describe('Pool Management Integration Tests', () => {
     // Setup environment variables
     process.env.POLYGON_AMOY_RPC_URL = 'https://rpc-amoy.polygon.technology'
     process.env.PRIVATE_KEY = '0x' + '1'.repeat(64)
-    process.env.POOL_FACTORY_ADDRESS_AMOY = TestFixtures.TestData.addresses.poolFactoryAddress
-    process.env.SAFE_ADDRESS_AMOY = TestFixtures.TestData.addresses.safeAddress
+    process.env.POOL_FACTORY_ADDRESS_AMOY = TestFixtures.TestData.addresses.contracts.poolFactory
+    process.env.SAFE_ADDRESS_AMOY = TestFixtures.TestData.addresses.contracts.safe
   })
 
   afterEach(() => {
@@ -98,7 +101,7 @@ describe('Pool Management Integration Tests', () => {
       expect(createResult.poolAddress).toBe(poolAddress)
 
       // Phase 2: Check status immediately after creation (should be completed)
-      const statusRequest = testEnvironment.functionTester.createUnauthenticatedRequest({
+      const statusRequest = FunctionsMock.createUnauthenticatedRequest({
         transactionHash: txHash,
       })
 
@@ -113,7 +116,7 @@ describe('Pool Management Integration Tests', () => {
       expect(statusResult.transactionHash).toBe(txHash)
 
       // Phase 3: List pools and verify the new pool appears
-      const listRequest = testEnvironment.functionTester.createUnauthenticatedRequest({})
+      const listRequest = FunctionsMock.createUnauthenticatedRequest({})
 
       // Mock pool listing with the newly created pool
       setupPoolListingMocks([
@@ -159,7 +162,7 @@ describe('Pool Management Integration Tests', () => {
       expect(createResult.transactionHash).toBe(txHash)
 
       // Phase 2: Check status while still pending
-      const statusRequest = testEnvironment.functionTester.createUnauthenticatedRequest({
+      const statusRequest = FunctionsMock.createUnauthenticatedRequest({
         transactionHash: txHash,
       })
 
@@ -241,7 +244,7 @@ describe('Pool Management Integration Tests', () => {
       expect(createResult.transactionHash).toBe(txHash)
 
       // Phase 2: Check status and discover failure
-      const statusRequest = testEnvironment.functionTester.createUnauthenticatedRequest({
+      const statusRequest = FunctionsMock.createUnauthenticatedRequest({
         transactionHash: txHash,
       })
 
@@ -297,14 +300,14 @@ describe('Pool Management Integration Tests', () => {
       const safeTransactionHash = '0x' + 'safetx'.repeat(10) + '1'
 
       // Phase 1: Prepare Safe transaction for pool creation
-      const safeRequest = testEnvironment.functionTester.createAuthenticatedRequest(testEnvironment.params, testEnvironment.uid)
+      const safeRequest = FunctionsMock.createAuthenticatedRequest(testEnvironment.params, testEnvironment.uid)
 
       // Setup Safe mocks
       mockSafeContract.getOwners.mockResolvedValue(TestFixtures.TestData.addresses.safeOwners)
       mockSafeContract.getThreshold.mockResolvedValue(2)
 
-      ethersMock.Contract.mockImplementation((address) => {
-        if (address === TestFixtures.TestData.addresses.safeAddress) {
+      ethersMock.Contract.mockImplementation((address: string) => {
+        if (address === TestFixtures.TestData.addresses.contracts.safe) {
           return {
             ...mockSafeContract,
             getTransactionHash: jest.fn().mockResolvedValue(safeTransactionHash),
@@ -333,7 +336,7 @@ describe('Pool Management Integration Tests', () => {
 
       expect(safeResult.success).toBe(true)
       expect(safeResult.transactionHash).toBe(safeTransactionHash)
-      expect(safeResult.safeAddress).toBe(TestFixtures.TestData.addresses.safeAddress)
+      expect(safeResult.safeAddress).toBe(TestFixtures.TestData.addresses.contracts.safe)
       expect(safeResult.requiredSignatures).toBe(2)
       expect(safeResult.currentSignatures).toBe(0)
 
@@ -341,7 +344,7 @@ describe('Pool Management Integration Tests', () => {
       expect(mockSafeTxDoc.set).toHaveBeenCalledWith(
         expect.objectContaining({
           transactionHash: safeTransactionHash,
-          safeAddress: TestFixtures.TestData.addresses.safeAddress,
+          safeAddress: TestFixtures.TestData.addresses.contracts.safe,
           status: 'pending_signatures',
           requiredSignatures: 2,
           currentSignatures: 0,
@@ -365,7 +368,7 @@ describe('Pool Management Integration Tests', () => {
       const executionMocks = setupPoolCreationMocks(executionTxHash, executedPoolId, executedPoolAddress)
 
       // Phase 3: Check that the pool was created after Safe execution
-      const listRequest = testEnvironment.functionTester.createUnauthenticatedRequest({})
+      const listRequest = FunctionsMock.createUnauthenticatedRequest({})
 
       setupPoolListingMocks([
         {
@@ -396,15 +399,15 @@ describe('Pool Management Integration Tests', () => {
     })
 
     it('should handle Safe transaction expiration correctly', async () => {
-      const expiredSafeRequest = testEnvironment.functionTester.createAuthenticatedRequest(testEnvironment.params, testEnvironment.uid)
+      const expiredSafeRequest = FunctionsMock.createAuthenticatedRequest(testEnvironment.params, testEnvironment.uid)
 
       mockSafeContract.getOwners.mockResolvedValue(TestFixtures.TestData.addresses.safeOwners)
       mockSafeContract.getThreshold.mockResolvedValue(3)
 
       const expiredTransactionHash = '0x' + 'expired'.repeat(10) + '2'
 
-      ethersMock.Contract.mockImplementation((address) => {
-        if (address === TestFixtures.TestData.addresses.safeAddress) {
+      ethersMock.Contract.mockImplementation((address: string) => {
+        if (address === TestFixtures.TestData.addresses.contracts.safe) {
           return {
             ...mockSafeContract,
             getTransactionHash: jest.fn().mockResolvedValue(expiredTransactionHash),
@@ -453,10 +456,10 @@ describe('Pool Management Integration Tests', () => {
         mockSafeContract.getOwners.mockResolvedValue(mockOwners)
         mockSafeContract.getThreshold.mockResolvedValue(threshold)
 
-        const txHash = '0x' + `multi${owners}${threshold}`.repeat(8) + i
+        const txHash = '0x' + `multi${owners}${threshold}`.repeat(8) + owners.toString()
 
-        ethersMock.Contract.mockImplementation((address) => {
-          if (address === TestFixtures.TestData.addresses.safeAddress) {
+        ethersMock.Contract.mockImplementation((address: string) => {
+          if (address === TestFixtures.TestData.addresses.contracts.safe) {
             return {
               ...mockSafeContract,
               getTransactionHash: jest.fn().mockResolvedValue(txHash),
@@ -475,7 +478,7 @@ describe('Pool Management Integration Tests', () => {
           doc: jest.fn().mockReturnValue(mockDoc),
         })
 
-        const request = testEnvironment.functionTester.createAuthenticatedRequest(testEnvironment.params, testEnvironment.uid)
+        const request = FunctionsMock.createAuthenticatedRequest(testEnvironment.params, testEnvironment.uid)
 
         const result = (await createPoolSafe(request)) as CreatePoolSafeResponse
 
@@ -511,7 +514,7 @@ describe('Pool Management Integration Tests', () => {
       const createTxHash = consistentPoolData.transactionHash
       setupPoolCreationMocks(createTxHash, consistentPoolData.poolId, consistentPoolData.poolAddress)
 
-      const createRequest = testEnvironment.functionTester.createAuthenticatedRequest(
+      const createRequest = FunctionsMock.createAuthenticatedRequest(
         {
           poolOwner: consistentPoolData.poolOwner,
           maxLoanAmount: consistentPoolData.maxLoanAmount,
@@ -526,7 +529,7 @@ describe('Pool Management Integration Tests', () => {
       const createResult = (await createPool(createRequest)) as CreatePoolResponse
 
       // Phase 2: Verify status shows consistent data
-      const statusRequest = testEnvironment.functionTester.createUnauthenticatedRequest({
+      const statusRequest = FunctionsMock.createUnauthenticatedRequest({
         transactionHash: createTxHash,
       })
 
@@ -539,7 +542,7 @@ describe('Pool Management Integration Tests', () => {
       expect(statusResult.transactionHash).toBe(consistentPoolData.transactionHash)
 
       // Phase 3: Verify listing shows consistent data
-      const listRequest = testEnvironment.functionTester.createUnauthenticatedRequest({})
+      const listRequest = FunctionsMock.createUnauthenticatedRequest({})
 
       setupPoolListingMocks([
         {
@@ -566,7 +569,7 @@ describe('Pool Management Integration Tests', () => {
       expect(listedPool.isActive).toBe(consistentPoolData.isActive)
 
       // Phase 4: Test Safe transaction consistency
-      const safeRequest = testEnvironment.functionTester.createAuthenticatedRequest(
+      const safeRequest = FunctionsMock.createAuthenticatedRequest(
         {
           poolOwner: consistentPoolData.poolOwner,
           maxLoanAmount: consistentPoolData.maxLoanAmount,
@@ -583,8 +586,8 @@ describe('Pool Management Integration Tests', () => {
 
       const safeTransactionHash = '0x' + 'safeconsistent'.repeat(5) + '999'
 
-      ethersMock.Contract.mockImplementation((address) => {
-        if (address === TestFixtures.TestData.addresses.safeAddress) {
+      ethersMock.Contract.mockImplementation((address: string) => {
+        if (address === TestFixtures.TestData.addresses.contracts.safe) {
           return {
             ...mockSafeContract,
             getTransactionHash: jest.fn().mockResolvedValue(safeTransactionHash),
@@ -668,7 +671,7 @@ describe('Pool Management Integration Tests', () => {
           // Test createPool
           setupPoolCreationMocks(txHash, poolId, poolAddress)
 
-          const createRequest = testEnvironment.functionTester.createAuthenticatedRequest(testParams, testEnvironment.uid)
+          const createRequest = FunctionsMock.createAuthenticatedRequest(testParams, testEnvironment.uid)
 
           try {
             const createResult = await createPool(createRequest)
@@ -677,7 +680,7 @@ describe('Pool Management Integration Tests', () => {
               // Test poolStatus
               setupStatusCheckMocks(txHash, poolId, poolAddress, 'completed')
 
-              const statusRequest = testEnvironment.functionTester.createUnauthenticatedRequest({
+              const statusRequest = FunctionsMock.createUnauthenticatedRequest({
                 transactionHash: txHash,
               })
 
@@ -703,7 +706,7 @@ describe('Pool Management Integration Tests', () => {
                 },
               ])
 
-              const listRequest = testEnvironment.functionTester.createUnauthenticatedRequest({})
+              const listRequest = FunctionsMock.createUnauthenticatedRequest({})
               const listResult = (await listPools(listRequest)) as ListPoolsResponse
 
               expect(listResult.pools).toHaveLength(1)
@@ -753,7 +756,7 @@ describe('Pool Management Integration Tests', () => {
 
               setupPoolCreationMocks(txHash, poolId, poolAddress)
 
-              const createRequest = testEnvironment.functionTester.createAuthenticatedRequest(
+              const createRequest = FunctionsMock.createAuthenticatedRequest(
                 { ...testEnvironment.params, name: `Load Test Pool ${poolId}` },
                 testEnvironment.uid
               )
@@ -767,7 +770,7 @@ describe('Pool Management Integration Tests', () => {
 
               setupStatusCheckMocks(statusTxHash, statusPoolId, statusPoolAddress, 'completed')
 
-              const statusRequest = testEnvironment.functionTester.createUnauthenticatedRequest({
+              const statusRequest = FunctionsMock.createUnauthenticatedRequest({
                 transactionHash: statusTxHash,
               })
 
@@ -792,7 +795,7 @@ describe('Pool Management Integration Tests', () => {
 
               setupPoolListingMocks(mockPools)
 
-              const listRequest = testEnvironment.functionTester.createUnauthenticatedRequest({
+              const listRequest = FunctionsMock.createUnauthenticatedRequest({
                 page: Math.floor(Math.random() * 3) + 1,
                 limit: 10,
               })
@@ -805,8 +808,8 @@ describe('Pool Management Integration Tests', () => {
 
               const safeTxHash = '0x' + 'safe'.repeat(12) + Math.floor(Math.random() * 1000)
 
-              ethersMock.Contract.mockImplementation((address) => {
-                if (address === TestFixtures.TestData.addresses.safeAddress) {
+              ethersMock.Contract.mockImplementation((address: string) => {
+                if (address === TestFixtures.TestData.addresses.contracts.safe) {
                   return {
                     ...mockSafeContract,
                     getTransactionHash: jest.fn().mockResolvedValue(safeTxHash),
@@ -821,7 +824,7 @@ describe('Pool Management Integration Tests', () => {
                 doc: jest.fn().mockReturnValue({ set: jest.fn().mockResolvedValue(undefined) }),
               })
 
-              const safeRequest = testEnvironment.functionTester.createAuthenticatedRequest(testEnvironment.params, testEnvironment.uid)
+              const safeRequest = FunctionsMock.createAuthenticatedRequest(testEnvironment.params, testEnvironment.uid)
 
               return await createPoolSafe(safeRequest)
           }
@@ -857,14 +860,14 @@ describe('Pool Management Integration Tests', () => {
 
           setupPoolCreationMocks(txHash, poolId, poolAddress)
 
-          const createRequest = testEnvironment.functionTester.createAuthenticatedRequest(testEnvironment.params, testEnvironment.uid)
+          const createRequest = FunctionsMock.createAuthenticatedRequest(testEnvironment.params, testEnvironment.uid)
 
           await createPool(createRequest)
 
           // Check status
           setupStatusCheckMocks(txHash, poolId, poolAddress, 'completed')
 
-          const statusRequest = testEnvironment.functionTester.createUnauthenticatedRequest({
+          const statusRequest = FunctionsMock.createUnauthenticatedRequest({
             transactionHash: txHash,
           })
 
@@ -889,7 +892,7 @@ describe('Pool Management Integration Tests', () => {
             },
           ])
 
-          const listRequest = testEnvironment.functionTester.createUnauthenticatedRequest({})
+          const listRequest = FunctionsMock.createUnauthenticatedRequest({})
           const result = await listPools(listRequest)
 
           // Cleanup to simulate garbage collection
