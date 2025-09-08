@@ -2,24 +2,11 @@ import { expect } from '@jest/globals'
 import { jest } from '@jest/globals'
 import { sanitizePoolParams, validatePoolCreationParams } from './validation'
 import { CreatePoolRequest } from '../functions/pools/createPool'
-
-// Mock ethers module with centralized system
-jest.mock('ethers', () => {
-  // Import mock utilities within the mock factory to avoid hoisting issues
-  const { mockEthersUtils } = jest.requireActual('../__mocks__/blockchain/EthersMock')
-
-  return {
-    ethers: {
-      isAddress: mockEthersUtils.isAddress,
-      parseEther: mockEthersUtils.parseEther,
-    },
-  }
-})
+import { ethersMock } from '../__mocks__'
 
 describe('validation utilities', () => {
   beforeEach(() => {
     // Reset all mocks before each test
-    const { ethersMock } = jest.requireActual('../__mocks__/blockchain/EthersMock')
     ethersMock.resetAllMocks()
   })
 

@@ -2,7 +2,7 @@
 import { expect } from '@jest/globals'
 import type { Provider } from 'ethers'
 import { AppError } from './errorHandling'
-import { ethersMock } from '../__mocks__/blockchain/EthersMock'
+import { ethersMock, mockEthersUtils } from '../__mocks__/blockchain/EthersMock'
 import {
   estimateGas,
   executeTransaction,
@@ -13,75 +13,6 @@ import {
   validateContractAddress,
   waitForConfirmation,
 } from './blockchain'
-
-// Mock ethers module directly in the test
-jest.mock('ethers', () => {
-  const mockEthersUtils = {
-    parseEther: jest.fn((value: string) => {
-      return BigInt(Math.floor(parseFloat(value) * 1e18))
-    }),
-
-    formatEther: jest.fn((value: bigint) => {
-      return (Number(value) / 1e18).toString()
-    }),
-
-    parseUnits: jest.fn((value: string, decimals: string | number) => {
-      // Handle gwei specifically - return 20000000000n for '20' + 'gwei'
-      if (decimals === 'gwei' || decimals === 9) {
-        return BigInt(Math.floor(parseFloat(value) * 1e9))
-      }
-      const decimalsNum = typeof decimals === 'string' ? 18 : decimals
-      return BigInt(Math.floor(parseFloat(value) * Math.pow(10, decimalsNum)))
-    }),
-
-    formatUnits: jest.fn((value: bigint, decimals: number) => {
-      return (Number(value) / Math.pow(10, decimals)).toString()
-    }),
-
-    // Address utilities
-    isAddress: jest.fn((address: string) => {
-      return /^0x[a-fA-F0-9]{40}$/.test(address)
-    }),
-
-    getAddress: jest.fn((address: string) => {
-      if (!/^0x[a-fA-F0-9]{40}$/.test(address)) {
-        throw new Error('Invalid address')
-      }
-      return address.toLowerCase()
-    }),
-
-    // Constants
-    ZeroAddress: '0x0000000000000000000000000000000000000000',
-    MaxUint256: BigInt('0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff'),
-  }
-
-  return {
-    // Named export (this is what the import { ethers } from 'ethers' uses)
-    ethers: mockEthersUtils,
-
-    // Provider
-    JsonRpcProvider: jest.fn(),
-
-    // Wallet
-    Wallet: jest.fn(),
-
-    // Contract
-    Contract: jest.fn(),
-
-    // Also spread as default properties in case of different import styles
-    ...mockEthersUtils,
-  }
-})
-
-// Firebase Functions mock (using centralized pattern)
-jest.mock('firebase-functions', () => ({
-  logger: {
-    info: jest.fn(),
-    error: jest.fn(),
-    warn: jest.fn(),
-    debug: jest.fn(),
-  },
-}))
 
 describe('blockchain utilities', () => {
   let mockContract: any
@@ -545,8 +476,7 @@ describe('blockchain utilities', () => {
 
     it('should return false for invalid address format', async () => {
       // Mock isAddress to return false for invalid addresses
-      const ethers = require('ethers')
-      ethers.isAddress.mockReturnValueOnce(false)
+      mockEthersUtils.isAddress.mockReturnValueOnce(false)
 
       const result = await validateContractAddress(getMockProvider(), 'invalid-address')
 

@@ -69,7 +69,7 @@ export interface ExecutionResult {
   transactionHash: string
   blockNumber?: number
   gasUsed?: string
-  events?: ethers.Log[]
+  events?: Array<{ name: string; args: ReadonlyArray<unknown>; address: string }>
   error?: string
 }
 
@@ -631,8 +631,10 @@ export class ContractService {
     return multiSendInterface.encodeFunctionData('multiSend', [transactionsData])
   }
 
-  private parseTransactionEvents(receipt: ethers.TransactionReceipt): ethers.Log[] {
-    const events: ethers.Log[] = []
+  private parseTransactionEvents(
+    receipt: ethers.TransactionReceipt
+  ): Array<{ name: string; args: ReadonlyArray<unknown>; address: string }> {
+    const events: Array<{ name: string; args: ReadonlyArray<unknown>; address: string }> = []
 
     try {
       // Parse PoolFactory events if applicable
@@ -648,7 +650,7 @@ export class ContractService {
             if (parsed) {
               events.push({
                 name: parsed.name,
-                args: parsed.args,
+                args: Array.from(parsed.args),
                 address: log.address,
               })
             }
@@ -667,19 +669,31 @@ export class ContractService {
   }
 
   private mapToTransactionStatus(data: Record<string, unknown>): TransactionStatus {
+    const createdAt = data.createdAt as FirebaseFirestore.Timestamp | undefined
+    const updatedAt = data.updatedAt as FirebaseFirestore.Timestamp | undefined
+    const executedAt = data.executedAt as FirebaseFirestore.Timestamp | undefined
+
     return {
-      id: data.id,
-      status: data.status,
-      safeTransaction: data.safeTransaction,
-      signatures: data.signatures || [],
-      requiredSignatures: data.requiredSignatures,
-      currentSignatures: data.currentSignatures || 0,
-      createdAt: data.createdAt?.toDate() || new Date(),
-      updatedAt: data.updatedAt?.toDate() || new Date(),
-      executedAt: data.executedAt?.toDate(),
-      executionResult: data.executionResult,
-      description: data.description,
-      metadata: data.metadata,
+      id: String(data.id || ''),
+      status:
+        (data.status as string) === 'pending_signatures' ||
+        (data.status as string) === 'ready_to_execute' ||
+        (data.status as string) === 'executing' ||
+        (data.status as string) === 'completed' ||
+        (data.status as string) === 'failed' ||
+        (data.status as string) === 'expired'
+          ? (data.status as TransactionStatus['status'])
+          : 'pending_signatures',
+      safeTransaction: (data.safeTransaction as SafeTransaction) || { to: '', value: '0', data: '0x', operation: 0 },
+      signatures: Array.isArray(data.signatures) ? (data.signatures as SafeSignature[]) : [],
+      requiredSignatures: Number(data.requiredSignatures) || 0,
+      currentSignatures: Number(data.currentSignatures) || 0,
+      createdAt: createdAt ? createdAt.toDate() : new Date(),
+      updatedAt: updatedAt ? updatedAt.toDate() : new Date(),
+      executedAt: executedAt ? executedAt.toDate() : undefined,
+      executionResult: data.executionResult as ExecutionResult | undefined,
+      description: String(data.description || ''),
+      metadata: data.metadata as Record<string, unknown> | undefined,
     }
   }
 }
