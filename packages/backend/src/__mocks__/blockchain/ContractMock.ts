@@ -314,7 +314,7 @@ export class ContractMock {
 
     // EIP-1271 signature verification support
     mock.VERSION = jest.fn(async () => '1.4.1') // Default to supported version
-    mock.isValidSignature = jest.fn(async (_messageHash: string, _signature: string) => {
+    mock.isValidSignature = jest.fn(async () => {
       // Default to valid signature - tests can override
       return '0x1626ba7e' // EIP-1271 magic value
     })

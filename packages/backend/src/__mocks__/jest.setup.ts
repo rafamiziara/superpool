@@ -142,7 +142,7 @@ class MockPerformanceMonitor {
   static getStats(): Record<string, { calls: number; avgTime: number; totalTime: number }> {
     const stats: Record<string, { calls: number; avgTime: number; totalTime: number }> = {}
 
-    for (const [mockName, count] of this.callCounts) {
+    this.callCounts.forEach((count, mockName) => {
       const times = this.callTimes.get(mockName) || []
       const totalTime = times.reduce((sum, time) => sum + time, 0)
       const avgTime = totalTime / times.length
@@ -152,7 +152,7 @@ class MockPerformanceMonitor {
         avgTime: Number(avgTime.toFixed(2)),
         totalTime: Number(totalTime.toFixed(2)),
       }
-    }
+    })
 
     return stats
   }

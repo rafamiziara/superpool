@@ -33,10 +33,20 @@ export interface MockAuthData {
  * Enhanced CallableRequest interface with all required properties
  * Fixes TypeScript errors by including missing acceptsStreaming property
  */
-export interface MockCallableRequest<T = Record<string, unknown>> extends Partial<CallableRequest<T>> {
+export interface MockCallableRequest<T = Record<string, unknown>> {
   data: T
-  auth?: MockAuthData | undefined
-  app?: unknown
+  auth?: MockAuthData | null
+  app?: {
+    appId: string
+    token: {
+      app_id: string
+      exp: number
+      iat: number
+      iss: string
+      sub: string
+      aud: string[]
+    }
+  }
   rawRequest?: {
     headers: Record<string, string>
     method: string
@@ -92,7 +102,7 @@ export class FunctionsMock {
       ...options,
     }
 
-    return baseRequest as CallableRequest<T>
+    return baseRequest as unknown as CallableRequest<T>
   }
 
   /**
@@ -155,20 +165,14 @@ export class FunctionsMock {
    * Matches Firebase Functions HttpsError structure exactly
    */
   static createHttpsError(code: string, message: string, details?: Record<string, unknown>): HttpsError {
-    const error = new Error(message) as HttpsError & {
-      code: string
-      details?: Record<string, unknown>
-      httpErrorCode: number
-      name: string
-      status: number
-    }
-    error.code = code
-    error.details = details
-    error.httpErrorCode = this.getHttpErrorCode(code)
+    const error = new Error(message) as unknown as HttpsError
+    ;(error as unknown as Record<string, unknown>).code = code
+    ;(error as unknown as Record<string, unknown>).details = details
+    ;(error as unknown as Record<string, unknown>).httpErrorCode = this.getHttpErrorCode(code)
 
     // Add Firebase-specific error properties
-    error.name = 'HttpsError'
-    error.status = error.httpErrorCode
+    ;(error as unknown as Record<string, unknown>).name = 'HttpsError'
+    ;(error as unknown as Record<string, unknown>).status = this.getHttpErrorCode(code)
 
     return error as HttpsError
   }
@@ -353,8 +357,10 @@ jest.mock('firebase-functions/v2/https', () => ({
       }
 
       // Add metadata for testing
-      ;(wrappedHandler as Record<string, unknown>).options = typeof options === 'object' ? options : {}
-      ;(wrappedHandler as Record<string, unknown>).originalHandler = actualHandler
+      Object.assign(wrappedHandler, {
+        options: typeof options === 'object' ? options : {},
+        originalHandler: actualHandler,
+      })
 
       return wrappedHandler
     }
