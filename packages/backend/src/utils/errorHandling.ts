@@ -109,7 +109,7 @@ function getFirebaseErrorCode(appErrorCode: string): string {
 /**
  * Handle and format errors for client consumption
  */
-export function handleError(error: unknown, functionName: string): any {
+export function handleError(error: unknown, functionName: string): never {
   logger.error(`${functionName}: Error occurred`, {
     error:
       error instanceof Error
@@ -141,10 +141,28 @@ export function handleError(error: unknown, functionName: string): any {
 
   if (error instanceof AppError) {
     const firebaseCode = getFirebaseErrorCode(error.code)
-    throw new HttpsError(firebaseCode as any, error.message, {
-      code: error.code,
-      original: error.message,
-    })
+    throw new HttpsError(
+      firebaseCode as
+        | 'internal'
+        | 'invalid-argument'
+        | 'failed-precondition'
+        | 'unauthenticated'
+        | 'permission-denied'
+        | 'not-found'
+        | 'already-exists'
+        | 'resource-exhausted'
+        | 'cancelled'
+        | 'data-loss'
+        | 'unknown'
+        | 'unimplemented'
+        | 'unavailable'
+        | 'deadline-exceeded',
+      error.message,
+      {
+        code: error.code,
+        original: error.message,
+      }
+    )
   }
 
   // Handle ethers.js errors
@@ -180,7 +198,7 @@ export function handleError(error: unknown, functionName: string): any {
 /**
  * Log error with context
  */
-export function logError(error: unknown, context: Record<string, any> = {}, functionName?: string): void {
+export function logError(error: unknown, context: Record<string, unknown> = {}, functionName?: string): void {
   const logData = {
     ...context,
     ...(functionName && { function: functionName }),
@@ -200,7 +218,11 @@ export function logError(error: unknown, context: Record<string, any> = {}, func
 /**
  * Create a standardized error response
  */
-export function createErrorResponse(message: string, code: string = 'UNKNOWN_ERROR', details?: Record<string, any>): any {
+export function createErrorResponse(
+  message: string,
+  code: string = 'UNKNOWN_ERROR',
+  details?: Record<string, unknown>
+): { success: false; error: { message: string; code: string; details?: Record<string, unknown> } } {
   return {
     success: false,
     error: {
@@ -214,7 +236,7 @@ export function createErrorResponse(message: string, code: string = 'UNKNOWN_ERR
 /**
  * Wrap async functions with error handling
  */
-export function withErrorHandling<T extends (...args: any[]) => Promise<any>>(fn: T, functionName: string): T {
+export function withErrorHandling<T extends (...args: unknown[]) => Promise<unknown>>(fn: T, functionName: string): T {
   return (async (...args: Parameters<T>) => {
     try {
       return await fn(...args)

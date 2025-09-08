@@ -6,6 +6,8 @@
  * realistic blockchain interaction patterns.
  */
 
+/* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unused-vars */
+
 import { Contract, JsonRpcProvider, Wallet } from 'ethers'
 import { jest } from '@jest/globals'
 import { ethersMock } from '../../__mocks__/blockchain/EthersMock'

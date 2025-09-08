@@ -123,7 +123,7 @@ export function validateTransactionHash(hash: string): boolean {
 /**
  * Sanitize and validate numeric input
  */
-export function sanitizeNumericInput(input: any, min?: number, max?: number): number {
+export function sanitizeNumericInput(input: unknown, min?: number, max?: number): number {
   const num = Number(input)
 
   if (isNaN(num)) {

@@ -66,7 +66,7 @@ export class MockFactory {
     }
 
     if (withAuth || withFirestore) {
-      ;(environment.mocks as any).firebase = firebaseAdminMock
+      ;(environment.mocks as any).firebase = firebaseAdminMock // eslint-disable-line @typescript-eslint/no-explicit-any
       firebaseAdminMock.resetAllMocks()
     }
 
@@ -91,16 +91,17 @@ export class MockFactory {
 
     // Setup user
     ;(environment.mocks as any).firebase?.seedUser({
+      // eslint-disable-line @typescript-eslint/no-explicit-any
       uid,
       email: TestFixtures.TestData.users.poolOwner.email,
-      customClaims: { walletAddress: (params as any).poolOwner || TestFixtures.TestData.addresses.poolOwners[0] },
+      customClaims: { walletAddress: (params as any).poolOwner || TestFixtures.TestData.addresses.poolOwners[0] }, // eslint-disable-line @typescript-eslint/no-explicit-any
     })
 
     // Create authenticated request
     const request = environment.functionTester.createAuthenticatedRequest(params, uid)
 
     // Setup successful Firestore operations
-    ;(environment.mocks as any).firebase?.firestore.collection('pools').doc().set.mockResolvedValue(undefined)
+    ;(environment.mocks as any).firebase?.firestore.collection('pools').doc().set.mockResolvedValue(undefined) // eslint-disable-line @typescript-eslint/no-explicit-any
 
     // Setup contract mock
     const poolFactory = ContractMock.createPoolFactoryMock()
@@ -127,6 +128,7 @@ export class MockFactory {
 
     // Setup Safe owner
     ;(environment.mocks as any).firebase?.seedUser({
+      // eslint-disable-line @typescript-eslint/no-explicit-any
       uid,
       email: TestFixtures.TestData.users.safeOwner.email,
       customClaims: {
@@ -143,7 +145,7 @@ export class MockFactory {
     environment.mocks.safeContract = safeContract
 
     // Setup Firestore for Safe transactions
-    ;(environment.mocks as any).firebase?.firestore.collection('safe_transactions').doc().set.mockResolvedValue(undefined)
+    ;(environment.mocks as any).firebase?.firestore.collection('safe_transactions').doc().set.mockResolvedValue(undefined) // eslint-disable-line @typescript-eslint/no-explicit-any
 
     return {
       ...environment,
@@ -164,7 +166,7 @@ export class MockFactory {
 
     // Create nonce
     const nonce = FirebaseFixtures.createNonce(address)
-    ;(environment.mocks as any).firebase?.seedDocument(`auth_nonces/${nonce.nonce}`, nonce)
+    ;(environment.mocks as any).firebase?.seedDocument(`auth_nonces/${nonce.nonce}`, nonce) // eslint-disable-line @typescript-eslint/no-explicit-any
 
     // Create auth message
     const message = SAMPLE_AUTH_MESSAGES.VALID_MESSAGE(address, nonce.nonce, nonce.timestamp)

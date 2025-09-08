@@ -7,7 +7,6 @@
  */
 
 import { Config } from 'jest'
-import { TestStrategy } from './jest.runner'
 
 // CI/CD Environment types
 export enum CIEnvironment {
@@ -387,7 +386,7 @@ export class CIPipelineManager {
   /**
    * Evaluate a quality gate
    */
-  private async evaluateQualityGate(qualityGate: QualityGate, stageResult: StageResult): Promise<QualityGateResult> {
+  private async evaluateQualityGate(qualityGate: QualityGate, _stageResult: StageResult): Promise<QualityGateResult> {
     const result: QualityGateResult = {
       name: qualityGate.name,
       stage: qualityGate.stage,
@@ -486,7 +485,7 @@ export class CIPipelineManager {
   /**
    * Simulate command execution
    */
-  private async simulateCommand(command: string, result: StageResult, duration: number): Promise<void> {
+  private async simulateCommand(command: string, result: StageResult, _duration: number): Promise<void> {
     console.log(`     💻 ${command}`)
 
     await new Promise((resolve) => setTimeout(resolve, Math.random() * 1000)) // Simulate variable execution time
@@ -580,7 +579,7 @@ export interface QualityGateResult {
   stage: PipelineStage
   passed: boolean
   message: string
-  metrics: Record<string, any>
+  metrics: Record<string, unknown>
 }
 
 export interface PipelineResult {

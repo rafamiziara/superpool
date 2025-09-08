@@ -5,6 +5,8 @@
  * across all SuperPool backend functions and services.
  */
 
+/* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unused-vars */
+
 import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals'
 import { MockFactory, quickSetup, SAMPLE_TRANSACTION_HASHES, TestFixtures } from '../../__mocks__/index'
 import { performanceManager, startPerformanceTest } from '../utils/PerformanceTestUtilities'

@@ -22,11 +22,7 @@ import { generateAuthMessageHandler } from './generateAuthMessage'
 import { verifySignatureAndLoginHandler } from './verifySignatureAndLogin'
 
 // Import centralized mock system (MOCK_SYSTEM.md compliant)
-import { 
-  FunctionsMock, 
-  firebaseAdminMock, 
-  ethersMock 
-} from '../../__mocks__'
+import { ethersMock, firebaseAdminMock, FunctionsMock } from '../../__mocks__'
 
 const mockDoc = jest.fn(() => ({
   set: mockSet,

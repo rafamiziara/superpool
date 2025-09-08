@@ -555,20 +555,20 @@ export class EthersMock {
   }
 }
 
-// Global mock instance
-export const ethersMock = EthersMock.getInstance()
+// Helper function for deterministic hash generation
+function createDeterministicHash(input: string): string {
+  // Simple deterministic hash for testing
+  let hash = 0
+  for (let i = 0; i < input.length; i++) {
+    const char = input.charCodeAt(i)
+    hash = (hash << 5) - hash + char
+    hash = hash & hash // Convert to 32-bit integer
+  }
+  return Math.abs(hash).toString(16).padStart(64, '0')
+}
 
-// Jest module mocks for ethers
-jest.mock('ethers', () => ({
-  // Provider
-  JsonRpcProvider: jest.fn(() => ethersMock.provider),
-
-  // Wallet
-  Wallet: jest.fn(() => ethersMock.wallet),
-
-  // Contract
-  Contract: jest.fn(() => ethersMock.contract),
-
+// Ethers utility functions (exported for proper mocking)
+export const mockEthersUtils = {
   // Utilities
   parseEther: jest.fn((value: string) => {
     return BigInt(Math.floor(parseFloat(value) * 1e18))
@@ -578,8 +578,13 @@ jest.mock('ethers', () => ({
     return (Number(value) / 1e18).toString()
   }),
 
-  parseUnits: jest.fn((value: string, decimals: number) => {
-    return BigInt(Math.floor(parseFloat(value) * Math.pow(10, decimals)))
+  parseUnits: jest.fn((value: string, decimals: string | number) => {
+    // Handle gwei specifically
+    if (decimals === 'gwei' || decimals === 9) {
+      return BigInt(Math.floor(parseFloat(value) * 1e9))
+    }
+    const decimalsNum = typeof decimals === 'string' ? 18 : decimals
+    return BigInt(Math.floor(parseFloat(value) * Math.pow(10, decimalsNum)))
   }),
 
   formatUnits: jest.fn((value: bigint, decimals: number) => {
@@ -601,13 +606,13 @@ jest.mock('ethers', () => ({
   // Hashing
   keccak256: jest.fn((data: string | Uint8Array) => {
     const input = typeof data === 'string' ? data : Buffer.from(data).toString()
-    const hash = ethersMock['createDeterministicHash'](input)
+    const hash = createDeterministicHash(input)
     return `0x${hash}`
   }),
 
   solidityPackedKeccak256: jest.fn((types: string[], values: unknown[]) => {
     const packed = types.map((type, i) => `${type}:${values[i]}`).join('|')
-    const hash = ethersMock['createDeterministicHash'](packed)
+    const hash = createDeterministicHash(packed)
     return `0x${hash}`
   }),
 
@@ -616,14 +621,6 @@ jest.mock('ethers', () => ({
     encode: jest.fn(() => '0x1234567890abcdef'),
     decode: jest.fn(() => ['decoded', 'values']),
   })),
-
-  // Constants
-  ZeroAddress: '0x0000000000000000000000000000000000000000',
-  MaxUint256: BigInt('0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff'),
-
-  // Errors
-  ErrorFragment: jest.fn(),
-  ErrorDescription: jest.fn(),
 
   // Bytes utilities
   getBytes: jest.fn((value: string) => {
@@ -648,6 +645,9 @@ jest.mock('ethers', () => ({
   toUtf8String: jest.fn((bytes: Uint8Array) => {
     return Buffer.from(bytes).toString('utf8')
   }),
-}))
+}
+
+// Global mock instance
+export const ethersMock = EthersMock.getInstance()
 
 export default ethersMock

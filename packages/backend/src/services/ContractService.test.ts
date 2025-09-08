@@ -1,15 +1,11 @@
+/* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unused-vars */
+
 import { BatchTransactionRequest, ContractCall, ContractService, ContractServiceConfig, TransactionProposal } from './ContractService'
 import { AppError } from '../utils/errorHandling'
 import { jest } from '@jest/globals'
 
 // Import centralized mock system (MOCK_SYSTEM.md compliant)
-import { 
-  FunctionsMock, 
-  firebaseAdminMock, 
-  ethersMock,
-  ContractMock,
-  MockFactory 
-} from '../__mocks__'
+import { ContractMock, ethersMock, firebaseAdminMock, MockFactory } from '../__mocks__'
 
 // Mock dependencies using centralized system
 jest.mock('firebase-functions')
@@ -43,7 +39,7 @@ describe('ContractService', () => {
     // Use centralized ethers mock system
     mockProvider = ethersMock.provider
     mockSigner = ethersMock.wallet
-    
+
     // Setup Safe contract mock using centralized system
     mockSafeContract = ContractMock.createSafeMock()
 
@@ -51,24 +47,26 @@ describe('ContractService', () => {
     mockDb = firebaseAdminMock.firestore
 
     // Ethers mocks are handled by centralized ethersMock system
-    // Setup specific ethers functions used by ContractService
-    ethers.toBeHex = jest.fn<(value: any) => string>().mockImplementation((value: any) => {
+    // Setup specific ethers functions used by ContractService using object assignment
+    ;(ethersMock as any).toBeHex = jest.fn().mockImplementation((value: any) => {
       if (value === undefined || value === null) return '0x0'
       if (typeof value === 'string') return value.startsWith('0x') ? value : `0x${value}`
       return `0x${value.toString(16)}`
     })
-    ethers.zeroPadValue = jest.fn<(value: any, length: number) => string>().mockImplementation((value: any, length: number) => {
-      if (value === undefined || value === null) value = '0x0'
-      let hex = typeof value === 'string' ? value : `0x${value.toString(16)}`
-      if (!hex.startsWith('0x')) hex = `0x${hex}`
-      // Ensure proper padding to exact length
-      const targetLength = length * 2 + 2 // +2 for '0x' prefix
-      if (hex.length < targetLength) {
-        hex = hex + '0'.repeat(targetLength - hex.length)
-      }
-      return hex
-    })
-    ethers.dataLength = jest.fn<(data: string) => number>().mockImplementation((data: string) => {
+    ;(ethersMock as any).zeroPadValue = jest
+      .fn<(value: any, length: number) => string>()
+      .mockImplementation((value: any, length: number) => {
+        if (value === undefined || value === null) value = '0x0'
+        let hex = typeof value === 'string' ? value : `0x${value.toString(16)}`
+        if (!hex.startsWith('0x')) hex = `0x${hex}`
+        // Ensure proper padding to exact length
+        const targetLength = length * 2 + 2 // +2 for '0x' prefix
+        if (hex.length < targetLength) {
+          hex = hex + '0'.repeat(targetLength - hex.length)
+        }
+        return hex
+      })
+    ;(ethersMock as any).dataLength = jest.fn<(data: string) => number>().mockImplementation((data: string) => {
       if (!data || data === '0x') return 0
       return (data.length - 2) / 2
     })

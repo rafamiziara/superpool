@@ -5,7 +5,9 @@
  * for Firebase Cloud Functions, blockchain integration, and mock systems.
  */
 
-import { jest } from '@jest/globals'
+/* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-namespace */
+
+import { jest, expect, beforeAll, afterAll, beforeEach, afterEach } from '@jest/globals'
 
 // Environment setup
 process.env.NODE_ENV = 'test'

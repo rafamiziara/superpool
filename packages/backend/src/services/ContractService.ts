@@ -1,6 +1,7 @@
 import { ethers } from 'ethers'
 import { logger } from 'firebase-functions'
 import { getFirestore } from 'firebase-admin/firestore'
+import type * as FirebaseFirestore from 'firebase-admin/firestore'
 import {
   createSafeTransactionHash,
   executeSafeTransaction as executeSafeTransactionUtil,
@@ -11,7 +12,6 @@ import {
   SafeTransaction,
 } from '../utils/multisig'
 import { AppError } from '../utils/errorHandling'
-import { estimateGas, executeTransaction, getGasPrice } from '../utils/blockchain'
 
 /**
  * Re-export types for external use
@@ -38,7 +38,7 @@ export interface TransactionProposal {
   data: string
   operation: number
   description: string
-  metadata?: any
+  metadata?: Record<string, unknown>
 }
 
 /**
@@ -47,8 +47,8 @@ export interface TransactionProposal {
 export interface ContractCall {
   contractAddress: string
   functionName: string
-  abi: any[]
-  args: any[]
+  abi: ethers.InterfaceAbi
+  args: unknown[]
   value?: string
 }
 
@@ -58,7 +58,7 @@ export interface ContractCall {
 export interface BatchTransactionRequest {
   transactions: TransactionProposal[]
   description: string
-  metadata?: any
+  metadata?: Record<string, unknown>
 }
 
 /**
@@ -69,7 +69,7 @@ export interface ExecutionResult {
   transactionHash: string
   blockNumber?: number
   gasUsed?: string
-  events?: any[]
+  events?: ethers.Log[]
   error?: string
 }
 
@@ -88,7 +88,7 @@ export interface TransactionStatus {
   executedAt?: Date
   executionResult?: ExecutionResult
   description: string
-  metadata?: any
+  metadata?: Record<string, unknown>
 }
 
 /**
@@ -244,7 +244,7 @@ export class ContractService {
       const updatedSignatures = [...existingSignatures, signature]
       const readyToExecute = updatedSignatures.length >= txData.requiredSignatures
 
-      const updateData: any = {
+      const updateData: Record<string, unknown> = {
         signatures: updatedSignatures,
         currentSignatures: updatedSignatures.length,
         updatedAt: new Date(),
@@ -388,7 +388,12 @@ export class ContractService {
   /**
    * Create a contract function call proposal
    */
-  async proposeContractCall(call: ContractCall, description: string, createdBy: string, metadata?: any): Promise<TransactionStatus> {
+  async proposeContractCall(
+    call: ContractCall,
+    description: string,
+    createdBy: string,
+    metadata?: Record<string, unknown>
+  ): Promise<TransactionStatus> {
     try {
       logger.info('Creating contract call proposal', {
         contractAddress: call.contractAddress,
@@ -504,7 +509,7 @@ export class ContractService {
     } = {}
   ): Promise<{ transactions: TransactionStatus[]; total: number }> {
     try {
-      let query: any = this.db
+      let query: FirebaseFirestore.Query<FirebaseFirestore.DocumentData> = this.db
         .collection('contract_transactions')
         .where('chainId', '==', this.config.chainId)
         .where('safeAddress', '==', this.config.safeAddress)
@@ -533,7 +538,9 @@ export class ContractService {
       }
 
       const snapshot = await query.get()
-      const transactions = snapshot.docs.map((doc: any) => this.mapToTransactionStatus(doc.data()))
+      const transactions = snapshot.docs.map((doc: FirebaseFirestore.QueryDocumentSnapshot<FirebaseFirestore.DocumentData>) =>
+        this.mapToTransactionStatus(doc.data())
+      )
 
       return { transactions, total }
     } catch (error) {
@@ -624,8 +631,8 @@ export class ContractService {
     return multiSendInterface.encodeFunctionData('multiSend', [transactionsData])
   }
 
-  private parseTransactionEvents(receipt: ethers.TransactionReceipt): any[] {
-    const events: any[] = []
+  private parseTransactionEvents(receipt: ethers.TransactionReceipt): ethers.Log[] {
+    const events: ethers.Log[] = []
 
     try {
       // Parse PoolFactory events if applicable
@@ -659,7 +666,7 @@ export class ContractService {
     return events
   }
 
-  private mapToTransactionStatus(data: any): TransactionStatus {
+  private mapToTransactionStatus(data: Record<string, unknown>): TransactionStatus {
     return {
       id: data.id,
       status: data.status,
