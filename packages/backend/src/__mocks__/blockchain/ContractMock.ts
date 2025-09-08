@@ -253,6 +253,24 @@ export class ContractMock {
       }
     )
 
+    mock.encodeTransactionData = jest.fn(
+      (
+        to: string,
+        value: bigint,
+        data: string,
+        operation: number,
+        safeTxGas: bigint,
+        baseGas: bigint,
+        gasPrice: bigint,
+        gasToken: string,
+        refundReceiver: string,
+        _nonce: bigint
+      ) => {
+        // Generate encoded transaction data for Safe transaction
+        return `0x${[to, value.toString(), data, operation.toString(), safeTxGas.toString(), baseGas.toString(), gasPrice.toString(), gasToken, refundReceiver].join('').slice(0, 128).padEnd(128, '0')}`
+      }
+    )
+
     mock.checkSignatures = jest.fn(async (dataHash: string, data: string, signatures: string) => {
       // Simple validation - in real tests, this would validate actual signatures
       return signatures.length >= ContractMock.safeThreshold * 130 // 65 bytes per signature * 2
@@ -293,6 +311,13 @@ export class ContractMock {
         return mockTx
       }
     )
+
+    // EIP-1271 signature verification support
+    mock.VERSION = jest.fn(async () => '1.4.1') // Default to supported version
+    mock.isValidSignature = jest.fn(async (messageHash: string, signature: string) => {
+      // Default to valid signature - tests can override
+      return '0x1626ba7e' // EIP-1271 magic value
+    })
 
     return mock
   }

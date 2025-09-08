@@ -103,28 +103,36 @@ export const TestData = {
   // Pool configurations
   pools: {
     basic: {
+      poolOwner: '0x742d35Cc6670C74288C2e768dC1E574a0B7DbE7a', // From addresses.poolOwners[0]
       maxLoanAmount: '1000', // ETH
       interestRate: 500, // 5%
       loanDuration: 2592000, // 30 days
       name: 'Basic Lending Pool',
+      description: 'A basic lending pool for testing',
     },
     highInterest: {
+      poolOwner: '0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC', // From addresses.poolOwners[1]
       maxLoanAmount: '500', // ETH
       interestRate: 1200, // 12%
       loanDuration: 1296000, // 15 days
       name: 'High Interest Short Term Pool',
+      description: 'Higher risk, higher reward short-term lending pool',
     },
     enterprise: {
+      poolOwner: '0x90F79bf6EB2c4f870365E785982E1f101E93b906', // From addresses.poolOwners[2]
       maxLoanAmount: '10000', // ETH
       interestRate: 300, // 3%
       loanDuration: 7776000, // 90 days
       name: 'Large Enterprise Pool',
+      description: 'Large pool for enterprise-level lending',
     },
     micro: {
+      poolOwner: '0x742d35Cc6670C74288C2e768dC1E574a0B7DbE7a', // From addresses.poolOwners[0]
       maxLoanAmount: '10', // ETH
       interestRate: 800, // 8%
       loanDuration: 604800, // 7 days
       name: 'Micro Lending Pool',
+      description: 'Small loans for micro-lending scenarios',
     },
   },
 

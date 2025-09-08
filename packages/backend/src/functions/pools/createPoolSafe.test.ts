@@ -14,26 +14,23 @@
 
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from '@jest/globals'
 import { ethers } from 'ethers'
+import { ContractMock, ethersMock, firebaseAdminMock, FunctionsMock, MockFactory, quickSetup, TestFixtures } from '../../__mocks__'
 import {
-  ContractMock,
-  ethersMock,
-  firebaseAdminMock,
-  MockFactory,
   performanceManager,
   type PerformanceThresholds,
-  quickSetup,
   runBenchmark,
   startPerformanceTest,
-  TestFixtures,
-} from '../../__mocks__'
-import { createPoolSafe, CreatePoolSafeRequest, CreatePoolSafeResponse } from './createPoolSafe'
-import { HttpsError } from 'firebase-functions/v2/https'
-import { AppError } from '../../utils/errorHandling'
+} from '../../__tests__/utils/PerformanceTestUtilities'
+import { CreatePoolSafeRequest, CreatePoolSafeResponse } from '../admin/createPoolSafe'
+
+// Get the handler function for testing (onCall wrapper is not needed in tests)
+const createPoolSafeModule = require('../admin/createPoolSafe')
+const createPoolSafeHandler = createPoolSafeModule.createPoolSafe.__handler || createPoolSafeModule.createPoolSafe
 
 describe('createPoolSafe Cloud Function', () => {
-  let testEnvironment: any
-  let mockSafeContract: any
-  let mockPoolFactory: any
+  let testEnvironment: any // ReturnType<typeof quickSetup.poolCreation>
+  let mockSafeContract: any // ReturnType<typeof ContractMock.createSafeMock>
+  let mockPoolFactory: any // ReturnType<typeof ContractMock.createPoolFactoryMock>
 
   beforeAll(() => {
     performanceManager.clearAll()
@@ -41,23 +38,27 @@ describe('createPoolSafe Cloud Function', () => {
 
   beforeEach(() => {
     MockFactory.resetAllMocks()
-    testEnvironment = quickSetup.safeTransaction()
-    mockSafeContract = testEnvironment.safeContract
 
-    // Setup Pool Factory mock for Safe integration
+    // Use pool creation scenario instead of Safe transaction scenario
+    // to get the correct pool parameters
+    testEnvironment = quickSetup.poolCreation()
+
+    // Create a Safe contract separately since we need both
+    mockSafeContract = ContractMock.createSafeMock()
+    testEnvironment.safeContract = mockSafeContract
+
     mockPoolFactory = ContractMock.createPoolFactoryMock()
 
     // Setup default environment variables
     process.env.POLYGON_AMOY_RPC_URL = 'https://rpc-amoy.polygon.technology'
-    process.env.SAFE_ADDRESS_AMOY = TestFixtures.TestData.addresses.safeAddress
-    process.env.POOL_FACTORY_ADDRESS_AMOY = TestFixtures.TestData.addresses.poolFactoryAddress
+    process.env.SAFE_ADDRESS_AMOY = TestFixtures.TestData.addresses.contracts.safe
+    process.env.POOL_FACTORY_ADDRESS_AMOY = TestFixtures.TestData.addresses.contracts.poolFactory
   })
 
   afterEach(() => {
     delete process.env.POLYGON_AMOY_RPC_URL
     delete process.env.SAFE_ADDRESS_AMOY
     delete process.env.POOL_FACTORY_ADDRESS_AMOY
-
     MockFactory.resetAllMocks()
   })
 
@@ -73,36 +74,32 @@ describe('createPoolSafe Cloud Function', () => {
     it('should successfully prepare a Safe transaction for pool creation', async () => {
       const performance = startPerformanceTest('safe-pool-creation', 'happy-path')
 
-      // Setup Safe configuration
-      mockSafeContract.getOwners.mockResolvedValue(TestFixtures.TestData.addresses.safeOwners)
-      mockSafeContract.getThreshold.mockResolvedValue(2)
-
-      // Setup transaction preparation
       const mockTransactionHash = '0x' + 'safe'.repeat(15) + '1'
       const expectedPoolParams = TestFixtures.TestData.pools.basic
 
-      // Mock Safe transaction hash generation
-      ethersMock.Contract.mockImplementation((address, abi) => {
-        if (address === TestFixtures.TestData.addresses.safeAddress) {
-          return {
-            ...mockSafeContract,
-            getTransactionHash: jest.fn().mockResolvedValue(mockTransactionHash),
-            encodeTransactionData: jest.fn().mockReturnValue('0x' + 'encoded'.repeat(10)),
-          }
-        }
-        return mockPoolFactory
+      // Configure Safe contract mock
+      mockSafeContract.getTransactionHash.mockResolvedValue(mockTransactionHash)
+      mockSafeContract.encodeTransactionData.mockReturnValue('0x' + 'encoded'.repeat(10))
+
+      const request = FunctionsMock.createCallableRequest({
+        data: expectedPoolParams,
+        auth: {
+          uid: testEnvironment.uid,
+          token: {},
+        },
       })
 
-      const request = testEnvironment.functionTester.createAuthenticatedRequest(expectedPoolParams, testEnvironment.uid)
-
-      const result = (await createPoolSafe(request)) as CreatePoolSafeResponse
+      const result = await createPoolSafeHandler(request)
 
       const metrics = performance.end()
 
+      // Debug: Log what we got back
+      console.log('Result from createPoolSafe:', result)
+
       // Verify successful response
-      expect(result.success).toBe(true)
+      expect(result?.success).toBe(true)
       expect(result.transactionHash).toBe(mockTransactionHash)
-      expect(result.safeAddress).toBe(TestFixtures.TestData.addresses.safeAddress)
+      expect(result.safeAddress).toBe(TestFixtures.TestData.addresses.contracts.safe)
       expect(result.requiredSignatures).toBe(2)
       expect(result.currentSignatures).toBe(0)
       expect(result.message).toContain('Requires 2 signature(s) to execute')
@@ -117,26 +114,24 @@ describe('createPoolSafe Cloud Function', () => {
 
     it('should handle different Safe threshold configurations', async () => {
       // Test 3-of-5 multisig configuration
-      mockSafeContract.getOwners.mockResolvedValue([
-        ...TestFixtures.TestData.addresses.safeOwners,
-        '0x' + '1'.repeat(40),
-        '0x' + '2'.repeat(40),
-      ])
+      const extendedOwners = [...TestFixtures.TestData.addresses.safeOwners, '0x' + '1'.repeat(40), '0x' + '2'.repeat(40)]
+
+      mockSafeContract.getOwners.mockResolvedValue(extendedOwners)
       mockSafeContract.getThreshold.mockResolvedValue(3)
 
       const mockTransactionHash = '0x' + 'multi'.repeat(12) + '2'
-      ethersMock.Contract.mockImplementation((address) => {
-        if (address === TestFixtures.TestData.addresses.safeAddress) {
-          return {
-            ...mockSafeContract,
-            getTransactionHash: jest.fn().mockResolvedValue(mockTransactionHash),
-            encodeTransactionData: jest.fn().mockReturnValue('0x' + 'encoded'.repeat(10)),
-          }
-        }
-        return mockPoolFactory
+      mockSafeContract.getTransactionHash.mockResolvedValue(mockTransactionHash)
+      mockSafeContract.encodeTransactionData.mockReturnValue('0x' + 'encoded'.repeat(10))
+
+      const request = FunctionsMock.createCallableRequest({
+        data: testEnvironment.params,
+        auth: {
+          uid: testEnvironment.uid,
+          token: {},
+        },
       })
 
-      const result = (await createPoolSafe(testEnvironment.request)) as CreatePoolSafeResponse
+      const result = (await createPoolSafeHandler(request)) as CreatePoolSafeResponse
 
       expect(result.success).toBe(true)
       expect(result.requiredSignatures).toBe(3)
@@ -144,38 +139,33 @@ describe('createPoolSafe Cloud Function', () => {
     })
 
     it('should store comprehensive Safe transaction data in Firestore', async () => {
-      mockSafeContract.getOwners.mockResolvedValue(TestFixtures.TestData.addresses.safeOwners)
-      mockSafeContract.getThreshold.mockResolvedValue(2)
-
       const mockTransactionHash = '0x' + 'storage'.repeat(10) + '3'
-      const mockDoc = {
-        set: jest.fn().mockResolvedValue(undefined),
-        update: jest.fn().mockResolvedValue(undefined),
-      }
-      firebaseAdminMock.firestore.collection.mockReturnValue({
-        doc: jest.fn().mockReturnValue(mockDoc),
+
+      // Configure Safe contract mock
+      mockSafeContract.getTransactionHash.mockResolvedValue(mockTransactionHash)
+      mockSafeContract.encodeTransactionData.mockReturnValue('0x' + 'encoded'.repeat(10))
+
+      const request = FunctionsMock.createCallableRequest({
+        data: testEnvironment.params,
+        auth: {
+          uid: testEnvironment.uid,
+          token: {},
+        },
       })
 
-      ethersMock.Contract.mockImplementation((address) => {
-        if (address === TestFixtures.TestData.addresses.safeAddress) {
-          return {
-            ...mockSafeContract,
-            getTransactionHash: jest.fn().mockResolvedValue(mockTransactionHash),
-            encodeTransactionData: jest.fn().mockReturnValue('0x' + 'encoded'.repeat(10)),
-          }
-        }
-        return mockPoolFactory
-      })
+      await createPoolSafeHandler(request)
 
-      await createPoolSafe(testEnvironment.request)
+      // Verify Safe transaction was stored with proper structure
+      const safeTransactionsCollection = firebaseAdminMock.firestore.collection('safe_transactions')
+      expect(safeTransactionsCollection.doc).toHaveBeenCalled()
 
-      // Verify Safe transaction document structure
-      expect(mockDoc.set).toHaveBeenCalledWith(
+      const docMock = safeTransactionsCollection.doc()
+      expect(docMock.set).toHaveBeenCalledWith(
         expect.objectContaining({
           transactionHash: mockTransactionHash,
-          safeAddress: TestFixtures.TestData.addresses.safeAddress,
+          safeAddress: TestFixtures.TestData.addresses.contracts.safe,
           safeTransaction: expect.objectContaining({
-            to: TestFixtures.TestData.addresses.poolFactoryAddress,
+            to: TestFixtures.TestData.addresses.contracts.poolFactory,
             data: expect.any(String),
             value: '0',
             operation: 0,
@@ -212,32 +202,29 @@ describe('createPoolSafe Cloud Function', () => {
       const nonOwnerUid = 'non-owner-uid'
       const nonOwnerAddress = '0x' + 'nonowner'.repeat(4)
 
-      // Setup non-owner user
+      // Setup non-owner user using centralized method
       firebaseAdminMock.seedUser({
         uid: nonOwnerUid,
         email: 'nonowner@test.com',
         customClaims: { walletAddress: nonOwnerAddress },
       })
 
-      // Add user wallet address to Firestore
-      const mockUserDoc = {
-        exists: true,
-        data: jest.fn().mockReturnValue({ walletAddress: nonOwnerAddress }),
-      }
-      firebaseAdminMock.firestore.collection.mockImplementation((collection) => {
-        if (collection === 'users') {
-          return { doc: jest.fn().mockReturnValue({ get: jest.fn().mockResolvedValue(mockUserDoc) }) }
-        }
-        return { doc: jest.fn().mockReturnValue({ set: jest.fn() }) }
+      // Seed user document in Firestore
+      firebaseAdminMock.seedDocument(`users/${nonOwnerUid}`, {
+        walletAddress: nonOwnerAddress,
+        createdAt: new Date(),
       })
 
-      mockSafeContract.getOwners.mockResolvedValue(TestFixtures.TestData.addresses.safeOwners)
-      mockSafeContract.getThreshold.mockResolvedValue(2)
-
-      const nonOwnerRequest = testEnvironment.functionTester.createAuthenticatedRequest(testEnvironment.params, nonOwnerUid)
+      const nonOwnerRequest = FunctionsMock.createCallableRequest({
+        data: testEnvironment.params,
+        auth: {
+          uid: nonOwnerUid,
+          token: {},
+        },
+      })
 
       // Function should still succeed but log a warning
-      const result = (await createPoolSafe(nonOwnerRequest)) as CreatePoolSafeResponse
+      const result = (await createPoolSafeHandler(nonOwnerRequest)) as CreatePoolSafeResponse
 
       expect(result.success).toBe(true)
       // The function allows non-owners to initiate (for admin flexibility)
@@ -247,30 +234,28 @@ describe('createPoolSafe Cloud Function', () => {
     it('should handle missing user wallet address gracefully', async () => {
       const noWalletUid = 'no-wallet-uid'
 
+      // Setup user without wallet address
       firebaseAdminMock.seedUser({
         uid: noWalletUid,
         email: 'nowallet@test.com',
         customClaims: {},
       })
 
-      // Mock user document without wallet address
-      const mockUserDoc = {
-        exists: true,
-        data: jest.fn().mockReturnValue({}), // No walletAddress field
-      }
-      firebaseAdminMock.firestore.collection.mockImplementation((collection) => {
-        if (collection === 'users') {
-          return { doc: jest.fn().mockReturnValue({ get: jest.fn().mockResolvedValue(mockUserDoc) }) }
-        }
-        return { doc: jest.fn().mockReturnValue({ set: jest.fn() }) }
+      // Seed user document without wallet address
+      firebaseAdminMock.seedDocument(`users/${noWalletUid}`, {
+        createdAt: new Date(),
+        // No walletAddress field
       })
 
-      mockSafeContract.getOwners.mockResolvedValue(TestFixtures.TestData.addresses.safeOwners)
-      mockSafeContract.getThreshold.mockResolvedValue(2)
+      const noWalletRequest = FunctionsMock.createCallableRequest({
+        data: testEnvironment.params,
+        auth: {
+          uid: noWalletUid,
+          token: {},
+        },
+      })
 
-      const noWalletRequest = testEnvironment.functionTester.createAuthenticatedRequest(testEnvironment.params, noWalletUid)
-
-      const result = (await createPoolSafe(noWalletRequest)) as CreatePoolSafeResponse
+      const result = (await createPoolSafeHandler(noWalletRequest)) as CreatePoolSafeResponse
 
       expect(result.success).toBe(true) // Should still work
     })
@@ -284,22 +269,23 @@ describe('createPoolSafe Cloud Function', () => {
         '0x' + '5'.repeat(40),
       ]
 
+      // Configure Safe contract mock
       mockSafeContract.getOwners.mockResolvedValue(validSafeOwners)
       mockSafeContract.getThreshold.mockResolvedValue(3)
 
       const mockTransactionHash = '0x' + 'owners'.repeat(11) + '4'
-      ethersMock.Contract.mockImplementation((address) => {
-        if (address === TestFixtures.TestData.addresses.safeAddress) {
-          return {
-            ...mockSafeContract,
-            getTransactionHash: jest.fn().mockResolvedValue(mockTransactionHash),
-            encodeTransactionData: jest.fn().mockReturnValue('0x' + 'encoded'.repeat(10)),
-          }
-        }
-        return mockPoolFactory
+      mockSafeContract.getTransactionHash.mockResolvedValue(mockTransactionHash)
+      mockSafeContract.encodeTransactionData.mockReturnValue('0x' + 'encoded'.repeat(10))
+
+      const request = FunctionsMock.createCallableRequest({
+        data: testEnvironment.params,
+        auth: {
+          uid: testEnvironment.uid,
+          token: {},
+        },
       })
 
-      const result = (await createPoolSafe(testEnvironment.request)) as CreatePoolSafeResponse
+      const result = (await createPoolSafeHandler(request)) as CreatePoolSafeResponse
 
       expect(result.success).toBe(true)
       expect(result.requiredSignatures).toBe(3)
@@ -310,17 +296,20 @@ describe('createPoolSafe Cloud Function', () => {
 
   describe('Parameter Validation for Safe Transactions', () => {
     it('should validate pool parameters before creating Safe transaction', async () => {
-      const invalidRequest = testEnvironment.functionTester.createAuthenticatedRequest(
-        {
+      const invalidRequest = FunctionsMock.createCallableRequest({
+        data: {
           ...testEnvironment.params,
           maxLoanAmount: 'invalid-amount',
           interestRate: -50,
           loanDuration: -1,
         },
-        testEnvironment.uid
-      )
+        auth: {
+          uid: testEnvironment.uid,
+          token: {},
+        },
+      })
 
-      const result = await createPoolSafe(invalidRequest)
+      const result = await createPoolSafeHandler(invalidRequest)
 
       expect(result.success).toBe(false)
       expect(result.code).toBe('invalid-argument')
@@ -328,31 +317,23 @@ describe('createPoolSafe Cloud Function', () => {
     })
 
     it('should sanitize parameters before Safe transaction preparation', async () => {
-      mockSafeContract.getOwners.mockResolvedValue(TestFixtures.TestData.addresses.safeOwners)
-      mockSafeContract.getThreshold.mockResolvedValue(2)
-
-      const maliciousRequest = testEnvironment.functionTester.createAuthenticatedRequest(
-        {
+      const maliciousRequest = FunctionsMock.createCallableRequest({
+        data: {
           ...testEnvironment.params,
           name: '<script>alert("xss")</script>Safe Pool',
           description: 'javascript:void(0) pool description',
         },
-        testEnvironment.uid
-      )
-
-      const mockTransactionHash = '0x' + 'sanitized'.repeat(8) + '5'
-      ethersMock.Contract.mockImplementation((address) => {
-        if (address === TestFixtures.TestData.addresses.safeAddress) {
-          return {
-            ...mockSafeContract,
-            getTransactionHash: jest.fn().mockResolvedValue(mockTransactionHash),
-            encodeTransactionData: jest.fn().mockReturnValue('0x' + 'encoded'.repeat(10)),
-          }
-        }
-        return mockPoolFactory
+        auth: {
+          uid: testEnvironment.uid,
+          token: {},
+        },
       })
 
-      const result = (await createPoolSafe(maliciousRequest)) as CreatePoolSafeResponse
+      const mockTransactionHash = '0x' + 'sanitized'.repeat(8) + '5'
+      mockSafeContract.getTransactionHash.mockResolvedValue(mockTransactionHash)
+      mockSafeContract.encodeTransactionData.mockReturnValue('0x' + 'encoded'.repeat(10))
+
+      const result = (await createPoolSafeHandler(maliciousRequest)) as CreatePoolSafeResponse
 
       expect(result.success).toBe(true)
 
@@ -363,8 +344,8 @@ describe('createPoolSafe Cloud Function', () => {
 
     it('should enforce pool parameter constraints for Safe transactions', async () => {
       // Test extreme values that should be rejected
-      const extremeRequest = testEnvironment.functionTester.createAuthenticatedRequest(
-        {
+      const extremeRequest = FunctionsMock.createCallableRequest({
+        data: {
           poolOwner: testEnvironment.params.poolOwner,
           maxLoanAmount: ethers.parseUnits('999999999999', 'ether').toString(),
           interestRate: 50000, // 500% APR
@@ -372,10 +353,13 @@ describe('createPoolSafe Cloud Function', () => {
           name: 'A'.repeat(1000), // Too long
           description: 'B'.repeat(5000), // Too long
         },
-        testEnvironment.uid
-      )
+        auth: {
+          uid: testEnvironment.uid,
+          token: {},
+        },
+      })
 
-      const result = await createPoolSafe(extremeRequest)
+      const result = await createPoolSafeHandler(extremeRequest)
 
       expect(result.success).toBe(false)
       expect(result.code).toBe('invalid-argument')
@@ -384,38 +368,26 @@ describe('createPoolSafe Cloud Function', () => {
 
   describe('Safe Contract Integration', () => {
     it('should properly encode pool creation transaction data', async () => {
-      mockSafeContract.getOwners.mockResolvedValue(TestFixtures.TestData.addresses.safeOwners)
-      mockSafeContract.getThreshold.mockResolvedValue(2)
-
       const expectedEncodedData = '0x' + 'poolcreation'.repeat(6) + '123456'
       const mockTransactionHash = '0x' + 'encoded'.repeat(10) + '6'
 
-      // Mock PoolFactory interface for encoding
-      const mockPoolFactoryInterface = {
+      // Configure mocks using centralized patterns
+      mockSafeContract.getTransactionHash.mockResolvedValue(mockTransactionHash)
+      mockSafeContract.encodeTransactionData.mockReturnValue(expectedEncodedData)
+
+      // Setup PoolFactory interface mock
+      const mockInterface = {
         encodeFunctionData: jest.fn().mockReturnValue(expectedEncodedData),
+        parseLog: jest.fn(),
+        getFunction: jest.fn(),
       }
+      // Note: ethersMock.Interface may not exist, so we set it directly on the pool factory
+      mockPoolFactory.interface = mockInterface
 
-      ethersMock.Contract.mockImplementation((address, abi) => {
-        if (address === TestFixtures.TestData.addresses.safeAddress) {
-          return {
-            ...mockSafeContract,
-            getTransactionHash: jest.fn().mockResolvedValue(mockTransactionHash),
-            encodeTransactionData: jest.fn().mockReturnValue(expectedEncodedData),
-          }
-        } else if (address === TestFixtures.TestData.addresses.poolFactoryAddress) {
-          return {
-            interface: mockPoolFactoryInterface,
-          }
-        }
-        return mockPoolFactory
-      })
-
-      ethersMock.Interface.mockReturnValue(mockPoolFactoryInterface)
-
-      const result = (await createPoolSafe(testEnvironment.request)) as CreatePoolSafeResponse
+      const result = (await createPoolSafeHandler(testEnvironment.request)) as CreatePoolSafeResponse
 
       expect(result.success).toBe(true)
-      expect(mockPoolFactoryInterface.encodeFunctionData).toHaveBeenCalledWith(
+      expect(mockInterface.encodeFunctionData).toHaveBeenCalledWith(
         'createPool',
         expect.arrayContaining([
           expect.objectContaining({
@@ -431,32 +403,21 @@ describe('createPoolSafe Cloud Function', () => {
     })
 
     it('should generate correct Safe transaction hash', async () => {
-      mockSafeContract.getOwners.mockResolvedValue(TestFixtures.TestData.addresses.safeOwners)
-      mockSafeContract.getThreshold.mockResolvedValue(2)
-
       const expectedTransactionHash = '0x' + 'specifichash'.repeat(5) + '789'
-      const mockSafe = {
-        ...mockSafeContract,
-        getTransactionHash: jest.fn().mockResolvedValue(expectedTransactionHash),
-        encodeTransactionData: jest.fn().mockReturnValue('0x' + 'data'.repeat(15)),
-        nonce: jest.fn().mockResolvedValue(42),
-      }
 
-      ethersMock.Contract.mockImplementation((address) => {
-        if (address === TestFixtures.TestData.addresses.safeAddress) {
-          return mockSafe
-        }
-        return mockPoolFactory
-      })
+      // Configure Safe contract mock
+      mockSafeContract.getTransactionHash.mockResolvedValue(expectedTransactionHash)
+      mockSafeContract.encodeTransactionData.mockReturnValue('0x' + 'data'.repeat(15))
+      mockSafeContract.nonce.mockResolvedValue(42)
 
-      const result = (await createPoolSafe(testEnvironment.request)) as CreatePoolSafeResponse
+      const result = (await createPoolSafeHandler(testEnvironment.request)) as CreatePoolSafeResponse
 
       expect(result.success).toBe(true)
       expect(result.transactionHash).toBe(expectedTransactionHash)
 
       // Verify Safe transaction hash was computed with correct parameters
-      expect(mockSafe.getTransactionHash).toHaveBeenCalledWith(
-        TestFixtures.TestData.addresses.poolFactoryAddress, // to
+      expect(mockSafeContract.getTransactionHash).toHaveBeenCalledWith(
+        TestFixtures.TestData.addresses.contracts.poolFactory, // to
         '0', // value
         expect.any(String), // data
         0, // operation (CALL)
@@ -470,28 +431,25 @@ describe('createPoolSafe Cloud Function', () => {
     })
 
     it('should handle Safe nonce management correctly', async () => {
-      mockSafeContract.getOwners.mockResolvedValue(TestFixtures.TestData.addresses.safeOwners)
-      mockSafeContract.getThreshold.mockResolvedValue(2)
-
       const mockNonce = 15
-      const mockSafe = {
-        ...mockSafeContract,
-        nonce: jest.fn().mockResolvedValue(mockNonce),
-        getTransactionHash: jest.fn().mockResolvedValue('0x' + 'nonce'.repeat(12) + '7'),
-        encodeTransactionData: jest.fn().mockReturnValue('0x' + 'data'.repeat(15)),
-      }
 
-      ethersMock.Contract.mockImplementation((address) => {
-        if (address === TestFixtures.TestData.addresses.safeAddress) {
-          return mockSafe
-        }
-        return mockPoolFactory
+      // Configure Safe contract mock
+      mockSafeContract.nonce.mockResolvedValue(mockNonce)
+      mockSafeContract.getTransactionHash.mockResolvedValue('0x' + 'nonce'.repeat(12) + '7')
+      mockSafeContract.encodeTransactionData.mockReturnValue('0x' + 'data'.repeat(15))
+
+      const request = FunctionsMock.createCallableRequest({
+        data: testEnvironment.params,
+        auth: {
+          uid: testEnvironment.uid,
+          token: {},
+        },
       })
 
-      await createPoolSafe(testEnvironment.request)
+      await createPoolSafeHandler(request)
 
-      expect(mockSafe.nonce).toHaveBeenCalled()
-      expect(mockSafe.getTransactionHash).toHaveBeenCalledWith(
+      expect(mockSafeContract.nonce).toHaveBeenCalled()
+      expect(mockSafeContract.getTransactionHash).toHaveBeenCalledWith(
         expect.any(String),
         expect.any(String),
         expect.any(String),
@@ -508,9 +466,12 @@ describe('createPoolSafe Cloud Function', () => {
 
   describe('Error Handling', () => {
     it('should handle unauthenticated requests', async () => {
-      const unauthenticatedRequest = testEnvironment.functionTester.createUnauthenticatedRequest(testEnvironment.params)
+      const unauthenticatedRequest = FunctionsMock.createCallableRequest({
+        data: testEnvironment.params,
+        // No auth object = unauthenticated
+      })
 
-      const result = await createPoolSafe(unauthenticatedRequest)
+      const result = await createPoolSafeHandler(unauthenticatedRequest)
 
       expect(result.success).toBe(false)
       expect(result.code).toBe('unauthenticated')
@@ -520,7 +481,15 @@ describe('createPoolSafe Cloud Function', () => {
     it('should handle missing Safe configuration', async () => {
       delete process.env.SAFE_ADDRESS_AMOY
 
-      const result = await createPoolSafe(testEnvironment.request)
+      const request = FunctionsMock.createCallableRequest({
+        data: testEnvironment.params,
+        auth: {
+          uid: testEnvironment.uid,
+          token: {},
+        },
+      })
+
+      const result = await createPoolSafeHandler(request)
 
       expect(result.success).toBe(false)
       expect(result.code).toBe('internal')
@@ -531,7 +500,15 @@ describe('createPoolSafe Cloud Function', () => {
       // Mock Safe contract failure
       mockSafeContract.getOwners.mockRejectedValue(new Error('Safe contract not found'))
 
-      const result = await createPoolSafe(testEnvironment.request)
+      const request = FunctionsMock.createCallableRequest({
+        data: testEnvironment.params,
+        auth: {
+          uid: testEnvironment.uid,
+          token: {},
+        },
+      })
+
+      const result = await createPoolSafeHandler(request)
 
       expect(result.success).toBe(false)
       expect(result.code).toBe('internal')
@@ -541,7 +518,15 @@ describe('createPoolSafe Cloud Function', () => {
     it('should handle provider connection failures', async () => {
       ethersMock.simulateNetworkError('RPC connection timeout')
 
-      const result = await createPoolSafe(testEnvironment.request)
+      const request = FunctionsMock.createCallableRequest({
+        data: testEnvironment.params,
+        auth: {
+          uid: testEnvironment.uid,
+          token: {},
+        },
+      })
+
+      const result = await createPoolSafeHandler(request)
 
       expect(result.success).toBe(false)
       expect(result.code).toBe('internal')
@@ -552,7 +537,15 @@ describe('createPoolSafe Cloud Function', () => {
       mockSafeContract.getOwners.mockResolvedValue(TestFixtures.TestData.addresses.safeOwners)
       mockSafeContract.getThreshold.mockResolvedValue(0) // Invalid threshold
 
-      const result = await createPoolSafe(testEnvironment.request)
+      const request = FunctionsMock.createCallableRequest({
+        data: testEnvironment.params,
+        auth: {
+          uid: testEnvironment.uid,
+          token: {},
+        },
+      })
+
+      const result = await createPoolSafeHandler(request)
 
       expect(result.success).toBe(false)
       expect(result.code).toBe('internal')
@@ -563,7 +556,15 @@ describe('createPoolSafe Cloud Function', () => {
       mockSafeContract.getOwners.mockResolvedValue([]) // No owners
       mockSafeContract.getThreshold.mockResolvedValue(2)
 
-      const result = await createPoolSafe(testEnvironment.request)
+      const request = FunctionsMock.createCallableRequest({
+        data: testEnvironment.params,
+        auth: {
+          uid: testEnvironment.uid,
+          token: {},
+        },
+      })
+
+      const result = await createPoolSafeHandler(request)
 
       expect(result.success).toBe(false)
       expect(result.code).toBe('internal')
@@ -571,12 +572,18 @@ describe('createPoolSafe Cloud Function', () => {
     })
 
     it('should handle Firestore save failures', async () => {
-      mockSafeContract.getOwners.mockResolvedValue(TestFixtures.TestData.addresses.safeOwners)
-      mockSafeContract.getThreshold.mockResolvedValue(2)
-
+      // Simulate Firestore error using centralized error management
       firebaseAdminMock.simulateFirestoreError('permission-denied')
 
-      const result = await createPoolSafe(testEnvironment.request)
+      const request = FunctionsMock.createCallableRequest({
+        data: testEnvironment.params,
+        auth: {
+          uid: testEnvironment.uid,
+          token: {},
+        },
+      })
+
+      const result = await createPoolSafeHandler(request)
 
       expect(result.success).toBe(false)
       expect(result.code).toBe('permission-denied')
@@ -588,23 +595,23 @@ describe('createPoolSafe Cloud Function', () => {
       const benchmarkResult = await runBenchmark(
         'createPoolSafe-performance',
         async () => {
-          mockSafeContract.getOwners.mockResolvedValue(TestFixtures.TestData.addresses.safeOwners)
-          mockSafeContract.getThreshold.mockResolvedValue(2)
+          // Reset mocks for each iteration to ensure consistent state
+          MockFactory.resetAllMocks()
+          const testEnv = quickSetup.safeTransaction()
 
           const mockTransactionHash = '0x' + Date.now().toString(16).padEnd(64, '0')
-          ethersMock.Contract.mockImplementation((address) => {
-            if (address === TestFixtures.TestData.addresses.safeAddress) {
-              return {
-                ...mockSafeContract,
-                getTransactionHash: jest.fn().mockResolvedValue(mockTransactionHash),
-                encodeTransactionData: jest.fn().mockReturnValue('0x' + 'encoded'.repeat(10)),
-                nonce: jest.fn().mockResolvedValue(Math.floor(Math.random() * 100)),
-              }
-            }
-            return mockPoolFactory
-          })
+          testEnv.safeContract.getTransactionHash.mockResolvedValue(mockTransactionHash)
+          testEnv.safeContract.encodeTransactionData.mockReturnValue('0x' + 'encoded'.repeat(10))
+          testEnv.safeContract.nonce.mockResolvedValue(Math.floor(Math.random() * 100))
 
-          return await createPoolSafe(testEnvironment.request)
+          const request = FunctionsMock.createCallableRequest({
+            data: testEnv.params,
+            auth: {
+              uid: testEnv.uid,
+              token: {},
+            },
+          })
+          return await createPoolSafeHandler(request)
         },
         30, // 30 iterations
         3 // 3 warmup runs
@@ -624,38 +631,33 @@ describe('createPoolSafe Cloud Function', () => {
     it('should handle concurrent Safe transaction preparations', async () => {
       const performance = startPerformanceTest('concurrent-safe-transactions', 'concurrency')
 
-      // Setup different requests for concurrent processing
-      const requests = Array.from({ length: 3 }, (_, i) =>
-        testEnvironment.functionTester.createAuthenticatedRequest(
-          {
-            ...testEnvironment.params,
-            name: `Safe Pool ${i + 1}`,
-            poolOwner: TestFixtures.TestData.addresses.poolOwners[i % TestFixtures.TestData.addresses.poolOwners.length],
-          },
-          testEnvironment.uid
-        )
-      )
-
-      // Mock successful Safe interactions
-      mockSafeContract.getOwners.mockResolvedValue(TestFixtures.TestData.addresses.safeOwners)
-      mockSafeContract.getThreshold.mockResolvedValue(2)
-
-      requests.forEach((_, i) => {
+      // Create separate test environments for each concurrent request
+      const testEnvironments = Array.from({ length: 3 }, (_, i) => {
+        const env = quickSetup.safeTransaction()
         const mockHash = '0x' + `concurrent${i}`.repeat(8).substring(0, 64)
-        ethersMock.Contract.mockImplementationOnce((address) => {
-          if (address === TestFixtures.TestData.addresses.safeAddress) {
-            return {
-              ...mockSafeContract,
-              getTransactionHash: jest.fn().mockResolvedValue(mockHash),
-              encodeTransactionData: jest.fn().mockReturnValue('0x' + 'encoded'.repeat(10)),
-              nonce: jest.fn().mockResolvedValue(100 + i),
-            }
-          }
-          return mockPoolFactory
-        })
+
+        // Configure each environment's Safe contract
+        env.safeContract.getTransactionHash.mockResolvedValue(mockHash)
+        env.safeContract.encodeTransactionData.mockReturnValue('0x' + 'encoded'.repeat(10))
+        env.safeContract.nonce.mockResolvedValue(100 + i)
+
+        return {
+          ...env,
+          request: FunctionsMock.createCallableRequest({
+            data: {
+              ...env.params,
+              name: `Safe Pool ${i + 1}`,
+              poolOwner: TestFixtures.TestData.addresses.poolOwners[i % TestFixtures.TestData.addresses.poolOwners.length],
+            },
+            auth: {
+              uid: env.uid,
+              token: {},
+            },
+          }),
+        }
       })
 
-      const results = await Promise.all(requests.map((request) => createPoolSafe(request)))
+      const results = await Promise.all(testEnvironments.map((env) => createPoolSafeHandler(env.request)))
 
       const metrics = performance.end()
 
@@ -672,35 +674,32 @@ describe('createPoolSafe Cloud Function', () => {
 
   describe('Security Testing', () => {
     it('should prevent unauthorized Safe transaction creation', async () => {
-      // Test with explicitly unauthorized address
       const unauthorizedUid = 'unauthorized-user'
       const unauthorizedAddress = '0x' + 'unauthorized'.repeat(3)
 
+      // Setup unauthorized user using centralized methods
       firebaseAdminMock.seedUser({
         uid: unauthorizedUid,
         email: 'unauthorized@test.com',
         customClaims: { walletAddress: unauthorizedAddress },
       })
 
-      // Mock user document
-      const mockUserDoc = {
-        exists: true,
-        data: jest.fn().mockReturnValue({ walletAddress: unauthorizedAddress }),
-      }
-      firebaseAdminMock.firestore.collection.mockImplementation((collection) => {
-        if (collection === 'users') {
-          return { doc: jest.fn().mockReturnValue({ get: jest.fn().mockResolvedValue(mockUserDoc) }) }
-        }
-        return { doc: jest.fn().mockReturnValue({ set: jest.fn() }) }
+      // Seed user document
+      firebaseAdminMock.seedDocument(`users/${unauthorizedUid}`, {
+        walletAddress: unauthorizedAddress,
+        createdAt: new Date(),
       })
 
-      mockSafeContract.getOwners.mockResolvedValue(TestFixtures.TestData.addresses.safeOwners)
-      mockSafeContract.getThreshold.mockResolvedValue(2)
-
-      const unauthorizedRequest = testEnvironment.functionTester.createAuthenticatedRequest(testEnvironment.params, unauthorizedUid)
+      const unauthorizedRequest = FunctionsMock.createCallableRequest({
+        data: testEnvironment.params,
+        auth: {
+          uid: unauthorizedUid,
+          token: {},
+        },
+      })
 
       // The function allows this but logs a warning (for admin flexibility)
-      const result = (await createPoolSafe(unauthorizedRequest)) as CreatePoolSafeResponse
+      const result = (await createPoolSafeHandler(unauthorizedRequest)) as CreatePoolSafeResponse
 
       expect(result.success).toBe(true) // Allowed but logged
     })
@@ -709,40 +708,47 @@ describe('createPoolSafe Cloud Function', () => {
       // Test with invalid Safe address format
       process.env.SAFE_ADDRESS_AMOY = 'invalid-address-format'
 
-      const result = await createPoolSafe(testEnvironment.request)
+      const request = FunctionsMock.createCallableRequest({
+        data: testEnvironment.params,
+        auth: {
+          uid: testEnvironment.uid,
+          token: {},
+        },
+      })
+
+      const result = await createPoolSafeHandler(request)
 
       expect(result.success).toBe(false)
       expect(result.code).toBe('internal')
     })
 
     it('should handle Safe transaction expiration correctly', async () => {
-      mockSafeContract.getOwners.mockResolvedValue(TestFixtures.TestData.addresses.safeOwners)
-      mockSafeContract.getThreshold.mockResolvedValue(2)
-
       const mockTransactionHash = '0x' + 'expiry'.repeat(11) + '8'
-      const mockDoc = {
-        set: jest.fn().mockResolvedValue(undefined),
-      }
-      firebaseAdminMock.firestore.collection.mockReturnValue({
-        doc: jest.fn().mockReturnValue(mockDoc),
+
+      // Configure Safe contract mock
+      mockSafeContract.getTransactionHash.mockResolvedValue(mockTransactionHash)
+      mockSafeContract.encodeTransactionData.mockReturnValue('0x' + 'encoded'.repeat(10))
+      mockSafeContract.nonce.mockResolvedValue(50)
+
+      const request = FunctionsMock.createCallableRequest({
+        data: testEnvironment.params,
+        auth: {
+          uid: testEnvironment.uid,
+          token: {},
+        },
       })
 
-      ethersMock.Contract.mockImplementation((address) => {
-        if (address === TestFixtures.TestData.addresses.safeAddress) {
-          return {
-            ...mockSafeContract,
-            getTransactionHash: jest.fn().mockResolvedValue(mockTransactionHash),
-            encodeTransactionData: jest.fn().mockReturnValue('0x' + 'encoded'.repeat(10)),
-            nonce: jest.fn().mockResolvedValue(50),
-          }
-        }
-        return mockPoolFactory
-      })
+      await createPoolSafeHandler(request)
 
-      await createPoolSafe(testEnvironment.request)
+      // Verify Safe transaction was stored
+      const safeTransactionsCollection = firebaseAdminMock.firestore.collection('safe_transactions')
+      expect(safeTransactionsCollection.doc).toHaveBeenCalled()
+
+      const docMock = safeTransactionsCollection.doc()
+      expect(docMock.set).toHaveBeenCalled()
 
       // Verify expiration date is set (7 days from creation)
-      const setCall = mockDoc.set.mock.calls[0][0]
+      const setCall = docMock.set.mock.calls[0][0]
       expect(setCall.expiresAt).toBeInstanceOf(Date)
 
       const expiryTime = setCall.expiresAt.getTime()
@@ -753,12 +759,9 @@ describe('createPoolSafe Cloud Function', () => {
     })
 
     it('should prevent parameter injection in Safe transaction data', async () => {
-      mockSafeContract.getOwners.mockResolvedValue(TestFixtures.TestData.addresses.safeOwners)
-      mockSafeContract.getThreshold.mockResolvedValue(2)
-
       // Attempt to inject malicious data in pool parameters
-      const maliciousRequest = testEnvironment.functionTester.createAuthenticatedRequest(
-        {
+      const maliciousRequest = FunctionsMock.createCallableRequest({
+        data: {
           poolOwner: testEnvironment.params.poolOwner,
           maxLoanAmount: "1000000000000000000'; DELETE FROM pools; --",
           interestRate: NaN,
@@ -766,10 +769,13 @@ describe('createPoolSafe Cloud Function', () => {
           name: '\x00\x01\x02malicious name',
           description: '\u200B\u200C\u200D\uFEFFhidden chars',
         },
-        testEnvironment.uid
-      )
+        auth: {
+          uid: testEnvironment.uid,
+          token: {},
+        },
+      })
 
-      const result = await createPoolSafe(maliciousRequest)
+      const result = await createPoolSafeHandler(maliciousRequest)
 
       // Should fail validation before reaching Safe transaction preparation
       expect(result.success).toBe(false)
@@ -779,33 +785,28 @@ describe('createPoolSafe Cloud Function', () => {
 
   describe('Chain Configuration', () => {
     it('should handle different chain configurations for Safe deployments', async () => {
-      // Test Polygon Mainnet configuration
+      // Setup Polygon Mainnet configuration
       process.env.POLYGON_MAINNET_RPC_URL = 'https://polygon-mainnet.rpc.url'
       process.env.SAFE_ADDRESS_POLYGON = '0x' + 'mainnet'.repeat(5)
       process.env.POOL_FACTORY_ADDRESS_POLYGON = '0x' + 'factory'.repeat(4)
 
-      mockSafeContract.getOwners.mockResolvedValue(TestFixtures.TestData.addresses.safeOwners)
-      mockSafeContract.getThreshold.mockResolvedValue(3)
-
-      const mainnetRequest = testEnvironment.functionTester.createAuthenticatedRequest(
-        { ...testEnvironment.params, chainId: 137 }, // Polygon Mainnet
-        testEnvironment.uid
-      )
-
       const mockTransactionHash = '0x' + 'mainnet'.repeat(10) + '9'
-      ethersMock.Contract.mockImplementation((address) => {
-        if (address === '0x' + 'mainnet'.repeat(5)) {
-          return {
-            ...mockSafeContract,
-            getTransactionHash: jest.fn().mockResolvedValue(mockTransactionHash),
-            encodeTransactionData: jest.fn().mockReturnValue('0x' + 'encoded'.repeat(10)),
-            nonce: jest.fn().mockResolvedValue(25),
-          }
-        }
-        return mockPoolFactory
+
+      // Configure Safe contract for mainnet
+      mockSafeContract.getThreshold.mockResolvedValue(3)
+      mockSafeContract.getTransactionHash.mockResolvedValue(mockTransactionHash)
+      mockSafeContract.encodeTransactionData.mockReturnValue('0x' + 'encoded'.repeat(10))
+      mockSafeContract.nonce.mockResolvedValue(25)
+
+      const mainnetRequest = FunctionsMock.createCallableRequest({
+        data: { ...testEnvironment.params, chainId: 137 }, // Polygon Mainnet
+        auth: {
+          uid: testEnvironment.uid,
+          token: {},
+        },
       })
 
-      const result = (await createPoolSafe(mainnetRequest)) as CreatePoolSafeResponse
+      const result = (await createPoolSafeHandler(mainnetRequest)) as CreatePoolSafeResponse
 
       expect(result.success).toBe(true)
       expect(result.safeAddress).toBe('0x' + 'mainnet'.repeat(5))
