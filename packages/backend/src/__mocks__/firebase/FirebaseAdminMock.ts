@@ -147,6 +147,16 @@ export interface MockAuth {
   setCustomUserClaims: jest.MockedFunction<(uid: string, customUserClaims: Record<string, unknown>) => Promise<void>>
 }
 
+export interface MockAppCheckToken {
+  token: string
+  ttlMillis: number
+}
+
+export interface MockAppCheck {
+  createToken: jest.MockedFunction<(appId: string, options?: { ttlMillis?: number }) => Promise<MockAppCheckToken>>
+  verifyToken: jest.MockedFunction<(appCheckToken: string) => Promise<{ appId: string; token: MockAppCheckToken }>>
+}
+
 export interface MockApp {
   name: string
   options: {
@@ -163,6 +173,7 @@ export class FirebaseAdminMock {
   public app!: MockApp
   public auth!: MockAuth
   public firestore!: MockFirestore
+  public appCheck!: MockAppCheck
 
   // Internal state for realistic mocking
   private mockDocuments = new Map<string, MockDocumentData>()
@@ -173,6 +184,7 @@ export class FirebaseAdminMock {
     this.initializeAppMock()
     this.initializeAuthMock()
     this.initializeFirestoreMock()
+    this.initializeAppCheckMock()
   }
 
   static getInstance(): FirebaseAdminMock {
@@ -481,6 +493,32 @@ export class FirebaseAdminMock {
   // Collection factory reference for internal use
   private createMockCollection!: (collectionId: string) => MockCollectionReference
 
+  private initializeAppCheckMock(): void {
+    this.appCheck = {
+      createToken: jest.fn(async (appId: string, options?: { ttlMillis?: number }): Promise<MockAppCheckToken> => {
+        const ttlMillis = options?.ttlMillis || 3600000 // Default 1 hour
+        return {
+          token: `mock-app-check-token-${Date.now()}`,
+          ttlMillis,
+        }
+      }),
+      verifyToken: jest.fn(async (appCheckToken: string) => {
+        return {
+          appId: 'superpool-test',
+          token: {
+            token: appCheckToken,
+            ttlMillis: 3600000,
+          },
+        }
+      }),
+    }
+  }
+
+  // Public accessor for App Check mock
+  getAppCheckMock(): MockAppCheck {
+    return this.appCheck
+  }
+
   // Test utilities
   resetAllMocks(): void {
     jest.clearAllMocks()
@@ -493,6 +531,7 @@ export class FirebaseAdminMock {
     // Reinitialize with fresh mocks
     this.initializeAuthMock()
     this.initializeFirestoreMock()
+    this.initializeAppCheckMock()
   }
 
   // Data seeding for tests
@@ -580,6 +619,10 @@ jest.mock('firebase-admin/firestore', () => ({
   getFirestore: jest.fn(() => firebaseAdminMock.firestore),
   FieldValue: firebaseAdminMock.firestore.FieldValue,
   Timestamp: firebaseAdminMock.firestore.Timestamp,
+}))
+
+jest.mock('firebase-admin/app-check', () => ({
+  getAppCheck: jest.fn(() => firebaseAdminMock.appCheck),
 }))
 
 export default firebaseAdminMock

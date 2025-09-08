@@ -23,14 +23,7 @@ import { generateAuthMessageHandler } from './generateAuthMessage'
 import { verifySignatureAndLoginHandler } from './verifySignatureAndLogin'
 
 // Import centralized mock system (MOCK_SYSTEM.md compliant)
-import { 
-  FunctionsMock, 
-  firebaseAdminMock, 
-  ethersMock,
-  CloudFunctionTester, 
-  TestData, 
-  TestHelpers 
-} from '../../__mocks__'
+import { CloudFunctionTester, ethersMock, firebaseAdminMock, FunctionsMock, TestData, TestHelpers } from '../../__mocks__'
 
 // Mock the services module that exports firestore and auth
 jest.mock('../../services', () => ({

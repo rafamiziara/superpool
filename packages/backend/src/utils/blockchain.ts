@@ -13,7 +13,12 @@ export interface TransactionOptions {
 /**
  * Estimate gas for a contract function call
  */
-export async function estimateGas(contract: ethers.Contract, functionName: string, args: any[], overrides: any = {}): Promise<bigint> {
+export async function estimateGas(
+  contract: ethers.Contract,
+  functionName: string,
+  args: unknown[],
+  overrides: ethers.Overrides = {}
+): Promise<bigint> {
   try {
     logger.info('Estimating gas', { functionName, contractAddress: contract.target })
 
@@ -48,7 +53,7 @@ export async function estimateGas(contract: ethers.Contract, functionName: strin
 export async function executeTransaction(
   contract: ethers.Contract,
   functionName: string,
-  args: any[],
+  args: unknown[],
   options: TransactionOptions = {}
 ): Promise<ethers.ContractTransactionResponse> {
   try {

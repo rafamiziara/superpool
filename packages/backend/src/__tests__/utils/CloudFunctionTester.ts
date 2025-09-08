@@ -5,6 +5,8 @@
  * including request creation, response validation, and error handling.
  */
 
+/* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unused-vars */
+
 import type { CallableRequest, HttpsError } from 'firebase-functions/v2/https'
 import { firebaseAdminMock } from '../../__mocks__/firebase/FirebaseAdminMock'
 

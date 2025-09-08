@@ -5,6 +5,8 @@
  * authorization controls, cryptographic operations, and attack prevention.
  */
 
+/* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unused-vars */
+
 import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals'
 import { MockFactory, quickSetup, TestFixtures } from '../../__mocks__/index'
 import { detectMemoryLeaks, performanceManager, startPerformanceTest } from '../utils/PerformanceTestUtilities'

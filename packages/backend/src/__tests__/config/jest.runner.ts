@@ -208,7 +208,7 @@ export class AdvancedTestRunner {
   /**
    * Pre-execution setup for test strategy
    */
-  private async preExecutionSetup(strategy: TestStrategy, options: TestExecutionOptions): Promise<void> {
+  private async preExecutionSetup(strategy: TestStrategy, _options: TestExecutionOptions): Promise<void> {
     switch (strategy) {
       case TestStrategy.INTEGRATION:
         // Setup Firebase emulators, blockchain test network
@@ -235,7 +235,7 @@ export class AdvancedTestRunner {
   /**
    * Post-execution cleanup
    */
-  private async postExecutionCleanup(strategy: TestStrategy, options: TestExecutionOptions): Promise<void> {
+  private async postExecutionCleanup(strategy: TestStrategy, _options: TestExecutionOptions): Promise<void> {
     switch (strategy) {
       case TestStrategy.INTEGRATION:
         await this.cleanupIntegrationEnvironment()
@@ -258,7 +258,7 @@ export class AdvancedTestRunner {
   /**
    * Mock test execution (in real implementation, integrates with Jest)
    */
-  private async runTestsWithConfig(config: Partial<Config>, options: TestExecutionOptions): Promise<TestExecutionResult> {
+  private async runTestsWithConfig(_config: Partial<Config>, _options: TestExecutionOptions): Promise<TestExecutionResult> {
     // This would be replaced with actual Jest runner integration
     return {
       success: true,
@@ -359,7 +359,7 @@ export class AdvancedTestRunner {
   /**
    * Calculate overall coverage from all strategies
    */
-  private calculateOverallCoverage(results: TestSuiteResult[]): CoverageData {
+  private calculateOverallCoverage(_results: TestSuiteResult[]): CoverageData {
     // Aggregate coverage data from all test strategies
     return {
       total: 95,

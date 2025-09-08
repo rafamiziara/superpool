@@ -1,6 +1,6 @@
 import { expect } from '@jest/globals'
 import { jest } from '@jest/globals'
-import { sanitizePoolParams, validatePoolCreationParams, ValidationResult } from './validation'
+import { sanitizePoolParams, validatePoolCreationParams } from './validation'
 import { CreatePoolRequest } from '../functions/pools/createPool'
 
 // Mock ethers module
@@ -114,7 +114,7 @@ describe('validation utilities', () => {
 
     describe('Interest Rate Validation', () => {
       it('should reject non-numeric interest rates', () => {
-        const invalidParams = { ...validParams, interestRate: 'not-a-number' as any }
+        const invalidParams = { ...validParams, interestRate: 'not-a-number' as any } // eslint-disable-line @typescript-eslint/no-explicit-any
         const result = validatePoolCreationParams(invalidParams)
 
         expect(result.isValid).toBe(false)
@@ -150,7 +150,7 @@ describe('validation utilities', () => {
 
     describe('Loan Duration Validation', () => {
       it('should reject non-numeric durations', () => {
-        const invalidParams = { ...validParams, loanDuration: 'not-a-number' as any }
+        const invalidParams = { ...validParams, loanDuration: 'not-a-number' as any } // eslint-disable-line @typescript-eslint/no-explicit-any
         const result = validatePoolCreationParams(invalidParams)
 
         expect(result.isValid).toBe(false)

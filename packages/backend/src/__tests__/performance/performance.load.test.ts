@@ -6,9 +6,12 @@
  * SuperPool backend functions.
  */
 
+/* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unused-vars */
+
 import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals'
 import { MockFactory, quickSetup, SAMPLE_TRANSACTION_HASHES, TestFixtures } from '../../__mocks__/index'
 import {
+  BenchmarkResult,
   detectMemoryLeaks,
   performanceManager,
   PerformanceTestManager,
@@ -18,27 +21,86 @@ import {
 import { TestEnvironmentContext, withTestIsolation } from '../utils/TestEnvironmentIsolation'
 import { ExecutionPriority, ParallelTestCase, ParallelTestExecutor, WorkloadCategory } from '../utils/ParallelTestExecution'
 
+// Define interfaces for properly typed test responses
+interface PoolCreationResult {
+  success: boolean
+  poolId?: string
+  processingTime: number
+  error?: string
+}
+
+interface TransactionData {
+  type: string
+  gasLimit: number
+  complexity: string
+}
+
+interface TransactionResult {
+  success: boolean
+  transactionHash: string
+  gasUsed: number
+  blockNumber: number
+  pipeline: {
+    gasEstimation: number
+    signing: number
+    network: number
+    confirmation: number
+    total: number
+  }
+}
+
+interface BatchTransactionResult {
+  batchId: string
+  results: Array<{
+    transactionHash: string
+    success: boolean
+    gasUsed: number
+  }>
+  batchSize: number
+  totalProcessingTime: number
+  efficiency: number
+}
+
+interface DeviceData {
+  deviceId: string
+  walletAddress?: string
+  approved?: boolean
+}
+
+interface BulkDeviceResult {
+  bulkId: string
+  results: Array<{
+    deviceId: string
+    approved: boolean
+    approvedAt: string
+    processingOrder: number
+  }>
+  bulkSize: number
+  totalProcessingTime: number
+  successRate: number
+}
+
 // Mock all critical services for performance testing
 const PerformanceTestServices = {
   authentication: {
-    generateAuthMessage: jest.fn(),
-    verifySignatureAndLogin: jest.fn(),
+    generateAuthMessage: jest.fn<(address: string) => Promise<{ success: boolean; nonce: string }>>(),
+    verifySignatureAndLogin: jest.fn<(data: any) => Promise<{ success: boolean; token: string }>>(),
   },
   pools: {
-    createPool: jest.fn(),
-    getPool: jest.fn(),
-    updatePool: jest.fn(),
-    listPools: jest.fn(),
+    createPool: jest.fn<(data: any) => Promise<PoolCreationResult>>(),
+    getPool: jest.fn<(poolId: string) => Promise<{ success: boolean; poolData: any }>>(),
+    updatePool: jest.fn<(poolId: string, data: any) => Promise<{ success: boolean }>>(),
+    listPools: jest.fn<(params: any) => Promise<{ pools: any[]; pagination: any; queryTime: number }>>(),
   },
   contracts: {
-    executeTransaction: jest.fn(),
-    estimateGas: jest.fn(),
-    batchTransactions: jest.fn(),
+    executeTransaction: jest.fn<(txData: TransactionData) => Promise<TransactionResult>>(),
+    estimateGas: jest.fn<(data: any) => Promise<{ estimatedGas: string }>>(),
+    batchTransactions: jest.fn<(transactions: TransactionData[]) => Promise<BatchTransactionResult>>(),
   },
   deviceVerification: {
-    approveDevice: jest.fn(),
-    checkDeviceApproval: jest.fn(),
-    bulkApproveDevices: jest.fn(),
+    approveDevice: jest.fn<(deviceId: string) => Promise<{ success: boolean; deviceId: string }>>(),
+    checkDeviceApproval: jest.fn<(deviceId: string) => Promise<{ success: boolean }>>(),
+    bulkApproveDevices: jest.fn<(devices: DeviceData[]) => Promise<BulkDeviceResult>>(),
   },
 }
 
@@ -150,14 +212,13 @@ describe('Performance and Load Tests - Critical Functions', () => {
           })
 
           // Act
-          const benchmarkResult: any = await runBenchmark(
+          const benchmarkResult: BenchmarkResult = await runBenchmark(
             'signature-verification',
             async () => {
               const testSig = testSignatures[Math.floor(Math.random() * testSignatures.length)]
               return PerformanceTestServices.authentication.verifySignatureAndLogin(testSig)
             },
-            200, // 200 iterations
-            20 // 20 warmup runs
+            200 // 200 iterations (warmup is handled internally)
           )
 
           // Assert
@@ -289,14 +350,13 @@ describe('Performance and Load Tests - Critical Functions', () => {
           })
 
           // Act
-          const benchmarkResult: any = await runBenchmark(
+          const benchmarkResult: BenchmarkResult = await runBenchmark(
             'pool-creation-end-to-end',
             async () => {
               const randomPoolConfig = poolConfigurations[Math.floor(Math.random() * poolConfigurations.length)]
               return PerformanceTestServices.pools.createPool(randomPoolConfig)
             },
-            50, // 50 iterations
-            5 // 5 warmup runs
+            50 // 50 iterations (warmup is handled internally)
           )
 
           // Assert
@@ -343,15 +403,15 @@ describe('Performance and Load Tests - Critical Functions', () => {
             })
           })
 
-          const results = await Promise.all(concurrentPromises)
+          const results: PoolCreationResult[] = await Promise.all(concurrentPromises)
           const metrics = measurement.end()
 
           // Assert
           expect(results).toHaveLength(concurrentCreations)
-          expect(results.every((r) => r.success)).toBe(true)
+          expect(results.every((r: PoolCreationResult) => r.success)).toBe(true)
 
           // Calculate concurrency efficiency
-          const totalSequentialTime = results.reduce((sum, r) => sum + r.processingTime, 0)
+          const totalSequentialTime: number = results.reduce((sum: number, r: PoolCreationResult) => sum + r.processingTime, 0)
           const actualConcurrentTime = metrics.executionTime
           const concurrencyEfficiency = (totalSequentialTime / actualConcurrentTime / concurrentCreations) * 100
 
@@ -373,39 +433,42 @@ describe('Performance and Load Tests - Critical Functions', () => {
           const totalPools = 10000 // Simulate large dataset
           const pageSizes = [10, 25, 50, 100]
 
-          PerformanceTestServices.pools.listPools.mockImplementation(async ({ page = 1, pageSize = 25, filters = {} }) => {
-            // Simulate database query with filtering and pagination
-            const queryTime = Math.log10(totalPools) * 10 + Math.random() * 50 // Logarithmic scaling
-            await new Promise((resolve) => setTimeout(resolve, queryTime))
+          PerformanceTestServices.pools.listPools.mockImplementation(
+            async (args: { page?: number; pageSize?: number; filters?: Record<string, any> }) => {
+              const { page = 1, pageSize = 25, filters = {} } = args
+              // Simulate database query with filtering and pagination
+              const queryTime = Math.log10(totalPools) * 10 + Math.random() * 50 // Logarithmic scaling
+              await new Promise((resolve) => setTimeout(resolve, queryTime))
 
-            const startIndex = (page - 1) * pageSize
-            const endIndex = Math.min(startIndex + pageSize, totalPools)
+              const startIndex = (page - 1) * pageSize
+              const endIndex = Math.min(startIndex + pageSize, totalPools)
 
-            const mockPools = Array.from({ length: endIndex - startIndex }, (_, i) => ({
-              poolId: `pool-${startIndex + i}`,
-              name: `Pool ${startIndex + i}`,
-              maxLoanAmount: '1000',
-              interestRate: 500,
-              status: 'active',
-            }))
+              const mockPools = Array.from({ length: endIndex - startIndex }, (_, i) => ({
+                poolId: `pool-${startIndex + i}`,
+                name: `Pool ${startIndex + i}`,
+                maxLoanAmount: '1000',
+                interestRate: 500,
+                status: 'active',
+              }))
 
-            return {
-              pools: mockPools,
-              pagination: {
-                page,
-                pageSize,
-                totalPages: Math.ceil(totalPools / pageSize),
-                totalPools,
-                hasNext: endIndex < totalPools,
-                hasPrev: page > 1,
-              },
-              queryTime,
+              return {
+                pools: mockPools,
+                pagination: {
+                  page,
+                  pageSize,
+                  totalPages: Math.ceil(totalPools / pageSize),
+                  totalPools,
+                  hasNext: endIndex < totalPools,
+                  hasPrev: page > 1,
+                },
+                queryTime,
+              }
             }
-          })
+          )
 
           // Act & Assert
           for (const pageSize of pageSizes) {
-            const benchmarkResult: any = await runBenchmark(
+            const benchmarkResult: BenchmarkResult = await runBenchmark(
               `pool-listing-pagesize-${pageSize}`,
               async () => {
                 const randomPage = Math.floor(Math.random() * 10) + 1 // Random page 1-10
@@ -415,8 +478,7 @@ describe('Performance and Load Tests - Critical Functions', () => {
                   filters: { status: 'active' },
                 })
               },
-              30, // 30 iterations
-              3 // 3 warmup runs
+              30 // 30 iterations (warmup is handled internally)
             )
 
             expect(benchmarkResult.timing.mean).toBeLessThan(500) // < 500ms average
@@ -443,56 +505,56 @@ describe('Performance and Load Tests - Critical Functions', () => {
             { type: 'multi_sig', gasLimit: 300000, complexity: 'medium' },
           ]
 
-          PerformanceTestServices.contracts.executeTransaction.mockImplementation(async (txData) => {
-            // Simulate transaction pipeline stages
+          PerformanceTestServices.contracts.executeTransaction.mockImplementation(
+            async (txData: TransactionData): Promise<TransactionResult> => {
+              // Simulate transaction pipeline stages
 
-            // 1. Gas estimation (100-300ms)
-            const gasEstimationTime = Math.random() * 200 + 100
-            await new Promise((resolve) => setTimeout(resolve, gasEstimationTime))
+              // 1. Gas estimation (100-300ms)
+              const gasEstimationTime = Math.random() * 200 + 100
+              await new Promise((resolve) => setTimeout(resolve, gasEstimationTime))
 
-            // 2. Transaction signing (50-150ms)
-            const signingTime = Math.random() * 100 + 50
-            await new Promise((resolve) => setTimeout(resolve, signingTime))
+              // 2. Transaction signing (50-150ms)
+              const signingTime = Math.random() * 100 + 50
+              await new Promise((resolve) => setTimeout(resolve, signingTime))
 
-            // 3. Network submission (200-800ms)
-            const networkTime = Math.random() * 600 + 200
-            await new Promise((resolve) => setTimeout(resolve, networkTime))
+              // 3. Network submission (200-800ms)
+              const networkTime = Math.random() * 600 + 200
+              await new Promise((resolve) => setTimeout(resolve, networkTime))
 
-            // 4. Confirmation waiting (1000-5000ms)
-            const confirmationTime = Math.random() * 4000 + 1000
-            await new Promise((resolve) => setTimeout(resolve, confirmationTime))
+              // 4. Confirmation waiting (1000-5000ms)
+              const confirmationTime = Math.random() * 4000 + 1000
+              await new Promise((resolve) => setTimeout(resolve, confirmationTime))
 
-            const totalTime = gasEstimationTime + signingTime + networkTime + confirmationTime
+              const totalTime = gasEstimationTime + signingTime + networkTime + confirmationTime
 
-            return {
-              success: true,
-              transactionHash: SAMPLE_TRANSACTION_HASHES.POOL_CREATION_1,
-              gasUsed: txData.gasLimit * (0.8 + Math.random() * 0.2), // 80-100% of limit
-              blockNumber: 12345 + Math.floor(Math.random() * 1000),
-              pipeline: {
-                gasEstimationTime,
-                signingTime,
-                networkTime,
-                confirmationTime,
-                totalTime,
-              },
+              return {
+                success: true,
+                transactionHash: SAMPLE_TRANSACTION_HASHES.POOL_CREATION_1,
+                gasUsed: txData.gasLimit * (0.8 + Math.random() * 0.2), // 80-100% of limit
+                blockNumber: 12345 + Math.floor(Math.random() * 1000),
+                pipeline: {
+                  gasEstimationTime,
+                  signingTime,
+                  networkTime,
+                  confirmationTime,
+                  totalTime,
+                },
+              }
             }
-          })
+          )
 
           // Act & Assert
           for (const txType of transactionTypes) {
-            const benchmarkResult: any = await runBenchmark(
+            const benchmarkResult: BenchmarkResult = await runBenchmark(
               `transaction-${txType.type}`,
               async () => {
                 return PerformanceTestServices.contracts.executeTransaction({
                   type: txType.type,
                   gasLimit: txType.gasLimit,
-                  to: TestFixtures.TestData.addresses.contracts.poolFactory,
-                  data: '0x123456',
+                  complexity: txType.complexity,
                 })
               },
-              20, // 20 iterations
-              3 // 3 warmup runs
+              20 // 20 iterations (warmup is handled internally)
             )
 
             // Performance expectations based on transaction complexity
@@ -520,7 +582,7 @@ describe('Performance and Load Tests - Critical Functions', () => {
           // Arrange
           const batchSizes = [5, 10, 20, 50]
 
-          PerformanceTestServices.contracts.batchTransactions.mockImplementation(async (transactions) => {
+          PerformanceTestServices.contracts.batchTransactions.mockImplementation(async (transactions: TransactionData[]) => {
             const batchSize = transactions.length
 
             // Simulate batch processing efficiency
@@ -531,7 +593,7 @@ describe('Performance and Load Tests - Critical Functions', () => {
             const totalTime = singleTxTime * batchSize * (1 - efficiencyGain) + batchOverhead
             await new Promise((resolve) => setTimeout(resolve, totalTime))
 
-            const results = transactions.map((tx, i) => ({
+            const results = transactions.map((tx: TransactionData, i: number) => ({
               transactionHash: `0x${'a'.repeat(60)}${i.toString().padStart(4, '0')}`,
               success: true,
               gasUsed: tx.gasLimit * 0.9,
@@ -541,9 +603,8 @@ describe('Performance and Load Tests - Critical Functions', () => {
               batchId: `batch-${Date.now()}`,
               results,
               batchSize,
-              totalTime,
-              averageTimePerTx: totalTime / batchSize,
-              efficiencyGain: efficiencyGain * 100,
+              totalProcessingTime: totalTime,
+              efficiency: efficiencyGain * 100,
             }
           })
 
@@ -551,20 +612,19 @@ describe('Performance and Load Tests - Critical Functions', () => {
           for (const batchSize of batchSizes) {
             const measurement = startPerformanceTest(`batch-tx-size-${batchSize}`, 'batch-processing')
 
-            const transactions = Array.from({ length: batchSize }, (_, i) => ({
-              to: TestFixtures.TestData.addresses.contracts.poolFactory,
-              data: `0x${i.toString(16).padStart(8, '0')}`,
+            const transactions: TransactionData[] = Array.from({ length: batchSize }, (_, i) => ({
+              type: 'batch_transaction',
               gasLimit: 200000,
-              value: '0',
+              complexity: 'medium',
             }))
 
-            const result: any = await PerformanceTestServices.contracts.batchTransactions(transactions)
+            const result: BatchTransactionResult = await PerformanceTestServices.contracts.batchTransactions(transactions)
             const metrics = measurement.end()
 
             // Assert
             expect(result.results).toHaveLength(batchSize)
-            expect(result.results.every((r) => r.success)).toBe(true)
-            expect(result.efficiencyGain).toBeGreaterThan(20) // At least 20% efficiency gain
+            expect(result.results.every((r: { success: boolean; transactionHash: string; gasUsed: number }) => r.success)).toBe(true)
+            expect(result.efficiency).toBeGreaterThan(20) // At least 20% efficiency gain
 
             // Performance should scale sub-linearly
             const expectedMaxTime = batchSize * 1500 // Less than 1.5s per transaction due to batching
@@ -572,8 +632,8 @@ describe('Performance and Load Tests - Critical Functions', () => {
 
             console.log(`Batch Transaction Results (size ${batchSize}):`)
             console.log(`  Total Time: ${metrics.executionTime.toFixed(2)}ms`)
-            console.log(`  Average per Tx: ${result.averageTimePerTx.toFixed(2)}ms`)
-            console.log(`  Efficiency Gain: ${result.efficiencyGain.toFixed(2)}%`)
+            console.log(`  Average per Tx: ${(result.totalProcessingTime / batchSize).toFixed(2)}ms`)
+            console.log(`  Efficiency Gain: ${result.efficiency.toFixed(2)}%`)
           }
         })
       })
@@ -587,47 +647,47 @@ describe('Performance and Load Tests - Critical Functions', () => {
           // Arrange
           const bulkSizes = [10, 50, 100, 500]
 
-          PerformanceTestServices.deviceVerification.bulkApproveDevices.mockImplementation(async (devices) => {
-            const bulkSize = devices.length
+          PerformanceTestServices.deviceVerification.bulkApproveDevices.mockImplementation(
+            async (devices: DeviceData[]): Promise<BulkDeviceResult> => {
+              const bulkSize = devices.length
 
-            // Simulate bulk processing with parallel operations
-            const singleProcessingTime = 200 // 200ms per device individually
-            const parallelFactor = Math.min(10, bulkSize) // Max 10 parallel operations
-            const processingTime = (bulkSize / parallelFactor) * singleProcessingTime
+              // Simulate bulk processing with parallel operations
+              const singleProcessingTime = 200 // 200ms per device individually
+              const parallelFactor = Math.min(10, bulkSize) // Max 10 parallel operations
+              const processingTime = (bulkSize / parallelFactor) * singleProcessingTime
 
-            await new Promise((resolve) => setTimeout(resolve, processingTime))
+              await new Promise((resolve) => setTimeout(resolve, processingTime))
 
-            const results = devices.map((device, i) => ({
-              deviceId: device.deviceId,
-              approved: true,
-              approvedAt: new Date().toISOString(),
-              processingOrder: i,
-            }))
+              const results = devices.map((device: DeviceData, i: number) => ({
+                deviceId: device.deviceId,
+                approved: true,
+                approvedAt: new Date().toISOString(),
+                processingOrder: i,
+              }))
 
-            return {
-              bulkId: `bulk-${Date.now()}`,
-              results,
-              bulkSize,
-              processingTime,
-              parallelOperations: parallelFactor,
-              averageTimePerDevice: processingTime / bulkSize,
+              return {
+                bulkId: `bulk-${Date.now()}`,
+                results,
+                bulkSize,
+                totalProcessingTime: processingTime,
+                successRate: 100, // 100% success rate in tests
+              }
             }
-          })
+          )
 
           // Act & Assert
           for (const bulkSize of bulkSizes) {
-            const devices = Array.from({ length: bulkSize }, (_, i) => ({
+            const devices: DeviceData[] = Array.from({ length: bulkSize }, (_, i) => ({
               deviceId: `bulk-device-${i}`,
               walletAddress: TestFixtures.TestData.addresses.poolOwners[i % TestFixtures.TestData.addresses.poolOwners.length],
             }))
 
-            const benchmarkResult: any = await runBenchmark(
+            const benchmarkResult: BenchmarkResult = await runBenchmark(
               `bulk-device-approval-${bulkSize}`,
               async () => {
                 return PerformanceTestServices.deviceVerification.bulkApproveDevices(devices)
               },
-              10, // 10 iterations
-              2 // 2 warmup runs
+              10 // 10 iterations (warmup is handled internally)
             )
 
             // Assert performance scaling
@@ -780,11 +840,10 @@ describe('Performance and Load Tests - Critical Functions', () => {
         ]
 
         for (const test of performanceTests) {
-          const benchmarkResult: any = await runBenchmark(
+          const benchmarkResult: BenchmarkResult = await runBenchmark(
             test.name,
             test.operation,
-            50, // 50 iterations for statistical significance
-            5 // 5 warmup runs
+            50 // 50 iterations for statistical significance (warmup is handled internally)
           )
 
           const deviation = Math.abs(benchmarkResult.timing.mean - test.baseline.baseline)
@@ -812,24 +871,22 @@ describe('Performance and Load Tests - Critical Functions', () => {
         // Arrange - Complete user workflow
         const userWorkflow = async () => {
           // 1. Generate auth message
-          const authMessage = await PerformanceTestServices.authentication.generateAuthMessage(
+          const authMessage: { success: boolean; nonce: string } = await PerformanceTestServices.authentication.generateAuthMessage(
             TestFixtures.TestData.addresses.poolOwners[0]
           )
 
           // 2. Verify signature and login
-          const loginResult: any = await PerformanceTestServices.authentication.verifySignatureAndLogin({
+          const loginResult: { success: boolean; token: string } = await PerformanceTestServices.authentication.verifySignatureAndLogin({
             signature: '0x123',
             nonce: authMessage.nonce,
           })
 
           // 3. Approve device
-          const deviceApproval = await PerformanceTestServices.deviceVerification.approveDevice({
-            deviceId: 'workflow-device',
-            walletAddress: TestFixtures.TestData.addresses.poolOwners[0],
-          })
+          const deviceApproval: { success: boolean; deviceId: string } =
+            await PerformanceTestServices.deviceVerification.approveDevice('workflow-device')
 
           // 4. Create pool
-          const poolCreation = await PerformanceTestServices.pools.createPool(TestFixtures.TestData.pools.basic)
+          const poolCreation: PoolCreationResult = await PerformanceTestServices.pools.createPool(TestFixtures.TestData.pools.basic)
 
           // 5. Get pool details
           const poolDetails = await PerformanceTestServices.pools.getPool(poolCreation.poolId)
@@ -871,11 +928,10 @@ describe('Performance and Load Tests - Critical Functions', () => {
         })
 
         // Act
-        const benchmarkResult: any = await runBenchmark(
+        const benchmarkResult: BenchmarkResult = await runBenchmark(
           'complete-user-workflow',
           userWorkflow,
-          20, // 20 iterations
-          3 // 3 warmup runs
+          20 // 20 iterations (warmup is handled internally)
         )
 
         // Assert

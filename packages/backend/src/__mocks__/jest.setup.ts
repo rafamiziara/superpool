@@ -140,7 +140,7 @@ class MockPerformanceMonitor {
   }
 
   static getStats(): Record<string, { calls: number; avgTime: number; totalTime: number }> {
-    const stats: Record<string, any> = {}
+    const stats: Record<string, unknown> = {}
 
     for (const [mockName, count] of this.callCounts) {
       const times = this.callTimes.get(mockName) || []
@@ -174,7 +174,7 @@ class MockPerformanceMonitor {
 // Global test hooks with centralized mock management
 beforeAll(async () => {
   console.log('🧪 Starting SuperPool Backend Test Suite with Centralized Mocks')
-  
+
   // Validate test environment
   if (!process.env.NODE_ENV || process.env.NODE_ENV !== 'test') {
     throw new Error('Tests must run with NODE_ENV=test')
@@ -198,7 +198,7 @@ beforeEach(() => {
 afterEach(() => {
   // Performance monitoring and warnings
   const testDuration = Date.now() - mockCallStartTime
-  
+
   if (testDuration > 5000) {
     console.warn(`⚠️  Slow test detected: ${testDuration}ms (consider optimizing mocks)`)
   }
@@ -215,10 +215,10 @@ afterEach(() => {
 
 afterAll(async () => {
   console.log('✅ SuperPool Backend Test Suite Complete')
-  
+
   // Clean up Functions environment
   FunctionsMock.resetFunctionsEnvironment()
-  
+
   // Force garbage collection if available
   if (global.gc) {
     global.gc()
@@ -241,7 +241,7 @@ jest.setTimeout(30000) // 30 seconds
 // Export test utilities for use in individual tests
 export const testUtils = {
   timeout: 5000,
-  
+
   // Helper for creating deterministic test data
   createTestData: (prefix: string, index?: number) => ({
     id: `${prefix}-${index || Date.now()}`,
@@ -284,6 +284,7 @@ export const testUtils = {
 
 // Type augmentation for custom matchers
 declare global {
+  // eslint-disable-next-line @typescript-eslint/no-namespace
   namespace jest {
     interface Matchers<R> {
       toBeValidTransactionHash(): R
