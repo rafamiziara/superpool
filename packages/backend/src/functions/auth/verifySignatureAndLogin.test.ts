@@ -1,14 +1,7 @@
 import { jest } from '@jest/globals'
 import { isAddress, verifyMessage } from 'ethers'
 import { AUTH_NONCES_COLLECTION, USERS_COLLECTION } from '../../constants'
-import { firebaseAdminMock, FunctionsMock } from '../../__mocks__'
-
-// Mock the ethers library
-jest.mock('ethers', () => ({
-  isAddress: jest.fn<typeof isAddress>(),
-  verifyMessage: jest.fn<typeof verifyMessage>(),
-  verifyTypedData: jest.fn(),
-}))
+import { firebaseAdminMock, FunctionsMock, ethersMock, mockEthersUtils } from '../../__mocks__'
 
 // Mock the createAuthMessage utility
 const mockCreateAuthMessage = jest.fn()
@@ -64,13 +57,13 @@ describe('verifySignatureAndLoginHandler', () => {
   beforeEach(() => {
     // Reset all centralized mocks
     firebaseAdminMock.resetAllMocks()
+    ethersMock.resetAllMocks()
     jest.clearAllMocks()
 
-    // Configure ethers mocks for successful verification
-    jest.mocked(isAddress).mockReturnValue(true)
-    jest.mocked(verifyMessage).mockReturnValue(walletAddress)
-    const { verifyTypedData } = require('ethers')
-    jest.mocked(verifyTypedData).mockReturnValue(walletAddress)
+    // Configure ethers mocks for successful verification using centralized system
+    mockEthersUtils.isAddress.mockReturnValue(true)
+    mockEthersUtils.verifyMessage.mockReturnValue(walletAddress)
+    mockEthersUtils.verifyTypedData.mockReturnValue(walletAddress)
 
     // Configure Firebase Auth mock
     firebaseAdminMock.auth.createCustomToken.mockResolvedValue(firebaseToken)
@@ -246,7 +239,7 @@ describe('verifySignatureAndLoginHandler', () => {
   it('should throw an unauthenticated error if the signature verification fails', async () => {
     // Arrange
     const request = FunctionsMock.createCallableRequest({ walletAddress, signature })
-    jest.mocked(verifyMessage).mockImplementation(() => {
+    mockEthersUtils.verifyMessage.mockImplementation(() => {
       throw new Error('Ethers verify failed')
     })
 
@@ -259,7 +252,7 @@ describe('verifySignatureAndLoginHandler', () => {
   it('should throw an unauthenticated error if the recovered address does not match', async () => {
     // Arrange
     const request = FunctionsMock.createCallableRequest({ walletAddress, signature })
-    jest.mocked(verifyMessage).mockReturnValue('0xDifferentAddress')
+    mockEthersUtils.verifyMessage.mockReturnValue('0xDifferentAddress')
 
     // Act & Assert
     await expect(verifySignatureAndLoginHandler(request)).rejects.toThrow('The signature does not match the provided wallet address.')
@@ -463,8 +456,8 @@ describe('verifySignatureAndLoginHandler', () => {
       chainId,
     })
 
-    const { verifyTypedData } = require('ethers')
-    jest.mocked(verifyTypedData).mockReturnValue(walletAddress)
+    // verifyTypedData is handled by centralized mock system
+    mockEthersUtils.verifyTypedData.mockReturnValue(walletAddress)
 
     // Act
     const result = await verifySignatureAndLoginHandler(request)
@@ -505,8 +498,8 @@ describe('verifySignatureAndLoginHandler', () => {
       chainId: 1,
     })
 
-    const { verifyTypedData } = require('ethers')
-    jest.mocked(verifyTypedData).mockImplementation(() => {
+    // verifyTypedData is handled by centralized mock system
+    mockEthersUtils.verifyTypedData.mockImplementation(() => {
       throw new Error('EIP-712 verification failed')
     })
 
@@ -526,8 +519,8 @@ describe('verifySignatureAndLoginHandler', () => {
       // chainId not provided
     })
 
-    const { verifyTypedData } = require('ethers')
-    jest.mocked(verifyTypedData).mockReturnValue(walletAddress)
+    // verifyTypedData is handled by centralized mock system
+    mockEthersUtils.verifyTypedData.mockReturnValue(walletAddress)
 
     // Act
     const result = await verifySignatureAndLoginHandler(request)
@@ -552,7 +545,7 @@ describe('verifySignatureAndLoginHandler', () => {
     const request = FunctionsMock.createCallableRequest({ walletAddress, signature })
     const nonErrorObject = { code: 'CUSTOM_ERROR', details: 'Some custom error' }
 
-    jest.mocked(verifyMessage).mockImplementation(() => {
+    mockEthersUtils.verifyMessage.mockImplementation(() => {
       throw nonErrorObject // Throw non-Error object
     })
 
@@ -567,7 +560,7 @@ describe('verifySignatureAndLoginHandler', () => {
     const request = FunctionsMock.createCallableRequest({ walletAddress, signature })
     const stringError = 'Custom string error'
 
-    jest.mocked(verifyMessage).mockImplementation(() => {
+    mockEthersUtils.verifyMessage.mockImplementation(() => {
       throw stringError // Throw string
     })
 
@@ -581,7 +574,7 @@ describe('verifySignatureAndLoginHandler', () => {
     // Arrange
     const request = FunctionsMock.createCallableRequest({ walletAddress, signature })
 
-    jest.mocked(verifyMessage).mockImplementation(() => {
+    mockEthersUtils.verifyMessage.mockImplementation(() => {
       throw null // Throw null
     })
 

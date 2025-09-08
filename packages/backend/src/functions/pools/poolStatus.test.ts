@@ -13,19 +13,6 @@
 
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from '@jest/globals'
 import { ethers } from 'ethers'
-
-// Mock ethers to use centralized mock system
-jest.mock('ethers', () => ({
-  ...jest.requireActual('ethers'),
-  Contract: jest.fn(),
-  JsonRpcProvider: jest.fn(),
-  parseUnits: jest.fn((value: string, unit: string) => {
-    if (unit === 'wei' || unit === 'gwei') {
-      return BigInt(value)
-    }
-    return BigInt(Math.floor(parseFloat(value) * Math.pow(10, 18)))
-  }),
-}))
 import { ContractMock, ethersMock, firebaseAdminMock, FunctionsMock, MockFactory, quickSetup, TestFixtures } from '../../__mocks__'
 import { detectMemoryLeaks, performanceManager, runBenchmark, startPerformanceTest } from '../../__tests__/utils/PerformanceTestUtilities'
 import { poolStatus, PoolStatusRequest, PoolStatusResponse } from './poolStatus'

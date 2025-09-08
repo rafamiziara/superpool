@@ -11,11 +11,6 @@ jest.mock('uuid', () => ({
   v4: mockV4,
 }))
 
-// Mock the ethers library
-jest.mock('ethers', () => ({
-  isAddress: jest.fn(),
-}))
-
 // Mock the createAuthMessage utility function
 jest.mock('../../utils', () => ({
   createAuthMessage: jest.fn(),

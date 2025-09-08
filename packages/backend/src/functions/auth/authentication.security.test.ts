@@ -22,42 +22,7 @@ import { generateAuthMessageHandler } from './generateAuthMessage'
 import { verifySignatureAndLoginHandler } from './verifySignatureAndLogin'
 
 // Import centralized mock system (MOCK_SYSTEM.md compliant)
-import { ethersMock, firebaseAdminMock, FunctionsMock } from '../../__mocks__'
-
-const mockDoc = jest.fn(() => ({
-  set: mockSet,
-  update: mockUpdate,
-  delete: mockDelete,
-  get: mockGet,
-}))
-
-const mockCollection = jest.fn(() => ({
-  doc: mockDoc,
-}))
-
-const mockFirestore = {
-  collection: mockCollection,
-}
-
-const mockAuth = {
-  createCustomToken: mockCreateCustomToken,
-}
-
-// Mock Firebase modules
-jest.mock('firebase-admin/firestore', () => ({
-  getFirestore: () => mockFirestore,
-}))
-
-jest.mock('firebase-admin/auth', () => ({
-  getAuth: () => mockAuth,
-}))
-
-// Mock ethers
-jest.mock('ethers', () => ({
-  isAddress: jest.fn<typeof isAddress>(),
-  verifyMessage: jest.fn<typeof verifyMessage>(),
-  verifyTypedData: jest.fn<typeof verifyTypedData>(),
-}))
+import { ethersMock, firebaseAdminMock, FunctionsMock, mockEthersUtils } from '../../__mocks__'
 
 // Mock uuid
 jest.mock('uuid', () => ({
@@ -106,12 +71,11 @@ describe('Authentication Security Tests', () => {
 
     // Setup ethers mocks using centralized system
     ethersMock.provider.getNetwork.mockResolvedValue({ chainId: 80002, name: 'polygon-amoy' })
+    mockEthersUtils.isAddress.mockReturnValue(true)
+    mockEthersUtils.verifyMessage.mockReturnValue(validWalletAddress)
 
-    // Setup Firestore mocks
-    mockSet.mockResolvedValue(undefined)
-    mockUpdate.mockResolvedValue(undefined)
-    mockDelete.mockResolvedValue(undefined)
-    mockCreateCustomToken.mockResolvedValue('mock-token')
+    // Setup Firebase Auth mock
+    firebaseAdminMock.auth.createCustomToken.mockResolvedValue('mock-token')
 
     // Setup UUID mock
     mockV4.mockReturnValue(mockNonce)
