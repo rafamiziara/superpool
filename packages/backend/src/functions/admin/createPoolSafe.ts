@@ -9,7 +9,6 @@ import {
   getSafeThreshold,
   isSafeOwner,
   prepareSafePoolCreationTransaction,
-  SafeTransaction,
 } from '../../utils/multisig'
 import { AppError, handleError } from '../../utils/errorHandling'
 
@@ -30,7 +29,7 @@ export interface CreatePoolSafeResponse {
   requiredSignatures: number
   currentSignatures: number
   message: string
-  poolParams?: any
+  poolParams?: Record<string, unknown>
 }
 
 /**

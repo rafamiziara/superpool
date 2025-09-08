@@ -3,7 +3,7 @@ import * as express from 'express'
 import { AppCheckToken } from 'firebase-admin/app-check'
 import { Request } from 'firebase-functions/v2/https'
 // Import centralized mocks
-import { firebaseAdminMock, FunctionsMock } from '../../__mocks__'
+import { firebaseAdminMock } from '../../__mocks__'
 
 // Mock the logger to prevent console clutter during tests
 const mockLoggerError = jest.fn()

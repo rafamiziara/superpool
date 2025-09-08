@@ -40,7 +40,7 @@ export interface CollectionSeedConfig {
 
 export interface DocumentSeedConfig {
   id?: string
-  data: Record<string, any>
+  data: Record<string, unknown>
   subcollections?: CollectionSeedConfig[]
 }
 
@@ -59,7 +59,7 @@ export interface DatabaseSnapshot {
 export interface CollectionSnapshot {
   name: string
   documentCount: number
-  documents: Map<string, any>
+  documents: Map<string, unknown>
   indexes: IndexConfig[]
 }
 
@@ -384,7 +384,7 @@ export class TestDatabaseManager extends EventEmitter {
       const collectionRef = this.firestore.collection(collectionName)
       const snapshot = await collectionRef.get()
 
-      const documents = new Map<string, any>()
+      const documents = new Map<string, unknown>()
       snapshot.forEach((doc) => {
         documents.set(doc.id, doc.data())
       })

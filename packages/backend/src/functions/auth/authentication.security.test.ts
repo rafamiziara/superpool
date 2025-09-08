@@ -11,11 +11,8 @@
  */
 
 import { jest } from '@jest/globals'
-import { isAddress, verifyMessage, verifyTypedData } from 'ethers'
+import { isAddress, verifyMessage } from 'ethers'
 import { HttpsError } from 'firebase-functions/v2/https'
-import { AUTH_NONCES_COLLECTION, USERS_COLLECTION } from '../../constants'
-import { AuthNonce, UserProfile } from '../../types'
-import { createAuthMessage } from '../../utils'
 
 // Import handlers for testing
 import { generateAuthMessageHandler } from './generateAuthMessage'

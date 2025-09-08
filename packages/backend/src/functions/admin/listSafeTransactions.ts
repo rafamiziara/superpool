@@ -1,7 +1,7 @@
 import { CallableRequest, HttpsError, onCall } from 'firebase-functions/v2/https'
 import { logger } from 'firebase-functions'
 import { getFirestore } from 'firebase-admin/firestore'
-import { getSafeOwners, isSafeOwner } from '../../utils/multisig'
+import { isSafeOwner } from '../../utils/multisig'
 import { ethers } from 'ethers'
 import { handleError } from '../../utils/errorHandling'
 
@@ -30,7 +30,7 @@ export interface SafeTransactionInfo {
   expiresAt: Date
   executionTxHash?: string
   executedAt?: Date
-  poolParams?: any
+  poolParams?: Record<string, unknown>
   readyToExecute: boolean
 }
 
@@ -96,7 +96,7 @@ export const listSafeTransactions = onCall(
 
       // 4. Build Firestore query
       const db = getFirestore()
-      let queryRef: any = db.collection('safe_transactions')
+      let queryRef = db.collection('safe_transactions')
 
       // Apply filters
       if (request.data.safeAddress) {
@@ -124,7 +124,7 @@ export const listSafeTransactions = onCall(
       const transactionsSnapshot = await queryRef.orderBy('createdAt', 'desc').offset(offset).limit(limit).get()
 
       // 7. Transform results
-      const transactions: SafeTransactionInfo[] = transactionsSnapshot.docs.map((doc: any) => {
+      const transactions: SafeTransactionInfo[] = transactionsSnapshot.docs.map((doc) => {
         const data = doc.data()
         const signatures = data.signatures || []
 
@@ -135,7 +135,7 @@ export const listSafeTransactions = onCall(
           status: data.status,
           requiredSignatures: data.requiredSignatures,
           currentSignatures: signatures.length,
-          signatures: signatures.map((sig: any) => ({
+          signatures: signatures.map((sig: { signer: string; signature: string; signedAt: Date }) => ({
             signer: sig.signer,
             signedAt: sig.signedAt?.toDate(),
           })),
