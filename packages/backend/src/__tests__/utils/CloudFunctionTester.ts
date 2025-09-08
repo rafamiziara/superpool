@@ -11,18 +11,18 @@ import { expect } from '@jest/globals'
 import type { CallableRequest, HttpsError } from 'firebase-functions/v2/https'
 import { firebaseAdminMock } from '../../__mocks__/firebase/FirebaseAdminMock'
 
-export interface TestCallableRequest<T = any> extends Partial<CallableRequest<T>> {
+export interface TestCallableRequest<T = Record<string, unknown>> {
   data: T
   auth?: {
     uid: string
-    token?: any
-  }
+    token: Record<string, unknown>
+  } | null
 }
 
 export interface MockHttpsError {
   code: string
   message: string
-  details?: any
+  details?: Record<string, unknown>
   httpErrorCode?: number
 }
 

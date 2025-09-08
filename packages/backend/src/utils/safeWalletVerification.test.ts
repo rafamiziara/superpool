@@ -30,6 +30,7 @@ interface MockSafeContract {
   getThreshold: jest.MockedFunction<() => Promise<bigint>>
   getOwners: jest.MockedFunction<() => Promise<string[]>>
   isValidSignature: jest.MockedFunction<(hash: string, signature: string) => Promise<string>>
+  [key: string]: unknown // Allow other properties
 }
 
 describe('SafeWalletVerificationService', () => {
