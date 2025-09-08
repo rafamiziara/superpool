@@ -22,11 +22,11 @@ import { HttpsError } from 'firebase-functions/v2/https'
 import { AppError } from '../../utils/errorHandling'
 import {
   detectMemoryLeaks,
+  type LoadTestConfig,
   performanceManager,
+  type PerformanceThresholds,
   runBenchmark,
   startPerformanceTest,
-  type LoadTestConfig,
-  type PerformanceThresholds,
 } from '../../__tests__/utils/PerformanceTestUtilities'
 
 describe('listPools Cloud Function', () => {

@@ -4,6 +4,9 @@ import { sanitizePoolParams, validatePoolCreationParams } from './validation'
 import { CreatePoolRequest } from '../functions/pools/createPool'
 import { ethersMock } from '../__mocks__'
 
+// Mock the ethers module with the manual mock
+jest.mock('ethers')
+
 describe('validation utilities', () => {
   beforeEach(() => {
     // Reset all mocks before each test

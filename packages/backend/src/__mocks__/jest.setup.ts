@@ -140,7 +140,7 @@ class MockPerformanceMonitor {
   }
 
   static getStats(): Record<string, { calls: number; avgTime: number; totalTime: number }> {
-    const stats: Record<string, unknown> = {}
+    const stats: Record<string, { calls: number; avgTime: number; totalTime: number }> = {}
 
     for (const [mockName, count] of this.callCounts) {
       const times = this.callTimes.get(mockName) || []
