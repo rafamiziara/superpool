@@ -20,5 +20,9 @@ export const auth = getAuth(adminApp)
 export const firestore = getFirestore(adminApp)
 export const appCheck = getAppCheck(adminApp)
 
+// Export services
+export * from './ContractService'
+export * from './deviceVerification'
+
 // Export provider service
 export { ProviderService } from './providerService'
