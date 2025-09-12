@@ -2,34 +2,8 @@ import { jest } from '@jest/globals'
 import * as express from 'express'
 import { AppCheckToken } from 'firebase-admin/app-check'
 import { Request } from 'firebase-functions/v2/https'
-
-// Mock the sub-path 'firebase-admin/firestore' to contain getFirestore
-jest.mock('firebase-admin/firestore', () => ({
-  getFirestore: jest.fn(),
-}))
-
-// Mock the sub-path 'firebase-admin/app-check' to return getAppCheck()
-type CreateTokenFunction = (appId: string, options?: { appId?: string }) => Promise<AppCheckToken>
-const mockCreateToken = jest.fn<CreateTokenFunction>()
-
-const mockAppCheck = { createToken: mockCreateToken }
-
-jest.mock('firebase-admin/app-check', () => ({
-  getAppCheck: () => mockAppCheck,
-}))
-
-// Mock the root 'firebase-admin' package with all the necessary dependencies
-const mockCredential = {
-  getAccessToken: jest.fn(() => ({
-    accessToken: 'mock-access-token',
-    expirationTime: 123456789,
-  })),
-}
-
-jest.mock('firebase-admin', () => ({
-  initializeApp: jest.fn(),
-  credential: { cert: () => mockCredential },
-}))
+// Import centralized mocks
+import { firebaseAdminMock } from '../../__mocks__'
 
 // Mock the logger to prevent console clutter during tests
 const mockLoggerError = jest.fn()
@@ -40,6 +14,18 @@ jest.mock('firebase-functions/v2', () => ({
   logger: { error: mockLoggerError, info: mockLoggerInfo, warn: mockLoggerWarn },
 }))
 
+// Mock the services module to use our centralized Firebase mocks
+jest.mock('../../services', () => {
+  const { firebaseAdminMock } = require('../../__mocks__')
+  return {
+    auth: firebaseAdminMock.auth,
+    firestore: firebaseAdminMock.firestore,
+    appCheck: firebaseAdminMock.appCheck,
+    ContractService: jest.fn(),
+    ProviderService: jest.fn(),
+  }
+})
+
 // Mock the DeviceVerificationService
 const mockIsDeviceApproved = jest.fn() as jest.MockedFunction<(deviceId: string) => Promise<boolean>>
 jest.mock('../../services/deviceVerification', () => ({
@@ -49,21 +35,34 @@ jest.mock('../../services/deviceVerification', () => ({
 }))
 
 const { customAppCheckMinterHandler } = require('./customAppCheckMinter')
+const services = require('../../services')
 
 describe('customAppCheckMinterHandler', () => {
   const TTL_MILLIS = 1000 * 60 * 60 * 24
   const FIREBASE_APP_ID = 'app-id-test'
 
   // Use a mocked request and response object
-  const mockRequest = { method: 'POST' } as Request
-  const mockResponse = { status: jest.fn(() => mockResponse), send: jest.fn() } as Partial<express.Response>
+  const mockRequest = { method: 'POST', body: {} } as Request
+  const mockResponse = {
+    status: jest.fn().mockReturnThis(),
+    send: jest.fn().mockReturnThis(),
+  } as Partial<express.Response>
 
   beforeEach(() => {
+    // Reset all centralized mocks
+    firebaseAdminMock.resetAllMocks()
     jest.clearAllMocks()
+
     process.env.APP_ID_FIREBASE = FIREBASE_APP_ID
 
     // Default to approved device for existing tests
     mockIsDeviceApproved.mockResolvedValue(true)
+
+    // Setup default App Check mock behavior
+    services.appCheck.createToken.mockResolvedValue({
+      token: 'default-mock-token',
+      ttlMillis: TTL_MILLIS,
+    })
   })
 
   // Test case: Successful token minting (Happy Path)
@@ -76,14 +75,16 @@ describe('customAppCheckMinterHandler', () => {
     }
 
     mockRequest.body = { deviceId: testDeviceId }
-    mockCreateToken.mockResolvedValue(expectedToken)
+
+    // Configure the centralized App Check mock
+    services.appCheck.createToken.mockResolvedValue(expectedToken)
 
     // Act
     await customAppCheckMinterHandler(mockRequest, mockResponse as express.Response)
 
     // Assert
     expect(mockIsDeviceApproved).toHaveBeenCalledWith(testDeviceId)
-    expect(mockCreateToken).toHaveBeenCalledWith(FIREBASE_APP_ID, { ttlMillis: TTL_MILLIS })
+    expect(services.appCheck.createToken).toHaveBeenCalledWith(FIREBASE_APP_ID, { ttlMillis: TTL_MILLIS })
     expect(mockLoggerInfo).toHaveBeenCalledWith('App Check token minted successfully', { deviceId: testDeviceId })
     expect(mockResponse.status).toHaveBeenCalledWith(200)
     expect(mockResponse.send).toHaveBeenCalledWith({ appCheckToken: expectedToken.token, expireTimeMillis: expectedToken.ttlMillis })
@@ -136,7 +137,8 @@ describe('customAppCheckMinterHandler', () => {
   it('should return a 500 error if token creation fails', async () => {
     // Arrange
     mockRequest.body = { deviceId: 'test-device' }
-    mockCreateToken.mockRejectedValue(new Error('Admin SDK error'))
+    // Configure the centralized App Check mock to throw an error
+    services.appCheck.createToken.mockRejectedValue(new Error('Admin SDK error'))
 
     // Act
     await customAppCheckMinterHandler(mockRequest, mockResponse as express.Response)
@@ -144,7 +146,7 @@ describe('customAppCheckMinterHandler', () => {
     // Assert
     expect(mockResponse.status).toHaveBeenCalledWith(500)
     expect(mockResponse.send).toHaveBeenCalledWith('Internal Server Error: Failed to mint App Check token')
-    expect(mockCreateToken).toHaveBeenCalledTimes(1)
+    expect(services.appCheck.createToken).toHaveBeenCalledTimes(1)
   })
 
   // Test case: Device not approved (Security)
@@ -162,7 +164,7 @@ describe('customAppCheckMinterHandler', () => {
     expect(mockLoggerWarn).toHaveBeenCalledWith('App Check token requested for unapproved device', { deviceId: testDeviceId })
     expect(mockResponse.status).toHaveBeenCalledWith(403)
     expect(mockResponse.send).toHaveBeenCalledWith('Forbidden: Device not approved. Please authenticate with your wallet first.')
-    expect(mockCreateToken).not.toHaveBeenCalled()
+    expect(services.appCheck.createToken).not.toHaveBeenCalled()
   })
 
   // Test case: Device verification throws error
@@ -180,6 +182,6 @@ describe('customAppCheckMinterHandler', () => {
     expect(mockLoggerError).toHaveBeenCalledWith('Device verification failed', { error: expect.any(Error), deviceId: testDeviceId })
     expect(mockResponse.status).toHaveBeenCalledWith(403)
     expect(mockResponse.send).toHaveBeenCalledWith('Forbidden: Device not approved. Please authenticate with your wallet first.')
-    expect(mockCreateToken).not.toHaveBeenCalled()
+    expect(services.appCheck.createToken).not.toHaveBeenCalled()
   })
 })

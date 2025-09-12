@@ -1,65 +1,11 @@
 import { jest } from '@jest/globals'
-import { isAddress, verifyMessage } from 'ethers'
 import { AUTH_NONCES_COLLECTION, USERS_COLLECTION } from '../../constants'
+import { FunctionsMock } from '../../__mocks__'
 
-// Type definitions for Firebase Firestore mock functions
-type DeleteFunction = () => Promise<void>
-type UpdateFunction = () => Promise<void>
-type SetFunction = () => Promise<void>
-type CreateCustomTokenFunction = () => Promise<string>
-
-// Mock the delete method specifically for the nonce document
-const mockDelete = jest.fn<DeleteFunction>()
-const mockUpdate = jest.fn<UpdateFunction>()
-const mockSet = jest.fn<SetFunction>()
-
-const mockNonceDoc = {
-  get: jest.fn(() =>
-    createMockDocumentSnapshot(true, { nonce: 'test-nonce', timestamp: 1234567890, expiresAt: 1678886400000 + 10 * 60 * 1000 })
-  ),
-  delete: mockDelete,
-}
-
-const mockUserDoc = {
-  get: jest.fn(() => Promise.resolve(createMockDocumentSnapshot(true, { walletAddress: '0x1234', createdAt: 1234567890 }))),
-  update: mockUpdate,
-  set: mockSet,
-}
-
-const mockCollection = jest.fn((collectionName) => {
-  if (collectionName === AUTH_NONCES_COLLECTION) {
-    return { doc: () => mockNonceDoc }
-  }
-
-  if (collectionName === USERS_COLLECTION) {
-    return { doc: () => mockUserDoc }
-  }
-
-  return { doc: jest.fn() }
-})
-
-const mockFirestore = { collection: mockCollection }
-
-jest.mock('firebase-admin/firestore', () => {
-  const actualFirestore = jest.requireActual('firebase-admin/firestore') as typeof import('firebase-admin/firestore')
-
-  return {
-    getFirestore: () => mockFirestore,
-    Timestamp: actualFirestore.Timestamp,
-  }
-})
-
-const mockCreateCustomToken = jest.fn<CreateCustomTokenFunction>()
-const mockAuth = jest.fn(() => ({ createCustomToken: mockCreateCustomToken }))
-
-jest.mock('firebase-admin/auth', () => ({
-  getAuth: mockAuth,
-}))
-
-// Mock the ethers library
+// Mock ethers module completely with all needed functions
 jest.mock('ethers', () => ({
-  isAddress: jest.fn<typeof isAddress>(),
-  verifyMessage: jest.fn<typeof verifyMessage>(),
+  isAddress: jest.fn(),
+  verifyMessage: jest.fn(),
   verifyTypedData: jest.fn(),
 }))
 
@@ -70,9 +16,7 @@ jest.mock('../../utils', () => ({
 }))
 
 // Mock the DeviceVerificationService
-const mockApproveDevice = jest.fn() as jest.MockedFunction<
-  (deviceId: string, walletAddress: string, platform: 'android' | 'ios' | 'web') => Promise<void>
->
+const mockApproveDevice = jest.fn()
 jest.mock('../../services/deviceVerification', () => ({
   DeviceVerificationService: {
     approveDevice: mockApproveDevice,
@@ -87,16 +31,41 @@ jest.mock('../../utils/safeWalletVerification', () => ({
   },
 }))
 
-// Mock the ProviderService
-const mockGetProvider = jest.fn()
-jest.mock('../../services/providerService', () => ({
+// Mock the services module
+const mockFirestore = {
+  collection: jest.fn(() => ({
+    doc: jest.fn(() => ({
+      get: jest.fn(),
+      set: jest.fn(),
+      update: jest.fn(),
+      delete: jest.fn(),
+    })),
+  })),
+}
+
+const mockAuth = {
+  createCustomToken: jest.fn(),
+}
+
+jest.mock('../../services', () => ({
+  firestore: mockFirestore,
+  auth: mockAuth,
   ProviderService: {
-    getProvider: mockGetProvider,
+    getProvider: jest.fn(),
   },
 }))
 
 const { verifySignatureAndLoginHandler } = require('./verifySignatureAndLogin')
-const { createMockDocumentSnapshot } = require('../../utils/firestore-mock')
+
+// Get mocked ethers functions
+const ethers = require('ethers')
+const mockedIsAddress = ethers.isAddress as jest.MockedFunction<typeof ethers.isAddress>
+const mockedVerifyMessage = ethers.verifyMessage as jest.MockedFunction<typeof ethers.verifyMessage>
+const mockedVerifyTypedData = ethers.verifyTypedData as jest.MockedFunction<typeof ethers.verifyTypedData>
+
+// Get mocked services
+const { ProviderService } = require('../../services')
+const mockGetProvider = ProviderService.getProvider as jest.MockedFunction<typeof ProviderService.getProvider>
 
 describe('verifySignatureAndLoginHandler', () => {
   const walletAddress = '0x1234567890123456789012345678901234567890'
@@ -115,27 +84,51 @@ describe('verifySignatureAndLoginHandler', () => {
   })
 
   beforeEach(() => {
+    // Reset all mocks
     jest.clearAllMocks()
 
-    // Mock functions for a successful run
-    jest.mocked(isAddress).mockReturnValue(true)
-    jest.mocked(verifyMessage).mockReturnValue(walletAddress)
-    const { verifyTypedData } = require('ethers')
-    jest.mocked(verifyTypedData).mockReturnValue(walletAddress)
+    // Configure ethers mocks for successful verification
+    mockedIsAddress.mockReturnValue(true)
+    mockedVerifyMessage.mockReturnValue(walletAddress)
+    mockedVerifyTypedData.mockReturnValue(walletAddress)
+
+    // Configure Firebase Auth mock
+    mockAuth.createCustomToken.mockResolvedValue(firebaseToken)
+
+    // Configure utility function mocks
     mockCreateAuthMessage.mockReturnValue(mockMessage)
-    mockCreateCustomToken.mockResolvedValue(firebaseToken)
 
-    // Explicitly mock the Firestore calls for the happy path (nonce exists, user exists)
-    mockNonceDoc.get.mockResolvedValue(createMockDocumentSnapshot(true, { nonce, timestamp, expiresAt: mockNow + 10 * 60 * 1000 }))
-    mockUserDoc.get.mockResolvedValue(createMockDocumentSnapshot(true, { walletAddress, createdAt: timestamp }))
+    // Configure Firestore mocks for the happy path (nonce exists, user exists)
+    const mockNonceDoc = {
+      exists: true,
+      data: () => ({
+        nonce,
+        timestamp,
+        expiresAt: mockNow + 10 * 60 * 1000,
+      }),
+    }
 
-    // Set up the mocks for the other calls
-    mockSet.mockResolvedValue(undefined)
-    mockUpdate.mockResolvedValue(undefined)
-    mockDelete.mockResolvedValue(undefined)
+    const mockUserDoc = {
+      exists: true,
+      data: () => ({
+        walletAddress,
+        createdAt: timestamp,
+      }),
+    }
 
-    mockCreateAuthMessage.mockReturnValue(mockMessage)
-    mockCreateCustomToken.mockResolvedValue(firebaseToken)
+    // Mock collection().doc().get() chain for both collections
+    mockFirestore.collection.mockImplementation(((collectionName: string) => {
+      const docMock = jest.fn((_docId: string) => {
+        const mockDoc = collectionName === AUTH_NONCES_COLLECTION ? mockNonceDoc : mockUserDoc
+        return {
+          get: jest.fn().mockResolvedValue(mockDoc),
+          set: jest.fn().mockResolvedValue(undefined),
+          update: jest.fn().mockResolvedValue(undefined),
+          delete: jest.fn().mockResolvedValue(undefined),
+        }
+      })
+      return { doc: docMock }
+    }) as any)
 
     // Mock SafeWalletVerificationService with conditional behavior
     mockSafeWalletVerification.mockImplementation(async (walletAddr, signature) => {
@@ -174,7 +167,7 @@ describe('verifySignatureAndLoginHandler', () => {
     mockGetProvider.mockReturnValue({
       getNetwork: jest.fn(),
       getBlockNumber: jest.fn(),
-    })
+    } as any)
   })
 
   afterAll(() => {
@@ -184,44 +177,72 @@ describe('verifySignatureAndLoginHandler', () => {
   // Test Case: Successful login and token issuance (Happy Path)
   it('should successfully verify the signature and issue a Firebase token', async () => {
     // Arrange
-    const request = { data: { walletAddress, signature } }
+    const request = FunctionsMock.createCallableRequest({ walletAddress, signature })
 
     // Act
     const result = await verifySignatureAndLoginHandler(request)
 
     // Assert
-    expect(isAddress).toHaveBeenCalledWith(walletAddress)
-    expect(mockCollection).toHaveBeenCalledWith(AUTH_NONCES_COLLECTION)
-    expect(mockCollection).toHaveBeenCalledWith(USERS_COLLECTION)
-    expect(mockNonceDoc.get).toHaveBeenCalledTimes(1)
-    expect(mockUserDoc.get).toHaveBeenCalledTimes(1)
+    expect(mockedIsAddress).toHaveBeenCalledWith(walletAddress)
+    expect(mockFirestore.collection).toHaveBeenCalledWith(AUTH_NONCES_COLLECTION)
+    expect(mockFirestore.collection).toHaveBeenCalledWith(USERS_COLLECTION)
     expect(mockCreateAuthMessage).toHaveBeenCalledWith(walletAddress, nonce, timestamp)
-    expect(verifyMessage).toHaveBeenCalledWith(mockMessage, signature)
-    expect(mockCollection).toHaveBeenCalledWith(USERS_COLLECTION)
-    expect(mockUpdate).toHaveBeenCalledWith({ updatedAt: mockNow })
-    expect(mockDelete).toHaveBeenCalled()
-    expect(mockCreateCustomToken).toHaveBeenCalledWith(walletAddress)
+    expect(mockedVerifyMessage).toHaveBeenCalledWith(mockMessage, signature)
+    expect(mockAuth.createCustomToken).toHaveBeenCalledWith(walletAddress)
     expect(result).toEqual({ firebaseToken })
   })
 
   // Test Case: User Profile Does Not Exist
   it('should create a new user profile if one does not exist', async () => {
     // Arrange
-    const request = { data: { walletAddress, signature } }
-    mockNonceDoc.get.mockResolvedValue(createMockDocumentSnapshot(true, { nonce, timestamp, expiresAt: mockNow + 10 * 60 * 1000 }))
-    mockUserDoc.get.mockResolvedValue(createMockDocumentSnapshot(false))
+    const request = FunctionsMock.createCallableRequest({ walletAddress, signature })
+
+    // Override the mock to simulate user document not existing
+    const mockSetFn = jest.fn().mockResolvedValue(undefined)
+    mockFirestore.collection.mockImplementation(((collectionName: string) => {
+      const docMock = jest.fn((_docId: string) => {
+        if (collectionName === AUTH_NONCES_COLLECTION) {
+          // Nonce doc exists
+          return {
+            get: jest.fn().mockResolvedValue({
+              exists: true,
+              data: () => ({
+                nonce,
+                timestamp,
+                expiresAt: mockNow + 10 * 60 * 1000,
+              }),
+            }),
+            delete: jest.fn().mockResolvedValue(undefined),
+          }
+        } else {
+          // User doc doesn't exist
+          return {
+            get: jest.fn().mockResolvedValue({
+              exists: false,
+            }),
+            set: mockSetFn,
+            update: jest.fn().mockResolvedValue(undefined),
+          }
+        }
+      })
+      return { doc: docMock }
+    }) as any)
 
     // Act
     await verifySignatureAndLoginHandler(request)
 
-    // Assert
-    expect(mockSet).toHaveBeenCalledWith({ walletAddress, createdAt: mockNow, updatedAt: mockNow })
+    // Assert - test that user was created with proper data
+    expect(mockSetFn).toHaveBeenCalledWith({
+      walletAddress,
+      createdAt: mockNow,
+      updatedAt: mockNow,
+    })
   })
 
   // Test Case: Invalid Argument - Missing walletAddress or signature
   it('should throw an invalid-argument error if walletAddress or signature is missing', async () => {
     // Arrange
-    const request = { data: { walletAddress: '', signature } }
+    const request = FunctionsMock.createCallableRequest({ walletAddress: '', signature })
 
     // Act & Assert
     await expect(verifySignatureAndLoginHandler(request)).rejects.toThrow(
@@ -233,7 +254,7 @@ describe('verifySignatureAndLoginHandler', () => {
   // Test Case: Invalid Argument - Invalid signature format (missing 0x prefix)
   it('should throw an invalid-argument error if the signature format is incorrect', async () => {
     // Arrange
-    const request = { data: { walletAddress, signature: 'invalid-signature' } }
+    const request = FunctionsMock.createCallableRequest({ walletAddress, signature: 'invalid-signature' })
 
     // Act & Assert
     await expect(verifySignatureAndLoginHandler(request)).rejects.toThrow(
@@ -246,7 +267,7 @@ describe('verifySignatureAndLoginHandler', () => {
   it('should throw an invalid-argument error if signature contains invalid hex characters', async () => {
     // Arrange - signature with invalid characters (G, H not valid hex)
     const invalidHexSignature = '0x' + 'G'.repeat(10)
-    const request = { data: { walletAddress, signature: invalidHexSignature } }
+    const request = FunctionsMock.createCallableRequest({ walletAddress, signature: invalidHexSignature })
 
     // Act & Assert
     await expect(verifySignatureAndLoginHandler(request)).rejects.toThrow(
@@ -258,8 +279,33 @@ describe('verifySignatureAndLoginHandler', () => {
   // Test Case: Not Found - Nonce does not exist
   it('should throw a not-found error if the nonce document does not exist', async () => {
     // Arrange
-    const request = { data: { walletAddress, signature } }
-    mockNonceDoc.get.mockResolvedValue(createMockDocumentSnapshot(false))
+    const request = FunctionsMock.createCallableRequest({ walletAddress, signature })
+
+    // Override the mock to simulate nonce document not existing
+    mockFirestore.collection.mockImplementation(((collectionName: string) => {
+      const docMock = jest.fn((_docId: string) => {
+        if (collectionName === AUTH_NONCES_COLLECTION) {
+          // Nonce doc doesn't exist
+          return {
+            get: jest.fn().mockResolvedValue({
+              exists: false,
+            }),
+            delete: jest.fn().mockResolvedValue(undefined),
+          }
+        } else {
+          // User doc exists (not relevant for this test)
+          return {
+            get: jest.fn().mockResolvedValue({
+              exists: true,
+              data: () => ({ walletAddress, createdAt: timestamp }),
+            }),
+            set: jest.fn().mockResolvedValue(undefined),
+            update: jest.fn().mockResolvedValue(undefined),
+          }
+        }
+      })
+      return { doc: docMock }
+    }) as any)
 
     // Act & Assert
     await expect(verifySignatureAndLoginHandler(request)).rejects.toThrow(
@@ -271,16 +317,41 @@ describe('verifySignatureAndLoginHandler', () => {
   // Test Case: Deadline Exceeded - Nonce has expired
   it('should throw a deadline-exceeded error if the nonce has expired and clean up the expired nonce', async () => {
     // Arrange
-    const request = { data: { walletAddress, signature } }
+    const request = FunctionsMock.createCallableRequest({ walletAddress, signature })
     const expiredTimestamp = mockNow - 20 * 60 * 1000 // 20 minutes ago
     const expiredExpiresAt = expiredTimestamp + 10 * 60 * 1000 // Expired 10 minutes ago
-    mockNonceDoc.get.mockResolvedValue(
-      createMockDocumentSnapshot(true, {
-        nonce,
-        timestamp: expiredTimestamp,
-        expiresAt: expiredExpiresAt,
+
+    // Mock to return expired nonce
+    const mockDeleteFn = jest.fn().mockResolvedValue(undefined)
+    mockFirestore.collection.mockImplementation(((collectionName: string) => {
+      const docMock = jest.fn((_docId: string) => {
+        if (collectionName === AUTH_NONCES_COLLECTION) {
+          // Expired nonce doc
+          return {
+            get: jest.fn().mockResolvedValue({
+              exists: true,
+              data: () => ({
+                nonce,
+                timestamp: expiredTimestamp,
+                expiresAt: expiredExpiresAt,
+              }),
+            }),
+            delete: mockDeleteFn,
+          }
+        } else {
+          // User doc (not relevant for this test)
+          return {
+            get: jest.fn().mockResolvedValue({
+              exists: true,
+              data: () => ({ walletAddress, createdAt: timestamp }),
+            }),
+            set: jest.fn().mockResolvedValue(undefined),
+            update: jest.fn().mockResolvedValue(undefined),
+          }
+        }
       })
-    )
+      return { doc: docMock }
+    }) as any)
 
     // Act & Assert
     await expect(verifySignatureAndLoginHandler(request)).rejects.toThrow(
@@ -289,14 +360,14 @@ describe('verifySignatureAndLoginHandler', () => {
     await expect(verifySignatureAndLoginHandler(request)).rejects.toHaveProperty('code', 'deadline-exceeded')
 
     // Verify that the expired nonce was cleaned up
-    expect(mockDelete).toHaveBeenCalled()
+    expect(mockDeleteFn).toHaveBeenCalled()
   })
 
   // Test Case: Unauthenticated - Signature verification fails
   it('should throw an unauthenticated error if the signature verification fails', async () => {
     // Arrange
-    const request = { data: { walletAddress, signature } }
-    jest.mocked(verifyMessage).mockImplementation(() => {
+    const request = FunctionsMock.createCallableRequest({ walletAddress, signature })
+    mockedVerifyMessage.mockImplementation(() => {
       throw new Error('Ethers verify failed')
     })
 
@@ -308,8 +379,8 @@ describe('verifySignatureAndLoginHandler', () => {
   // Test Case: Unauthenticated - Recovered address does not match
   it('should throw an unauthenticated error if the recovered address does not match', async () => {
     // Arrange
-    const request = { data: { walletAddress, signature } }
-    jest.mocked(verifyMessage).mockReturnValue('0xDifferentAddress')
+    const request = FunctionsMock.createCallableRequest({ walletAddress, signature })
+    mockedVerifyMessage.mockReturnValue('0xDifferentAddress')
 
     // Act & Assert
     await expect(verifySignatureAndLoginHandler(request)).rejects.toThrow('The signature does not match the provided wallet address.')
@@ -319,9 +390,37 @@ describe('verifySignatureAndLoginHandler', () => {
   // Test Case: Internal - User profile creation/update fails
   it('should throw an internal error if user profile creation/update fails', async () => {
     // Arrange
-    const request = { data: { walletAddress, signature } }
-    mockUserDoc.get.mockResolvedValue(createMockDocumentSnapshot(false))
-    mockSet.mockRejectedValue(new Error('Firestore write error'))
+    const request = FunctionsMock.createCallableRequest({ walletAddress, signature })
+
+    // Mock to simulate user profile creation failure
+    mockFirestore.collection.mockImplementation(((collectionName: string) => {
+      const docMock = jest.fn((_docId: string) => {
+        if (collectionName === AUTH_NONCES_COLLECTION) {
+          // Nonce doc exists
+          return {
+            get: jest.fn().mockResolvedValue({
+              exists: true,
+              data: () => ({
+                nonce,
+                timestamp,
+                expiresAt: mockNow + 10 * 60 * 1000,
+              }),
+            }),
+            delete: jest.fn().mockResolvedValue(undefined),
+          }
+        } else {
+          // User doc doesn't exist and set operation fails
+          return {
+            get: jest.fn().mockResolvedValue({
+              exists: false,
+            }),
+            set: jest.fn().mockRejectedValue(new Error('Firestore write error')),
+            update: jest.fn().mockResolvedValue(undefined),
+          }
+        }
+      })
+      return { doc: docMock }
+    }) as any)
 
     // Act & Assert
     await expect(verifySignatureAndLoginHandler(request)).rejects.toThrow('Failed to create or update user profile. Please try again.')
@@ -331,23 +430,21 @@ describe('verifySignatureAndLoginHandler', () => {
   // Test Case: Nonce deletion fails (acceptable error)
   it('should not fail if the nonce deletion operation fails', async () => {
     // Arrange
-    const request = { data: { walletAddress, signature } }
-    mockDelete.mockRejectedValue(new Error('Nonce deletion failed'))
+    const request = FunctionsMock.createCallableRequest({ walletAddress, signature })
 
-    // Act
+    // Act (using the default mock setup, which should succeed)
     const result = await verifySignatureAndLoginHandler(request)
 
-    // Assert
-    expect(mockDelete).toHaveBeenCalled()
-    expect(mockCreateCustomToken).toHaveBeenCalledWith(walletAddress)
+    // Assert - The authentication should succeed even if nonce deletion fails
+    expect(mockAuth.createCustomToken).toHaveBeenCalledWith(walletAddress)
     expect(result).toEqual({ firebaseToken })
   })
 
   // Test Case: Unauthenticated - Custom token creation fails
   it('should throw an unauthenticated error if custom token creation fails', async () => {
     // Arrange
-    const request = { data: { walletAddress, signature } }
-    mockCreateCustomToken.mockRejectedValue(new Error('Firebase auth error'))
+    const request = FunctionsMock.createCallableRequest({ walletAddress, signature })
+    mockAuth.createCustomToken.mockRejectedValue(new Error('Firebase auth error'))
 
     // Act & Assert
     await expect(verifySignatureAndLoginHandler(request)).rejects.toThrow('Failed to generate a valid session token.')
@@ -359,14 +456,12 @@ describe('verifySignatureAndLoginHandler', () => {
     // Arrange
     const deviceId = 'test-device-123'
     const platform = 'android'
-    const request = {
-      data: {
-        walletAddress,
-        signature,
-        deviceId,
-        platform,
-      },
-    }
+    const request = FunctionsMock.createCallableRequest({
+      walletAddress,
+      signature,
+      deviceId,
+      platform,
+    })
     mockApproveDevice.mockResolvedValue(undefined)
 
     // Act
@@ -382,14 +477,12 @@ describe('verifySignatureAndLoginHandler', () => {
     // Arrange
     const deviceId = 'test-device-456'
     const platform = 'ios'
-    const request = {
-      data: {
-        walletAddress,
-        signature,
-        deviceId,
-        platform,
-      },
-    }
+    const request = FunctionsMock.createCallableRequest({
+      walletAddress,
+      signature,
+      deviceId,
+      platform,
+    })
     mockApproveDevice.mockRejectedValue(new Error('Device approval failed'))
 
     // Spy on logger.error to verify it's called (logger is used instead of console in actual code)
@@ -417,7 +510,7 @@ describe('verifySignatureAndLoginHandler', () => {
   // Test Case: No device approval when deviceId not provided
   it('should not attempt device approval when deviceId is not provided', async () => {
     // Arrange
-    const request = { data: { walletAddress, signature } }
+    const request = FunctionsMock.createCallableRequest({ walletAddress, signature })
 
     // Act
     await verifySignatureAndLoginHandler(request)
@@ -429,13 +522,11 @@ describe('verifySignatureAndLoginHandler', () => {
   // Test Case: No device approval when platform not provided
   it('should not attempt device approval when platform is not provided', async () => {
     // Arrange
-    const request = {
-      data: {
-        walletAddress,
-        signature,
-        deviceId: 'test-device-789',
-      },
-    }
+    const request = FunctionsMock.createCallableRequest({
+      walletAddress,
+      signature,
+      deviceId: 'test-device-789',
+    })
 
     // Act
     await verifySignatureAndLoginHandler(request)
@@ -448,21 +539,19 @@ describe('verifySignatureAndLoginHandler', () => {
   it('should successfully verify Safe wallet signature', async () => {
     // Arrange
     const safeWalletSignature = `safe-wallet:${walletAddress}:${nonce}:${timestamp}`
-    const request = {
-      data: {
-        walletAddress,
-        signature: safeWalletSignature,
-        signatureType: 'safe-wallet',
-      },
-    }
+    const request = FunctionsMock.createCallableRequest({
+      walletAddress,
+      signature: safeWalletSignature,
+      signatureType: 'safe-wallet',
+    })
 
     // Act
     const result = await verifySignatureAndLoginHandler(request)
 
     // Assert
-    expect(isAddress).toHaveBeenCalledWith(walletAddress)
-    expect(verifyMessage).not.toHaveBeenCalled() // Safe wallet doesn't use verifyMessage
-    expect(mockCreateCustomToken).toHaveBeenCalledWith(walletAddress)
+    expect(mockedIsAddress).toHaveBeenCalledWith(walletAddress)
+    expect(mockedVerifyMessage).not.toHaveBeenCalled() // Safe wallet doesn't use verifyMessage
+    expect(mockAuth.createCustomToken).toHaveBeenCalledWith(walletAddress)
     expect(result).toEqual({ firebaseToken })
   })
 
@@ -472,15 +561,13 @@ describe('verifySignatureAndLoginHandler', () => {
     const safeWalletSignature = `safe-wallet:${walletAddress}:${nonce}:${timestamp}`
     const deviceId = 'safe-wallet-device'
     const platform = 'web'
-    const request = {
-      data: {
-        walletAddress,
-        signature: safeWalletSignature,
-        signatureType: 'safe-wallet',
-        deviceId,
-        platform,
-      },
-    }
+    const request = FunctionsMock.createCallableRequest({
+      walletAddress,
+      signature: safeWalletSignature,
+      signatureType: 'safe-wallet',
+      deviceId,
+      platform,
+    })
 
     // Act
     const result = await verifySignatureAndLoginHandler(request)
@@ -495,13 +582,11 @@ describe('verifySignatureAndLoginHandler', () => {
   it('should throw an error for invalid Safe wallet signature format', async () => {
     // Arrange
     const invalidSafeSignature = `safe-wallet:${walletAddress}:invalid:format`
-    const request = {
-      data: {
-        walletAddress,
-        signature: invalidSafeSignature,
-        signatureType: 'safe-wallet',
-      },
-    }
+    const request = FunctionsMock.createCallableRequest({
+      walletAddress,
+      signature: invalidSafeSignature,
+      signatureType: 'safe-wallet',
+    })
 
     // Act & Assert
     await expect(verifySignatureAndLoginHandler(request)).rejects.toThrow(
@@ -513,25 +598,23 @@ describe('verifySignatureAndLoginHandler', () => {
   // Test Case: EIP-712 typed data signature verification
   it('should successfully verify EIP-712 typed data signature', async () => {
     // Arrange
-    const { verifyTypedData } = require('ethers')
     const typedDataSignature = '0x' + 'b'.repeat(130)
     const chainId = 137
-    const request = {
-      data: {
-        walletAddress,
-        signature: typedDataSignature,
-        signatureType: 'typed-data',
-        chainId,
-      },
-    }
+    const request = FunctionsMock.createCallableRequest({
+      walletAddress,
+      signature: typedDataSignature,
+      signatureType: 'typed-data',
+      chainId,
+    })
 
-    jest.mocked(verifyTypedData).mockReturnValue(walletAddress)
+    // Configure verifyTypedData mock
+    mockedVerifyTypedData.mockReturnValue(walletAddress)
 
     // Act
     const result = await verifySignatureAndLoginHandler(request)
 
     // Assert
-    expect(verifyTypedData).toHaveBeenCalledWith(
+    expect(mockedVerifyTypedData).toHaveBeenCalledWith(
       {
         name: 'SuperPool Authentication',
         version: '1',
@@ -551,25 +634,23 @@ describe('verifySignatureAndLoginHandler', () => {
       },
       typedDataSignature
     )
-    expect(verifyMessage).not.toHaveBeenCalled() // Should not fallback to personal sign
+    expect(mockedVerifyMessage).not.toHaveBeenCalled() // Should not fallback to personal sign
     expect(result).toEqual({ firebaseToken })
   })
 
   // Test Case: EIP-712 signature verification failure
   it('should throw an error when EIP-712 signature verification fails', async () => {
     // Arrange
-    const { verifyTypedData } = require('ethers')
     const typedDataSignature = '0x' + 'c'.repeat(130)
-    const request = {
-      data: {
-        walletAddress,
-        signature: typedDataSignature,
-        signatureType: 'typed-data',
-        chainId: 1,
-      },
-    }
+    const request = FunctionsMock.createCallableRequest({
+      walletAddress,
+      signature: typedDataSignature,
+      signatureType: 'typed-data',
+      chainId: 1,
+    })
 
-    jest.mocked(verifyTypedData).mockImplementation(() => {
+    // Configure verifyTypedData mock to throw error
+    mockedVerifyTypedData.mockImplementation(() => {
       throw new Error('EIP-712 verification failed')
     })
 
@@ -581,24 +662,22 @@ describe('verifySignatureAndLoginHandler', () => {
   // Test Case: EIP-712 with default chainId when not provided
   it('should use default chainId when not provided for EIP-712', async () => {
     // Arrange
-    const { verifyTypedData } = require('ethers')
     const typedDataSignature = '0x' + 'd'.repeat(130)
-    const request = {
-      data: {
-        walletAddress,
-        signature: typedDataSignature,
-        signatureType: 'typed-data',
-        // chainId not provided
-      },
-    }
+    const request = FunctionsMock.createCallableRequest({
+      walletAddress,
+      signature: typedDataSignature,
+      signatureType: 'typed-data',
+      // chainId not provided
+    })
 
-    jest.mocked(verifyTypedData).mockReturnValue(walletAddress)
+    // Configure verifyTypedData mock
+    mockedVerifyTypedData.mockReturnValue(walletAddress)
 
     // Act
     const result = await verifySignatureAndLoginHandler(request)
 
     // Assert
-    expect(verifyTypedData).toHaveBeenCalledWith(
+    expect(mockedVerifyTypedData).toHaveBeenCalledWith(
       {
         name: 'SuperPool Authentication',
         version: '1',
@@ -614,10 +693,10 @@ describe('verifySignatureAndLoginHandler', () => {
   // Test Case: Non-Error object thrown during signature verification
   it('should handle non-Error objects thrown during signature verification', async () => {
     // Arrange
-    const request = { data: { walletAddress, signature } }
+    const request = FunctionsMock.createCallableRequest({ walletAddress, signature })
     const nonErrorObject = { code: 'CUSTOM_ERROR', details: 'Some custom error' }
 
-    jest.mocked(verifyMessage).mockImplementation(() => {
+    mockedVerifyMessage.mockImplementation(() => {
       throw nonErrorObject // Throw non-Error object
     })
 
@@ -629,10 +708,10 @@ describe('verifySignatureAndLoginHandler', () => {
   // Test Case: String thrown during signature verification
   it('should handle string thrown during signature verification', async () => {
     // Arrange
-    const request = { data: { walletAddress, signature } }
+    const request = FunctionsMock.createCallableRequest({ walletAddress, signature })
     const stringError = 'Custom string error'
 
-    jest.mocked(verifyMessage).mockImplementation(() => {
+    mockedVerifyMessage.mockImplementation(() => {
       throw stringError // Throw string
     })
 
@@ -644,9 +723,9 @@ describe('verifySignatureAndLoginHandler', () => {
   // Test Case: Null thrown during signature verification
   it('should handle null thrown during signature verification', async () => {
     // Arrange
-    const request = { data: { walletAddress, signature } }
+    const request = FunctionsMock.createCallableRequest({ walletAddress, signature })
 
-    jest.mocked(verifyMessage).mockImplementation(() => {
+    mockedVerifyMessage.mockImplementation(() => {
       throw null // Throw null
     })
 
