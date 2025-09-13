@@ -1,7 +1,7 @@
 {
   "name": "mobile",
   "version": "1.0.0",
-  "main": "expo-router/entry",
+  "main": "index.ts",
   "scripts": {
     "start": "expo start",
     "android": "expo start --android",
@@ -14,14 +14,18 @@
     "expo-linking": "~8.0.8",
     "expo-router": "~6.0.3",
     "expo-status-bar": "~3.0.8",
+    "nativewind": "^4.2.0",
     "react": "19.1.0",
     "react-native": "0.81.4",
-    "react-native-safe-area-context": "~5.6.1",
+    "react-native-reanimated": "~4.1.0",
+    "react-native-safe-area-context": "~5.6.0",
     "react-native-screens": "~4.16.0"
   },
   "devDependencies": {
     "@types/react": "~19.1.0",
     "minimatch": "^10.0.3",
+    "prettier-plugin-tailwindcss": "^0.5.14",
+    "tailwindcss": "^3.4.17",
     "typescript": "~5.9.2"
   },
   "private": true
