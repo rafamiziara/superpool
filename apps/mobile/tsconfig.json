@@ -1,14 +1,6 @@
 {
+  "extends": "expo/tsconfig.base",
   "compilerOptions": {
-    "strict": true,
-    "paths": {
-      "@firebase/auth": ["../../node_modules/@firebase/auth/dist/index.rn.d.ts"],
-      "@superpool/assets/*": ["../../packages/assets/*"],
-      "@superpool/ui/*": ["../../packages/ui/*"],
-      "@superpool/types/*": ["../../packages/types/*"],
-      "@superpool/design/*": ["../../packages/design/*"],
-      "@mocks/*": ["./__mocks__/*"]
-    }
-  },
-  "extends": "expo/tsconfig.base"
+    "strict": true
+  }
 }
