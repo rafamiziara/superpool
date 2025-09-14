@@ -4,6 +4,7 @@
     "strict": true,
     "paths": {
       "@superpool/design/*": ["../../packages/design/*"],
+      "@superpool/types/*": ["../../packages/types/*"]
     }
   }
 }
