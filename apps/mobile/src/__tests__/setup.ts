@@ -2,12 +2,17 @@ import 'react-native-get-random-values'
 
 import mockAsyncStorage from '@react-native-async-storage/async-storage/jest/async-storage-mock'
 
+// Export router mock functions for tests that need to access them
+export const mockRouterReplace = jest.fn()
+export const mockRouterPush = jest.fn()
+export const mockRouterBack = jest.fn()
+
 // Mock Expo modules
 jest.mock('expo-router', () => ({
   useRouter: () => ({
-    push: jest.fn(),
-    replace: jest.fn(),
-    back: jest.fn(),
+    push: mockRouterPush,
+    replace: mockRouterReplace,
+    back: mockRouterBack,
   }),
 }))
 
