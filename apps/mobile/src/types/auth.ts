@@ -1,4 +1,4 @@
-import { AuthMessage } from '@superpool/types'
+import { AuthenticationData, AuthMessage, User } from '@superpool/types'
 
 export interface MessageGenerationState {
   message: string | null
@@ -22,4 +22,16 @@ export interface SignatureHandlingState {
 export interface SignatureHandlingHook extends SignatureHandlingState {
   requestSignature: (message: string) => Promise<string>
   clearSignature: () => void
+}
+
+export interface FirebaseAuthState {
+  user: User | null
+  isAuthenticating: boolean
+  error: string | null
+}
+
+export interface FirebaseAuthHook extends FirebaseAuthState {
+  authenticateWithSignature: (authData: AuthenticationData) => Promise<User>
+  logout: () => Promise<void>
+  clearError: () => void
 }

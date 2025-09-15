@@ -1,31 +1,26 @@
 // Authentication and user management types
 
+// Unified User type (backend and frontend use same structure)
 export interface User {
   walletAddress: string
-  deviceId: string
-  createdAt: Date
-  lastLoginAt: Date
-  profile?: UserProfile
+  createdAt: number // timestamp in milliseconds
+  updatedAt: number // timestamp in milliseconds
+  deviceId?: string // optional since mobile doesn't always have it
 }
 
-export interface UserProfile {
-  displayName?: string
-  avatar?: string
-  bio?: string
-}
-
+// Backend AuthNonce (stored in Firestore with number timestamps)
 export interface AuthNonce {
   nonce: string
-  walletAddress: string
-  timestamp: Date
-  expiresAt: Date
+  timestamp: number
+  expiresAt: number
 }
 
 export interface ApprovedDevice {
   deviceId: string
   walletAddress: string
-  approvedAt: Date
-  lastActiveAt: Date
+  approvedAt: number
+  platform: 'android' | 'ios' | 'web'
+  lastUsed: number
   deviceInfo?: DeviceInfo
 }
 
@@ -41,118 +36,50 @@ export interface AuthMessage {
   timestamp: number
 }
 
-export interface SignatureVerification {
-  signature: string
+// Shared authentication data type (replaces mobile-specific AuthData)
+export interface AuthenticationData {
   message: string
-  walletAddress: string
-}
-
-// Mobile app authentication workflow types
-export type AuthStep = 'connect-wallet' | 'acquire-lock' | 'generate-message' | 'request-signature' | 'verify-signature' | 'firebase-auth'
-
-export interface AuthStepInfo {
-  step: AuthStep
-  title: string
-  description: string
-}
-
-export interface AuthProgressState {
-  currentStep: AuthStep | null
-  completedSteps: Set<AuthStep>
-  failedStep: AuthStep | null
-  isComplete: boolean
-  error: string | null
-}
-
-// Firebase authentication state for mobile apps
-export interface FirebaseAuthState {
-  user: FirebaseUser | null
-  isLoading: boolean
-  isAuthenticated: boolean
-  walletAddress: string | null
-}
-
-// Firebase user interface - matches firebase/auth User type
-export interface FirebaseUser {
-  uid: string
-  email?: string | null
-  displayName?: string | null
-  photoURL?: string | null
-  emailVerified?: boolean
-  isAnonymous?: boolean
-  metadata?: {
-    creationTime?: string
-    lastSignInTime?: string
-  }
-}
-
-// Signature and wallet interaction types
-export type SignatureType = 'typed-data' | 'personal-sign' | 'safe-wallet'
-
-export interface SignatureRequest extends AuthMessage {
-  walletAddress: string
-  chainId?: number
-}
-
-export interface SignatureResult {
+  nonce: string
+  timestamp: number
   signature: string
-  signatureType: SignatureType
-}
-
-export interface SignatureFunctions {
-  signTypedDataAsync: (data: TypedDataParameter) => Promise<string>
-  signMessageAsync: (params: { message: string; account: `0x${string}`; connector?: WagmiConnector }) => Promise<string>
-}
-
-// Type for typed data parameters used in signing
-export interface TypedDataParameter {
-  domain?: {
-    name?: string
-    version?: string
-    chainId?: number | bigint
-    verifyingContract?: `0x${string}`
-    salt?: `0x${string}`
-  }
-  types?: Record<string, Array<{ name: string; type: string }>>
-  primaryType?: string
-  message?: Record<string, string | number | boolean | bigint>
-}
-
-// Minimal Wagmi Connector interface for our use case
-export interface WagmiConnector {
-  id: string
-  name: string
-  type: string
-}
-
-// Authentication flow progress types
-export interface AuthProgressCallbacks {
-  onStepStart?: (step: AuthStep) => void
-  onStepComplete?: (step: AuthStep) => void
-  onStepFail?: (step: AuthStep, error: string) => void
-}
-
-export interface AuthenticationContext {
   walletAddress: string
-  connector?: WagmiConnector | string
+  deviceId?: string
+  platform?: 'android' | 'ios' | 'web'
   chainId?: number
-  signatureFunctions: SignatureFunctions
-  disconnect: () => void
-  progressCallbacks?: AuthProgressCallbacks
+  signatureType?: 'typed-data' | 'personal-sign' | 'safe-wallet'
 }
 
-// Error recovery types
-export type ErrorType = 'session' | 'timeout' | 'connector' | 'generic'
+// Backend Cloud Function Request/Response Types
 
-export interface ErrorRecoveryResult {
-  shouldDisconnect: boolean
-  shouldShowError: boolean
-  errorDelay: number
-  cleanupPerformed: boolean
+export interface CustomAppCheckMinterRequest {
+  deviceId: string
 }
 
-export interface SessionErrorContext {
-  errorMessage: string
-  sessionId?: string
-  isSessionError: boolean
+export interface CustomAppCheckMinterResponse {
+  appCheckToken: string
+  expireTimeMillis: number
+}
+
+export interface AuthMessageRequest {
+  walletAddress: string
+}
+
+export interface AuthMessageResponse {
+  message: string
+  nonce: string
+  timestamp: number
+}
+
+export interface VerifySignatureAndLoginRequest {
+  walletAddress: string
+  signature: string
+  deviceId?: string
+  platform?: 'android' | 'ios' | 'web'
+  chainId?: number
+  signatureType?: 'typed-data' | 'personal-sign' | 'safe-wallet'
+}
+
+export interface VerifySignatureAndLoginResponse {
+  firebaseToken: string
+  user: User // Return the actual user data from backend
 }

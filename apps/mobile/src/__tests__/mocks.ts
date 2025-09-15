@@ -20,6 +20,10 @@ export const mockFirebaseAuth = {
   connectAuthEmulator: jest.fn(),
   signInWithCustomToken: jest.fn().mockResolvedValue({ user: { uid: 'test' } }),
   signOut: jest.fn().mockResolvedValue(undefined),
+  onAuthStateChanged: jest.fn((auth, callback) => {
+    callback(null) // Default to not authenticated
+    return jest.fn() // Return unsubscribe function
+  }),
 }
 
 export const mockFirebaseCallable = jest.fn(() =>

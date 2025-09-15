@@ -21,6 +21,7 @@
   },
   "main": "lib/index.js",
   "dependencies": {
+    "@superpool/types": "workspace:*",
     "dotenv": "^17.2.1",
     "ethers": "^6.15.0",
     "firebase-admin": "^12.7.0",
