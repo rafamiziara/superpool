@@ -58,6 +58,20 @@ describe('useWalletListener', () => {
     expect(result.current.isConnected).toBe(false)
   })
 
+  it('should handle connected state with no address', () => {
+    mockWagmiUseAccount.mockReturnValue({
+      isConnected: true,
+      address: undefined,
+      chainId: 137,
+      isConnecting: false,
+    })
+
+    renderHook(() => useWalletListener())
+
+    expect(mockConsoleLog).not.toHaveBeenCalledWith(expect.stringContaining('auto-connected'))
+    expect(mockConsoleLog).not.toHaveBeenCalledWith(expect.stringContaining('disconnected'))
+  })
+
   it('should return null address when disconnected', () => {
     mockWagmiUseAccount.mockReturnValue({
       isConnected: false,

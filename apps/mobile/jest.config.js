@@ -33,6 +33,11 @@ module.exports = {
     '!app/**/*.test.{ts,tsx}',
     '!src/__tests__/**',
     '!src/**/*.d.ts',
+    '!app/**/+*.tsx', // Expo router files
+    '!src/config/**', // Configuration directory
+    '!src/assets/**', // Static assets
+    '!src/**/index.ts', // Barrel export files
+    '!src/**/types/**', // TypeScript interface definitions only
   ],
   coverageThreshold: {
     global: {
