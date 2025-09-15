@@ -28,7 +28,7 @@ describe('useFirebaseAuth', () => {
     mockConsoleError.mockClear()
 
     // Mock auth state listener to call immediately with null (not authenticated)
-    mockOnAuthStateChanged.mockImplementation((auth, callback) => {
+    mockOnAuthStateChanged.mockImplementation((_, callback) => {
       callback(null)
       return jest.fn() // Return unsubscribe function
     })

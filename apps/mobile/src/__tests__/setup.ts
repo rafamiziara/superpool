@@ -14,3 +14,6 @@ jest.mock('expo-router', () => ({
 jest.mock('@expo/vector-icons', () => ({ FontAwesome: 'FontAwesome' }))
 
 jest.mock('@react-native-async-storage/async-storage', () => mockAsyncStorage)
+
+// Import global mocks to ensure they are registered
+import './mocks'
