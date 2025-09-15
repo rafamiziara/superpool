@@ -3,17 +3,18 @@ import { Text, View } from 'react-native'
 import { ErrorDetails } from '../types/errors'
 import { getErrorSuggestions } from '../utils/errorUtils'
 
-interface ErrorDisplayProps {
+export interface ErrorDisplayProps {
   error: ErrorDetails
   onRetry?: () => void
   className?: string
+  testID?: string
 }
 
-export const ErrorDisplay: React.FC<ErrorDisplayProps> = ({ error, onRetry, className = '' }) => {
+export const ErrorDisplay: React.FC<ErrorDisplayProps> = ({ error, onRetry, className = '', testID }) => {
   const suggestions = getErrorSuggestions(error)
 
   return (
-    <View className={`bg-destructive/10 p-4 rounded-xl border border-destructive/20 ${className}`}>
+    <View className={`bg-destructive/10 p-4 rounded-xl border border-destructive/20 ${className}`} testID={testID}>
       <View className="flex-row items-center mb-2">
         <Text className="text-lg mr-2">⚠️</Text>
         <Text className="text-destructive font-medium text-sm flex-1">Error</Text>
