@@ -1,4 +1,5 @@
 import { AuthMessage } from '@superpool/types'
+import type { AuthMessageResponse } from '@superpool/types'
 import { act, renderHook } from '@testing-library/react-native'
 import { mockFirebaseCallable } from '../../__tests__/mocks'
 import { useMessageGeneration } from './useMessageGeneration'
@@ -32,7 +33,7 @@ describe('useMessageGeneration', () => {
   })
 
   it('should generate message successfully', async () => {
-    const mockResponse = {
+    const mockResponse: AuthMessageResponse = {
       message: 'Sign this message to authenticate',
       nonce: 'abc123',
       timestamp: Date.now(),
@@ -97,7 +98,7 @@ describe('useMessageGeneration', () => {
 
   it('should clear state when clearState is called', async () => {
     // First generate a message
-    const mockResponse = {
+    const mockResponse: AuthMessageResponse = {
       message: 'Sign this message',
       nonce: 'abc123',
       timestamp: Date.now(),

@@ -12,10 +12,10 @@
  */
 
 import { jest } from '@jest/globals'
+import { AuthNonce, User } from '@superpool/types'
 import { isAddress, verifyMessage, verifyTypedData } from 'ethers'
 import { HttpsError } from 'firebase-functions/v2/https'
 import { AUTH_NONCES_COLLECTION, USERS_COLLECTION } from '../../constants'
-import { AuthNonce, UserProfile } from '../../types'
 import { createAuthMessage } from '../../utils'
 
 // Import handlers for testing
@@ -23,7 +23,7 @@ import { generateAuthMessageHandler } from './generateAuthMessage'
 import { verifySignatureAndLoginHandler } from './verifySignatureAndLogin'
 
 // Import centralized mock system (MOCK_SYSTEM.md compliant)
-import { CloudFunctionTester, ethersMock, firebaseAdminMock, FunctionsMock, TestData, TestHelpers } from '../../__mocks__'
+import { ethersMock, firebaseAdminMock, FunctionsMock, TestData, TestHelpers } from '../../__mocks__'
 
 // Mock the services module that exports firestore and auth
 jest.mock('../../services', () => ({
@@ -87,7 +87,7 @@ interface TestSignatureRequest {
 // Define proper document snapshot type
 interface MockDocumentSnapshot {
   exists: boolean
-  data: () => Record<string, unknown> | AuthNonce | UserProfile | undefined
+  data: () => Record<string, unknown> | AuthNonce | User | undefined
 }
 
 // Define proper service mock types
@@ -112,7 +112,7 @@ const PERFORMANCE_THRESHOLDS: PerformanceThresholds = {
 }
 
 // Helper functions
-const createMockDocumentSnapshot = (exists: boolean, data?: Record<string, unknown> | AuthNonce | UserProfile): MockDocumentSnapshot => ({
+const createMockDocumentSnapshot = (exists: boolean, data?: Record<string, unknown> | AuthNonce | User): MockDocumentSnapshot => ({
   exists,
   data: () => data,
 })
@@ -149,15 +149,6 @@ describe('Authentication System - Comprehensive Test Suite', () => {
   const mockCollection = jest.fn<() => { doc: typeof mockDoc }>(() => ({
     doc: mockDoc,
   }))
-
-  // Mock Firestore and Auth available if needed
-  const mockFirestore = {
-    collection: mockCollection,
-  }
-
-  const mockAuth = {
-    createCustomToken: mockCreateCustomToken,
-  }
 
   // Service mock functions with proper typing
   const mockApproveDevice = jest.fn<() => Promise<void>>()
@@ -535,13 +526,13 @@ describe('Authentication System - Comprehensive Test Suite', () => {
         expect(result.firebaseToken).toBe(mockToken)
 
         // Verify new profile was created
-        const expectedProfile: UserProfile = {
+        const expectedUser: User = {
           walletAddress: validWalletAddress,
           createdAt: mockTimestamp,
           updatedAt: mockTimestamp,
         }
 
-        expect(mockSet).toHaveBeenCalledWith(expectedProfile)
+        expect(mockSet).toHaveBeenCalledWith(expectedUser)
       })
 
       it('should update existing user profile timestamp', async () => {
@@ -896,7 +887,7 @@ describe('Authentication System - Comprehensive Test Suite', () => {
         mockCreateCustomToken.mockImplementation(async () => `concurrent-token-${++tokenCounter}`)
 
         // Mock verifyMessage to return the correct address for each request
-        jest.mocked(verifyMessage).mockImplementation((message: string, _signature: string) => {
+        jest.mocked(verifyMessage).mockImplementation((message: string | Uint8Array<ArrayBufferLike>) => {
           // Extract wallet address from the message to return the correct address
           // This is a simple approach for testing - in reality, signature verification is more complex
           for (const address of TestData.addresses.poolOwners) {

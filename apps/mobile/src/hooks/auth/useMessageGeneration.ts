@@ -1,4 +1,5 @@
 import { AuthMessage } from '@superpool/types'
+import type { AuthMessageResponse } from '@superpool/types'
 import { httpsCallable } from 'firebase/functions'
 import { useCallback, useState } from 'react'
 import { FIREBASE_FUNCTIONS } from '../../config/firebase'
@@ -30,7 +31,7 @@ export const useMessageGeneration = (): MessageGenerationHook => {
         throw new Error('Invalid response from generateAuthMessage function')
       }
 
-      const { message, nonce, timestamp } = response.data as AuthMessage
+      const { message, nonce, timestamp } = response.data as AuthMessageResponse
 
       if (!message || !nonce || !timestamp) {
         throw new Error('Incomplete auth message data received')
