@@ -15,6 +15,9 @@ export const mockWagmiUseSignMessage = jest.fn(() => ({
 
 // Firebase service mocks
 export const mockFirebaseAuth = {
+  getReactNativePersistence: jest.fn(() => ({})),
+  initializeAuth: jest.fn(() => ({ currentUser: null })),
+  connectAuthEmulator: jest.fn(),
   signInWithCustomToken: jest.fn().mockResolvedValue({ user: { uid: 'test' } }),
   signOut: jest.fn().mockResolvedValue(undefined),
 }
@@ -38,8 +41,10 @@ jest.mock('wagmi', () => ({
 }))
 
 jest.mock('firebase/auth', () => mockFirebaseAuth)
+
 jest.mock('firebase/functions', () => ({
   httpsCallable: mockFirebaseCallable,
+  getFunctions: jest.fn(() => ({})),
 }))
 
 jest.mock('react-native-toast-message', () => ({

@@ -31,6 +31,33 @@ describe('useWalletListener', () => {
     expect(result.current.isConnecting).toBe(false)
   })
 
+  it('should log wallet connection', () => {
+    mockWagmiUseAccount.mockReturnValue({
+      isConnected: true,
+      address: '0x123456789',
+      chainId: 137,
+      isConnecting: false,
+    })
+
+    renderHook(() => useWalletListener())
+
+    expect(mockConsoleLog).toHaveBeenCalledWith('✅ Wallet auto-connected:', '0x123456789')
+  })
+
+  it('should handle connecting state', () => {
+    mockWagmiUseAccount.mockReturnValue({
+      isConnected: false,
+      address: undefined,
+      chainId: undefined,
+      isConnecting: true,
+    })
+
+    const { result } = renderHook(() => useWalletListener())
+
+    expect(result.current.isConnecting).toBe(true)
+    expect(result.current.isConnected).toBe(false)
+  })
+
   it('should return null address when disconnected', () => {
     mockWagmiUseAccount.mockReturnValue({
       isConnected: false,
@@ -44,19 +71,6 @@ describe('useWalletListener', () => {
     expect(result.current.isConnected).toBe(false)
     expect(result.current.address).toBe(null)
     expect(result.current.chainId).toBe(null)
-  })
-
-  it('should log wallet connection', () => {
-    mockWagmiUseAccount.mockReturnValue({
-      isConnected: true,
-      address: '0x123456789',
-      chainId: 137,
-      isConnecting: false,
-    })
-
-    renderHook(() => useWalletListener())
-
-    expect(mockConsoleLog).toHaveBeenCalledWith('✅ Wallet auto-connected:', '0x123456789')
   })
 
   it('should log wallet disconnection', () => {
@@ -81,20 +95,6 @@ describe('useWalletListener', () => {
     rerender({})
 
     expect(mockConsoleLog).toHaveBeenCalledWith('❌ Wallet disconnected - clearing auth state')
-  })
-
-  it('should handle connecting state', () => {
-    mockWagmiUseAccount.mockReturnValue({
-      isConnected: false,
-      address: undefined,
-      chainId: undefined,
-      isConnecting: true,
-    })
-
-    const { result } = renderHook(() => useWalletListener())
-
-    expect(result.current.isConnecting).toBe(true)
-    expect(result.current.isConnected).toBe(false)
   })
 
   it('should not log when address is present but not connected', () => {
