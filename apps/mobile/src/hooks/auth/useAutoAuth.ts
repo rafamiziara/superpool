@@ -87,7 +87,7 @@ export const useAutoAuth = (): AutoAuthHook => {
       messageGeneration.clearState()
       // Note: Firebase auth and signature states will be cleared by their respective hooks
     }
-  }, [walletListener.isConnected, messageGeneration])
+  }, [walletListener.isConnected, messageGeneration.clearState])
 
   // Manual retry function
   const retryAuthentication = async () => {

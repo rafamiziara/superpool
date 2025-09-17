@@ -46,8 +46,8 @@ export const ProgressIndicator: React.FC<ProgressIndicatorProps> = ({
       // Current/active step
       return `${baseClass} bg-primary ${activeDotClassName}`
     } else {
-      // Future/pending step
-      return `${baseClass} bg-muted-foreground/30`
+      // Future/pending step - make more visible
+      return `${baseClass} bg-gray-300`
     }
   }
 
@@ -69,12 +69,7 @@ export const ProgressIndicator: React.FC<ProgressIndicatorProps> = ({
           className={getDotClassName(index)}
           testID={`${testID}-step-${index}`}
           accessibilityLabel={getAccessibilityLabel(index)}
-          accessibilityRole="progressbar"
-          accessibilityValue={{
-            min: 0,
-            max: totalSteps - 1,
-            now: currentStep,
-          }}
+          accessibilityRole="button"
         />
       ))}
     </View>

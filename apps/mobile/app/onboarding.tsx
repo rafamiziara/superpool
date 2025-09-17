@@ -1,7 +1,7 @@
 import { AppKitButton } from '@reown/appkit-wagmi-react-native'
 import { StatusBar } from 'expo-status-bar'
 import React, { useRef, useState } from 'react'
-import { FlatList, Image, ListRenderItem, NativeScrollEvent, NativeSyntheticEvent, Text, View } from 'react-native'
+import { Dimensions, FlatList, Image, ListRenderItem, NativeScrollEvent, NativeSyntheticEvent, Text, View } from 'react-native'
 import { ProgressIndicator } from '../src/components/ProgressIndicator'
 
 interface OnboardingSlide {
@@ -42,8 +42,8 @@ const slides: OnboardingSlide[] = [
   },
 ]
 
-// Use a standard width for testing purposes
-const screenWidth = 375
+// Get actual device width for proper centering
+const screenWidth = Dimensions.get('window').width
 
 export default function OnboardingScreen() {
   const flatListRef = useRef<FlatList>(null)
