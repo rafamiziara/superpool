@@ -1,5 +1,5 @@
 import type { User } from '@superpool/types'
-import { useRouter } from 'expo-router'
+import { useRouter, useSegments } from 'expo-router'
 import { useEffect, useRef } from 'react'
 import Toast from 'react-native-toast-message'
 import { useAutoAuth } from '../auth/useAutoAuth'
@@ -7,6 +7,7 @@ import { useAutoAuth } from '../auth/useAutoAuth'
 export const useNavigationController = () => {
   const { isConnected, user } = useAutoAuth()
   const router = useRouter()
+  const segments = useSegments()
 
   // Previous state tracking for toast triggers
   const prevConnected = useRef<boolean | null>(null)
@@ -15,28 +16,41 @@ export const useNavigationController = () => {
 
   // 🎯 CENTRALIZED NAVIGATION LOGIC
   useEffect(() => {
-    // Skip navigation on first render to prevent flash
-    if (!hasInitialized.current) {
-      hasInitialized.current = true
-      return
-    }
+    console.log('🧭 Current segments:', segments)
+    console.log('🧭 Navigation decision:', { isConnected, hasUser: !!user, hasInitialized: hasInitialized.current })
 
-    console.log('🧭 Navigation decision:', { isConnected, hasUser: !!user })
+    // Delay navigation to ensure router is ready
+    const timeoutId = setTimeout(() => {
+      let targetRoute = '/onboarding'
 
-    if (user) {
-      // Fully authenticated - go to dashboard
-      console.log('✅ Navigating to dashboard - user authenticated')
-      router.replace('/(auth)/dashboard')
-    } else if (isConnected) {
-      // Connected but not authenticated - go to connecting
-      console.log('🔐 Navigating to connecting - wallet connected')
-      router.replace('/connecting')
-    } else {
-      // Not connected - go to onboarding
-      console.log('📱 Navigating to onboarding - wallet not connected')
-      router.replace('/onboarding')
-    }
-  }, [isConnected, user, router])
+      if (user) {
+        // Fully authenticated - go to dashboard
+        targetRoute = '/(auth)/dashboard'
+        console.log('✅ Navigating to dashboard - user authenticated')
+      } else if (isConnected) {
+        // Connected but not authenticated - go to connecting
+        targetRoute = '/connecting'
+        console.log('🔐 Navigating to connecting - wallet connected')
+      } else {
+        // Not connected - go to onboarding
+        console.log('📱 Navigating to onboarding - wallet not connected')
+      }
+
+      // Only navigate if we're not already on the correct route
+      const currentRoute = segments.length > 0 ? `/${segments.join('/')}` : '/'
+      if (currentRoute !== targetRoute && currentRoute !== targetRoute.replace(/^\//, '')) {
+        console.log('🔀 Navigating from', currentRoute, 'to', targetRoute)
+        router.replace(targetRoute)
+      }
+
+      // Mark as initialized after first navigation attempt
+      if (!hasInitialized.current) {
+        hasInitialized.current = true
+      }
+    }, 100) // Small delay to ensure router is ready
+
+    return () => clearTimeout(timeoutId)
+  }, [isConnected, user, router, segments])
 
   // 🎉 TOAST NOTIFICATION TRIGGERS
   useEffect(() => {
