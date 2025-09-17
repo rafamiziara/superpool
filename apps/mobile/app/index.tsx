@@ -1,20 +1,23 @@
-import { AppKitButton } from '@reown/appkit-wagmi-react-native'
 import { Text, View } from 'react-native'
+import { useNavigationController } from '../src/hooks/navigation/useNavigationController'
 
-export default function Index() {
+export default function NavigationController() {
+  const { isNavigating } = useNavigationController()
+
+  // Show loading screen while navigation logic determines destination
+  if (isNavigating) {
+    return (
+      <View className="flex-1 bg-white items-center justify-center">
+        <Text className="text-3xl font-extrabold text-primary">SUPERPOOL</Text>
+        <Text className="text-sm text-muted-foreground mt-2">Loading...</Text>
+      </View>
+    )
+  }
+
+  // Show logo while navigation transition happens
   return (
-    <View className="flex-1 items-center justify-center p-4">
-      <Text className="font-bold text-2xl mb-32">SUPERPOOL</Text>
-      <AppKitButton
-        balance="hide"
-        label="Connect Wallet"
-        connectStyle={{
-          alignSelf: 'stretch',
-          marginBottom: 0,
-          marginHorizontal: 30,
-          borderRadius: 10,
-        }}
-      />
+    <View className="flex-1 bg-white items-center justify-center">
+      <Text className="text-3xl font-extrabold text-primary">SUPERPOOL</Text>
     </View>
   )
 }
