@@ -21,8 +21,8 @@ export const useAutoAuth = (): AutoAuthHook => {
   // 🚀 THE MAGIC: Auto-authenticate when wallet connects
   useEffect(() => {
     const autoAuthenticate = async () => {
-      // Only auto-auth if: wallet connected + no user + not already authenticating
-      if (!walletListener.isConnected || !walletListener.address || firebaseAuth.user || authState.isAuthenticating) {
+      // Only auto-auth if: wallet connected + no user + not already authenticating + no recent error
+      if (!walletListener.isConnected || !walletListener.address || firebaseAuth.user || authState.isAuthenticating || authState.error) {
         return
       }
 
@@ -74,7 +74,8 @@ export const useAutoAuth = (): AutoAuthHook => {
     walletListener.isConnected,
     walletListener.address,
     firebaseAuth.user,
-    authState.isAuthenticating, // Include to prevent re-triggering
+    authState.isAuthenticating,
+    authState.error, // Include error to prevent re-triggering on error
   ])
 
   // Auto-reset on wallet disconnect
@@ -95,8 +96,9 @@ export const useAutoAuth = (): AutoAuthHook => {
       throw new Error('Wallet not connected')
     }
 
+    console.log('🔄 Retrying authentication...')
     setAuthState({ isAuthenticating: false, error: null, progress: 0 })
-    // This will trigger the useEffect above
+    // This will trigger the useEffect above by clearing the error state
   }
 
   return {

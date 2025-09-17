@@ -116,7 +116,7 @@ export default function OnboardingScreen() {
           scrollEventThrottle={16}
           testID="onboarding-flatlist"
           accessibilityLabel={`Onboarding slides, ${slides.length} screens total`}
-          getItemLayout={(data, index) => ({
+          getItemLayout={(_, index) => ({
             length: screenWidth,
             offset: screenWidth * index,
             index,
