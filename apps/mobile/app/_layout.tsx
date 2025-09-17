@@ -21,12 +21,10 @@ export default function RootLayout() {
           {/* Auth-protected screens */}
           <Stack.Screen name="(auth)" options={{ animation: 'fade' }} />
 
-          {/* Status bar configuration */}
-          <StatusBar style="auto" backgroundColor="#ffffff" />
-
           {/* Toast notification system */}
           <Toast config={toastConfig} />
         </Stack>
+        <StatusBar style="auto" />
         <AppKit />
       </QueryClientProvider>
     </WagmiProvider>
