@@ -20,34 +20,42 @@ export const useNavigationController = () => {
     console.log('🧭 Navigation decision:', { isConnected, hasUser: !!user, hasInitialized: hasInitialized.current })
 
     // Delay navigation to ensure router is ready
-    const timeoutId = setTimeout(() => {
-      let targetRoute = '/onboarding'
+    const timeoutId = setTimeout(
+      () => {
+        let targetRoute = '/onboarding'
 
-      if (user) {
-        // Fully authenticated - go to dashboard
-        targetRoute = '/(auth)/dashboard'
-        console.log('✅ Navigating to dashboard - user authenticated')
-      } else if (isConnected) {
-        // Connected but not authenticated - go to connecting
-        targetRoute = '/connecting'
-        console.log('🔐 Navigating to connecting - wallet connected')
-      } else {
-        // Not connected - go to onboarding
-        console.log('📱 Navigating to onboarding - wallet not connected')
-      }
+        if (user) {
+          // Fully authenticated - go to dashboard
+          targetRoute = '/(auth)/dashboard'
+          console.log('✅ Navigating to dashboard - user authenticated')
+        } else if (isConnected) {
+          // Connected but not authenticated - go to connecting
+          targetRoute = '/connecting'
+          console.log('🔐 Navigating to connecting - wallet connected')
+        } else {
+          // Not connected - go to onboarding
+          console.log('📱 Navigating to onboarding - wallet not connected')
+        }
 
-      // Only navigate if we're not already on the correct route
-      const currentRoute = segments.length > 0 ? `/${segments.join('/')}` : '/'
-      if (currentRoute !== targetRoute && currentRoute !== targetRoute.replace(/^\//, '')) {
-        console.log('🔀 Navigating from', currentRoute, 'to', targetRoute)
-        router.replace(targetRoute)
-      }
+        // Only navigate if we're not already on the correct route
+        const currentRoute = segments.length > 0 ? `/${segments.join('/')}` : '/'
+        const cleanTargetRoute = targetRoute.replace(/^\//, '')
+        const cleanCurrentRoute = currentRoute.replace(/^\//, '')
 
-      // Mark as initialized after first navigation attempt
-      if (!hasInitialized.current) {
-        hasInitialized.current = true
-      }
-    }, 100) // Small delay to ensure router is ready
+        if (cleanCurrentRoute !== cleanTargetRoute && cleanCurrentRoute !== targetRoute) {
+          console.log('🔀 Navigating from', currentRoute, 'to', targetRoute)
+          router.replace(targetRoute)
+        } else {
+          console.log('🔄 Already on correct route:', currentRoute, '==', targetRoute)
+        }
+
+        // Mark as initialized after first navigation attempt
+        if (!hasInitialized.current) {
+          hasInitialized.current = true
+        }
+      },
+      hasInitialized.current ? 50 : 100
+    ) // Faster subsequent navigations
 
     return () => clearTimeout(timeoutId)
   }, [isConnected, user, router, segments])
