@@ -14,6 +14,7 @@ module.exports = {
   // Module mapping for workspace dependencies
   moduleNameMapper: {
     '^@/(.*)$': '<rootDir>/src/$1',
+    '^@superpool/assets/(.*)$': '<rootDir>/../../packages/assets/$1',
     '^@superpool/(.*)$': '<rootDir>/../../packages/$1/src',
   },
 
