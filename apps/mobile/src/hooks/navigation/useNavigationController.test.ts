@@ -4,6 +4,22 @@ import { mockRouterReplace } from '../../__tests__/setup'
 import { mockToast } from '../../__tests__/mocks'
 import { useNavigationController } from './useNavigationController'
 
+// Create mock functions at module level - must be hoisted
+const mockUseSegmentsReturn = jest.fn()
+
+// Mock expo-router - override the setup mock
+jest.mock('expo-router', () => {
+  const { mockRouterReplace, mockRouterPush, mockRouterBack } = require('../../__tests__/setup')
+  return {
+    useRouter: () => ({
+      push: mockRouterPush,
+      replace: mockRouterReplace,
+      back: mockRouterBack,
+    }),
+    useSegments: () => mockUseSegmentsReturn(),
+  }
+})
+
 // Mock useAutoAuth
 jest.mock('../auth/useAutoAuth')
 import { useAutoAuth } from '../auth/useAutoAuth'
@@ -14,26 +30,38 @@ const mockConsoleLog = jest.spyOn(console, 'log').mockImplementation(() => {})
 
 describe('useNavigationController', () => {
   const mockAutoAuthHook = {
+    // Wallet state
     isConnected: false,
     address: null,
+    chainId: null,
+    // User state
     user: null,
+    // Auth state
     isAuthenticating: false,
     error: null,
     progress: 0,
+    // Computed states
     isFullyAuthenticated: false,
     needsAuthentication: false,
-    chainId: null,
+    // Actions
     retryAuthentication: jest.fn(),
   }
 
   beforeEach(() => {
     jest.clearAllMocks()
+    jest.useFakeTimers()
     mockRouterReplace.mockClear()
     mockToast.show.mockClear()
     mockConsoleLog.mockClear()
+    mockUseSegmentsReturn.mockReturnValue([])
 
     // Set up default mock return
     mockUseAutoAuth.mockReturnValue(mockAutoAuthHook)
+  })
+
+  afterEach(() => {
+    jest.runOnlyPendingTimers()
+    jest.useRealTimers()
   })
 
   afterAll(() => {
@@ -54,6 +82,7 @@ describe('useNavigationController', () => {
     // Trigger navigation after initialization
     await act(async () => {
       rerender({})
+      jest.advanceTimersByTime(200) // Advance past the timeout
     })
 
     expect(result.current.isNavigating).toBe(false)
@@ -72,6 +101,7 @@ describe('useNavigationController', () => {
 
     await act(async () => {
       rerender({})
+      jest.advanceTimersByTime(200) // Advance past the timeout
     })
 
     expect(mockRouterReplace).toHaveBeenCalledWith('/connecting')
@@ -95,6 +125,7 @@ describe('useNavigationController', () => {
 
     await act(async () => {
       rerender({})
+      jest.advanceTimersByTime(200) // Advance past the timeout
     })
 
     expect(mockRouterReplace).toHaveBeenCalledWith('/(auth)/dashboard')
@@ -252,5 +283,61 @@ describe('useNavigationController', () => {
 
     // Should handle both toasts
     expect(mockToast.show).toHaveBeenCalledTimes(2)
+  })
+
+  it('should not navigate if already on correct route', async () => {
+    // Set segments BEFORE rendering
+    mockUseSegmentsReturn.mockReturnValue(['onboarding'])
+
+    const { rerender } = renderHook(() => useNavigationController())
+
+    // First timer advance for initial load
+    await act(async () => {
+      jest.advanceTimersByTime(150) // Initial timeout
+    })
+
+    // Wait for second timer (subsequent navigation check)
+    await act(async () => {
+      rerender({})
+      jest.advanceTimersByTime(150) // Subsequent timeout
+    })
+
+    expect(mockRouterReplace).not.toHaveBeenCalled()
+    // The route matching is working if router.replace wasn't called
+    // Don't require specific console log as the timing might vary
+  })
+
+  it('should handle different route formats correctly', async () => {
+    // Set segments and user BEFORE rendering
+    mockUseSegmentsReturn.mockReturnValue(['(auth)', 'dashboard'])
+
+    const mockUser: User = {
+      walletAddress: '0x123456789',
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+    }
+
+    mockUseAutoAuth.mockReturnValue({
+      ...mockAutoAuthHook,
+      isConnected: true,
+      user: mockUser,
+    })
+
+    const { rerender } = renderHook(() => useNavigationController())
+
+    // First timer advance for initial load
+    await act(async () => {
+      jest.advanceTimersByTime(150) // Initial timeout
+    })
+
+    // Wait for second timer (subsequent navigation check)
+    await act(async () => {
+      rerender({})
+      jest.advanceTimersByTime(150) // Subsequent timeout
+    })
+
+    expect(mockRouterReplace).not.toHaveBeenCalled()
+    // The route matching is working if router.replace wasn't called
+    // Don't require specific console log as the timing might vary
   })
 })
