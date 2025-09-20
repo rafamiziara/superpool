@@ -49,23 +49,10 @@ export default function OnboardingScreen() {
   const flatListRef = useRef<FlatList>(null)
   const [currentSlide, setCurrentSlide] = useState(0)
 
-  // IMPORTANT: No navigation logic - all handled in index.tsx
-  // Toast notifications handled in index.tsx navigation controller
-  // This component is purely for UI presentation
-
   const handleScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
     const contentOffsetX = event.nativeEvent.contentOffset.x
     const index = Math.round(contentOffsetX / screenWidth)
     setCurrentSlide(index)
-  }
-
-  const _scrollToSlide = (slideIndex: number) => {
-    if (flatListRef.current && slideIndex >= 0 && slideIndex < slides.length) {
-      flatListRef.current.scrollToIndex({
-        index: slideIndex,
-        animated: true,
-      })
-    }
   }
 
   const renderSlide: ListRenderItem<OnboardingSlide> = ({ item }) => (

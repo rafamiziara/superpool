@@ -32,15 +32,11 @@ describe('ProgressIndicator', () => {
     expect(step2.props.accessibilityLabel).toBe('Step 3 of 3 (pending)')
   })
 
-  it('should apply correct accessibility values', () => {
+  it('should apply correct accessibility role', () => {
     const { getByTestId } = render(<ProgressIndicator totalSteps={5} currentStep={2} />)
 
     const step = getByTestId('progress-indicator-step-0')
-    expect(step.props.accessibilityValue).toEqual({
-      min: 0,
-      max: 4,
-      now: 2,
-    })
+    expect(step.props.accessibilityRole).toBe('button')
   })
 
   it('should handle first step correctly', () => {

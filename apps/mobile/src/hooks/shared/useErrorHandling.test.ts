@@ -1,5 +1,5 @@
 import { act, renderHook } from '@testing-library/react-native'
-import { ErrorType } from '../../types/errors'
+import { ErrorDetails, ErrorType } from '../../types/errors'
 import { useErrorHandling } from './useErrorHandling'
 
 describe('useErrorHandling', () => {
@@ -17,54 +17,69 @@ describe('useErrorHandling', () => {
     const { result } = renderHook(() => useErrorHandling())
 
     const testError = new Error('Test error message')
-    const errorDetails = result.current.formatError(testError)
+    let errorDetails: ErrorDetails
+    act(() => {
+      errorDetails = result.current.formatError(testError)
+    })
 
-    expect(errorDetails.type).toBe(ErrorType.UNKNOWN_ERROR)
-    expect(errorDetails.message).toBe('An unexpected error occurred. Please try again.')
-    expect(errorDetails.originalError).toBe(testError)
-    expect(errorDetails.timestamp).toBeCloseTo(Date.now(), -2)
-    expect(errorDetails.context?.originalMessage).toBe('Test error message')
+    expect(errorDetails!.type).toBe(ErrorType.UNKNOWN_ERROR)
+    expect(errorDetails!.message).toBe('An unexpected error occurred. Please try again.')
+    expect(errorDetails!.originalError).toBe(testError)
+    expect(errorDetails!.timestamp).toBeCloseTo(Date.now(), -2)
+    expect(errorDetails!.context?.originalMessage).toBe('Test error message')
   })
 
   it('should detect signature rejection errors', () => {
     const { result } = renderHook(() => useErrorHandling())
 
     const signatureError = new Error('User rejected the request')
-    const errorDetails = result.current.formatError(signatureError)
+    let errorDetails: ErrorDetails
+    act(() => {
+      errorDetails = result.current.formatError(signatureError)
+    })
 
-    expect(errorDetails.type).toBe(ErrorType.SIGNATURE_REJECTED)
-    expect(errorDetails.message).toBe('You rejected the signature request. Authentication cancelled.')
+    expect(errorDetails!.type).toBe(ErrorType.SIGNATURE_REJECTED)
+    expect(errorDetails!.message).toBe('You rejected the signature request. Authentication cancelled.')
   })
 
   it('should detect network errors', () => {
     const { result } = renderHook(() => useErrorHandling())
 
     const networkError = new Error('Network request failed')
-    const errorDetails = result.current.formatError(networkError)
+    let errorDetails: ErrorDetails
+    act(() => {
+      errorDetails = result.current.formatError(networkError)
+    })
 
-    expect(errorDetails.type).toBe(ErrorType.NETWORK_ERROR)
-    expect(errorDetails.message).toBe('Network connection error. Please check your internet and try again.')
+    expect(errorDetails!.type).toBe(ErrorType.NETWORK_ERROR)
+    expect(errorDetails!.message).toBe('Network connection error. Please check your internet and try again.')
   })
 
   it('should detect Firebase auth errors', () => {
     const { result } = renderHook(() => useErrorHandling())
 
     const authError = new Error('Firebase auth failed')
-    const errorDetails = result.current.formatError(authError)
+    let errorDetails: ErrorDetails
+    act(() => {
+      errorDetails = result.current.formatError(authError)
+    })
 
-    expect(errorDetails.type).toBe(ErrorType.FIREBASE_AUTH_FAILED)
-    expect(errorDetails.message).toBe('Authentication failed. Please try connecting your wallet again.')
+    expect(errorDetails!.type).toBe(ErrorType.FIREBASE_AUTH_FAILED)
+    expect(errorDetails!.message).toBe('Authentication failed. Please try connecting your wallet again.')
   })
 
   it('should handle specific error types', () => {
     const { result } = renderHook(() => useErrorHandling())
 
     const testError = new Error('Wallet connection failed')
-    const errorDetails = result.current.formatError(testError, ErrorType.WALLET_CONNECTION_FAILED, { walletType: 'MetaMask' })
+    let errorDetails: ErrorDetails
+    act(() => {
+      errorDetails = result.current.formatError(testError, ErrorType.WALLET_CONNECTION_FAILED, { walletType: 'MetaMask' })
+    })
 
-    expect(errorDetails.type).toBe(ErrorType.WALLET_CONNECTION_FAILED)
-    expect(errorDetails.message).toBe('Failed to connect to your wallet. Please try again.')
-    expect(errorDetails.context).toMatchObject({
+    expect(errorDetails!.type).toBe(ErrorType.WALLET_CONNECTION_FAILED)
+    expect(errorDetails!.message).toBe('Failed to connect to your wallet. Please try again.')
+    expect(errorDetails!.context).toMatchObject({
       walletType: 'MetaMask',
       originalMessage: 'Wallet connection failed',
     })
@@ -87,21 +102,27 @@ describe('useErrorHandling', () => {
   it('should identify retryable errors correctly', () => {
     const { result } = renderHook(() => useErrorHandling())
 
-    const retryableError = result.current.formatError(new Error('Test'), ErrorType.NETWORK_ERROR)
-    const nonRetryableError = result.current.formatError(new Error('Test'), ErrorType.SIGNATURE_REJECTED)
+    let retryableError: ErrorDetails, nonRetryableError: ErrorDetails
+    act(() => {
+      retryableError = result.current.formatError(new Error('Test'), ErrorType.NETWORK_ERROR)
+      nonRetryableError = result.current.formatError(new Error('Test'), ErrorType.SIGNATURE_REJECTED)
+    })
 
-    expect(result.current.isRetryableError(retryableError)).toBe(true)
-    expect(result.current.isRetryableError(nonRetryableError)).toBe(false)
+    expect(result.current.isRetryableError(retryableError!)).toBe(true)
+    expect(result.current.isRetryableError(nonRetryableError!)).toBe(false)
   })
 
   it('should identify user-visible errors correctly', () => {
     const { result } = renderHook(() => useErrorHandling())
 
-    const visibleError = result.current.formatError(new Error('Test'), ErrorType.WALLET_CONNECTION_FAILED)
-    const internalError = result.current.formatError(new Error('Test'), ErrorType.MESSAGE_GENERATION_FAILED)
+    let visibleError: ErrorDetails, internalError: ErrorDetails
+    act(() => {
+      visibleError = result.current.formatError(new Error('Test'), ErrorType.WALLET_CONNECTION_FAILED)
+      internalError = result.current.formatError(new Error('Test'), ErrorType.MESSAGE_GENERATION_FAILED)
+    })
 
-    expect(result.current.shouldShowToUser(visibleError)).toBe(true)
-    expect(result.current.shouldShowToUser(internalError)).toBe(false)
+    expect(result.current.shouldShowToUser(visibleError!)).toBe(true)
+    expect(result.current.shouldShowToUser(internalError!)).toBe(false)
   })
 
   it('should track last error', () => {
@@ -139,19 +160,25 @@ describe('useErrorHandling', () => {
     const { result } = renderHook(() => useErrorHandling())
 
     const stringError = 'Something went wrong'
-    const errorDetails = result.current.formatError(stringError)
+    let errorDetails: ErrorDetails
+    act(() => {
+      errorDetails = result.current.formatError(stringError)
+    })
 
-    expect(errorDetails.type).toBe(ErrorType.UNKNOWN_ERROR)
-    expect(errorDetails.originalError).toBe(stringError)
+    expect(errorDetails!.type).toBe(ErrorType.UNKNOWN_ERROR)
+    expect(errorDetails!.originalError).toBe(stringError)
   })
 
   it('should handle null/undefined errors', () => {
     const { result } = renderHook(() => useErrorHandling())
 
-    const nullErrorDetails = result.current.formatError(null)
-    const undefinedErrorDetails = result.current.formatError(undefined)
+    let nullErrorDetails: ErrorDetails, undefinedErrorDetails: ErrorDetails
+    act(() => {
+      nullErrorDetails = result.current.formatError(null)
+      undefinedErrorDetails = result.current.formatError(undefined)
+    })
 
-    expect(nullErrorDetails.type).toBe(ErrorType.UNKNOWN_ERROR)
-    expect(undefinedErrorDetails.type).toBe(ErrorType.UNKNOWN_ERROR)
+    expect(nullErrorDetails!.type).toBe(ErrorType.UNKNOWN_ERROR)
+    expect(undefinedErrorDetails!.type).toBe(ErrorType.UNKNOWN_ERROR)
   })
 })
