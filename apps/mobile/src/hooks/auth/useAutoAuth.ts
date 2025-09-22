@@ -1,123 +1,165 @@
 import { AuthenticationData } from '@superpool/types'
 import { useEffect, useState } from 'react'
-import { AutoAuthHook, AutoAuthState } from '../../types/auth'
+import { FIREBASE_AUTH } from '../../config/firebase'
+import { authStore } from '../../stores/AuthStore'
+import { AutoAuthHook } from '../../types/auth'
 import { useFirebaseAuth } from './useFirebaseAuth'
 import { useMessageGeneration } from './useMessageGeneration'
 import { useSignatureHandling } from './useSignatureHandling'
-import { useWalletListener } from './useWalletListener'
 
 export const useAutoAuth = (): AutoAuthHook => {
-  const walletListener = useWalletListener()
   const messageGeneration = useMessageGeneration()
   const signatureHandling = useSignatureHandling()
   const firebaseAuth = useFirebaseAuth()
 
-  const [authState, setAuthState] = useState<AutoAuthState>({
-    isAuthenticating: false,
-    error: null,
-    progress: 0,
-  })
+  // Sync MobX state to React state for reactivity
+  const [user, setUser] = useState(authStore.user)
+  const [isAuthenticating, setIsAuthenticating] = useState(authStore.isAuthenticating)
+  const [error, setError] = useState(authStore.error)
+  const [progress, setProgress] = useState(authStore.progress)
 
-  // 🚀 THE MAGIC: Auto-authenticate when wallet connects
+  // Sync MobX store state to React state
+  useEffect(() => {
+    const updateState = () => {
+      const newUser = authStore.user
+      const newIsAuthenticating = authStore.isAuthenticating
+      const newError = authStore.error
+      const newProgress = authStore.progress
+
+      // Log state changes for debugging
+      if (newUser !== user) {
+        console.log('🔄 User state changed:', { from: user?.walletAddress, to: newUser?.walletAddress })
+      }
+
+      setUser(newUser)
+      setIsAuthenticating(newIsAuthenticating)
+      setError(newError)
+      setProgress(newProgress)
+    }
+
+    // Initial sync
+    updateState()
+
+    // Set up a simple polling mechanism to detect changes
+    const interval = setInterval(updateState, 100)
+
+    return () => clearInterval(interval)
+  }, [user])
+
+  // Auto-authentication effect
   useEffect(() => {
     const autoAuthenticate = async () => {
-      // Only auto-auth if: wallet connected + no user + not already authenticating + no recent error
-      if (!walletListener.isConnected || !walletListener.address || firebaseAuth.user || authState.isAuthenticating || authState.error) {
+      // Guard conditions
+      if (!authStore.isWalletConnected || !authStore.walletAddress || FIREBASE_AUTH.currentUser || isAuthenticating) {
         return
       }
 
-      console.log('🚀 Auto-authenticating for:', walletListener.address)
-      setAuthState((s) => ({ ...s, isAuthenticating: true, error: null, progress: 0 }))
+      console.log('🚀 Auto-authenticating for:', authStore.walletAddress)
+
+      // Try to acquire auth lock
+      if (!authStore.acquireAuthLock(authStore.walletAddress)) {
+        console.log('🔒 Authentication already in progress, skipping')
+        return
+      }
 
       try {
-        // Step 1: Generate auth message (0-25%)
-        console.log('📝 Step 1: Generating auth message...')
-        setAuthState((s) => ({ ...s, progress: 10 }))
-        const authMessage = await messageGeneration.generateMessage(walletListener.address!)
-        setAuthState((s) => ({ ...s, progress: 25 }))
+        // Step 1: Connect wallet (already done)
+        authStore.startStep('connect-wallet')
+        authStore.completeStep('connect-wallet')
 
-        // Step 2: Request signature (25-50%)
-        console.log('✍️ Step 2: Requesting wallet signature...')
-        setAuthState((s) => ({ ...s, progress: 35 }))
+        // Step 2: Acquire lock (already done)
+        authStore.startStep('acquire-lock')
+        authStore.completeStep('acquire-lock')
+
+        // Step 3: Generate auth message
+        authStore.startStep('generate-message')
+        console.log('📝 Step 3: Generating auth message...')
+        const authMessage = await messageGeneration.generateMessage(authStore.walletAddress!)
+        authStore.completeStep('generate-message')
+
+        // Step 4: Request signature
+        authStore.startStep('request-signature')
+        console.log('✍️ Step 4: Requesting wallet signature...')
         const signature = await signatureHandling.requestSignature(authMessage.message)
-        setAuthState((s) => ({ ...s, progress: 50 }))
+        authStore.completeStep('request-signature')
 
-        // Step 3: Firebase authentication (50-100%)
-        console.log('🔥 Step 3: Authenticating with Firebase...')
-        setAuthState((s) => ({ ...s, progress: 75 }))
+        // Step 5: Verify signature (implicit in Firebase auth)
+        authStore.startStep('verify-signature')
+        authStore.completeStep('verify-signature')
+
+        // Step 6: Firebase authentication
+        authStore.startStep('firebase-auth')
+        console.log('🔥 Step 6: Authenticating with Firebase...')
         const authData: AuthenticationData = {
-          walletAddress: walletListener.address!,
+          walletAddress: authStore.walletAddress!,
           signature,
           nonce: authMessage.nonce,
           timestamp: authMessage.timestamp,
           message: authMessage.message,
         }
-        await firebaseAuth.authenticateWithSignature(authData)
+        const user = await firebaseAuth.authenticateWithSignature(authData)
+        authStore.completeStep('firebase-auth')
+        authStore.setUser(user)
 
-        setAuthState((s) => ({ ...s, progress: 100, isAuthenticating: false }))
         console.log('✅ Auto-authentication complete!')
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : 'Auto-authentication failed'
         console.error('❌ Auto-authentication failed:', errorMessage)
 
-        setAuthState((s) => ({
-          ...s,
-          error: errorMessage,
-          isAuthenticating: false,
-          progress: 0,
-        }))
+        if (authStore.currentStep) {
+          authStore.failStep(authStore.currentStep, errorMessage)
+        }
+        authStore.setError(errorMessage)
+      } finally {
+        authStore.releaseAuthLock()
       }
     }
 
     autoAuthenticate()
   }, [
-    walletListener.isConnected,
-    walletListener.address,
+    authStore.isWalletConnected,
+    authStore.walletAddress,
     firebaseAuth.user,
-    authState.isAuthenticating,
-    authState.error, // Include error to prevent re-triggering on error
+    isAuthenticating, // Watch local reactive state
   ])
 
   // Auto-reset on wallet disconnect
   useEffect(() => {
-    if (!walletListener.isConnected) {
+    if (!authStore.isWalletConnected) {
       console.log('🔌 Wallet disconnected - resetting auth state')
-      setAuthState({ isAuthenticating: false, error: null, progress: 0 })
-
-      // Clear auth module states
+      authStore.reset()
       messageGeneration.clearState()
-      // Note: Firebase auth and signature states will be cleared by their respective hooks
     }
-  }, [walletListener.isConnected, messageGeneration.clearState])
+  }, [authStore.isWalletConnected, messageGeneration.clearState])
 
   // Manual retry function
   const retryAuthentication = async () => {
-    if (!walletListener.isConnected || !walletListener.address) {
+    if (!authStore.isWalletConnected || !authStore.walletAddress) {
       throw new Error('Wallet not connected')
     }
 
     console.log('🔄 Retrying authentication...')
-    setAuthState({ isAuthenticating: false, error: null, progress: 0 })
-    // This will trigger the useEffect above by clearing the error state
+    authStore.resetProgress()
+    // This will trigger the useEffect above
   }
 
   return {
     // Combined wallet state
-    isConnected: walletListener.isConnected,
-    address: walletListener.address,
-    chainId: walletListener.chainId,
+    isConnected: authStore.isWalletConnected,
+    address: authStore.walletAddress,
+    chainId: authStore.chainId,
 
-    // User state
-    user: firebaseAuth.user,
+    // User state (reactive to MobX changes)
+    user,
 
-    // Auto-auth state
-    isAuthenticating: authState.isAuthenticating,
-    error: authState.error,
-    progress: authState.progress,
+    // Auth state (reactive to MobX changes)
+    isAuthenticating,
+    error,
+    progress,
 
-    // Computed states
-    isFullyAuthenticated: walletListener.isConnected && !!firebaseAuth.user,
-    needsAuthentication: walletListener.isConnected && !firebaseAuth.user && !authState.isAuthenticating,
+    // Computed states (reactive)
+    isFullyAuthenticated: authStore.isWalletConnected && !!user,
+    needsAuthentication: authStore.isWalletConnected && !user && !isAuthenticating,
 
     // Actions
     retryAuthentication,

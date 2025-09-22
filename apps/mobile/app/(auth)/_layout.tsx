@@ -1,14 +1,13 @@
 import { Stack } from 'expo-router'
+import { observer } from 'mobx-react-lite'
 import React from 'react'
 import { Text, View } from 'react-native'
-import { useAutoAuth } from '../../src/hooks/auth/useAutoAuth'
+import { authStore } from '../../src/stores/AuthStore'
 
-export default function AuthLayout() {
-  const { isFullyAuthenticated } = useAutoAuth()
-
-  // Redirect protection - this should not happen due to navigation controller
+export default observer(function AuthLayout() {
+  // Redirect protection - this should not happen due to NavigationStore
   // but provides a fallback if someone tries to access auth routes directly
-  if (!isFullyAuthenticated) {
+  if (!authStore.isWalletConnected || !authStore.user) {
     return (
       <View className="flex-1 bg-white items-center justify-center">
         <Text className="text-muted-foreground">Redirecting to authentication...</Text>
@@ -19,7 +18,6 @@ export default function AuthLayout() {
   return (
     <Stack screenOptions={{ headerShown: false, animation: 'slide_from_right' }}>
       <Stack.Screen name="dashboard" />
-      <Stack.Screen name="profile" />
     </Stack>
   )
-}
+})
