@@ -1,8 +1,8 @@
 import type { VerifySignatureAndLoginResponse } from '@superpool/types'
 import { AuthenticationData, User } from '@superpool/types'
-import { onAuthStateChanged, signInWithCustomToken, signOut } from 'firebase/auth'
+import { signInWithCustomToken, signOut } from 'firebase/auth'
 import { httpsCallable } from 'firebase/functions'
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useState } from 'react'
 import { FIREBASE_AUTH, FIREBASE_FUNCTIONS } from '../../config/firebase'
 import { FirebaseAuthHook, FirebaseAuthState } from '../../types/auth'
 
@@ -12,20 +12,6 @@ export const useFirebaseAuth = (): FirebaseAuthHook => {
     isAuthenticating: false,
     error: null,
   })
-
-  useEffect(() => {
-    const unsubscribe = onAuthStateChanged(FIREBASE_AUTH, (firebaseUser) => {
-      if (firebaseUser) {
-        console.log('🔥 Firebase auth state: User authenticated', firebaseUser.uid)
-        setState((prevState) => (!prevState.user ? { ...prevState, isAuthenticating: false } : prevState))
-      } else {
-        setState((s) => ({ ...s, user: null, isAuthenticating: false }))
-        console.log('🔥 Firebase auth state: User not authenticated')
-      }
-    })
-
-    return unsubscribe
-  }, [])
 
   const authenticateWithSignature = useCallback(async (authData: AuthenticationData): Promise<User> => {
     const { walletAddress, signature, nonce, timestamp } = authData
@@ -42,6 +28,7 @@ export const useFirebaseAuth = (): FirebaseAuthHook => {
       console.log('🔥 Authenticating with Firebase...', { walletAddress })
 
       const verifySignature = httpsCallable(FIREBASE_FUNCTIONS, 'verifySignatureAndLogin')
+
       const response = await verifySignature({
         walletAddress,
         signature,

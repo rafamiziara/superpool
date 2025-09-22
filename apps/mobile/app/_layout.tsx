@@ -5,25 +5,40 @@ import { StatusBar } from 'expo-status-bar'
 import Toast from 'react-native-toast-message'
 import { WagmiProvider } from 'wagmi'
 import { toastConfig, wagmiConfig } from '../src/config'
+import { FirebaseInitializer } from '../src/components/FirebaseInitializer'
+import { WalletListener } from '../src/components/WalletListener'
+import '../src/stores/NavigationStore' // Initialize NavigationStore
 
 const queryClient = new QueryClient()
+
+function AppContent() {
+  return (
+    <>
+      {/* Global state initialization */}
+      <FirebaseInitializer />
+      <WalletListener />
+
+      <Stack screenOptions={{ headerShown: false }}>
+        {/* Navigation screens */}
+        <Stack.Screen name="index" />
+        <Stack.Screen name="onboarding" />
+        <Stack.Screen name="connecting" />
+
+        {/* Auth-protected screens */}
+        <Stack.Screen name="(auth)" options={{ animation: 'fade' }} />
+
+        {/* Toast notification system */}
+        <Toast config={toastConfig} />
+      </Stack>
+    </>
+  )
+}
 
 export default function RootLayout() {
   return (
     <WagmiProvider config={wagmiConfig}>
       <QueryClientProvider client={queryClient}>
-        <Stack screenOptions={{ headerShown: false }}>
-          {/* Navigation screens */}
-          <Stack.Screen name="index" />
-          <Stack.Screen name="onboarding" />
-          <Stack.Screen name="connecting" />
-
-          {/* Auth-protected screens */}
-          <Stack.Screen name="(auth)" options={{ animation: 'fade' }} />
-
-          {/* Toast notification system */}
-          <Toast config={toastConfig} />
-        </Stack>
+        <AppContent />
         <StatusBar style="auto" />
         <AppKit />
       </QueryClientProvider>

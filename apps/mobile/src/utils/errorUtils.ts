@@ -1,5 +1,5 @@
+import { ERROR_MESSAGES, ERROR_SUGGESTIONS } from '../constants'
 import { ErrorContext, ErrorDetails, ErrorType } from '../types/errors'
-import { ERROR_MESSAGES, ERROR_SUGGESTIONS } from './errorMessages'
 
 export const createErrorDetails = (type: ErrorType, originalError?: unknown, context?: ErrorContext): ErrorDetails => ({
   type,

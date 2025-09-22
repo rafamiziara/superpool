@@ -1,11 +1,12 @@
 import { AppKitButton } from '@reown/appkit-wagmi-react-native'
 import { StatusBar } from 'expo-status-bar'
+import { observer } from 'mobx-react-lite'
 import React from 'react'
 import { Alert, ScrollView, Text, View } from 'react-native'
-import { useAutoAuth } from '../../src/hooks/auth/useAutoAuth'
+import { authStore } from '../../src/stores/AuthStore'
 
-export default function DashboardScreen() {
-  const { address, chainId, isConnected } = useAutoAuth()
+function DashboardScreen() {
+  const { walletAddress, chainId, isWalletConnected } = authStore
 
   const handlePoolAction = (action: string) => {
     Alert.alert('Pool Action', `${action} functionality will be available in the next phase.`, [{ text: 'OK' }])
@@ -36,7 +37,7 @@ export default function DashboardScreen() {
             <View testID="wallet-address-info">
               <Text className="text-sm font-medium text-muted-foreground">Wallet Address</Text>
               <Text className="text-sm text-foreground font-mono" testID="wallet-address-value" selectable>
-                {address || 'Not connected'}
+                {walletAddress || 'Not connected'}
               </Text>
             </View>
 
@@ -44,7 +45,7 @@ export default function DashboardScreen() {
               <Text className="text-sm font-medium text-muted-foreground">Network</Text>
               <View className="flex-row items-center">
                 <View
-                  className={`w-2 h-2 rounded-full mr-2 ${isConnected ? 'bg-success' : 'bg-destructive'}`}
+                  className={`w-2 h-2 rounded-full mr-2 ${isWalletConnected ? 'bg-success' : 'bg-destructive'}`}
                   testID="connection-status-dot"
                 />
                 <Text className="text-sm text-foreground" testID="network-info-value">
@@ -154,3 +155,5 @@ export default function DashboardScreen() {
     </ScrollView>
   )
 }
+
+export default observer(DashboardScreen)

@@ -37,6 +37,7 @@ module.exports = {
     '!app/**/+*.tsx', // Expo router files
     '!src/config/**', // Configuration directory
     '!src/assets/**', // Static assets
+    '!src/constants/**', // Constants and configuration data
     '!src/**/index.ts', // Barrel export files
     '!src/**/types/**', // TypeScript interface definitions only
   ],

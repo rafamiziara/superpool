@@ -42,6 +42,14 @@ export interface AutoAuthState {
   progress: number // 0-100
 }
 
+export type AuthStep = 'connect-wallet' | 'acquire-lock' | 'generate-message' | 'request-signature' | 'verify-signature' | 'firebase-auth'
+
+export interface AuthStepInfo {
+  step: AuthStep
+  title: string
+  description: string
+}
+
 export interface AutoAuthHook extends AutoAuthState {
   // Wallet state
   isConnected: boolean
