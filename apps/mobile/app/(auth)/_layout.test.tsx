@@ -1,12 +1,15 @@
 import { render } from '@testing-library/react-native'
 import React from 'react'
+import { authStore } from '../../src/stores/AuthStore'
 import AuthLayout from './_layout'
 
-// Mock useAutoAuth
-jest.mock('../../src/hooks/auth/useAutoAuth')
-import { useAutoAuth } from '../../src/hooks/auth/useAutoAuth'
-
-const mockUseAutoAuth = useAutoAuth as jest.MockedFunction<typeof useAutoAuth>
+// Mock authStore
+jest.mock('../../src/stores/AuthStore', () => ({
+  authStore: {
+    isWalletConnected: false,
+    user: null,
+  },
+}))
 
 // Mock Stack component
 jest.mock('expo-router', () => {
@@ -18,73 +21,54 @@ jest.mock('expo-router', () => {
   }
 })
 
-describe('AuthLayout', () => {
-  const mockAutoAuthHook = {
-    isConnected: false,
-    address: null,
-    user: null,
-    isAuthenticating: false,
-    error: null,
-    progress: 0,
-    isFullyAuthenticated: false,
-    needsAuthentication: false,
-    chainId: null,
-    retryAuthentication: jest.fn(),
-  }
+const mockAuthStore = authStore as jest.Mocked<typeof authStore>
 
+describe('AuthLayout', () => {
   beforeEach(() => {
     jest.clearAllMocks()
 
-    // Set up default mock return
-    mockUseAutoAuth.mockReturnValue(mockAutoAuthHook)
+    // Reset to default state
+    mockAuthStore.isWalletConnected = false
+    mockAuthStore.user = null
   })
 
   it('should render Stack when fully authenticated', () => {
-    mockUseAutoAuth.mockReturnValue({
-      ...mockAutoAuthHook,
-      isFullyAuthenticated: true,
-    })
+    mockAuthStore.isWalletConnected = true
+    mockAuthStore.user = {
+      walletAddress: '0x123456789',
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+    }
 
     const { UNSAFE_root } = render(<AuthLayout />)
     expect(UNSAFE_root).toBeTruthy()
   })
 
   it('should show redirect message when not authenticated', () => {
-    mockUseAutoAuth.mockReturnValue({
-      ...mockAutoAuthHook,
-      isFullyAuthenticated: false,
-    })
+    mockAuthStore.isWalletConnected = false
+    mockAuthStore.user = null
 
     const { getByText } = render(<AuthLayout />)
     expect(getByText('Redirecting to authentication...')).toBeTruthy()
   })
 
-  it('should handle authentication states correctly', () => {
-    // Test when user is connected but not fully authenticated
-    mockUseAutoAuth.mockReturnValue({
-      ...mockAutoAuthHook,
-      isConnected: true,
-      isFullyAuthenticated: false,
-    })
+  it('should show redirect message when wallet connected but no user', () => {
+    mockAuthStore.isWalletConnected = true
+    mockAuthStore.user = null
 
     const { getByText } = render(<AuthLayout />)
     expect(getByText('Redirecting to authentication...')).toBeTruthy()
   })
 
-  it('should use complete hook interface for type safety', () => {
-    // Test that all required properties are provided
-    mockUseAutoAuth.mockReturnValue({
-      ...mockAutoAuthHook,
-      isFullyAuthenticated: true,
-      isConnected: true,
-      user: {
-        walletAddress: '0x123456789',
-        createdAt: Date.now(),
-        updatedAt: Date.now(),
-      },
-    })
+  it('should show redirect message when user exists but wallet not connected', () => {
+    mockAuthStore.isWalletConnected = false
+    mockAuthStore.user = {
+      walletAddress: '0x123456789',
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+    }
 
-    const { UNSAFE_root } = render(<AuthLayout />)
-    expect(UNSAFE_root).toBeTruthy()
+    const { getByText } = render(<AuthLayout />)
+    expect(getByText('Redirecting to authentication...')).toBeTruthy()
   })
 })

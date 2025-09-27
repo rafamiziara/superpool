@@ -18,21 +18,34 @@ jest.mock('../src/components/LoadingSpinner', () => ({
   },
 }))
 
-const mockUseAutoAuth = jest.fn()
+// Mock useAutoAuth (returns void now)
 jest.mock('../src/hooks/auth/useAutoAuth', () => ({
-  useAutoAuth: () => mockUseAutoAuth(),
+  useAutoAuth: jest.fn(),
+}))
+
+// Mock authStore
+const mockAuthStore = {
+  isAuthenticating: true,
+  progress: 25,
+  error: null as string | null,
+  currentStep: null as string | null,
+  getStepStatus: jest.fn(),
+}
+
+jest.mock('../src/stores/AuthStore', () => ({
+  authStore: mockAuthStore,
 }))
 
 describe('ConnectingScreen', () => {
   beforeEach(() => {
     jest.clearAllMocks()
 
-    // Default mock state
-    mockUseAutoAuth.mockReturnValue({
-      isAuthenticating: true,
-      progress: 25,
-      error: null,
-    })
+    // Reset to default state
+    mockAuthStore.isAuthenticating = true
+    mockAuthStore.progress = 25
+    mockAuthStore.error = null
+    mockAuthStore.currentStep = null
+    mockAuthStore.getStepStatus.mockReturnValue('pending')
   })
 
   it('should render connecting screen', () => {
@@ -60,11 +73,9 @@ describe('ConnectingScreen', () => {
   })
 
   it('should show error status when error occurs', () => {
-    mockUseAutoAuth.mockReturnValue({
-      isAuthenticating: false,
-      progress: 0,
-      error: 'User rejected signature',
-    })
+    mockAuthStore.isAuthenticating = false
+    mockAuthStore.progress = 0
+    mockAuthStore.error = 'User rejected signature'
 
     const { getByTestId, getByText } = render(<ConnectingScreen />)
 
@@ -98,11 +109,9 @@ describe('ConnectingScreen', () => {
 
   it('should show correct step based on progress', () => {
     // Progress 25% should be step 1 (index 1)
-    mockUseAutoAuth.mockReturnValue({
-      isAuthenticating: true,
-      progress: 25,
-      error: null,
-    })
+    mockAuthStore.isAuthenticating = true
+    mockAuthStore.progress = 25
+    mockAuthStore.error = null
 
     const { getByTestId } = render(<ConnectingScreen />)
 
@@ -117,11 +126,9 @@ describe('ConnectingScreen', () => {
   })
 
   it('should show error icon for failed step', () => {
-    mockUseAutoAuth.mockReturnValue({
-      isAuthenticating: false,
-      progress: 50,
-      error: 'Signature failed',
-    })
+    mockAuthStore.isAuthenticating = false
+    mockAuthStore.progress = 50
+    mockAuthStore.error = 'Signature failed'
 
     const { getByTestId } = render(<ConnectingScreen />)
 
@@ -132,11 +139,10 @@ describe('ConnectingScreen', () => {
   })
 
   it('should show signature prompt at correct progress', () => {
-    mockUseAutoAuth.mockReturnValue({
-      isAuthenticating: true,
-      progress: 60, // Between 50 and 75
-      error: null,
-    })
+    mockAuthStore.isAuthenticating = true
+    mockAuthStore.progress = 60 // Between 50 and 75
+    mockAuthStore.error = null
+    mockAuthStore.currentStep = 'request-signature'
 
     const { getByTestId, getByText } = render(<ConnectingScreen />)
 
@@ -145,11 +151,9 @@ describe('ConnectingScreen', () => {
   })
 
   it('should show progress message during authentication', () => {
-    mockUseAutoAuth.mockReturnValue({
-      isAuthenticating: true,
-      progress: 30,
-      error: null,
-    })
+    mockAuthStore.isAuthenticating = true
+    mockAuthStore.progress = 30
+    mockAuthStore.error = null
 
     const { getByTestId, getByText } = render(<ConnectingScreen />)
 
@@ -158,11 +162,9 @@ describe('ConnectingScreen', () => {
   })
 
   it('should show ready message when not authenticating', () => {
-    mockUseAutoAuth.mockReturnValue({
-      isAuthenticating: false,
-      progress: 0,
-      error: null,
-    })
+    mockAuthStore.isAuthenticating = false
+    mockAuthStore.progress = 0
+    mockAuthStore.error = null
 
     const { getByTestId, getByText } = render(<ConnectingScreen />)
 
@@ -172,11 +174,9 @@ describe('ConnectingScreen', () => {
 
   describe('Step Icons', () => {
     it('should show loading spinner for current step', () => {
-      mockUseAutoAuth.mockReturnValue({
-        isAuthenticating: true,
-        progress: 50,
-        error: null,
-      })
+      mockAuthStore.isAuthenticating = true
+      mockAuthStore.progress = 50
+      mockAuthStore.error = null
 
       const { getByTestId } = render(<ConnectingScreen />)
 
@@ -185,11 +185,9 @@ describe('ConnectingScreen', () => {
     })
 
     it('should show success icon for completed steps', () => {
-      mockUseAutoAuth.mockReturnValue({
-        isAuthenticating: true,
-        progress: 75,
-        error: null,
-      })
+      mockAuthStore.isAuthenticating = true
+      mockAuthStore.progress = 75
+      mockAuthStore.error = null
 
       const { getByTestId } = render(<ConnectingScreen />)
 
@@ -200,11 +198,9 @@ describe('ConnectingScreen', () => {
     })
 
     it('should show pending dots for future steps', () => {
-      mockUseAutoAuth.mockReturnValue({
-        isAuthenticating: true,
-        progress: 25,
-        error: null,
-      })
+      mockAuthStore.isAuthenticating = true
+      mockAuthStore.progress = 25
+      mockAuthStore.error = null
 
       const { getByTestId } = render(<ConnectingScreen />)
 
@@ -217,11 +213,9 @@ describe('ConnectingScreen', () => {
 
   describe('Progress Mapping', () => {
     it('should map progress 0% to step 0', () => {
-      mockUseAutoAuth.mockReturnValue({
-        isAuthenticating: true,
-        progress: 0,
-        error: null,
-      })
+      mockAuthStore.isAuthenticating = true
+      mockAuthStore.progress = 0
+      mockAuthStore.error = null
 
       const { getByTestId } = render(<ConnectingScreen />)
 
@@ -229,11 +223,9 @@ describe('ConnectingScreen', () => {
     })
 
     it('should map progress 100% to last step', () => {
-      mockUseAutoAuth.mockReturnValue({
-        isAuthenticating: true,
-        progress: 100,
-        error: null,
-      })
+      mockAuthStore.isAuthenticating = true
+      mockAuthStore.progress = 100
+      mockAuthStore.error = null
 
       const { getByTestId } = render(<ConnectingScreen />)
 
@@ -249,11 +241,9 @@ describe('ConnectingScreen', () => {
       ]
 
       testCases.forEach(({ progress, expectedStep }) => {
-        mockUseAutoAuth.mockReturnValue({
-          isAuthenticating: true,
-          progress,
-          error: null,
-        })
+        mockAuthStore.isAuthenticating = true
+        mockAuthStore.progress = progress
+        mockAuthStore.error = null
 
         const { getByTestId } = render(<ConnectingScreen />)
 
