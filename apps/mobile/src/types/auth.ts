@@ -49,20 +49,3 @@ export interface AuthStepInfo {
   title: string
   description: string
 }
-
-export interface AutoAuthHook extends AutoAuthState {
-  // Wallet state
-  isConnected: boolean
-  address: string | null
-  chainId: number | null
-
-  // User state
-  user: User | null
-
-  // Computed states
-  isFullyAuthenticated: boolean
-  needsAuthentication: boolean
-
-  // Actions
-  retryAuthentication: () => Promise<void>
-}

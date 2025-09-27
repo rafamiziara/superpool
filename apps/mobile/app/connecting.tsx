@@ -91,7 +91,7 @@ export default observer(function ConnectingScreen() {
           <View className="bg-gray-50 p-2 rounded-xl items-center">
             {error ? (
               <View className="items-center" testID="error-status">
-                <Text className="text-destructive font-medium text-lg text-center mb-2">Authentication Failed</Text>
+                <Text className="text-destructive font-medium text-lg text-center">Authentication Failed</Text>
               </View>
             ) : (
               <View className="items-center" testID="authenticating-status">
