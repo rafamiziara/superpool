@@ -1,5 +1,5 @@
 import React from 'react'
-import { render } from '@testing-library/react-native'
+import { render } from '../src/__tests__/test-utils'
 import RootLayout from './_layout'
 
 // Mock AppKit
@@ -61,7 +61,7 @@ jest.mock('react-native-toast-message', () => ({
   },
 }))
 
-// Mock Wagmi Provider
+// Mock Wagmi Provider and hooks
 jest.mock('wagmi', () => ({
   WagmiProvider: ({ children, config }: { children: React.ReactNode; config: unknown }) => {
     const { View, Text } = require('react-native')
@@ -72,12 +72,25 @@ jest.mock('wagmi', () => ({
       </View>
     )
   },
+  useAccount: jest.fn(() => ({
+    isConnected: false,
+    isConnecting: false,
+    address: undefined,
+    chainId: undefined,
+  })),
+  useSignMessage: jest.fn(() => ({
+    signMessageAsync: jest.fn().mockResolvedValue('0xsignature'),
+    isPending: false,
+  })),
 }))
 
 // Mock config imports
 jest.mock('../src/config', () => ({
   toastConfig: { mockToastConfig: true },
   wagmiConfig: { mockWagmiConfig: true },
+  FIREBASE_AUTH: {
+    authStateReady: jest.fn().mockResolvedValue(undefined),
+  },
 }))
 
 describe('RootLayout', () => {

@@ -1,3 +1,4 @@
+import React from 'react'
 import type { Address } from 'viem'
 
 // Wagmi hooks mocks
@@ -24,6 +25,7 @@ export const mockFirebaseAuth = {
     callback(null) // Default to not authenticated
     return jest.fn() // Return unsubscribe function
   }),
+  authStateReady: jest.fn().mockResolvedValue(undefined),
 }
 
 export const mockFirebaseCallable = jest.fn(() =>
@@ -39,9 +41,13 @@ export const mockToast = {
 }
 
 // Global mocks
+// Wagmi Provider mock
+export const mockWagmiProvider = ({ children }: { children: React.ReactNode }) => children
+
 jest.mock('wagmi', () => ({
   useAccount: mockWagmiUseAccount,
   useSignMessage: mockWagmiUseSignMessage,
+  WagmiProvider: mockWagmiProvider,
 }))
 
 jest.mock('firebase/auth', () => mockFirebaseAuth)

@@ -33,7 +33,7 @@ export const useMessageGeneration = (): MessageGenerationHook => {
 
       const { message, nonce, timestamp } = response.data as AuthMessageResponse
 
-      if (!message || !nonce || !timestamp) {
+      if (!message || !nonce || timestamp === undefined || timestamp === null) {
         throw new Error('Incomplete auth message data received')
       }
 

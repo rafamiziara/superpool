@@ -1,4 +1,4 @@
-import { render } from '@testing-library/react-native'
+import { render } from '../../src/__tests__/test-utils'
 import React from 'react'
 import { authStore } from '../../src/stores/AuthStore'
 import AuthLayout from './_layout'
