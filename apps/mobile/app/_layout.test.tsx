@@ -48,7 +48,7 @@ jest.mock('expo-status-bar', () => ({
   },
 }))
 
-// Mock Toast
+// Mock Toast with enhanced functionality for this test
 jest.mock('react-native-toast-message', () => ({
   __esModule: true,
   default: ({ config }: { config: unknown }) => {
@@ -61,7 +61,7 @@ jest.mock('react-native-toast-message', () => ({
   },
 }))
 
-// Mock Wagmi Provider and hooks
+// Mock Wagmi Provider with enhanced functionality for this test
 jest.mock('wagmi', () => ({
   WagmiProvider: ({ children, config }: { children: React.ReactNode; config: unknown }) => {
     const { View, Text } = require('react-native')
@@ -88,6 +88,10 @@ jest.mock('wagmi', () => ({
 jest.mock('../src/config', () => ({
   toastConfig: { mockToastConfig: true },
   wagmiConfig: { mockWagmiConfig: true },
+}))
+
+// Mock Firebase config to match the global mocks
+jest.mock('../src/config/firebase', () => ({
   FIREBASE_AUTH: {
     authStateReady: jest.fn().mockResolvedValue(undefined),
   },
