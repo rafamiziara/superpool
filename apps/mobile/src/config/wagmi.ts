@@ -1,7 +1,7 @@
 import '@walletconnect/react-native-compat'
 
 import { createAppKit, defaultWagmiConfig } from '@reown/appkit-wagmi-react-native'
-import { localhost, polygon, polygonAmoy } from 'wagmi/chains'
+import { arbitrum, base, bsc, localhost, mainnet, polygon, polygonAmoy } from 'wagmi/chains'
 
 // Get environment variables with validation
 const projectId = process.env.EXPO_PUBLIC_REOWN_PROJECT_ID
@@ -37,7 +37,9 @@ const metadata = {
 }
 
 // Configure chains based on environment
-const chains = __DEV__ ? ([polygon, polygonAmoy, localhostChain] as const) : ([polygon, polygonAmoy] as const)
+const chains = __DEV__
+  ? ([mainnet, polygon, arbitrum, base, bsc, polygonAmoy, localhostChain] as const)
+  : ([mainnet, polygon, arbitrum, base, bsc, polygonAmoy] as const)
 
 // Create Wagmi configuration
 export const wagmiConfig = defaultWagmiConfig({ chains, projectId, metadata })
