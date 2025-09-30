@@ -83,10 +83,14 @@ export default function OnboardingScreen() {
   return (
     <View className="flex-1 bg-white" testID="onboarding-screen">
       {/* Fixed Header - Logo */}
-      <View className="pt-20 pb-6 mt-12" testID="onboarding-header">
-        <Text className="text-3xl font-extrabold text-primary text-center" testID="superpool-logo" accessibilityRole="header">
-          SUPERPOOL
-        </Text>
+      <View className="pt-20 pb-6 mt-12 items-center" testID="onboarding-header">
+        <Image
+          source={require('@superpool/assets/images/logos/no_bg_color.png')}
+          className="h-8 w-48"
+          resizeMode="contain"
+          testID="superpool-logo"
+          accessibilityLabel="SuperPool Logo"
+        />
       </View>
 
       {/* Scrollable Content Area */}

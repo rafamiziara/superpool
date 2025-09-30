@@ -40,7 +40,7 @@ export default function Home() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center">
-              <h1 className="text-2xl font-bold text-white font-accent">SuperPool</h1>
+              <Image src="/images/logos/no_bg_white.svg" alt="SuperPool" width={150} height={40} className="h-8 w-auto" />
             </div>
             <div className="flex items-center space-x-4">
               <button className="text-white hover:text-primary transition-colors font-semibold px-4 py-2">Features</button>
@@ -122,7 +122,9 @@ export default function Home() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
             <div className="col-span-2">
-              <h3 className="text-2xl font-bold mb-4 font-accent">SuperPool</h3>
+              <div className="mb-4">
+                <Image src="/images/logos/no_bg_white.svg" alt="SuperPool" width={180} height={48} className="h-10 w-auto" />
+              </div>
               <p className="text-gray-300 mb-4">Decentralized micro-lending platform built on Polygon with multi-signature security.</p>
               <div className="flex space-x-4">
                 <Button variant="ghost" size="sm" className="px-4 py-2">

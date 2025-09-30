@@ -2,7 +2,7 @@ import { AppKitButton } from '@reown/appkit-wagmi-react-native'
 import { StatusBar } from 'expo-status-bar'
 import { observer } from 'mobx-react-lite'
 import React from 'react'
-import { Text, View } from 'react-native'
+import { Image, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
 function DashboardScreen() {
@@ -18,9 +18,13 @@ function DashboardScreen() {
         style={{ paddingTop: insets.top + 16 }}
         testID="dashboard-top-bar"
       >
-        <Text className="text-xl font-bold text-primary" testID="app-logo">
-          SUPERPOOL
-        </Text>
+        <Image
+          source={require('@superpool/assets/images/logos/no_bg_color.png')}
+          className="h-10 w-40"
+          resizeMode="contain"
+          testID="app-logo"
+          accessibilityLabel="SuperPool Logo"
+        />
         <AppKitButton size="sm" />
       </View>
 

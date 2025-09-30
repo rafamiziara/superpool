@@ -2,7 +2,7 @@ import { AppKitButton } from '@reown/appkit-wagmi-react-native'
 import { StatusBar } from 'expo-status-bar'
 import { observer } from 'mobx-react-lite'
 import React from 'react'
-import { Text, View } from 'react-native'
+import { Image, Text, View } from 'react-native'
 import { LoadingSpinner } from '../src/components/LoadingSpinner'
 import { AUTH_STEP_INFO, AUTH_STEPS } from '../src/constants/authSteps'
 import { useAutoAuth } from '../src/hooks/auth/useAutoAuth'
@@ -63,10 +63,14 @@ export default observer(function ConnectingScreen() {
   return (
     <View className="flex-1 bg-white" testID="connecting-screen">
       {/* Fixed Header */}
-      <View className="pt-20 pb-4 mt-12" testID="connecting-header">
-        <Text className="text-3xl font-extrabold text-primary text-center" testID="superpool-logo" accessibilityRole="header">
-          SUPERPOOL
-        </Text>
+      <View className="pt-20 pb-4 mt-12 items-center" testID="connecting-header">
+        <Image
+          source={require('@superpool/assets/images/logos/no_bg_color.png')}
+          className="h-8 w-48"
+          resizeMode="contain"
+          testID="superpool-logo"
+          accessibilityLabel="SuperPool Logo"
+        />
       </View>
 
       {/* Content Area */}
