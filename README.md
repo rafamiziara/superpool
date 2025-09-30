@@ -1,3 +1,7 @@
+<div align="center">
+  <img src="packages/assets/images/logos/with_padding.png" alt="SuperPool Logo" height="auto" />
+</div>
+
 # 🚀 **SuperPool: Decentralized Micro-Lending Pools**
 
 ![GitHub repo size](https://img.shields.io/github/repo-size/rafamiziara/superpool)
