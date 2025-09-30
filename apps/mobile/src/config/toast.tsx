@@ -5,42 +5,30 @@ import Toast, { BaseToastProps, ToastConfig } from 'react-native-toast-message'
 // Custom toast configurations
 export const toastConfig: ToastConfig = {
   success: ({ text1, text2 }: BaseToastProps) => (
-    <View className="bg-success/10 border border-success/20 rounded-xl mx-4 p-4 flex-row items-center">
-      <Text className="text-success text-lg mr-3">✅</Text>
-      <View className="flex-1">
-        <Text className="text-success font-medium text-sm">{text1}</Text>
-        {text2 && <Text className="text-success/70 text-xs mt-1">{text2}</Text>}
-      </View>
+    <View className="bg-success/90 border border-success rounded-xl mx-4 p-4">
+      <Text className="text-white font-medium text-sm">{text1}</Text>
+      {text2 && <Text className="text-white/90 text-xs mt-1">{text2}</Text>}
     </View>
   ),
 
   error: ({ text1, text2 }: BaseToastProps) => (
-    <View className="bg-destructive/10 border border-destructive/20 rounded-xl mx-4 p-4 flex-row items-center">
-      <Text className="text-destructive text-lg mr-3">❌</Text>
-      <View className="flex-1">
-        <Text className="text-destructive font-medium text-sm">{text1}</Text>
-        {text2 && <Text className="text-destructive/70 text-xs mt-1">{text2}</Text>}
-      </View>
+    <View className="bg-destructive/90 border border-destructive rounded-xl mx-4 p-4">
+      <Text className="text-white font-medium text-sm">{text1}</Text>
+      {text2 && <Text className="text-white/90 text-xs mt-1">{text2}</Text>}
     </View>
   ),
 
   info: ({ text1, text2 }: BaseToastProps) => (
-    <View className="bg-primary/10 border border-primary/20 rounded-xl mx-4 p-4 flex-row items-center">
-      <Text className="text-primary text-lg mr-3">ℹ️</Text>
-      <View className="flex-1">
-        <Text className="text-primary font-medium text-sm">{text1}</Text>
-        {text2 && <Text className="text-primary/70 text-xs mt-1">{text2}</Text>}
-      </View>
+    <View className="bg-primary/90 border border-primary rounded-xl mx-4 p-4">
+      <Text className="text-white font-medium text-sm">{text1}</Text>
+      {text2 && <Text className="text-white/90 text-xs mt-1">{text2}</Text>}
     </View>
   ),
 
   warning: ({ text1, text2 }: BaseToastProps) => (
-    <View className="bg-warning/10 border border-warning/20 rounded-xl mx-4 p-4 flex-row items-center">
-      <Text className="text-warning text-lg mr-3">⚠️</Text>
-      <View className="flex-1">
-        <Text className="text-warning font-medium text-sm">{text1}</Text>
-        {text2 && <Text className="text-warning/70 text-xs mt-1">{text2}</Text>}
-      </View>
+    <View className="bg-warning/90 border border-warning rounded-xl mx-4 p-4">
+      <Text className="text-white font-medium text-sm">{text1}</Text>
+      {text2 && <Text className="text-white/90 text-xs mt-1">{text2}</Text>}
     </View>
   ),
 }
@@ -54,6 +42,7 @@ export const showToast = {
       text2: message,
       position: 'top',
       visibilityTime: 3000,
+      autoHide: true,
       topOffset: 60,
     })
   },
@@ -65,6 +54,7 @@ export const showToast = {
       text2: message,
       position: 'top',
       visibilityTime: 4000,
+      autoHide: true,
       topOffset: 60,
     })
   },
@@ -76,6 +66,7 @@ export const showToast = {
       text2: message,
       position: 'top',
       visibilityTime: 3000,
+      autoHide: true,
       topOffset: 60,
     })
   },
@@ -87,6 +78,7 @@ export const showToast = {
       text2: message,
       position: 'top',
       visibilityTime: 3500,
+      autoHide: true,
       topOffset: 60,
     })
   },
