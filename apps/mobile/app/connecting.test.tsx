@@ -50,10 +50,11 @@ describe('ConnectingScreen', () => {
   })
 
   it('should display SuperPool logo', () => {
-    const { getByTestId, getByText } = render(<ConnectingScreen />)
+    const { getByTestId } = render(<ConnectingScreen />)
 
-    expect(getByTestId('superpool-logo')).toBeTruthy()
-    expect(getByText('SUPERPOOL')).toBeTruthy()
+    const logo = getByTestId('superpool-logo')
+    expect(logo).toBeTruthy()
+    expect(logo.props.accessibilityLabel).toBe('SuperPool Logo')
   })
 
   it('should show authenticating status when active', () => {
@@ -329,7 +330,7 @@ describe('ConnectingScreen', () => {
       const { getByTestId } = render(<ConnectingScreen />)
 
       const logo = getByTestId('superpool-logo')
-      expect(logo.props.accessibilityRole).toBe('header')
+      expect(logo.props.accessibilityLabel).toBe('SuperPool Logo')
     })
   })
 

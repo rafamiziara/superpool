@@ -1,3 +1,4 @@
+import { AppCheckToken, CustomProviderOptions } from 'firebase/app-check'
 import React from 'react'
 import type { Address } from 'viem'
 
@@ -21,7 +22,7 @@ export const mockFirebaseAuth = {
   connectAuthEmulator: jest.fn(),
   signInWithCustomToken: jest.fn().mockResolvedValue({ user: { uid: 'test' } }),
   signOut: jest.fn().mockResolvedValue(undefined),
-  onAuthStateChanged: jest.fn((auth, callback) => {
+  onAuthStateChanged: jest.fn((_, callback) => {
     callback(null) // Default to not authenticated
     return jest.fn() // Return unsubscribe function
   }),
@@ -50,11 +51,36 @@ jest.mock('wagmi', () => ({
   WagmiProvider: mockWagmiProvider,
 }))
 
+jest.mock('firebase/app', () => ({
+  initializeApp: jest.fn(() => ({ name: 'test-app' })),
+}))
+
+jest.mock('firebase/app-check', () => ({
+  initializeAppCheck: jest.fn(() => ({})),
+  CustomProvider: class CustomProvider {
+    private _getToken: () => Promise<AppCheckToken>
+
+    constructor(options: CustomProviderOptions) {
+      this._getToken = options.getToken
+    }
+
+    getToken(): Promise<AppCheckToken> {
+      return this._getToken()
+    }
+  },
+}))
+
 jest.mock('firebase/auth', () => mockFirebaseAuth)
 
 jest.mock('firebase/functions', () => ({
   httpsCallable: mockFirebaseCallable,
   getFunctions: jest.fn(() => ({})),
+  connectFunctionsEmulator: jest.fn(),
+}))
+
+jest.mock('firebase/firestore', () => ({
+  getFirestore: jest.fn(() => ({})),
+  connectFirestoreEmulator: jest.fn(),
 }))
 
 jest.mock('react-native-toast-message', () => ({

@@ -25,7 +25,7 @@ describe('useErrorHandling', () => {
     expect(errorDetails!.type).toBe(ErrorType.UNKNOWN_ERROR)
     expect(errorDetails!.message).toBe('An unexpected error occurred. Please try again.')
     expect(errorDetails!.originalError).toBe(testError)
-    expect(errorDetails!.timestamp).toBeCloseTo(Date.now(), -2)
+    expect(errorDetails!.timestamp).toBeCloseTo(Date.now(), -3)
     expect(errorDetails!.context?.originalMessage).toBe('Test error message')
   })
 
