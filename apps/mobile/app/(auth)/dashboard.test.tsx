@@ -30,10 +30,11 @@ describe('DashboardScreen', () => {
   })
 
   it('should display app logo', () => {
-    const { getByTestId, getByText } = render(<DashboardScreen />)
+    const { getByTestId } = render(<DashboardScreen />)
 
-    expect(getByTestId('app-logo')).toBeTruthy()
-    expect(getByText('SUPERPOOL')).toBeTruthy()
+    const logo = getByTestId('app-logo')
+    expect(logo).toBeTruthy()
+    expect(logo.props.accessibilityLabel).toBe('SuperPool Logo')
   })
 
   it('should render AppKit button in top bar', () => {
@@ -64,11 +65,12 @@ describe('DashboardScreen', () => {
   })
 
   describe('Top Bar', () => {
-    it('should display SUPERPOOL logo', () => {
-      const { getByTestId, getByText } = render(<DashboardScreen />)
+    it('should display SuperPool logo image', () => {
+      const { getByTestId } = render(<DashboardScreen />)
 
-      expect(getByTestId('app-logo')).toBeTruthy()
-      expect(getByText('SUPERPOOL')).toBeTruthy()
+      const logo = getByTestId('app-logo')
+      expect(logo).toBeTruthy()
+      expect(logo.props.accessibilityLabel).toBe('SuperPool Logo')
     })
 
     it('should render AppKit button', () => {

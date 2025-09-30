@@ -3,12 +3,9 @@ module.exports = {
   setupFilesAfterEnv: ['<rootDir>/src/__tests__/setup.ts'],
   moduleDirectories: ['node_modules', '<rootDir>/src'],
 
-  // Use jsdom environment to avoid React Native native module issues
-  testEnvironment: 'jsdom',
-
   // Transform ES6 modules from node_modules
   transformIgnorePatterns: [
-    'node_modules/(?!(react-native|@react-native|expo|@expo|expo-.*|@reown|@walletconnect|wagmi|viem|@tanstack|mobx|mobx-react-lite|react-native-toast-message|@react-native-async-storage|@react-native-community)/)',
+    'node_modules/(?!(react-native|@react-native|expo|@expo|expo-.*|@reown|@walletconnect|wagmi|viem|@tanstack|mobx|mobx-react-lite|react-native-toast-message|@react-native-async-storage|@react-native-community|firebase|@firebase|uuid)/)',
   ],
 
   // Module mapping for workspace dependencies

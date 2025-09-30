@@ -14,10 +14,16 @@ export const useFirebaseAuth = (): FirebaseAuthHook => {
   })
 
   const authenticateWithSignature = useCallback(async (authData: AuthenticationData): Promise<User> => {
-    const { walletAddress, signature, nonce, timestamp } = authData
+    const { walletAddress, signature, nonce, timestamp, deviceId, platform } = authData
 
     if (!walletAddress || !signature || !nonce || !timestamp) {
       const error = 'Missing required authentication data'
+      setState((s) => ({ ...s, error }))
+      throw new Error(error)
+    }
+
+    if (!deviceId || !platform) {
+      const error = 'Missing device identification data'
       setState((s) => ({ ...s, error }))
       throw new Error(error)
     }
@@ -32,8 +38,8 @@ export const useFirebaseAuth = (): FirebaseAuthHook => {
       const response = await verifySignature({
         walletAddress,
         signature,
-        deviceId: authData.deviceId,
-        platform: authData.platform,
+        deviceId,
+        platform,
         chainId: authData.chainId,
         signatureType: authData.signatureType,
       })

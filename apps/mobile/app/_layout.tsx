@@ -26,10 +26,10 @@ function AppContent() {
 
         {/* Auth-protected screens */}
         <Stack.Screen name="(auth)" options={{ animation: 'fade' }} />
-
-        {/* Toast notification system */}
-        <Toast config={toastConfig} />
       </Stack>
+
+      {/* Toast notification system - at root level for proper display */}
+      <Toast config={toastConfig} />
     </>
   )
 }

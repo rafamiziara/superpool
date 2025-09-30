@@ -44,8 +44,9 @@ describe('OnboardingScreen', () => {
     render(<OnboardingScreen />)
 
     expect(screen.getByTestId('onboarding-screen')).toBeTruthy()
-    expect(screen.getByTestId('superpool-logo')).toBeTruthy()
-    expect(screen.getByText('SUPERPOOL')).toBeTruthy()
+    const logo = screen.getByTestId('superpool-logo')
+    expect(logo).toBeTruthy()
+    expect(logo.props.accessibilityLabel).toBe('SuperPool Logo')
   })
 
   it('should render all onboarding components', () => {
