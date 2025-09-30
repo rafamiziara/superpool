@@ -17,7 +17,7 @@ const slides: OnboardingSlide[] = [
     image: require('@superpool/assets/images/illustrations/feature_1.png'),
     title: 'Secure Wallet Authentication',
     description:
-      'Connect with 100+ wallets including MetaMask, WalletConnect, and Coinbase. Secure signature-based login with no passwords required.',
+      'Secure signature-based login system supporting 500+ wallet providers through WalletConnect protocol. No passwords required.',
   },
   {
     id: 2,
@@ -83,10 +83,10 @@ export default function OnboardingScreen() {
   return (
     <View className="flex-1 bg-white" testID="onboarding-screen">
       {/* Fixed Header - Logo */}
-      <View className="pt-20 pb-6 mt-12 items-center" testID="onboarding-header">
+      <View className="pt-20 pb-8 mt-12 items-center" testID="onboarding-header">
         <Image
           source={require('@superpool/assets/images/logos/no_bg_color.png')}
-          className="h-8 w-48"
+          className="h-12 w-64"
           resizeMode="contain"
           testID="superpool-logo"
           accessibilityLabel="SuperPool Logo"
@@ -94,7 +94,7 @@ export default function OnboardingScreen() {
       </View>
 
       {/* Scrollable Content Area */}
-      <View className="flex-1" testID="onboarding-content">
+      <View className="flex-1 mt-4" testID="onboarding-content">
         <FlatList
           ref={flatListRef}
           data={slides}
