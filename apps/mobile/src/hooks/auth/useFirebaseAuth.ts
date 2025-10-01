@@ -22,12 +22,6 @@ export const useFirebaseAuth = (): FirebaseAuthHook => {
       throw new Error(error)
     }
 
-    if (!deviceId || !platform) {
-      const error = 'Missing device identification data'
-      setState((s) => ({ ...s, error }))
-      throw new Error(error)
-    }
-
     setState((s) => ({ ...s, isAuthenticating: true, error: null }))
 
     try {

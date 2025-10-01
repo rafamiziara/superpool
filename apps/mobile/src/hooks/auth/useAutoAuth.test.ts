@@ -187,6 +187,8 @@ describe('useAutoAuth', () => {
         nonce: 'test-nonce',
         timestamp: expect.any(Number),
         message: 'Test authentication message',
+        deviceId: expect.any(String),
+        platform: expect.stringMatching(/^(android|ios|web)$/),
       })
 
       // Verify final state
