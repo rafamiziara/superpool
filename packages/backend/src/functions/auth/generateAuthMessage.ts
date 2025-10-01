@@ -1,3 +1,4 @@
+import { AuthMessageRequest, AuthMessageResponse } from '@superpool/types'
 import { isAddress } from 'ethers'
 import { logger } from 'firebase-functions/v2'
 import { CallableRequest, HttpsError, onCall } from 'firebase-functions/v2/https'
@@ -5,11 +6,6 @@ import { v4 as uuidv4 } from 'uuid'
 import { AUTH_NONCES_COLLECTION } from '../../constants'
 import { firestore } from '../../services'
 import { createAuthMessage } from '../../utils'
-
-// Define the interface for your function's input
-interface AuthMessageRequest {
-  walletAddress: string
-}
 
 export const generateAuthMessageHandler = async (request: CallableRequest<AuthMessageRequest>) => {
   const { walletAddress } = request.data
@@ -49,7 +45,8 @@ export const generateAuthMessageHandler = async (request: CallableRequest<AuthMe
     walletAddress,
   })
 
-  return { message, nonce, timestamp }
+  const response: AuthMessageResponse = { message, nonce, timestamp }
+  return response
 }
 
 /**

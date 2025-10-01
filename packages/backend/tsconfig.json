@@ -11,7 +11,10 @@
     "target": "es2022",
     "isolatedModules": true,
     "skipLibCheck": true,
-    "types": ["node", "jest"]
+    "types": ["node", "jest"],
+    "paths": {
+      "@superpool/types/*": ["../types/*"]
+    }
   },
   "compileOnSave": true,
   "include": ["src"]

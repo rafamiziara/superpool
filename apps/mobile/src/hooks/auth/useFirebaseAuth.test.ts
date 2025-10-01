@@ -1,163 +1,239 @@
-import { FirebaseAuthState } from '@superpool/types'
-import { renderHook } from '@testing-library/react-native'
-import { User } from 'firebase/auth'
-
-// Mock the firebaseAuthManager module using manual mock
-jest.mock('../../utils/firebaseAuthManager')
-
-// Import the hook after mocking
+import type { VerifySignatureAndLoginResponse } from '@superpool/types'
+import { AuthenticationData, User } from '@superpool/types'
+import { act, renderHook } from '@testing-library/react-native'
+import { mockFirebaseAuth, mockFirebaseCallable } from '../../__tests__/mocks'
 import { useFirebaseAuth } from './useFirebaseAuth'
-import { firebaseAuthManager } from '../../utils/firebaseAuthManager'
 
-// Get typed references to the mocked functions
-const mockFirebaseAuthManager = firebaseAuthManager as jest.Mocked<typeof firebaseAuthManager>
+// Access mocks from global mocks
+const mockOnAuthStateChanged = mockFirebaseAuth.onAuthStateChanged
+const mockSignOut = mockFirebaseAuth.signOut
+
+const mockConsoleLog = jest.spyOn(console, 'log').mockImplementation(() => {})
+const mockConsoleError = jest.spyOn(console, 'error').mockImplementation(() => {})
 
 describe('useFirebaseAuth', () => {
+  const mockAuthData: AuthenticationData = {
+    walletAddress: '0x123456789',
+    signature: '0xabcdef',
+    nonce: 'test-nonce',
+    message: 'message',
+    timestamp: Date.now(),
+    deviceId: 'test-device-id',
+    platform: 'ios' as const,
+  }
+
   beforeEach(() => {
     jest.clearAllMocks()
+    mockConsoleLog.mockClear()
+    mockConsoleError.mockClear()
 
-    // Reset mock implementation to default values
-    mockFirebaseAuthManager.getCurrentState.mockReturnValue({
-      user: null,
-      isLoading: false,
-      isAuthenticated: false,
-      walletAddress: null,
+    // Mock auth state listener to call immediately with null (not authenticated)
+    mockOnAuthStateChanged.mockImplementation((_, callback) => {
+      callback(null)
+      return jest.fn() // Return unsubscribe function
     })
 
-    // Reset addListener to default behavior
-    mockFirebaseAuthManager.addListener.mockImplementation((callback) => {
-      callback({
-        user: null,
-        isLoading: false,
-        isAuthenticated: false,
-        walletAddress: null,
-      })
-      return jest.fn() // cleanup function
-    })
+    mockSignOut.mockResolvedValue(undefined)
   })
 
-  it('should return initial state from firebase auth manager', () => {
+  afterAll(() => {
+    mockConsoleLog.mockRestore()
+    mockConsoleError.mockRestore()
+  })
+
+  it('should initialize with default state', () => {
     const { result } = renderHook(() => useFirebaseAuth())
 
-    expect(mockFirebaseAuthManager.getCurrentState).toHaveBeenCalled()
-    expect(mockFirebaseAuthManager.addListener).toHaveBeenCalled()
-    expect(result.current).toEqual({
-      user: null,
-      isLoading: false,
-      isAuthenticated: false,
-      walletAddress: null,
-    })
+    expect(result.current.user).toBe(null)
+    expect(result.current.isAuthenticating).toBe(false)
+    expect(result.current.error).toBe(null)
+    expect(typeof result.current.authenticateWithSignature).toBe('function')
+    expect(typeof result.current.logout).toBe('function')
+    expect(typeof result.current.clearError).toBe('function')
   })
 
-  it('should subscribe to auth state changes and update state', () => {
-    const mockUser: Partial<User> = {
-      uid: '0x1234567890123456789012345678901234567890',
+  it('should authenticate successfully', async () => {
+    const mockFirebaseToken = 'firebase-custom-token-123'
+    const mockUser: User = {
+      walletAddress: mockAuthData.walletAddress,
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+      deviceId: 'test-device-id',
     }
-
-    const authenticatedState: FirebaseAuthState = {
-      user: mockUser as User,
-      isLoading: false,
-      isAuthenticated: true,
-      walletAddress: '0x1234567890123456789012345678901234567890',
+    const mockResponse: VerifySignatureAndLoginResponse = {
+      firebaseToken: mockFirebaseToken,
+      user: mockUser,
     }
-
-    mockFirebaseAuthManager.addListener.mockImplementation((callback) => {
-      // Initial call with authenticated state
-      callback(authenticatedState)
-      return jest.fn()
+    const mockCallable = jest.fn().mockResolvedValue({
+      data: mockResponse,
     })
+
+    mockFirebaseCallable.mockReturnValue(mockCallable)
+    mockFirebaseAuth.signInWithCustomToken.mockResolvedValue({ user: mockUser })
 
     const { result } = renderHook(() => useFirebaseAuth())
 
-    expect(result.current).toEqual(authenticatedState)
-  })
-
-  it('should cleanup subscription on unmount', () => {
-    const mockCleanup = jest.fn()
-    mockFirebaseAuthManager.addListener.mockReturnValue(mockCleanup)
-
-    const { unmount } = renderHook(() => useFirebaseAuth())
-
-    expect(mockFirebaseAuthManager.addListener).toHaveBeenCalled()
-
-    unmount()
-
-    expect(mockCleanup).toHaveBeenCalled()
-  })
-
-  it('should handle loading state transitions', () => {
-    const loadingState: FirebaseAuthState = {
-      user: null,
-      isLoading: true,
-      isAuthenticated: false,
-      walletAddress: null,
-    }
-
-    mockFirebaseAuthManager.getCurrentState.mockReturnValue(loadingState)
-
-    // Also update the addListener to call with the same state
-    mockFirebaseAuthManager.addListener.mockImplementation((callback) => {
-      callback(loadingState)
-      return jest.fn() // cleanup function
+    let authenticatedUser: User
+    await act(async () => {
+      authenticatedUser = await result.current.authenticateWithSignature(mockAuthData)
     })
+
+    expect(result.current.isAuthenticating).toBe(false)
+    expect(result.current.error).toBe(null)
+    expect(authenticatedUser!).toEqual({
+      walletAddress: mockAuthData.walletAddress,
+      createdAt: mockUser.createdAt,
+      updatedAt: mockUser.updatedAt,
+      deviceId: 'test-device-id',
+    })
+
+    expect(mockCallable).toHaveBeenCalledWith({
+      walletAddress: mockAuthData.walletAddress,
+      signature: mockAuthData.signature,
+      deviceId: mockAuthData.deviceId,
+      platform: mockAuthData.platform,
+      chainId: mockAuthData.chainId,
+      signatureType: mockAuthData.signatureType,
+    })
+
+    expect(mockFirebaseAuth.signInWithCustomToken).toHaveBeenCalledWith(
+      expect.any(Object), // FIREBASE_AUTH
+      mockFirebaseToken
+    )
+
+    expect(mockConsoleLog).toHaveBeenCalledWith('🔥 Authenticating with Firebase...', { walletAddress: mockAuthData.walletAddress })
+    expect(mockConsoleLog).toHaveBeenCalledWith('✅ Firebase authentication successful!', mockAuthData.walletAddress)
+  })
+
+  it('should handle Firebase function errors', async () => {
+    const mockError = new Error('Signature verification failed')
+    const mockCallable = jest.fn().mockRejectedValue(mockError)
+    mockFirebaseCallable.mockReturnValue(mockCallable)
 
     const { result } = renderHook(() => useFirebaseAuth())
 
-    expect(result.current.isLoading).toBe(true)
-    expect(result.current.isAuthenticated).toBe(false)
+    await act(async () => {
+      try {
+        await result.current.authenticateWithSignature(mockAuthData)
+      } catch (error) {
+        expect((error as Error).message).toBe('Signature verification failed')
+      }
+    })
+
+    expect(result.current.isAuthenticating).toBe(false)
+    expect(result.current.error).toBe('Signature verification failed')
+    expect(result.current.user).toBe(null)
+
+    expect(mockConsoleError).toHaveBeenCalledWith('❌ Firebase authentication failed:', 'Signature verification failed')
   })
 
-  it('should handle authentication state changes with wallet validation', () => {
-    const mockUser: Partial<User> = {
-      uid: '0x1234567890123456789012345678901234567890',
-    }
+  it('should validate required auth data', async () => {
+    const { result } = renderHook(() => useFirebaseAuth())
 
-    const authState: FirebaseAuthState = {
-      user: mockUser as User,
-      isLoading: false,
-      isAuthenticated: true,
-      walletAddress: '0x1234567890123456789012345678901234567890',
-    }
-
-    mockFirebaseAuthManager.getCurrentState.mockReturnValue(authState)
-
-    // Also update the addListener to call with the same state
-    mockFirebaseAuthManager.addListener.mockImplementation((callback) => {
-      callback(authState)
-      return jest.fn() // cleanup function
+    // Test missing walletAddress
+    await act(async () => {
+      try {
+        await result.current.authenticateWithSignature({
+          ...mockAuthData,
+          walletAddress: '',
+        })
+      } catch (error) {
+        expect((error as Error).message).toBe('Missing required authentication data')
+      }
     })
+
+    expect(result.current.error).toBe('Missing required authentication data')
+  })
+
+  it('should handle invalid Firebase response', async () => {
+    const mockCallable = jest.fn().mockResolvedValue({ data: { firebaseToken: 'token' } as VerifySignatureAndLoginResponse }) // Missing user data
+    mockFirebaseCallable.mockReturnValue(mockCallable)
 
     const { result } = renderHook(() => useFirebaseAuth())
 
-    expect(result.current.isAuthenticated).toBe(true)
-    expect(result.current.walletAddress).toBe('0x1234567890123456789012345678901234567890')
-    expect(result.current.user?.uid).toBe('0x1234567890123456789012345678901234567890')
+    await act(async () => {
+      try {
+        await result.current.authenticateWithSignature(mockAuthData)
+      } catch (error) {
+        expect((error as Error).message).toBe('Invalid response from Firebase function - missing token or user data')
+      }
+    })
+
+    expect(result.current.error).toBe('Invalid response from Firebase function - missing token or user data')
   })
 
-  it('should handle invalid wallet address in Firebase UID', () => {
-    const mockUser: Partial<User> = {
-      uid: 'invalid-wallet-address',
+  it('should handle Firebase signInWithCustomToken failure', async () => {
+    const mockUser: User = {
+      walletAddress: '0x123456789',
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
     }
-
-    const invalidState: FirebaseAuthState = {
-      user: mockUser as User,
-      isLoading: false,
-      isAuthenticated: true,
-      walletAddress: null, // Should be null due to invalid format
+    const mockResponse: VerifySignatureAndLoginResponse = {
+      firebaseToken: 'valid-token',
+      user: mockUser,
     }
-
-    mockFirebaseAuthManager.getCurrentState.mockReturnValue(invalidState)
-
-    // Also update the addListener to call with the same state
-    mockFirebaseAuthManager.addListener.mockImplementation((callback) => {
-      callback(invalidState)
-      return jest.fn() // cleanup function
+    const mockCallable = jest.fn().mockResolvedValue({
+      data: mockResponse,
     })
+    mockFirebaseCallable.mockReturnValue(mockCallable)
+
+    mockFirebaseAuth.signInWithCustomToken.mockResolvedValue({ user: null }) // No user returned
 
     const { result } = renderHook(() => useFirebaseAuth())
 
-    expect(result.current.isAuthenticated).toBe(true)
-    expect(result.current.walletAddress).toBeNull()
-    expect(result.current.user?.uid).toBe('invalid-wallet-address')
+    await act(async () => {
+      try {
+        await result.current.authenticateWithSignature(mockAuthData)
+      } catch (error) {
+        expect((error as Error).message).toBe('Firebase authentication failed - no user returned')
+      }
+    })
+
+    expect(result.current.error).toBe('Firebase authentication failed - no user returned')
+  })
+
+  it('should handle logout successfully', async () => {
+    const { result } = renderHook(() => useFirebaseAuth())
+
+    await act(async () => {
+      await result.current.logout()
+    })
+
+    expect(mockSignOut).toHaveBeenCalledWith(expect.any(Object)) // FIREBASE_AUTH
+    expect(result.current.user).toBe(null)
+    expect(result.current.isAuthenticating).toBe(false)
+    expect(result.current.error).toBe(null)
+
+    expect(mockConsoleLog).toHaveBeenCalledWith('🚪 Logging out from Firebase...')
+    expect(mockConsoleLog).toHaveBeenCalledWith('✅ Successfully logged out from Firebase')
+  })
+
+  it('should handle logout errors', async () => {
+    const logoutError = new Error('Logout failed')
+    mockSignOut.mockRejectedValue(logoutError)
+
+    const { result } = renderHook(() => useFirebaseAuth())
+
+    await act(async () => {
+      try {
+        await result.current.logout()
+      } catch (error) {
+        expect((error as Error).message).toBe('Logout failed')
+      }
+    })
+
+    expect(result.current.error).toBe('Logout failed')
+    expect(mockConsoleError).toHaveBeenCalledWith('❌ Firebase logout failed:', 'Logout failed')
+  })
+
+  it('should clear error state', () => {
+    const { result } = renderHook(() => useFirebaseAuth())
+
+    // Set an error first
+    act(() => {
+      result.current.clearError()
+    })
+
+    expect(result.current.error).toBe(null)
   })
 })

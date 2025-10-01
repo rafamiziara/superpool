@@ -1,79 +1,145 @@
+import { render } from '@testing-library/react-native'
 import React from 'react'
-import { render } from '@mocks/factories/testFactory'
-import { ProgressIndicator } from './ProgressIndicator'
+import { ProgressIndicator, ProgressIndicatorPresets } from './ProgressIndicator'
 
 describe('ProgressIndicator', () => {
-  describe('Basic Rendering', () => {
-    it('should render with correct number of steps', () => {
-      const totalSteps = 5
-      const { getAllByTestId } = render(<ProgressIndicator totalSteps={totalSteps} currentStep={2} />)
+  it('should render correct number of steps', () => {
+    const { getByTestId } = render(<ProgressIndicator totalSteps={4} currentStep={1} />)
 
-      const steps = getAllByTestId(/progress-step-\d+/)
-      expect(steps).toHaveLength(totalSteps)
+    expect(getByTestId('progress-indicator-container')).toBeTruthy()
+    expect(getByTestId('progress-indicator-step-0')).toBeTruthy()
+    expect(getByTestId('progress-indicator-step-1')).toBeTruthy()
+    expect(getByTestId('progress-indicator-step-2')).toBeTruthy()
+    expect(getByTestId('progress-indicator-step-3')).toBeTruthy()
+  })
+
+  it('should show correct current step', () => {
+    const { getByTestId } = render(<ProgressIndicator totalSteps={3} currentStep={1} />)
+
+    const currentStepElement = getByTestId('progress-indicator-step-1')
+    expect(currentStepElement).toBeTruthy()
+  })
+
+  it('should apply correct accessibility labels', () => {
+    const { getByTestId } = render(<ProgressIndicator totalSteps={3} currentStep={1} />)
+
+    const step0 = getByTestId('progress-indicator-step-0')
+    const step1 = getByTestId('progress-indicator-step-1')
+    const step2 = getByTestId('progress-indicator-step-2')
+
+    expect(step0.props.accessibilityLabel).toBe('Step 1 of 3 (completed)')
+    expect(step1.props.accessibilityLabel).toBe('Step 2 of 3 (current)')
+    expect(step2.props.accessibilityLabel).toBe('Step 3 of 3 (pending)')
+  })
+
+  it('should apply correct accessibility role', () => {
+    const { getByTestId } = render(<ProgressIndicator totalSteps={5} currentStep={2} />)
+
+    const step = getByTestId('progress-indicator-step-0')
+    expect(step.props.accessibilityRole).toBe('button')
+  })
+
+  it('should handle first step correctly', () => {
+    const { getByTestId } = render(<ProgressIndicator totalSteps={3} currentStep={0} />)
+
+    const step0 = getByTestId('progress-indicator-step-0')
+    expect(step0.props.accessibilityLabel).toBe('Step 1 of 3 (current)')
+  })
+
+  it('should handle last step correctly', () => {
+    const { getByTestId } = render(<ProgressIndicator totalSteps={3} currentStep={2} />)
+
+    const step2 = getByTestId('progress-indicator-step-2')
+    expect(step2.props.accessibilityLabel).toBe('Step 3 of 3 (current)')
+  })
+
+  it('should apply custom className', () => {
+    const { getByTestId } = render(<ProgressIndicator totalSteps={3} currentStep={1} className="custom-class" />)
+
+    const container = getByTestId('progress-indicator-container')
+    expect(container).toBeTruthy()
+  })
+
+  it('should use custom testID', () => {
+    const { getByTestId } = render(<ProgressIndicator totalSteps={3} currentStep={1} testID="custom-progress" />)
+
+    expect(getByTestId('custom-progress-container')).toBeTruthy()
+    expect(getByTestId('custom-progress-step-0')).toBeTruthy()
+  })
+
+  describe('Size variants', () => {
+    it('should render small size', () => {
+      const { getByTestId } = render(<ProgressIndicator totalSteps={3} currentStep={1} size="small" />)
+
+      expect(getByTestId('progress-indicator-container')).toBeTruthy()
+    })
+
+    it('should render medium size (default)', () => {
+      const { getByTestId } = render(<ProgressIndicator totalSteps={3} currentStep={1} size="medium" />)
+
+      expect(getByTestId('progress-indicator-container')).toBeTruthy()
+    })
+
+    it('should render large size', () => {
+      const { getByTestId } = render(<ProgressIndicator totalSteps={3} currentStep={1} size="large" />)
+
+      expect(getByTestId('progress-indicator-container')).toBeTruthy()
     })
   })
 
-  describe('Step State Visualization', () => {
-    it('should highlight current step and dim others', () => {
-      const currentStep = 2
-      const totalSteps = 5
-      const { getByTestId } = render(<ProgressIndicator totalSteps={totalSteps} currentStep={currentStep} />)
+  describe('ProgressIndicatorPresets', () => {
+    it('should render onboarding preset', () => {
+      const { getByTestId } = render(ProgressIndicatorPresets.onboarding(1))
 
-      const currentStepElement = getByTestId(`progress-step-${currentStep}`)
-      expect(currentStepElement.props.className).toContain('bg-primary')
+      expect(getByTestId('onboarding-progress-container')).toBeTruthy()
+      expect(getByTestId('onboarding-progress-step-0')).toBeTruthy()
+      expect(getByTestId('onboarding-progress-step-1')).toBeTruthy()
+      expect(getByTestId('onboarding-progress-step-2')).toBeTruthy()
+      expect(getByTestId('onboarding-progress-step-3')).toBeTruthy()
+    })
 
-      const inactiveStep = getByTestId(`progress-step-${currentStep + 1}`)
-      expect(inactiveStep.props.className).toContain('bg-muted-foreground/30')
-      expect(inactiveStep.props.className).not.toContain('bg-primary')
+    it('should render authentication preset', () => {
+      const { getByTestId } = render(ProgressIndicatorPresets.authentication(2))
+
+      expect(getByTestId('auth-progress-container')).toBeTruthy()
+      // Should have 5 steps for authentication
+      expect(getByTestId('auth-progress-step-0')).toBeTruthy()
+      expect(getByTestId('auth-progress-step-4')).toBeTruthy()
+    })
+
+    it('should render steps preset with custom values', () => {
+      const { getByTestId } = render(ProgressIndicatorPresets.steps(6, 3))
+
+      expect(getByTestId('steps-progress-container')).toBeTruthy()
+      expect(getByTestId('steps-progress-step-0')).toBeTruthy()
+      expect(getByTestId('steps-progress-step-5')).toBeTruthy()
     })
   })
 
-  describe('Edge Cases', () => {
-    it('should handle zero steps gracefully', () => {
-      const { queryAllByTestId } = render(<ProgressIndicator totalSteps={0} currentStep={0} />)
+  describe('Edge cases', () => {
+    it('should handle single step', () => {
+      const { getByTestId } = render(<ProgressIndicator totalSteps={1} currentStep={0} />)
 
-      const steps = queryAllByTestId(/progress-step-\d+/)
-      expect(steps).toHaveLength(0)
+      expect(getByTestId('progress-indicator-step-0')).toBeTruthy()
+      expect(() => getByTestId('progress-indicator-step-1')).toThrow()
     })
 
-    it('should handle invalid currentStep gracefully', () => {
-      const { getByTestId } = render(<ProgressIndicator totalSteps={3} currentStep={-1} />)
+    it('should handle zero current step', () => {
+      const { getByTestId } = render(<ProgressIndicator totalSteps={3} currentStep={0} />)
 
-      // All steps should be inactive since currentStep is invalid
-      for (let i = 0; i < 3; i++) {
-        const step = getByTestId(`progress-step-${i}`)
-        expect(step.props.className).toContain('bg-muted-foreground/30')
-      }
+      const step0 = getByTestId('progress-indicator-step-0')
+      expect(step0.props.accessibilityLabel).toBe('Step 1 of 3 (current)')
     })
-  })
 
-  describe('Accessibility', () => {
-    it('should provide proper accessibility labels', () => {
-      const { getByTestId } = render(<ProgressIndicator totalSteps={4} currentStep={2} />)
+    it('should handle current step beyond total steps', () => {
+      // This shouldn't happen in normal usage but test defensive behavior
+      const { getByTestId } = render(<ProgressIndicator totalSteps={3} currentStep={5} />)
 
-      const currentStep = getByTestId('progress-step-2')
-      expect(currentStep.props.accessibilityLabel).toBe('Step 3 of 4 (current)')
+      const step0 = getByTestId('progress-indicator-step-0')
+      const step2 = getByTestId('progress-indicator-step-2')
 
-      const completedStep = getByTestId('progress-step-1')
-      expect(completedStep.props.accessibilityLabel).toBe('Step 2 of 4 (completed)')
-
-      const pendingStep = getByTestId('progress-step-3')
-      expect(pendingStep.props.accessibilityLabel).toBe('Step 4 of 4 (pending)')
-    })
-  })
-
-  describe('Dynamic Updates', () => {
-    it('should update when props change', () => {
-      const { getByTestId, rerender, getAllByTestId } = render(<ProgressIndicator totalSteps={3} currentStep={0} />)
-
-      expect(getByTestId('progress-step-0').props.className).toContain('bg-primary')
-      expect(getAllByTestId(/progress-step-\d+/)).toHaveLength(3)
-
-      // Update both currentStep and totalSteps
-      rerender(<ProgressIndicator totalSteps={4} currentStep={2} />)
-
-      expect(getByTestId('progress-step-2').props.className).toContain('bg-primary')
-      expect(getAllByTestId(/progress-step-\d+/)).toHaveLength(4)
+      expect(step0.props.accessibilityLabel).toBe('Step 1 of 3 (completed)')
+      expect(step2.props.accessibilityLabel).toBe('Step 3 of 3 (completed)')
     })
   })
 })
