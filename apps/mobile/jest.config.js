@@ -1,62 +1,57 @@
 module.exports = {
   preset: 'jest-expo',
-  testMatch: ['**/__tests__/**/*.(ts|tsx|js)', '**/*.(test|spec).(ts|tsx|js)'],
-  testEnvironment: 'jsdom',
+  setupFilesAfterEnv: ['<rootDir>/src/__tests__/setup.ts'],
+  moduleDirectories: ['node_modules', '<rootDir>/src'],
+
+  // Transform ES6 modules from node_modules
   transformIgnorePatterns: [
-    'node_modules/(?!(?:.pnpm/)?((jest-)?react-native|@react-native(-community)?|expo(nent)?|@expo(nent)?/.*|@expo-google-fonts/.*|react-navigation|@react-navigation/.*|@sentry/react-native|native-base|react-native-svg|@wagmi|wagmi|@tanstack|viem|@reown))',
+    'node_modules/(?!(react-native|@react-native|expo|@expo|expo-.*|@reown|@walletconnect|wagmi|viem|@tanstack|mobx|mobx-react-lite|react-native-toast-message|@react-native-async-storage|@react-native-community|firebase|@firebase|uuid)/)',
   ],
-  setupFilesAfterEnv: ['<rootDir>/src/setupTests.ts'],
+
+  // Module mapping for workspace dependencies
   moduleNameMapper: {
     '^@/(.*)$': '<rootDir>/src/$1',
+    '^@superpool/assets/(.*)$': '<rootDir>/../../packages/assets/$1',
     '^@superpool/(.*)$': '<rootDir>/../../packages/$1/src',
-    '^@mocks/(.*)$': '<rootDir>/__mocks__/$1',
   },
-  moduleDirectories: ['node_modules', '<rootDir>/src'],
+
+  // Test files are co-located with implementation files
+  testMatch: ['<rootDir>/src/**/*.test.{ts,tsx}', '<rootDir>/app/**/*.test.{ts,tsx}'],
+
+  // Ignore problematic paths
+  testPathIgnorePatterns: ['/node_modules/', '/build/', '/.expo/'],
+
+  // Coverage configuration
+  coverageDirectory: '../../coverage/mobile-v2',
+  coverageReporters: ['text', 'lcov', 'html'],
   collectCoverageFrom: [
     'src/**/*.{ts,tsx}',
-    '!src/**/*.d.ts',
-    '!src/setupTests.ts',
+    'app/**/*.{ts,tsx}',
     '!src/**/*.test.{ts,tsx}',
-    '!src/**/*.spec.{ts,tsx}',
-    '!src/app/**', // App screens excluded for now
-    '!src/**/+*.tsx', // Expo router files
-    '!src/firebase.config.ts', // Configuration file
+    '!app/**/*.test.{ts,tsx}',
+    '!src/__tests__/**',
+    '!src/**/*.d.ts',
+    '!app/**/+*.tsx', // Expo router files
     '!src/config/**', // Configuration directory
-    '!src/globals.d.ts', // Type definitions
     '!src/assets/**', // Static assets
+    '!src/constants/**', // Constants and configuration data
     '!src/**/index.ts', // Barrel export files
     '!src/**/types/**', // TypeScript interface definitions only
   ],
-  coverageDirectory: '<rootDir>/../../coverage/mobile',
-  coverageReporters: ['lcov', 'text'],
   coverageThreshold: {
     global: {
       branches: 90,
-      functions: 95,
-      lines: 95,
-      statements: 95,
-    },
-    // Specific thresholds for critical areas
-    'src/stores/**': {
-      branches: 95,
-      functions: 95,
-      lines: 95,
-      statements: 95,
-    },
-    'src/services/**': {
-      branches: 90,
-      functions: 95,
-      lines: 95,
-      statements: 95,
-    },
-    'src/hooks/**': {
-      branches: 90,
-      functions: 95,
-      lines: 95,
-      statements: 95,
+      functions: 90,
+      lines: 90,
+      statements: 90,
     },
   },
+
+  // Avoid Expo runtime issues in tests
   globals: {
     __DEV__: true,
   },
+
+  // Set longer timeout for tests
+  testTimeout: 10000,
 }

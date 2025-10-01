@@ -1,6 +1,6 @@
+import { ApprovedDevice } from '@superpool/types'
 import { logger } from 'firebase-functions/v2'
 import { APPROVED_DEVICES_COLLECTION } from '../constants'
-import { ApprovedDevice } from '../types'
 import { firestore } from './index'
 
 /**

@@ -3,13 +3,9 @@ import 'firebase-functions/v2/https'
 import * as express from 'express'
 import { logger } from 'firebase-functions/v2'
 import { onRequest, Request } from 'firebase-functions/v2/https'
+import { CustomAppCheckMinterRequest, CustomAppCheckMinterResponse } from '@superpool/types'
 import { appCheck } from '../../services'
 import { DeviceVerificationService } from '../../services/deviceVerification'
-
-// Define the interface for the request body
-interface CustomAppCheckMinterRequest {
-  deviceId: string
-}
 
 export const customAppCheckMinterHandler = async (req: Request, res: express.Response) => {
   // Check that the App ID is configured
@@ -58,10 +54,11 @@ export const customAppCheckMinterHandler = async (req: Request, res: express.Res
     logger.info('App Check token minted successfully', { deviceId })
 
     // Return the token and its expiration to the client
-    res.status(200).send({
+    const response: CustomAppCheckMinterResponse = {
       appCheckToken: appCheckToken.token,
       expireTimeMillis: appCheckToken.ttlMillis,
-    })
+    }
+    res.status(200).send(response)
   } catch (error) {
     logger.error('Failed to mint App Check token', { error, deviceId })
     res.status(500).send('Internal Server Error: Failed to mint App Check token')

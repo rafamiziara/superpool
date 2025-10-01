@@ -1,22 +1,12 @@
+import { AuthNonce, User, VerifySignatureAndLoginRequest, VerifySignatureAndLoginResponse } from '@superpool/types'
 import { isAddress, verifyMessage, verifyTypedData } from 'ethers'
 import { logger } from 'firebase-functions/v2'
 import { CallableRequest, HttpsError, onCall } from 'firebase-functions/v2/https'
 import { AUTH_NONCES_COLLECTION, USERS_COLLECTION } from '../../constants'
 import { auth, firestore, ProviderService } from '../../services'
 import { DeviceVerificationService } from '../../services/deviceVerification'
-import { AuthNonce, UserProfile } from '../../types'
 import { createAuthMessage } from '../../utils'
 import { SafeWalletVerificationService } from '../../utils/safeWalletVerification'
-
-// Define the interface for your function's input
-interface VerifySignatureAndLoginRequest {
-  walletAddress: string
-  signature: string
-  deviceId?: string
-  platform?: 'android' | 'ios' | 'web'
-  chainId?: number
-  signatureType?: 'typed-data' | 'personal-sign' | 'safe-wallet'
-}
 
 export const verifySignatureAndLoginHandler = async (request: CallableRequest<VerifySignatureAndLoginRequest>) => {
   const { walletAddress, signature, deviceId, platform, chainId, signatureType = 'personal-sign' } = request.data
@@ -186,14 +176,17 @@ export const verifySignatureAndLoginHandler = async (request: CallableRequest<Ve
     const userProfileDoc = await userProfileRef.get()
     const now = new Date().getTime()
 
+    let userData: User
+
     if (!userProfileDoc.exists) {
       // Profile does not exist, so create a new one
-      const newUserProfile: UserProfile = { walletAddress, createdAt: now, updatedAt: now }
-      await userProfileRef.set(newUserProfile)
+      userData = { walletAddress, createdAt: now, updatedAt: now }
+      await userProfileRef.set(userData)
       logger.info('User profile created', { walletAddress })
     } else {
       // Profile exists, so update the updatedAt timestamp
       await userProfileRef.update({ updatedAt: now })
+      userData = { ...(userProfileDoc.data() as User), updatedAt: now }
       logger.info('User profile updated', { walletAddress })
     }
   } catch (error) {
@@ -240,7 +233,8 @@ export const verifySignatureAndLoginHandler = async (request: CallableRequest<Ve
     logger.info('Creating Firebase custom token', { walletAddress })
     const firebaseToken = await auth.createCustomToken(walletAddress)
     logger.info('Firebase custom token created successfully', { walletAddress })
-    return { firebaseToken }
+    const response: VerifySignatureAndLoginResponse = { firebaseToken, user: userData }
+    return response
   } catch (error) {
     logger.error('Failed to create Firebase custom token', { error, walletAddress })
     throw new HttpsError('unauthenticated', 'Failed to generate a valid session token.')

@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-SuperPool is a decentralized micro-lending platform built on Polygon. It's a monorepo with shared packages for consistent development:
+SuperPool is a proof-of-concept multi-chain decentralized micro-lending platform under active development. It's a monorepo with shared packages for consistent development across multiple EVM-compatible blockchains:
 
 ### Applications
 
@@ -165,11 +165,11 @@ For a comprehensive overview of the complete project structure, file organizatio
 
 **Mobile Application:**
 
-- **Wallet Integration**: Reown AppKit with WalletConnect for multi-wallet support
+- **Wallet Integration**: Reown AppKit with WalletConnect for multi-wallet support (500+ wallets)
 - **State Management**: MobX reactive stores with centralized state management
 - **Styling**: NativeWind for Tailwind CSS compatibility with shared design tokens
 - **Icons**: FontAwesome via `@expo/vector-icons` (wallet, users, shield, etc.)
-- **Chain Support**: Mainnet, Polygon, Polygon Amoy, Localhost (dev mode)
+- **Chain Support**: Ethereum Mainnet, Polygon, Arbitrum, Base, BSC, Polygon Amoy, Localhost (dev mode)
 - **Firebase Integration**: Authentication, Firestore, Cloud Functions
 - **Architecture**: Expo Router with TypeScript and shared type definitions
 - **Store Architecture**: AuthenticationStore, WalletConnectionStore, PoolManagementStore, RootStore pattern
@@ -217,7 +217,7 @@ pnpm test:safe     # Complete Safe multi-sig testing
 
 #### Production Deployment
 
-1. Smart contracts deployed to Polygon Amoy testnet
+1. Smart contracts deployable to multiple EVM-compatible chains (Polygon, Ethereum, Arbitrum, Base, BSC)
 2. Backend Cloud Functions handle off-chain logic and Safe interactions
 3. Mobile app connects wallets and interfaces with both backend and contracts
 4. Device approval happens automatically after successful wallet authentication
@@ -419,7 +419,7 @@ Comprehensive interfaces for type safety:
 
 ## Key Technologies
 
-- **Blockchain**: Solidity, Hardhat, OpenZeppelin, Polygon
+- **Blockchain**: Solidity, Hardhat, OpenZeppelin, Multi-chain (Polygon, Ethereum, Arbitrum, Base, BSC)
 - **Backend**: Firebase Cloud Functions, TypeScript, Ethers.js
 - **Frontend**: Next.js 15.5.0, React Native, Expo, Wagmi, Viem, Reown AppKit
 - **State Management**: MobX, mobx-react-lite for reactive state management

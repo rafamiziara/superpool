@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "SuperPool",
-    "slug": "superpool-mobile",
+    "slug": "superpool",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -15,14 +15,7 @@
     "ios": {
       "supportsTablet": true,
       "infoPlist": {
-        "LSApplicationQueriesSchemes": [
-          "metamask",
-          "trust",
-          "safe",
-          "rainbow",
-          "uniswap"
-          // Add other wallet schemes names here
-        ]
+        "LSApplicationQueriesSchemes": ["metamask", "trust", "safe", "rainbow", "uniswap"]
       }
     },
     "android": {
@@ -30,13 +23,14 @@
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "edgeToEdgeEnabled": true
+      "edgeToEdgeEnabled": true,
+      "predictiveBackGestureEnabled": false
     },
     "web": {
       "favicon": "./assets/favicon.png",
       "bundler": "metro"
     },
-    "plugins": ["expo-secure-store", "expo-router"],
+    "plugins": ["expo-router", "expo-secure-store"],
     "scheme": "superpool"
   }
 }
