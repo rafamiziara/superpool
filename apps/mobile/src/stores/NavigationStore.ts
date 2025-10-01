@@ -1,10 +1,10 @@
-import { makeAutoObservable, reaction } from 'mobx'
+import type { User } from '@superpool/types'
 import { router } from 'expo-router'
 import { signOut } from 'firebase/auth'
+import { makeAutoObservable, reaction } from 'mobx'
 import Toast from 'react-native-toast-message'
-import { authStore } from './AuthStore'
 import { FIREBASE_AUTH } from '../config/firebase'
-import type { User } from '@superpool/types'
+import { authStore } from './AuthStore'
 
 export class NavigationStore {
   // Current state tracking
@@ -122,12 +122,12 @@ export class NavigationStore {
     // Toast: Authentication successful
     if (!previousState.user && currentState.user) {
       console.log('🎉 NavigationStore: Authentication successful')
+
+      // Show toast notification
       Toast.show({
-        type: 'success',
+        type: 'info',
         text1: 'Authentication Successful!',
-        text2: 'Welcome to SuperPool',
-        position: 'top',
-        visibilityTime: 3000,
+        text2: 'Welcome to SuperPool 🎉',
         topOffset: 60,
       })
     }
@@ -174,8 +174,6 @@ export class NavigationStore {
       type: 'info',
       text1: 'Wallet Disconnected',
       text2: 'You have been logged out',
-      position: 'top',
-      visibilityTime: 3000,
       topOffset: 60,
     })
   }
@@ -188,8 +186,6 @@ export class NavigationStore {
       type: 'success',
       text1: 'Wallet Connected!',
       text2: 'Starting authentication...',
-      position: 'top',
-      visibilityTime: 3000,
       topOffset: 60,
     })
   }

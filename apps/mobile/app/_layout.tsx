@@ -4,10 +4,10 @@ import { Stack } from 'expo-router'
 import { StatusBar } from 'expo-status-bar'
 import Toast from 'react-native-toast-message'
 import { WagmiProvider } from 'wagmi'
-import { toastConfig, wagmiConfig } from '../src/config'
 import { FirebaseInitializer } from '../src/components/FirebaseInitializer'
 import { WalletListener } from '../src/components/WalletListener'
-import '../src/stores/NavigationStore' // Initialize NavigationStore
+import { wagmiConfig } from '../src/config'
+import '../src/stores/NavigationStore'
 
 const queryClient = new QueryClient()
 
@@ -28,8 +28,8 @@ function AppContent() {
         <Stack.Screen name="(auth)" options={{ animation: 'fade' }} />
       </Stack>
 
-      {/* Toast notification system - at root level for proper display */}
-      <Toast config={toastConfig} />
+      {/* Toast notification system */}
+      <Toast />
     </>
   )
 }

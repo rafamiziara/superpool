@@ -63,25 +63,21 @@ export default observer(function ConnectingScreen() {
   return (
     <View className="flex-1 bg-white" testID="connecting-screen">
       {/* Fixed Header */}
-      <View className="pt-20 pb-4 mt-12 items-center" testID="connecting-header">
+      <View className="pt-12 mt-24 items-center" testID="connecting-header">
         <Image
           source={require('@superpool/assets/images/logos/no_bg_color.png')}
-          className="h-8 w-48"
+          className="h-12 w-64"
           resizeMode="contain"
           testID="superpool-logo"
           accessibilityLabel="SuperPool Logo"
         />
-      </View>
 
-      {/* Content Area */}
-      <View className="flex-1 items-center justify-center px-8" testID="connecting-content">
         {/* Wallet Status - AppKit Button */}
-        <View className="mb-7 w-full max-w-sm" testID="wallet-status">
+        <View className="mt-8 max-w-sm" testID="wallet-status">
           <AppKitButton
             balance="show"
             label=""
             connectStyle={{
-              alignSelf: 'stretch',
               borderRadius: 10,
               backgroundColor: '#f8f9fa',
               borderWidth: 1,
@@ -89,21 +85,22 @@ export default observer(function ConnectingScreen() {
             }}
           />
         </View>
+      </View>
 
+      {/* Content Area */}
+      <View className="flex-1 items-center justify-center px-8" testID="connecting-content">
         {/* Main Status Display */}
         <View className="mb-8 w-full max-w-sm" testID="main-status">
-          <View className="bg-gray-50 p-2 rounded-xl items-center">
-            {error ? (
-              <View className="items-center" testID="error-status">
-                <Text className="text-destructive font-medium text-lg text-center">Authentication Failed</Text>
-              </View>
-            ) : (
-              <View className="items-center" testID="authenticating-status">
-                <LoadingSpinner size="large" testID="main-loading-spinner" />
-                <Text className="text-foreground font-medium text-lg mt-4 text-center">Authenticating...</Text>
-              </View>
-            )}
-          </View>
+          {error ? (
+            <View className="items-center" testID="error-status">
+              <Text className="text-destructive font-medium text-lg text-center">Authentication Failed</Text>
+            </View>
+          ) : (
+            <View className="bg-gray-50 p-2 rounded-xl items-center" testID="authenticating-status">
+              <LoadingSpinner size="large" testID="main-loading-spinner" />
+              <Text className="text-foreground font-medium text-lg mt-4 text-center">Authenticating...</Text>
+            </View>
+          )}
         </View>
 
         {/* Step Progress List */}
