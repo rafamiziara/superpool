@@ -1,7 +1,9 @@
 import { AuthenticationData } from '@superpool/types'
 import { useEffect } from 'react'
+import { Platform } from 'react-native'
 import { FIREBASE_AUTH } from '../../config/firebase'
 import { authStore } from '../../stores/AuthStore'
+import { getUniqueDeviceId } from '../../utils/deviceId'
 import { useFirebaseAuth } from './useFirebaseAuth'
 import { useMessageGeneration } from './useMessageGeneration'
 import { useSignatureHandling } from './useSignatureHandling'
@@ -62,12 +64,28 @@ export const useAutoAuth = (): void => {
         authStore.startStep('firebase-auth')
         console.log('🔥 Step 6: Authenticating with Firebase...')
 
+        // Get device info for device approval (optional)
+        let deviceId: string | undefined
+        let platform: 'android' | 'ios' | 'web' | undefined
+
+        try {
+          const uniqueDeviceId = await getUniqueDeviceId()
+          if (uniqueDeviceId) {
+            deviceId = uniqueDeviceId
+            platform = Platform.OS === 'android' ? 'android' : Platform.OS === 'ios' ? 'ios' : 'web'
+          }
+        } catch (error) {
+          console.warn('Could not get device ID, continuing without device approval:', error)
+        }
+
         const authData: AuthenticationData = {
           walletAddress: authStore.walletAddress!,
           signature,
           nonce: authMessage.nonce,
           timestamp: authMessage.timestamp,
           message: authMessage.message,
+          deviceId,
+          platform,
         }
 
         const user = await firebaseAuth.authenticateWithSignature(authData)
