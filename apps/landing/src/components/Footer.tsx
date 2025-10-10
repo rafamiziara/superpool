@@ -19,9 +19,10 @@ export function Footer() {
               <h4 className="text-lg font-semibold mb-4 text-foreground">Security Disclaimer</h4>
               <div className="text-foreground-muted space-y-3 leading-relaxed text-sm">
                 <p>
-                  <span className="font-semibold text-foreground">This project is a proof-of-concept under active development.</span> It is NOT
-                  intended for production use with real funds. The smart contracts have <span className="font-semibold text-foreground">NOT been audited</span> and may contain
-                  vulnerabilities. Only use testnet deployments with test funds.
+                  <span className="font-semibold text-foreground">This project is a proof-of-concept under active development.</span> It is
+                  NOT intended for production use with real funds. The smart contracts have{' '}
+                  <span className="font-semibold text-foreground">NOT been audited</span> and may contain vulnerabilities. Only use testnet
+                  deployments with test funds.
                 </p>
               </div>
             </div>
@@ -30,7 +31,7 @@ export function Footer() {
         <div className="border-t border-gray-300 dark:border-gray-700 mt-8 pt-8 text-center text-foreground-muted">
           <p>
             &copy; 2025 SuperPool. Built with ❤️ for the DeFi community by
-            <a target="_blank" href="https://www.rm30.dev/" className="hover:text-foreground transition-colors">
+            <a target="_blank" rel="noopener noreferrer" href="https://www.rm30.dev/" className="hover:text-foreground transition-colors">
               <span> RM30</span>
             </a>
           </p>
