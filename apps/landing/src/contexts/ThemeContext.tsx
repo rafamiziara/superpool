@@ -16,8 +16,11 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const [theme, setTheme] = useState<Theme>(() => {
     // Lazy initialization to prevent flash
     if (typeof window !== 'undefined') {
-      const savedTheme = window.localStorage.getItem('theme') as Theme | null
-      if (savedTheme) return savedTheme
+      const savedTheme = window.localStorage.getItem('theme')
+      // Validate savedTheme before using it
+      if (savedTheme === 'light' || savedTheme === 'dark') {
+        return savedTheme
+      }
 
       // Fallback to system preference
       const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches

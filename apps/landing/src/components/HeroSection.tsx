@@ -18,7 +18,7 @@ export function HeroSection() {
           security.
         </p>
         <div className="flex flex-col sm:flex-row gap-4 justify-center">
-          <a target="_blank" href="https://github.com/rafamiziara/superpool">
+          <a target="_blank" rel="noopener noreferrer" href="https://github.com/rafamiziara/superpool">
             <Button size="lg" variant="primary" className="px-8 py-4 font-semibold">
               View on GitHub
             </Button>
