@@ -15,8 +15,7 @@ const features = [
   },
   {
     title: 'Contribute & Borrow Funds',
-    description:
-      'Pool members can contribute liquidity and request loans from their trusted community with AI-assisted approval.',
+    description: 'Pool members can contribute liquidity and request loans from their trusted community with AI-assisted approval.',
     image: '/images/illustrations/feature_3.png',
   },
   {
@@ -43,10 +42,7 @@ export function FeaturesSection() {
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-12 max-w-5xl mx-auto">
           {features.map((feature, index) => (
-            <div
-              key={index}
-              className="bg-background dark:bg-secondary rounded-lg p-6 shadow hover:shadow-lg transition-shadow"
-            >
+            <div key={index} className="bg-background dark:bg-secondary rounded-lg p-6 shadow hover:shadow-lg transition-shadow">
               <div className="flex items-start gap-5">
                 <div className="flex-shrink-0">
                   <Image src={feature.image} alt={feature.title} width={256} height={256} className="h-36 w-36 rounded-lg" />
