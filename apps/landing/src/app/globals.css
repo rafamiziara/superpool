@@ -1,21 +1,22 @@
 @import 'tailwindcss';
-@import '@superpool/design/tokens.css';
 @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700&family=Space+Mono:wght@400;700&family=Geist:wght@300;400;500;600;700&display=swap');
 
-@theme inline {
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
   /* SuperPool Design System Colors */
   --color-primary: #2563eb;
-  --color-secondary: #0f172a;
   --color-accent: #06b6d4;
   --color-success: #10b981;
   --color-warning: #f59e0b;
   --color-error: #ef4444;
 
-  /* Background Colors */
+  /* Background/Foreground colors */
   --color-background: #ffffff;
-  --color-background-dark: #0f172a;
+  --color-secondary: #f8f9fa;
   --color-foreground: #0f172a;
   --color-foreground-muted: #64748b;
+  --color-inverted: #0f172a;
 
   /* Typography - SuperPool Contemporary Tech */
   --font-primary: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
@@ -34,12 +35,17 @@
   --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
 }
 
-@media (prefers-color-scheme: dark) {
-  @theme inline {
-    --color-background: var(--color-background-dark);
-    --color-foreground: #ffffff;
-    --color-foreground-muted: #94a3b8;
-  }
+/* Dark theme */
+.dark {
+  --color-background: #0f172a;
+  --color-secondary: #1e293b;
+  --color-foreground: #ffffff;
+  --color-foreground-muted: #94a3b8;
+  --color-inverted: #ffffff;
+}
+
+html {
+  scroll-behavior: smooth;
 }
 
 body {

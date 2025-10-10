@@ -84,6 +84,7 @@ export default [
       },
       globals: {
         ...globals.node,
+        ...globals.browser,
         ...globals.es2022,
         __DEV__: 'readonly',
         NodeJS: 'readonly',
