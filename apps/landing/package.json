@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev --port 3001",
-    "prebuild": "pnpm --filter @superpool/assets run build",
+    "prebuild": "pnpm --filter @superpool/types run build && pnpm --filter @superpool/ui run build && pnpm --filter @superpool/assets run build",
     "build": "next build",
     "start": "next start --port 3001",
     "lint": "eslint . --config ../../eslint.config.mjs",

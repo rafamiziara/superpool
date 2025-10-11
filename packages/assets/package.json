@@ -14,9 +14,12 @@
     "./package.json": "./package.json"
   },
   "scripts": {
-    "copy-to-landing": "mkdir -p ../../apps/landing/public/images/illustrations && cp images/illustrations/* ../../apps/landing/public/images/illustrations/",
+    "copy-to-landing": "cpy 'images/illustrations/*' '../../apps/landing/public/images/illustrations'",
     "build": "pnpm run copy-to-landing",
     "format": "prettier --write ."
+  },
+  "devDependencies": {
+    "cpy-cli": "^5.0.0"
   },
   "keywords": [
     "assets",
