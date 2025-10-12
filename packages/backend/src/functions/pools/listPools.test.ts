@@ -334,4 +334,25 @@ describe('listPoolsHandler', () => {
     // Assert
     expect(result.pools[0].createdAt).toBeInstanceOf(Date)
   })
+
+  // Test Case: Error handling - Non-Error object thrown
+  it('should handle non-Error objects thrown during query execution', async () => {
+    // Arrange
+    const request = { data: {} }
+    const mockQuery = createMockQuery([], 0)
+    const nonErrorObject = { code: 'CUSTOM_ERROR', details: 'Custom error details' }
+    mockQuery.get.mockRejectedValue(nonErrorObject)
+    firestore.collection.mockReturnValue(mockQuery)
+
+    // Act & Assert
+    await expect(listPoolsHandler(request)).rejects.toThrow('Failed to list pools. Please try again.')
+    await expect(listPoolsHandler(request)).rejects.toHaveProperty('code', 'internal')
+    expect(mockLogger.error).toHaveBeenCalledWith(
+      'Error listing pools',
+      expect.objectContaining({
+        error: '[object Object]',
+        params: {},
+      })
+    )
+  })
 })
