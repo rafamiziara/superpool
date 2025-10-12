@@ -214,9 +214,10 @@ To facilitate local testing of the authentication and signature verification flo
 
 The `generateKey` script creates a new public/private key pair used for signing messages during local development.
 
-- **Purpose**: Generates `privateKey.pem` and `publicKey.pem` files in the `scripts` directory. The private key is used by the `signMessage` script, and the public key is used by the backend to verify signatures.
-- **Usage**:
+- **Purpose**: Generates `privateKey.pem`, `publicKey.pem`, and `wallet-info.json` files in the `packages/backend/scripts/` directory. The private key is used by the `signMessage` script, and the public key is used by the backend to verify signatures.
+- **Usage** (run from backend package):
   ```bash
+  cd packages/backend
   pnpm generateKey
   ```
 - **Note**: These files are automatically added to `.gitignore` and should **never** be committed to the repository.
@@ -226,8 +227,9 @@ The `generateKey` script creates a new public/private key pair used for signing 
 The `signMessage` script signs a message using the generated private key and the `nonce` and `timestamp` from your backend.
 
 - **Purpose**: Creates a cryptographic signature that you can use to test the `verifySignatureAndLogin` backend function.
-- **Usage**:
+- **Usage** (run from backend package):
   ```bash
+  cd packages/backend
   pnpm signMessage <nonce> <timestamp>
   ```
 - **Output**: The script will print the generated signature, which you can then use in your test requests (e.g., Postman).
