@@ -15,6 +15,7 @@ service-account-key.json
 # Generated development keys
 privateKey.pem
 publicKey.pem
+wallet-info.json
 
 # Test coverage reports
 /coverage

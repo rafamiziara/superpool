@@ -62,8 +62,8 @@ pnpm lint            # ESLint
 pnpm test            # Jest tests
 pnpm serve           # Start Firebase emulators
 pnpm deploy          # Deploy to Firebase
-pnpm generateKey     # Generate dev keys for testing
-pnpm signMessage     # Sign test messages
+pnpm generateKey     # Generate dev keys for backend testing
+pnpm signMessage     # Sign test messages for backend auth
 ```
 
 ### Landing Page (`apps/landing/`)
@@ -121,9 +121,13 @@ pnpm type-check      # TypeScript type checking
 
 ## Architecture
 
-For a comprehensive overview of the complete project structure, file organization, and package relationships, see [`docs/PROJECT_STRUCTURE.md`](docs/PROJECT_STRUCTURE.md).
+For project structure overview, see the [Architecture section in README.md](README.md#-architecture-overview). Each package has detailed documentation in its own README:
 
-**IMPORTANT**: When making structural changes to the project (adding/removing packages, applications, or reorganizing directories), always update `docs/PROJECT_STRUCTURE.md` to reflect the changes. This ensures the documentation stays current and accurate for all developers.
+- [Mobile App](apps/mobile/README.md) | [Landing Page](apps/landing/README.md)
+- [Smart Contracts](packages/contracts/README.md) | [Backend](packages/backend/README.md)
+- [UI Components](packages/ui/README.md) | [Types](packages/types/README.md) | [Design System](packages/design/README.md) | [Assets](packages/assets/README.md)
+
+**IMPORTANT**: When making structural changes to a package, always update its README to reflect the changes.
 
 ### Monorepo Structure
 
@@ -319,10 +323,14 @@ The mobile app automatically includes localhost (chain ID 31337) in development 
 
 ### Testing Backend Functions
 
+From the `packages/backend` directory:
+
 1. Generate development keys: `pnpm generateKey`
 2. Get auth message from `generateAuthMessage` function
 3. Sign with `pnpm signMessage <nonce> <timestamp>`
 4. Test authentication with `verifySignatureAndLogin`
+
+**Note**: Keys are saved in `packages/backend/scripts/` and automatically ignored by git.
 
 ### Firebase Emulator Setup
 

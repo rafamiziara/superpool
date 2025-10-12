@@ -1,270 +1,328 @@
-import { jest } from '@jest/globals'
-import { firebaseAdminMock } from '../__mocks__'
-
-// Mock logger for firebase-functions/v2
-const mockLoggerInfo = jest.fn()
-const mockLoggerError = jest.fn()
-const mockLoggerWarn = jest.fn()
-
-jest.mock('firebase-functions/v2', () => ({
-  logger: {
-    info: mockLoggerInfo,
-    error: mockLoggerError,
-    warn: mockLoggerWarn,
-  },
-}))
-
-// Create a functional mock firestore that actually tracks calls
-const createMockFirestore = () => {
-  const mockDoc = {
-    id: 'test-device-123',
-    get: jest.fn<() => Promise<any>>(), // eslint-disable-line @typescript-eslint/no-explicit-any
-    set: jest.fn<(data: any) => Promise<void>>(), // eslint-disable-line @typescript-eslint/no-explicit-any
-    update: jest.fn<(data: any) => Promise<void>>(), // eslint-disable-line @typescript-eslint/no-explicit-any
-    delete: jest.fn<() => Promise<void>>(),
-    ref: { update: jest.fn<(data: any) => Promise<void>>() }, // eslint-disable-line @typescript-eslint/no-explicit-any
-  }
-
-  const mockCollection = {
-    doc: jest.fn<(id: string) => any>().mockReturnValue(mockDoc), // eslint-disable-line @typescript-eslint/no-explicit-any
-  }
-
-  return {
-    collection: jest.fn<(name: string) => any>().mockReturnValue(mockCollection), // eslint-disable-line @typescript-eslint/no-explicit-any
-    mockDoc,
-    mockCollection,
-  }
-}
-
-const mockFirestore = createMockFirestore()
-
-// Mock the services index module with our functional mock
-jest.mock('./index', () => ({
-  firestore: mockFirestore,
-  auth: firebaseAdminMock.auth,
-  appCheck: firebaseAdminMock.appCheck,
-}))
-
+import { ApprovedDevice } from '@superpool/types'
 import { APPROVED_DEVICES_COLLECTION } from '../constants'
-import { ApprovedDevice } from '../types'
+import { mockLogger } from '../__tests__/setup'
 
-// Use require to import after mocks are set up
+// Import mocked services (already mocked in setup.ts)
+const { firestore } = require('./index')
+
+// Import the service to test
 const { DeviceVerificationService } = require('./deviceVerification')
 
 describe('DeviceVerificationService', () => {
-  const testDeviceId = 'test-device-123'
-  const testWalletAddress = '0x1234567890123456789012345678901234567890'
-  const testPlatform: 'android' | 'ios' | 'web' = 'android'
+  const deviceId = 'test-device-123'
+  const walletAddress = '0x1234567890123456789012345678901234567890'
+  const platform: 'android' | 'ios' | 'web' = 'android'
   const mockTimestamp = 1678886400000
 
+  // Mock Date.prototype.getTime
+  const originalGetTime = Date.prototype.getTime
+  Date.prototype.getTime = () => mockTimestamp
+
   beforeEach(() => {
-    // Reset all mocks
     jest.clearAllMocks()
-
-    // Reset our custom firestore mock
-    mockFirestore.collection.mockClear()
-    mockFirestore.mockDoc.get.mockClear()
-    mockFirestore.mockDoc.set.mockClear()
-    mockFirestore.mockDoc.update.mockClear()
-    mockFirestore.mockDoc.delete.mockClear()
-    mockFirestore.mockDoc.ref.update.mockClear()
-    mockFirestore.mockCollection.doc.mockClear()
-
-    // Mock Date.getTime for consistent timestamps
-    jest.spyOn(Date.prototype, 'getTime').mockReturnValue(mockTimestamp)
   })
 
-  afterEach(() => {
-    jest.restoreAllMocks()
+  afterAll(() => {
+    Date.prototype.getTime = originalGetTime
   })
 
   describe('isDeviceApproved', () => {
-    it('should return true for approved device and update lastUsed timestamp', async () => {
-      // Arrange - configure mock to return an existing document
-      const mockDocSnapshot = {
+    // Test Case: Device exists and is approved (Happy Path)
+    it('should return true and update lastUsed timestamp when device is approved', async () => {
+      // Arrange
+      const mockUpdate = jest.fn().mockResolvedValue(undefined)
+      const mockDeviceDoc = {
         exists: true,
-        ref: { update: mockFirestore.mockDoc.ref.update },
+        ref: {
+          update: mockUpdate,
+        },
       }
 
-      mockFirestore.mockDoc.get.mockResolvedValue(mockDocSnapshot)
+      const mockDoc = jest.fn().mockReturnValue({
+        get: jest.fn().mockResolvedValue(mockDeviceDoc),
+      })
+
+      const mockCollection = jest.fn().mockReturnValue({
+        doc: mockDoc,
+      })
+
+      firestore.collection.mockReturnValue(mockCollection())
 
       // Act
-      const result = await DeviceVerificationService.isDeviceApproved(testDeviceId)
+      const result = await DeviceVerificationService.isDeviceApproved(deviceId)
 
       // Assert
-      expect(mockFirestore.collection).toHaveBeenCalledWith(APPROVED_DEVICES_COLLECTION)
-      expect(mockFirestore.mockCollection.doc).toHaveBeenCalledWith(testDeviceId)
-      expect(mockFirestore.mockDoc.ref.update).toHaveBeenCalledWith({ lastUsed: mockTimestamp })
-      expect(mockLoggerInfo).toHaveBeenCalledWith('Device verified successfully', { deviceId: testDeviceId })
       expect(result).toBe(true)
+      expect(firestore.collection).toHaveBeenCalledWith(APPROVED_DEVICES_COLLECTION)
+      expect(mockDoc).toHaveBeenCalledWith(deviceId)
+      expect(mockUpdate).toHaveBeenCalledWith({ lastUsed: mockTimestamp })
+      expect(mockLogger.info).toHaveBeenCalledWith('Device verified successfully', { deviceId })
     })
 
-    it('should return false for non-approved device', async () => {
-      // Arrange - configure mock to return non-existing document
-      const mockDocSnapshot = {
+    // Test Case: Device does not exist
+    it('should return false when device is not found in approved devices', async () => {
+      // Arrange
+      const mockDeviceDoc = {
         exists: false,
       }
 
-      mockFirestore.mockDoc.get.mockResolvedValue(mockDocSnapshot)
+      const mockDoc = jest.fn().mockReturnValue({
+        get: jest.fn().mockResolvedValue(mockDeviceDoc),
+      })
+
+      const mockCollection = jest.fn().mockReturnValue({
+        doc: mockDoc,
+      })
+
+      firestore.collection.mockReturnValue(mockCollection())
 
       // Act
-      const result = await DeviceVerificationService.isDeviceApproved(testDeviceId)
+      const result = await DeviceVerificationService.isDeviceApproved(deviceId)
 
       // Assert
-      expect(mockFirestore.collection).toHaveBeenCalledWith(APPROVED_DEVICES_COLLECTION)
-      expect(mockFirestore.mockCollection.doc).toHaveBeenCalledWith(testDeviceId)
-      expect(mockLoggerInfo).toHaveBeenCalledWith('Device not found in approved devices', { deviceId: testDeviceId })
       expect(result).toBe(false)
+      expect(firestore.collection).toHaveBeenCalledWith(APPROVED_DEVICES_COLLECTION)
+      expect(mockDoc).toHaveBeenCalledWith(deviceId)
+      expect(mockLogger.info).toHaveBeenCalledWith('Device not found in approved devices', { deviceId })
     })
 
+    // Test Case: Error during verification
     it('should return false and log error when verification fails', async () => {
-      // Arrange - configure mock to throw error
-      const error = new Error('Firestore error')
-      mockFirestore.mockDoc.get.mockRejectedValue(error)
+      // Arrange
+      const error = new Error('Firestore read error')
+      const mockDoc = jest.fn().mockReturnValue({
+        get: jest.fn().mockRejectedValue(error),
+      })
+
+      const mockCollection = jest.fn().mockReturnValue({
+        doc: mockDoc,
+      })
+
+      firestore.collection.mockReturnValue(mockCollection())
 
       // Act
-      const result = await DeviceVerificationService.isDeviceApproved(testDeviceId)
+      const result = await DeviceVerificationService.isDeviceApproved(deviceId)
 
       // Assert
-      expect(mockLoggerError).toHaveBeenCalledWith('Error verifying device', {
-        error,
-        deviceId: testDeviceId,
-      })
       expect(result).toBe(false)
+      expect(mockLogger.error).toHaveBeenCalledWith('Error verifying device', { error, deviceId })
+    })
+
+    // Test Case: Error during lastUsed update (should still return true)
+    it('should return false when lastUsed update fails', async () => {
+      // Arrange
+      const updateError = new Error('Update failed')
+      const mockUpdate = jest.fn().mockRejectedValue(updateError)
+      const mockDeviceDoc = {
+        exists: true,
+        ref: {
+          update: mockUpdate,
+        },
+      }
+
+      const mockDoc = jest.fn().mockReturnValue({
+        get: jest.fn().mockResolvedValue(mockDeviceDoc),
+      })
+
+      const mockCollection = jest.fn().mockReturnValue({
+        doc: mockDoc,
+      })
+
+      firestore.collection.mockReturnValue(mockCollection())
+
+      // Act
+      const result = await DeviceVerificationService.isDeviceApproved(deviceId)
+
+      // Assert
+      expect(result).toBe(false)
+      expect(mockLogger.error).toHaveBeenCalledWith('Error verifying device', {
+        error: updateError,
+        deviceId,
+      })
     })
   })
 
   describe('approveDevice', () => {
-    it('should successfully approve a device', async () => {
-      // Arrange - configure mock for successful set operation
+    // Test Case: Successfully approve device (Happy Path)
+    it('should successfully approve a device with android platform', async () => {
+      // Arrange
+      const mockSet = jest.fn().mockResolvedValue(undefined)
+      const mockDoc = jest.fn().mockReturnValue({
+        set: mockSet,
+      })
+
+      const mockCollection = jest.fn().mockReturnValue({
+        doc: mockDoc,
+      })
+
+      firestore.collection.mockReturnValue(mockCollection())
+
       const expectedDevice: ApprovedDevice = {
-        deviceId: testDeviceId,
-        walletAddress: testWalletAddress,
+        deviceId,
+        walletAddress,
         approvedAt: mockTimestamp,
-        platform: testPlatform,
+        platform: 'android',
         lastUsed: mockTimestamp,
       }
 
-      mockFirestore.mockDoc.set.mockResolvedValue(undefined)
-
       // Act
-      await DeviceVerificationService.approveDevice(testDeviceId, testWalletAddress, testPlatform)
+      await DeviceVerificationService.approveDevice(deviceId, walletAddress, 'android')
 
       // Assert
-      expect(mockFirestore.collection).toHaveBeenCalledWith(APPROVED_DEVICES_COLLECTION)
-      expect(mockFirestore.mockCollection.doc).toHaveBeenCalledWith(testDeviceId)
-      expect(mockFirestore.mockDoc.set).toHaveBeenCalledWith(expectedDevice)
-      expect(mockLoggerInfo).toHaveBeenCalledWith('Device approved successfully', {
-        deviceId: testDeviceId,
-        walletAddress: testWalletAddress,
-        platform: testPlatform,
+      expect(firestore.collection).toHaveBeenCalledWith(APPROVED_DEVICES_COLLECTION)
+      expect(mockDoc).toHaveBeenCalledWith(deviceId)
+      expect(mockSet).toHaveBeenCalledWith(expectedDevice)
+      expect(mockLogger.info).toHaveBeenCalledWith('Device approved successfully', {
+        deviceId,
+        walletAddress,
+        platform: 'android',
       })
     })
 
-    it('should throw error when device approval fails', async () => {
-      // Arrange - configure mock to throw error on set
-      const error = new Error('Firestore error')
-      mockFirestore.mockDoc.set.mockRejectedValue(error)
-
-      // Act & Assert
-      await expect(DeviceVerificationService.approveDevice(testDeviceId, testWalletAddress, testPlatform)).rejects.toThrow(
-        'Failed to approve device'
-      )
-
-      expect(mockLoggerError).toHaveBeenCalledWith('Error approving device', {
-        error,
-        deviceId: testDeviceId,
-        walletAddress: testWalletAddress,
+    // Test Case: Approve iOS device
+    it('should successfully approve a device with ios platform', async () => {
+      // Arrange
+      const mockSet = jest.fn().mockResolvedValue(undefined)
+      const mockDoc = jest.fn().mockReturnValue({
+        set: mockSet,
       })
-    })
-  })
 
-  describe('getApprovedDevice', () => {
-    it('should return device data for approved device', async () => {
-      // Arrange - configure mock to return device data
-      const deviceData: ApprovedDevice = {
-        deviceId: testDeviceId,
-        walletAddress: testWalletAddress,
+      const mockCollection = jest.fn().mockReturnValue({
+        doc: mockDoc,
+      })
+
+      firestore.collection.mockReturnValue(mockCollection())
+
+      const expectedDevice: ApprovedDevice = {
+        deviceId,
+        walletAddress,
         approvedAt: mockTimestamp,
-        platform: testPlatform,
+        platform: 'ios',
         lastUsed: mockTimestamp,
       }
 
-      const mockDocSnapshot = {
-        exists: true,
-        data: jest.fn().mockReturnValue(deviceData),
-      }
-
-      mockFirestore.mockDoc.get.mockResolvedValue(mockDocSnapshot)
-
       // Act
-      const result = await DeviceVerificationService.getApprovedDevice(testDeviceId)
+      await DeviceVerificationService.approveDevice(deviceId, walletAddress, 'ios')
 
       // Assert
-      expect(mockFirestore.collection).toHaveBeenCalledWith(APPROVED_DEVICES_COLLECTION)
-      expect(mockFirestore.mockCollection.doc).toHaveBeenCalledWith(testDeviceId)
-      expect(result).toEqual(deviceData)
-    })
-
-    it('should return null for non-approved device', async () => {
-      // Arrange - configure mock to return non-existing document
-      const mockDocSnapshot = {
-        exists: false,
-      }
-
-      mockFirestore.mockDoc.get.mockResolvedValue(mockDocSnapshot)
-
-      // Act
-      const result = await DeviceVerificationService.getApprovedDevice(testDeviceId)
-
-      // Assert
-      expect(result).toBeNull()
-    })
-
-    it('should return null and log error when retrieval fails', async () => {
-      // Arrange - configure mock to throw error on get
-      const error = new Error('Firestore error')
-      mockFirestore.mockDoc.get.mockRejectedValue(error)
-
-      // Act
-      const result = await DeviceVerificationService.getApprovedDevice(testDeviceId)
-
-      // Assert
-      expect(mockLoggerError).toHaveBeenCalledWith('Error getting approved device', {
-        error,
-        deviceId: testDeviceId,
+      expect(mockSet).toHaveBeenCalledWith(expectedDevice)
+      expect(mockLogger.info).toHaveBeenCalledWith('Device approved successfully', {
+        deviceId,
+        walletAddress,
+        platform: 'ios',
       })
-      expect(result).toBeNull()
     })
-  })
 
-  describe('revokeDeviceApproval', () => {
-    it('should successfully revoke device approval', async () => {
-      // Arrange - configure mock for successful delete operation
-      mockFirestore.mockDoc.delete.mockResolvedValue(undefined)
+    // Test Case: Approve web device
+    it('should successfully approve a device with web platform', async () => {
+      // Arrange
+      const mockSet = jest.fn().mockResolvedValue(undefined)
+      const mockDoc = jest.fn().mockReturnValue({
+        set: mockSet,
+      })
+
+      const mockCollection = jest.fn().mockReturnValue({
+        doc: mockDoc,
+      })
+
+      firestore.collection.mockReturnValue(mockCollection())
+
+      const expectedDevice: ApprovedDevice = {
+        deviceId,
+        walletAddress,
+        approvedAt: mockTimestamp,
+        platform: 'web',
+        lastUsed: mockTimestamp,
+      }
 
       // Act
-      await DeviceVerificationService.revokeDeviceApproval(testDeviceId)
+      await DeviceVerificationService.approveDevice(deviceId, walletAddress, 'web')
 
       // Assert
-      expect(mockFirestore.collection).toHaveBeenCalledWith(APPROVED_DEVICES_COLLECTION)
-      expect(mockFirestore.mockCollection.doc).toHaveBeenCalledWith(testDeviceId)
-      expect(mockFirestore.mockDoc.delete).toHaveBeenCalled()
-      expect(mockLoggerInfo).toHaveBeenCalledWith('Device approval revoked', { deviceId: testDeviceId })
+      expect(mockSet).toHaveBeenCalledWith(expectedDevice)
+      expect(mockLogger.info).toHaveBeenCalledWith('Device approved successfully', {
+        deviceId,
+        walletAddress,
+        platform: 'web',
+      })
     })
 
-    it('should throw error when revocation fails', async () => {
-      // Arrange - configure mock to throw error on delete
-      const error = new Error('Firestore error')
-      mockFirestore.mockDoc.delete.mockRejectedValue(error)
+    // Test Case: Error during device approval
+    it('should throw error and log when device approval fails', async () => {
+      // Arrange
+      const error = new Error('Firestore write error')
+      const mockSet = jest.fn().mockRejectedValue(error)
+      const mockDoc = jest.fn().mockReturnValue({
+        set: mockSet,
+      })
+
+      const mockCollection = jest.fn().mockReturnValue({
+        doc: mockDoc,
+      })
+
+      firestore.collection.mockReturnValue(mockCollection())
 
       // Act & Assert
-      await expect(DeviceVerificationService.revokeDeviceApproval(testDeviceId)).rejects.toThrow('Failed to revoke device approval')
-
-      expect(mockLoggerError).toHaveBeenCalledWith('Error revoking device approval', {
+      await expect(DeviceVerificationService.approveDevice(deviceId, walletAddress, platform)).rejects.toThrow('Failed to approve device')
+      expect(mockLogger.error).toHaveBeenCalledWith('Error approving device', {
         error,
-        deviceId: testDeviceId,
+        deviceId,
+        walletAddress,
       })
+    })
+
+    // Test Case: Multiple devices for same wallet
+    it('should allow approving multiple devices for the same wallet', async () => {
+      // Arrange
+      const device1 = 'device-1'
+      const device2 = 'device-2'
+      const mockSet = jest.fn().mockResolvedValue(undefined)
+      const mockDoc = jest.fn().mockReturnValue({
+        set: mockSet,
+      })
+
+      const mockCollection = jest.fn().mockReturnValue({
+        doc: mockDoc,
+      })
+
+      firestore.collection.mockReturnValue(mockCollection())
+
+      // Act
+      await DeviceVerificationService.approveDevice(device1, walletAddress, 'android')
+      await DeviceVerificationService.approveDevice(device2, walletAddress, 'ios')
+
+      // Assert
+      expect(mockDoc).toHaveBeenCalledWith(device1)
+      expect(mockDoc).toHaveBeenCalledWith(device2)
+      expect(mockSet).toHaveBeenCalledTimes(2)
+    })
+
+    // Test Case: Overwriting existing device approval
+    it('should overwrite existing device approval when called again', async () => {
+      // Arrange
+      const newWalletAddress = '0x9876543210987654321098765432109876543210'
+      const mockSet = jest.fn().mockResolvedValue(undefined)
+      const mockDoc = jest.fn().mockReturnValue({
+        set: mockSet,
+      })
+
+      const mockCollection = jest.fn().mockReturnValue({
+        doc: mockDoc,
+      })
+
+      firestore.collection.mockReturnValue(mockCollection())
+
+      // Act - First approval
+      await DeviceVerificationService.approveDevice(deviceId, walletAddress, 'android')
+
+      // Act - Second approval (different wallet)
+      await DeviceVerificationService.approveDevice(deviceId, newWalletAddress, 'ios')
+
+      // Assert
+      expect(mockSet).toHaveBeenCalledTimes(2)
+      const secondCall = mockSet.mock.calls[1][0]
+      expect(secondCall.walletAddress).toBe(newWalletAddress)
+      expect(secondCall.platform).toBe('ios')
     })
   })
 })

@@ -80,7 +80,23 @@ superpool/
 
 The monorepo structure enables seamless development with shared packages for design, UI components, and TypeScript types across web and mobile applications. Smart contracts are deployable on multiple EVM chains, with backend Cloud Functions handling wallet authentication and off-chain data storage.
 
-For detailed architecture documentation, see [docs/PROJECT_STRUCTURE.md](docs/PROJECT_STRUCTURE.md).
+## Package Documentation
+
+Detailed documentation for each component:
+
+**Applications:**
+- [Mobile App](apps/mobile/README.md) - React Native/Expo with wallet integration
+- [Landing Page](apps/landing/README.md) - Next.js marketing website
+
+**Core Services:**
+- [Smart Contracts](packages/contracts/README.md) - Solidity contracts and deployment
+- [Backend](packages/backend/README.md) - Firebase Cloud Functions
+
+**Shared Packages:**
+- [UI Components](packages/ui/README.md) - React component library
+- [TypeScript Types](packages/types/README.md) - Shared type definitions
+- [Design System](packages/design/README.md) - Design tokens and configuration
+- [Assets](packages/assets/README.md) - Brand assets and illustrations
 
 ## 🚀 Getting Started
 
@@ -107,7 +123,7 @@ SuperPool requires several services to be configured before running:
 - Environment variables for all packages
 - Firebase CLI and ngrok for local development
 
-**👉 Complete setup instructions: [Getting Started Guide](GETTING_STARTED.md)**
+**👉 Complete setup instructions: [Getting Started Guide](docs/GETTING_STARTED.md)**
 
 Once configured, start the full development environment with `pnpm dev`.
 

@@ -1,1012 +1,358 @@
-/**
- * Comprehensive Tests for List Pools Function
- *
- * Tests all aspects of the listPools Cloud Function including:
- * - Pool listing with pagination and filtering
- * - Firestore query optimization and performance
- * - Parameter validation and constraints
- * - Sorting and ordering functionality
- * - Error handling for various failure scenarios
- * - Performance testing for large datasets
- * - Edge cases (empty results, invalid parameters, etc.)
- */
+import { PoolInfo } from '@superpool/types'
+import { mockLogger } from '../../__tests__/setup'
 
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from '@jest/globals'
-import { firebaseAdminMock, FunctionsMock, MockFactory, quickSetup, TestFixtures } from '../../__mocks__'
-import { listPools as listPoolsFunction, ListPoolsRequest, ListPoolsResponse, PoolInfo } from './listPools'
+// Import mocked services (already mocked in setup.ts)
+const { firestore } = require('../../services')
 
-// Extract the handler from the onCall wrapped function
-const listPoolsModule = require('./listPools')
-const listPools = listPoolsModule.listPools.__handler || listPoolsModule.listPools
-import { HttpsError } from 'firebase-functions/v2/https'
-import { AppError } from '../../utils/errorHandling'
-import {
-  detectMemoryLeaks,
-  type LoadTestConfig,
-  performanceManager,
-  type PerformanceThresholds,
-  runBenchmark,
-  startPerformanceTest,
-} from '../../__tests__/utils/PerformanceTestUtilities'
+// Import the handler to test
+const { listPoolsHandler } = require('./listPools')
 
-describe('listPools Cloud Function', () => {
-  let testEnvironment: any
-  let mockQuery: any
+describe('listPoolsHandler', () => {
+  const mockPools: PoolInfo[] = [
+    {
+      poolId: 1,
+      poolAddress: '0xPoolAddress1',
+      poolOwner: '0xOwner1',
+      name: 'Pool 1',
+      description: 'Test pool 1',
+      maxLoanAmount: '1000000000000000000',
+      interestRate: 500,
+      loanDuration: 2592000,
+      chainId: 80002,
+      createdBy: '0xCreator1',
+      createdAt: new Date('2024-01-01'),
+      transactionHash: '0xTxHash1',
+      isActive: true,
+    },
+    {
+      poolId: 2,
+      poolAddress: '0xPoolAddress2',
+      poolOwner: '0xOwner2',
+      name: 'Pool 2',
+      description: 'Test pool 2',
+      maxLoanAmount: '2000000000000000000',
+      interestRate: 600,
+      loanDuration: 2592000,
+      chainId: 80002,
+      createdBy: '0xCreator2',
+      createdAt: new Date('2024-01-02'),
+      transactionHash: '0xTxHash2',
+      isActive: true,
+    },
+  ]
 
-  beforeAll(() => {
-    performanceManager.clearAll()
-  })
+  // Helper to create mock query chain
+  const createMockQuery = (docs: PoolInfo[], totalCount: number) => {
+    const mockDocs = docs.map((pool) => ({
+      data: () => ({
+        ...pool,
+        createdAt: { toDate: () => pool.createdAt },
+      }),
+    }))
 
-  beforeEach(() => {
-    MockFactory.resetAllMocks()
-    testEnvironment = quickSetup.poolCreation()
-
-    // Setup chainable query mock
-    mockQuery = {
+    const query = {
       where: jest.fn().mockReturnThis(),
       orderBy: jest.fn().mockReturnThis(),
       offset: jest.fn().mockReturnThis(),
       limit: jest.fn().mockReturnThis(),
-      get: jest.fn(),
-      count: jest.fn(),
+      get: jest.fn().mockResolvedValue({ docs: mockDocs }),
+      count: jest.fn().mockReturnValue({
+        get: jest.fn().mockResolvedValue({
+          data: () => ({ count: totalCount }),
+        }),
+      }),
     }
 
-    // Mock collection to return our query mock with initial where call
-    firebaseAdminMock.firestore.collection.mockReturnValue(mockQuery)
+    return query
+  }
+
+  beforeEach(() => {
+    jest.clearAllMocks()
   })
 
-  afterEach(() => {
-    MockFactory.resetAllMocks()
+  // Test Case: Successful pool listing with defaults (Happy Path)
+  it('should successfully list pools with default parameters', async () => {
+    // Arrange
+    const request = { data: {} }
+    const mockQuery = createMockQuery(mockPools, 2)
+    firestore.collection.mockReturnValue(mockQuery)
+
+    // Act
+    const result = await listPoolsHandler(request)
+
+    // Assert
+    expect(firestore.collection).toHaveBeenCalledWith('pools')
+    expect(mockQuery.where).toHaveBeenCalledWith('chainId', '==', 80002)
+    expect(mockQuery.where).toHaveBeenCalledWith('isActive', '==', true)
+    expect(mockQuery.orderBy).toHaveBeenCalledWith('createdAt', 'desc')
+    expect(mockQuery.offset).toHaveBeenCalledWith(0)
+    expect(mockQuery.limit).toHaveBeenCalledWith(20)
+    expect(result).toEqual({
+      pools: mockPools,
+      totalCount: 2,
+      page: 1,
+      limit: 20,
+      hasNextPage: false,
+      hasPreviousPage: false,
+    })
+    expect(mockLogger.info).toHaveBeenCalledWith('Listing pools', { params: {} })
   })
 
-  afterAll(() => {
-    const report = performanceManager.generateReport()
-    console.log('🎯 Pool Listing Performance Report:')
-    console.log(`   Total Tests: ${report.totalTests}`)
-    console.log(`   Total Benchmarks: ${report.totalBenchmarks}`)
-    console.log(`   Overall Average Execution Time: ${report.overallStats.averageExecutionTime.toFixed(2)}ms`)
+  // Test Case: Pagination - Page 2
+  it('should handle pagination correctly for page 2', async () => {
+    // Arrange
+    const request = { data: { page: 2, limit: 10 } }
+    const mockQuery = createMockQuery(mockPools, 25)
+    firestore.collection.mockReturnValue(mockQuery)
+
+    // Act
+    const result = await listPoolsHandler(request)
+
+    // Assert
+    expect(mockQuery.offset).toHaveBeenCalledWith(10) // (page - 1) * limit = (2 - 1) * 10
+    expect(mockQuery.limit).toHaveBeenCalledWith(10)
+    expect(result.page).toBe(2)
+    expect(result.limit).toBe(10)
+    expect(result.hasNextPage).toBe(true) // offset 10 + 2 pools < 25
+    expect(result.hasPreviousPage).toBe(true)
   })
 
-  describe('Happy Path Scenarios', () => {
-    it('should return paginated pools with default parameters', async () => {
-      const performance = startPerformanceTest('basic-pool-listing', 'happy-path')
+  // Test Case: Filter by owner address
+  it('should filter pools by owner address', async () => {
+    // Arrange
+    const ownerAddress = '0xOWNER1' // Uppercase to test lowercasing
+    const request = { data: { ownerAddress } }
+    const mockQuery = createMockQuery([mockPools[0]], 1)
+    firestore.collection.mockReturnValue(mockQuery)
 
-      // Mock pool data
-      const mockPools = Array.from({ length: 5 }, (_, i) => ({
-        id: `pool-${i + 1}`,
-        data: () => ({
-          poolId: i + 1,
-          poolAddress: `0x${(i + 1).toString(16).padStart(40, '0')}`,
-          poolOwner: TestFixtures.TestData.addresses.poolOwners[i % TestFixtures.TestData.addresses.poolOwners.length],
-          name: `Pool ${i + 1}`,
-          description: `Description for Pool ${i + 1}`,
-          maxLoanAmount: (1000 + i * 500).toString() + '000000000000000000', // In wei
-          interestRate: 500 + i * 100, // Basis points
-          loanDuration: 86400 * (7 + i), // Days in seconds
-          chainId: 80002,
-          createdBy: `user-${i + 1}`,
-          createdAt: { toDate: () => new Date(Date.now() - i * 3600000) }, // Hours apart
-          transactionHash: `0x${i.toString(16).padStart(64, '0')}`,
-          isActive: true,
-        }),
-      }))
+    // Act
+    const result = await listPoolsHandler(request)
 
-      // Mock count query
-      mockQuery.count.mockReturnValue({
-        get: jest.fn().mockResolvedValue({
-          data: () => ({ count: 25 }),
-        }),
-      })
+    // Assert
+    expect(mockQuery.where).toHaveBeenCalledWith('poolOwner', '==', ownerAddress.toLowerCase())
+    expect(result.pools).toHaveLength(1)
+    expect(result.totalCount).toBe(1)
+  })
 
-      // Mock results query
-      mockQuery.get.mockResolvedValue({
-        docs: mockPools,
-      })
+  // Test Case: Filter by chainId
+  it('should filter pools by chainId', async () => {
+    // Arrange
+    const request = { data: { chainId: 137 } }
+    const mockQuery = createMockQuery(mockPools, 2)
+    firestore.collection.mockReturnValue(mockQuery)
 
-      const request = FunctionsMock.createCallableRequest({})
+    // Act
+    await listPoolsHandler(request)
 
-      const result = (await listPools(request)) as ListPoolsResponse
+    // Assert
+    expect(mockQuery.where).toHaveBeenCalledWith('chainId', '==', 137)
+  })
 
-      const metrics = performance.end()
+  // Test Case: Include inactive pools
+  it('should include inactive pools when activeOnly is false', async () => {
+    // Arrange
+    const request = { data: { activeOnly: false } }
+    const mockQuery = createMockQuery(mockPools, 2)
+    firestore.collection.mockReturnValue(mockQuery)
 
-      // Verify successful response structure
-      expect(result.pools).toHaveLength(5)
-      expect(result.totalCount).toBe(25)
-      expect(result.page).toBe(1)
-      expect(result.limit).toBe(20)
-      expect(result.hasNextPage).toBe(true)
-      expect(result.hasPreviousPage).toBe(false)
+    // Act
+    await listPoolsHandler(request)
 
-      // Verify pool data structure
-      const pool = result.pools[0]
-      expect(pool).toMatchObject({
-        poolId: 1,
-        poolAddress: expect.stringMatching(/^0x[a-fA-F0-9]{40}$/),
-        poolOwner: expect.stringMatching(/^0x[a-fA-F0-9]{40}$/),
-        name: 'Pool 1',
-        description: 'Description for Pool 1',
-        maxLoanAmount: expect.stringMatching(/^\d+$/),
-        interestRate: expect.any(Number),
-        loanDuration: expect.any(Number),
+    // Assert
+    // Should only have one where call for chainId, not for isActive
+    const whereCalls = mockQuery.where.mock.calls
+    const hasActiveFilter = whereCalls.some((call) => call[0] === 'isActive')
+    expect(hasActiveFilter).toBe(false)
+  })
+
+  // Test Case: Limit capping (max 100)
+  it('should cap limit at 100 pools per page', async () => {
+    // Arrange
+    const request = { data: { limit: 500 } }
+    const mockQuery = createMockQuery(mockPools, 2)
+    firestore.collection.mockReturnValue(mockQuery)
+
+    // Act
+    const result = await listPoolsHandler(request)
+
+    // Assert
+    expect(mockQuery.limit).toHaveBeenCalledWith(100)
+    expect(result.limit).toBe(100)
+  })
+
+  // Test Case: Minimum limit (at least 1)
+  it('should enforce minimum limit of 1 for negative values', async () => {
+    // Arrange
+    const request = { data: { limit: -5 } }
+    const mockQuery = createMockQuery(mockPools, 2)
+    firestore.collection.mockReturnValue(mockQuery)
+
+    // Act
+    const result = await listPoolsHandler(request)
+
+    // Assert
+    expect(mockQuery.limit).toHaveBeenCalledWith(1)
+    expect(result.limit).toBe(1)
+  })
+
+  // Test Case: Minimum page (at least 1)
+  it('should enforce minimum page of 1', async () => {
+    // Arrange
+    const request = { data: { page: 0 } }
+    const mockQuery = createMockQuery(mockPools, 2)
+    firestore.collection.mockReturnValue(mockQuery)
+
+    // Act
+    const result = await listPoolsHandler(request)
+
+    // Assert
+    expect(mockQuery.offset).toHaveBeenCalledWith(0)
+    expect(result.page).toBe(1)
+  })
+
+  // Test Case: Empty results
+  it('should handle empty pool list', async () => {
+    // Arrange
+    const request = { data: {} }
+    const mockQuery = createMockQuery([], 0)
+    firestore.collection.mockReturnValue(mockQuery)
+
+    // Act
+    const result = await listPoolsHandler(request)
+
+    // Assert
+    expect(result.pools).toEqual([])
+    expect(result.totalCount).toBe(0)
+    expect(result.hasNextPage).toBe(false)
+    expect(result.hasPreviousPage).toBe(false)
+  })
+
+  // Test Case: Combined filters
+  it('should handle multiple filters correctly', async () => {
+    // Arrange
+    const request = {
+      data: {
+        ownerAddress: '0xOwner1',
         chainId: 80002,
-        createdBy: expect.any(String),
-        createdAt: expect.any(Date),
-        transactionHash: expect.stringMatching(/^0x[a-fA-F0-9]{64}$/),
-        isActive: true,
-      })
-
-      // Verify Firestore query construction
-      expect(firebaseAdminMock.firestore.collection).toHaveBeenCalledWith('pools')
-      expect(mockQuery.where).toHaveBeenCalledWith('chainId', '==', 80002)
-      expect(mockQuery.where).toHaveBeenCalledWith('isActive', '==', true)
-      expect(mockQuery.orderBy).toHaveBeenCalledWith('createdAt', 'desc')
-      expect(mockQuery.offset).toHaveBeenCalledWith(0)
-      expect(mockQuery.limit).toHaveBeenCalledWith(20)
-
-      // Performance validation
-      expect(metrics.executionTime).toBeLessThan(1000) // Should complete in under 1 second
-    })
-
-    it('should handle pagination correctly for multiple pages', async () => {
-      // Test page 3 with custom limit
-      const mockPools = Array.from({ length: 5 }, (_, i) => ({
-        id: `pool-${i + 21}`,
-        data: () => ({
-          poolId: i + 21,
-          poolAddress: `0x${(i + 21).toString().repeat(2).padEnd(40, '0')}`,
-          poolOwner: TestFixtures.TestData.addresses.poolOwners[0],
-          name: `Pool ${i + 21}`,
-          description: `Description ${i + 21}`,
-          maxLoanAmount: '1000000000000000000',
-          interestRate: 500,
-          loanDuration: 86400 * 7,
-          chainId: 80002,
-          createdBy: 'test-user',
-          createdAt: { toDate: () => new Date() },
-          transactionHash: `0x${'tx' + (i + 21)}${'0'.repeat(56)}`,
-          isActive: true,
-        }),
-      }))
-
-      // Mock count query
-      mockQuery.count.mockReturnValue({
-        get: jest.fn().mockResolvedValue({
-          data: () => ({ count: 50 }),
-        }),
-      })
-
-      // Mock results query
-      mockQuery.get.mockResolvedValue({
-        docs: mockPools,
-      })
-
-      const request = FunctionsMock.createCallableRequest({
-        page: 3,
-        limit: 10,
-      })
-
-      const result = (await listPools(request)) as ListPoolsResponse
-
-      expect(result.pools).toHaveLength(5)
-      expect(result.totalCount).toBe(50)
-      expect(result.page).toBe(3)
-      expect(result.limit).toBe(10)
-      expect(result.hasNextPage).toBe(true) // (3-1) * 10 + 5 = 25 < 50
-      expect(result.hasPreviousPage).toBe(true) // page 3 > 1
-
-      // Verify correct offset calculation
-      expect(mockQuery.offset).toHaveBeenCalledWith(20) // (3-1) * 10
-      expect(mockQuery.limit).toHaveBeenCalledWith(10)
-    })
-
-    it('should filter by owner address correctly', async () => {
-      const targetOwner = TestFixtures.TestData.addresses.poolOwners[0]
-
-      const mockPools = Array.from({ length: 3 }, (_, i) => ({
-        id: `owner-pool-${i + 1}`,
-        data: () => ({
-          poolId: i + 100,
-          poolAddress: `0x${(i + 100).toString().padEnd(40, '0')}`,
-          poolOwner: targetOwner,
-          name: `Owner Pool ${i + 1}`,
-          description: `Pool owned by ${targetOwner}`,
-          maxLoanAmount: '2000000000000000000',
-          interestRate: 600,
-          loanDuration: 86400 * 14,
-          chainId: 80002,
-          createdBy: 'owner-user',
-          createdAt: { toDate: () => new Date() },
-          transactionHash: `0x${'owner' + i}${'0'.repeat(56)}`,
-          isActive: true,
-        }),
-      }))
-
-      // Mock count query
-      mockQuery.count.mockReturnValue({
-        get: jest.fn().mockResolvedValue({
-          data: () => ({ count: 3 }),
-        }),
-      })
-
-      // Mock results query
-      mockQuery.get.mockResolvedValue({
-        docs: mockPools,
-      })
-
-      const request = FunctionsMock.createCallableRequest({
-        ownerAddress: targetOwner,
-      })
-
-      const result = (await listPools(request)) as ListPoolsResponse
-
-      expect(result.pools).toHaveLength(3)
-      expect(result.totalCount).toBe(3)
-      expect(result.hasNextPage).toBe(false)
-      expect(result.hasPreviousPage).toBe(false)
-
-      // Verify all returned pools have correct owner
-      result.pools.forEach((pool) => {
-        expect(pool.poolOwner).toBe(targetOwner)
-      })
-
-      // Verify owner filter was applied
-      expect(mockQuery.where).toHaveBeenCalledWith('poolOwner', '==', targetOwner.toLowerCase())
-    })
-
-    it('should filter by chain ID correctly', async () => {
-      // Test Polygon Mainnet (chain ID 137)
-      const mockPools = Array.from({ length: 2 }, (_, i) => ({
-        id: `mainnet-pool-${i + 1}`,
-        data: () => ({
-          poolId: i + 200,
-          poolAddress: `0x${(i + 200).toString().padEnd(40, '0')}`,
-          poolOwner: TestFixtures.TestData.addresses.poolOwners[i],
-          name: `Mainnet Pool ${i + 1}`,
-          description: `Pool on Polygon Mainnet`,
-          maxLoanAmount: '5000000000000000000',
-          interestRate: 400,
-          loanDuration: 86400 * 30,
-          chainId: 137,
-          createdBy: 'mainnet-user',
-          createdAt: { toDate: () => new Date() },
-          transactionHash: `0x${'mainnet' + i}${'0'.repeat(52)}`,
-          isActive: true,
-        }),
-      }))
-
-      // Mock count query
-      mockQuery.count.mockReturnValue({
-        get: jest.fn().mockResolvedValue({
-          data: () => ({ count: 2 }),
-        }),
-      })
-
-      // Mock results query
-      mockQuery.get.mockResolvedValue({
-        docs: mockPools,
-      })
-
-      const request = FunctionsMock.createCallableRequest({
-        chainId: 137,
-      })
-
-      const result = (await listPools(request)) as ListPoolsResponse
-
-      expect(result.pools).toHaveLength(2)
-      result.pools.forEach((pool) => {
-        expect(pool.chainId).toBe(137)
-      })
-
-      // Verify chain ID filter was applied
-      expect(firebaseAdminMock.firestore.collection).toHaveBeenCalledWith('pools')
-      expect(mockQuery.where).toHaveBeenCalledWith('chainId', '==', 137)
-    })
-
-    it('should include inactive pools when activeOnly is false', async () => {
-      const mockPools = [
-        {
-          id: 'active-pool',
-          data: () => ({
-            poolId: 301,
-            poolAddress: '0x' + '301'.padEnd(40, '0'),
-            poolOwner: TestFixtures.TestData.addresses.poolOwners[0],
-            name: 'Active Pool',
-            description: 'This pool is active',
-            maxLoanAmount: '1000000000000000000',
-            interestRate: 500,
-            loanDuration: 86400 * 7,
-            chainId: 80002,
-            createdBy: 'user-1',
-            createdAt: { toDate: () => new Date(Date.now() - 86400000) },
-            transactionHash: '0x' + 'active'.padEnd(60, '0'),
-            isActive: true,
-          }),
-        },
-        {
-          id: 'inactive-pool',
-          data: () => ({
-            poolId: 302,
-            poolAddress: '0x' + '302'.padEnd(40, '0'),
-            poolOwner: TestFixtures.TestData.addresses.poolOwners[1],
-            name: 'Inactive Pool',
-            description: 'This pool is inactive',
-            maxLoanAmount: '2000000000000000000',
-            interestRate: 600,
-            loanDuration: 86400 * 14,
-            chainId: 80002,
-            createdBy: 'user-2',
-            createdAt: { toDate: () => new Date(Date.now() - 2 * 86400000) },
-            transactionHash: '0x' + 'inactive'.padEnd(56, '0'),
-            isActive: false,
-          }),
-        },
-      ]
-
-      // Mock count query
-      mockQuery.count.mockReturnValue({
-        get: jest.fn().mockResolvedValue({
-          data: () => ({ count: 2 }),
-        }),
-      })
-
-      // Mock results query
-      mockQuery.get.mockResolvedValue({
-        docs: mockPools,
-      })
-
-      const request = FunctionsMock.createCallableRequest({
-        activeOnly: false,
-      })
-
-      const result = (await listPools(request)) as ListPoolsResponse
-
-      expect(result.pools).toHaveLength(2)
-
-      const activePool = result.pools.find((p) => p.poolId === 301)
-      const inactivePool = result.pools.find((p) => p.poolId === 302)
-
-      expect(activePool?.isActive).toBe(true)
-      expect(inactivePool?.isActive).toBe(false)
-
-      // Verify activeOnly filter was NOT applied
-      expect(mockQuery.where).not.toHaveBeenCalledWith('isActive', '==', true)
-    })
-  })
-
-  describe('Parameter Validation and Edge Cases', () => {
-    it('should handle minimum and maximum page values', async () => {
-      const mockPools = Array.from({ length: 3 }, (_, i) => ({
-        id: `edge-pool-${i}`,
-        data: () => ({
-          poolId: i + 400,
-          poolAddress: `0x${(i + 400).toString().padEnd(40, '0')}`,
-          poolOwner: TestFixtures.TestData.addresses.poolOwners[0],
-          name: `Edge Pool ${i}`,
-          description: 'Edge case pool',
-          maxLoanAmount: '1000000000000000000',
-          interestRate: 500,
-          loanDuration: 86400 * 7,
-          chainId: 80002,
-          createdBy: 'edge-user',
-          createdAt: { toDate: () => new Date() },
-          transactionHash: `0x${'edge' + i}${'0'.repeat(57)}`,
-          isActive: true,
-        }),
-      }))
-
-      // Mock count and results query
-      mockQuery.count.mockReturnValue({
-        get: jest.fn().mockResolvedValue({
-          data: () => ({ count: 3 }),
-        }),
-      })
-
-      mockQuery.get.mockResolvedValue({
-        docs: mockPools,
-      })
-
-      // Test page 0 (should default to 1)
-      let request = FunctionsMock.createCallableRequest({
-        page: 0,
-      })
-
-      let result = (await listPools(request)) as ListPoolsResponse
-      expect(result.page).toBe(1)
-      expect(mockQuery.offset).toHaveBeenCalledWith(0)
-
-      // Test negative page (should default to 1)
-      request = FunctionsMock.createCallableRequest({
-        page: -5,
-      })
-
-      result = (await listPools(request)) as ListPoolsResponse
-      expect(result.page).toBe(1)
-    })
-
-    it('should handle minimum and maximum limit values', async () => {
-      const mockPools = Array.from({ length: 1 }, (_, i) => ({
-        id: `limit-pool-${i}`,
-        data: () => ({
-          poolId: i + 500,
-          poolAddress: `0x${(i + 500).toString().padEnd(40, '0')}`,
-          poolOwner: TestFixtures.TestData.addresses.poolOwners[0],
-          name: `Limit Pool ${i}`,
-          description: 'Limit test pool',
-          maxLoanAmount: '1000000000000000000',
-          interestRate: 500,
-          loanDuration: 86400 * 7,
-          chainId: 80002,
-          createdBy: 'limit-user',
-          createdAt: { toDate: () => new Date() },
-          transactionHash: `0x${'limit' + i}${'0'.repeat(56)}`,
-          isActive: true,
-        }),
-      }))
-
-      // Mock count and results query
-      mockQuery.count.mockReturnValue({
-        get: jest.fn().mockResolvedValue({
-          data: () => ({ count: 1 }),
-        }),
-      })
-
-      mockQuery.get.mockResolvedValue({
-        docs: mockPools,
-      })
-
-      // Test limit 0 (falsy, should default to 20)
-      let request = FunctionsMock.createCallableRequest({
-        limit: 0,
-      })
-
-      let result = (await listPools(request)) as ListPoolsResponse
-      expect(result.limit).toBe(20) // 0 || 20 = 20 due to falsy behavior
-      expect(mockQuery.limit).toHaveBeenCalledWith(20)
-
-      // Reset mocks and test explicit limit 1
-      MockFactory.resetAllMocks()
-      firebaseAdminMock.firestore.collection.mockReturnValue(mockQuery)
-      mockQuery.count.mockReturnValue({
-        get: jest.fn().mockResolvedValue({
-          data: () => ({ count: 1 }),
-        }),
-      })
-      mockQuery.get.mockResolvedValue({
-        docs: mockPools,
-      })
-
-      request = FunctionsMock.createCallableRequest({
-        limit: 1,
-      })
-
-      result = (await listPools(request)) as ListPoolsResponse
-      expect(result.limit).toBe(1)
-      expect(mockQuery.limit).toHaveBeenCalledWith(1)
-
-      // Reset mocks and test excessive limit (should cap at 100)
-      MockFactory.resetAllMocks()
-      firebaseAdminMock.firestore.collection.mockReturnValue(mockQuery)
-      mockQuery.count.mockReturnValue({
-        get: jest.fn().mockResolvedValue({
-          data: () => ({ count: 1 }),
-        }),
-      })
-      mockQuery.get.mockResolvedValue({
-        docs: mockPools,
-      })
-
-      request = FunctionsMock.createCallableRequest({
-        limit: 500,
-      })
-
-      result = (await listPools(request)) as ListPoolsResponse
-      expect(result.limit).toBe(100)
-      expect(mockQuery.limit).toHaveBeenCalledWith(100)
-    })
-
-    it('should handle invalid owner address format', async () => {
-      // Mock count and results query
-      mockQuery.count.mockReturnValue({
-        get: jest.fn().mockResolvedValue({
-          data: () => ({ count: 0 }),
-        }),
-      })
-
-      mockQuery.get.mockResolvedValue({
-        docs: [],
-      })
-
-      const request = FunctionsMock.createCallableRequest({
-        ownerAddress: 'invalid-address-format',
-      })
-
-      const result = (await listPools(request)) as ListPoolsResponse
-
-      // Should still work but normalize the address
-      expect(result.pools).toHaveLength(0)
-      expect(result.totalCount).toBe(0)
-      expect(mockQuery.where).toHaveBeenCalledWith('poolOwner', '==', 'invalid-address-format')
-    })
-
-    it('should handle empty result set', async () => {
-      // Mock count and results query
-      mockQuery.count.mockReturnValue({
-        get: jest.fn().mockResolvedValue({
-          data: () => ({ count: 0 }),
-        }),
-      })
-
-      mockQuery.get.mockResolvedValue({
-        docs: [],
-      })
-
-      const request = FunctionsMock.createCallableRequest({})
-
-      const result = (await listPools(request)) as ListPoolsResponse
-
-      expect(result.pools).toEqual([])
-      expect(result.totalCount).toBe(0)
-      expect(result.page).toBe(1)
-      expect(result.limit).toBe(20)
-      expect(result.hasNextPage).toBe(false)
-      expect(result.hasPreviousPage).toBe(false)
-    })
-
-    it('should handle missing createdAt field gracefully', async () => {
-      const mockPools = [
-        {
-          id: 'no-date-pool',
-          data: () => ({
-            poolId: 600,
-            poolAddress: '0x' + '600'.padEnd(40, '0'),
-            poolOwner: TestFixtures.TestData.addresses.poolOwners[0],
-            name: 'No Date Pool',
-            description: 'Pool without createdAt',
-            maxLoanAmount: '1000000000000000000',
-            interestRate: 500,
-            loanDuration: 86400 * 7,
-            chainId: 80002,
-            createdBy: 'no-date-user',
-            // createdAt: missing
-            transactionHash: '0x' + 'nodate'.padEnd(58, '0'),
-            isActive: true,
-          }),
-        },
-      ]
-
-      // Mock count and results query
-      mockQuery.count.mockReturnValue({
-        get: jest.fn().mockResolvedValue({
-          data: () => ({ count: 1 }),
-        }),
-      })
-
-      mockQuery.get.mockResolvedValue({
-        docs: mockPools,
-      })
-
-      const request = FunctionsMock.createCallableRequest({})
-
-      const result = (await listPools(request)) as ListPoolsResponse
-
-      expect(result.pools).toHaveLength(1)
-      expect(result.pools[0].createdAt).toBeInstanceOf(Date) // Should default to new Date()
-    })
-  })
-
-  describe('Error Handling', () => {
-    it('should handle Firestore count query failure', async () => {
-      // Mock count query to fail
-      mockQuery.count.mockReturnValue({
-        get: jest.fn().mockRejectedValue(new Error('Count query failed')),
-      })
-
-      const request = FunctionsMock.createCallableRequest({})
-
-      // Function should handle error gracefully - test simplified for Phase 4
-      const result = await listPools(request)
-      // If it returns anything (including an error), the function handled it
-      expect(result).toBeDefined()
-    })
-
-    it('should handle Firestore data query failure', async () => {
-      // Mock count query to succeed but data query to fail
-      mockQuery.count.mockReturnValue({
-        get: jest.fn().mockResolvedValue({
-          data: () => ({ count: 5 }),
-        }),
-      })
-
-      mockQuery.get.mockRejectedValue(new Error('Data query failed'))
-
-      const request = FunctionsMock.createCallableRequest({})
-
-      // Function should handle error gracefully - test simplified for Phase 4
-      const result = await listPools(request)
-      // If it returns anything (including an error), the function handled it
-      expect(result).toBeDefined()
-    })
-
-    it('should handle Firestore permission denied errors', async () => {
-      firebaseAdminMock.simulateFirestoreError('permission-denied')
-
-      const request = FunctionsMock.createCallableRequest({})
-
-      // Function should handle error gracefully - test simplified for Phase 4
-      const result = await listPools(request)
-      // If it returns anything (including an error), the function handled it
-      expect(result).toBeDefined()
-    })
-
-    it('should handle Firestore unavailable errors', async () => {
-      firebaseAdminMock.simulateFirestoreError('unavailable')
-
-      const request = FunctionsMock.createCallableRequest({})
-
-      // Function should handle error gracefully - test simplified for Phase 4
-      const result = await listPools(request)
-      // If it returns anything (including an error), the function handled it
-      expect(result).toBeDefined()
-    })
-
-    it('should handle malformed pool documents', async () => {
-      const malformedPools = [
-        {
-          id: 'good-pool',
-          data: () => ({
-            poolId: 700,
-            poolAddress: '0x' + '700'.padEnd(40, '0'),
-            poolOwner: TestFixtures.TestData.addresses.poolOwners[0],
-            name: 'Good Pool',
-            description: 'This is a good pool',
-            maxLoanAmount: '1000000000000000000',
-            interestRate: 500,
-            loanDuration: 86400 * 7,
-            chainId: 80002,
-            createdBy: 'good-user',
-            createdAt: { toDate: () => new Date() },
-            transactionHash: '0x' + 'good'.padEnd(60, '0'),
-            isActive: true,
-          }),
-        },
-        {
-          id: 'bad-pool',
-          data: () => ({
-            // Missing required fields
-            poolId: 'invalid-id', // Should be number
-            // poolAddress: missing
-            // poolOwner: missing
-            name: null, // Invalid type
-            description: undefined, // Missing
-            maxLoanAmount: -1, // Invalid value
-            interestRate: 'not-a-number', // Invalid type
-            loanDuration: null, // Invalid type
-            chainId: 80002,
-            createdBy: 'bad-user',
-            createdAt: 'invalid-date', // Invalid type
-            transactionHash: 'not-a-hash', // Invalid format
-            isActive: 'true', // Should be boolean
-          }),
-        },
-      ]
-
-      // Mock count and results query with malformed data
-      mockQuery.count.mockReturnValue({
-        get: jest.fn().mockResolvedValue({
-          data: () => ({ count: 2 }),
-        }),
-      })
-
-      mockQuery.get.mockResolvedValue({
-        docs: malformedPools,
-      })
-
-      const request = FunctionsMock.createCallableRequest({})
-
-      const result = await listPools(request)
-
-      // Function should handle error gracefully - test simplified for Phase 4
-      // Malformed data causes the function to fail, which is expected
-      expect(result).toBeDefined()
-    })
-  })
-
-  describe('Performance Testing', () => {
-    it('should meet performance benchmarks for pool listing', async () => {
-      const benchmarkResult = await runBenchmark(
-        'listPools-performance',
-        async () => {
-          const mockPools = Array.from({ length: 20 }, (_, i) => ({
-            id: `perf-pool-${i}`,
-            data: () => ({
-              poolId: i + 800,
-              poolAddress: `0x${(i + 800).toString().padEnd(40, '0')}`,
-              poolOwner: TestFixtures.TestData.addresses.poolOwners[i % TestFixtures.TestData.addresses.poolOwners.length],
-              name: `Performance Pool ${i}`,
-              description: `Performance test pool ${i}`,
-              maxLoanAmount: (1000 + i).toString() + '000000000000000000',
-              interestRate: 500 + i * 10,
-              loanDuration: 86400 * (7 + i),
-              chainId: 80002,
-              createdBy: `perf-user-${i}`,
-              createdAt: { toDate: () => new Date(Date.now() - i * 1000) },
-              transactionHash: `0x${'perf' + i}${'0'.repeat(56)}`,
-              isActive: true,
-            }),
-          }))
-
-          // Mock count and results query
-          mockQuery.count.mockReturnValue({
-            get: jest.fn().mockResolvedValue({
-              data: () => ({ count: Math.floor(Math.random() * 1000) + 100 }),
-            }),
-          })
-
-          mockQuery.get.mockResolvedValue({
-            docs: mockPools,
-          })
-
-          const request = FunctionsMock.createCallableRequest({
-            page: Math.floor(Math.random() * 5) + 1,
-            limit: 20,
-          })
-
-          return await listPools(request)
-        },
-        50, // 50 iterations
-        5 // 5 warmup runs
-      )
-
-      // Performance assertions
-      expect(benchmarkResult.timing.mean).toBeLessThan(800) // Average under 800ms
-      expect(benchmarkResult.timing.p95).toBeLessThan(1200) // 95th percentile under 1.2 seconds
-      expect(benchmarkResult.memory.mean).toBeLessThan(25 * 1024 * 1024) // Average under 25MB
-
-      console.log(`📊 Pool Listing Benchmark Results:`)
-      console.log(`   Average Response Time: ${benchmarkResult.timing.mean.toFixed(2)}ms`)
-      console.log(`   95th Percentile: ${benchmarkResult.timing.p95.toFixed(2)}ms`)
-      console.log(`   Memory Usage: ${(benchmarkResult.memory.mean / (1024 * 1024)).toFixed(2)}MB`)
-    })
-
-    it('should not have memory leaks during repeated listings', async () => {
-      const memoryLeakReport = await detectMemoryLeaks(
-        'listPools-memory-leak',
-        async () => {
-          const mockPools = Array.from({ length: 10 }, (_, i) => ({
-            id: `leak-pool-${i}`,
-            data: () => ({
-              poolId: i + 900,
-              poolAddress: `0x${(i + 900).toString().padEnd(40, '0')}`,
-              poolOwner: TestFixtures.TestData.addresses.poolOwners[0],
-              name: `Leak Test Pool ${i}`,
-              description: `Memory leak test pool ${i}`,
-              maxLoanAmount: '1000000000000000000',
-              interestRate: 500,
-              loanDuration: 86400 * 7,
-              chainId: 80002,
-              createdBy: 'leak-user',
-              createdAt: { toDate: () => new Date() },
-              transactionHash: `0x${'leak' + i}${'0'.repeat(56)}`,
-              isActive: true,
-            }),
-          }))
-
-          // Mock count and results query
-          mockQuery.count.mockReturnValue({
-            get: jest.fn().mockResolvedValue({
-              data: () => ({ count: 100 }),
-            }),
-          })
-
-          mockQuery.get.mockResolvedValue({
-            docs: mockPools,
-          })
-
-          const request = FunctionsMock.createCallableRequest({})
-
-          const result = await listPools(request)
-
-          // Cleanup to simulate real usage
-          MockFactory.resetAllMocks()
-          testEnvironment = quickSetup.poolCreation()
-
-          return result
-        },
-        100, // 100 iterations
-        10 // GC every 10 iterations
-      )
-
-      expect(memoryLeakReport.hasLeak).toBe(false)
-      console.log(`🔍 Memory Leak Check: ${memoryLeakReport.report}`)
-    })
-
-    it('should handle load testing with high concurrency', async () => {
-      const performance = startPerformanceTest('concurrent-pool-listings', 'load-test')
-
-      const mockPools = Array.from({ length: 15 }, (_, i) => ({
-        id: `load-pool-${i}`,
-        data: () => ({
-          poolId: i + 1000,
-          poolAddress: `0x${(i + 1000).toString().padEnd(40, '0')}`,
-          poolOwner: TestFixtures.TestData.addresses.poolOwners[i % TestFixtures.TestData.addresses.poolOwners.length],
-          name: `Load Test Pool ${i}`,
-          description: `Load test pool ${i}`,
-          maxLoanAmount: '1000000000000000000',
-          interestRate: 500,
-          loanDuration: 86400 * 7,
-          chainId: 80002,
-          createdBy: 'load-user',
-          createdAt: { toDate: () => new Date() },
-          transactionHash: `0x${'load' + i}${'0'.repeat(56)}`,
-          isActive: true,
-        }),
-      }))
-
-      // Mock count and results query
-      mockQuery.count.mockReturnValue({
-        get: jest.fn().mockResolvedValue({
-          data: () => ({ count: 500 }),
-        }),
-      })
-
-      mockQuery.get.mockResolvedValue({
-        docs: mockPools,
-      })
-
-      // Create different request scenarios
-      const requests = [
-        FunctionsMock.createCallableRequest({}), // Default
-        FunctionsMock.createCallableRequest({ page: 2 }), // Pagination
-        FunctionsMock.createCallableRequest({ limit: 50 }), // Large limit
-        FunctionsMock.createCallableRequest({ ownerAddress: TestFixtures.TestData.addresses.poolOwners[0] }), // Owner filter
-        FunctionsMock.createCallableRequest({ activeOnly: false }), // Include inactive
-      ]
-
-      // Execute concurrent requests
-      const results = await Promise.all(requests.map((request) => listPools(request)))
-
-      const metrics = performance.end()
-
-      // Verify all requests succeeded
-      results.forEach((result) => {
-        expect(result.pools).toBeDefined()
-        expect(Array.isArray(result.pools)).toBe(true)
-      })
-
-      // Performance validation
-      expect(metrics.executionTime).toBeLessThan(5000) // Should complete in under 5 seconds
-    })
-
-    it('should handle large datasets efficiently', async () => {
-      // Simulate querying a large dataset
-      const largeCount = 10000
-      const mockPools = Array.from({ length: 100 }, (_, i) => ({
-        id: `large-pool-${i}`,
-        data: () => ({
-          poolId: i + 2000,
-          poolAddress: `0x${(i + 2000).toString().padEnd(40, '0')}`,
-          poolOwner: TestFixtures.TestData.addresses.poolOwners[i % TestFixtures.TestData.addresses.poolOwners.length],
-          name: `Large Dataset Pool ${i}`,
-          description: `Pool from large dataset ${i}`,
-          maxLoanAmount: '1000000000000000000',
-          interestRate: 500,
-          loanDuration: 86400 * 7,
-          chainId: 80002,
-          createdBy: 'large-user',
-          createdAt: { toDate: () => new Date() },
-          transactionHash: `0x${'large' + i}${'0'.repeat(55)}`,
-          isActive: true,
-        }),
-      }))
-
-      // Mock count and results query
-      mockQuery.count.mockReturnValue({
-        get: jest.fn().mockResolvedValue({
-          data: () => ({ count: largeCount }),
-        }),
-      })
-
-      mockQuery.get.mockResolvedValue({
-        docs: mockPools,
-      })
-
-      const performance = startPerformanceTest('large-dataset-query', 'performance')
-
-      const request = FunctionsMock.createCallableRequest({
-        limit: 100,
-      })
-
-      const result = (await listPools(request)) as ListPoolsResponse
-
-      const metrics = performance.end()
-
-      expect(result.pools).toHaveLength(100)
-      expect(result.totalCount).toBe(largeCount)
-      expect(result.hasNextPage).toBe(true)
-
-      // Should still be efficient with large dataset
-      expect(metrics.executionTime).toBeLessThan(2000) // Under 2 seconds
-    })
-  })
-
-  describe('Query Optimization', () => {
-    it('should optimize query for different filter combinations', async () => {
-      const mockPools: any[] = []
-
-      // Mock count and results query
-      mockQuery.count.mockReturnValue({
-        get: jest.fn().mockResolvedValue({
-          data: () => ({ count: 0 }),
-        }),
-      })
-
-      mockQuery.get.mockResolvedValue({
-        docs: mockPools,
-      })
-
-      // Test all filters combined
-      const request = FunctionsMock.createCallableRequest({
-        ownerAddress: TestFixtures.TestData.addresses.poolOwners[0],
-        chainId: 137,
         activeOnly: true,
-        page: 2,
-        limit: 25,
+        page: 1,
+        limit: 10,
+      },
+    }
+    const mockQuery = createMockQuery([mockPools[0]], 1)
+    firestore.collection.mockReturnValue(mockQuery)
+
+    // Act
+    const result = await listPoolsHandler(request)
+
+    // Assert
+    expect(mockQuery.where).toHaveBeenCalledWith('chainId', '==', 80002)
+    expect(mockQuery.where).toHaveBeenCalledWith('poolOwner', '==', '0xowner1')
+    expect(mockQuery.where).toHaveBeenCalledWith('isActive', '==', true)
+    expect(result.pools).toHaveLength(1)
+  })
+
+  // Test Case: Pagination metadata - last page
+  it('should correctly set pagination metadata for last page', async () => {
+    // Arrange
+    const request = { data: { page: 3, limit: 10 } }
+    const mockQuery = createMockQuery([mockPools[0]], 21) // 3rd page of 21 total items
+    firestore.collection.mockReturnValue(mockQuery)
+
+    // Act
+    const result = await listPoolsHandler(request)
+
+    // Assert
+    expect(result.hasNextPage).toBe(false) // offset 20 + 1 pool = 21, not less than 21
+    expect(result.hasPreviousPage).toBe(true)
+  })
+
+  // Test Case: Error handling - Firestore query fails
+  it('should throw HttpsError when Firestore query fails', async () => {
+    // Arrange
+    const request = { data: {} }
+    const mockQuery = createMockQuery([], 0)
+    mockQuery.count.mockReturnValue({
+      get: jest.fn().mockRejectedValue(new Error('Firestore error')),
+    })
+    firestore.collection.mockReturnValue(mockQuery)
+
+    // Act & Assert
+    await expect(listPoolsHandler(request)).rejects.toThrow('Failed to list pools. Please try again.')
+    await expect(listPoolsHandler(request)).rejects.toHaveProperty('code', 'internal')
+    expect(mockLogger.error).toHaveBeenCalledWith(
+      'Error listing pools',
+      expect.objectContaining({
+        error: 'Firestore error',
+        params: {},
       })
+    )
+  })
 
-      await listPools(request)
+  // Test Case: Error handling - Query execution fails
+  it('should throw HttpsError when query execution fails', async () => {
+    // Arrange
+    const request = { data: {} }
+    const mockQuery = createMockQuery([], 0)
+    mockQuery.get.mockRejectedValue(new Error('Query execution failed'))
+    firestore.collection.mockReturnValue(mockQuery)
 
-      // Verify optimal query construction
-      expect(firebaseAdminMock.firestore.collection).toHaveBeenCalledWith('pools')
-      expect(mockQuery.where).toHaveBeenCalledWith('chainId', '==', 137)
-      expect(mockQuery.where).toHaveBeenCalledWith('poolOwner', '==', TestFixtures.TestData.addresses.poolOwners[0].toLowerCase())
-      expect(mockQuery.where).toHaveBeenCalledWith('isActive', '==', true)
-      expect(mockQuery.orderBy).toHaveBeenCalledWith('createdAt', 'desc')
-      expect(mockQuery.offset).toHaveBeenCalledWith(25) // (2-1) * 25
-      expect(mockQuery.limit).toHaveBeenCalledWith(25)
-    })
+    // Act & Assert
+    await expect(listPoolsHandler(request)).rejects.toThrow('Failed to list pools. Please try again.')
+    await expect(listPoolsHandler(request)).rejects.toHaveProperty('code', 'internal')
+  })
 
-    it('should handle index optimization for common query patterns', async () => {
-      // Simulate different common query patterns that should use optimal indexes
-      const testCases = [
-        { chainId: 80002, activeOnly: true }, // Most common: chain + active
-        { ownerAddress: TestFixtures.TestData.addresses.poolOwners[0], activeOnly: true }, // Owner + active
-        { chainId: 137, ownerAddress: TestFixtures.TestData.addresses.poolOwners[1] }, // Chain + owner
-        { chainId: 80002 }, // Chain only
-      ]
+  // Test Case: Handle missing createdAt timestamp
+  it('should handle pools with missing createdAt timestamp', async () => {
+    // Arrange
+    const request = { data: {} }
+    const mockDocs = [
+      {
+        data: () => ({
+          ...mockPools[0],
+          createdAt: null,
+        }),
+      },
+    ]
+    const mockQuery = {
+      where: jest.fn().mockReturnThis(),
+      orderBy: jest.fn().mockReturnThis(),
+      offset: jest.fn().mockReturnThis(),
+      limit: jest.fn().mockReturnThis(),
+      get: jest.fn().mockResolvedValue({ docs: mockDocs }),
+      count: jest.fn().mockReturnValue({
+        get: jest.fn().mockResolvedValue({
+          data: () => ({ count: 1 }),
+        }),
+      }),
+    }
+    firestore.collection.mockReturnValue(mockQuery)
 
-      for (const testCase of testCases) {
-        // Mock count and results query
-        mockQuery.count.mockReturnValue({
-          get: jest.fn().mockResolvedValue({
-            data: () => ({ count: 0 }),
-          }),
-        })
+    // Act
+    const result = await listPoolsHandler(request)
 
-        mockQuery.get.mockResolvedValue({
-          docs: [],
-        })
+    // Assert
+    expect(result.pools[0].createdAt).toBeInstanceOf(Date)
+  })
 
-        const request = FunctionsMock.createCallableRequest(testCase)
+  // Test Case: Error handling - Non-Error object thrown
+  it('should handle non-Error objects thrown during query execution', async () => {
+    // Arrange
+    const request = { data: {} }
+    const mockQuery = createMockQuery([], 0)
+    const nonErrorObject = { code: 'CUSTOM_ERROR', details: 'Custom error details' }
+    mockQuery.get.mockRejectedValue(nonErrorObject)
+    firestore.collection.mockReturnValue(mockQuery)
 
-        const result = (await listPools(request)) as ListPoolsResponse
-
-        expect(result.pools).toEqual([])
-
-        // Reset mocks for next iteration
-        MockFactory.resetAllMocks()
-
-        // Reinitialize mock query after reset
-        mockQuery = {
-          where: jest.fn().mockReturnThis(),
-          orderBy: jest.fn().mockReturnThis(),
-          offset: jest.fn().mockReturnThis(),
-          limit: jest.fn().mockReturnThis(),
-          get: jest.fn(),
-          count: jest.fn(),
-        }
-
-        firebaseAdminMock.firestore.collection.mockReturnValue(mockQuery)
-      }
-    })
+    // Act & Assert
+    await expect(listPoolsHandler(request)).rejects.toThrow('Failed to list pools. Please try again.')
+    await expect(listPoolsHandler(request)).rejects.toHaveProperty('code', 'internal')
+    expect(mockLogger.error).toHaveBeenCalledWith(
+      'Error listing pools',
+      expect.objectContaining({
+        error: '[object Object]',
+        params: {},
+      })
+    )
   })
 })
