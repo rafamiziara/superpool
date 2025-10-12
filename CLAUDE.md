@@ -121,9 +121,13 @@ pnpm type-check      # TypeScript type checking
 
 ## Architecture
 
-For a comprehensive overview of the complete project structure, file organization, and package relationships, see [`docs/PROJECT_STRUCTURE.md`](docs/PROJECT_STRUCTURE.md).
+For project structure overview, see the [Architecture section in README.md](README.md#-architecture-overview). Each package has detailed documentation in its own README:
 
-**IMPORTANT**: When making structural changes to the project (adding/removing packages, applications, or reorganizing directories), always update `docs/PROJECT_STRUCTURE.md` to reflect the changes. This ensures the documentation stays current and accurate for all developers.
+- [Mobile App](apps/mobile/README.md) | [Landing Page](apps/landing/README.md)
+- [Smart Contracts](packages/contracts/README.md) | [Backend](packages/backend/README.md)
+- [UI Components](packages/ui/README.md) | [Types](packages/types/README.md) | [Design System](packages/design/README.md) | [Assets](packages/assets/README.md)
+
+**IMPORTANT**: When making structural changes to a package, always update its README to reflect the changes.
 
 ### Monorepo Structure
 
