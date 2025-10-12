@@ -324,11 +324,44 @@ describe('verifySignatureAndLoginHandler', () => {
   it('should not fail if the nonce deletion operation fails', async () => {
     // Arrange
     const request = { data: { walletAddress, signature } }
+    const mockDeleteFn = jest.fn().mockRejectedValue(new Error('Firestore delete error'))
+
+    firestore.collection.mockImplementation((collectionName: string) => {
+      const docMock = jest.fn((_docId: string) => {
+        if (collectionName === AUTH_NONCES_COLLECTION) {
+          return {
+            get: jest.fn().mockResolvedValue({
+              exists: true,
+              data: () => ({ nonce, timestamp, expiresAt: mockNow + 10 * 60 * 1000 }),
+            }),
+            delete: mockDeleteFn,
+          }
+        } else {
+          return {
+            get: jest.fn().mockResolvedValue({
+              exists: true,
+              data: () => ({ walletAddress, createdAt: timestamp }),
+            }),
+            set: jest.fn().mockResolvedValue(undefined),
+            update: jest.fn().mockResolvedValue(undefined),
+          }
+        }
+      })
+      return { doc: docMock }
+    })
 
     // Act
     const result = await verifySignatureAndLoginHandler(request)
 
     // Assert
+    expect(mockDeleteFn).toHaveBeenCalled()
+    expect(mockLogger.error).toHaveBeenCalledWith(
+      'Failed to delete nonce document',
+      expect.objectContaining({
+        error: expect.any(Error),
+        walletAddress,
+      })
+    )
     expect(auth.createCustomToken).toHaveBeenCalledWith(walletAddress)
     expect(result).toEqual({ firebaseToken, user: expect.objectContaining({ walletAddress }) })
   })
