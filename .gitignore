@@ -29,26 +29,6 @@ ngrok.yml
 # SuperDesign files
 .superdesign/
 
-# Hardhat contracts
-packages/contracts/artifacts/
-packages/contracts/cache/
-packages/contracts/coverage/
-packages/contracts/coverage.json
-packages/contracts/typechain-types/
-packages/contracts/.openzeppelin/
-packages/contracts/deployments/
-
-# Service account keys
-packages/backend/service-account-key.json
-
-# Wallet information (contains private keys)
-wallet-info.json
-scripts/wallet-info.json
-
-# Development keys (never commit these!)
-scripts/privateKey.pem
-scripts/publicKey.pem
-
 # Build artifacts
 packages/*/dist/
 apps/*/dist/
