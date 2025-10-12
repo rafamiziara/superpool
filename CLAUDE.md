@@ -62,8 +62,8 @@ pnpm lint            # ESLint
 pnpm test            # Jest tests
 pnpm serve           # Start Firebase emulators
 pnpm deploy          # Deploy to Firebase
-pnpm generateKey     # Generate dev keys for testing
-pnpm signMessage     # Sign test messages
+pnpm generateKey     # Generate dev keys for backend testing
+pnpm signMessage     # Sign test messages for backend auth
 ```
 
 ### Landing Page (`apps/landing/`)
@@ -319,10 +319,14 @@ The mobile app automatically includes localhost (chain ID 31337) in development 
 
 ### Testing Backend Functions
 
+From the `packages/backend` directory:
+
 1. Generate development keys: `pnpm generateKey`
 2. Get auth message from `generateAuthMessage` function
 3. Sign with `pnpm signMessage <nonce> <timestamp>`
 4. Test authentication with `verifySignatureAndLogin`
+
+**Note**: Keys are saved in `packages/backend/scripts/` and automatically ignored by git.
 
 ### Firebase Emulator Setup
 
