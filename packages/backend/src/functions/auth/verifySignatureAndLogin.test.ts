@@ -182,12 +182,38 @@ describe('verifySignatureAndLoginHandler', () => {
   // Test Case: Invalid Argument - Invalid hex characters in signature
   it('should throw an invalid-argument error if signature contains invalid hex characters', async () => {
     // Arrange
-    const invalidHexSignature = '0x' + 'G'.repeat(10)
+    const invalidHexSignature = '0x' + 'G'.repeat(130) // 132 chars total, correct length but invalid hex
     const request = { data: { walletAddress, signature: invalidHexSignature } }
 
     // Act & Assert
     await expect(verifySignatureAndLoginHandler(request)).rejects.toThrow(
       'Invalid signature format. Signature must contain only hexadecimal characters.'
+    )
+    await expect(verifySignatureAndLoginHandler(request)).rejects.toHaveProperty('code', 'invalid-argument')
+  })
+
+  // Test Case: Invalid Argument - Signature too short (< 132 chars)
+  it('should throw an invalid-argument error if signature is too short', async () => {
+    // Arrange
+    const shortSignature = '0x' + 'a'.repeat(100) // 102 chars total
+    const request = { data: { walletAddress, signature: shortSignature } }
+
+    // Act & Assert
+    await expect(verifySignatureAndLoginHandler(request)).rejects.toThrow(
+      'Invalid signature format. It must be a hex string prefixed with "0x".'
+    )
+    await expect(verifySignatureAndLoginHandler(request)).rejects.toHaveProperty('code', 'invalid-argument')
+  })
+
+  // Test Case: Invalid Argument - Signature too long (> 132 chars)
+  it('should throw an invalid-argument error if signature is too long', async () => {
+    // Arrange
+    const longSignature = '0x' + 'a'.repeat(150) // 152 chars total
+    const request = { data: { walletAddress, signature: longSignature } }
+
+    // Act & Assert
+    await expect(verifySignatureAndLoginHandler(request)).rejects.toThrow(
+      'Invalid signature format. It must be a hex string prefixed with "0x".'
     )
     await expect(verifySignatureAndLoginHandler(request)).rejects.toHaveProperty('code', 'invalid-argument')
   })
@@ -274,7 +300,7 @@ describe('verifySignatureAndLoginHandler', () => {
     })
 
     // Act & Assert
-    await expect(verifySignatureAndLoginHandler(request)).rejects.toThrow('Signature verification failed: Ethers verify failed')
+    await expect(verifySignatureAndLoginHandler(request)).rejects.toThrow('Invalid signature or expired nonce. Please try again.')
     await expect(verifySignatureAndLoginHandler(request)).rejects.toHaveProperty('code', 'unauthenticated')
   })
 
@@ -320,8 +346,8 @@ describe('verifySignatureAndLoginHandler', () => {
     await expect(verifySignatureAndLoginHandler(request)).rejects.toHaveProperty('code', 'internal')
   })
 
-  // Test Case: Nonce deletion fails (acceptable error)
-  it('should not fail if the nonce deletion operation fails', async () => {
+  // Test Case: SECURITY - Nonce deletion fails (must fail authentication to prevent replay attacks)
+  it('should fail authentication if nonce deletion fails to prevent replay attacks', async () => {
     // Arrange
     const request = { data: { walletAddress, signature } }
     const mockDeleteFn = jest.fn().mockRejectedValue(new Error('Firestore delete error'))
@@ -350,20 +376,11 @@ describe('verifySignatureAndLoginHandler', () => {
       return { doc: docMock }
     })
 
-    // Act
-    const result = await verifySignatureAndLoginHandler(request)
-
-    // Assert
+    // Act & Assert
+    // SECURITY - must fail authentication to prevent replay attacks
+    await expect(verifySignatureAndLoginHandler(request)).rejects.toThrow('Firestore delete error')
     expect(mockDeleteFn).toHaveBeenCalled()
-    expect(mockLogger.error).toHaveBeenCalledWith(
-      'Failed to delete nonce document',
-      expect.objectContaining({
-        error: expect.any(Error),
-        walletAddress,
-      })
-    )
-    expect(auth.createCustomToken).toHaveBeenCalledWith(walletAddress)
-    expect(result).toEqual({ firebaseToken, user: expect.objectContaining({ walletAddress }) })
+    expect(auth.createCustomToken).not.toHaveBeenCalled()
   })
 
   // Test Case: Unauthenticated - Custom token creation fails
@@ -490,7 +507,7 @@ describe('verifySignatureAndLoginHandler', () => {
     })
 
     // Act & Assert
-    await expect(verifySignatureAndLoginHandler(request)).rejects.toThrow('Signature verification failed: EIP-712 verification failed')
+    await expect(verifySignatureAndLoginHandler(request)).rejects.toThrow('Invalid signature or expired nonce. Please try again.')
     await expect(verifySignatureAndLoginHandler(request)).rejects.toHaveProperty('code', 'unauthenticated')
   })
 
@@ -530,7 +547,7 @@ describe('verifySignatureAndLoginHandler', () => {
     })
 
     // Act & Assert
-    await expect(verifySignatureAndLoginHandler(request)).rejects.toThrow('Signature verification failed: Invalid signature')
+    await expect(verifySignatureAndLoginHandler(request)).rejects.toThrow('Invalid signature or expired nonce. Please try again.')
     await expect(verifySignatureAndLoginHandler(request)).rejects.toHaveProperty('code', 'unauthenticated')
   })
 
@@ -545,7 +562,7 @@ describe('verifySignatureAndLoginHandler', () => {
     })
 
     // Act & Assert
-    await expect(verifySignatureAndLoginHandler(request)).rejects.toThrow('Signature verification failed: Invalid signature')
+    await expect(verifySignatureAndLoginHandler(request)).rejects.toThrow('Invalid signature or expired nonce. Please try again.')
     await expect(verifySignatureAndLoginHandler(request)).rejects.toHaveProperty('code', 'unauthenticated')
   })
 
@@ -559,7 +576,7 @@ describe('verifySignatureAndLoginHandler', () => {
     })
 
     // Act & Assert
-    await expect(verifySignatureAndLoginHandler(request)).rejects.toThrow('Signature verification failed: Invalid signature')
+    await expect(verifySignatureAndLoginHandler(request)).rejects.toThrow('Invalid signature or expired nonce. Please try again.')
     await expect(verifySignatureAndLoginHandler(request)).rejects.toHaveProperty('code', 'unauthenticated')
   })
 })
