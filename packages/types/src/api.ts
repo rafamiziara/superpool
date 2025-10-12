@@ -73,6 +73,39 @@ export interface GetPoolsResponse {
   hasMore: boolean
 }
 
+export interface ListPoolsRequest {
+  page?: number
+  limit?: number
+  ownerAddress?: string
+  chainId?: number
+  activeOnly?: boolean
+}
+
+export interface PoolInfo {
+  poolId: number
+  poolAddress: string
+  poolOwner: string
+  name: string
+  description: string
+  maxLoanAmount: string
+  interestRate: number
+  loanDuration: number
+  chainId: number
+  createdBy: string
+  createdAt: Date
+  transactionHash: string
+  isActive: boolean
+}
+
+export interface ListPoolsResponse {
+  pools: PoolInfo[]
+  totalCount: number
+  page: number
+  limit: number
+  hasNextPage: boolean
+  hasPreviousPage: boolean
+}
+
 export interface JoinPoolRequest {
   poolId: string
   userAddress: string

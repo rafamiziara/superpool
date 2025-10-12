@@ -1,36 +1,75 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Landing Page
 
-## Getting Started
+Next.js marketing website showcasing SuperPool's features.
 
-First, run the development server:
+## Overview
+
+Responsive landing page built with Next.js 15.5, React 19, and Tailwind CSS v4.
+
+## Features
+
+- 🎨 SuperPool design system integration
+- 📱 Fully responsive design
+- ⚡ Next.js App Router with React Server Components
+- 🎯 Feature showcase with illustrations
+- 🚀 Optimized fonts and images
+
+## Development
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
+# Start dev server (runs on port 3001)
 pnpm dev
-# or
-bun dev
+
+# Build for production
+pnpm build
+
+# Start production server
+pnpm start
+
+# Type checking
+pnpm type-check
+
+# Linting
+pnpm lint
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Structure
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```
+apps/landing/
+├── src/
+│   ├── app/              # Next.js pages (App Router)
+│   └── components/       # Page-specific components
+└── public/              # Static assets
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Styling
 
-## Learn More
+Uses Tailwind CSS v4 with SuperPool design tokens:
 
-To learn more about Next.js, take a look at the following resources:
+```typescript
+import '@superpool/design/tokens.css'
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+Tailwind config extends `@superpool/design` for consistent branding.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Deployment
 
-## Deploy on Vercel
+Optimized for Vercel deployment:
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+```bash
+# Deploy to Vercel
+vercel
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+# Or build locally
+pnpm build
+```
+
+## Dependencies
+
+- **Next.js 15.5** - React framework
+- **React 19** - UI library
+- **Tailwind CSS v4** - Styling
+- **@superpool/ui** - Shared components
+- **@superpool/design** - Design tokens
+- **@superpool/assets** - Brand assets

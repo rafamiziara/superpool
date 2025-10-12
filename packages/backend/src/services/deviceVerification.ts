@@ -51,36 +51,4 @@ export class DeviceVerificationService {
       throw new Error('Failed to approve device')
     }
   }
-
-  /**
-   * Get device information if approved
-   */
-  static async getApprovedDevice(deviceId: string): Promise<ApprovedDevice | null> {
-    try {
-      const deviceDoc = await firestore.collection(APPROVED_DEVICES_COLLECTION).doc(deviceId).get()
-
-      if (!deviceDoc.exists) {
-        return null
-      }
-
-      return deviceDoc.data() as ApprovedDevice
-    } catch (error) {
-      logger.error('Error getting approved device', { error, deviceId })
-      return null
-    }
-  }
-
-  /**
-   * Remove device approval (for security/admin purposes)
-   */
-  static async revokeDeviceApproval(deviceId: string): Promise<void> {
-    try {
-      await firestore.collection(APPROVED_DEVICES_COLLECTION).doc(deviceId).delete()
-
-      logger.info('Device approval revoked', { deviceId })
-    } catch (error) {
-      logger.error('Error revoking device approval', { error, deviceId })
-      throw new Error('Failed to revoke device approval')
-    }
-  }
 }
