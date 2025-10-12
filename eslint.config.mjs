@@ -32,8 +32,7 @@ export default [
       // Config files that don't need linting
       '**/scripts/dev-start.js',
       '**/merge-coverage.js',
-      'packages/backend/scripts/generateKey.ts',
-      'packages/backend/scripts/signMessage.ts',
+      'packages/backend/scripts/**',
 
       // Build configs outside of TypeScript projects
       '**/tsup.config.ts',

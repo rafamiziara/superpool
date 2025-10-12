@@ -15,8 +15,8 @@ export const verifySignatureAndLoginHandler = async (request: CallableRequest<Ve
     throw new HttpsError('invalid-argument', 'The function must be called with a valid walletAddress and signature.')
   }
 
-  // Validate signature format
-  if (!signature.startsWith('0x') || signature.length < 4) {
+  // Validate signature format (Ethereum signatures are 65 bytes = 130 hex chars + 0x prefix = 132 total)
+  if (!signature.startsWith('0x') || signature.length !== 132) {
     throw new HttpsError('invalid-argument', 'Invalid signature format. It must be a hex string prefixed with "0x".')
   }
 
@@ -100,10 +100,7 @@ export const verifySignatureAndLoginHandler = async (request: CallableRequest<Ve
       signatureType,
       errorMessage: error instanceof Error ? error.message : String(error),
     })
-    throw new HttpsError(
-      'unauthenticated',
-      `Signature verification failed: ${error instanceof Error ? error.message : 'Invalid signature'}`
-    )
+    throw new HttpsError('unauthenticated', 'Invalid signature or expired nonce. Please try again.')
   }
 
   if (recoveredAddress.toLowerCase() !== walletAddress.toLowerCase()) {
@@ -155,14 +152,10 @@ export const verifySignatureAndLoginHandler = async (request: CallableRequest<Ve
   }
 
   // Delete the nonce to prevent replay attacks
-  try {
-    logger.info('Deleting nonce document', { walletAddress })
-    await nonceRef.delete()
-    logger.info('Nonce document deleted successfully', { walletAddress })
-  } catch (error) {
-    // The user has already been authenticated, so a failure here is an acceptable cleanup error.
-    logger.error('Failed to delete nonce document', { error, walletAddress })
-  }
+  // SECURITY: If nonce deletion fails, authentication must fail to prevent replay attacks
+  logger.info('Deleting nonce document', { walletAddress })
+  await nonceRef.delete()
+  logger.info('Nonce document deleted successfully', { walletAddress })
 
   // Issue a Firebase Custom Token
   // Use the walletAddress as the user's unique UID in Firebase Auth.
