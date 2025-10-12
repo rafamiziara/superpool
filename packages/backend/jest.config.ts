@@ -23,6 +23,7 @@ const config: Config = {
     '!src/**/*.test.ts',
     '!src/__tests__/**',
     '!src/constants/**',
+    '!src/config/**',
     '!src/**/index.ts',
     '!lib/**',
   ],

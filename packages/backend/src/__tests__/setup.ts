@@ -20,7 +20,7 @@ jest.mock('firebase-functions', () => ({
 }))
 
 // Mock Firebase Admin initialization (uses service account)
-jest.mock('../services/firebase', () => ({
+jest.mock('../config/firebase', () => ({
   auth: {
     createCustomToken: jest.fn(),
   },

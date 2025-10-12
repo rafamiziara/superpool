@@ -1,2 +1,2 @@
 export * from './deviceVerification'
-export * from './firebase'
+export * from '../config/firebase'
