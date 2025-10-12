@@ -3,10 +3,9 @@ import { isAddress, verifyMessage, verifyTypedData } from 'ethers'
 import { logger } from 'firebase-functions/v2'
 import { CallableRequest, HttpsError, onCall } from 'firebase-functions/v2/https'
 import { AUTH_NONCES_COLLECTION, USERS_COLLECTION } from '../../constants'
-import { auth, firestore, ProviderService } from '../../services'
+import { auth, firestore } from '../../services'
 import { DeviceVerificationService } from '../../services/deviceVerification'
 import { createAuthMessage } from '../../utils'
-import { SafeWalletVerificationService } from '../../utils/safeWalletVerification'
 
 export const verifySignatureAndLoginHandler = async (request: CallableRequest<VerifySignatureAndLoginRequest>) => {
   const { walletAddress, signature, deviceId, platform, chainId, signatureType = 'personal-sign' } = request.data
@@ -16,19 +15,15 @@ export const verifySignatureAndLoginHandler = async (request: CallableRequest<Ve
     throw new HttpsError('invalid-argument', 'The function must be called with a valid walletAddress and signature.')
   }
 
-  // Validate signature format (support EOA, smart contract signatures, and Safe wallet tokens)
-  const isSafeWalletToken = signature.startsWith('safe-wallet:')
+  // Validate signature format
+  if (!signature.startsWith('0x') || signature.length < 4) {
+    throw new HttpsError('invalid-argument', 'Invalid signature format. It must be a hex string prefixed with "0x".')
+  }
 
-  if (!isSafeWalletToken) {
-    if (!signature.startsWith('0x') || signature.length < 4) {
-      throw new HttpsError('invalid-argument', 'Invalid signature format. It must be a hex string prefixed with "0x".')
-    }
-
-    // Additional validation: ensure it's valid hex
-    const hexPattern = /^0x[0-9a-fA-F]*$/
-    if (!hexPattern.test(signature)) {
-      throw new HttpsError('invalid-argument', 'Invalid signature format. Signature must contain only hexadecimal characters.')
-    }
+  // Additional validation: ensure it's valid hex
+  const hexPattern = /^0x[0-9a-fA-F]*$/
+  if (!hexPattern.test(signature)) {
+    throw new HttpsError('invalid-argument', 'Invalid signature format. Signature must contain only hexadecimal characters.')
   }
 
   // Retrieve Nonce from Firestore
@@ -90,62 +85,8 @@ export const verifySignatureAndLoginHandler = async (request: CallableRequest<Ve
 
       recoveredAddress = verifyTypedData(domain, types, value, signature)
       logger.info('EIP-712 signature verification successful', { recoveredAddress })
-    } else if (signatureType === 'safe-wallet') {
-      // Enhanced Safe wallet verification with cryptographic validation
-      logger.info('Starting enhanced Safe wallet verification', {
-        walletAddress,
-        chainId: chainId || 80002,
-      })
-
-      try {
-        // Get provider for the specified chain
-        const provider = ProviderService.getProvider(chainId || 80002)
-
-        // Perform comprehensive Safe wallet verification
-        const verificationResult = await SafeWalletVerificationService.verifySafeWalletSignature(
-          walletAddress,
-          signature,
-          nonce,
-          timestamp,
-          provider,
-          chainId
-        )
-
-        if (!verificationResult.isValid) {
-          logger.error('Safe wallet verification failed', {
-            walletAddress,
-            error: verificationResult.error,
-            verification: verificationResult.verification,
-          })
-          throw new Error(`Safe wallet verification failed: ${verificationResult.error || 'Invalid signature'}`)
-        }
-
-        // Log verification details and warnings
-        logger.info('Safe wallet verification successful', {
-          walletAddress,
-          verification: verificationResult.verification,
-          warnings: verificationResult.warnings,
-        })
-
-        // Log any warnings for monitoring
-        if (verificationResult.warnings && verificationResult.warnings.length > 0) {
-          logger.warn('Safe wallet verification warnings', {
-            walletAddress,
-            warnings: verificationResult.warnings,
-          })
-        }
-
-        recoveredAddress = walletAddress
-      } catch (error) {
-        logger.error('Safe wallet verification error', {
-          error: error instanceof Error ? error.message : String(error),
-          walletAddress,
-          chainId,
-        })
-        throw new Error(`Safe wallet authentication failed: ${error instanceof Error ? error.message : 'Verification error'}`)
-      }
     } else {
-      // Personal message verification
+      // Personal message verification (default)
       recoveredAddress = verifyMessage(message, signature)
       logger.info('Personal sign verification successful', { recoveredAddress })
     }
@@ -170,13 +111,13 @@ export const verifySignatureAndLoginHandler = async (request: CallableRequest<Ve
   }
 
   // Create or Update User Profile
+  let userData: User
+
   try {
     logger.info('Creating/updating user profile', { walletAddress })
     const userProfileRef = firestore.collection(USERS_COLLECTION).doc(walletAddress)
     const userProfileDoc = await userProfileRef.get()
     const now = new Date().getTime()
-
-    let userData: User
 
     if (!userProfileDoc.exists) {
       // Profile does not exist, so create a new one
@@ -198,12 +139,8 @@ export const verifySignatureAndLoginHandler = async (request: CallableRequest<Ve
   if (deviceId && platform) {
     try {
       logger.info('Approving device', { deviceId, walletAddress, platform, signatureType })
-
-      // For Safe wallets, use a stable device identifier based on wallet address
-      const finalDeviceId = signatureType === 'safe-wallet' ? `safe-wallet-${walletAddress.toLowerCase()}` : deviceId
-
-      await DeviceVerificationService.approveDevice(finalDeviceId, walletAddress, platform)
-      logger.info('Device approved successfully', { deviceId: finalDeviceId, walletAddress, signatureType })
+      await DeviceVerificationService.approveDevice(deviceId, walletAddress, platform)
+      logger.info('Device approved successfully', { deviceId, walletAddress, signatureType })
     } catch (error) {
       // Device approval failure shouldn't block authentication
       logger.error('Failed to approve device', { error, deviceId, walletAddress, signatureType })
@@ -233,6 +170,7 @@ export const verifySignatureAndLoginHandler = async (request: CallableRequest<Ve
     logger.info('Creating Firebase custom token', { walletAddress })
     const firebaseToken = await auth.createCustomToken(walletAddress)
     logger.info('Firebase custom token created successfully', { walletAddress })
+
     const response: VerifySignatureAndLoginResponse = { firebaseToken, user: userData }
     return response
   } catch (error) {
