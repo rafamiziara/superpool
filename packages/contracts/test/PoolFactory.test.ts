@@ -85,7 +85,6 @@ describe('PoolFactory', function () {
   describe('Pool Creation', function () {
     it('Should create a pool successfully', async function () {
       const params = {
-        poolOwner: poolOwner1.address,
         ...defaultPoolParams,
       }
 
@@ -101,7 +100,7 @@ describe('PoolFactory', function () {
         const decodedEvent = poolFactory.interface.decodeEventLog('PoolCreated', poolCreatedEvent.data, poolCreatedEvent.topics)
 
         expect(decodedEvent.poolId).to.equal(1)
-        expect(decodedEvent.poolOwner).to.equal(poolOwner1.address)
+        expect(decodedEvent.poolOwner).to.equal(owner.address)
         expect(decodedEvent.name).to.equal(params.name)
         expect(decodedEvent.maxLoanAmount).to.equal(params.maxLoanAmount)
         expect(decodedEvent.interestRate).to.equal(params.interestRate)
@@ -114,7 +113,7 @@ describe('PoolFactory', function () {
 
       // Check pool info
       const poolInfo = await poolFactory.getPoolInfo(1)
-      expect(poolInfo.poolOwner).to.equal(poolOwner1.address)
+      expect(poolInfo.poolOwner).to.equal(owner.address)
       expect(poolInfo.maxLoanAmount).to.equal(params.maxLoanAmount)
       expect(poolInfo.interestRate).to.equal(params.interestRate)
       expect(poolInfo.loanDuration).to.equal(params.loanDuration)
@@ -125,12 +124,10 @@ describe('PoolFactory', function () {
 
     it('Should create multiple pools', async function () {
       const params1 = {
-        poolOwner: poolOwner1.address,
         ...defaultPoolParams,
       }
 
       const params2 = {
-        poolOwner: poolOwner2.address,
         maxLoanAmount: ethers.parseEther('20'),
         interestRate: 750, // 7.5%
         loanDuration: 60 * 24 * 60 * 60, // 60 days
@@ -138,11 +135,16 @@ describe('PoolFactory', function () {
         description: 'Second test pool',
       }
 
-      // Create first pool
-      await poolFactory.connect(owner).createPool(params1)
+      // Enable whitelist and authorize users (simulating lazy whitelisting)
+      await poolFactory.connect(owner).setWhitelistMode(true)
+      await poolFactory.connect(owner).setCreatorAuthorization(poolOwner1.address, true)
+      await poolFactory.connect(owner).setCreatorAuthorization(poolOwner2.address, true)
 
-      // Create second pool
-      await poolFactory.connect(owner).createPool(params2)
+      // Create first pool by poolOwner1
+      await poolFactory.connect(poolOwner1).createPool(params1)
+
+      // Create second pool by poolOwner2
+      await poolFactory.connect(poolOwner2).createPool(params2)
 
       expect(await poolFactory.getPoolCount()).to.equal(2)
 
@@ -155,28 +157,46 @@ describe('PoolFactory', function () {
       expect(pool2Info.maxLoanAmount).to.equal(params2.maxLoanAmount)
     })
 
-    it('Should reject pool creation from non-owner', async function () {
+    it('Should reject pool creation from non-whitelisted accounts (lazy whitelisting)', async function () {
       const params = {
-        poolOwner: poolOwner1.address,
         ...defaultPoolParams,
       }
 
+      // Non-whitelisted account cannot create pools (whitelist disabled by default)
       await expect(poolFactory.connect(otherAccount).createPool(params)).to.be.revertedWithCustomError(poolFactory, 'UnauthorizedCreator')
+
+      // Owner can always create pools
+      await expect(poolFactory.connect(owner).createPool(params)).to.not.be.reverted
+      const poolInfo = await poolFactory.getPoolInfo(1)
+      expect(poolInfo.poolOwner).to.equal(owner.address)
+    })
+
+    it('Should allow whitelisted users to create pools (simulating lazy whitelisting)', async function () {
+      const params = {
+        ...defaultPoolParams,
+      }
+
+      // Enable whitelist mode
+      await poolFactory.connect(owner).setWhitelistMode(true)
+
+      // Initially, poolOwner1 is not whitelisted and cannot create
+      await expect(poolFactory.connect(poolOwner1).createPool(params)).to.be.revertedWithCustomError(poolFactory, 'UnauthorizedCreator')
+
+      // Backend whitelists the user (simulating lazy whitelisting)
+      await poolFactory.connect(owner).setCreatorAuthorization(poolOwner1.address, true)
+
+      // Now poolOwner1 can create pools
+      await expect(poolFactory.connect(poolOwner1).createPool(params)).to.not.be.reverted
+
+      // Verify the creator became the pool owner
+      const poolInfo = await poolFactory.getPoolInfo(1)
+      expect(poolInfo.poolOwner).to.equal(poolOwner1.address)
     })
 
     it('Should reject pool creation with invalid parameters', async function () {
-      // Zero pool owner
-      await expect(
-        poolFactory.connect(owner).createPool({
-          poolOwner: ethers.ZeroAddress,
-          ...defaultPoolParams,
-        })
-      ).to.be.revertedWithCustomError(poolFactory, 'InvalidPoolOwner')
-
       // Zero max loan amount
       await expect(
         poolFactory.connect(owner).createPool({
-          poolOwner: poolOwner1.address,
           maxLoanAmount: 0,
           interestRate: defaultPoolParams.interestRate,
           loanDuration: defaultPoolParams.loanDuration,
@@ -188,7 +208,6 @@ describe('PoolFactory', function () {
       // Interest rate too high (>100%)
       await expect(
         poolFactory.connect(owner).createPool({
-          poolOwner: poolOwner1.address,
           maxLoanAmount: defaultPoolParams.maxLoanAmount,
           interestRate: 15000, // 150%
           loanDuration: defaultPoolParams.loanDuration,
@@ -200,7 +219,6 @@ describe('PoolFactory', function () {
       // Zero loan duration
       await expect(
         poolFactory.connect(owner).createPool({
-          poolOwner: poolOwner1.address,
           maxLoanAmount: defaultPoolParams.maxLoanAmount,
           interestRate: defaultPoolParams.interestRate,
           loanDuration: 0,
@@ -212,7 +230,6 @@ describe('PoolFactory', function () {
       // Empty name
       await expect(
         poolFactory.connect(owner).createPool({
-          poolOwner: poolOwner1.address,
           maxLoanAmount: defaultPoolParams.maxLoanAmount,
           interestRate: defaultPoolParams.interestRate,
           loanDuration: defaultPoolParams.loanDuration,
@@ -226,7 +243,6 @@ describe('PoolFactory', function () {
       await poolFactory.connect(owner).pause()
 
       const params = {
-        poolOwner: poolOwner1.address,
         ...defaultPoolParams,
       }
 
@@ -236,14 +252,17 @@ describe('PoolFactory', function () {
 
   describe('Pool Registry Functions', function () {
     beforeEach(async function () {
-      // Create test pools
-      await poolFactory.connect(owner).createPool({
-        poolOwner: poolOwner1.address,
+      // Enable whitelist and authorize users (simulating lazy whitelisting)
+      await poolFactory.connect(owner).setWhitelistMode(true)
+      await poolFactory.connect(owner).setCreatorAuthorization(poolOwner1.address, true)
+      await poolFactory.connect(owner).setCreatorAuthorization(poolOwner2.address, true)
+
+      // Create test pools (creators become owners)
+      await poolFactory.connect(poolOwner1).createPool({
         ...defaultPoolParams,
       })
 
-      await poolFactory.connect(owner).createPool({
-        poolOwner: poolOwner2.address,
+      await poolFactory.connect(poolOwner2).createPool({
         maxLoanAmount: ethers.parseEther('20'),
         interestRate: 750,
         loanDuration: 60 * 24 * 60 * 60,
@@ -308,8 +327,11 @@ describe('PoolFactory', function () {
 
   describe('Pool Management', function () {
     beforeEach(async function () {
-      await poolFactory.connect(owner).createPool({
-        poolOwner: poolOwner1.address,
+      // Enable whitelist and authorize user (simulating lazy whitelisting)
+      await poolFactory.connect(owner).setWhitelistMode(true)
+      await poolFactory.connect(owner).setCreatorAuthorization(poolOwner1.address, true)
+
+      await poolFactory.connect(poolOwner1).createPool({
         ...defaultPoolParams,
       })
     })
@@ -407,13 +429,16 @@ describe('PoolFactory', function () {
 
   describe('Integration Tests', function () {
     it('Should create functional lending pools', async function () {
+      // Enable whitelist and authorize user (simulating lazy whitelisting)
+      await poolFactory.connect(owner).setWhitelistMode(true)
+      await poolFactory.connect(owner).setCreatorAuthorization(poolOwner1.address, true)
+
       // Create pool through factory
       const params = {
-        poolOwner: poolOwner1.address,
         ...defaultPoolParams,
       }
 
-      await poolFactory.connect(owner).createPool(params)
+      await poolFactory.connect(poolOwner1).createPool(params)
 
       // Get pool address and interact with it
       const poolAddress = await poolFactory.getPoolAddress(1)
@@ -435,9 +460,13 @@ describe('PoolFactory', function () {
     })
 
     it('Should maintain separate state for multiple pools', async function () {
-      // Create two pools with different configurations
-      await poolFactory.connect(owner).createPool({
-        poolOwner: poolOwner1.address,
+      // Enable whitelist and authorize users (simulating lazy whitelisting)
+      await poolFactory.connect(owner).setWhitelistMode(true)
+      await poolFactory.connect(owner).setCreatorAuthorization(poolOwner1.address, true)
+      await poolFactory.connect(owner).setCreatorAuthorization(poolOwner2.address, true)
+
+      // Create two pools with different configurations (by different creators)
+      await poolFactory.connect(poolOwner1).createPool({
         maxLoanAmount: ethers.parseEther('10'),
         interestRate: 500,
         loanDuration: 30 * 24 * 60 * 60,
@@ -445,8 +474,7 @@ describe('PoolFactory', function () {
         description: 'First pool',
       })
 
-      await poolFactory.connect(owner).createPool({
-        poolOwner: poolOwner2.address,
+      await poolFactory.connect(poolOwner2).createPool({
         maxLoanAmount: ethers.parseEther('20'),
         interestRate: 750,
         loanDuration: 60 * 24 * 60 * 60,
@@ -605,16 +633,15 @@ describe('PoolFactory', function () {
         // Initiate transfer
         await poolFactory.connect(owner).transferOwnership(newOwner.address)
 
-        // Original owner should still be able to perform owner functions
+        // Original owner should still be able to create pools
         const params = {
-          poolOwner: poolOwner1.address,
           ...defaultPoolParams,
         }
 
         await expect(poolFactory.connect(owner).createPool(params)).to.not.be.reverted
         expect(await poolFactory.getPoolCount()).to.equal(1)
 
-        // Pending owner should not be able to perform owner functions
+        // Pending owner cannot create pools (not whitelisted)
         await expect(poolFactory.connect(newOwner).createPool(params)).to.be.revertedWithCustomError(poolFactory, 'UnauthorizedCreator')
       })
     })
@@ -687,7 +714,6 @@ describe('PoolFactory', function () {
 
         // Step 2: Original owner can still operate the contract
         const params = {
-          poolOwner: poolOwner1.address,
           ...defaultPoolParams,
         }
         await poolFactory.connect(owner).createPool(params)
@@ -704,15 +730,15 @@ describe('PoolFactory', function () {
         expect(status.pendingOwnerAddress).to.equal(ethers.ZeroAddress)
         expect(status.hasPendingTransfer).to.be.false
 
-        // Step 5: New owner can operate, old owner cannot
+        // Step 5: New owner can create pools (owners are always authorized)
         await expect(
           poolFactory.connect(newOwner).createPool({
-            poolOwner: poolOwner2.address,
             ...defaultPoolParams,
             name: 'Pool 2',
           })
         ).to.not.be.reverted
 
+        // Old owner can no longer create pools (not the owner anymore, and not whitelisted)
         await expect(poolFactory.connect(owner).createPool(params)).to.be.revertedWithCustomError(poolFactory, 'UnauthorizedCreator')
 
         expect(await poolFactory.getPoolCount()).to.equal(2)
