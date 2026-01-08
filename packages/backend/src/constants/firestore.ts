@@ -12,3 +12,8 @@ export const USERS_COLLECTION = 'users'
  * The name of the Firestore collection used to store approved devices.
  */
 export const APPROVED_DEVICES_COLLECTION = 'approved_devices'
+
+/**
+ * The name of the Firestore collection used to store whitelisting audit logs.
+ */
+export const WHITELISTING_LOGS_COLLECTION = 'whitelisting_logs'

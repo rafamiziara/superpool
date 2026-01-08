@@ -20,6 +20,7 @@ export const PoolFactoryABI = [
   'function getPoolsRange(uint256 _start, uint256 _limit) external view returns (uint256[] memory poolIds, tuple(address poolAddress, address poolOwner, uint256 maxLoanAmount, uint256 interestRate, uint256 loanDuration, string name, string description, uint256 createdAt, bool isActive)[] memory poolInfos)',
   'function isPoolActive(uint256 _poolId) external view returns (bool)',
   'function isAuthorizedCreator(address _creator) external view returns (bool)',
+  'function isWhitelistEnabled() external view returns (bool)',
   'function getOwnershipStatus() external view returns (address currentOwner, address pendingOwnerAddress, bool hasPendingTransfer)',
   'function version() external pure returns (string memory)',
 
