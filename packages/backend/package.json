@@ -11,6 +11,7 @@
     "logs": "cd ../../config && firebase functions:log",
     "generateKey": "ts-node scripts/generateKey.ts",
     "signMessage": "ts-node scripts/signMessage.ts",
+    "testIndexer": "ts-node scripts/testEventIndexer.ts",
     "test": "jest",
     "format": "prettier --write .",
     "type-check": "tsc --noEmit",

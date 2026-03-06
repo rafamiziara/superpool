@@ -41,6 +41,7 @@ cp .env.template .env
 ```
 
 Then update values in `.env`:
+
 - **APP_ID_FIREBASE**: Your Firebase app ID
 - **CHAIN_ID/RPC_URL/POOL_FACTORY_ADDRESS**: Blockchain configuration (localhost or Polygon Amoy)
 - **BACKEND_WALLET_PRIVATE_KEY**: Wallet for automated whitelisting (funded with gas)

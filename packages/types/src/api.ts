@@ -117,6 +117,17 @@ export interface PreparePoolCreationResponse {
   gasCost?: string
 }
 
+export interface IndexPoolRequest {
+  txHash: string
+  chainId?: number
+}
+
+export interface IndexPoolResponse {
+  poolId: number
+  alreadyIndexed: boolean
+  stored: boolean
+}
+
 // Dev/Testing API types (emulator only)
 export interface SignMessageRequest {
   nonce: string

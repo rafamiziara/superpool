@@ -5,7 +5,15 @@ dotenv.config()
 setGlobalOptions({ maxInstances: 10 })
 
 // Production functions
-export { customAppCheckMinter, generateAuthMessage, listPools, preparePoolCreation, verifySignatureAndLogin } from './functions'
+export {
+  customAppCheckMinter,
+  generateAuthMessage,
+  indexPool,
+  listPools,
+  preparePoolCreation,
+  syncPoolEvents,
+  verifySignatureAndLogin,
+} from './functions'
 
 // Dev-only functions (emulator only)
 // In production, this will be undefined and won't be deployed
