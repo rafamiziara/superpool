@@ -14,7 +14,13 @@
     "ios": {
       "supportsTablet": true,
       "infoPlist": {
-        "LSApplicationQueriesSchemes": ["metamask", "trust", "safe", "rainbow", "uniswap"]
+        "LSApplicationQueriesSchemes": [
+          "metamask",
+          "trust",
+          "safe",
+          "rainbow",
+          "uniswap"
+        ]
       }
     },
     "android": {
@@ -28,7 +34,17 @@
       "favicon": "./assets/favicon.png",
       "bundler": "metro"
     },
-    "plugins": ["expo-router", "expo-secure-store"],
-    "scheme": "superpool"
+    "plugins": [
+      "expo-router",
+      "expo-secure-store"
+    ],
+    "scheme": "superpool",
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "514342f1-b2d2-41f4-adfc-26aaca5ca281"
+      }
+    },
+    "owner": "rafaelmiziara"
   }
 }
