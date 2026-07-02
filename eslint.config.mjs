@@ -24,6 +24,7 @@ export default [
       '**/typechain-types/**',
       '**/artifacts/**',
       '**/cache/**',
+      '**/next-env.d.ts',
 
       // Coverage reports
       '**/coverage/**',
