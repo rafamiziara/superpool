@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.22;
+pragma solidity ^0.8.24;
 
 import {
     Ownable2StepUpgradeable
@@ -7,9 +7,7 @@ import {
 import {
     PausableUpgradeable
 } from "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
-import {
-    ReentrancyGuardUpgradeable
-} from "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
+import {ReentrancyGuardTransient} from "@openzeppelin/contracts/utils/ReentrancyGuardTransient.sol";
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import {Clones} from "@openzeppelin/contracts/proxy/Clones.sol";
@@ -34,14 +32,13 @@ contract PoolFactory is
     Initializable,
     Ownable2StepUpgradeable,
     PausableUpgradeable,
-    ReentrancyGuardUpgradeable,
+    ReentrancyGuardTransient,
     UUPSUpgradeable
 {
     using Clones for address;
 
     /// @dev Pool creation parameters
     struct PoolParams {
-        address poolOwner;
         uint256 maxLoanAmount;
         uint256 interestRate;
         uint256 loanDuration;
@@ -198,8 +195,6 @@ contract PoolFactory is
         __Ownable_init(_owner);
         __Ownable2Step_init();
         __Pausable_init();
-        __ReentrancyGuard_init();
-        __UUPSUpgradeable_init();
 
         lendingPoolImplementation = _implementation;
         poolCount = 0;
@@ -225,8 +220,10 @@ contract PoolFactory is
 
     /**
      * @notice Create a new lending pool
-     * @dev Function exceeds 50-line limit but maintains readability for complex pool creation logic
-     * @param _params Pool creation parameters
+     * @dev Pool owner is automatically set to msg.sender
+     * @dev Requires caller to be whitelisted (lazy whitelisting via backend)
+     * @dev Function exceeds 50-line limit but maintains readability
+     * @param _params Pool creation parameters struct
      * @return poolId The ID of the newly created pool
      * @return poolAddress The address of the newly created pool
      */
@@ -239,12 +236,13 @@ contract PoolFactory is
         nonReentrant
         returns (uint256 poolId, address poolAddress)
     {
-        // Validate parameters
-        if (_params.poolOwner == address(0)) revert InvalidPoolOwner();
+        // Validate pool owner (msg.sender becomes pool owner)
+        if (msg.sender == address(0)) revert InvalidPoolOwner();
 
         // Enhanced pool owner validation
-        _validatePoolOwner(_params.poolOwner);
+        _validatePoolOwner(msg.sender);
 
+        // Validate parameters
         if (_params.maxLoanAmount == 0) revert InvalidMaxLoanAmount();
         if (_params.interestRate > 10000) revert InvalidInterestRate(); // Max 100%
         if (_params.loanDuration == 0) revert InvalidLoanDuration();
@@ -256,9 +254,9 @@ contract PoolFactory is
         poolAddress = lendingPoolImplementation.clone();
         if (poolAddress == address(0)) revert PoolCreationFailed();
 
-        // Initialize the new pool
+        // Initialize the new pool (msg.sender becomes pool owner)
         SampleLendingPool(poolAddress).initialize(
-            _params.poolOwner,
+            msg.sender,
             _params.maxLoanAmount,
             _params.interestRate,
             _params.loanDuration
@@ -267,10 +265,10 @@ contract PoolFactory is
         // Increment pool count and assign ID (using pre-increment for gas efficiency)
         poolId = ++poolCount;
 
-        // Store pool information
+        // Store pool information (msg.sender becomes pool owner)
         pools[poolId] = PoolInfo({
             poolAddress: poolAddress,
-            poolOwner: _params.poolOwner,
+            poolOwner: msg.sender,
             maxLoanAmount: _params.maxLoanAmount,
             interestRate: _params.interestRate,
             loanDuration: _params.loanDuration,
@@ -282,13 +280,13 @@ contract PoolFactory is
 
         // Update mappings
         poolAddressToId[poolAddress] = poolId;
-        ownerToPools[_params.poolOwner].push(poolId);
+        ownerToPools[msg.sender].push(poolId);
         allPools.push(poolAddress);
 
         emit PoolCreated(
             poolId,
             poolAddress,
-            _params.poolOwner,
+            msg.sender,
             _params.name,
             _params.maxLoanAmount,
             _params.interestRate,

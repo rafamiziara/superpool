@@ -35,7 +35,7 @@
   ],
   "repository": {
     "type": "git",
-    "url": "https://github.com/rafamiziara/superpool.git",
+    "url": "https://github.com/rm30-dev/superpool.git",
     "directory": "packages/types"
   },
   "license": "MIT"

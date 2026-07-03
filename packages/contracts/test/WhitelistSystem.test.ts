@@ -119,9 +119,8 @@ describe('Whitelist System', function () {
     })
   })
 
-  describe('Pool Creation with Whitelist', function () {
+  describe('Pool Creation (Lazy Whitelisting)', function () {
     const poolParams = {
-      poolOwner: '0x0000000000000000000000000000000000000000', // Will be set in tests
       maxLoanAmount: ethers.parseEther('1000'),
       interestRate: 500, // 5%
       loanDuration: 30 * 24 * 60 * 60, // 30 days
@@ -129,65 +128,65 @@ describe('Whitelist System', function () {
       description: 'Test pool description',
     }
 
-    it('Should allow owner to create pools when whitelist disabled (default behavior)', async function () {
-      const params = { ...poolParams, poolOwner: addr1.address }
+    it('Should allow owner to create pools (owner always authorized)', async function () {
+      // Owner can create without explicit authorization
+      await expect(poolFactory.connect(owner).createPool(poolParams)).to.not.be.reverted
 
-      await expect(poolFactory.createPool(params)).to.not.be.reverted
+      // Verify owner becomes pool owner
+      const poolInfo = await poolFactory.getPoolInfo(1)
+      expect(poolInfo.poolOwner).to.equal(owner.address)
+    })
+
+    it('Should reject non-authorized creators when whitelist disabled (default)', async function () {
+      // Whitelist disabled by default (only owner can create)
+      expect(await poolFactory.isWhitelistEnabled()).to.be.false
+
+      // Non-owner cannot create (not authorized)
+      await expect(poolFactory.connect(addr1).createPool(poolParams)).to.be.revertedWithCustomError(poolFactory, 'UnauthorizedCreator')
+
+      // Owner can always create
+      await expect(poolFactory.connect(owner).createPool(poolParams)).to.not.be.reverted
       expect(await poolFactory.getPoolCount()).to.equal(1)
     })
 
-    it('Should prevent non-owner from creating pools when whitelist disabled', async function () {
-      const params = { ...poolParams, poolOwner: addr2.address }
-
-      await expect(poolFactory.connect(addr1).createPool(params)).to.be.revertedWithCustomError(poolFactory, 'UnauthorizedCreator')
-    })
-
-    it('Should allow owner to create pools when whitelist enabled', async function () {
+    it('Should enforce whitelist when enabled (lazy whitelisting simulation)', async function () {
       await poolFactory.setWhitelistMode(true)
-      const params = { ...poolParams, poolOwner: addr1.address }
 
-      await expect(poolFactory.createPool(params)).to.not.be.reverted
-      expect(await poolFactory.getPoolCount()).to.equal(1)
-    })
+      // addr1 is NOT authorized
+      expect(await poolFactory.isAuthorizedCreator(addr1.address)).to.be.false
 
-    it('Should allow authorized creator to create pools when whitelist enabled', async function () {
-      await poolFactory.setWhitelistMode(true)
+      // Cannot create pools (whitelist enforced)
+      await expect(poolFactory.connect(addr1).createPool(poolParams)).to.be.revertedWithCustomError(poolFactory, 'UnauthorizedCreator')
+
+      // Backend whitelists user (lazy whitelisting)
       await poolFactory.setCreatorAuthorization(addr1.address, true)
 
-      const params = { ...poolParams, poolOwner: addr2.address }
+      // Now addr1 can create pools
+      await expect(poolFactory.connect(addr1).createPool(poolParams)).to.not.be.reverted
 
-      await expect(poolFactory.connect(addr1).createPool(params)).to.not.be.reverted
-      expect(await poolFactory.getPoolCount()).to.equal(1)
+      // Verify creator became pool owner
+      const poolInfo = await poolFactory.getPoolInfo(1)
+      expect(poolInfo.poolOwner).to.equal(addr1.address)
     })
 
-    it('Should prevent unauthorized creator from creating pools when whitelist enabled', async function () {
+    it('Should enforce authorization for all non-owner creators', async function () {
       await poolFactory.setWhitelistMode(true)
 
-      const params = { ...poolParams, poolOwner: addr2.address }
-
-      await expect(poolFactory.connect(addr1).createPool(params)).to.be.revertedWithCustomError(poolFactory, 'UnauthorizedCreator')
-    })
-
-    it('Should prevent revoked creator from creating pools', async function () {
-      await poolFactory.setWhitelistMode(true)
+      // Authorize addr1 but not addr2
       await poolFactory.setCreatorAuthorization(addr1.address, true)
 
-      // Verify authorization works
-      const params = { ...poolParams, poolOwner: addr2.address }
-      await expect(poolFactory.connect(addr1).createPool(params)).to.not.be.reverted
+      // addr1 can create (authorized)
+      await expect(poolFactory.connect(addr1).createPool(poolParams)).to.not.be.reverted
 
-      // Revoke authorization
-      await poolFactory.setCreatorAuthorization(addr1.address, false)
+      // addr2 cannot create (not authorized)
+      await expect(poolFactory.connect(addr2).createPool(poolParams)).to.be.revertedWithCustomError(poolFactory, 'UnauthorizedCreator')
 
-      // Should now fail
-      const params2 = { ...poolParams, poolOwner: addr3.address, name: 'Test Pool 2' }
-      await expect(poolFactory.connect(addr1).createPool(params2)).to.be.revertedWithCustomError(poolFactory, 'UnauthorizedCreator')
+      expect(await poolFactory.getPoolCount()).to.equal(1)
     })
   })
 
-  describe('Multiple Authorized Creators', function () {
+  describe('Multiple Authorized Creators (Lazy Whitelisting)', function () {
     const testPoolParams = {
-      poolOwner: '0x0000000000000000000000000000000000000000', // Will be set in tests
       maxLoanAmount: ethers.parseEther('1000'),
       interestRate: 500, // 5%
       loanDuration: 30 * 24 * 60 * 60, // 30 days
@@ -195,24 +194,28 @@ describe('Whitelist System', function () {
       description: 'Test pool description',
     }
 
-    it('Should handle multiple authorized creators correctly', async function () {
+    it('Should allow multiple authorized creators when whitelisted', async function () {
       await poolFactory.setWhitelistMode(true)
 
-      // Authorize multiple creators
+      // Authorize multiple creators (simulating lazy whitelisting)
       await poolFactory.setCreatorAuthorization(addr1.address, true)
       await poolFactory.setCreatorAuthorization(addr2.address, true)
 
-      // Both should be able to create pools
-      const params1 = { ...testPoolParams, poolOwner: owner.address, name: 'Pool 1' }
-      const params2 = { ...testPoolParams, poolOwner: owner.address, name: 'Pool 2' }
+      // Both authorized can create pools
+      const params1 = { ...testPoolParams, name: 'Pool 1' }
+      const params2 = { ...testPoolParams, name: 'Pool 2' }
 
       await expect(poolFactory.connect(addr1).createPool(params1)).to.not.be.reverted
       await expect(poolFactory.connect(addr2).createPool(params2)).to.not.be.reverted
 
+      // Non-authorized cannot create (whitelist enforced)
+      const params3 = { ...testPoolParams, name: 'Pool 3' }
+      await expect(poolFactory.connect(addr3).createPool(params3)).to.be.revertedWithCustomError(poolFactory, 'UnauthorizedCreator')
+
       expect(await poolFactory.getPoolCount()).to.equal(2)
     })
 
-    it('Should allow selective revocation', async function () {
+    it('Should prevent creation after authorization revocation', async function () {
       await poolFactory.setWhitelistMode(true)
 
       // Authorize both
@@ -222,12 +225,12 @@ describe('Whitelist System', function () {
       // Revoke only addr1
       await poolFactory.setCreatorAuthorization(addr1.address, false)
 
-      // addr1 should fail, addr2 should succeed
-      const params1 = { ...testPoolParams, poolOwner: owner.address, name: 'Pool 1' }
-      const params2 = { ...testPoolParams, poolOwner: owner.address, name: 'Pool 2' }
-
+      // addr1 can no longer create (authorization revoked)
+      const params1 = { ...testPoolParams, name: 'Pool 1' }
       await expect(poolFactory.connect(addr1).createPool(params1)).to.be.revertedWithCustomError(poolFactory, 'UnauthorizedCreator')
 
+      // addr2 can still create pools (still authorized)
+      const params2 = { ...testPoolParams, name: 'Pool 2' }
       await expect(poolFactory.connect(addr2).createPool(params2)).to.not.be.reverted
 
       expect(await poolFactory.getPoolCount()).to.equal(1)

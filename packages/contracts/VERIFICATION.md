@@ -341,4 +341,4 @@ etherscan: {
 ---
 
 **Last Updated**: December 2024  
-**Related Issue**: [#26 - Add contract verification automation](https://github.com/rafamiziara/superpool/issues/26)
+**Related Issue**: [#26 - Add contract verification automation](https://github.com/rm30-dev/superpool/issues/26)

@@ -1,47 +1,51 @@
 @import 'tailwindcss';
-@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700&family=Space+Mono:wght@400;700&family=Geist:wght@300;400;500;600;700&display=swap');
-
-@custom-variant dark (&:where(.dark, .dark *));
 
 @theme {
-  /* SuperPool Design System Colors */
-  --color-primary: #2563eb;
-  --color-accent: #06b6d4;
-  --color-success: #10b981;
-  --color-warning: #f59e0b;
-  --color-error: #ef4444;
+  /* SuperPool landing — "the pool at night" */
+  --color-abyss: #04070d;
+  --color-deep: #070d1a;
+  --color-depth: #0b1424;
+  --color-raised: #101b30;
+  --color-brand: #2563eb;
+  --color-brand-soft: #3b82f6;
+  --color-lumen: #22d3ee;
+  --color-lumen-bright: #67e8f9;
+  --color-foam: #e9f1fc;
+  --color-mist: #93a7c4;
+  --color-mist-dim: #5c6f8f;
+  --color-hairline: rgba(147, 197, 253, 0.12);
+  --color-hairline-soft: rgba(147, 197, 253, 0.06);
 
-  /* Background/Foreground colors */
-  --color-background: #ffffff;
-  --color-secondary: #f8f9fa;
-  --color-foreground: #0f172a;
-  --color-foreground-muted: #64748b;
-  --color-inverted: #0f172a;
+  --animate-marquee: marquee 36s linear infinite;
+  --animate-caret: caret 1.1s step-end infinite;
 
-  /* Typography - SuperPool Contemporary Tech */
-  --font-primary: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
-  --font-secondary: 'Space Mono', 'Fira Code', monospace;
-  --font-accent: 'Geist', system-ui, -apple-system, sans-serif;
-  --font-sans: var(--font-primary);
-  --font-mono: var(--font-secondary);
+  @keyframes marquee {
+    from {
+      transform: translateX(0);
+    }
+    to {
+      transform: translateX(-50%);
+    }
+  }
 
-  /* Spacing & Layout */
-  --spacing-section: 3rem;
-  --radius: 0.5rem;
-
-  /* Shadows */
-  --shadow-sm: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
-  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
-  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+  @keyframes caret {
+    0%,
+    100% {
+      opacity: 1;
+    }
+    50% {
+      opacity: 0;
+    }
+  }
 }
 
-/* Dark theme */
-.dark {
-  --color-background: #0f172a;
-  --color-secondary: #1e293b;
-  --color-foreground: #ffffff;
-  --color-foreground-muted: #94a3b8;
-  --color-inverted: #ffffff;
+/* next/font variables live on <html>, so these must be resolved at the
+   usage site — hence @theme inline */
+@theme inline {
+  --font-display: var(--font-space-grotesk), 'Space Grotesk', system-ui, sans-serif;
+  --font-body: var(--font-jakarta), 'Plus Jakarta Sans', system-ui, sans-serif;
+  --font-mono: var(--font-space-mono), 'Space Mono', monospace;
+  --font-sans: var(--font-body);
 }
 
 html {
@@ -49,16 +53,70 @@ html {
 }
 
 body {
-  background: var(--color-background);
-  color: var(--color-foreground);
-  font-family: var(--font-primary);
-  line-height: 1.6;
+  background: var(--color-abyss);
+  color: var(--color-foam);
+  font-family: var(--font-body);
+  line-height: 1.65;
+  overflow-x: hidden;
 }
 
-/* Smooth transitions for color scheme changes */
-* {
-  transition:
-    background-color 0.2s ease,
-    color 0.2s ease,
-    border-color 0.2s ease;
+::selection {
+  background: rgba(37, 99, 235, 0.45);
+  color: var(--color-foam);
+}
+
+/* Ledger-style eyebrow labels */
+.eyebrow {
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  letter-spacing: 0.28em;
+  text-transform: uppercase;
+  color: var(--color-lumen);
+}
+
+/* Subtle static grain so large dark areas don't band */
+.grain::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  pointer-events: none;
+  opacity: 0.035;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+/* Focus visibility on a dark page */
+:focus-visible {
+  outline: 2px solid var(--color-lumen);
+  outline-offset: 3px;
+  border-radius: 4px;
+}
+
+/* Hero entrance — pure CSS so dev-server refreshes can't strand it */
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(34px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.rise {
+  animation: rise 0.9s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation-delay: var(--rise-delay, 0s);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  .animate-marquee {
+    animation: none;
+  }
+  .rise {
+    animation: none;
+  }
 }

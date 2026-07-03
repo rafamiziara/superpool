@@ -14,12 +14,17 @@ packages/backend/
 │   ├── functions/          # Cloud Function implementations
 │   │   ├── auth/          # Wallet authentication functions
 │   │   ├── app-check/     # Device verification functions
-│   │   └── pools/         # Pool-related functions
+│   │   ├── pools/         # Pool management functions
+│   │   └── dev/           # Development/testing functions
 │   ├── services/          # Business logic services
 │   ├── utils/             # Shared utilities
+│   │   ├── auth.ts        # Authentication helpers
+│   │   └── blockchain.ts  # Blockchain interaction utilities
 │   ├── config/            # Firebase configuration
-│   ├── constants/         # ABIs, Firestore collections
-│   ├── types/             # TypeScript type definitions
+│   ├── constants/         # ABIs, chain configs, Firestore collections
+│   │   ├── abis.ts        # Smart contract ABIs
+│   │   ├── chains.ts      # Blockchain network configs
+│   │   └── firestore.ts   # Firestore collection names
 │   └── __tests__/         # Test mocks and setup
 ├── scripts/               # Development utilities
 │   ├── generateKey.ts     # Generate dev wallet keys
@@ -29,12 +34,19 @@ packages/backend/
 
 ## Environment Setup
 
-Create `.env` file:
+Copy `.env.template` to `.env` and configure:
 
 ```bash
-# Firebase App ID for App Check
-APP_ID_FIREBASE=your_firebase_app_id
+cp .env.template .env
 ```
+
+Then update values in `.env`:
+
+- **APP_ID_FIREBASE**: Your Firebase app ID
+- **CHAIN_ID/RPC_URL/POOL_FACTORY_ADDRESS**: Blockchain configuration (localhost or Polygon Amoy)
+- **BACKEND_WALLET_PRIVATE_KEY**: Wallet for automated whitelisting (funded with gas)
+
+See `.env.template` for detailed configuration examples.
 
 ### Service Account Key
 
@@ -62,10 +74,35 @@ Required for local development and Firebase Admin SDK:
 
 ### App Check
 
-**`mintAppCheckToken`**
+**`customAppCheckMinter`**
 
 - Issues App Check tokens for approved devices
 - Hybrid approval system (wallet auth or manual approval)
+
+### Pool Management
+
+**`preparePoolCreation`**
+
+- Verifies user authentication via Firebase Auth
+- Checks if whitelist mode is enabled on PoolFactory
+- Checks if wallet is already whitelisted
+- Whitelists user automatically (backend pays gas)
+- Returns whitelisting status and transaction details
+
+**`listPools`**
+
+- Lists pools from Firestore with pagination
+- Filters by chain ID, owner address, active status
+- Returns pool metadata with pagination info
+
+### Development Functions
+
+**`signMessageForTesting`** (Emulator only)
+
+- Dev-only function for testing authentication flow
+- Signs messages with test wallet private key
+- Only available when `FUNCTIONS_EMULATOR=true`
+- Never deployed to production
 
 ## Development
 
@@ -117,16 +154,37 @@ pnpm deploy
 pnpm logs
 ```
 
+## Blockchain Utilities
+
+Located in `utils/blockchain.ts`:
+
+**`getProvider(chainId)`** - Get JSON-RPC provider for a chain
+
+**`getBackendWallet(chainId)`** - Get backend wallet instance for transactions
+
+**`getPoolFactoryContract(chainId)`** - Get PoolFactory contract connected to backend wallet
+
+**`isWhitelistModeEnabled(chainId)`** - Check if whitelist mode is enabled
+
+**`isWalletWhitelisted(walletAddress, chainId)`** - Check if wallet is authorized creator
+
+**`whitelistWallet(walletAddress, chainId)`** - Whitelist wallet for pool creation (backend pays gas)
+
 ## Security
 
 - Device approval required for App Check tokens
 - Nonce-based authentication prevents replay attacks
 - Service account key never committed (gitignored)
 - Environment variables for sensitive config
+- Backend wallet private key securely stored
+- Whitelist mode enforcement for pool creation
+- Dev-only functions blocked in production
 
 ## Dependencies
 
 - `firebase-admin` - Firestore, Auth admin SDK
 - `firebase-functions` - Cloud Functions runtime
-- `ethers` - Wallet signature verification
+- `ethers` - Wallet signature verification and blockchain interactions
 - `@superpool/types` - Shared TypeScript types
+- `dotenv` - Environment variable management
+- `uuid` - Unique identifier generation

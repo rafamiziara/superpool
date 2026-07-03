@@ -4,9 +4,9 @@
 
 # 🚀 **SuperPool: Decentralized Micro-Lending Pools**
 
-![GitHub repo size](https://img.shields.io/github/repo-size/rafamiziara/superpool)
-![GitHub last commit](https://img.shields.io/github/last-commit/rafamiziara/superpool)
-![License](https://img.shields.io/github/license/rafamiziara/superpool)
+![GitHub repo size](https://img.shields.io/github/repo-size/rm30-dev/superpool)
+![GitHub last commit](https://img.shields.io/github/last-commit/rm30-dev/superpool)
+![License](https://img.shields.io/github/license/rm30-dev/superpool)
 
 > ⚠️ **DEVELOPMENT STATUS**: SuperPool is currently under active development as a proof-of-concept. The smart contracts have NOT been audited and should NOT be used with real funds on mainnet. Always use testnet deployments and dedicated test wallets. For development and testing purposes only.
 
@@ -104,7 +104,7 @@ Detailed documentation for each component:
 
 ```bash
 # Clone the repository
-git clone https://github.com/rafamiziara/superpool.git
+git clone https://github.com/rm30-dev/superpool.git
 cd superpool
 
 # Install dependencies

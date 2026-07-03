@@ -1,19 +1,29 @@
-'use client'
-
 import { Navigation } from '@/components/Navigation'
-import { HeroSection } from '@/components/HeroSection'
-import { FeaturesSection } from '@/components/FeaturesSection'
-import { CTASection } from '@/components/CTASection'
+import { Hero } from '@/components/Hero'
+import { ChainTicker } from '@/components/ChainTicker'
+import { HowItWorks } from '@/components/HowItWorks'
+import { Features } from '@/components/Features'
+import { Roadmap } from '@/components/Roadmap'
+import { OpenSource } from '@/components/OpenSource'
+import { AppTeaser } from '@/components/AppTeaser'
 import { Footer } from '@/components/Footer'
+import { ScrollReveals } from '@/components/ScrollReveals'
 
 export default function Home() {
   return (
-    <div className="min-h-screen bg-background transition-colors">
+    <>
+      <ScrollReveals />
       <Navigation />
-      <HeroSection />
-      <FeaturesSection />
-      <CTASection />
+      <main>
+        <Hero />
+        <ChainTicker />
+        <HowItWorks />
+        <Features />
+        <Roadmap />
+        <OpenSource />
+        <AppTeaser />
+      </main>
       <Footer />
-    </div>
+    </>
   )
 }

@@ -106,6 +106,40 @@ export interface ListPoolsResponse {
   hasPreviousPage: boolean
 }
 
+export interface PreparePoolCreationRequest {
+  chainId?: number
+}
+
+export interface PreparePoolCreationResponse {
+  isWhitelisted: boolean
+  wasAlreadyWhitelisted: boolean
+  transactionHash?: string
+  gasCost?: string
+}
+
+export interface IndexPoolRequest {
+  txHash: string
+  chainId?: number
+}
+
+export interface IndexPoolResponse {
+  poolId: number
+  alreadyIndexed: boolean
+  stored: boolean
+}
+
+// Dev/Testing API types (emulator only)
+export interface SignMessageRequest {
+  nonce: string
+  timestamp: number
+}
+
+export interface SignMessageResponse {
+  signature: string
+  walletAddress: string
+  message: string
+}
+
 export interface JoinPoolRequest {
   poolId: string
   userAddress: string
