@@ -46,7 +46,7 @@ export function Navigation() {
         </div>
 
         <a
-          href="https://github.com/rafamiziara/superpool"
+          href="https://github.com/rm30-dev/superpool"
           target="_blank"
           rel="noopener noreferrer"
           className="group flex items-center gap-2 rounded-full border border-hairline bg-depth/60 px-4 py-2 text-sm font-medium text-foam transition-all duration-300 hover:border-lumen/40 hover:bg-raised"

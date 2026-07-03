@@ -168,6 +168,6 @@ import '@superpool/design/tokens.css'
 
 ---
 
-**Related Issue**: [#39 - Implement design system, branding, and NativeWind integration](https://github.com/rafamiziara/superpool/issues/39)
+**Related Issue**: [#39 - Implement design system, branding, and NativeWind integration](https://github.com/rm30-dev/superpool/issues/39)
 
 **Last Updated**: December 2024

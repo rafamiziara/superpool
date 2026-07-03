@@ -26,12 +26,12 @@ export function Footer() {
 
           <nav className="flex flex-col gap-3 font-mono text-xs tracking-wider" aria-label="Footer">
             <a
-              href="https://github.com/rafamiziara/superpool"
+              href="https://github.com/rm30-dev/superpool"
               target="_blank"
               rel="noopener noreferrer"
               className="text-mist transition-colors hover:text-lumen-bright"
             >
-              github.com/rafamiziara/superpool
+              github.com/rm30-dev/superpool
             </a>
             <a
               href="https://www.rm30.dev/"

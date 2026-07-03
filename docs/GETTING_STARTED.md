@@ -18,7 +18,7 @@ Before starting, ensure you have:
 
 ```bash
 # Clone and install
-git clone https://github.com/rafamiziara/superpool.git
+git clone https://github.com/rm30-dev/superpool.git
 cd superpool
 pnpm install
 ```

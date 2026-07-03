@@ -37,7 +37,7 @@ export function Hero() {
 
         <div className="mt-10 flex flex-col gap-4 sm:flex-row sm:items-center">
           <a
-            href="https://github.com/rafamiziara/superpool"
+            href="https://github.com/rm30-dev/superpool"
             target="_blank"
             rel="noopener noreferrer"
             className="rise group inline-flex items-center justify-center gap-2.5 rounded-full bg-brand px-7 py-3.5 font-display text-sm font-semibold text-white shadow-[0_0_40px_rgba(37,99,235,0.35)] transition-[background-color,box-shadow] duration-300 hover:bg-brand-soft hover:shadow-[0_0_60px_rgba(37,99,235,0.55)]"
