@@ -6,6 +6,7 @@
   "main": "index.js",
   "scripts": {
     "dev": "node scripts/dev-start.js",
+    "dev:backend": "node scripts/backend-start.js",
     "test": "pnpm run test:backend && pnpm run test:contracts && pnpm run test:mobile",
     "test:backend": "pnpm --filter backend test",
     "test:contracts": "pnpm --filter contracts test",

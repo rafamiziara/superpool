@@ -20,8 +20,10 @@
           "safe",
           "rainbow",
           "uniswap"
-        ]
-      }
+        ],
+        "ITSAppUsesNonExemptEncryption": false
+      },
+      "bundleIdentifier": "com.rafaelmiziara.superpool"
     },
     "android": {
       "adaptiveIcon": {
