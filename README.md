@@ -4,6 +4,7 @@
 
 # 🚀 **SuperPool: Decentralized Micro-Lending Pools**
 
+[![CI](https://github.com/rm30-dev/superpool/actions/workflows/ci.yml/badge.svg?branch=develop)](https://github.com/rm30-dev/superpool/actions/workflows/ci.yml)
 ![GitHub repo size](https://img.shields.io/github/repo-size/rm30-dev/superpool)
 ![GitHub last commit](https://img.shields.io/github/last-commit/rm30-dev/superpool)
 ![License](https://img.shields.io/github/license/rm30-dev/superpool)
