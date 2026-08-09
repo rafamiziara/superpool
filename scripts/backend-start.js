@@ -47,7 +47,7 @@ class BackendEnvironment {
       try {
         await this.execAsync(check.command)
         this.log(`✓ ${check.name} is installed`, 'success')
-      } catch (error) {
+      } catch {
         this.log(`✗ ${check.name} is not installed or not in PATH`, 'error')
         throw new Error(`Missing prerequisite: ${check.name}`)
       }
@@ -107,7 +107,7 @@ class BackendEnvironment {
 
         this.log('Firebase Emulators are ready!', 'success')
         break
-      } catch (error) {
+      } catch {
         attempts++
         if (attempts >= maxAttempts) {
           throw new Error('Firebase Emulators failed to start within 30 seconds')
@@ -238,7 +238,7 @@ class BackendEnvironment {
 
     // Update Cloud Functions URL - only replace the ngrok domain, preserve project ID and zone
     envContent = envContent.replace(
-      /EXPO_PUBLIC_CLOUD_FUNCTIONS_BASE_URL="http:\/\/[^\/]+\/(.*?)"/,
+      /EXPO_PUBLIC_CLOUD_FUNCTIONS_BASE_URL="http:\/\/[^/]+\/(.*?)"/,
       `EXPO_PUBLIC_CLOUD_FUNCTIONS_BASE_URL="http://${this.ngrokUrls.functions}/$1"`
     )
 

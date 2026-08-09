@@ -85,14 +85,17 @@ The monorepo structure enables seamless development with shared packages for des
 Detailed documentation for each component:
 
 **Applications:**
+
 - [Mobile App](apps/mobile/README.md) - React Native/Expo with wallet integration
 - [Landing Page](apps/landing/README.md) - Next.js marketing website
 
 **Core Services:**
+
 - [Smart Contracts](packages/contracts/README.md) - Solidity contracts and deployment
 - [Backend](packages/backend/README.md) - Firebase Cloud Functions
 
 **Shared Packages:**
+
 - [UI Components](packages/ui/README.md) - React component library
 - [TypeScript Types](packages/types/README.md) - Shared type definitions
 - [Design System](packages/design/README.md) - Design tokens and configuration
