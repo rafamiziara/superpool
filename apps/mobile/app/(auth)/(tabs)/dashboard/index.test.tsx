@@ -1,0 +1,97 @@
+import React from 'react'
+import { mockToast } from '../../../../src/__tests__/mocks'
+import { mockRouterPush, mockRouterReplace } from '../../../../src/__tests__/setup'
+import { fireEvent, render } from '../../../../src/__tests__/test-utils'
+import { poolStore } from '../../../../src/stores/PoolStore'
+import DashboardScreen from './index'
+
+// Mock dependencies
+jest.mock('expo-status-bar', () => ({
+  StatusBar: () => null,
+}))
+
+describe('DashboardScreen', () => {
+  beforeEach(async () => {
+    jest.clearAllMocks()
+    await poolStore.loadPools()
+  })
+
+  it('renders the dashboard structure', () => {
+    const { getByTestId } = render(<DashboardScreen />)
+
+    expect(getByTestId('dashboard-screen')).toBeTruthy()
+    expect(getByTestId('dashboard-hero')).toBeTruthy()
+    expect(getByTestId('dashboard-pools')).toBeTruthy()
+    expect(getByTestId('dashboard-actions')).toBeTruthy()
+    expect(getByTestId('dashboard-activity')).toBeTruthy()
+  })
+
+  it('shows the total pool balance from the store', () => {
+    const { getByText } = render(<DashboardScreen />)
+
+    expect(getByText('601.6')).toBeTruthy()
+    expect(getByText('+26.6 POL earned all-time')).toBeTruthy()
+  })
+
+  it('renders a macro-card per joined pool', () => {
+    const { getByTestId } = render(<DashboardScreen />)
+
+    for (const pool of poolStore.myPools) {
+      expect(getByTestId(`pool-card-${pool.poolId}`)).toBeTruthy()
+    }
+  })
+
+  it('shows the active loan with repay action', () => {
+    const { getByTestId } = render(<DashboardScreen />)
+
+    expect(getByTestId('dashboard-loan')).toBeTruthy()
+    expect(getByTestId('repay-button')).toBeTruthy()
+  })
+
+  it('renders thumb-zone quick actions', () => {
+    const { getByTestId } = render(<DashboardScreen />)
+
+    expect(getByTestId('contribute-button')).toBeTruthy()
+    expect(getByTestId('request-loan-button')).toBeTruthy()
+  })
+
+  it('shows coming-soon toasts for the unimplemented actions', () => {
+    const { getByTestId } = render(<DashboardScreen />)
+
+    fireEvent.press(getByTestId('contribute-button'))
+    expect(mockToast.show).toHaveBeenCalledWith({ type: 'info', text1: 'Contributing is coming soon' })
+
+    fireEvent.press(getByTestId('request-loan-button'))
+    expect(mockToast.show).toHaveBeenCalledWith({ type: 'info', text1: 'Loan request is coming soon' })
+
+    fireEvent.press(getByTestId('repay-button'))
+    expect(mockToast.show).toHaveBeenCalledWith({ type: 'info', text1: 'Repayment is coming soon' })
+  })
+
+  it('navigates from the "see all" links to the matching tabs', () => {
+    const { getByTestId } = render(<DashboardScreen />)
+
+    fireEvent.press(getByTestId('see-all-pools'))
+    expect(mockRouterReplace).toHaveBeenCalledWith('/(auth)/(tabs)/pools')
+
+    fireEvent.press(getByTestId('see-all-activity'))
+    expect(mockRouterReplace).toHaveBeenCalledWith('/(auth)/(tabs)/activity')
+  })
+
+  it('opens the pool detail from a macro-card', () => {
+    const { getByTestId } = render(<DashboardScreen />)
+
+    fireEvent.press(getByTestId('pool-card-1'))
+
+    expect(mockRouterPush).toHaveBeenCalledWith('/(auth)/pool/1')
+  })
+
+  it('hides the loan section when the user has no active loan', () => {
+    poolStore.loans = []
+
+    const { queryByTestId } = render(<DashboardScreen />)
+
+    expect(queryByTestId('dashboard-loan')).toBeNull()
+    expect(queryByTestId('repay-button')).toBeNull()
+  })
+})

@@ -44,8 +44,8 @@ Ideal for exploring DeFi lending mechanics, studying trust-based financial netwo
 
 - **Smart Contracts:** Solidity, Hardhat, OpenZeppelin (ERC-20, UUPS Proxies, Ownable)
 - **Multi-Chain Deployment:** EVM-compatible chains including Polygon, Ethereum, Arbitrum, Base, and BSC
-- **Frontend - Landing Page:** Next.js 15.5, React 19, Tailwind CSS v4
-- **Frontend - Mobile App:** React Native/Expo, NativeWind, MobX state management
+- **Frontend - Landing Page:** Next.js 16, React 19, Tailwind CSS v4
+- **Frontend - Mobile App:** React Native/Expo, Uniwind (Tailwind CSS v4), MobX state management
 - **Wallet Integration:** Reown AppKit with WalletConnect protocol supporting 500+ wallets
 - **Blockchain Interaction:** Wagmi hooks, Viem, Typechain for type-safe contract bindings
 - **Backend:** Firebase Cloud Functions, Firestore, wallet-based authentication
@@ -61,7 +61,7 @@ The project is structured as a monorepo, allowing for seamless development and t
 superpool/
 ├── apps/
 │ ├── mobile/           # React Native / Expo application
-│ └── landing/          # Next.js 15.5.0 landing page
+│ └── landing/          # Next.js 16 landing page
 ├── packages/
 │ ├── contracts/        # Solidity smart contracts (PoolFactory, LendingPool)
 │ ├── backend/          # Firebase Cloud Functions & backend logic

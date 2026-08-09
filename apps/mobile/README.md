@@ -63,20 +63,26 @@ pnpm test
 
 ## State Management
 
-MobX stores configured in `src/stores/`:
+MobX singleton stores configured in `src/stores/`:
 
-- **`AuthenticationStore`** - User authentication and session
-- **`WalletConnectionStore`** - Blockchain wallet connections
-- **`PoolManagementStore`** - Lending pool operations
-- **`RootStore`** - Store composition and context provider
-
-Access via React Context:
+- **`AuthStore`** - User authentication, wallet state and session
+- **`NavigationStore`** - Auth-driven routing decisions
+- **`PoolStore`** - Lending pools, memberships, loans and transactions (currently mock data shaped on the real backend/contract payloads — `listPools` Cloud Function `PoolInfo`, shared `@superpool/types`)
 
 ```typescript
-import { useStores } from './stores/RootStore'
-
-const { authStore, walletStore } = useStores()
+import { authStore, poolStore } from '../src/stores'
 ```
+
+## Post-login UI
+
+Dark-first "Abyss & Aurora" theme defined in `global.css` (Tailwind v4 `@theme` tokens: `abyss`/`surface`/`raised` depth scale, `mint`/`amber`/`iris`/`coral` accents). Screens live under `app/(auth)/`:
+
+- **`(tabs)/dashboard`** - Balance hero, horizontal pool macro-cards, active loan, quick actions
+- **`(tabs)/pools`** - Pool list + create-pool placeholder
+- **`(tabs)/activity`** - Transaction feed grouped by day
+- **`pool/[id]`** - Pool detail with stats, your position, thumb-zone action bar
+
+Navigation uses Expo Router **NativeTabs** (SF Symbols on iOS, Material icons on Android) with a per-tab native **Stack**: the dashboard header shows the SuperPool logo + `AppKitButton`, Pools/Activity use native large titles, and pool detail pushes over the tabs with a native back button. Shared header styling lives in `src/constants/navigation.ts`.
 
 ## Network Configuration
 
@@ -116,7 +122,10 @@ Configured in `src/config/wagmi.ts`:
 - **Reown AppKit** - Wallet connection UI
 - **Wagmi/Viem** - Ethereum interactions
 - **MobX** - Reactive state management
-- **NativeWind** - Tailwind CSS for React Native
-- **@superpool/ui** - Shared components
-- **@superpool/design** - Design tokens
-- **@superpool/types** - TypeScript types
+- **Uniwind** - Tailwind CSS v4 for React Native
+- **@superpool/types** - Shared TypeScript types
+- **@superpool/assets** - Shared logos and onboarding illustrations
+
+> The mobile app does not consume `@superpool/ui` (React DOM components) or
+> `@superpool/design` (Tailwind v3 config + web tokens). Its theme lives in
+> `global.css` — see [Post-login UI](#post-login-ui).

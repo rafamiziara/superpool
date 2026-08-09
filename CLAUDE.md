@@ -8,7 +8,7 @@ SuperPool is a proof-of-concept multi-chain decentralized micro-lending platform
 
 ### Applications
 
-- **Landing Page** (`apps/landing/`) - Next.js 15.5.0 marketing website
+- **Landing Page** (`apps/landing/`) - Next.js 16 marketing website
 - **Mobile App** (`apps/mobile/`) - React Native/Expo app with wallet integration
 
 ### Core Services
@@ -160,7 +160,7 @@ For project structure overview, see the [Architecture section in README.md](READ
 - **UI Components** (`@superpool/ui`): Button, Card, Input components with TypeScript support
 - **Types** (`@superpool/types`): Authentication, lending, blockchain, and API interfaces
 
-**Landing Page** (Next.js 15.5.0):
+**Landing Page** (Next.js 16):
 
 - **Framework**: Next.js with App Router and React 19 support
 - **Styling**: Tailwind CSS v4 with shared design system integration
@@ -171,12 +171,12 @@ For project structure overview, see the [Architecture section in README.md](READ
 
 - **Wallet Integration**: Reown AppKit with WalletConnect for multi-wallet support (500+ wallets)
 - **State Management**: MobX reactive stores with centralized state management
-- **Styling**: NativeWind for Tailwind CSS compatibility with shared design tokens
+- **Styling**: Uniwind (Tailwind CSS v4) with theme tokens in global.css
 - **Icons**: FontAwesome via `@expo/vector-icons` (wallet, users, shield, etc.)
 - **Chain Support**: Ethereum Mainnet, Polygon, Arbitrum, Base, BSC, Polygon Amoy, Localhost (dev mode)
 - **Firebase Integration**: Authentication, Firestore, Cloud Functions
 - **Architecture**: Expo Router with TypeScript and shared type definitions
-- **Store Architecture**: AuthenticationStore, WalletConnectionStore, PoolManagementStore, RootStore pattern
+- **Store Architecture**: AuthStore, NavigationStore, PoolStore singletons in `src/stores/`
 - **React Integration**: mobx-react-lite with observer components and React Context
 - **Configuration**: React Native batching, development mode validation
 - **Assets**: References shared onboarding illustrations and brand assets
@@ -429,9 +429,9 @@ Comprehensive interfaces for type safety:
 
 - **Blockchain**: Solidity, Hardhat, OpenZeppelin, Multi-chain (Polygon, Ethereum, Arbitrum, Base, BSC)
 - **Backend**: Firebase Cloud Functions, TypeScript, Ethers.js
-- **Frontend**: Next.js 15.5.0, React Native, Expo, Wagmi, Viem, Reown AppKit
+- **Frontend**: Next.js 16, React Native, Expo, Wagmi, Viem, Reown AppKit
 - **State Management**: MobX, mobx-react-lite for reactive state management
-- **Styling**: Tailwind CSS v4, NativeWind, shared design system
+- **Styling**: Tailwind CSS v4 (web + mobile via Uniwind), shared design system
 - **Icons**: FontAwesome (@expo/vector-icons for mobile)
 - **Development**: pnpm workspaces, TypeScript project references, Jest
 
