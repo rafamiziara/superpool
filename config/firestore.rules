@@ -1,18 +1,101 @@
-rules_version='2'
+rules_version = '2';
+
+// SuperPool Firestore security rules.
+//
+// Posture: DEFAULT DENY. Every document in this database is written by the
+// backend Cloud Functions through the Firebase Admin SDK, which bypasses these
+// rules entirely. Clients therefore never need write access, and the few reads
+// they may legitimately perform are allow-listed one collection at a time.
+//
+// Auth model: `verifySignatureAndLogin` mints a Firebase custom token whose UID
+// is the user's wallet address (see packages/backend/src/functions/auth). So
+// `request.auth.uid` IS the wallet address, and document IDs in `users` and
+// `auth_nonces` are wallet addresses too. Address casing is not guaranteed to
+// be consistent between clients (checksummed vs. lowercase), so ownership
+// checks compare case-insensitively.
 
 service cloud.firestore {
   match /databases/{database}/documents {
+
+    // --- Helpers -----------------------------------------------------------
+
+    function isSignedIn() {
+      return request.auth != null && request.auth.uid != null;
+    }
+
+    // The signed-in wallet address, normalised for comparison.
+    function callerWallet() {
+      return request.auth.uid.lower();
+    }
+
+    function isWallet(walletAddress) {
+      return isSignedIn() && callerWallet() == walletAddress.lower();
+    }
+
+    // --- users -------------------------------------------------------------
+    // Profile documents keyed by wallet address. A user may read their own
+    // profile; profiles are created and updated only by the auth function.
+
+    match /users/{walletAddress} {
+      allow get: if isWallet(walletAddress);
+      allow list: if false; // no enumerating the user base
+      allow write: if false; // backend-only (Admin SDK)
+    }
+
+    // --- pools -------------------------------------------------------------
+    // Lending pools indexed from on-chain events. The data is public by nature
+    // (it mirrors the blockchain), but reads are gated on authentication so the
+    // database cannot be scraped anonymously. Writes come from the indexer.
+
+    // Note: authentication is cheap here — any wallet can sign a nonce and get
+    // a token — so this is close to public read. That is acceptable because the
+    // data mirrors public chain state, but queries are capped so a session
+    // cannot be used to drain the collection (and the read quota) in bulk.
+
+    match /pools/{poolId} {
+      allow get: if isSignedIn();
+      allow list: if isSignedIn() && request.query.limit <= 100; // mirrors listPools' own cap
+      allow write: if false; // backend-only (event indexer)
+    }
+
+    // --- auth_nonces -------------------------------------------------------
+    // Single-use login challenges. Readable nonces would let an attacker who
+    // has any authenticated session harvest challenges for other wallets, and
+    // writable nonces would break replay protection outright. Never exposed.
+
+    match /auth_nonces/{walletAddress} {
+      allow read, write: if false; // backend-only
+    }
+
+    // --- approved_devices --------------------------------------------------
+    // Device-to-wallet mappings backing App Check custom token minting. Client
+    // write access here would let anyone self-approve a device.
+
+    match /approved_devices/{deviceId} {
+      allow read, write: if false; // backend-only
+    }
+
+    // --- whitelisting_logs -------------------------------------------------
+    // Audit trail for backend-paid pool-creator whitelisting. Internal only.
+
+    match /whitelisting_logs/{logId} {
+      allow read, write: if false; // backend-only
+    }
+
+    // --- event_sync_state --------------------------------------------------
+    // Per-chain indexer cursors (last processed block). Tampering with these
+    // would let an attacker skip or replay blockchain event ranges.
+
+    match /event_sync_state/{chainId} {
+      allow read, write: if false; // backend-only
+    }
+
+    // --- Catch-all ---------------------------------------------------------
+    // Any collection not named above (including future ones) is closed to
+    // clients. Add an explicit `match` block above to open one deliberately.
+
     match /{document=**} {
-      // This rule allows anyone with your database reference to view, edit,
-      // and delete all data in your database. It is useful for getting
-      // started, but it is configured to expire after 30 days because it
-      // leaves your app open to attackers. At that time, all client
-      // requests to your database will be denied.
-      //
-      // Make sure to write security rules for your app before that time, or
-      // else all client requests to your database will be denied until you
-      // update your rules.
-      allow read, write: if request.time < timestamp.date(2025, 8, 30);
+      allow read, write: if false;
     }
   }
 }
