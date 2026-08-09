@@ -1,5 +1,5 @@
 const { getDefaultConfig } = require('expo/metro-config')
-const { withNativeWind } = require('nativewind/metro')
+const { withUniwindConfig } = require('uniwind/metro')
 const path = require('path')
 
 const config = getDefaultConfig(__dirname)
@@ -23,5 +23,8 @@ config.watchFolders = [
   path.resolve(__dirname, '../../packages/types'),
 ]
 
-// Add NativeWind support
-module.exports = withNativeWind(config, { input: './global.css' })
+// withUniwindConfig must be the outermost wrapper
+module.exports = withUniwindConfig(config, {
+  cssEntryFile: './global.css',
+  dtsFile: './src/uniwind-types.d.ts',
+})

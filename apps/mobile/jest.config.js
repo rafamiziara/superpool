@@ -5,11 +5,12 @@ module.exports = {
 
   // Transform ES6 modules from node_modules
   transformIgnorePatterns: [
-    'node_modules/(?!(react-native|@react-native|expo|@expo|expo-.*|@reown|@walletconnect|wagmi|viem|@tanstack|mobx|mobx-react-lite|react-native-toast-message|@react-native-async-storage|@react-native-community|firebase|@firebase|uuid)/)',
+    'node_modules/(?!(react-native|@react-native|expo|@expo|expo-.*|@reown|@walletconnect|wagmi|viem|@tanstack|mobx|mobx-react-lite|react-native-toast-message|@react-native-async-storage|@react-native-community|firebase|@firebase|uuid|uniwind)/)',
   ],
 
   // Module mapping for workspace dependencies
   moduleNameMapper: {
+    '\\.css$': '<rootDir>/src/__tests__/styleMock.js',
     '^@/(.*)$': '<rootDir>/src/$1',
     '^@superpool/assets/(.*)$': '<rootDir>/../../packages/assets/$1',
     '^@superpool/(.*)$': '<rootDir>/../../packages/$1/src',
@@ -32,6 +33,7 @@ module.exports = {
     '!src/__tests__/**',
     '!src/**/*.d.ts',
     '!app/**/+*.tsx', // Expo router files
+    '!app/**/_layout.tsx', // Router layouts: declarative navigator config, no logic
     '!src/config/**', // Configuration directory
     '!src/assets/**', // Static assets
     '!src/constants/**', // Constants and configuration data

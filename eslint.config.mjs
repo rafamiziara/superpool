@@ -25,6 +25,7 @@ export default [
       '**/artifacts/**',
       '**/cache/**',
       '**/next-env.d.ts',
+      '**/uniwind-types.d.ts',
 
       // Coverage reports
       '**/coverage/**',

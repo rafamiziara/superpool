@@ -1,7 +1,64 @@
-/* Import design tokens from shared design system */
-@import '@superpool/design/tokens.css';
+@import 'tailwindcss';
+@import 'uniwind';
 
-/* Tailwind directives */
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+/*
+ * SuperPool mobile theme — "Abyss & Aurora"
+ * Deep ink-navy atmosphere with a luminous mint accent (aurora light on dark
+ * water), warm amber for lending/yield moments, coral for danger.
+ * Dark-first: the post-login experience uses these tokens exclusively.
+ */
+@theme {
+  /* Depth scale (backgrounds, from deepest to most elevated) */
+  --color-abyss: #060b16;
+  --color-surface: #0c1526;
+  --color-raised: #142138;
+  --color-veil: #1c2b45; /* hairline borders / dividers */
+
+  /* Text on dark */
+  --color-snow: #f2f6fc;
+  --color-fog: #94a6c4;
+  --color-mist: #5c6e8c;
+
+  /* Accents */
+  --color-mint: #4ae3b5; /* primary action / positive */
+  --color-mint-deep: #0e3b31; /* mint wash background */
+  --color-amber: #f7bb64; /* loans / attention */
+  --color-amber-deep: #3d2c12;
+  --color-coral: #ff7a7a; /* danger / overdue */
+  --color-coral-deep: #3d1a1e;
+  --color-iris: #8b9dff; /* secondary accent (variety on cards) */
+  --color-iris-deep: #1e2547;
+
+  /* Legacy tokens still used by the pre-login (light) auth screens */
+  --color-primary: #2563eb;
+  --color-destructive: #ef4444;
+  --color-muted-foreground: #64748b;
+}
+
+/* Platform-correct monospace for amounts, addresses and hashes */
+@layer theme {
+  :root {
+    @variant ios {
+      --font-mono: 'Menlo';
+    }
+    @variant android {
+      --font-mono: 'monospace';
+    }
+    @variant web {
+      --font-mono: 'monospace';
+    }
+  }
+}
+
+/* Layered soft shadows for depth on dark surfaces */
+@utility shadow-float {
+  box-shadow:
+    0 2px 6px rgba(2, 6, 18, 0.35),
+    0 14px 34px rgba(2, 6, 18, 0.55);
+}
+@utility shadow-glow-mint {
+  box-shadow: 0 10px 30px rgba(74, 227, 181, 0.28);
+}
+@utility border-hairline {
+  border-width: hairlineWidth();
+}

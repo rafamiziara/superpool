@@ -14,13 +14,7 @@
     "ios": {
       "supportsTablet": true,
       "infoPlist": {
-        "LSApplicationQueriesSchemes": [
-          "metamask",
-          "trust",
-          "safe",
-          "rainbow",
-          "uniswap"
-        ],
+        "LSApplicationQueriesSchemes": ["metamask", "trust", "safe", "rainbow", "uniswap"],
         "ITSAppUsesNonExemptEncryption": false
       },
       "bundleIdentifier": "com.rafaelmiziara.superpool"
@@ -36,10 +30,7 @@
       "favicon": "./assets/favicon.png",
       "bundler": "metro"
     },
-    "plugins": [
-      "expo-router",
-      "expo-secure-store"
-    ],
+    "plugins": ["expo-router", "expo-secure-store", "expo-status-bar"],
     "scheme": "superpool",
     "extra": {
       "router": {},

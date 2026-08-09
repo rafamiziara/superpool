@@ -1,8 +1,12 @@
+import '../global.css'
+
 import { AppKit } from '@reown/appkit-wagmi-react-native'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { Stack } from 'expo-router'
 import { StatusBar } from 'expo-status-bar'
+import { SafeAreaListener } from 'react-native-safe-area-context'
 import Toast from 'react-native-toast-message'
+import { Uniwind } from 'uniwind'
 import { WagmiProvider } from 'wagmi'
 import { FirebaseInitializer } from '../src/components/FirebaseInitializer'
 import { WalletListener } from '../src/components/WalletListener'
@@ -36,12 +40,14 @@ function AppContent() {
 
 export default function RootLayout() {
   return (
-    <WagmiProvider config={wagmiConfig}>
-      <QueryClientProvider client={queryClient}>
-        <AppContent />
-        <StatusBar style="auto" />
-        <AppKit />
-      </QueryClientProvider>
-    </WagmiProvider>
+    <SafeAreaListener onChange={({ insets }) => Uniwind.updateInsets(insets)}>
+      <WagmiProvider config={wagmiConfig}>
+        <QueryClientProvider client={queryClient}>
+          <AppContent />
+          <StatusBar style="auto" />
+          <AppKit />
+        </QueryClientProvider>
+      </WagmiProvider>
+    </SafeAreaListener>
   )
 }

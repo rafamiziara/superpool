@@ -7,5 +7,9 @@ coverage
 lib
 .next
 
+# Generated type declarations (rewritten by their toolchains)
+next-env.d.ts
+uniwind-types.d.ts
+
 # Ignore lock files
 pnpm-lock.yaml
