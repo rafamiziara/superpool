@@ -1,7 +1,16 @@
 import * as dotenv from 'dotenv'
+import { mkdirSync, writeFileSync } from 'fs'
 import { ethers, network, run, upgrades } from 'hardhat'
+import { join } from 'path'
 
 dotenv.config()
+
+/**
+ * Hardhat's first default account. This key is published in Hardhat's own docs
+ * and funded only on throwaway local chains — it is printed here so local
+ * backend setup is copy-pasteable. Never use it on a live network.
+ */
+const HARDHAT_ACCOUNT_0_PRIVATE_KEY = '0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80'
 
 /**
  * Verify a contract with retry logic (skips on localhost)
@@ -118,12 +127,29 @@ async function main() {
     // Verify PoolFactory proxy (will skip on localhost)
     await verifyContract('PoolFactory Proxy', factoryAddress, [])
 
-    // Step 3: Create multiple sample pools for testing
-    console.log('\n3️⃣ Creating sample pools for local testing...')
+    // Step 3: Enable whitelist mode and authorize the sample creators
+    //
+    // This mirrors production: `createPool` is guarded by `onlyAuthorizedCreator`,
+    // and in the real flow the backend authorizes a wallet on demand (lazy
+    // whitelisting) before the user sends their own creation transaction. Doing
+    // the same here means the local chain exercises the same authorization path
+    // instead of letting the factory owner bypass it.
+    console.log('\n3️⃣ Enabling whitelist mode and authorizing sample creators...')
+
+    const whitelistTx = await poolFactory.setWhitelistMode(true)
+    await whitelistTx.wait()
+    console.log('   ✅ Whitelist mode enabled')
+
+    // Step 4: Create sample pools, each from its own creator account
+    //
+    // `PoolParams` no longer carries `poolOwner` — the factory sets
+    // `poolOwner = msg.sender` — so ownership is decided by who sends the
+    // transaction, not by a field in the struct.
+    console.log('\n4️⃣ Creating sample pools for local testing...')
 
     const samplePools = [
       {
-        poolOwner: accounts[1].address, // Different owner for testing
+        creator: accounts[1], // Different owner for testing
         maxLoanAmount: ethers.parseEther('5'),
         interestRate: 500, // 5%
         loanDuration: 7 * 24 * 60 * 60, // 7 days
@@ -131,7 +157,7 @@ async function main() {
         description: 'Short-term loans with fast approval',
       },
       {
-        poolOwner: accounts[2].address,
+        creator: accounts[2],
         maxLoanAmount: ethers.parseEther('20'),
         interestRate: 750, // 7.5%
         loanDuration: 30 * 24 * 60 * 60, // 30 days
@@ -139,7 +165,7 @@ async function main() {
         description: 'Medium-term loans for moderate amounts',
       },
       {
-        poolOwner: deployer.address,
+        creator: deployer,
         maxLoanAmount: ethers.parseEther('100'),
         interestRate: 1000, // 10%
         loanDuration: 90 * 24 * 60 * 60, // 90 days
@@ -148,17 +174,26 @@ async function main() {
       },
     ]
 
+    // Authorize every non-owner creator up front (the factory owner is always
+    // authorized, so the deployer needs no explicit entry).
+    for (const { creator } of samplePools) {
+      if (creator.address === deployer.address) continue
+      const authTx = await poolFactory.setCreatorAuthorization(creator.address, true)
+      await authTx.wait()
+      console.log(`   ✅ Authorized creator ${creator.address}`)
+    }
+
     const createdPools = []
 
     for (let i = 0; i < samplePools.length; i++) {
-      const poolParams = samplePools[i]
+      const { creator, ...poolParams } = samplePools[i]
       console.log(`\n   Creating pool ${i + 1}: ${poolParams.name}`)
-      console.log(`   - Owner: ${poolParams.poolOwner}`)
+      console.log(`   - Owner (tx sender): ${creator.address}`)
       console.log(`   - Max Loan: ${ethers.formatEther(poolParams.maxLoanAmount)} ETH`)
       console.log(`   - Interest: ${poolParams.interestRate / 100}%`)
       console.log(`   - Duration: ${poolParams.loanDuration / (24 * 60 * 60)} days`)
 
-      const createPoolTx = await poolFactory.createPool(poolParams)
+      const createPoolTx = await poolFactory.connect(creator).createPool(poolParams)
       const receipt = await createPoolTx.wait()
 
       // Get the created pool address from the event
@@ -171,14 +206,14 @@ async function main() {
           id: i + 1,
           address: poolAddress,
           name: poolParams.name,
-          owner: poolParams.poolOwner,
+          owner: creator.address,
         })
         console.log(`   ✅ Pool created at: ${poolAddress}`)
       }
     }
 
-    // Step 4: Fund pools with test liquidity
-    console.log('\n4️⃣ Funding pools with test liquidity...')
+    // Step 5: Fund pools with test liquidity
+    console.log('\n5️⃣ Funding pools with test liquidity...')
 
     for (let i = 0; i < createdPools.length; i++) {
       const pool = createdPools[i]
@@ -203,14 +238,16 @@ async function main() {
       }
     }
 
-    // Step 5: Display comprehensive deployment info
-    console.log('\n5️⃣ Deployment Summary')
+    // Step 6: Display comprehensive deployment info
+    console.log('\n6️⃣ Deployment Summary')
     console.log('================================')
 
-    const network = await ethers.provider.getNetwork()
+    // Renamed to avoid shadowing hardhat's `network` import, which the
+    // deployment record below needs for the target network's name.
+    const providerNetwork = await ethers.provider.getNetwork()
     const totalPools = await poolFactory.getPoolCount()
 
-    console.log(`📍 Network: ${network.name} (${network.chainId})`)
+    console.log(`📍 Network: ${providerNetwork.name} (${providerNetwork.chainId})`)
     console.log(`🏭 Factory Address: ${factoryAddress}`)
     console.log(`📊 Total Pools Created: ${totalPools}`)
 
@@ -221,7 +258,7 @@ async function main() {
       console.log(`      Owner: ${pool.owner}`)
     }
 
-    // Step 6: Create test accounts summary
+    // Step 7: Create test accounts summary
     console.log(`\n👥 Test Accounts Summary:`)
     console.log(`   Deployer (Account 0): ${deployer.address}`)
     console.log(`   Pool Owner 1 (Account 1): ${accounts[1]?.address || 'N/A'}`)
@@ -247,15 +284,21 @@ async function main() {
     console.log(`   - Chain ID: 31337`)
     console.log(`   - Factory Address: ${factoryAddress}`)
 
-    // Save deployment info for mobile app
+    // Step 8: Persist the deployment record
+    //
+    // Printing the addresses is not enough — the backend and the mobile app
+    // both need the PoolFactory address, and re-reading scrollback to find it
+    // is how deployment state ends up untracked. Write it to a file the rest
+    // of the monorepo can read.
     const deploymentInfo = {
       network: {
         name: 'localhost',
-        chainId: 31337,
-        rpcUrl: 'http://localhost:8545',
+        chainId: Number(providerNetwork.chainId),
+        rpcUrl: 'http://127.0.0.1:8545',
       },
       timestamp: new Date().toISOString(),
       deployer: deployer.address,
+      whitelistMode: await poolFactory.isWhitelistEnabled(),
       contracts: {
         lendingPoolImplementation: implementationAddress,
         poolFactory: {
@@ -271,8 +314,23 @@ async function main() {
       },
     }
 
-    console.log('\n📄 Deployment Info (save this for mobile app):')
-    console.log(JSON.stringify(deploymentInfo, null, 2))
+    const deploymentsDir = join(__dirname, '..', 'deployments')
+    mkdirSync(deploymentsDir, { recursive: true })
+    const deploymentPath = join(deploymentsDir, `${network.name}.json`)
+    writeFileSync(deploymentPath, `${JSON.stringify(deploymentInfo, null, 2)}\n`)
+
+    console.log(`\n📄 Deployment record written to: ${deploymentPath}`)
+    console.log('\n🔑 Backend configuration (packages/backend/.env):')
+    console.log(`   CHAIN_ID=${deploymentInfo.network.chainId}`)
+    console.log(`   CHAIN_NAME=Localhost`)
+    console.log(`   RPC_URL=${deploymentInfo.network.rpcUrl}`)
+    console.log(`   POOL_FACTORY_ADDRESS=${factoryAddress}`)
+    console.log(`   BACKEND_WALLET_PRIVATE_KEY=${HARDHAT_ACCOUNT_0_PRIVATE_KEY}`)
+    console.log('')
+    console.log(`   The backend wallet must be the factory owner (${deployer.address},`)
+    console.log('   Hardhat account #0): lazy whitelisting calls setCreatorAuthorization,')
+    console.log('   which is onlyOwner. The key above is the well-known Hardhat test key —')
+    console.log('   it is safe here and must never be used on a live network.')
   } catch (error) {
     console.error('❌ LOCAL deployment failed:')
     console.error(error)
