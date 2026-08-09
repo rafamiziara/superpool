@@ -10,7 +10,10 @@
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
     "resolveJsonModule": true,
+    // TODO: migrate to moduleResolution "node16" — blocked on chai 5 being ESM-only
+    // (TS1479) and on stale scripts/tests still passing the removed `poolOwner` param.
     "moduleResolution": "node",
+    "ignoreDeprecations": "6.0",
     "allowSyntheticDefaultImports": true,
     "composite": true,
     "declaration": true,
