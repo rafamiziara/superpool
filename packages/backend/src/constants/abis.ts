@@ -8,16 +8,18 @@ export const PoolFactoryABI = [
   'event PoolDeactivated(uint256 indexed poolId, address indexed poolAddress)',
   'event PoolReactivated(uint256 indexed poolId, address indexed poolAddress)',
   'event ImplementationUpdated(address indexed oldImplementation, address indexed newImplementation)',
-  'event CreatorAuthorized(address indexed creator, bool authorized)',
-  'event WhitelistModeChanged(bool enabled)',
+  'event CreatorAuthorized(address indexed creator, bool indexed authorized)',
+  'event WhitelistModeChanged(bool indexed enabled)',
 
   // View functions
   'function getPoolAddress(uint256 _poolId) external view returns (address)',
   'function getPoolCount() external view returns (uint256)',
-  'function getPoolInfo(uint256 _poolId) external view returns (tuple(address poolAddress, address poolOwner, uint256 maxLoanAmount, uint256 interestRate, uint256 loanDuration, string name, string description, uint256 createdAt, bool isActive))',
+  // PoolInfo field order must match the struct in PoolFactory.sol exactly:
+  // isActive is third, and name/description come last.
+  'function getPoolInfo(uint256 _poolId) external view returns (tuple(address poolAddress, address poolOwner, bool isActive, uint256 maxLoanAmount, uint256 interestRate, uint256 loanDuration, uint256 createdAt, string name, string description))',
   'function getPoolId(address _poolAddress) external view returns (uint256)',
   'function getPoolsByOwner(address _owner) external view returns (uint256[] memory)',
-  'function getPoolsRange(uint256 _start, uint256 _limit) external view returns (uint256[] memory poolIds, tuple(address poolAddress, address poolOwner, uint256 maxLoanAmount, uint256 interestRate, uint256 loanDuration, string name, string description, uint256 createdAt, bool isActive)[] memory poolInfos)',
+  'function getPoolsRange(uint256 _start, uint256 _limit) external view returns (uint256[] memory poolIds, tuple(address poolAddress, address poolOwner, bool isActive, uint256 maxLoanAmount, uint256 interestRate, uint256 loanDuration, uint256 createdAt, string name, string description)[] memory poolInfos)',
   'function isPoolActive(uint256 _poolId) external view returns (bool)',
   'function isAuthorizedCreator(address _creator) external view returns (bool)',
   'function isWhitelistEnabled() external view returns (bool)',

@@ -1,5 +1,5 @@
 import { Firestore } from 'firebase-admin/firestore'
-import { Interface, JsonRpcProvider, Log } from 'ethers'
+import { Contract, Interface, JsonRpcProvider, Log, Provider } from 'ethers'
 import { logger } from 'firebase-functions/v2'
 import { HttpsError } from 'firebase-functions/v2/https'
 import { PoolFactoryABI, POOLS_COLLECTION } from '../constants'
@@ -9,7 +9,7 @@ export interface ParsedPoolEvent {
   poolAddress: string
   poolOwner: string
   name: string
-  description: string // empty string for MVP — not emitted in PoolCreated event
+  description: string // not in the event — read back from the factory, see fetchPoolDescription
   maxLoanAmount: string // bigint as string
   interestRate: number
   loanDuration: number
@@ -49,6 +49,32 @@ export function parsePoolCreatedLog(log: Log, chainId: number, blockTimestamp: n
     }
   } catch (error) {
     throw new Error(`Failed to decode PoolCreated log: ${error instanceof Error ? error.message : String(error)}`)
+  }
+}
+
+/**
+ * Read a pool's description back from the factory.
+ *
+ * `PoolCreated` does not emit `description`, so the value the user typed would
+ * otherwise be written on-chain and then be invisible to the app, which reads
+ * Firestore. `getPoolInfo` has it, and the log's own `address` is the factory
+ * that emitted the event — so no chain configuration is needed here.
+ *
+ * The description is cosmetic: if this read fails, indexing must still store
+ * the pool rather than lose it, so failures degrade to an empty string.
+ */
+export async function fetchPoolDescription(poolId: number, factoryAddress: string, provider: Provider): Promise<string> {
+  try {
+    const factory = new Contract(factoryAddress, [...PoolFactoryABI], provider)
+    const poolInfo = await factory.getPoolInfo(poolId)
+    return (poolInfo.description as string) ?? ''
+  } catch (error) {
+    logger.warn('Failed to read pool description from factory; indexing without it', {
+      poolId,
+      factoryAddress,
+      error: error instanceof Error ? error.message : String(error),
+    })
+    return ''
   }
 }
 
@@ -123,6 +149,7 @@ export async function indexPoolByTxHash(
   }
 
   const parsedPool = parsePoolCreatedLog(matchingLogs[0], chainId, block.timestamp)
+  parsedPool.description = await fetchPoolDescription(parsedPool.poolId, matchingLogs[0].address, provider)
 
   return indexPoolEvent(parsedPool, firestore)
 }

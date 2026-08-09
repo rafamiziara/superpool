@@ -4,7 +4,7 @@ import { logger } from 'firebase-functions/v2'
 import { onSchedule } from 'firebase-functions/v2/scheduler'
 import { ACTIVE_CHAIN_CONFIG, EVENT_SYNC_STATE_COLLECTION, PoolFactoryABI } from '../../constants'
 import { firestore } from '../../services'
-import { indexPoolEvent, parsePoolCreatedLog } from '../../services/eventIndexer'
+import { fetchPoolDescription, indexPoolEvent, parsePoolCreatedLog } from '../../services/eventIndexer'
 import { getProvider } from '../../utils/blockchain'
 
 const MAX_BLOCK_RANGE = 500
@@ -94,6 +94,7 @@ export const syncPoolEventsHandler = async (): Promise<void> => {
       }
 
       const parsedPool = parsePoolCreatedLog(event, chainId, block.timestamp)
+      parsedPool.description = await fetchPoolDescription(parsedPool.poolId, event.address, provider)
       const result = await indexPoolEvent(parsedPool, firestore)
 
       if (result.stored) {
