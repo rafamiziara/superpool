@@ -184,7 +184,7 @@ contract SampleLendingPool is
             revert InsufficientFunds();
         }
 
-        uint256 loanId = ++nextLoanId;
+        uint256 loanId = nextLoanId++;
 
         // Complete all state changes before external call (CEI pattern)
         loans[loanId] = Loan({

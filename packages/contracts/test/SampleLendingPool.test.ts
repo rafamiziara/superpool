@@ -94,10 +94,10 @@ describe('SampleLendingPool', function () {
 
       await expect(lendingPool.connect(borrower).createLoan(loanAmount))
         .to.emit(lendingPool, 'LoanCreated')
-        .withArgs(2, borrower.address, loanAmount)
+        .withArgs(1, borrower.address, loanAmount)
 
       // Check loan details
-      const loan = await lendingPool.getLoan(2)
+      const loan = await lendingPool.getLoan(1)
       expect(loan.borrower).to.equal(borrower.address)
       expect(loan.amount).to.equal(loanAmount)
       expect(loan.interestRate).to.equal(interestRate)

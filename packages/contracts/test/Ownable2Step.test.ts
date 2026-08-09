@@ -252,7 +252,6 @@ describe('PoolFactory Ownable2Step', function () {
       // Step 5: New owner can operate, old owner cannot
       await expect(
         poolFactory.connect(newOwner).createPool({
-          poolOwner: otherAccount.address,
           maxLoanAmount: ethers.parseEther('5'),
           interestRate: 750,
           loanDuration: 60 * 24 * 60 * 60,

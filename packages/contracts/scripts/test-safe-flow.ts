@@ -122,7 +122,6 @@ async function testSafeFlow() {
       ...poolParams,
       name: 'Pending Phase Pool',
       description: 'Pool created during pending transfer phase',
-      poolOwner: poolOwner2.address,
     })
     const poolCount2 = await poolFactory.getPoolCount()
     console.log(`✅ Original owner can still create pools. Total pools: ${poolCount2}`)
