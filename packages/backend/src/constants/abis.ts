@@ -25,7 +25,9 @@ export const PoolFactoryABI = [
   'function version() external pure returns (string memory)',
 
   // State-changing functions
-  'function createPool(tuple(address poolOwner, uint256 maxLoanAmount, uint256 interestRate, uint256 loanDuration, string name, string description) calldata _params) external returns (uint256 poolId, address poolAddress)',
+  // PoolParams has no poolOwner: the factory sets poolOwner = msg.sender.
+  // Field order must match the struct in PoolFactory.sol exactly.
+  'function createPool(tuple(uint256 maxLoanAmount, uint256 interestRate, uint256 loanDuration, string name, string description) calldata _params) external returns (uint256 poolId, address poolAddress)',
   'function deactivatePool(uint256 _poolId) external',
   'function reactivatePool(uint256 _poolId) external',
   'function updateImplementation(address _newImplementation) external',
