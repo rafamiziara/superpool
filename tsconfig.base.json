@@ -4,7 +4,12 @@
     "lib": ["ES2020", "DOM"],
     "types": [],
     "module": "ESNext",
-    "moduleResolution": "node",
+    // "node" (node10) is deprecated as of TS 6 and errors without an
+    // ignoreDeprecations escape hatch. Every package extending this base is
+    // bundled (tsup) or consumed by a bundler (Next, Metro), so "bundler" is
+    // the accurate mode. packages/contracts keeps node10 deliberately — see
+    // the TODO in its own tsconfig.
+    "moduleResolution": "bundler",
     "esModuleInterop": true,
     "allowSyntheticDefaultImports": true,
     "strict": true,

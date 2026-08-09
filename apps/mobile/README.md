@@ -129,3 +129,9 @@ Configured in `src/config/wagmi.ts`:
 > The mobile app does not consume `@superpool/ui` (React DOM components) or
 > `@superpool/design` (Tailwind v3 config + web tokens). Its theme lives in
 > `global.css` — see [Post-login UI](#post-login-ui).
+
+> **Jest stays on 29 here while `packages/backend` is on 30.** This is a
+> toolchain constraint, not drift: `jest-expo` builds on jest 29 internals
+> (`@jest/globals`, `babel-jest`, `jest-snapshot`, `jest-environment-jsdom` are
+> all pinned to `^29.2.1`), and that is still true of `jest-expo@57`. Mobile can
+> move to jest 30 only when Expo's preset does.
