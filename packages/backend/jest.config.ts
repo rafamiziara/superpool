@@ -24,6 +24,7 @@ const config: Config = {
     '!src/__tests__/**',
     '!src/constants/**',
     '!src/config/**',
+    '!src/functions/dev/**', // emulator-only helpers; index.ts never exports these in production
     '!src/**/index.ts',
     '!lib/**',
   ],
