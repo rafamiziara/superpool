@@ -4,8 +4,10 @@
   "description": "Smart contracts for SuperPool decentralized lending platform",
   "scripts": {
     "compile": "hardhat compile",
+    "type-check": "tsc --noEmit",
     "test": "hardhat test",
     "test:gas": "cross-env REPORT_GAS=true hardhat test",
+    "test:integration": "hardhat test test/SafeIntegration.test.ts --network polygonAmoyFork",
     "test:fork": "hardhat test --network polygonAmoyFork",
     "coverage": "cross-env COVERAGE=true hardhat coverage --testfiles \"test/!(SafeIntegration).test.ts\" || true && npm run coverage:copy",
     "coverage:copy": "cpx \"coverage/**\" \"../../coverage/contracts/\" && echo \"✅ Contracts coverage copied to root directory\"",

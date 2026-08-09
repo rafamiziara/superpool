@@ -13,7 +13,9 @@ interface ILendingPool {
  * This contract should NOT be able to exploit the lending pool
  */
 contract TestReentrancyAttacker {
-    ILendingPool public target;
+    /// @dev Named `targetPool`, not `target`: a public `target()` getter collides
+    /// with ethers' `BaseContract.target` and breaks the generated typechain types.
+    ILendingPool public targetPool;
     uint256 public attackCount;
     uint256 public maxAttacks = 3;
     bool public attacking = false;
@@ -22,25 +24,25 @@ contract TestReentrancyAttacker {
         if (attacking && attackCount < maxAttacks) {
             attackCount++;
             // Attempt to create another loan during the callback
-            try target.createLoan(0.1 ether) {} catch {}
+            try targetPool.createLoan(0.1 ether) {} catch {}
         }
     }
 
     function setTarget(address _target) external {
-        target = ILendingPool(_target);
+        targetPool = ILendingPool(_target);
     }
 
     function attackCreateLoan(uint256 _amount) external {
         attacking = true;
         attackCount = 0;
-        target.createLoan(_amount);
+        targetPool.createLoan(_amount);
         attacking = false;
     }
 
     function attackRepayLoan(uint256 _loanId, uint256 _value) external {
         attacking = true;
         attackCount = 0;
-        target.repayLoan{value: _value}(_loanId);
+        targetPool.repayLoan{value: _value}(_loanId);
         attacking = false;
     }
 

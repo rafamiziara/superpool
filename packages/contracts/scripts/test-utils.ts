@@ -188,8 +188,8 @@ export async function getPoolInfo(poolAddress: string): Promise<{
       totalFunds: ethers.formatEther(totalFunds),
       nextLoanId: nextLoanId.toString(),
       maxLoanAmount: ethers.formatEther(config.maxLoanAmount),
-      interestRate: config.interestRate,
-      loanDuration: config.loanDuration,
+      interestRate: Number(config.interestRate),
+      loanDuration: Number(config.loanDuration),
       isActive: config.isActive,
     }
   } catch (error) {

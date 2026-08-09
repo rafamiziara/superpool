@@ -1,7 +1,7 @@
 import { SignerWithAddress } from '@nomicfoundation/hardhat-ethers/signers'
 import { expect } from 'chai'
 import chaiAsPromised from 'chai-as-promised'
-import { ethers } from 'hardhat'
+import { ethers, network } from 'hardhat'
 
 // Use chai-as-promised for async testing
 import chai from 'chai'
@@ -11,6 +11,15 @@ import { PoolFactory, SampleLendingPool } from '../typechain-types'
 chai.use(chaiAsPromised)
 
 describe('Safe Integration Tests', function () {
+  // The Safe SDK deploys via a live JSON-RPC node and the canonical Safe
+  // singletons, neither of which exist on the ephemeral in-process network.
+  // Run against a node: `pnpm test:integration` (fork) or --network localhost.
+  before(function () {
+    if (network.name === 'hardhat') {
+      this.skip()
+    }
+  })
+
   let poolFactory: PoolFactory
   let lendingPoolImplementation: SampleLendingPool
   let deployer: SignerWithAddress
