@@ -103,7 +103,10 @@ function CreatePoolScreen() {
           {poolId === null ? 'It will appear in your circles shortly.' : `Pool #${poolId} is ready for members to join.`}
         </Text>
         <Pressable
-          onPress={() => router.replace('/(auth)/(tabs)/pools')}
+          // See the note in pool/contribute.tsx — replacing this screen with the
+          // pools tab leaves two of them on the stack and a back press that
+          // looks ignored.
+          onPress={() => router.dismissTo('/(auth)/(tabs)/pools')}
           className="mt-2 items-center justify-center rounded-2xl border-continuous bg-mint px-6 py-4 shadow-glow-mint active:opacity-90"
           testID="create-pool-view-pools"
         >

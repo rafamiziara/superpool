@@ -10,6 +10,8 @@ import mockAsyncStorage from '@react-native-async-storage/async-storage/jest/asy
 export const mockRouterReplace = jest.fn()
 export const mockRouterPush = jest.fn()
 export const mockRouterBack = jest.fn()
+/** Pops back to an existing screen instead of stacking a duplicate. */
+export const mockRouterDismissTo = jest.fn()
 
 /** Route params for screens under `app/**\/[param].tsx`. Set per test. */
 export const mockLocalSearchParams = jest.fn<Record<string, string>, []>(() => ({}))
@@ -26,11 +28,13 @@ jest.mock('expo-router', () => {
       push: mockRouterPush,
       replace: mockRouterReplace,
       back: mockRouterBack,
+      dismissTo: mockRouterDismissTo,
     }),
     router: {
       push: mockRouterPush,
       replace: mockRouterReplace,
       back: mockRouterBack,
+      dismissTo: mockRouterDismissTo,
     },
     usePathname: () => '/dashboard',
     useLocalSearchParams: () => mockLocalSearchParams(),

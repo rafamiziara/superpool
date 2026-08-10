@@ -1,7 +1,7 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native'
 import React from 'react'
 import type { Address } from 'viem'
-import { mockRouterReplace } from '../../../src/__tests__/setup'
+import { mockRouterDismissTo } from '../../../src/__tests__/setup'
 import { mockWagmiUseAccount, mockWagmiUseBalance } from '../../../src/__tests__/mocks'
 import CreatePoolScreen from './create'
 
@@ -150,7 +150,7 @@ describe('CreatePoolScreen', () => {
 
       fireEvent.press(screen.getByTestId('create-pool-view-pools'))
 
-      expect(mockRouterReplace).toHaveBeenCalledWith('/(auth)/(tabs)/pools')
+      expect(mockRouterDismissTo).toHaveBeenCalledWith('/(auth)/(tabs)/pools')
     })
 
     it('still reports success when the pool id could not be read', async () => {

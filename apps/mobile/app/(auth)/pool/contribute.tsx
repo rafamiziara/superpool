@@ -118,7 +118,13 @@ function ContributeScreen() {
             : `${formatToken(contributed)} POL is now in ${pool.name} and available to lend.`}
         </Text>
         <Pressable
-          onPress={() => router.replace(`/(auth)/pool/${pool.poolId}`)}
+          // `dismissTo`, not `replace`: this screen was pushed from the pool
+          // page, and replacing it puts a *second* pool page on the stack — so
+          // the first back lands on the pool page and the second appears to do
+          // nothing. Popping back to the existing entry leaves one of each. If
+          // the pool page is not in the stack (reached from elsewhere), this
+          // pushes it, which is the same thing replace would have done.
+          onPress={() => router.dismissTo(`/(auth)/pool/${pool.poolId}`)}
           className="mt-2 items-center justify-center rounded-2xl border-continuous bg-mint px-6 py-4 shadow-glow-mint active:opacity-90"
           testID="contribute-view-pool"
         >

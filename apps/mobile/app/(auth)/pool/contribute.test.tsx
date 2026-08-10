@@ -2,7 +2,7 @@ import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-
 import React from 'react'
 import { type Address, parseEther } from 'viem'
 import { mockWagmiUseAccount, mockWagmiUseBalance } from '../../../src/__tests__/mocks'
-import { mockLocalSearchParams, mockRouterBack, mockRouterReplace } from '../../../src/__tests__/setup'
+import { mockLocalSearchParams, mockRouterBack, mockRouterDismissTo } from '../../../src/__tests__/setup'
 import { poolStore } from '../../../src/stores/PoolStore'
 import ContributeScreen from './contribute'
 
@@ -131,7 +131,9 @@ describe('ContributeScreen', () => {
       await submitAmount()
       fireEvent.press(screen.getByTestId('contribute-view-pool'))
 
-      expect(mockRouterReplace).toHaveBeenCalledWith('/(auth)/pool/1')
+      // Pops back to the pool page already on the stack rather than adding a
+      // second one, which made the first back press look ignored.
+      expect(mockRouterDismissTo).toHaveBeenCalledWith('/(auth)/pool/1')
     })
   })
 
