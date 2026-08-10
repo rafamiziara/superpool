@@ -60,6 +60,16 @@ contract SampleLendingPool is
     /// @notice Current loan ID counter
     uint256 public nextLoanId;
 
+    /**
+     * @notice Amount each member has deposited and not yet withdrawn
+     * @dev Appended in v2. Before it existed, per-member balances had no
+     * on-chain counterpart at all — they were derived from `FundsDeposited`
+     * events off chain, which is why no withdrawal could be written. New state
+     * goes at the end of the most-derived contract to keep the layout
+     * upgrade-safe; the OpenZeppelin bases use ERC-7201 namespaces of their own.
+     */
+    mapping(address => uint256) public contributions;
+
     /// @notice Events
     /**
      * @notice Emitted when the pool configuration is updated
@@ -159,10 +169,15 @@ contract SampleLendingPool is
 
     /**
      * @notice Deposit funds into the pool
+     * @dev Credits the caller's contribution balance as well as pool liquidity.
+     * The two differ once loans are outstanding: `totalFunds` is what the pool
+     * can currently lend or return, while the sum of `contributions` is what it
+     * owes its members.
      */
     function depositFunds() external payable whenNotPaused {
         if (msg.value == 0) revert InvalidAmount();
         totalFunds += msg.value;
+        contributions[msg.sender] += msg.value;
         emit FundsDeposited(msg.sender, msg.value);
     }
 

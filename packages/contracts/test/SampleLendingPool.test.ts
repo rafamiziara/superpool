@@ -78,6 +78,40 @@ describe('SampleLendingPool', function () {
 
       expect(await lendingPool.totalFunds()).to.equal(deposit1 + deposit2)
     })
+
+    it('Should credit the depositor and nobody else', async function () {
+      const depositAmount = ethers.parseEther('5')
+
+      await lendingPool.connect(lender).depositFunds({ value: depositAmount })
+
+      expect(await lendingPool.contributions(lender.address)).to.equal(depositAmount)
+      expect(await lendingPool.contributions(otherAccount.address)).to.equal(0)
+    })
+
+    it('Should accumulate repeated deposits from the same member', async function () {
+      const deposit1 = ethers.parseEther('3')
+      const deposit2 = ethers.parseEther('2')
+
+      await lendingPool.connect(lender).depositFunds({ value: deposit1 })
+      await lendingPool.connect(lender).depositFunds({ value: deposit2 })
+
+      expect(await lendingPool.contributions(lender.address)).to.equal(deposit1 + deposit2)
+    })
+
+    it('Should track contributions separately per member', async function () {
+      const lenderDeposit = ethers.parseEther('3')
+      const otherDeposit = ethers.parseEther('2')
+
+      await lendingPool.connect(lender).depositFunds({ value: lenderDeposit })
+      await lendingPool.connect(otherAccount).depositFunds({ value: otherDeposit })
+
+      expect(await lendingPool.contributions(lender.address)).to.equal(lenderDeposit)
+      expect(await lendingPool.contributions(otherAccount.address)).to.equal(otherDeposit)
+    })
+
+    it('Should report zero for an address that never deposited', async function () {
+      expect(await lendingPool.contributions(borrower.address)).to.equal(0)
+    })
   })
 
   describe('Create Loan', function () {
