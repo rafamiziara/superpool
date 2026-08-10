@@ -89,6 +89,15 @@ contract SampleLendingPool is
      */
     event FundsDeposited(address indexed depositor, uint256 indexed amount);
     /**
+     * @notice Emitted when a member withdraws part or all of their contribution
+     * @param member Address of the account that withdrew funds
+     * @param amount Amount withdrawn
+     * @dev Both parameters are indexed to mirror `FundsDeposited`, so the two
+     * share one decoding shape off chain: `data` is empty and every field comes
+     * from the log topics.
+     */
+    event FundsWithdrawn(address indexed member, uint256 indexed amount);
+    /**
      * @notice Emitted when a new loan is created
      * @param loanId Unique identifier of the created loan
      * @param borrower Address of the borrower
@@ -113,6 +122,8 @@ contract SampleLendingPool is
 
     /// @notice Errors
     error InsufficientFunds();
+    error InsufficientBalance();
+    error InsufficientLiquidity();
     error LoanAlreadyRepaid();
     error UnauthorizedBorrower();
     error ExceedsMaxLoanAmount();
@@ -179,6 +190,53 @@ contract SampleLendingPool is
         totalFunds += msg.value;
         contributions[msg.sender] += msg.value;
         emit FundsDeposited(msg.sender, msg.value);
+    }
+
+    /**
+     * @notice Withdraw part or all of your contribution
+     * @param _amount Amount to withdraw, in wei
+     * @dev Bounded by two independent limits: what the caller is owed
+     * (`contributions[msg.sender]`) and what the pool can currently pay
+     * (`totalFunds`, which excludes anything lent out). The second is
+     * first-come-first-served on purpose — a member is not entitled to more
+     * than the pool holds, and outstanding loans therefore delay some
+     * withdrawals rather than failing them permanently.
+     *
+     * Interest earned through `repayLoan` is deliberately *not* withdrawable:
+     * it raises `totalFunds` without crediting any contribution, so it
+     * accumulates unclaimed. Distributing it is a separate milestone.
+     */
+    function withdraw(
+        uint256 _amount
+    ) external whenNotPaused nonReentrant {
+        if (_amount == 0) revert InvalidAmount();
+
+        uint256 balance = contributions[msg.sender];
+        if (_amount > balance) revert InsufficientBalance();
+        if (_amount > totalFunds) revert InsufficientLiquidity();
+
+        // Complete all state changes before external call (CEI pattern)
+        contributions[msg.sender] = balance - _amount;
+        totalFunds -= _amount;
+
+        // Emit event before external call
+        emit FundsWithdrawn(msg.sender, _amount);
+
+        (bool success, ) = payable(msg.sender).call{value: _amount}("");
+        if (!success) revert TransferFailed();
+    }
+
+    /**
+     * @notice Amount a member could withdraw right now
+     * @param _member Address to query
+     * @return The member's contribution, capped by the pool's free liquidity
+     * @dev A UI convenience so a "withdraw max" control does not have to
+     * reimplement the bound and drift from it.
+     */
+    function withdrawableAmount(
+        address _member
+    ) external view returns (uint256) {
+        return Math.min(contributions[_member], totalFunds);
     }
 
     /**

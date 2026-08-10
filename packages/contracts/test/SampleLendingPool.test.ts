@@ -114,6 +114,116 @@ describe('SampleLendingPool', function () {
     })
   })
 
+  describe('Withdraw', function () {
+    const depositAmount = ethers.parseEther('10')
+
+    beforeEach(async function () {
+      await lendingPool.connect(lender).depositFunds({ value: depositAmount })
+    })
+
+    it('Should withdraw a partial amount and debit the member', async function () {
+      const withdrawAmount = ethers.parseEther('4')
+
+      await expect(lendingPool.connect(lender).withdraw(withdrawAmount))
+        .to.emit(lendingPool, 'FundsWithdrawn')
+        .withArgs(lender.address, withdrawAmount)
+
+      expect(await lendingPool.contributions(lender.address)).to.equal(depositAmount - withdrawAmount)
+      expect(await lendingPool.totalFunds()).to.equal(depositAmount - withdrawAmount)
+    })
+
+    it('Should send the funds to the member', async function () {
+      const withdrawAmount = ethers.parseEther('4')
+      const balanceBefore = await ethers.provider.getBalance(lender.address)
+
+      const tx = await lendingPool.connect(lender).withdraw(withdrawAmount)
+      const receipt = await tx.wait()
+      const gasUsed = receipt!.gasUsed * receipt!.gasPrice
+
+      const balanceAfter = await ethers.provider.getBalance(lender.address)
+      expect(balanceAfter).to.equal(balanceBefore + withdrawAmount - gasUsed)
+    })
+
+    it('Should allow withdrawing the full contribution', async function () {
+      await lendingPool.connect(lender).withdraw(depositAmount)
+
+      expect(await lendingPool.contributions(lender.address)).to.equal(0)
+      expect(await lendingPool.totalFunds()).to.equal(0)
+    })
+
+    it('Should reject zero withdrawals', async function () {
+      await expect(lendingPool.connect(lender).withdraw(0)).to.be.revertedWithCustomError(lendingPool, 'InvalidAmount')
+    })
+
+    it('Should reject withdrawing more than the member contributed', async function () {
+      await expect(lendingPool.connect(lender).withdraw(depositAmount + 1n)).to.be.revertedWithCustomError(
+        lendingPool,
+        'InsufficientBalance'
+      )
+    })
+
+    it("Should reject withdrawing another member's funds", async function () {
+      await expect(lendingPool.connect(otherAccount).withdraw(ethers.parseEther('1'))).to.be.revertedWithCustomError(
+        lendingPool,
+        'InsufficientBalance'
+      )
+    })
+
+    it('Should reject a withdrawal the pool cannot currently pay', async function () {
+      // A borrower takes liquidity out, leaving less than the lender is owed.
+      await lendingPool.connect(borrower).depositFunds({ value: ethers.parseEther('1') })
+      await lendingPool.connect(borrower).createLoan(ethers.parseEther('9'))
+
+      // 10 + 1 - 9 = 2 free, but the lender is owed 10.
+      expect(await lendingPool.totalFunds()).to.equal(ethers.parseEther('2'))
+
+      await expect(lendingPool.connect(lender).withdraw(depositAmount)).to.be.revertedWithCustomError(lendingPool, 'InsufficientLiquidity')
+
+      // The free liquidity is still withdrawable.
+      await expect(lendingPool.connect(lender).withdraw(ethers.parseEther('2'))).to.not.be.reverted
+    })
+
+    it('Should reject withdrawals while paused', async function () {
+      await lendingPool.connect(owner).pause()
+
+      await expect(lendingPool.connect(lender).withdraw(ethers.parseEther('1'))).to.be.revertedWithCustomError(lendingPool, 'EnforcedPause')
+    })
+
+    it('Should not let interest earned by the pool be withdrawn as contribution', async function () {
+      await lendingPool.connect(borrower).depositFunds({ value: ethers.parseEther('1') })
+      await lendingPool.connect(borrower).createLoan(ethers.parseEther('5'))
+      const repayment = await lendingPool.calculateRepaymentAmount(1)
+      await lendingPool.connect(borrower).repayLoan(1, { value: repayment })
+
+      // The pool now holds more than the sum of contributions: the interest.
+      const interest = repayment - ethers.parseEther('5')
+      expect(await lendingPool.totalFunds()).to.equal(depositAmount + ethers.parseEther('1') + interest)
+
+      // Each member is still capped at what they put in.
+      await expect(lendingPool.connect(lender).withdraw(depositAmount + 1n)).to.be.revertedWithCustomError(
+        lendingPool,
+        'InsufficientBalance'
+      )
+    })
+
+    describe('withdrawableAmount', function () {
+      it('Should equal the contribution when the pool is liquid', async function () {
+        expect(await lendingPool.withdrawableAmount(lender.address)).to.equal(depositAmount)
+      })
+
+      it('Should be capped by free liquidity when loans are outstanding', async function () {
+        await lendingPool.connect(borrower).depositFunds({ value: ethers.parseEther('1') })
+        await lendingPool.connect(borrower).createLoan(ethers.parseEther('9'))
+
+        expect(await lendingPool.withdrawableAmount(lender.address)).to.equal(ethers.parseEther('2'))
+      })
+
+      it('Should be zero for a non-member', async function () {
+        expect(await lendingPool.withdrawableAmount(otherAccount.address)).to.equal(0)
+      })
+    })
+  })
+
   describe('Create Loan', function () {
     beforeEach(async function () {
       // Fund the pool
