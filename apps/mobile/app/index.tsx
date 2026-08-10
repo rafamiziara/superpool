@@ -1,6 +1,6 @@
 import { Redirect } from 'expo-router'
 import { observer } from 'mobx-react-lite'
-import { Text, View } from 'react-native'
+import { Image, View } from 'react-native'
 import { navigationStore } from '../src/stores/NavigationStore'
 
 export default observer(function NavigationController() {
@@ -16,8 +16,14 @@ export default observer(function NavigationController() {
 
   // Shown only while the state is still settling.
   return (
-    <View className="flex-1 bg-abyss items-center justify-center">
-      <Text className="text-3xl font-extrabold text-mint">SUPERPOOL</Text>
+    <View className="flex-1 bg-abyss items-center justify-center" testID="splash-screen">
+      <Image
+        source={require('@superpool/assets/images/logos/no_bg_white.png')}
+        className="h-12 w-64"
+        resizeMode="contain"
+        accessibilityLabel="SuperPool"
+        testID="splash-logo"
+      />
     </View>
   )
 })

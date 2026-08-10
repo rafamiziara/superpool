@@ -22,12 +22,12 @@ jest.mock('expo-router', () => ({
 }))
 
 describe('NavigationController', () => {
-  it('should show the SUPERPOOL splash while the target route is undecided', () => {
+  it('should show the SuperPool splash while the target route is undecided', () => {
     mockNavigationStore.targetRoute = null
 
     render(<NavigationController />)
 
-    expect(screen.getByText('SUPERPOOL')).toBeTruthy()
+    expect(screen.getByTestId('splash-logo')).toBeTruthy()
   })
 
   it('should redirect to the target route without waiting for a state change', () => {
@@ -38,7 +38,7 @@ describe('NavigationController', () => {
     render(<NavigationController />)
 
     expect(screen.getByText('redirect:/(auth)/dashboard')).toBeTruthy()
-    expect(screen.queryByText('SUPERPOOL')).toBeNull()
+    expect(screen.queryByTestId('splash-logo')).toBeNull()
   })
 
   it('should redirect to onboarding when no wallet is connected', () => {
