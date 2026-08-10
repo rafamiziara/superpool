@@ -77,6 +77,18 @@ const COPY: Record<
       failed: 'Your deposit was not taken and no funds moved beyond the network fee. You can safely try again.',
     },
   },
+  WITHDRAW: {
+    headline: {
+      submitted: 'Sending your funds back',
+      confirmed: 'Almost there',
+      failed: 'That withdrawal failed',
+    },
+    summary: {
+      submitted: 'The network is confirming your withdrawal. You can leave this screen — it carries on without you.',
+      confirmed: 'Your funds are on their way back to your wallet.',
+      failed: 'Nothing left the pool and no funds moved beyond the network fee. You can safely try again.',
+    },
+  },
 }
 
 function StepRow({ step }: { step: Step }) {
@@ -106,11 +118,11 @@ interface DetailRow {
 
 /**
  * The rows that describe what this transaction is, which is the one place the
- * two types genuinely diverge: a pool creation is defined by its terms, a
- * contribution by its amount and destination.
+ * types genuinely diverge: a pool creation is defined by its terms, a
+ * contribution or withdrawal by its amount and the pool it moved through.
  */
 function detailsFor(transaction: PendingTransaction): DetailRow[] {
-  if (transaction.type === 'CONTRIBUTE') {
+  if (transaction.type === 'CONTRIBUTE' || transaction.type === 'WITHDRAW') {
     const { params, result } = transaction
 
     return [

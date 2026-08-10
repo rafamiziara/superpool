@@ -16,10 +16,20 @@ export interface UsePoolIndexingReturn {
   isIndexing: boolean
 }
 
-/** The callable that indexes each transaction type. */
-const CALLABLE_NAME: Record<PendingTransactionType, string> = {
+/**
+ * The callable that indexes each transaction type, or `null` where none exists.
+ *
+ * Withdrawals have no indexer yet. The transaction is on chain and confirmed
+ * either way, so the record is cleared without a backend round trip — leaving it
+ * to fail would strand the pending card and make `indexConfirmed` retry it on
+ * every drain. Balances derived from contributions stay stale until the
+ * `FundsWithdrawn` indexer lands; the withdraw screen reads the chain directly
+ * for that reason.
+ */
+const CALLABLE_NAME: Record<PendingTransactionType, string | null> = {
   CREATE_POOL: 'indexPool',
   CONTRIBUTE: 'indexContribution',
+  WITHDRAW: null,
 }
 
 /**
@@ -43,13 +53,19 @@ export const usePoolIndexing = (): UsePoolIndexingReturn => {
       setIsIndexing(true)
 
       try {
-        const index = httpsCallable<IndexPoolRequest | IndexContributionRequest, IndexPoolResponse | IndexContributionResponse>(
-          FIREBASE_FUNCTIONS,
-          CALLABLE_NAME[type]
-        )
-        const response = await index({ txHash, chainId: requestedChainId ?? chainId ?? DEFAULT_CHAIN_ID })
+        const callableName = CALLABLE_NAME[type]
 
-        logger.debug('🗂️ Indexed:', type, response.data)
+        if (callableName === null) {
+          logger.debug('🗂️ No indexer for', type, '— clearing the pending record without one')
+        } else {
+          const index = httpsCallable<IndexPoolRequest | IndexContributionRequest, IndexPoolResponse | IndexContributionResponse>(
+            FIREBASE_FUNCTIONS,
+            callableName
+          )
+          const response = await index({ txHash, chainId: requestedChainId ?? chainId ?? DEFAULT_CHAIN_ID })
+
+          logger.debug('🗂️ Indexed:', type, response.data)
+        }
 
         // Refresh before dropping the pending record, so the result never
         // disappears from the UI in the gap between the two. `refreshPools`

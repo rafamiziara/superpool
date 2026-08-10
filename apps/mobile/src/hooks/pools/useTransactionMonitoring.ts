@@ -7,6 +7,7 @@ import {
   extractResult,
   pendingTransactionsStore,
   type PendingTransactionType,
+  type WithdrawResult,
 } from '../../stores/PendingTransactionsStore'
 import { describeTransactionError } from './transactionErrors'
 
@@ -14,7 +15,11 @@ import { describeTransactionError } from './transactionErrors'
 const RECEIPT_TIMEOUT_MS = 120_000
 
 /** What a confirmed transaction of each type yields. */
-export type ResultFor<T extends PendingTransactionType> = T extends 'CREATE_POOL' ? CreatePoolResult : ContributeResult
+export type ResultFor<T extends PendingTransactionType> = T extends 'CREATE_POOL'
+  ? CreatePoolResult
+  : T extends 'WITHDRAW'
+    ? WithdrawResult
+    : ContributeResult
 
 export type TransactionOutcome<T extends PendingTransactionType> = ResultFor<T> & { txHash: `0x${string}` }
 
@@ -26,6 +31,7 @@ export type TransactionOutcome<T extends PendingTransactionType> = ResultFor<T> 
 const MISSING_LOG_MESSAGE: Record<PendingTransactionType, string> = {
   CREATE_POOL: 'The transaction confirmed but did not create a pool',
   CONTRIBUTE: 'The transaction confirmed but did not record a deposit',
+  WITHDRAW: 'The transaction confirmed but did not record a withdrawal',
 }
 
 export interface UseTransactionMonitoringReturn {

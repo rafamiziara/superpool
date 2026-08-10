@@ -27,6 +27,16 @@ export const mockWagmiUseWriteContract = jest.fn(() => ({
 
 export const mockWagmiUseBalance = jest.fn((): { data?: { value: bigint } } => ({ data: { value: 1_000_000_000_000_000_000n } }))
 
+/**
+ * `useReadContract`, which callers use for several different reads on one
+ * screen. Tests dispatch on `functionName` rather than on call order, so adding
+ * a read does not shift what an existing assertion sees.
+ */
+export const mockWagmiUseReadContract = jest.fn((_config?: { functionName?: string }): { data?: unknown; refetch: jest.Mock } => ({
+  data: undefined,
+  refetch: jest.fn().mockResolvedValue({ data: undefined }),
+}))
+
 export type MockPublicClient = {
   chain?: { id: number }
   estimateContractGas: jest.Mock
@@ -84,6 +94,7 @@ jest.mock('wagmi', () => ({
   useSignMessage: mockWagmiUseSignMessage,
   usePublicClient: mockWagmiUsePublicClient,
   useWriteContract: mockWagmiUseWriteContract,
+  useReadContract: mockWagmiUseReadContract,
   WagmiProvider: mockWagmiProvider,
 }))
 

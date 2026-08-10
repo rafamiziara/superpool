@@ -148,6 +148,22 @@ function PoolDetailScreen() {
         >
           <Text className="text-sm font-bold text-abyss">Contribute</Text>
         </Pressable>
+        {/*
+          Only offered to members. Someone who never contributed has nothing to
+          take out, and `withdraw` would revert on them. The membership is
+          derived from indexed deposits, so it answers "has this wallet ever
+          funded this pool" — the withdrawable amount itself is read from the
+          chain on the next screen, where it has to be exact.
+        */}
+        {membership && (
+          <Pressable
+            onPress={() => router.push(`/(auth)/pool/withdraw?poolId=${pool.poolId}`)}
+            className="flex-1 items-center justify-center rounded-2xl border-continuous border-hairline border-veil bg-raised py-4 active:scale-[0.97] active:opacity-80"
+            testID="pool-withdraw-button"
+          >
+            <Text className="text-sm font-bold text-snow">Withdraw</Text>
+          </Pressable>
+        )}
         <Pressable
           onPress={() => comingSoon('Loan request')}
           className="flex-1 items-center justify-center rounded-2xl border-continuous border-hairline border-veil bg-raised py-4 active:scale-[0.97] active:opacity-80"

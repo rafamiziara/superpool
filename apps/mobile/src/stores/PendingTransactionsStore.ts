@@ -15,7 +15,7 @@ const STORAGE_KEY = '@superpool/pending_transactions'
 const MAX_STORED_TRANSACTIONS = 50
 
 export type PendingTransactionStatus = 'submitted' | 'confirmed' | 'failed'
-export type PendingTransactionType = 'CREATE_POOL' | 'CONTRIBUTE'
+export type PendingTransactionType = 'CREATE_POOL' | 'CONTRIBUTE' | 'WITHDRAW'
 
 export interface CreatePoolParams {
   name: string
@@ -52,6 +52,12 @@ export interface ContributeResult {
   amount: string
 }
 
+/** Populated once the transaction is confirmed and its `FundsWithdrawn` log is decoded. */
+export interface WithdrawResult {
+  /** Wei, as the chain recorded it — authoritative over the submitted params. */
+  amount: string
+}
+
 interface PendingTransactionBase {
   txHash: `0x${string}`
   chainId: number
@@ -71,13 +77,24 @@ export interface ContributeTransaction extends PendingTransactionBase {
   result?: ContributeResult
 }
 
+export interface WithdrawTransaction extends PendingTransactionBase {
+  type: 'WITHDRAW'
+  /** Same shape as a contribution: an amount, and the pool it moved through. */
+  params: ContributeParams
+  result?: WithdrawResult
+}
+
 /**
- * Discriminated on `type`, because the two flows carry genuinely different
+ * Discriminated on `type`, because the flows carry genuinely different
  * payloads: a pool creation has terms and produces an id, a contribution has an
- * amount and a pool it went into. Widening both into one optional-everything
+ * amount and a pool it went into. Widening them into one optional-everything
  * shape would push the narrowing into every consumer instead.
+ *
+ * A withdrawal reuses `ContributeParams` — it is the same amount moving the
+ * other way — but keeps its own `type`, since the extractor, the copy and
+ * eventually the indexer all differ.
  */
-export type PendingTransaction = CreatePoolTransaction | ContributeTransaction
+export type PendingTransaction = CreatePoolTransaction | ContributeTransaction | WithdrawTransaction
 
 /**
  * The slice of a Viem `PublicClient` this store needs. Injected rather than
@@ -185,6 +202,18 @@ function toPendingTransaction(value: JsonValue): PendingTransaction | null {
     return transaction
   }
 
+  if (type === 'WITHDRAW') {
+    const parsedParams = toContributeParams(params)
+    if (!parsedParams) return null
+
+    const transaction: WithdrawTransaction = { ...base, type, params: parsedParams }
+
+    const parsedResult = toContributeResult(result)
+    if (parsedResult) transaction.result = parsedResult
+
+    return transaction
+  }
+
   return null
 }
 
@@ -224,14 +253,38 @@ export function extractFundsDepositedResult(receipt: TransactionReceipt): Contri
 }
 
 /**
+ * Reads the withdrawn amount out of a confirmed receipt's `FundsWithdrawn` log.
+ *
+ * Like `FundsDeposited`, both parameters are `indexed`, so the values live in
+ * the log topics and `data` is empty.
+ */
+export function extractFundsWithdrawnResult(receipt: TransactionReceipt): WithdrawResult | undefined {
+  try {
+    const [event] = parseEventLogs({ abi: SampleLendingPoolABI, eventName: 'FundsWithdrawn', logs: receipt.logs })
+    if (!event) return undefined
+
+    return { amount: event.args.amount.toString() }
+  } catch {
+    return undefined
+  }
+}
+
+/**
  * The result extractor for a transaction's type.
  *
- * Startup recovery resolves records of both kinds against the chain and has only
+ * Startup recovery resolves records of every kind against the chain and has only
  * the stored `type` to tell them apart, so the dispatch lives here rather than
- * at each call site.
+ * at each call site. Picking the wrong extractor finds no log, and "no log" is
+ * what the monitor reads as failure.
  */
-export function extractResult(type: PendingTransactionType, receipt: TransactionReceipt): CreatePoolResult | ContributeResult | undefined {
-  return type === 'CREATE_POOL' ? extractPoolCreatedResult(receipt) : extractFundsDepositedResult(receipt)
+export function extractResult(
+  type: PendingTransactionType,
+  receipt: TransactionReceipt
+): CreatePoolResult | ContributeResult | WithdrawResult | undefined {
+  if (type === 'CREATE_POOL') return extractPoolCreatedResult(receipt)
+  if (type === 'WITHDRAW') return extractFundsWithdrawnResult(receipt)
+
+  return extractFundsDepositedResult(receipt)
 }
 
 /**
