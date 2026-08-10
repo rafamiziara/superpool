@@ -2,12 +2,15 @@ import { FontAwesome } from '@expo/vector-icons'
 import { router } from 'expo-router'
 import { StatusBar } from 'expo-status-bar'
 import { observer } from 'mobx-react-lite'
-import React from 'react'
+import React, { useState } from 'react'
 import { Pressable, ScrollView, Text, View } from 'react-native'
 import Toast from 'react-native-toast-message'
 import { ActivityRow } from '../../../../src/components/lending/ActivityRow'
+import { PendingTransactionBanner } from '../../../../src/components/lending/PendingTransactionBanner'
 import { PoolCard } from '../../../../src/components/lending/PoolCard'
+import { TransactionStatusModal } from '../../../../src/components/lending/TransactionStatusModal'
 import { palette } from '../../../../src/constants/palette'
+import { type PendingTransaction, pendingTransactionsStore } from '../../../../src/stores/PendingTransactionsStore'
 import { poolStore } from '../../../../src/stores/PoolStore'
 import { daysUntil, formatToken } from '../../../../src/utils/format'
 
@@ -23,6 +26,8 @@ function DashboardScreen() {
   const loanPool = loan ? poolStore.poolById(Number(loan.poolId)) : undefined
   const loanTotal = loan ? loan.amount + loan.interestAccrued : 0n
   const repaidPct = loan && loanTotal > 0n ? Number((loan.amountRepaid * 100n) / loanTotal) : 0
+
+  const [detail, setDetail] = useState<PendingTransaction | null>(null)
 
   return (
     <View className="flex-1 bg-abyss" testID="dashboard-screen">
@@ -61,6 +66,9 @@ function DashboardScreen() {
             )}
           </View>
         </View>
+
+        {/* Pool creations that have not landed yet — invisible on this screen otherwise */}
+        <PendingTransactionBanner className="mx-6 mt-6" onPress={setDetail} />
 
         {/* Your pools: horizontal macro-cards */}
         <View className="mt-10" testID="dashboard-pools">
@@ -165,6 +173,20 @@ function DashboardScreen() {
           </View>
         </View>
       </ScrollView>
+
+      <TransactionStatusModal
+        transaction={detail}
+        onClose={() => setDetail(null)}
+        onDismiss={
+          detail?.status === 'failed'
+            ? () => {
+                const { txHash } = detail
+                setDetail(null)
+                pendingTransactionsStore.removePendingTransaction(txHash)
+              }
+            : undefined
+        }
+      />
     </View>
   )
 }

@@ -164,6 +164,33 @@ describe('PoolsScreen', () => {
 
       expect(queryByTestId('pending-pool-dismiss-0xabc')).toBeNull()
     })
+
+    it('opens the status modal from a pending card', async () => {
+      await pendingTransactionsStore.addPendingTransaction(buildTransaction())
+
+      const { getByTestId, getByText, queryByText } = render(<PoolsScreen />)
+
+      expect(queryByText('Creating your pool')).toBeNull()
+
+      fireEvent.press(getByTestId('pending-pool-card-0xabc'))
+
+      expect(getByText('Creating your pool')).toBeTruthy()
+      expect(getByText('Sent to the network')).toBeTruthy()
+    })
+
+    it('removes the transaction when the modal dismisses it', async () => {
+      await pendingTransactionsStore.addPendingTransaction(buildTransaction({ status: 'failed' }))
+
+      const { getByTestId, queryByTestId } = render(<PoolsScreen />)
+
+      fireEvent.press(getByTestId('pending-pool-card-0xabc'))
+      await act(async () => {
+        fireEvent.press(getByTestId('transaction-status-dismiss'))
+      })
+
+      expect(queryByTestId('pending-pool-card-0xabc')).toBeNull()
+      expect(pendingTransactionsStore.transactions).toHaveLength(0)
+    })
   })
 
   describe('load states', () => {

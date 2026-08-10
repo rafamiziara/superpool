@@ -2,11 +2,12 @@ import { FontAwesome } from '@expo/vector-icons'
 import { router } from 'expo-router'
 import { StatusBar } from 'expo-status-bar'
 import { observer } from 'mobx-react-lite'
-import React, { useCallback, useEffect } from 'react'
+import React, { useCallback, useEffect, useState } from 'react'
 import { ActivityIndicator, Pressable, RefreshControl, ScrollView, Text, View } from 'react-native'
 import { useAccount } from 'wagmi'
 import { PendingPoolCard } from '../../../../src/components/lending/PendingPoolCard'
 import { PoolCard } from '../../../../src/components/lending/PoolCard'
+import { TransactionStatusModal } from '../../../../src/components/lending/TransactionStatusModal'
 import { DEFAULT_CHAIN_ID } from '../../../../src/config/contracts'
 import { palette } from '../../../../src/constants/palette'
 import { usePoolIndexing } from '../../../../src/hooks/pools/usePoolIndexing'
@@ -41,6 +42,14 @@ function PoolsScreen() {
   const activeChainId = chainId ?? DEFAULT_CHAIN_ID
   const pools = poolStore.myPools
   const pending = unlistedTransactions(activeChainId)
+
+  /** The transaction the status modal is describing; `null` keeps it closed. */
+  const [detail, setDetail] = useState<PendingTransaction | null>(null)
+
+  const dismiss = (transaction: PendingTransaction) => {
+    setDetail(null)
+    pendingTransactionsStore.removePendingTransaction(transaction.txHash)
+  }
 
   /**
    * Hands the backend anything startup recovery confirmed while the app was
@@ -129,9 +138,8 @@ function PoolsScreen() {
             <PendingPoolCard
               key={transaction.txHash}
               transaction={transaction}
-              onDismiss={
-                transaction.status === 'failed' ? () => pendingTransactionsStore.removePendingTransaction(transaction.txHash) : undefined
-              }
+              onPress={() => setDetail(transaction)}
+              onDismiss={transaction.status === 'failed' ? () => dismiss(transaction) : undefined}
             />
           ))}
 
@@ -164,6 +172,12 @@ function PoolsScreen() {
           </Pressable>
         </View>
       </ScrollView>
+
+      <TransactionStatusModal
+        transaction={detail}
+        onClose={() => setDetail(null)}
+        onDismiss={detail?.status === 'failed' ? () => dismiss(detail) : undefined}
+      />
     </View>
   )
 }
