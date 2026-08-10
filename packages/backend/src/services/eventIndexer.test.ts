@@ -1,5 +1,4 @@
 import { mockLogger } from '../__tests__/setup'
-import { createMockDoc } from '../__tests__/mocks'
 import { ParsedPoolEvent } from './eventIndexer'
 
 // ---------------------------------------------------------------------------
@@ -39,6 +38,14 @@ const POOL_CREATED_TOPIC = '0xPOOL_CREATED_TOPIC'
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
+
+/**
+ * What Firestore throws when `create()` hits an existing document: a plain
+ * Error carrying the gRPC status, not a typed class the SDK exports.
+ */
+function alreadyExistsError(): Error & { code: number } {
+  return Object.assign(new Error('6 ALREADY_EXISTS: entity already exists'), { code: 6 })
+}
 
 function buildMockLog(
   overrides: Partial<{
@@ -203,12 +210,12 @@ describe('parsePoolCreatedLog', () => {
 
 describe('indexPoolEvent', () => {
   function buildMockFirestore(docExists: boolean) {
-    const mockSet = jest.fn().mockResolvedValue(undefined)
-    const mockGet = jest.fn().mockResolvedValue(createMockDoc({}, docExists))
+    // `create()` is what the indexer relies on for atomicity: Firestore rejects
+    // it with ALREADY_EXISTS rather than overwriting.
+    const mockCreate = docExists ? jest.fn().mockRejectedValue(alreadyExistsError()) : jest.fn().mockResolvedValue(undefined)
 
     const mockDocRef = {
-      get: mockGet,
-      set: mockSet,
+      create: mockCreate,
     }
 
     const mockCollection = {
@@ -219,7 +226,7 @@ describe('indexPoolEvent', () => {
       collection: jest.fn().mockReturnValue(mockCollection),
     }
 
-    return { mockFs, mockCollection, mockDocRef, mockGet, mockSet }
+    return { mockFs, mockCollection, mockDocRef, mockCreate }
   }
 
   beforeEach(() => {
@@ -253,16 +260,39 @@ describe('indexPoolEvent', () => {
     )
   })
 
-  it('should not call set when document already exists', async () => {
-    // Arrange
-    const { mockFs, mockDocRef } = buildMockFirestore(true)
+  it('should store exactly once when two callers index the same pool concurrently', async () => {
+    // Arrange — the create screen and the pools screen both index the same
+    // confirmed transaction. A read-then-write let both observe "absent" and
+    // both report a first-time store; only one may win.
+    let created = false
+    const mockCreate = jest.fn().mockImplementation(async () => {
+      if (created) throw alreadyExistsError()
+      created = true
+    })
+    const mockFs = {
+      collection: jest.fn().mockReturnValue({ doc: jest.fn().mockReturnValue({ create: mockCreate }) }),
+    }
     const parsedPool = buildParsedPool({ poolId: 5, chainId: CHAIN_ID })
 
     // Act
-    await indexPoolEvent(parsedPool, mockFs)
+    const results = await Promise.all([indexPoolEvent(parsedPool, mockFs), indexPoolEvent(parsedPool, mockFs)])
 
     // Assert
-    expect(mockDocRef.set).not.toHaveBeenCalled()
+    expect(results.filter((result) => result.stored)).toHaveLength(1)
+    expect(results.filter((result) => result.alreadyIndexed)).toHaveLength(1)
+  })
+
+  it('should propagate a write failure that is not ALREADY_EXISTS', async () => {
+    // Arrange — a permission or transport error must not be reported as an
+    // already-indexed pool, which would silently drop it.
+    const mockCreate = jest.fn().mockRejectedValue(Object.assign(new Error('7 PERMISSION_DENIED'), { code: 7 }))
+    const mockFs = {
+      collection: jest.fn().mockReturnValue({ doc: jest.fn().mockReturnValue({ create: mockCreate }) }),
+    }
+    const parsedPool = buildParsedPool({ poolId: 6, chainId: CHAIN_ID })
+
+    // Act & Assert
+    await expect(indexPoolEvent(parsedPool, mockFs)).rejects.toThrow('7 PERMISSION_DENIED')
   })
 
   it('should return alreadyIndexed:false and stored:true when document does not exist', async () => {
@@ -286,7 +316,7 @@ describe('indexPoolEvent', () => {
     await indexPoolEvent(parsedPool, mockFs)
 
     // Assert
-    expect(mockDocRef.set).toHaveBeenCalledWith(
+    expect(mockDocRef.create).toHaveBeenCalledWith(
       expect.objectContaining({
         poolId: 3,
         poolAddress: parsedPool.poolAddress,
@@ -326,7 +356,7 @@ describe('indexPoolEvent', () => {
     await indexPoolEvent(parsedPool, mockFs)
 
     // Assert
-    expect(mockDocRef.set).toHaveBeenCalledWith(expect.objectContaining({ createdBy: '0xcreatoraddr' }))
+    expect(mockDocRef.create).toHaveBeenCalledWith(expect.objectContaining({ createdBy: '0xcreatoraddr' }))
   })
 
   it('should store addresses lowercased, so the listPools owner filter can match', async () => {
@@ -338,7 +368,7 @@ describe('indexPoolEvent', () => {
     await indexPoolEvent(parsedPool, mockFs)
 
     // Assert
-    expect(mockDocRef.set).toHaveBeenCalledWith(
+    expect(mockDocRef.create).toHaveBeenCalledWith(
       expect.objectContaining({
         poolOwner: '0x9965507d1a55bcc2695c58ba16fb37d819b0a4dc',
         createdBy: '0x9965507d1a55bcc2695c58ba16fb37d819b0a4dc',
@@ -392,9 +422,8 @@ describe('indexPoolByTxHash', () => {
   }
 
   function buildMockFirestoreForIndex(docExists: boolean) {
-    const mockSet = jest.fn().mockResolvedValue(undefined)
-    const mockGet = jest.fn().mockResolvedValue(createMockDoc({}, docExists))
-    const mockDocRef = { get: mockGet, set: mockSet }
+    const mockCreate = docExists ? jest.fn().mockRejectedValue(alreadyExistsError()) : jest.fn().mockResolvedValue(undefined)
+    const mockDocRef = { create: mockCreate }
     const mockCollection = { doc: jest.fn().mockReturnValue(mockDocRef) }
     return {
       collection: jest.fn().mockReturnValue(mockCollection),

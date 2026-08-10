@@ -78,38 +78,50 @@ export async function fetchPoolDescription(poolId: number, factoryAddress: strin
   }
 }
 
+/** Firestore's gRPC status for a `create()` against a document that exists. */
+const ALREADY_EXISTS = 6
+
 export async function indexPoolEvent(parsedPool: ParsedPoolEvent, firestore: Firestore): Promise<IndexPoolResult> {
   const docId = `${parsedPool.chainId}-${parsedPool.poolId}`
   const docRef = firestore.collection(POOLS_COLLECTION).doc(docId)
 
-  const existingDoc = await docRef.get()
+  // `create()` rather than read-then-`set()`: the indexing paths race. The
+  // create screen indexes the transaction it just saw confirmed while the pools
+  // screen drains the same hash, and the scheduled sync can arrive on top. A
+  // read-then-write lets every caller observe "absent" and write, so each one
+  // reports a first-time store and a doc written elsewhere in between is lost.
+  // Rejection on an existing document is what makes the guarantee atomic.
+  try {
+    await docRef.create({
+      poolId: parsedPool.poolId,
+      poolAddress: parsedPool.poolAddress,
+      // Lowercased on write: `listPools` lowercases the ownerAddress it filters
+      // by, so storing the checksummed form would make that filter match nothing.
+      poolOwner: parsedPool.poolOwner.toLowerCase(),
+      name: parsedPool.name,
+      description: parsedPool.description,
+      maxLoanAmount: parsedPool.maxLoanAmount,
+      interestRate: parsedPool.interestRate,
+      loanDuration: parsedPool.loanDuration,
+      chainId: parsedPool.chainId,
+      createdBy: parsedPool.poolOwner.toLowerCase(), // poolOwner === msg.sender at creation time
+      createdAt: parsedPool.createdAt,
+      transactionHash: parsedPool.transactionHash,
+      isActive: parsedPool.isActive,
+    })
+  } catch (error) {
+    const alreadyExists = typeof error === 'object' && error !== null && 'code' in error && error.code === ALREADY_EXISTS
 
-  if (existingDoc.exists) {
+    if (!alreadyExists) throw error
+
     logger.info('Pool already indexed, skipping', {
       poolId: parsedPool.poolId,
       chainId: parsedPool.chainId,
       docId,
     })
+
     return { poolId: parsedPool.poolId, alreadyIndexed: true, stored: false }
   }
-
-  await docRef.set({
-    poolId: parsedPool.poolId,
-    poolAddress: parsedPool.poolAddress,
-    // Lowercased on write: `listPools` lowercases the ownerAddress it filters
-    // by, so storing the checksummed form would make that filter match nothing.
-    poolOwner: parsedPool.poolOwner.toLowerCase(),
-    name: parsedPool.name,
-    description: parsedPool.description,
-    maxLoanAmount: parsedPool.maxLoanAmount,
-    interestRate: parsedPool.interestRate,
-    loanDuration: parsedPool.loanDuration,
-    chainId: parsedPool.chainId,
-    createdBy: parsedPool.poolOwner.toLowerCase(), // poolOwner === msg.sender at creation time
-    createdAt: parsedPool.createdAt,
-    transactionHash: parsedPool.transactionHash,
-    isActive: parsedPool.isActive,
-  })
 
   logger.info('Pool indexed successfully', {
     poolId: parsedPool.poolId,
