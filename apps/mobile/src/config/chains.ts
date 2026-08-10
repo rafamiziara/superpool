@@ -9,7 +9,13 @@ import { arbitrum, base, bsc, hardhat, mainnet, polygon, polygonAmoy } from 'wag
  *
  * Renamed to "Localhost" because that is what it is to the person using it, and
  * the name reaches the wallet's network picker.
+ *
+ * The RPC URL is overridable via `EXPO_PUBLIC_LOCALHOST_RPC_URL`: on a physical
+ * device `127.0.0.1` is the phone, not the machine running the node, so testing
+ * there needs the development machine's LAN address instead.
  */
+const LOCALHOST_RPC_URL = process.env.EXPO_PUBLIC_LOCALHOST_RPC_URL ?? 'http://127.0.0.1:8545'
+
 export const localhostChain = {
   ...hardhat,
   name: 'Localhost',
@@ -19,8 +25,8 @@ export const localhostChain = {
     decimals: 18,
   },
   rpcUrls: {
-    default: { http: ['http://127.0.0.1:8545'] },
-    public: { http: ['http://127.0.0.1:8545'] },
+    default: { http: [LOCALHOST_RPC_URL] },
+    public: { http: [LOCALHOST_RPC_URL] },
   },
 } as const
 
