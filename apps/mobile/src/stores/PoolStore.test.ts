@@ -89,9 +89,25 @@ const LIVE_POOL = {
   isActive: true,
 }
 
+/** One deposit into `LIVE_POOL`, as `listContributions` returns it. */
+const LIVE_CONTRIBUTION = {
+  id: '31337-0xbbbb-0',
+  poolId: 12,
+  poolAddress: LIVE_POOL.poolAddress,
+  // Lowercased, as the indexer stores it.
+  contributor: '0x90f79bf6eb2c4f870365e785982e1f101e93b906',
+  amount: '2000000000000000000',
+  chainId: 31337,
+  transactionHash: '0xbbbb',
+  logIndex: 0,
+  blockNumber: 101,
+  contributedAt: '2026-08-10T08:00:00.000Z',
+}
+
 describe('PoolStore against listPools', () => {
   let store: PoolStore
   let listPoolsCallable: jest.Mock
+  let listContributionsCallable: jest.Mock
 
   beforeEach(() => {
     jest.clearAllMocks()
@@ -104,7 +120,14 @@ describe('PoolStore against listPools', () => {
     listPoolsCallable = jest.fn().mockResolvedValue({
       data: { pools: [LIVE_POOL], totalCount: 1, page: 1, limit: 50, hasNextPage: false, hasPreviousPage: false },
     })
-    mockFirebaseCallable.mockReturnValue(listPoolsCallable)
+    listContributionsCallable = jest.fn().mockResolvedValue({
+      data: { contributions: [], totalCount: 0, limit: 50 },
+    })
+    // A load calls both callables, so the mock has to answer by name — a single
+    // stub would hand the pools response to the contributions request.
+    mockFirebaseCallable.mockImplementation((_functions?: unknown, name?: string) =>
+      name === 'listContributions' ? listContributionsCallable : listPoolsCallable
+    )
   })
 
   afterEach(() => {
@@ -233,6 +256,174 @@ describe('PoolStore against listPools', () => {
     await store.fetchPools()
 
     expect(store.isEmpty).toBe(true)
+    expect(store.hasError).toBe(false)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Contributions, and the memberships derived from them.
+// ---------------------------------------------------------------------------
+
+describe('PoolStore contributions', () => {
+  const CONTRIBUTOR = LIVE_CONTRIBUTION.contributor
+  const OTHER_WALLET = '0x0000000000000000000000000000000000000009'
+
+  let store: PoolStore
+  let listContributionsCallable: jest.Mock
+
+  /** Seeds the backend with `contributions` and loads. */
+  async function loadWith(contributions: (typeof LIVE_CONTRIBUTION)[]) {
+    listContributionsCallable.mockResolvedValue({
+      data: { contributions, totalCount: contributions.length, limit: 50 },
+    })
+    await store.fetchPools()
+  }
+
+  beforeEach(() => {
+    jest.clearAllMocks()
+    delete process.env.EXPO_PUBLIC_USE_MOCK_POOLS
+
+    authStore.walletAddress = null
+    authStore.chainId = 31337
+
+    store = new PoolStore()
+    const listPoolsCallable = jest.fn().mockResolvedValue({
+      data: { pools: [LIVE_POOL], totalCount: 1, page: 1, limit: 50, hasNextPage: false, hasPreviousPage: false },
+    })
+    listContributionsCallable = jest.fn().mockResolvedValue({ data: { contributions: [], totalCount: 0, limit: 50 } })
+    mockFirebaseCallable.mockImplementation((_functions?: unknown, name?: string) =>
+      name === 'listContributions' ? listContributionsCallable : listPoolsCallable
+    )
+  })
+
+  afterEach(() => {
+    process.env.EXPO_PUBLIC_USE_MOCK_POOLS = 'true'
+    authStore.walletAddress = null
+    authStore.chainId = null
+  })
+
+  it('asks the backend for the connected chain', async () => {
+    await store.fetchPools()
+
+    expect(mockFirebaseCallable).toHaveBeenCalledWith(expect.anything(), 'listContributions')
+    expect(listContributionsCallable).toHaveBeenCalledWith({ chainId: 31337, limit: 50 })
+  })
+
+  it('does not filter by wallet, so other members count towards pool liquidity', async () => {
+    // A pool's liquidity is what everyone put in, and it is shown on pools the
+    // user has not contributed to.
+    await store.fetchPools()
+
+    expect(listContributionsCallable).toHaveBeenCalledWith(expect.not.objectContaining({ contributor: expect.anything() }))
+  })
+
+  it('sums a pool’s liquidity across contributors', async () => {
+    await loadWith([
+      LIVE_CONTRIBUTION,
+      { ...LIVE_CONTRIBUTION, id: '31337-0xcccc-0', transactionHash: '0xcccc', contributor: OTHER_WALLET, amount: '3000000000000000000' },
+    ])
+
+    expect(store.poolLiquidity(12)).toBe(parseEther('5'))
+  })
+
+  it('reports zero liquidity for a pool nobody has funded', async () => {
+    await loadWith([])
+
+    expect(store.poolLiquidity(12)).toBe(0n)
+  })
+
+  it('lists the contributions into one pool', async () => {
+    await loadWith([LIVE_CONTRIBUTION, { ...LIVE_CONTRIBUTION, id: 'other', poolId: 99 }])
+
+    expect(store.contributionsFor(12)).toHaveLength(1)
+    expect(store.contributionsFor(12)[0].id).toBe(LIVE_CONTRIBUTION.id)
+  })
+
+  it('derives a membership from a contribution', async () => {
+    // There is no membership register on chain, so funding a pool is what makes
+    // someone a member of it.
+    authStore.walletAddress = CONTRIBUTOR
+    await loadWith([LIVE_CONTRIBUTION])
+
+    const membership = store.membershipFor(12)
+    expect(membership?.totalContributed).toBe(parseEther('2'))
+    expect(membership?.currentBalance).toBe(parseEther('2'))
+    expect(membership?.status).toBe(MemberStatus.ACTIVE)
+  })
+
+  it('sums repeat deposits into one membership', async () => {
+    authStore.walletAddress = CONTRIBUTOR
+    await loadWith([
+      LIVE_CONTRIBUTION,
+      { ...LIVE_CONTRIBUTION, id: '31337-0xdddd-0', transactionHash: '0xdddd', amount: '1000000000000000000' },
+    ])
+
+    expect(store.memberships).toHaveLength(1)
+    expect(store.membershipFor(12)?.totalContributed).toBe(parseEther('3'))
+  })
+
+  it('dates a membership from the first deposit, not the most recent', async () => {
+    authStore.walletAddress = CONTRIBUTOR
+    await loadWith([
+      LIVE_CONTRIBUTION,
+      { ...LIVE_CONTRIBUTION, id: 'earlier', transactionHash: '0xeeee', contributedAt: '2026-01-01T00:00:00.000Z' },
+    ])
+
+    expect(store.membershipFor(12)?.joinedAt).toEqual(new Date('2026-01-01T00:00:00.000Z'))
+  })
+
+  it('keeps one membership per wallet per pool', async () => {
+    await loadWith([LIVE_CONTRIBUTION, { ...LIVE_CONTRIBUTION, id: 'other-wallet', contributor: OTHER_WALLET }])
+
+    expect(store.memberships).toHaveLength(2)
+  })
+
+  it('matches the connected wallet case-insensitively', async () => {
+    // The indexer stores addresses lowercased; wallets report them checksummed.
+    authStore.walletAddress = '0x90F79bf6EB2c4f870365E785982E1f101E93b906'
+    await loadWith([LIVE_CONTRIBUTION])
+
+    expect(store.membershipFor(12)).toBeDefined()
+  })
+
+  it('marks the pool owner as an admin of their own pool', async () => {
+    // LIVE_POOL's owner is the contributor in this fixture.
+    await loadWith([LIVE_CONTRIBUTION])
+
+    expect(store.memberships[0].isAdmin).toBe(true)
+  })
+
+  it('does not mark an ordinary contributor as an admin', async () => {
+    await loadWith([{ ...LIVE_CONTRIBUTION, contributor: OTHER_WALLET }])
+
+    expect(store.memberships[0].isAdmin).toBe(false)
+  })
+
+  it('counts a pool the user contributed to as one of mine', async () => {
+    authStore.walletAddress = OTHER_WALLET
+    await loadWith([{ ...LIVE_CONTRIBUTION, contributor: OTHER_WALLET }])
+
+    expect(store.myPools.map((pool) => pool.poolId)).toEqual([12])
+  })
+
+  it('adds the user’s balance to the dashboard total', async () => {
+    authStore.walletAddress = OTHER_WALLET
+    await loadWith([{ ...LIVE_CONTRIBUTION, contributor: OTHER_WALLET }])
+
+    expect(store.totalBalance).toBe(parseEther('2'))
+    // No interest accrues yet, so a balance is exactly what was put in.
+    expect(store.totalEarned).toBe(0n)
+  })
+
+  it('survives a response with no contributions field', async () => {
+    // `memberships` derives from this and runs during render, so a malformed
+    // response must not take the screen down.
+    listContributionsCallable.mockResolvedValue({ data: { totalCount: 0, limit: 50 } })
+
+    await store.fetchPools()
+
+    expect(store.contributions).toEqual([])
+    expect(store.memberships).toEqual([])
     expect(store.hasError).toBe(false)
   })
 })

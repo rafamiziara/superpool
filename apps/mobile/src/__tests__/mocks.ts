@@ -55,7 +55,14 @@ export const mockFirebaseAuth = {
   authStateReady: jest.fn().mockResolvedValue(undefined),
 }
 
-export const mockFirebaseCallable = jest.fn(() =>
+/**
+ * Stands in for `httpsCallable(functions, name)`.
+ *
+ * The parameters are declared even though the default factory ignores them: a
+ * screen that calls two different functions needs `mockImplementation` to answer
+ * by name, and a zero-argument factory makes that a type error.
+ */
+export const mockFirebaseCallable = jest.fn((_functions?: unknown, _name?: string) =>
   jest.fn().mockResolvedValue({
     data: { message: 'test', nonce: '123', timestamp: Date.now(), expiresAt: new Date().toISOString() },
   })

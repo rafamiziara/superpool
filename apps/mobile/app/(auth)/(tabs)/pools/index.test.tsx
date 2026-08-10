@@ -44,9 +44,10 @@ describe('PoolsScreen', () => {
 
   it('uses the singular form for a single pool', () => {
     // myPools counts membership *or* ownership, so both have to be trimmed to
-    // leave exactly one: mock pool 2 is owned by the mock user.
+    // leave exactly one: mock pool 2 is owned by the mock user. Memberships are
+    // derived from contributions now, so trimming those is what shortens them.
     poolStore.pools = poolStore.pools.slice(0, 1)
-    poolStore.memberships = poolStore.memberships.slice(0, 1)
+    poolStore.contributions = []
 
     const { getByText } = render(<PoolsScreen />)
 

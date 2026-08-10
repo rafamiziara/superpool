@@ -1,4 +1,14 @@
-import type { ListPoolsRequest, ListPoolsResponse, Loan, PoolInfo, PoolMember, Transaction } from '@superpool/types'
+import type {
+  ContributionInfo,
+  ListContributionsRequest,
+  ListContributionsResponse,
+  ListPoolsRequest,
+  ListPoolsResponse,
+  Loan,
+  PoolInfo,
+  PoolMember,
+  Transaction,
+} from '@superpool/types'
 import { LoanStatus, MemberStatus, TransactionStatus } from '@superpool/types'
 import { httpsCallable } from 'firebase/functions'
 import { makeAutoObservable, runInAction } from 'mobx'
@@ -25,13 +35,13 @@ const DEFAULT_PAGE_SIZE = 50
 /**
  * Lending pool state.
  *
- * Pools come from the `listPools` Cloud Function. Memberships, loans and
- * transactions are still mock-backed — no backend serves them yet — so a load
- * is deliberately hybrid rather than all-or-nothing.
+ * Pools and contributions come from the `listPools` and `listContributions`
+ * Cloud Functions. Loans and transactions are still mock-backed — no backend
+ * serves them yet — so a load is deliberately hybrid rather than all-or-nothing.
  */
 export class PoolStore {
   pools: PoolInfo[] = []
-  memberships: PoolMember[] = []
+  contributions: ContributionInfo[] = []
   loans: Loan[] = []
   transactions: Transaction[] = []
 
@@ -77,7 +87,7 @@ export class PoolStore {
   reset = (): void => {
     runInAction(() => {
       this.pools = []
-      this.memberships = []
+      this.contributions = []
       this.loans = []
       this.transactions = []
       this.isLoading = false
@@ -95,13 +105,18 @@ export class PoolStore {
     })
 
     try {
-      const pools = usingMockPools() ? MOCK_POOLS : await this.requestPools(params)
+      // Fetched together so pools and the positions in them are one snapshot:
+      // a balance shown against a pool that is not in the list, or vice versa,
+      // reads as a bug even though each half was individually correct.
+      const [pools, contributions]: [PoolInfo[], ContributionInfo[]] = usingMockPools()
+        ? [MOCK_POOLS, []]
+        : await Promise.all([this.requestPools(params), this.requestContributions(params)])
 
       runInAction(() => {
         this.pools = pools
+        this.contributions = contributions
         this.lastFetchedAt = new Date()
-        // Everything below is still mock-backed; see the note on the class.
-        this.memberships = MOCK_MEMBERSHIPS
+        // Loans and transactions are still mock-backed; see the note on the class.
         this.loans = MOCK_LOANS
         this.transactions = MOCK_TRANSACTIONS
       })
@@ -131,8 +146,84 @@ export class PoolStore {
     return response.data.pools
   }
 
+  /**
+   * Every contribution on the chain, not just the user's.
+   *
+   * A pool's liquidity is the sum of what everyone put in, and that is shown on
+   * pools the user has not contributed to — so filtering by wallet here would
+   * make every pool but their own read as empty.
+   */
+  private requestContributions = async (params: ListPoolsRequest): Promise<ContributionInfo[]> => {
+    const listContributions = httpsCallable<ListContributionsRequest, ListContributionsResponse>(FIREBASE_FUNCTIONS, 'listContributions')
+
+    const response = await listContributions({
+      chainId: params.chainId ?? authStore.chainId ?? DEFAULT_CHAIN_ID,
+      limit: DEFAULT_PAGE_SIZE,
+    })
+
+    // Normalised at the boundary: `memberships` derives from this list and runs
+    // during render, so a malformed response would surface as a crashed screen
+    // far from the call that caused it.
+    return response.data.contributions ?? []
+  }
+
   poolById = (poolId: number): PoolInfo | undefined => {
     return this.pools.find((pool) => pool.poolId === poolId)
+  }
+
+  /** Every contribution into one pool, newest first. */
+  contributionsFor = (poolId: number): ContributionInfo[] => {
+    return this.contributions.filter((contribution) => contribution.poolId === poolId)
+  }
+
+  /** Total liquidity a pool has received, in wei. */
+  poolLiquidity = (poolId: number): bigint => {
+    return this.contributionsFor(poolId).reduce((sum, contribution) => sum + BigInt(contribution.amount), 0n)
+  }
+
+  /**
+   * Memberships, derived from contributions.
+   *
+   * `SampleLendingPool` has no membership register — there is nothing on chain
+   * to join — so putting money into a pool is what makes someone a member of it.
+   * Deriving rather than storing means the two can never disagree.
+   *
+   * In mock mode the fixtures stand in, so the UI can be worked on without the
+   * emulators running.
+   */
+  get memberships(): PoolMember[] {
+    if (usingMockPools()) return MOCK_MEMBERSHIPS
+
+    const byMember = new Map<string, PoolMember>()
+
+    for (const contribution of this.contributions) {
+      const key = `${contribution.poolId}-${contribution.contributor}`
+      const amount = BigInt(contribution.amount)
+      const contributedAt = new Date(contribution.contributedAt)
+      const existing = byMember.get(key)
+
+      if (existing) {
+        existing.totalContributed += amount
+        // No interest accrues and nothing can be withdrawn yet, so a balance is
+        // exactly what was put in. This is where earnings would join it.
+        existing.currentBalance = existing.totalContributed
+        // Membership dates from the first deposit, not the most recent one.
+        if (contributedAt < existing.joinedAt) existing.joinedAt = contributedAt
+        continue
+      }
+
+      byMember.set(key, {
+        walletAddress: contribution.contributor,
+        poolId: String(contribution.poolId),
+        joinedAt: contributedAt,
+        totalContributed: amount,
+        currentBalance: amount,
+        isAdmin: sameAddress(this.poolById(contribution.poolId)?.poolOwner, contribution.contributor),
+        status: MemberStatus.ACTIVE,
+      })
+    }
+
+    return [...byMember.values()]
   }
 
   membershipFor = (poolId: number): PoolMember | undefined => {
