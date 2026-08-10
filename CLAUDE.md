@@ -457,6 +457,13 @@ For anything touching pool creation, indexing or pending transactions, read
 indexing paths, the idempotency guarantees, and the chain-shaped traps that
 mocked tests do not catch.
 
+## Contributions
+
+For anything touching deposits, pool liquidity or membership, read
+[`docs/CONTRIBUTIONS.md`](docs/CONTRIBUTIONS.md). Note especially that there is
+**no membership register on chain** — memberships are derived from
+contributions, and liquidity is summed from events rather than stored.
+
 ## UI & Frontend Interface Design
 
 There is **no shared design package**. Each app owns its theme, and the two are

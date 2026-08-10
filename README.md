@@ -35,7 +35,8 @@ These are implemented end to end and verified against a live chain:
 - **🔐 Wallet-Based Authentication:** Signature-based login through WalletConnect (Reown AppKit), with nonce expiry and replay protection.
 - **📲 Device Verification:** Firebase App Check tokens issued only to devices linked to an authenticated wallet.
 - **🏗️ Pool Creation:** A user creates their own lending pool from the mobile app — form → `PoolFactory.createPool` → receipt parsing → an indexed Firestore document, with three independent indexing paths and idempotent writes ([how it works](docs/POOL_CREATION.md)).
-- **⏳ Pending Transaction Tracking:** Submitted transactions survive an app restart; startup recovery resolves them and drains them into the pool list.
+- **💰 Liquidity Contribution:** A member deposits native currency into a pool — form → `depositFunds` → `FundsDeposited` indexed into Firestore → the pool's liquidity and the member's position, both summed from the events rather than stored as totals ([how it works](docs/CONTRIBUTIONS.md)).
+- **⏳ Pending Transaction Tracking:** Submitted transactions of either kind survive an app restart; startup recovery resolves them and drains them into the pool list.
 - **📱 Cross-Platform Mobile App:** React Native/Expo application with onboarding, wallet connection and a live pool list.
 - **🔐 Multi-Sig Administration:** `PoolFactory` ownership transfers to a Safe; admin actions are executed through it.
 - **📦 Monorepo Structure:** pnpm workspaces with shared types, CI running lint, type-check and the test matrix.
@@ -44,9 +45,9 @@ These are implemented end to end and verified against a live chain:
 
 Designed and partly scaffolded, but **not** functional yet — the mobile screens for these are placeholders:
 
-- **👥 Permissioned Membership:** Pool administrators approving members before they can contribute or borrow.
-- **💰 Liquidity Contribution:** Members contributing native or ERC-20 tokens as pool liquidity.
-- **📋 Loan Request & Approval:** Members requesting loans, reviewed and approved by pool admins.
+- **👥 Permissioned Membership:** Pool administrators approving members before they can contribute or borrow. There is no membership register on chain today — contributing to a pool is what makes you a member of it.
+- **🪙 ERC-20 Liquidity:** Contributions are native currency only; token deposits need contract work.
+- **📋 Loan Request & Approval:** Members requesting loans, reviewed and approved by pool admins. `createLoan` exists but is permissionless and self-funding, so it is not exposed in the app.
 - **💸 Loan Repayment & Management:** Repayment, default handling and pool health.
 - **🌐 Multi-Chain Support:** The contracts are chain-agnostic and the wallet offers Ethereum, Polygon, Arbitrum, Base and BSC, but the backend currently resolves exactly one configured chain at a time. Only a local Hardhat node is deployed today; Polygon Amoy is next.
 
