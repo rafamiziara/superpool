@@ -71,6 +71,18 @@ service cloud.firestore {
       allow write: if false; // backend-only (contribution indexer)
     }
 
+    // --- withdrawals -------------------------------------------------------
+    // Liquidity withdrawals indexed from on-chain FundsWithdrawn events. The
+    // counterpart to contributions — a position is one minus the other — and
+    // governed identically: public chain state, gated on authentication, capped
+    // queries, writes from the indexer only.
+
+    match /withdrawals/{withdrawalId} {
+      allow get: if isSignedIn();
+      allow list: if isSignedIn() && request.query.limit <= 100; // mirrors listWithdrawals' own cap
+      allow write: if false; // backend-only (withdrawal indexer)
+    }
+
     // --- auth_nonces -------------------------------------------------------
     // Single-use login challenges. Readable nonces would let an attacker who
     // has any authenticated session harvest challenges for other wallets, and

@@ -33,3 +33,12 @@ export const EVENT_SYNC_STATE_COLLECTION = 'event_sync_state'
  * contributions (`FundsDeposited` events).
  */
 export const CONTRIBUTIONS_COLLECTION = 'contributions'
+
+/**
+ * The name of the Firestore collection used to store indexed liquidity
+ * withdrawals (`FundsWithdrawn` events).
+ *
+ * Separate from contributions rather than a signed amount on them: each is one
+ * event, and a position is deposits minus withdrawals, summed on read.
+ */
+export const WITHDRAWALS_COLLECTION = 'withdrawals'

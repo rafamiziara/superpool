@@ -172,6 +172,61 @@ export interface IndexContributionResponse {
   alreadyIndexed: boolean
 }
 
+/**
+ * One `FundsWithdrawn` event: a member taking liquidity back out of a pool.
+ *
+ * Deliberately a separate record from `ContributionInfo` rather than a signed
+ * amount on it. Each is one event, and a position is deposits minus
+ * withdrawals — computed on read, so nothing can fall out of step with the
+ * chain. The field names mirror the contribution's so the two sum together
+ * without special casing.
+ */
+export interface WithdrawalInfo {
+  /** `${chainId}-${transactionHash}-${logIndex}` — the document id, and stable. */
+  id: string
+  poolId: number
+  poolAddress: string
+  /** Lowercased on write; compare case-insensitively. */
+  member: string
+  /** Wei, as a decimal string — JSON has no bigint. */
+  amount: string
+  chainId: number
+  transactionHash: string
+  /** Position of the `FundsWithdrawn` log within its transaction. */
+  logIndex: number
+  blockNumber: number
+  /** ISO 8601, not a Date — see the note on `ContributionInfo.contributedAt`. */
+  withdrawnAt: string
+}
+
+export interface IndexWithdrawalRequest {
+  txHash: string
+  chainId?: number
+}
+
+export interface IndexWithdrawalResponse {
+  /** One entry per `FundsWithdrawn` log in the transaction. */
+  withdrawals: WithdrawalInfo[]
+  /** How many were written by this call; the rest were already stored. */
+  storedCount: number
+  alreadyIndexed: boolean
+}
+
+export interface ListWithdrawalsRequest {
+  chainId?: number
+  /** Restrict to one pool. Omit for every pool on the chain. */
+  poolId?: number
+  /** Restrict to one wallet. Matched case-insensitively. */
+  member?: string
+  limit?: number
+}
+
+export interface ListWithdrawalsResponse {
+  withdrawals: WithdrawalInfo[]
+  totalCount: number
+  limit: number
+}
+
 export interface ListContributionsRequest {
   chainId?: number
   /** Restrict to one pool. Omit for every pool on the chain. */

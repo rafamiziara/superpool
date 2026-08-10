@@ -1,5 +1,7 @@
 export * from './indexContribution'
 export * from './indexPool'
+export * from './indexWithdrawal'
 export * from './listContributions'
 export * from './listPools'
+export * from './listWithdrawals'
 export * from './preparePoolCreation'

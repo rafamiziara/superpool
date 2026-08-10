@@ -104,10 +104,26 @@ const LIVE_CONTRIBUTION = {
   contributedAt: '2026-08-10T08:00:00.000Z',
 }
 
+/** One withdrawal out of `LIVE_POOL`, as `listWithdrawals` returns it. */
+const LIVE_WITHDRAWAL = {
+  id: '31337-0xcccc-0',
+  poolId: 12,
+  poolAddress: LIVE_POOL.poolAddress,
+  // Lowercased, as the indexer stores it.
+  member: '0x90f79bf6eb2c4f870365e785982e1f101e93b906',
+  amount: '500000000000000000',
+  chainId: 31337,
+  transactionHash: '0xcccc',
+  logIndex: 0,
+  blockNumber: 102,
+  withdrawnAt: '2026-08-10T09:00:00.000Z',
+}
+
 describe('PoolStore against listPools', () => {
   let store: PoolStore
   let listPoolsCallable: jest.Mock
   let listContributionsCallable: jest.Mock
+  let listWithdrawalsCallable: jest.Mock
 
   beforeEach(() => {
     jest.clearAllMocks()
@@ -123,11 +139,16 @@ describe('PoolStore against listPools', () => {
     listContributionsCallable = jest.fn().mockResolvedValue({
       data: { contributions: [], totalCount: 0, limit: 50 },
     })
-    // A load calls both callables, so the mock has to answer by name — a single
-    // stub would hand the pools response to the contributions request.
-    mockFirebaseCallable.mockImplementation((_functions?: unknown, name?: string) =>
-      name === 'listContributions' ? listContributionsCallable : listPoolsCallable
-    )
+    listWithdrawalsCallable = jest.fn().mockResolvedValue({
+      data: { withdrawals: [], totalCount: 0, limit: 50 },
+    })
+    // A load calls all three callables, so the mock has to answer by name — a
+    // single stub would hand the pools response to the contributions request.
+    mockFirebaseCallable.mockImplementation((_functions?: unknown, name?: string) => {
+      if (name === 'listContributions') return listContributionsCallable
+      if (name === 'listWithdrawals') return listWithdrawalsCallable
+      return listPoolsCallable
+    })
   })
 
   afterEach(() => {
@@ -270,11 +291,15 @@ describe('PoolStore contributions', () => {
 
   let store: PoolStore
   let listContributionsCallable: jest.Mock
+  let listWithdrawalsCallable: jest.Mock
 
-  /** Seeds the backend with `contributions` and loads. */
-  async function loadWith(contributions: (typeof LIVE_CONTRIBUTION)[]) {
+  /** Seeds the backend with `contributions` (and optionally withdrawals) and loads. */
+  async function loadWith(contributions: (typeof LIVE_CONTRIBUTION)[], withdrawals: (typeof LIVE_WITHDRAWAL)[] = []) {
     listContributionsCallable.mockResolvedValue({
       data: { contributions, totalCount: contributions.length, limit: 50 },
+    })
+    listWithdrawalsCallable.mockResolvedValue({
+      data: { withdrawals, totalCount: withdrawals.length, limit: 50 },
     })
     await store.fetchPools()
   }
@@ -291,9 +316,12 @@ describe('PoolStore contributions', () => {
       data: { pools: [LIVE_POOL], totalCount: 1, page: 1, limit: 50, hasNextPage: false, hasPreviousPage: false },
     })
     listContributionsCallable = jest.fn().mockResolvedValue({ data: { contributions: [], totalCount: 0, limit: 50 } })
-    mockFirebaseCallable.mockImplementation((_functions?: unknown, name?: string) =>
-      name === 'listContributions' ? listContributionsCallable : listPoolsCallable
-    )
+    listWithdrawalsCallable = jest.fn().mockResolvedValue({ data: { withdrawals: [], totalCount: 0, limit: 50 } })
+    mockFirebaseCallable.mockImplementation((_functions?: unknown, name?: string) => {
+      if (name === 'listContributions') return listContributionsCallable
+      if (name === 'listWithdrawals') return listWithdrawalsCallable
+      return listPoolsCallable
+    })
   })
 
   afterEach(() => {
@@ -434,6 +462,94 @@ describe('PoolStore contributions', () => {
     await loadWith([LIVE_CONTRIBUTION, { ...LIVE_CONTRIBUTION, id: 'other-pool', poolId: 99 }])
 
     expect(store.transactionsFor(12).map((tx) => tx.id)).toEqual([LIVE_CONTRIBUTION.id])
+  })
+
+  // -------------------------------------------------------------------------
+  // Withdrawals, and the positions they reduce.
+  // -------------------------------------------------------------------------
+
+  it('asks for withdrawals on the same chain as the contributions', async () => {
+    await store.fetchPools()
+
+    expect(mockFirebaseCallable).toHaveBeenCalledWith(expect.anything(), 'listWithdrawals')
+    expect(listWithdrawalsCallable).toHaveBeenCalledWith({ chainId: 31337, limit: 50 })
+  })
+
+  it('subtracts a withdrawal from the balance but not from what was contributed', async () => {
+    // The two are kept apart so a member who took everything out still reads as
+    // one, and so earnings are not confused with a withdrawal.
+    authStore.walletAddress = CONTRIBUTOR
+    await loadWith([LIVE_CONTRIBUTION], [LIVE_WITHDRAWAL])
+
+    const membership = store.membershipFor(12)
+    expect(membership?.totalContributed).toBe(parseEther('2'))
+    expect(membership?.currentBalance).toBe(parseEther('1.5'))
+  })
+
+  it('subtracts withdrawals from a pool’s liquidity', async () => {
+    await loadWith([LIVE_CONTRIBUTION], [LIVE_WITHDRAWAL])
+
+    expect(store.poolLiquidity(12)).toBe(parseEther('1.5'))
+  })
+
+  it('never reports negative liquidity when a deposit has fallen off the page', async () => {
+    // The two lists are paged independently, so a withdrawal can arrive without
+    // the deposit that funded it. A low figure beats a negative one.
+    await loadWith([], [LIVE_WITHDRAWAL])
+
+    expect(store.poolLiquidity(12)).toBe(0n)
+  })
+
+  it('ignores a withdrawal with no matching membership rather than inventing one', async () => {
+    await loadWith([], [LIVE_WITHDRAWAL])
+
+    expect(store.memberships).toHaveLength(0)
+  })
+
+  it('never lets a balance go below zero', async () => {
+    await loadWith([LIVE_CONTRIBUTION], [{ ...LIVE_WITHDRAWAL, amount: '99000000000000000000' }])
+
+    expect(store.memberships[0].currentBalance).toBe(0n)
+  })
+
+  it('matches a withdrawal to its member case-insensitively', async () => {
+    // The indexer lowercases, but a fixture or a future writer may not.
+    authStore.walletAddress = CONTRIBUTOR
+    await loadWith([LIVE_CONTRIBUTION], [{ ...LIVE_WITHDRAWAL, member: '0x90F79bf6EB2c4f870365E785982E1f101E93b906' }])
+
+    expect(store.membershipFor(12)?.currentBalance).toBe(parseEther('1.5'))
+  })
+
+  it('reports no earnings rather than negative ones after a withdrawal', async () => {
+    // Interest reaches the pool but the contract cannot distribute it, so there
+    // is nothing to credit — and a withdrawal must not read as a loss.
+    authStore.walletAddress = CONTRIBUTOR
+    await loadWith([LIVE_CONTRIBUTION], [LIVE_WITHDRAWAL])
+
+    expect(store.totalBalance).toBe(parseEther('1.5'))
+    expect(store.totalEarned).toBe(0n)
+  })
+
+  it('shows a withdrawal as activity, distinct from a contribution', async () => {
+    await loadWith([LIVE_CONTRIBUTION], [LIVE_WITHDRAWAL])
+
+    const activity = store.recentTransactions
+    expect(activity).toHaveLength(2)
+    // Newest first: the withdrawal is an hour after the deposit.
+    expect(activity[0].type).toBe(TransactionType.WITHDRAWAL)
+    expect(activity[0].amount).toBe(parseEther('0.5'))
+    expect(activity[0].txHash).toBe(LIVE_WITHDRAWAL.transactionHash)
+    expect(activity[1].type).toBe(TransactionType.CONTRIBUTION)
+  })
+
+  it('survives a response with no withdrawals field', async () => {
+    listContributionsCallable.mockResolvedValue({ data: { contributions: [LIVE_CONTRIBUTION], totalCount: 1, limit: 50 } })
+    listWithdrawalsCallable.mockResolvedValue({ data: { totalCount: 0, limit: 50 } })
+
+    await store.fetchPools()
+
+    expect(store.withdrawals).toEqual([])
+    expect(store.poolLiquidity(12)).toBe(parseEther('2'))
   })
 
   it('counts a pool the user contributed to as one of mine', async () => {

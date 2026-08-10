@@ -108,13 +108,13 @@ function WithdrawScreen() {
       return
     }
 
-    // Never throws. There is no withdrawal indexer yet, so this clears the
-    // pending record and refreshes rather than calling a backend.
+    // Never throws: indexing is best-effort, and the record is recoverable.
     setStage('settling')
     await triggerIndexing(txHash, 'WITHDRAW')
 
-    // The chain reads are what the form trusts, so they have to be re-read: the
-    // contributions refresh behind `triggerIndexing` cannot see a withdrawal.
+    // Re-read the chain even though indexing refreshed the store: this screen
+    // trusts the contract over the indexed events, and the two are only
+    // eventually consistent.
     await Promise.all([refetchPosition(), refetchWithdrawable()])
 
     setStage('done')

@@ -4,10 +4,13 @@ import type {
   ListContributionsResponse,
   ListPoolsRequest,
   ListPoolsResponse,
+  ListWithdrawalsRequest,
+  ListWithdrawalsResponse,
   Loan,
   PoolInfo,
   PoolMember,
   Transaction,
+  WithdrawalInfo,
 } from '@superpool/types'
 import { LoanStatus, MemberStatus, TransactionStatus, TransactionType } from '@superpool/types'
 import { httpsCallable } from 'firebase/functions'
@@ -35,15 +38,18 @@ const DEFAULT_PAGE_SIZE = 50
 /**
  * Lending pool state.
  *
- * Pools and contributions come from the `listPools` and `listContributions`
- * Cloud Functions. Activity is derived from the contributions rather than
- * fetched — there is no transactions collection. Loans are still mock-backed,
- * no backend serves them yet, so a load is deliberately hybrid rather than
- * all-or-nothing.
+ * Pools, contributions and withdrawals come from the `listPools`,
+ * `listContributions` and `listWithdrawals` Cloud Functions. Positions and
+ * liquidity are deposits minus withdrawals, summed on read — nothing is stored,
+ * so nothing can fall out of step with the chain. Activity is derived from the
+ * same events rather than fetched; there is no transactions collection. Loans
+ * are still mock-backed, no backend serves them yet, so a load is deliberately
+ * hybrid rather than all-or-nothing.
  */
 export class PoolStore {
   pools: PoolInfo[] = []
   contributions: ContributionInfo[] = []
+  withdrawals: WithdrawalInfo[] = []
   loans: Loan[] = []
   transactions: Transaction[] = []
 
@@ -90,6 +96,7 @@ export class PoolStore {
     runInAction(() => {
       this.pools = []
       this.contributions = []
+      this.withdrawals = []
       this.loans = []
       this.transactions = []
       this.isLoading = false
@@ -110,13 +117,14 @@ export class PoolStore {
       // Fetched together so pools and the positions in them are one snapshot:
       // a balance shown against a pool that is not in the list, or vice versa,
       // reads as a bug even though each half was individually correct.
-      const [pools, contributions]: [PoolInfo[], ContributionInfo[]] = usingMockPools()
-        ? [MOCK_POOLS, []]
-        : await Promise.all([this.requestPools(params), this.requestContributions(params)])
+      const [pools, contributions, withdrawals]: [PoolInfo[], ContributionInfo[], WithdrawalInfo[]] = usingMockPools()
+        ? [MOCK_POOLS, [], []]
+        : await Promise.all([this.requestPools(params), this.requestContributions(params), this.requestWithdrawals(params)])
 
       runInAction(() => {
         this.pools = pools
         this.contributions = contributions
+        this.withdrawals = withdrawals
         this.lastFetchedAt = new Date()
         // Loans are still mock-backed; see the note on the class.
         this.loans = MOCK_LOANS
@@ -171,6 +179,22 @@ export class PoolStore {
     return response.data.contributions ?? []
   }
 
+  /**
+   * Every withdrawal on the chain, for the same reason contributions are not
+   * filtered by wallet: a pool's liquidity is what everyone put in minus what
+   * everyone took out.
+   */
+  private requestWithdrawals = async (params: ListPoolsRequest): Promise<WithdrawalInfo[]> => {
+    const listWithdrawals = httpsCallable<ListWithdrawalsRequest, ListWithdrawalsResponse>(FIREBASE_FUNCTIONS, 'listWithdrawals')
+
+    const response = await listWithdrawals({
+      chainId: params.chainId ?? authStore.chainId ?? DEFAULT_CHAIN_ID,
+      limit: DEFAULT_PAGE_SIZE,
+    })
+
+    return response.data.withdrawals ?? []
+  }
+
   poolById = (poolId: number): PoolInfo | undefined => {
     return this.pools.find((pool) => pool.poolId === poolId)
   }
@@ -180,17 +204,41 @@ export class PoolStore {
     return this.contributions.filter((contribution) => contribution.poolId === poolId)
   }
 
-  /** Total liquidity a pool has received, in wei. */
-  poolLiquidity = (poolId: number): bigint => {
-    return this.contributionsFor(poolId).reduce((sum, contribution) => sum + BigInt(contribution.amount), 0n)
+  /** Every withdrawal out of one pool. */
+  withdrawalsFor = (poolId: number): WithdrawalInfo[] => {
+    return this.withdrawals.filter((withdrawal) => withdrawal.poolId === poolId)
   }
 
   /**
-   * Memberships, derived from contributions.
+   * Liquidity a pool currently holds, in wei: deposits minus withdrawals.
+   *
+   * Not the same as the contract's `totalFunds` once loans are outstanding —
+   * this is what members are owed, not what the pool can pay today. A screen
+   * that needs the payable figure has to read the chain.
+   */
+  poolLiquidity = (poolId: number): bigint => {
+    const deposited = this.contributionsFor(poolId).reduce((sum, contribution) => sum + BigInt(contribution.amount), 0n)
+    const withdrawn = this.withdrawalsFor(poolId).reduce((sum, withdrawal) => sum + BigInt(withdrawal.amount), 0n)
+
+    // Clamped because the two lists are paged independently: a withdrawal can
+    // be indexed while the deposit that funded it has fallen off the page,
+    // and a negative liquidity figure is worse than a low one.
+    const remaining = deposited - withdrawn
+
+    return remaining > 0n ? remaining : 0n
+  }
+
+  /**
+   * Memberships, derived from contributions and withdrawals.
    *
    * `SampleLendingPool` has no membership register — there is nothing on chain
    * to join — so putting money into a pool is what makes someone a member of it.
    * Deriving rather than storing means the two can never disagree.
+   *
+   * `totalContributed` is lifetime deposits and only ever grows; `currentBalance`
+   * is what is left after withdrawals. Keeping them apart is what lets a member
+   * who has taken everything out still read as a past member rather than
+   * vanishing, and it is why `totalEarned` subtracts one from the other.
    *
    * In mock mode the fixtures stand in, so the UI can be worked on without the
    * emulators running.
@@ -201,16 +249,14 @@ export class PoolStore {
     const byMember = new Map<string, PoolMember>()
 
     for (const contribution of this.contributions) {
-      const key = `${contribution.poolId}-${contribution.contributor}`
+      const key = `${contribution.poolId}-${contribution.contributor.toLowerCase()}`
       const amount = BigInt(contribution.amount)
       const contributedAt = new Date(contribution.contributedAt)
       const existing = byMember.get(key)
 
       if (existing) {
         existing.totalContributed += amount
-        // No interest accrues and nothing can be withdrawn yet, so a balance is
-        // exactly what was put in. This is where earnings would join it.
-        existing.currentBalance = existing.totalContributed
+        existing.currentBalance += amount
         // Membership dates from the first deposit, not the most recent one.
         if (contributedAt < existing.joinedAt) existing.joinedAt = contributedAt
         continue
@@ -225,6 +271,20 @@ export class PoolStore {
         isAdmin: sameAddress(this.poolById(contribution.poolId)?.poolOwner, contribution.contributor),
         status: MemberStatus.ACTIVE,
       })
+    }
+
+    for (const withdrawal of this.withdrawals) {
+      const existing = byMember.get(`${withdrawal.poolId}-${withdrawal.member.toLowerCase()}`)
+
+      // A withdrawal with no matching deposit means the deposit fell off the
+      // page, not that someone withdrew what they never put in — the contract
+      // makes that impossible. Skipping is better than inventing a member with
+      // a negative balance.
+      if (!existing) continue
+
+      const amount = BigInt(withdrawal.amount)
+
+      existing.currentBalance = existing.currentBalance > amount ? existing.currentBalance - amount : 0n
     }
 
     return [...byMember.values()]
@@ -255,9 +315,22 @@ export class PoolStore {
     return this.activeMemberships.reduce((sum, member) => sum + member.currentBalance, 0n)
   }
 
-  /** Lifetime earnings: current balances minus what was contributed (wei). */
+  /**
+   * Lifetime earnings: current balances minus what was contributed (wei).
+   *
+   * Zero against real data today, and honestly so. Interest reaches the pool
+   * through `repayLoan` but the contract has no way to distribute it — a member
+   * can only ever withdraw what they put in — so there is nothing to credit
+   * anyone. Clamped per member because a withdrawal makes `currentBalance` fall
+   * below `totalContributed`, and reporting that difference as negative earnings
+   * would be wrong rather than merely empty.
+   */
   get totalEarned(): bigint {
-    return this.activeMemberships.reduce((sum, member) => sum + (member.currentBalance - member.totalContributed), 0n)
+    return this.activeMemberships.reduce((sum, member) => {
+      const earned = member.currentBalance - member.totalContributed
+
+      return sum + (earned > 0n ? earned : 0n)
+    }, 0n)
   }
 
   get activeMemberships(): PoolMember[] {
@@ -307,8 +380,29 @@ export class PoolStore {
     })
   }
 
+  /** Withdrawals as activity rows, the mirror of `contributionActivity`. */
+  get withdrawalActivity(): Transaction[] {
+    return this.withdrawals.map((withdrawal) => {
+      const withdrawnAt = new Date(withdrawal.withdrawnAt)
+
+      return {
+        id: withdrawal.id,
+        poolId: String(withdrawal.poolId),
+        from: withdrawal.poolAddress,
+        to: withdrawal.member,
+        type: TransactionType.WITHDRAWAL,
+        amount: BigInt(withdrawal.amount),
+        status: TransactionStatus.CONFIRMED,
+        txHash: withdrawal.transactionHash,
+        blockNumber: withdrawal.blockNumber,
+        createdAt: withdrawnAt,
+        confirmedAt: withdrawnAt,
+      }
+    })
+  }
+
   get recentTransactions(): Transaction[] {
-    return [...this.transactions, ...this.contributionActivity]
+    return [...this.transactions, ...this.contributionActivity, ...this.withdrawalActivity]
       .filter((tx) => tx.status !== TransactionStatus.CANCELLED)
       .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
   }
