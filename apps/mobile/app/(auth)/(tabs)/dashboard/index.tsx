@@ -140,8 +140,10 @@ function DashboardScreen() {
 
         {/* Quick actions — thumb zone */}
         <View className="mt-6 flex-row gap-3 px-6" testID="dashboard-actions">
+          {/* Contributing needs a pool, and this screen does not know which one
+              is meant, so it hands over to the list rather than guessing. */}
           <Pressable
-            onPress={() => comingSoon('Contributing')}
+            onPress={() => router.replace('/(auth)/(tabs)/pools')}
             className="flex-1 flex-row items-center justify-center gap-2 rounded-2xl border-continuous bg-mint py-4 shadow-glow-mint active:scale-[0.97] active:opacity-90"
             testID="contribute-button"
           >

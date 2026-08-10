@@ -1,13 +1,28 @@
 import React from 'react'
+import {
+  makeContributeTransaction,
+  makePendingTransaction,
+  POOL_ADDRESS,
+  TX_HASH,
+} from '../../../src/__tests__/fixtures/pendingTransaction'
 import { mockToast } from '../../../src/__tests__/mocks'
-import { mockLocalSearchParams, mockRouterBack } from '../../../src/__tests__/setup'
+import { mockLocalSearchParams, mockRouterBack, mockRouterPush } from '../../../src/__tests__/setup'
 import { fireEvent, render } from '../../../src/__tests__/test-utils'
+import { pendingTransactionsStore } from '../../../src/stores/PendingTransactionsStore'
 import { poolStore } from '../../../src/stores/PoolStore'
 import PoolDetailScreen from './[id]'
 
 jest.mock('expo-status-bar', () => ({
   StatusBar: () => null,
 }))
+
+/** The contribution fixture's params, so each case only varies the pool. */
+const CONTRIBUTION_PARAMS = {
+  poolId: 1,
+  poolAddress: POOL_ADDRESS,
+  poolName: 'Neighbourhood Fund',
+  amount: '5000000000000000000',
+} as const
 
 /** Pool 1 is owned by someone else; pool 2 is owned by the mock user. */
 const OTHER_OWNED = '1'
@@ -34,7 +49,15 @@ describe('PoolDetailScreen', () => {
     expect(getByText('500 POL')).toBeTruthy() // max loan
     expect(getByText('4.5%')).toBeTruthy() // 450 bps
     expect(getByText('30 days')).toBeTruthy()
-    expect(getByText('Polygon Amoy')).toBeTruthy()
+  })
+
+  it('shows the pool’s liquidity, summed from its contributions', () => {
+    const { getByText } = render(<PoolDetailScreen />)
+
+    expect(getByText('Liquidity')).toBeTruthy()
+    // Mock mode serves no contributions, so a pool starts at zero rather than
+    // showing a figure the chain has not produced.
+    expect(getByText('0 POL')).toBeTruthy()
   })
 
   it('shows the abbreviated owner address when the user is not the owner', () => {
@@ -71,14 +94,64 @@ describe('PoolDetailScreen', () => {
     }
   })
 
-  it('shows coming-soon toasts from the action bar', () => {
+  it('opens the contribute screen for this pool', () => {
     const { getByTestId } = render(<PoolDetailScreen />)
 
     fireEvent.press(getByTestId('pool-contribute-button'))
-    expect(mockToast.show).toHaveBeenCalledWith({ type: 'info', text1: 'Contributing is coming soon' })
+
+    // The pool travels as a query parameter: `pool/contribute` is a static
+    // sibling of `pool/[id]`, not a segment beneath it.
+    expect(mockRouterPush).toHaveBeenCalledWith('/(auth)/pool/contribute?poolId=1')
+  })
+
+  it('still shows a coming-soon toast for loan requests', () => {
+    const { getByTestId } = render(<PoolDetailScreen />)
 
     fireEvent.press(getByTestId('pool-request-loan-button'))
+
     expect(mockToast.show).toHaveBeenCalledWith({ type: 'info', text1: 'Loan request is coming soon' })
+  })
+
+  describe('contributions still in flight', () => {
+    afterEach(async () => {
+      await pendingTransactionsStore.reset()
+    })
+
+    it('shows a pending deposit into this pool', async () => {
+      // Until the backend has indexed it, the deposit is invisible in the
+      // liquidity figure — this row is the only trace of it.
+      await pendingTransactionsStore.addPendingTransaction(makeContributeTransaction({ params: { ...CONTRIBUTION_PARAMS, poolId: 1 } }))
+
+      const { getByTestId } = render(<PoolDetailScreen />)
+
+      expect(getByTestId('pool-pending-contributions')).toBeTruthy()
+      expect(getByTestId(`pending-contribution-card-${TX_HASH}`)).toBeTruthy()
+    })
+
+    it('ignores deposits into other pools', async () => {
+      await pendingTransactionsStore.addPendingTransaction(makeContributeTransaction({ params: { ...CONTRIBUTION_PARAMS, poolId: 2 } }))
+
+      const { queryByTestId } = render(<PoolDetailScreen />)
+
+      expect(queryByTestId('pool-pending-contributions')).toBeNull()
+    })
+
+    it('ignores pool creations, which the pools list shows instead', async () => {
+      await pendingTransactionsStore.addPendingTransaction(makePendingTransaction())
+
+      const { queryByTestId } = render(<PoolDetailScreen />)
+
+      expect(queryByTestId('pool-pending-contributions')).toBeNull()
+    })
+
+    it('opens the status modal from a pending row', async () => {
+      await pendingTransactionsStore.addPendingTransaction(makeContributeTransaction({ params: { ...CONTRIBUTION_PARAMS, poolId: 1 } }))
+
+      const { getByTestId } = render(<PoolDetailScreen />)
+      fireEvent.press(getByTestId(`pending-contribution-card-${TX_HASH}`))
+
+      expect(getByTestId('transaction-status-modal').props.visible).toBe(true)
+    })
   })
 
   it('falls back to a not-found state for an unknown pool', () => {

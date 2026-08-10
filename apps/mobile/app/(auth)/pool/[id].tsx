@@ -1,10 +1,13 @@
 import { router, Stack, useLocalSearchParams } from 'expo-router'
 import { StatusBar } from 'expo-status-bar'
 import { observer } from 'mobx-react-lite'
-import React from 'react'
+import React, { useState } from 'react'
 import { Pressable, ScrollView, Text, View } from 'react-native'
 import Toast from 'react-native-toast-message'
 import { ActivityRow } from '../../../src/components/lending/ActivityRow'
+import { PendingContributionCard } from '../../../src/components/lending/PendingContributionCard'
+import { TransactionStatusModal } from '../../../src/components/lending/TransactionStatusModal'
+import { type ContributeTransaction, type PendingTransaction, pendingTransactionsStore } from '../../../src/stores/PendingTransactionsStore'
 import { poolStore } from '../../../src/stores/PoolStore'
 import { bpsToPercent, formatDuration, formatToken, sameAddress, shortAddress } from '../../../src/utils/format'
 
@@ -12,11 +15,31 @@ function comingSoon(action: string) {
   Toast.show({ type: 'info', text1: `${action} is coming soon` })
 }
 
+/**
+ * This pool's deposits that are not yet reflected in its liquidity, newest first.
+ *
+ * No dedupe against indexed contributions is needed, unlike the pools screen:
+ * `triggerIndexing` removes the record only after the refresh that lists the
+ * contribution has already landed, so the two never both hold it.
+ */
+function pendingContributionsFor(poolId: number): ContributeTransaction[] {
+  return pendingTransactionsStore.transactions
+    .filter((transaction): transaction is ContributeTransaction => transaction.type === 'CONTRIBUTE')
+    .filter((transaction) => transaction.params.poolId === poolId)
+    .sort((a, b) => b.timestamp - a.timestamp)
+}
+
 function PoolDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>()
   const pool = poolStore.poolById(Number(id))
   const membership = pool ? poolStore.membershipFor(pool.poolId) : undefined
   const transactions = pool ? poolStore.transactionsFor(pool.poolId) : []
+
+  /** Deposits into this pool that the backend has not indexed yet. */
+  const pending = pool ? pendingContributionsFor(pool.poolId) : []
+
+  /** The transaction the status modal is describing; `null` keeps it closed. */
+  const [detail, setDetail] = useState<PendingTransaction | null>(null)
 
   if (!pool) {
     return (
@@ -33,10 +56,10 @@ function PoolDetailScreen() {
   const isOwner = sameAddress(pool.poolOwner, poolStore.userAddress)
 
   const stats = [
+    { label: 'Liquidity', value: `${formatToken(poolStore.poolLiquidity(pool.poolId))} POL` },
     { label: 'Max loan', value: `${formatToken(pool.maxLoanAmount)} POL` },
     { label: 'Interest', value: bpsToPercent(pool.interestRate) },
     { label: 'Term', value: formatDuration(pool.loanDuration) },
-    { label: 'Network', value: pool.chainId === 80002 ? 'Polygon Amoy' : `Chain ${pool.chainId}` },
   ]
 
   return (
@@ -94,6 +117,15 @@ function PoolDetailScreen() {
           </View>
         )}
 
+        {/* Contributions still in flight — invisible in the liquidity figure until indexed */}
+        {pending.length > 0 && (
+          <View className="mt-6 gap-3 px-6" testID="pool-pending-contributions">
+            {pending.map((transaction) => (
+              <PendingContributionCard key={transaction.txHash} transaction={transaction} onPress={() => setDetail(transaction)} />
+            ))}
+          </View>
+        )}
+
         {/* Pool activity */}
         {transactions.length > 0 && (
           <View className="mt-8 px-6">
@@ -110,7 +142,7 @@ function PoolDetailScreen() {
       {/* Fixed thumb-zone action bar */}
       <View className="absolute inset-x-0 bottom-safe-offset-4 flex-row gap-3 px-6" testID="pool-actions">
         <Pressable
-          onPress={() => comingSoon('Contributing')}
+          onPress={() => router.push(`/(auth)/pool/contribute?poolId=${pool.poolId}`)}
           className="flex-1 items-center justify-center rounded-2xl border-continuous bg-mint py-4 shadow-glow-mint active:scale-[0.97] active:opacity-90"
           testID="pool-contribute-button"
         >
@@ -124,6 +156,20 @@ function PoolDetailScreen() {
           <Text className="text-sm font-bold text-snow">Request loan</Text>
         </Pressable>
       </View>
+
+      <TransactionStatusModal
+        transaction={detail}
+        onClose={() => setDetail(null)}
+        onDismiss={
+          detail?.status === 'failed'
+            ? () => {
+                const { txHash } = detail
+                setDetail(null)
+                pendingTransactionsStore.removePendingTransaction(txHash)
+              }
+            : undefined
+        }
+      />
     </View>
   )
 }

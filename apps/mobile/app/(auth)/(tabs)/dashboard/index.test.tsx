@@ -59,11 +59,18 @@ describe('DashboardScreen', () => {
     expect(getByTestId('request-loan-button')).toBeTruthy()
   })
 
-  it('shows coming-soon toasts for the unimplemented actions', () => {
+  it('sends the contribute action to the pools list, which is where a pool is chosen', () => {
+    // The dashboard has no single pool in mind, so it hands over rather than
+    // guessing which one the user meant.
     const { getByTestId } = render(<DashboardScreen />)
 
     fireEvent.press(getByTestId('contribute-button'))
-    expect(mockToast.show).toHaveBeenCalledWith({ type: 'info', text1: 'Contributing is coming soon' })
+
+    expect(mockRouterReplace).toHaveBeenCalledWith('/(auth)/(tabs)/pools')
+  })
+
+  it('shows coming-soon toasts for the actions that are still unimplemented', () => {
+    const { getByTestId } = render(<DashboardScreen />)
 
     fireEvent.press(getByTestId('request-loan-button'))
     expect(mockToast.show).toHaveBeenCalledWith({ type: 'info', text1: 'Loan request is coming soon' })
