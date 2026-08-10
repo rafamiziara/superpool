@@ -312,10 +312,7 @@ describe('SampleLendingPool', function () {
       // Before v2 a single caller could drain the pool maxLoanAmount at a time.
       await lendingPool.connect(borrower).createLoan(maxLoanAmount)
 
-      await expect(lendingPool.connect(borrower).createLoan(maxLoanAmount)).to.be.revertedWithCustomError(
-        lendingPool,
-        'LoanOutstanding'
-      )
+      await expect(lendingPool.connect(borrower).createLoan(maxLoanAmount)).to.be.revertedWithCustomError(lendingPool, 'LoanOutstanding')
 
       // 21 deposited, 10 lent — the rest stays put.
       expect(await lendingPool.totalFunds()).to.equal(ethers.parseEther('11'))
@@ -340,10 +337,7 @@ describe('SampleLendingPool', function () {
       await lendingPool.connect(otherAccount).createLoan(ethers.parseEther('8'))
 
       // lender is a member with no open loan, but the pool only holds 6.
-      await expect(lendingPool.connect(lender).createLoan(largeLoanAmount)).to.be.revertedWithCustomError(
-        lendingPool,
-        'InsufficientFunds'
-      )
+      await expect(lendingPool.connect(lender).createLoan(largeLoanAmount)).to.be.revertedWithCustomError(lendingPool, 'InsufficientFunds')
     })
 
     it('Should reject loan when pool is inactive', async function () {
