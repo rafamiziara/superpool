@@ -50,7 +50,7 @@ describe('SampleLendingPool', function () {
     })
 
     it('Should return correct version', async function () {
-      expect(await lendingPool.version()).to.equal('1.0.0')
+      expect(await lendingPool.version()).to.equal('2.0.0')
     })
   })
 
@@ -230,6 +230,12 @@ describe('SampleLendingPool', function () {
       await lendingPool.connect(lender).depositFunds({
         value: ethers.parseEther('20'),
       })
+
+      // Borrowing is members-only, so the borrower needs a contribution of
+      // their own. It is a gate, not collateral — it does not bound the loan.
+      await lendingPool.connect(borrower).depositFunds({
+        value: ethers.parseEther('1'),
+      })
     })
 
     it('Should create a loan successfully', async function () {
@@ -252,10 +258,67 @@ describe('SampleLendingPool', function () {
       expect(borrowerBalanceAfter).to.be.gt(borrowerBalanceBefore)
 
       // Check total funds decreased
-      expect(await lendingPool.totalFunds()).to.equal(ethers.parseEther('15'))
+      expect(await lendingPool.totalFunds()).to.equal(ethers.parseEther('16'))
 
       // Check next loan ID incremented
       expect(await lendingPool.nextLoanId()).to.equal(2)
+
+      // Check the borrower is now locked to this loan
+      expect(await lendingPool.activeLoanId(borrower.address)).to.equal(1)
+    })
+
+    it('Should reject a borrower who has never contributed', async function () {
+      await expect(lendingPool.connect(otherAccount).createLoan(ethers.parseEther('5'))).to.be.revertedWithCustomError(
+        lendingPool,
+        'UnauthorizedBorrower'
+      )
+    })
+
+    it('Should reject a second loan while one is outstanding', async function () {
+      await lendingPool.connect(borrower).createLoan(ethers.parseEther('5'))
+
+      await expect(lendingPool.connect(borrower).createLoan(ethers.parseEther('5'))).to.be.revertedWithCustomError(
+        lendingPool,
+        'LoanOutstanding'
+      )
+    })
+
+    it('Should allow a new loan once the previous one is repaid', async function () {
+      await lendingPool.connect(borrower).createLoan(ethers.parseEther('5'))
+      const repayment = await lendingPool.calculateRepaymentAmount(1)
+      await lendingPool.connect(borrower).repayLoan(1, { value: repayment })
+
+      expect(await lendingPool.activeLoanId(borrower.address)).to.equal(0)
+
+      await expect(lendingPool.connect(borrower).createLoan(ethers.parseEther('5'))).to.not.be.reverted
+      expect(await lendingPool.activeLoanId(borrower.address)).to.equal(2)
+    })
+
+    it('Should lock the borrower out of withdrawing while the loan is open', async function () {
+      await lendingPool.connect(borrower).createLoan(ethers.parseEther('5'))
+
+      await expect(lendingPool.connect(borrower).withdraw(ethers.parseEther('1'))).to.be.revertedWithCustomError(
+        lendingPool,
+        'LoanOutstanding'
+      )
+
+      const repayment = await lendingPool.calculateRepaymentAmount(1)
+      await lendingPool.connect(borrower).repayLoan(1, { value: repayment })
+
+      await expect(lendingPool.connect(borrower).withdraw(ethers.parseEther('1'))).to.not.be.reverted
+    })
+
+    it('Should cap one borrower at maxLoanAmount rather than the whole pool', async function () {
+      // Before v2 a single caller could drain the pool maxLoanAmount at a time.
+      await lendingPool.connect(borrower).createLoan(maxLoanAmount)
+
+      await expect(lendingPool.connect(borrower).createLoan(maxLoanAmount)).to.be.revertedWithCustomError(
+        lendingPool,
+        'LoanOutstanding'
+      )
+
+      // 21 deposited, 10 lent — the rest stays put.
+      expect(await lendingPool.totalFunds()).to.equal(ethers.parseEther('11'))
     })
 
     it('Should reject loan exceeding max amount', async function () {
@@ -268,15 +331,16 @@ describe('SampleLendingPool', function () {
     })
 
     it('Should reject loan when insufficient funds', async function () {
-      // First, empty the pool to create insufficient funds scenario
-      const largeLoanAmount = ethers.parseEther('8') // Less than max but more than available after creating other loans
+      // Draining now takes several borrowers, since each is capped at one open
+      // loan. 21 ETH available; two 8 ETH loans leave 5.
+      const largeLoanAmount = ethers.parseEther('8') // Less than max but more than available
 
-      // Create loans to drain the pool (20 ETH available, create 2 loans of 8 ETH each)
       await lendingPool.connect(borrower).createLoan(ethers.parseEther('8'))
-      await lendingPool.connect(borrower).createLoan(ethers.parseEther('8'))
+      await lendingPool.connect(otherAccount).depositFunds({ value: ethers.parseEther('1') })
+      await lendingPool.connect(otherAccount).createLoan(ethers.parseEther('8'))
 
-      // Now try to create another loan - should fail due to insufficient funds (only 4 ETH left)
-      await expect(lendingPool.connect(borrower).createLoan(largeLoanAmount)).to.be.revertedWithCustomError(
+      // lender is a member with no open loan, but the pool only holds 6.
+      await expect(lendingPool.connect(lender).createLoan(largeLoanAmount)).to.be.revertedWithCustomError(
         lendingPool,
         'InsufficientFunds'
       )
@@ -300,6 +364,11 @@ describe('SampleLendingPool', function () {
       // Fund the pool and create a loan
       await lendingPool.connect(lender).depositFunds({
         value: ethers.parseEther('20'),
+      })
+
+      // Borrowing is members-only.
+      await lendingPool.connect(borrower).depositFunds({
+        value: ethers.parseEther('1'),
       })
 
       await lendingPool.connect(borrower).createLoan(loanAmount)

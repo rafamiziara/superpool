@@ -70,6 +70,14 @@ contract SampleLendingPool is
      */
     mapping(address => uint256) public contributions;
 
+    /**
+     * @notice The borrower's unrepaid loan, or 0 if they have none
+     * @dev Appended in v2, and doing double duty: it caps a borrower at one
+     * open loan at a time, and it locks their contribution until they repay.
+     * Loan ids start at 1, so 0 is an unambiguous "none".
+     */
+    mapping(address => uint256) public activeLoanId;
+
     /// @notice Events
     /**
      * @notice Emitted when the pool configuration is updated
@@ -124,6 +132,7 @@ contract SampleLendingPool is
     error InsufficientFunds();
     error InsufficientBalance();
     error InsufficientLiquidity();
+    error LoanOutstanding();
     error LoanAlreadyRepaid();
     error UnauthorizedBorrower();
     error ExceedsMaxLoanAmount();
@@ -210,6 +219,7 @@ contract SampleLendingPool is
         uint256 _amount
     ) external whenNotPaused nonReentrant {
         if (_amount == 0) revert InvalidAmount();
+        if (activeLoanId[msg.sender] != 0) revert LoanOutstanding();
 
         uint256 balance = contributions[msg.sender];
         if (_amount > balance) revert InsufficientBalance();
@@ -243,11 +253,27 @@ contract SampleLendingPool is
      * @notice Create a new loan
      * @param _amount Loan amount requested
      * @return loanId The ID of the created loan
+     * @dev Borrowing is restricted to members — a caller with a non-zero
+     * contribution — which is the same definition of membership the app
+     * already uses, and needs no separate approval flow. Before v2 there was
+     * no check on `msg.sender` at all, so anyone could take `maxLoanAmount`
+     * repeatedly until the pool was empty and never repay.
+     *
+     * Membership alone is a weak gate, so two limits back it up: one open loan
+     * per borrower, which caps a single borrower's exposure at the owner's
+     * configured `maxLoanAmount`; and a lock on the borrower's contribution
+     * until they repay, so a member cannot borrow and then withdraw their
+     * stake. Note the contribution is *not* collateral — it does not bound the
+     * loan and is not seized on default.
      */
     function createLoan(
         uint256 _amount
     ) external whenNotPaused nonReentrant returns (uint256) {
         if (!poolConfig.isActive) revert PoolNotActive();
+
+        if (contributions[msg.sender] == 0) revert UnauthorizedBorrower();
+
+        if (activeLoanId[msg.sender] != 0) revert LoanOutstanding();
 
         if (_amount > poolConfig.maxLoanAmount) {
             revert ExceedsMaxLoanAmount();
@@ -270,6 +296,7 @@ contract SampleLendingPool is
         });
 
         totalFunds -= _amount;
+        activeLoanId[msg.sender] = loanId;
 
         // Emit event before external call
         emit LoanCreated(loanId, msg.sender, _amount);
@@ -306,6 +333,12 @@ contract SampleLendingPool is
         // Complete all state changes before external call (CEI pattern)
         loan.isRepaid = true;
         totalFunds += totalRepayment;
+        // Only clears the lock if this is the tracked loan. A pool upgraded to
+        // v2 can hold loans created before `activeLoanId` existed; repaying one
+        // of those must not release a lock taken by a newer loan.
+        if (activeLoanId[msg.sender] == _loanId) {
+            delete activeLoanId[msg.sender];
+        }
 
         // Emit event before external call
         emit LoanRepaid(_loanId, msg.sender, totalRepayment);
@@ -388,6 +421,6 @@ contract SampleLendingPool is
      * @return version Version string of the contract
      */
     function version() external pure returns (string memory) {
-        return "1.0.0";
+        return "2.0.0";
     }
 }

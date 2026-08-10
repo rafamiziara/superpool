@@ -274,7 +274,8 @@ describe('Security Improvements Summary', function () {
       await pool.connect(addr2).depositFunds({ value: ethers.parseEther('2') })
       expect(await pool.totalFunds()).to.equal(ethers.parseEther('2'))
 
-      // Create a loan
+      // Create a loan — borrowing is members-only, so the borrower contributes first
+      await pool.connect(addr3).depositFunds({ value: ethers.parseEther('0.5') })
       await pool.connect(addr3).createLoan(ethers.parseEther('1'))
       const loan = await pool.loans(1)
       expect(loan.borrower).to.equal(addr3.address)

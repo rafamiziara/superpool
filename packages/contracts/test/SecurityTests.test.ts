@@ -27,6 +27,9 @@ describe('Security Tests', function () {
 
     // Add some initial funds to the pool
     await lendingPool.connect(lender).depositFunds({ value: ethers.parseEther('20') })
+
+    // Borrowing is members-only, so the borrower needs a contribution of their own
+    await lendingPool.connect(borrower).depositFunds({ value: ethers.parseEther('1') })
   })
 
   describe('Reentrancy Attack Protection', function () {
@@ -41,6 +44,9 @@ describe('Security Tests', function () {
 
       // Fund the malicious contract
       await maliciousContract.fund({ value: ethers.parseEther('2') })
+
+      // Borrowing is members-only, so the attacker has to contribute first
+      await maliciousContract.joinPool({ value: ethers.parseEther('1') })
 
       // Since our CEI pattern prevents reentrancy by design (external call at end),
       // the attack should either fail or not cause any damage
@@ -85,10 +91,13 @@ describe('Security Tests', function () {
     it('Should properly handle legitimate high-frequency transactions', async function () {
       const loanAmount = ethers.parseEther('0.1')
 
-      // Multiple rapid legitimate transactions should work
-      await lendingPool.connect(borrower).createLoan(loanAmount)
-      await lendingPool.connect(borrower).createLoan(loanAmount)
-      await lendingPool.connect(borrower).createLoan(loanAmount)
+      // Multiple rapid legitimate borrow/repay cycles should work. A borrower
+      // is capped at one open loan, so the cycle is the legitimate pattern.
+      for (let loanId = 1; loanId <= 3; loanId++) {
+        await lendingPool.connect(borrower).createLoan(loanAmount)
+        const repayment = await lendingPool.calculateRepaymentAmount(loanId)
+        await lendingPool.connect(borrower).repayLoan(loanId, { value: repayment })
+      }
 
       expect(await lendingPool.nextLoanId()).to.equal(4)
     })
@@ -116,6 +125,9 @@ describe('Security Tests', function () {
       // Add sufficient funds
       await largeLendingPool.connect(lender).depositFunds({
         value: ethers.parseEther('2000'),
+      })
+      await largeLendingPool.connect(borrower).depositFunds({
+        value: ethers.parseEther('1'),
       })
 
       // Create a large loan
@@ -146,6 +158,7 @@ describe('Security Tests', function () {
 
       await testPool.waitForDeployment()
       await testPool.connect(lender).depositFunds({ value: ethers.parseEther('200') })
+      await testPool.connect(borrower).depositFunds({ value: ethers.parseEther('1') })
 
       // Create loan with maximum amount
       await testPool.connect(borrower).createLoan(maxSafeAmount)
@@ -174,6 +187,7 @@ describe('Security Tests', function () {
 
         await testPool.waitForDeployment()
         await testPool.connect(lender).depositFunds({ value: ethers.parseEther('20') })
+        await testPool.connect(borrower).depositFunds({ value: ethers.parseEther('1') })
 
         const loanAmount = ethers.parseEther('1')
         await testPool.connect(borrower).createLoan(loanAmount)
@@ -196,6 +210,11 @@ describe('Security Tests', function () {
 
       // Fund the rejecting contract using the fundMe function
       await rejectingContract.fundMe({ value: ethers.parseEther('5') })
+
+      // Borrowing is members-only, so it has to contribute before it can borrow
+      await rejectingContract.depositFunds(await lendingPool.getAddress(), {
+        value: ethers.parseEther('1'),
+      })
 
       // Try to create a loan from the rejecting contract
       // This should fail because the loan transfer will be rejected
@@ -243,6 +262,7 @@ describe('Security Tests', function () {
 
       await zeroPool.waitForDeployment()
       await zeroPool.connect(lender).depositFunds({ value: ethers.parseEther('20') })
+      await zeroPool.connect(borrower).depositFunds({ value: ethers.parseEther('1') })
 
       const loanAmount = ethers.parseEther('1')
       await zeroPool.connect(borrower).createLoan(loanAmount)

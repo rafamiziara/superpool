@@ -48,4 +48,10 @@ contract TestReentrancyAttacker {
 
     // Allow the contract to receive funds for testing
     function fund() external payable {}
+
+    /// @dev Borrowing is members-only, so the attacker has to contribute
+    /// before it can attempt anything through `createLoan`.
+    function joinPool() external payable {
+        targetPool.depositFunds{value: msg.value}();
+    }
 }

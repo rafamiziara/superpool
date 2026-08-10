@@ -1282,6 +1282,11 @@ export const SampleLendingPoolABI = [
   },
   {
     "inputs": [],
+    "name": "LoanOutstanding",
+    "type": "error"
+  },
+  {
+    "inputs": [],
     "name": "NotInitializing",
     "type": "error"
   },
@@ -1540,6 +1545,25 @@ export const SampleLendingPoolABI = [
         "internalType": "string",
         "name": "",
         "type": "string"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "name": "activeLoanId",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
       }
     ],
     "stateMutability": "view",
