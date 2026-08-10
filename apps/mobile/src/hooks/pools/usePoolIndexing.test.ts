@@ -1,5 +1,6 @@
 import { act, renderHook } from '@testing-library/react-native'
 import type { Address } from 'viem'
+import { LOCALHOST_CHAIN_ID, makePendingTransaction, OTHER_TX_HASH, TX_HASH } from '../../__tests__/fixtures/pendingTransaction'
 import { mockFirebaseCallable, mockWagmiUseAccount } from '../../__tests__/mocks'
 import { type PendingTransaction, pendingTransactionsStore } from '../../stores/PendingTransactionsStore'
 import { poolStore } from '../../stores/PoolStore'
@@ -7,9 +8,6 @@ import { usePoolIndexing } from './usePoolIndexing'
 
 const WALLET_ADDRESS = '0x70997970C51812dc3A010C7d01b50e0d17dc79C8'
 const POOL_ADDRESS = '0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0'
-const TX_HASH = '0xaaaa000000000000000000000000000000000000000000000000000000000001'
-const OTHER_TX_HASH = '0xbbbb000000000000000000000000000000000000000000000000000000000002'
-const LOCALHOST_CHAIN_ID = 31337
 
 jest.mock('../../config/contracts', () => ({
   DEFAULT_CHAIN_ID: 31337,
@@ -24,23 +22,12 @@ jest.mock('../../stores/PoolStore', () => ({
 
 const refreshPools = jest.mocked(poolStore.refreshPools)
 
-function makeTransaction(overrides: Partial<PendingTransaction> = {}): PendingTransaction {
-  return {
-    txHash: TX_HASH,
-    chainId: LOCALHOST_CHAIN_ID,
-    type: 'CREATE_POOL',
-    status: 'confirmed',
-    timestamp: 1_760_000_000_000,
-    result: { poolId: 7, poolAddress: POOL_ADDRESS },
-    params: {
-      name: 'Neighbourhood Fund',
-      description: 'Micro-loans for the block',
-      maxLoanAmount: '1000000000000000000',
-      interestRate: 500,
-      loanDuration: 2_592_000,
-    },
-    ...overrides,
-  }
+/**
+ * Indexing only ever runs against a record the chain has already confirmed, so
+ * that — not the fixture's default `submitted` — is this suite's starting point.
+ */
+function makeConfirmed(overrides: Partial<PendingTransaction> = {}): PendingTransaction {
+  return makePendingTransaction({ status: 'confirmed', result: { poolId: 7, poolAddress: POOL_ADDRESS }, ...overrides })
 }
 
 describe('usePoolIndexing', () => {
@@ -80,7 +67,7 @@ describe('usePoolIndexing', () => {
 
   describe('triggerIndexing', () => {
     beforeEach(async () => {
-      await pendingTransactionsStore.addPendingTransaction(makeTransaction())
+      await pendingTransactionsStore.addPendingTransaction(makeConfirmed())
     })
 
     it('asks the backend to index the transaction on the connected chain', async () => {
@@ -166,8 +153,8 @@ describe('usePoolIndexing', () => {
 
   describe('indexConfirmed', () => {
     it('indexes every confirmed transaction, including ones recovered at startup', async () => {
-      await pendingTransactionsStore.addPendingTransaction(makeTransaction())
-      await pendingTransactionsStore.addPendingTransaction(makeTransaction({ txHash: OTHER_TX_HASH, chainId: 80002 }))
+      await pendingTransactionsStore.addPendingTransaction(makeConfirmed())
+      await pendingTransactionsStore.addPendingTransaction(makeConfirmed({ txHash: OTHER_TX_HASH, chainId: 80002 }))
       const { result } = renderHook(() => usePoolIndexing())
 
       await act(async () => {
@@ -182,7 +169,7 @@ describe('usePoolIndexing', () => {
     })
 
     it('leaves still-submitted transactions alone', async () => {
-      await pendingTransactionsStore.addPendingTransaction(makeTransaction({ status: 'submitted' }))
+      await pendingTransactionsStore.addPendingTransaction(makeConfirmed({ status: 'submitted' }))
       const { result } = renderHook(() => usePoolIndexing())
 
       await act(async () => {
@@ -194,7 +181,7 @@ describe('usePoolIndexing', () => {
     })
 
     it('ignores failed transactions', async () => {
-      await pendingTransactionsStore.addPendingTransaction(makeTransaction({ status: 'failed' }))
+      await pendingTransactionsStore.addPendingTransaction(makeConfirmed({ status: 'failed' }))
       const { result } = renderHook(() => usePoolIndexing())
 
       await act(async () => {
@@ -215,8 +202,8 @@ describe('usePoolIndexing', () => {
     })
 
     it('carries on after one transaction fails to index', async () => {
-      await pendingTransactionsStore.addPendingTransaction(makeTransaction())
-      await pendingTransactionsStore.addPendingTransaction(makeTransaction({ txHash: OTHER_TX_HASH }))
+      await pendingTransactionsStore.addPendingTransaction(makeConfirmed())
+      await pendingTransactionsStore.addPendingTransaction(makeConfirmed({ txHash: OTHER_TX_HASH }))
       indexPoolCallable.mockRejectedValueOnce(new Error('functions/unavailable'))
       const { result } = renderHook(() => usePoolIndexing())
 

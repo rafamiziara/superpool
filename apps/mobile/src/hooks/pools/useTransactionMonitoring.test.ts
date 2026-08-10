@@ -13,8 +13,9 @@ import {
   mockWagmiUsePublicClient,
   mockWaitForTransactionReceipt,
 } from '../../__tests__/mocks'
+import { makePendingTransaction, TX_HASH } from '../../__tests__/fixtures/pendingTransaction'
 import { PoolFactoryABI } from '../../constants/abis'
-import { type PendingTransaction, pendingTransactionsStore } from '../../stores/PendingTransactionsStore'
+import { pendingTransactionsStore } from '../../stores/PendingTransactionsStore'
 import { useTransactionMonitoring } from './useTransactionMonitoring'
 
 type ReceiptLog = TransactionReceipt['logs'][number]
@@ -22,7 +23,6 @@ type ReceiptLog = TransactionReceipt['logs'][number]
 const FACTORY_ADDRESS = '0x5FbDB2315678afecb367f032d93F642f64180aa3'
 const POOL_ADDRESS = '0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0'
 const POOL_OWNER = '0x70997970C51812dc3A010C7d01b50e0d17dc79C8'
-const TX_HASH = '0xaaaa000000000000000000000000000000000000000000000000000000000001'
 
 function makePoolCreatedLog(poolId: bigint): ReceiptLog {
   return {
@@ -65,30 +65,13 @@ function makeReceipt(overrides: Partial<TransactionReceipt> = {}): TransactionRe
   }
 }
 
-function makeTransaction(): PendingTransaction {
-  return {
-    txHash: TX_HASH,
-    chainId: 31337,
-    type: 'CREATE_POOL',
-    status: 'submitted',
-    timestamp: 1_760_000_000_000,
-    params: {
-      name: 'Neighbourhood Fund',
-      description: 'Micro-loans for the block',
-      maxLoanAmount: '1000000000000000000',
-      interestRate: 500,
-      loanDuration: 2_592_000,
-    },
-  }
-}
-
 const storedStatus = () => pendingTransactionsStore.transactions[0]?.status
 
 describe('useTransactionMonitoring', () => {
   beforeEach(async () => {
     jest.clearAllMocks()
     await pendingTransactionsStore.reset()
-    await pendingTransactionsStore.addPendingTransaction(makeTransaction())
+    await pendingTransactionsStore.addPendingTransaction(makePendingTransaction())
 
     mockWagmiUsePublicClient.mockReturnValue({
       chain: { id: 31337 },

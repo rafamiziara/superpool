@@ -1,12 +1,21 @@
 #!/usr/bin/env node
 
+// Starts the local development environment: Firebase emulators, ngrok tunnels,
+// and the mobile app's .env rewritten to point at the fresh tunnel URLs.
+//
+// Usage:
+//   node scripts/dev-environment.js              # backend only (pnpm dev:backend)
+//   node scripts/dev-environment.js --with-app   # also spawn Expo (pnpm dev)
+
 const { spawn, exec } = require('child_process')
 const fs = require('fs')
 const path = require('path')
 const http = require('http')
 
 class DevEnvironment {
-  constructor() {
+  constructor({ withApp = false } = {}) {
+    this.withApp = withApp
+    this.label = withApp ? 'Development' : 'Backend'
     this.processes = []
     this.ngrokUrls = {}
     this.isShuttingDown = false
@@ -47,7 +56,7 @@ class DevEnvironment {
       try {
         await this.execAsync(check.command)
         this.log(`✓ ${check.name} is installed`, 'success')
-      } catch (error) {
+      } catch {
         this.log(`✗ ${check.name} is not installed or not in PATH`, 'error')
         throw new Error(`Missing prerequisite: ${check.name}`)
       }
@@ -56,7 +65,7 @@ class DevEnvironment {
 
   execAsync(command) {
     return new Promise((resolve, reject) => {
-      exec(command, (error, stdout, stderr) => {
+      exec(command, (error, stdout) => {
         if (error) reject(error)
         else resolve(stdout)
       })
@@ -107,7 +116,7 @@ class DevEnvironment {
 
         this.log('Firebase Emulators are ready!', 'success')
         break
-      } catch (error) {
+      } catch {
         attempts++
         if (attempts >= maxAttempts) {
           throw new Error('Firebase Emulators failed to start within 30 seconds')
@@ -128,7 +137,7 @@ class DevEnvironment {
           method: 'GET',
           timeout: 1000,
         },
-        (res) => {
+        () => {
           resolve(true)
         }
       )
@@ -238,7 +247,7 @@ class DevEnvironment {
 
     // Update Cloud Functions URL - only replace the ngrok domain, preserve project ID and zone
     envContent = envContent.replace(
-      /EXPO_PUBLIC_CLOUD_FUNCTIONS_BASE_URL="http:\/\/[^\/]+\/(.*?)"/,
+      /EXPO_PUBLIC_CLOUD_FUNCTIONS_BASE_URL="http:\/\/[^/]+\/(.*?)"/,
       `EXPO_PUBLIC_CLOUD_FUNCTIONS_BASE_URL="http://${this.ngrokUrls.functions}/$1"`
     )
 
@@ -261,7 +270,7 @@ class DevEnvironment {
     if (this.isShuttingDown) return
     this.isShuttingDown = true
 
-    this.log('Shutting down development environment...', 'warning')
+    this.log(`Shutting down ${this.label.toLowerCase()} environment...`, 'warning')
 
     // Kill all spawned processes
     this.processes.forEach((proc, index) => {
@@ -282,13 +291,13 @@ class DevEnvironment {
       }
     })
 
-    this.log('Development environment stopped.', 'success')
+    this.log(`${this.label} environment stopped.`, 'success')
     process.exit(0)
   }
 
   async start() {
     try {
-      this.log('🚀 Starting SuperPool Development Environment', 'success')
+      this.log(`🚀 Starting SuperPool ${this.label} Environment`, 'success')
       this.log('')
 
       await this.checkPrerequisites()
@@ -303,10 +312,12 @@ class DevEnvironment {
       await this.updateEnvironmentFile()
       this.log('')
 
-      await this.startExpoApp()
-      this.log('')
+      if (this.withApp) {
+        await this.startExpoApp()
+        this.log('')
+      }
 
-      this.log('🎉 Development environment is ready!', 'success')
+      this.log(`🎉 ${this.label} environment is ready!`, 'success')
       this.log('')
       this.log('Available services:')
       this.log(`  Firebase Auth Emulator: http://localhost:9099`)
@@ -319,15 +330,16 @@ class DevEnvironment {
         this.log(`  ${service.charAt(0).toUpperCase() + service.slice(1)}: https://${url}`)
       })
       this.log('')
+      this.log('⚠ If testing on a physical device, make sure any VPN is disabled — it can block ngrok DNS resolution.', 'warning')
+      this.log('')
       this.log('Press Ctrl+C to stop all services')
     } catch (error) {
-      this.log(`Failed to start development environment: ${error.message}`, 'error')
+      this.log(`Failed to start ${this.label.toLowerCase()} environment: ${error.message}`, 'error')
       await this.cleanup()
       process.exit(1)
     }
   }
 }
 
-// Start the development environment
-const devEnv = new DevEnvironment()
-devEnv.start()
+const environment = new DevEnvironment({ withApp: process.argv.includes('--with-app') })
+environment.start()

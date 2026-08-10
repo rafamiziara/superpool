@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
 import { usePublicClient } from 'wagmi'
 import { pendingTransactionsStore } from '../stores/PendingTransactionsStore'
+import { logger } from '../utils/logger'
 
 /**
  * Restores pool-creation transactions left over from a previous run and resolves
@@ -28,7 +29,7 @@ export function PendingTransactionsInitializer() {
 
     // Startup recovery is best-effort: the store already swallows storage and
     // receipt failures, but an unexpected throw here must not take down the app.
-    recover().catch((error) => console.warn('Failed to recover pending transactions:', error))
+    recover().catch((error) => logger.warn('Failed to recover pending transactions:', error))
 
     return () => {
       cancelled = true

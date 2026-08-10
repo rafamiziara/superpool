@@ -6,7 +6,7 @@ import { Pressable, ScrollView, Text, View } from 'react-native'
 import Toast from 'react-native-toast-message'
 import { ActivityRow } from '../../../src/components/lending/ActivityRow'
 import { poolStore } from '../../../src/stores/PoolStore'
-import { bpsToPercent, formatDuration, formatToken, shortAddress } from '../../../src/utils/format'
+import { bpsToPercent, formatDuration, formatToken, sameAddress, shortAddress } from '../../../src/utils/format'
 
 function comingSoon(action: string) {
   Toast.show({ type: 'info', text1: `${action} is coming soon` })
@@ -29,9 +29,8 @@ function PoolDetailScreen() {
     )
   }
 
-  // Case-insensitive: the backend stores addresses lowercased, wallets report
-  // them checksummed, so a strict compare hides the admin controls from the owner.
-  const isOwner = pool.poolOwner.toLowerCase() === poolStore.userAddress.toLowerCase()
+  // A strict compare would hide the admin controls from the pool's own owner.
+  const isOwner = sameAddress(pool.poolOwner, poolStore.userAddress)
 
   const stats = [
     { label: 'Max loan', value: `${formatToken(pool.maxLoanAmount)} POL` },

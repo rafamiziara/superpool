@@ -5,7 +5,7 @@ import React from 'react'
 import { Pressable, Text, View } from 'react-native'
 import { palette } from '../../constants/palette'
 import { poolStore } from '../../stores/PoolStore'
-import { bpsToPercent, formatDuration, formatToken } from '../../utils/format'
+import { bpsToPercent, formatDuration, formatToken, sameAddress } from '../../utils/format'
 
 type Accent = 'mint' | 'iris' | 'amber'
 
@@ -27,9 +27,7 @@ interface PoolCardProps {
 
 export function PoolCard({ pool, membership, onPress, carousel = false }: PoolCardProps) {
   const accent = accentStyles[ACCENT_CYCLE[pool.poolId % ACCENT_CYCLE.length]]
-  // Case-insensitive: the backend stores addresses lowercased, wallets report
-  // them checksummed.
-  const isOwner = pool.poolOwner.toLowerCase() === poolStore.userAddress.toLowerCase()
+  const isOwner = sameAddress(pool.poolOwner, poolStore.userAddress)
   const isPending = membership?.status === MemberStatus.PENDING
 
   return (

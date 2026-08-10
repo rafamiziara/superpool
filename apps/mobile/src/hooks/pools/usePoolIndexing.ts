@@ -6,6 +6,7 @@ import { DEFAULT_CHAIN_ID } from '../../config/contracts'
 import { FIREBASE_FUNCTIONS } from '../../config/firebase'
 import { pendingTransactionsStore } from '../../stores/PendingTransactionsStore'
 import { poolStore } from '../../stores/PoolStore'
+import { logger } from '../../utils/logger'
 
 export interface UsePoolIndexingReturn {
   /** Asks the backend to index a confirmed transaction. Never rejects. */
@@ -39,7 +40,7 @@ export const usePoolIndexing = (): UsePoolIndexingReturn => {
         const indexPool = httpsCallable<IndexPoolRequest, IndexPoolResponse>(FIREBASE_FUNCTIONS, 'indexPool')
         const response = await indexPool({ txHash, chainId: requestedChainId ?? chainId ?? DEFAULT_CHAIN_ID })
 
-        console.log('🗂️ Pool indexed:', response.data)
+        logger.debug('🗂️ Pool indexed:', response.data)
 
         // Refresh before dropping the pending record, so the pool never
         // disappears from the UI in the gap between the two.
@@ -47,7 +48,7 @@ export const usePoolIndexing = (): UsePoolIndexingReturn => {
         await pendingTransactionsStore.removePendingTransaction(txHash)
       } catch (error) {
         // Deliberately not surfaced — see the note on this hook.
-        console.warn('Immediate pool indexing failed; the scheduled sync will pick it up:', error)
+        logger.warn('Immediate pool indexing failed; the scheduled sync will pick it up:', error)
       } finally {
         setIsIndexing(false)
       }

@@ -1,32 +1,15 @@
 import React from 'react'
+import { LOCALHOST_CHAIN_ID, makePendingTransaction, TX_HASH } from '../../../../src/__tests__/fixtures/pendingTransaction'
 import { mockFirebaseCallable, mockWagmiUseAccount } from '../../../../src/__tests__/mocks'
 import { mockRouterPush } from '../../../../src/__tests__/setup'
 import { act, fireEvent, render, waitFor } from '../../../../src/__tests__/test-utils'
-import { type PendingTransaction, pendingTransactionsStore } from '../../../../src/stores/PendingTransactionsStore'
+import { pendingTransactionsStore } from '../../../../src/stores/PendingTransactionsStore'
 import { poolStore } from '../../../../src/stores/PoolStore'
 import PoolsScreen from './index'
 
 jest.mock('expo-status-bar', () => ({
   StatusBar: () => null,
 }))
-
-const CHAIN_ID = 31337
-
-const buildTransaction = (overrides: Partial<PendingTransaction> = {}): PendingTransaction => ({
-  txHash: '0xabc',
-  chainId: CHAIN_ID,
-  type: 'CREATE_POOL',
-  status: 'submitted',
-  timestamp: Date.now(),
-  params: {
-    name: 'Weekend Circle',
-    description: 'A pool for the weekend crew',
-    maxLoanAmount: '1000000000000000000',
-    interestRate: 500,
-    loanDuration: 2_592_000,
-  },
-  ...overrides,
-})
 
 /** Makes every callable reject, so a confirmed record survives the drain. */
 const failIndexing = () => {
@@ -39,7 +22,7 @@ describe('PoolsScreen', () => {
     // Restored per test rather than reset: `mockFirebaseCallable` is shared by
     // every suite, and resetting it would strip the implementation for good.
     mockFirebaseCallable.mockReturnValue(jest.fn().mockResolvedValue({ data: { poolId: 99, alreadyIndexed: false, stored: true } }))
-    mockWagmiUseAccount.mockReturnValue({ isConnected: true, isConnecting: false, address: undefined, chainId: CHAIN_ID })
+    mockWagmiUseAccount.mockReturnValue({ isConnected: true, isConnecting: false, address: undefined, chainId: LOCALHOST_CHAIN_ID })
     await pendingTransactionsStore.reset()
     await poolStore.fetchPools()
   })
@@ -88,18 +71,18 @@ describe('PoolsScreen', () => {
 
   describe('pending pools', () => {
     it('shows a pending card for a submitted transaction', async () => {
-      await pendingTransactionsStore.addPendingTransaction(buildTransaction())
+      await pendingTransactionsStore.addPendingTransaction(makePendingTransaction())
 
       const { getByTestId } = render(<PoolsScreen />)
 
-      expect(getByTestId('pending-pool-card-0xabc')).toBeTruthy()
+      expect(getByTestId(`pending-pool-card-${TX_HASH}`)).toBeTruthy()
       expect(getByTestId('pending-pool-badge-submitted')).toBeTruthy()
     })
 
     it('shows the syncing state while a confirmed transaction is unindexed', async () => {
       failIndexing()
       await pendingTransactionsStore.addPendingTransaction(
-        buildTransaction({ status: 'confirmed', result: { poolId: 99, poolAddress: '0xdef' } })
+        makePendingTransaction({ status: 'confirmed', result: { poolId: 99, poolAddress: '0xdef' } })
       )
 
       const { getByTestId } = render(<PoolsScreen />)
@@ -114,27 +97,27 @@ describe('PoolsScreen', () => {
       failIndexing()
       const listed = poolStore.pools[0].poolId
       await pendingTransactionsStore.addPendingTransaction(
-        buildTransaction({ status: 'confirmed', result: { poolId: listed, poolAddress: '0xdef' } })
+        makePendingTransaction({ status: 'confirmed', result: { poolId: listed, poolAddress: '0xdef' } })
       )
 
       const { queryByTestId, getByTestId } = render(<PoolsScreen />)
 
       await waitFor(() => expect(mockFirebaseCallable).toHaveBeenCalled())
-      expect(queryByTestId('pending-pool-card-0xabc')).toBeNull()
+      expect(queryByTestId(`pending-pool-card-${TX_HASH}`)).toBeNull()
       expect(getByTestId(`pool-card-${listed}`)).toBeTruthy()
     })
 
     it('ignores pending transactions from another chain', async () => {
-      await pendingTransactionsStore.addPendingTransaction(buildTransaction({ chainId: 80002 }))
+      await pendingTransactionsStore.addPendingTransaction(makePendingTransaction({ chainId: 80002 }))
 
       const { queryByTestId } = render(<PoolsScreen />)
 
-      expect(queryByTestId('pending-pool-card-0xabc')).toBeNull()
+      expect(queryByTestId(`pending-pool-card-${TX_HASH}`)).toBeNull()
     })
 
     it('asks the backend to index transactions confirmed while the app was closed', async () => {
       await pendingTransactionsStore.addPendingTransaction(
-        buildTransaction({ status: 'confirmed', result: { poolId: 99, poolAddress: '0xdef' } })
+        makePendingTransaction({ status: 'confirmed', result: { poolId: 99, poolAddress: '0xdef' } })
       )
 
       render(<PoolsScreen />)
@@ -145,50 +128,50 @@ describe('PoolsScreen', () => {
     })
 
     it('dismisses a failed transaction', async () => {
-      await pendingTransactionsStore.addPendingTransaction(buildTransaction({ status: 'failed' }))
+      await pendingTransactionsStore.addPendingTransaction(makePendingTransaction({ status: 'failed' }))
 
       const { getByTestId, queryByTestId } = render(<PoolsScreen />)
 
       await act(async () => {
-        fireEvent.press(getByTestId('pending-pool-dismiss-0xabc'))
+        fireEvent.press(getByTestId(`pending-pool-dismiss-${TX_HASH}`))
       })
 
-      expect(queryByTestId('pending-pool-card-0xabc')).toBeNull()
+      expect(queryByTestId(`pending-pool-card-${TX_HASH}`)).toBeNull()
       expect(pendingTransactionsStore.transactions).toHaveLength(0)
     })
 
     it('offers no dismiss action while a transaction is still in flight', async () => {
-      await pendingTransactionsStore.addPendingTransaction(buildTransaction())
+      await pendingTransactionsStore.addPendingTransaction(makePendingTransaction())
 
       const { queryByTestId } = render(<PoolsScreen />)
 
-      expect(queryByTestId('pending-pool-dismiss-0xabc')).toBeNull()
+      expect(queryByTestId(`pending-pool-dismiss-${TX_HASH}`)).toBeNull()
     })
 
     it('opens the status modal from a pending card', async () => {
-      await pendingTransactionsStore.addPendingTransaction(buildTransaction())
+      await pendingTransactionsStore.addPendingTransaction(makePendingTransaction())
 
       const { getByTestId, getByText, queryByText } = render(<PoolsScreen />)
 
       expect(queryByText('Creating your pool')).toBeNull()
 
-      fireEvent.press(getByTestId('pending-pool-card-0xabc'))
+      fireEvent.press(getByTestId(`pending-pool-card-${TX_HASH}`))
 
       expect(getByText('Creating your pool')).toBeTruthy()
       expect(getByText('Sent to the network')).toBeTruthy()
     })
 
     it('removes the transaction when the modal dismisses it', async () => {
-      await pendingTransactionsStore.addPendingTransaction(buildTransaction({ status: 'failed' }))
+      await pendingTransactionsStore.addPendingTransaction(makePendingTransaction({ status: 'failed' }))
 
       const { getByTestId, queryByTestId } = render(<PoolsScreen />)
 
-      fireEvent.press(getByTestId('pending-pool-card-0xabc'))
+      fireEvent.press(getByTestId(`pending-pool-card-${TX_HASH}`))
       await act(async () => {
         fireEvent.press(getByTestId('transaction-status-dismiss'))
       })
 
-      expect(queryByTestId('pending-pool-card-0xabc')).toBeNull()
+      expect(queryByTestId(`pending-pool-card-${TX_HASH}`)).toBeNull()
       expect(pendingTransactionsStore.transactions).toHaveLength(0)
     })
   })
@@ -220,7 +203,7 @@ describe('PoolsScreen', () => {
       failIndexing()
       poolStore.lastFetchedAt = null
       await pendingTransactionsStore.addPendingTransaction(
-        buildTransaction({ status: 'confirmed', result: { poolId: 99, poolAddress: '0xdef' } })
+        makePendingTransaction({ status: 'confirmed', result: { poolId: 99, poolAddress: '0xdef' } })
       )
 
       const { getByTestId } = render(<PoolsScreen />)

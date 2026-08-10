@@ -33,7 +33,6 @@ export default [
       '**/lcov-report/**',
 
       // Config files that don't need linting
-      '**/scripts/dev-start.js',
       '**/merge-coverage.js',
       'packages/backend/scripts/**',
 

@@ -5,6 +5,7 @@ import { httpsCallable } from 'firebase/functions'
 import { useCallback, useState } from 'react'
 import { FIREBASE_AUTH, FIREBASE_FUNCTIONS } from '../../config/firebase'
 import { FirebaseAuthHook, FirebaseAuthState } from '../../types/auth'
+import { logger } from '../../utils/logger'
 
 export const useFirebaseAuth = (): FirebaseAuthHook => {
   const [state, setState] = useState<FirebaseAuthState>({
@@ -25,7 +26,7 @@ export const useFirebaseAuth = (): FirebaseAuthHook => {
     setState((s) => ({ ...s, isAuthenticating: true, error: null }))
 
     try {
-      console.log('🔥 Authenticating with Firebase...', { walletAddress })
+      logger.debug('🔥 Authenticating with Firebase...', { walletAddress })
 
       const verifySignature = httpsCallable(FIREBASE_FUNCTIONS, 'verifySignatureAndLogin')
 
@@ -60,12 +61,12 @@ export const useFirebaseAuth = (): FirebaseAuthHook => {
       }
 
       setState((s) => ({ ...s, user: userWithDeviceId, isAuthenticating: false, error: null }))
-      console.log('✅ Firebase authentication successful!', userWithDeviceId.walletAddress)
+      logger.debug('✅ Firebase authentication successful!', userWithDeviceId.walletAddress)
 
       return userWithDeviceId
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Firebase authentication failed'
-      console.error('❌ Firebase authentication failed:', errorMessage)
+      logger.error('❌ Firebase authentication failed:', errorMessage)
 
       setState((s) => ({
         ...s,
@@ -80,7 +81,7 @@ export const useFirebaseAuth = (): FirebaseAuthHook => {
 
   const logout = useCallback(async (): Promise<void> => {
     try {
-      console.log('🚪 Logging out from Firebase...')
+      logger.debug('🚪 Logging out from Firebase...')
       await signOut(FIREBASE_AUTH)
 
       setState({
@@ -89,10 +90,10 @@ export const useFirebaseAuth = (): FirebaseAuthHook => {
         error: null,
       })
 
-      console.log('✅ Successfully logged out from Firebase')
+      logger.debug('✅ Successfully logged out from Firebase')
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Logout failed'
-      console.error('❌ Firebase logout failed:', errorMessage)
+      logger.error('❌ Firebase logout failed:', errorMessage)
 
       setState((s) => ({ ...s, error: errorMessage }))
       throw new Error(errorMessage)

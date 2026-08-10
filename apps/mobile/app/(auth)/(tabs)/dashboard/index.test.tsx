@@ -1,28 +1,11 @@
 import React from 'react'
+import { LOCALHOST_CHAIN_ID, makePendingTransaction } from '../../../../src/__tests__/fixtures/pendingTransaction'
 import { mockToast, mockWagmiUseAccount } from '../../../../src/__tests__/mocks'
 import { mockRouterPush, mockRouterReplace } from '../../../../src/__tests__/setup'
 import { fireEvent, render } from '../../../../src/__tests__/test-utils'
-import { type PendingTransaction, pendingTransactionsStore } from '../../../../src/stores/PendingTransactionsStore'
+import { pendingTransactionsStore } from '../../../../src/stores/PendingTransactionsStore'
 import { poolStore } from '../../../../src/stores/PoolStore'
 import DashboardScreen from './index'
-
-const CHAIN_ID = 31337
-
-const buildTransaction = (overrides: Partial<PendingTransaction> = {}): PendingTransaction => ({
-  txHash: '0xabc',
-  chainId: CHAIN_ID,
-  type: 'CREATE_POOL',
-  status: 'submitted',
-  timestamp: Date.now(),
-  params: {
-    name: 'Weekend Circle',
-    description: 'A pool for the weekend crew',
-    maxLoanAmount: '1000000000000000000',
-    interestRate: 500,
-    loanDuration: 2_592_000,
-  },
-  ...overrides,
-})
 
 // Mock dependencies
 jest.mock('expo-status-bar', () => ({
@@ -32,7 +15,7 @@ jest.mock('expo-status-bar', () => ({
 describe('DashboardScreen', () => {
   beforeEach(async () => {
     jest.clearAllMocks()
-    mockWagmiUseAccount.mockReturnValue({ isConnected: true, isConnecting: false, address: undefined, chainId: CHAIN_ID })
+    mockWagmiUseAccount.mockReturnValue({ isConnected: true, isConnecting: false, address: undefined, chainId: LOCALHOST_CHAIN_ID })
     await pendingTransactionsStore.reset()
     await poolStore.fetchPools()
   })
@@ -126,7 +109,7 @@ describe('DashboardScreen', () => {
     it('reports a pool being created', async () => {
       // The dashboard has no pending pool card, so without this the pool is
       // invisible here until the backend catches up.
-      await pendingTransactionsStore.addPendingTransaction(buildTransaction())
+      await pendingTransactionsStore.addPendingTransaction(makePendingTransaction())
 
       const { getByText } = render(<DashboardScreen />)
 
@@ -134,7 +117,7 @@ describe('DashboardScreen', () => {
     })
 
     it('opens the status modal from the banner', async () => {
-      await pendingTransactionsStore.addPendingTransaction(buildTransaction())
+      await pendingTransactionsStore.addPendingTransaction(makePendingTransaction())
 
       const { getByTestId, getByText, queryByText } = render(<DashboardScreen />)
 

@@ -2,6 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage'
 import { makeAutoObservable, runInAction } from 'mobx'
 import { parseEventLogs, type TransactionReceipt } from 'viem'
 import { PoolFactoryABI } from '../constants/abis'
+import { logger } from '../utils/logger'
 
 /** AsyncStorage key holding the serialised transaction list. */
 const STORAGE_KEY = '@superpool/pending_transactions'
@@ -265,7 +266,7 @@ export class PendingTransactionsStore {
     try {
       await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(this.transactions))
     } catch (error) {
-      console.warn('Failed to persist pending transactions:', error)
+      logger.warn('Failed to persist pending transactions:', error)
     }
   }
 
@@ -285,7 +286,7 @@ export class PendingTransactionsStore {
 
       return restored.slice(-MAX_STORED_TRANSACTIONS)
     } catch (error) {
-      console.warn('Failed to restore pending transactions:', error)
+      logger.warn('Failed to restore pending transactions:', error)
       return []
     }
   }

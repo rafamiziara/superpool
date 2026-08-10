@@ -5,6 +5,7 @@ import { connectAuthEmulator, getReactNativePersistence, initializeAuth } from '
 import { connectFirestoreEmulator, getFirestore } from 'firebase/firestore'
 import { connectFunctionsEmulator, getFunctions } from 'firebase/functions'
 import { appCheckProvider } from '../utils/appCheckProvider'
+import { logger } from '../utils/logger'
 
 const firebaseConfig = {
   apiKey: process.env.EXPO_PUBLIC_FIREBASE_API_KEY,
@@ -31,7 +32,7 @@ export const FIREBASE_FUNCTIONS = getFunctions(FIREBASE_APP)
 
 // --- Connect to Emulators in Development ---
 if (__DEV__) {
-  console.log('Connecting to Firebase Emulators...')
+  logger.debug('Connecting to Firebase Emulators...')
 
   const ngrokAuthUrl = process.env.EXPO_PUBLIC_NGROK_URL_AUTH
   const ngrokFirestoreUrl = process.env.EXPO_PUBLIC_NGROK_URL_FIRESTORE

@@ -5,6 +5,7 @@ import { makeAutoObservable, runInAction } from 'mobx'
 import { DEFAULT_CHAIN_ID } from '../config/contracts'
 import { FIREBASE_FUNCTIONS } from '../config/firebase'
 import { MOCK_LOANS, MOCK_MEMBERSHIPS, MOCK_POOLS, MOCK_TRANSACTIONS, MOCK_USER_ADDRESS } from '../mocks/lending'
+import { sameAddress } from '../utils/format'
 import { authStore } from './AuthStore'
 
 /**
@@ -135,7 +136,7 @@ export class PoolStore {
   }
 
   membershipFor = (poolId: number): PoolMember | undefined => {
-    return this.memberships.find((member) => member.poolId === String(poolId) && member.walletAddress === this.userAddress)
+    return this.memberships.find((member) => member.poolId === String(poolId) && sameAddress(member.walletAddress, this.userAddress))
   }
 
   transactionsFor = (poolId: number): Transaction[] => {
@@ -146,16 +147,12 @@ export class PoolStore {
    * Pools the user belongs to or owns, newest first.
    *
    * Ownership counts on its own: a pool you just created is yours to see before
-   * any membership record exists for it. Addresses are compared case-insensitively
-   * because the backend stores them lowercased and wallets report them checksummed.
+   * any membership record exists for it.
    */
   get myPools(): PoolInfo[] {
     const memberPoolIds = new Set(this.memberships.map((member) => member.poolId))
-    const address = this.userAddress.toLowerCase()
 
-    return this.pools.filter(
-      (pool) => memberPoolIds.has(String(pool.poolId)) || (address !== '' && pool.poolOwner.toLowerCase() === address)
-    )
+    return this.pools.filter((pool) => memberPoolIds.has(String(pool.poolId)) || sameAddress(pool.poolOwner, this.userAddress))
   }
 
   /** Sum of the user's active balances across pools (wei). */
@@ -169,15 +166,15 @@ export class PoolStore {
   }
 
   get activeMemberships(): PoolMember[] {
-    return this.memberships.filter((member) => member.status === MemberStatus.ACTIVE && member.walletAddress === this.userAddress)
+    return this.memberships.filter((member) => member.status === MemberStatus.ACTIVE && sameAddress(member.walletAddress, this.userAddress))
   }
 
   get activeLoan(): Loan | undefined {
-    return this.loans.find((loan) => loan.status === LoanStatus.DISBURSED && loan.borrower === this.userAddress)
+    return this.loans.find((loan) => loan.status === LoanStatus.DISBURSED && sameAddress(loan.borrower, this.userAddress))
   }
 
   get pendingLoan(): Loan | undefined {
-    return this.loans.find((loan) => loan.status === LoanStatus.REQUESTED && loan.borrower === this.userAddress)
+    return this.loans.find((loan) => loan.status === LoanStatus.REQUESTED && sameAddress(loan.borrower, this.userAddress))
   }
 
   get recentTransactions(): Transaction[] {

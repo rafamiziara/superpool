@@ -1,6 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import { createPublicClient, encodeAbiParameters, encodeEventTopics, http, type TransactionReceipt } from 'viem'
 import { hardhat } from 'viem/chains'
+import { makePendingTransaction, OTHER_TX_HASH, TX_HASH } from '../__tests__/fixtures/pendingTransaction'
 import { PoolFactoryABI } from '../constants/abis'
 import {
   extractPoolCreatedResult,
@@ -41,30 +42,10 @@ const STORAGE_KEY = '@superpool/pending_transactions'
 const FACTORY_ADDRESS = '0x5FbDB2315678afecb367f032d93F642f64180aa3'
 const POOL_ADDRESS = '0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0'
 const POOL_OWNER = '0x70997970C51812dc3A010C7d01b50e0d17dc79C8'
-const TX_HASH = '0xaaaa000000000000000000000000000000000000000000000000000000000001'
-const OTHER_TX_HASH = '0xbbbb000000000000000000000000000000000000000000000000000000000002'
 
 // ---------------------------------------------------------------------------
 // Fixtures
 // ---------------------------------------------------------------------------
-
-function makeTransaction(overrides: Partial<PendingTransaction> = {}): PendingTransaction {
-  return {
-    txHash: TX_HASH,
-    chainId: 31337,
-    type: 'CREATE_POOL',
-    status: 'submitted',
-    timestamp: 1_760_000_000_000,
-    params: {
-      name: 'Neighbourhood Fund',
-      description: 'Micro-loans for the block',
-      maxLoanAmount: '1000000000000000000',
-      interestRate: 500,
-      loanDuration: 2_592_000,
-    },
-    ...overrides,
-  }
-}
 
 /**
  * Builds a `PoolCreated` log by encoding against the generated ABI, so the
@@ -161,15 +142,15 @@ describe('PendingTransactionsStore', () => {
 
   describe('addPendingTransaction', () => {
     it('adds and persists', async () => {
-      await store.addPendingTransaction(makeTransaction())
+      await store.addPendingTransaction(makePendingTransaction())
 
       expect(store.transactions).toHaveLength(1)
       expect(await readStoredHashes()).toEqual([TX_HASH])
     })
 
     it('replaces an entry with the same hash rather than duplicating it', async () => {
-      await store.addPendingTransaction(makeTransaction())
-      await store.addPendingTransaction(makeTransaction({ status: 'confirmed' }))
+      await store.addPendingTransaction(makePendingTransaction())
+      await store.addPendingTransaction(makePendingTransaction({ status: 'confirmed' }))
 
       expect(store.transactions).toHaveLength(1)
       expect(store.transactions[0].status).toBe('confirmed')
@@ -177,7 +158,7 @@ describe('PendingTransactionsStore', () => {
 
     it('keeps the newest 50 transactions', async () => {
       for (let index = 0; index < 55; index += 1) {
-        await store.addPendingTransaction(makeTransaction({ txHash: `0x${String(index).padStart(64, '0')}` }))
+        await store.addPendingTransaction(makePendingTransaction({ txHash: `0x${String(index).padStart(64, '0')}` }))
       }
 
       expect(store.transactions).toHaveLength(50)
@@ -188,7 +169,7 @@ describe('PendingTransactionsStore', () => {
     it('keeps the transaction when persistence fails', async () => {
       jest.mocked(AsyncStorage.setItem).mockRejectedValueOnce(new Error('quota exceeded'))
 
-      await expect(store.addPendingTransaction(makeTransaction())).resolves.toBeUndefined()
+      await expect(store.addPendingTransaction(makePendingTransaction())).resolves.toBeUndefined()
 
       expect(store.transactions).toHaveLength(1)
       expect(warnSpy).toHaveBeenCalled()
@@ -197,7 +178,7 @@ describe('PendingTransactionsStore', () => {
 
   describe('updateTransactionStatus', () => {
     beforeEach(async () => {
-      await store.addPendingTransaction(makeTransaction())
+      await store.addPendingTransaction(makePendingTransaction())
     })
 
     it('updates status and result, and persists both', async () => {
@@ -228,7 +209,7 @@ describe('PendingTransactionsStore', () => {
 
   describe('removePendingTransaction', () => {
     it('removes and persists', async () => {
-      await store.addPendingTransaction(makeTransaction())
+      await store.addPendingTransaction(makePendingTransaction())
       await store.removePendingTransaction(TX_HASH)
 
       expect(store.transactions).toHaveLength(0)
@@ -236,7 +217,7 @@ describe('PendingTransactionsStore', () => {
     })
 
     it('does not write when the hash is unknown', async () => {
-      await store.addPendingTransaction(makeTransaction())
+      await store.addPendingTransaction(makePendingTransaction())
       jest.mocked(AsyncStorage.setItem).mockClear()
 
       await store.removePendingTransaction(OTHER_TX_HASH)
@@ -248,7 +229,7 @@ describe('PendingTransactionsStore', () => {
 
   describe('loadFromStorage', () => {
     it('restores persisted transactions', async () => {
-      await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify([makeTransaction()]))
+      await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify([makePendingTransaction()]))
 
       await store.loadFromStorage()
 
@@ -258,7 +239,7 @@ describe('PendingTransactionsStore', () => {
     })
 
     it('restores an optional result', async () => {
-      const confirmed = makeTransaction({ status: 'confirmed', result: { poolId: 7, poolAddress: POOL_ADDRESS } })
+      const confirmed = makePendingTransaction({ status: 'confirmed', result: { poolId: 7, poolAddress: POOL_ADDRESS } })
       await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify([confirmed]))
 
       await store.loadFromStorage()
@@ -301,17 +282,17 @@ describe('PendingTransactionsStore', () => {
 
     it.each([
       ['a non-object entry', 'nonsense'],
-      ['a missing hash', { ...makeTransaction(), txHash: undefined }],
-      ['a non-hex hash', { ...makeTransaction(), txHash: 'nope' }],
-      ['a non-numeric chainId', { ...makeTransaction(), chainId: '31337' }],
-      ['an unknown type', { ...makeTransaction(), type: 'CLOSE_POOL' }],
-      ['an unknown status', { ...makeTransaction(), status: 'queued' }],
-      ['a missing timestamp', { ...makeTransaction(), timestamp: undefined }],
-      ['missing params', { ...makeTransaction(), params: undefined }],
-      ['a numeric maxLoanAmount', { ...makeTransaction(), params: { ...makeTransaction().params, maxLoanAmount: 1 } }],
-      ['a string interestRate', { ...makeTransaction(), params: { ...makeTransaction().params, interestRate: '500' } }],
+      ['a missing hash', { ...makePendingTransaction(), txHash: undefined }],
+      ['a non-hex hash', { ...makePendingTransaction(), txHash: 'nope' }],
+      ['a non-numeric chainId', { ...makePendingTransaction(), chainId: '31337' }],
+      ['an unknown type', { ...makePendingTransaction(), type: 'CLOSE_POOL' }],
+      ['an unknown status', { ...makePendingTransaction(), status: 'queued' }],
+      ['a missing timestamp', { ...makePendingTransaction(), timestamp: undefined }],
+      ['missing params', { ...makePendingTransaction(), params: undefined }],
+      ['a numeric maxLoanAmount', { ...makePendingTransaction(), params: { ...makePendingTransaction().params, maxLoanAmount: 1 } }],
+      ['a string interestRate', { ...makePendingTransaction(), params: { ...makePendingTransaction().params, interestRate: '500' } }],
     ])('drops an entry left by an older build: %s', async (_label, entry) => {
-      await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify([entry, makeTransaction({ txHash: OTHER_TX_HASH })]))
+      await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify([entry, makePendingTransaction({ txHash: OTHER_TX_HASH })]))
 
       await store.loadFromStorage()
 
@@ -319,7 +300,7 @@ describe('PendingTransactionsStore', () => {
     })
 
     it('drops an unusable result but keeps the transaction', async () => {
-      const entry = { ...makeTransaction(), status: 'confirmed', result: { poolId: '7', poolAddress: POOL_ADDRESS } }
+      const entry = { ...makePendingTransaction(), status: 'confirmed', result: { poolId: '7', poolAddress: POOL_ADDRESS } }
       await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify([entry]))
 
       await store.loadFromStorage()
@@ -329,7 +310,9 @@ describe('PendingTransactionsStore', () => {
     })
 
     it('caps a stored list that grew beyond the limit', async () => {
-      const stored = Array.from({ length: 60 }, (_unused, index) => makeTransaction({ txHash: `0x${String(index).padStart(64, '0')}` }))
+      const stored = Array.from({ length: 60 }, (_unused, index) =>
+        makePendingTransaction({ txHash: `0x${String(index).padStart(64, '0')}` })
+      )
       await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(stored))
 
       await store.loadFromStorage()
@@ -341,7 +324,7 @@ describe('PendingTransactionsStore', () => {
 
   describe('checkPendingTransactions', () => {
     beforeEach(async () => {
-      await store.addPendingTransaction(makeTransaction())
+      await store.addPendingTransaction(makePendingTransaction())
     })
 
     it('confirms a successful transaction and decodes its pool identifiers', async () => {
@@ -410,7 +393,7 @@ describe('PendingTransactionsStore', () => {
 
   describe('reset', () => {
     it('clears state and storage', async () => {
-      await store.addPendingTransaction(makeTransaction())
+      await store.addPendingTransaction(makePendingTransaction())
 
       await store.reset()
 
@@ -421,8 +404,8 @@ describe('PendingTransactionsStore', () => {
 
   describe('computed counts', () => {
     it('counts only submitted transactions as pending', async () => {
-      await store.addPendingTransaction(makeTransaction())
-      await store.addPendingTransaction(makeTransaction({ txHash: OTHER_TX_HASH, status: 'confirmed' }))
+      await store.addPendingTransaction(makePendingTransaction())
+      await store.addPendingTransaction(makePendingTransaction({ txHash: OTHER_TX_HASH, status: 'confirmed' }))
 
       expect(store.pendingCount).toBe(1)
       expect(store.hasPending).toBe(true)

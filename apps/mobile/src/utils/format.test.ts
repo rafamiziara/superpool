@@ -1,5 +1,5 @@
 import { parseEther } from 'viem'
-import { bpsToPercent, daysUntil, formatDuration, formatToken, shortAddress, timeAgo } from './format'
+import { bpsToPercent, daysUntil, formatDuration, formatToken, sameAddress, shortAddress, timeAgo } from './format'
 
 describe('format utils', () => {
   describe('formatToken', () => {
@@ -50,6 +50,25 @@ describe('format utils', () => {
     it('counts days to a future date and floors past dates at 0', () => {
       expect(daysUntil(new Date(Date.now() + 12 * 86_400_000))).toBe(12)
       expect(daysUntil(new Date(Date.now() - 86_400_000))).toBe(0)
+    })
+  })
+
+  describe('sameAddress', () => {
+    it('matches the same account however each side cased it', () => {
+      // The backend lowercases what it stores; the wallet reports EIP-55.
+      expect(sameAddress('0x70997970C51812dc3A010C7d01b50e0d17dc79C8', '0x70997970c51812dc3a010c7d01b50e0d17dc79c8')).toBe(true)
+    })
+
+    it('rejects a different account', () => {
+      expect(sameAddress('0x70997970C51812dc3A010C7d01b50e0d17dc79C8', '0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0')).toBe(false)
+    })
+
+    it('treats a missing address as matching nothing, including another missing one', () => {
+      // userAddress is '' with no wallet connected: nobody must not own a
+      // record whose address is also blank.
+      expect(sameAddress('', '')).toBe(false)
+      expect(sameAddress(undefined, '0x70997970C51812dc3A010C7d01b50e0d17dc79C8')).toBe(false)
+      expect(sameAddress('0x70997970C51812dc3A010C7d01b50e0d17dc79C8', null)).toBe(false)
     })
   })
 })

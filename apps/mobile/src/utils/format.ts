@@ -15,6 +15,22 @@ export function shortAddress(address: string): string {
   return `${address.slice(0, 6)}…${address.slice(-4)}`
 }
 
+/**
+ * Compare two EVM addresses. **Always use this instead of `===`.**
+ *
+ * The backend stores addresses lowercased (the indexer lowercases what it
+ * filters by) while wallets report them EIP-55 checksummed, so a direct
+ * comparison silently returns false for the same account.
+ *
+ * A missing or empty address is never equal to anything, including another
+ * empty one: `userAddress` is `''` when no wallet is connected, and "nobody"
+ * must not match a record whose address is also blank.
+ */
+export function sameAddress(a: string | undefined | null, b: string | undefined | null): boolean {
+  if (!a || !b) return false
+  return a.toLowerCase() === b.toLowerCase()
+}
+
 /** Basis points to display percentage: 450 -> "4.5%" */
 export function bpsToPercent(bps: number): string {
   return `${numberFormat.format(bps / 100)}%`

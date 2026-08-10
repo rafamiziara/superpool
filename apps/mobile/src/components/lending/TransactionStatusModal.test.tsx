@@ -1,26 +1,8 @@
 import React from 'react'
 import { Linking } from 'react-native'
+import { makePendingTransaction, TX_HASH } from '../../__tests__/fixtures/pendingTransaction'
 import { fireEvent, render } from '../../__tests__/test-utils'
-import type { PendingTransaction } from '../../stores/PendingTransactionsStore'
 import { TransactionStatusModal } from './TransactionStatusModal'
-
-const TX_HASH = '0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef'
-
-const buildTransaction = (overrides: Partial<PendingTransaction> = {}): PendingTransaction => ({
-  txHash: TX_HASH,
-  chainId: 31337,
-  type: 'CREATE_POOL',
-  status: 'submitted',
-  timestamp: Date.now(),
-  params: {
-    name: 'Weekend Circle',
-    description: 'A pool for the weekend crew',
-    maxLoanAmount: '1000000000000000000',
-    interestRate: 500,
-    loanDuration: 2_592_000,
-  },
-  ...overrides,
-})
 
 describe('TransactionStatusModal', () => {
   beforeEach(() => {
@@ -34,7 +16,7 @@ describe('TransactionStatusModal', () => {
   })
 
   it('describes a transaction still in flight', () => {
-    const { getByText, getAllByTestId } = render(<TransactionStatusModal transaction={buildTransaction()} onClose={jest.fn()} />)
+    const { getByText, getAllByTestId } = render(<TransactionStatusModal transaction={makePendingTransaction()} onClose={jest.fn()} />)
 
     expect(getByText('Creating your pool')).toBeTruthy()
     expect(getByText('Sent to the network')).toBeTruthy()
@@ -45,7 +27,7 @@ describe('TransactionStatusModal', () => {
   })
 
   it('advances the steps once the transaction is confirmed', () => {
-    const transaction = buildTransaction({ status: 'confirmed', result: { poolId: 7, poolAddress: '0xabc' } })
+    const transaction = makePendingTransaction({ status: 'confirmed', result: { poolId: 7, poolAddress: '0xabc' } })
 
     const { getByText, getAllByTestId, queryByTestId } = render(<TransactionStatusModal transaction={transaction} onClose={jest.fn()} />)
 
@@ -57,7 +39,7 @@ describe('TransactionStatusModal', () => {
   })
 
   it('shows the pool id once the receipt has been decoded', () => {
-    const transaction = buildTransaction({ status: 'confirmed', result: { poolId: 7, poolAddress: '0xabc' } })
+    const transaction = makePendingTransaction({ status: 'confirmed', result: { poolId: 7, poolAddress: '0xabc' } })
 
     const { getByText } = render(<TransactionStatusModal transaction={transaction} onClose={jest.fn()} />)
 
@@ -66,7 +48,7 @@ describe('TransactionStatusModal', () => {
 
   it('marks the chain step as failed', () => {
     const { getByText, getByTestId } = render(
-      <TransactionStatusModal transaction={buildTransaction({ status: 'failed' })} onClose={jest.fn()} />
+      <TransactionStatusModal transaction={makePendingTransaction({ status: 'failed' })} onClose={jest.fn()} />
     )
 
     expect(getByText('That transaction failed')).toBeTruthy()
@@ -75,16 +57,16 @@ describe('TransactionStatusModal', () => {
   })
 
   it('shows the pool terms in contract-agnostic units', () => {
-    const { getByText } = render(<TransactionStatusModal transaction={buildTransaction()} onClose={jest.fn()} />)
+    const { getByText } = render(<TransactionStatusModal transaction={makePendingTransaction()} onClose={jest.fn()} />)
 
-    expect(getByText('Weekend Circle')).toBeTruthy()
-    expect(getByText('1 POL · 5% · 30 days')).toBeTruthy()
+    expect(getByText('Neighbourhood Fund')).toBeTruthy()
+    expect(getByText('100 POL · 5% · 30 days')).toBeTruthy()
   })
 
   describe('explorer link', () => {
     it('is hidden on a chain without an explorer', () => {
       // The local Hardhat node has none — a link there would be dead.
-      const { queryByTestId, getByTestId } = render(<TransactionStatusModal transaction={buildTransaction()} onClose={jest.fn()} />)
+      const { queryByTestId, getByTestId } = render(<TransactionStatusModal transaction={makePendingTransaction()} onClose={jest.fn()} />)
 
       expect(queryByTestId('transaction-explorer-link')).toBeNull()
       expect(getByTestId('transaction-hash')).toBeTruthy()
@@ -93,7 +75,9 @@ describe('TransactionStatusModal', () => {
     it('opens the explorer for a public chain', () => {
       const openURL = jest.spyOn(Linking, 'openURL').mockResolvedValue(true)
 
-      const { getByTestId } = render(<TransactionStatusModal transaction={buildTransaction({ chainId: 80002 })} onClose={jest.fn()} />)
+      const { getByTestId } = render(
+        <TransactionStatusModal transaction={makePendingTransaction({ chainId: 80002 })} onClose={jest.fn()} />
+      )
 
       fireEvent.press(getByTestId('transaction-explorer-link'))
 
@@ -105,7 +89,7 @@ describe('TransactionStatusModal', () => {
     it('closes from the done button', () => {
       const onClose = jest.fn()
 
-      const { getByTestId } = render(<TransactionStatusModal transaction={buildTransaction()} onClose={onClose} />)
+      const { getByTestId } = render(<TransactionStatusModal transaction={makePendingTransaction()} onClose={onClose} />)
 
       fireEvent.press(getByTestId('transaction-status-close'))
 
@@ -115,7 +99,7 @@ describe('TransactionStatusModal', () => {
     it('closes from the backdrop', () => {
       const onClose = jest.fn()
 
-      const { getByTestId } = render(<TransactionStatusModal transaction={buildTransaction()} onClose={onClose} />)
+      const { getByTestId } = render(<TransactionStatusModal transaction={makePendingTransaction()} onClose={onClose} />)
 
       fireEvent.press(getByTestId('transaction-status-backdrop'))
 
@@ -125,11 +109,11 @@ describe('TransactionStatusModal', () => {
     it('offers removal only when the caller allows it', () => {
       const onDismiss = jest.fn()
 
-      const { queryByTestId } = render(<TransactionStatusModal transaction={buildTransaction()} onClose={jest.fn()} />)
+      const { queryByTestId } = render(<TransactionStatusModal transaction={makePendingTransaction()} onClose={jest.fn()} />)
       expect(queryByTestId('transaction-status-dismiss')).toBeNull()
 
       const { getByTestId } = render(
-        <TransactionStatusModal transaction={buildTransaction({ status: 'failed' })} onClose={jest.fn()} onDismiss={onDismiss} />
+        <TransactionStatusModal transaction={makePendingTransaction({ status: 'failed' })} onClose={jest.fn()} onDismiss={onDismiss} />
       )
       fireEvent.press(getByTestId('transaction-status-dismiss'))
 
