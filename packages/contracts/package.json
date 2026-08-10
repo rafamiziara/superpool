@@ -42,7 +42,7 @@
     "test:full": "npm run test:local && npm run test:safe",
     "lint": "solhint contracts/*.sol && cd ../.. && npx eslint packages/contracts/**/*.ts --config eslint.config.mjs",
     "clean": "hardhat clean",
-    "format": "prettier --write ."
+    "format": "prettier --write . --ignore-path ../../.prettierignore"
   },
   "keywords": [
     "solidity",

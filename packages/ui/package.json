@@ -14,7 +14,7 @@
     "dev": "tsup --watch",
     "lint": "eslint . --config ../../eslint.config.mjs",
     "type-check": "tsc --noEmit",
-    "format": "prettier --write ."
+    "format": "prettier --write . --ignore-path ../../.prettierignore"
   },
   "exports": {
     ".": {

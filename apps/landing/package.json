@@ -9,7 +9,7 @@
     "start": "next start --port 3001",
     "lint": "eslint . --config ../../eslint.config.mjs",
     "type-check": "tsc --noEmit",
-    "format": "prettier --write ."
+    "format": "prettier --write . --ignore-path ../../.prettierignore"
   },
   "dependencies": {
     "@superpool/assets": "workspace:*",
