@@ -82,6 +82,8 @@ jest.mock('wagmi', () => ({
     signMessageAsync: jest.fn().mockResolvedValue('0xsignature'),
     isPending: false,
   })),
+  // PendingTransactionsInitializer resolves stored transactions against this.
+  usePublicClient: jest.fn(() => undefined),
 }))
 
 // Mock config imports

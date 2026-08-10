@@ -3,8 +3,10 @@ import { type Address, BaseError, ContractFunctionRevertedError, InsufficientFun
 import {
   mockEstimateContractGas,
   mockFirebaseCallable,
+  mockGetTransactionReceipt,
   mockWagmiUseAccount,
   mockWagmiUsePublicClient,
+  mockWaitForTransactionReceipt,
   mockWriteContractAsync,
 } from '../../__tests__/mocks'
 import { PoolFactoryABI } from '../../constants/abis'
@@ -134,7 +136,12 @@ describe('usePoolCreation', () => {
       address: WALLET_ADDRESS as Address,
       chainId: LOCALHOST_CHAIN_ID,
     })
-    mockWagmiUsePublicClient.mockReturnValue({ estimateContractGas: mockEstimateContractGas })
+    mockWagmiUsePublicClient.mockReturnValue({
+      chain: { id: LOCALHOST_CHAIN_ID },
+      estimateContractGas: mockEstimateContractGas,
+      waitForTransactionReceipt: mockWaitForTransactionReceipt,
+      getTransactionReceipt: mockGetTransactionReceipt,
+    })
     getPoolFactoryAddress.mockImplementation((chainId: number) => (chainId === LOCALHOST_CHAIN_ID ? FACTORY_ADDRESS : undefined))
 
     mockEstimateContractGas.mockResolvedValue(1_000_000n)

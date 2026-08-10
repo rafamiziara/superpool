@@ -17,14 +17,26 @@ export const mockWagmiUseSignMessage = jest.fn(() => ({
 
 export const mockWriteContractAsync = jest.fn()
 export const mockEstimateContractGas = jest.fn()
+export const mockWaitForTransactionReceipt = jest.fn()
+export const mockGetTransactionReceipt = jest.fn()
 
 export const mockWagmiUseWriteContract = jest.fn(() => ({
   writeContractAsync: mockWriteContractAsync,
   isPending: false,
 }))
 
-export const mockWagmiUsePublicClient = jest.fn((): { estimateContractGas: jest.Mock } | undefined => ({
+export type MockPublicClient = {
+  chain?: { id: number }
+  estimateContractGas: jest.Mock
+  waitForTransactionReceipt: jest.Mock
+  getTransactionReceipt: jest.Mock
+}
+
+export const mockWagmiUsePublicClient = jest.fn((): MockPublicClient | undefined => ({
+  chain: { id: 31337 },
   estimateContractGas: mockEstimateContractGas,
+  waitForTransactionReceipt: mockWaitForTransactionReceipt,
+  getTransactionReceipt: mockGetTransactionReceipt,
 }))
 
 // Firebase service mocks
