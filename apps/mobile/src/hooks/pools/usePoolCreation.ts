@@ -6,10 +6,8 @@ import { useAccount, usePublicClient, useWriteContract } from 'wagmi'
 import { FIREBASE_FUNCTIONS } from '../../config/firebase'
 import { DEFAULT_CHAIN_ID, getPoolFactoryAddress } from '../../config/contracts'
 import { PoolFactoryABI } from '../../constants/abis'
+import { MAX_INTEREST_RATE_BPS } from '../../constants/pools'
 import { pendingTransactionsStore } from '../../stores/PendingTransactionsStore'
-
-/** Interest rate ceiling enforced by `PoolFactory.createPool` — 10000 bps = 100%. */
-export const MAX_INTEREST_RATE_BPS = 10_000
 
 /**
  * Head-room added to the estimated gas. The estimate is taken against the

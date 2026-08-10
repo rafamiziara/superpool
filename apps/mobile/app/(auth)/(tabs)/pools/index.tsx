@@ -4,7 +4,6 @@ import { StatusBar } from 'expo-status-bar'
 import { observer } from 'mobx-react-lite'
 import React from 'react'
 import { Pressable, ScrollView, Text, View } from 'react-native'
-import Toast from 'react-native-toast-message'
 import { PoolCard } from '../../../../src/components/lending/PoolCard'
 import { palette } from '../../../../src/constants/palette'
 import { poolStore } from '../../../../src/stores/PoolStore'
@@ -35,7 +34,7 @@ function PoolsScreen() {
 
           {/* Create pool ghost card */}
           <Pressable
-            onPress={() => Toast.show({ type: 'info', text1: 'Pool creation is coming soon' })}
+            onPress={() => router.push('/(auth)/pool/create')}
             className="items-center justify-center gap-3 rounded-3xl border-continuous border border-dashed border-veil bg-abyss py-10 active:opacity-70"
             testID="create-pool-card"
           >

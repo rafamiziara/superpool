@@ -1,5 +1,4 @@
 import React from 'react'
-import { mockToast } from '../../../../src/__tests__/mocks'
 import { mockRouterPush } from '../../../../src/__tests__/setup'
 import { fireEvent, render } from '../../../../src/__tests__/test-utils'
 import { poolStore } from '../../../../src/stores/PoolStore'
@@ -46,11 +45,11 @@ describe('PoolsScreen', () => {
     expect(mockRouterPush).toHaveBeenCalledWith('/(auth)/pool/1')
   })
 
-  it('shows a coming-soon toast from the create-pool card', () => {
+  it('opens the create-pool screen from the create-pool card', () => {
     const { getByTestId } = render(<PoolsScreen />)
 
     fireEvent.press(getByTestId('create-pool-card'))
 
-    expect(mockToast.show).toHaveBeenCalledWith({ type: 'info', text1: 'Pool creation is coming soon' })
+    expect(mockRouterPush).toHaveBeenCalledWith('/(auth)/pool/create')
   })
 })

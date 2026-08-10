@@ -2,13 +2,13 @@ import React, { useMemo, useState } from 'react'
 import { Pressable, Text, TextInput, View } from 'react-native'
 import { parseEther } from 'viem'
 import { z } from 'zod'
-import { MAX_INTEREST_RATE_BPS, type PoolCreationParams } from '../../hooks/pools/usePoolCreation'
-
-const SECONDS_PER_DAY = 86_400
-
-/** Generous caps: the contract only requires a non-empty name, but unbounded strings cost gas. */
-const MAX_NAME_LENGTH = 64
-const MAX_DESCRIPTION_LENGTH = 256
+import {
+  MAX_POOL_DESCRIPTION_LENGTH as MAX_DESCRIPTION_LENGTH,
+  MAX_INTEREST_RATE_BPS,
+  MAX_POOL_NAME_LENGTH as MAX_NAME_LENGTH,
+  SECONDS_PER_DAY,
+} from '../../constants/pools'
+import type { PoolCreationParams } from '../../hooks/pools/usePoolCreation'
 
 /**
  * Parses what the user typed into the parameters `createPool` takes.

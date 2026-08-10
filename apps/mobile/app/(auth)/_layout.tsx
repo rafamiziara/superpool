@@ -34,6 +34,7 @@ export default observer(function AuthLayout() {
     >
       <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
       <Stack.Screen name="pool/[id]" options={{ headerLargeTitle: true, headerBackButtonDisplayMode: 'minimal', title: '' }} />
+      <Stack.Screen name="pool/create" options={{ headerBackButtonDisplayMode: 'minimal', title: 'New pool' }} />
     </Stack>
   )
 })

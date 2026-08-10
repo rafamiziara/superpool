@@ -25,6 +25,8 @@ export const mockWagmiUseWriteContract = jest.fn(() => ({
   isPending: false,
 }))
 
+export const mockWagmiUseBalance = jest.fn((): { data?: { value: bigint } } => ({ data: { value: 1_000_000_000_000_000_000n } }))
+
 export type MockPublicClient = {
   chain?: { id: number }
   estimateContractGas: jest.Mock
@@ -71,6 +73,7 @@ export const mockWagmiProvider = ({ children }: { children: React.ReactNode }) =
 
 jest.mock('wagmi', () => ({
   useAccount: mockWagmiUseAccount,
+  useBalance: mockWagmiUseBalance,
   useSignMessage: mockWagmiUseSignMessage,
   usePublicClient: mockWagmiUsePublicClient,
   useWriteContract: mockWagmiUseWriteContract,
