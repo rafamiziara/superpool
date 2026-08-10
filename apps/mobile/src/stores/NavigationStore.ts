@@ -7,6 +7,36 @@ import { FIREBASE_AUTH } from '../config/firebase'
 import { logger } from '../utils/logger'
 import { authStore } from './AuthStore'
 
+export type AppRoute = '/onboarding' | '/connecting' | '/(auth)/dashboard'
+
+interface NavigationState {
+  user: { walletAddress: string } | null
+  isAuthenticating: boolean
+  isWalletConnected: boolean
+  walletAddress: string | null
+  isFullyInitialized: boolean
+}
+
+/**
+ * Where a given auth state belongs, with the reason for the log line. A null
+ * route means the answer is not yet knowable — still initializing, or an
+ * authentication in flight that will decide it shortly.
+ *
+ * Priority: no wallet → onboarding; wallet but no user → connecting; both →
+ * dashboard.
+ */
+function resolveRoute(state: NavigationState): { route: AppRoute | null; reason: string } {
+  if (!state.isFullyInitialized) return { route: null, reason: 'waiting for initialization' }
+
+  if (state.isAuthenticating) return { route: null, reason: 'auth in progress' }
+
+  if (!state.isWalletConnected) return { route: '/onboarding', reason: 'wallet disconnected' }
+
+  if (!state.user) return { route: '/connecting', reason: 'wallet connected, needs authentication' }
+
+  return { route: '/(auth)/dashboard', reason: `wallet connected and user authenticated: ${state.walletAddress}` }
+}
+
 export class NavigationStore {
   // Current state tracking
   private hasInitialized = false
@@ -54,48 +84,39 @@ export class NavigationStore {
     logger.debug('🧭 NavigationStore: Reactive navigation initialized')
   }
 
-  private navigateBasedOnCurrentState(currentState: {
-    user: { walletAddress: string } | null
-    isAuthenticating: boolean
-    isWalletConnected: boolean
-    walletAddress: string | null
-    isFullyInitialized: boolean
-  }) {
-    // Wait for both wallet and Firebase to initialize before making navigation decisions
-    if (!currentState.isFullyInitialized) {
-      logger.debug('🧭 NavigationStore: Waiting for initialization...', {
-        walletInit: authStore.hasInitializedWallet,
-        firebaseInit: authStore.hasInitializedFirebase,
-      })
+  /**
+   * The route the current state calls for, or null while it cannot be decided.
+   *
+   * Exposed because a screen change is not always preceded by a state change:
+   * the wallet returns to the app through a bare `superpool://` deep link,
+   * which lands on `/` with the wallet still connected and the user still
+   * authenticated. The reaction below only fires on change, so the index screen
+   * would sit there forever unless it can ask where it should be.
+   */
+  get targetRoute(): AppRoute | null {
+    return resolveRoute({
+      user: authStore.user,
+      isAuthenticating: authStore.isAuthenticating,
+      isWalletConnected: authStore.isWalletConnected,
+      walletAddress: authStore.walletAddress,
+      isFullyInitialized: authStore.isFullyInitialized,
+    }).route
+  }
+
+  private navigateBasedOnCurrentState(currentState: NavigationState) {
+    const { route: targetRoute, reason } = resolveRoute(currentState)
+
+    if (!targetRoute) {
+      // Wait for both wallet and Firebase to initialize before making navigation decisions
+      if (!currentState.isFullyInitialized) {
+        logger.debug('🧭 NavigationStore: Waiting for initialization...', {
+          walletInit: authStore.hasInitializedWallet,
+          firebaseInit: authStore.hasInitializedFirebase,
+        })
+      } else {
+        logger.debug('🧭 NavigationStore: Skipping navigation - auth in progress')
+      }
       return
-    }
-
-    // Don't navigate while authentication is in progress
-    if (currentState.isAuthenticating) {
-      logger.debug('🧭 NavigationStore: Skipping navigation - auth in progress')
-      return
-    }
-
-    // Navigation priority logic:
-    // 1. No wallet connected → onboarding
-    // 2. Wallet connected + no user → connecting
-    // 3. Wallet connected + user exists → dashboard
-
-    let targetRoute: string
-    let reason: string
-
-    if (!currentState.isWalletConnected) {
-      // No wallet connected → onboarding
-      targetRoute = '/onboarding'
-      reason = 'wallet disconnected'
-    } else if (!currentState.user) {
-      // Wallet connected but no authenticated user → connecting
-      targetRoute = '/connecting'
-      reason = 'wallet connected, needs authentication'
-    } else {
-      // Wallet connected and user authenticated → dashboard
-      targetRoute = '/(auth)/dashboard'
-      reason = `wallet connected and user authenticated: ${currentState.walletAddress}`
     }
 
     logger.debug(`🧭 NavigationStore: Navigating to ${targetRoute} - ${reason}`)
@@ -103,7 +124,7 @@ export class NavigationStore {
     // Navigate with a small delay to ensure state updates complete
     setTimeout(() => {
       try {
-        router.replace(targetRoute as '/onboarding' | '/connecting' | '/(auth)/dashboard')
+        router.replace(targetRoute)
       } catch (error) {
         logger.error('❌ NavigationStore: Navigation failed:', error)
       }
