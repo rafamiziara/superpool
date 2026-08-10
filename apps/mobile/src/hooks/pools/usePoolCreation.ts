@@ -9,7 +9,7 @@ import { PoolFactoryABI } from '../../constants/abis'
 import { pendingTransactionsStore } from '../../stores/PendingTransactionsStore'
 
 /** Interest rate ceiling enforced by `PoolFactory.createPool` — 10000 bps = 100%. */
-const MAX_INTEREST_RATE_BPS = 10_000
+export const MAX_INTEREST_RATE_BPS = 10_000
 
 /**
  * Head-room added to the estimated gas. The estimate is taken against the

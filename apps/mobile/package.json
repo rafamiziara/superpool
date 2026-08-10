@@ -46,7 +46,8 @@
     "react-native-worklets": "0.8.3",
     "uniwind": "^1.9.0",
     "viem": "^2.37.5",
-    "wagmi": "^2.16.9"
+    "wagmi": "^2.16.9",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "@testing-library/react-native": "^13.3.3",
