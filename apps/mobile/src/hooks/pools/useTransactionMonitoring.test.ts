@@ -13,8 +13,8 @@ import {
   mockWagmiUsePublicClient,
   mockWaitForTransactionReceipt,
 } from '../../__tests__/mocks'
-import { makePendingTransaction, TX_HASH } from '../../__tests__/fixtures/pendingTransaction'
-import { PoolFactoryABI } from '../../constants/abis'
+import { makeContributeTransaction, makePendingTransaction, TX_HASH } from '../../__tests__/fixtures/pendingTransaction'
+import { PoolFactoryABI, SampleLendingPoolABI } from '../../constants/abis'
 import { pendingTransactionsStore } from '../../stores/PendingTransactionsStore'
 import { useTransactionMonitoring } from './useTransactionMonitoring'
 
@@ -36,6 +36,25 @@ function makePoolCreatedLog(poolId: bigint): ReceiptLog {
       [{ type: 'string' }, { type: 'uint256' }, { type: 'uint256' }, { type: 'uint256' }],
       ['Neighbourhood Fund', 1_000_000_000_000_000_000n, 500n, 2_592_000n]
     ),
+    blockHash: '0xdead000000000000000000000000000000000000000000000000000000000001',
+    blockNumber: 42n,
+    logIndex: 0,
+    transactionHash: TX_HASH,
+    transactionIndex: 0,
+    removed: false,
+  } as ReceiptLog
+}
+
+/** Both parameters are `indexed`, so everything lands in topics and `data` is empty. */
+function makeFundsDepositedLog(amount: bigint): ReceiptLog {
+  return {
+    address: POOL_ADDRESS,
+    topics: encodeEventTopics({
+      abi: SampleLendingPoolABI,
+      eventName: 'FundsDeposited',
+      args: { depositor: POOL_OWNER, amount },
+    }),
+    data: '0x',
     blockHash: '0xdead000000000000000000000000000000000000000000000000000000000001',
     blockNumber: 42n,
     logIndex: 0,
@@ -95,7 +114,7 @@ describe('useTransactionMonitoring', () => {
 
       let outcome
       await act(async () => {
-        outcome = await result.current.waitForTransaction(TX_HASH)
+        outcome = await result.current.waitForTransaction(TX_HASH, 'CREATE_POOL')
       })
 
       expect(outcome).toEqual({ poolId: 7, poolAddress: POOL_ADDRESS, txHash: TX_HASH })
@@ -107,7 +126,7 @@ describe('useTransactionMonitoring', () => {
       const { result } = renderHook(() => useTransactionMonitoring())
 
       await act(async () => {
-        await result.current.waitForTransaction(TX_HASH)
+        await result.current.waitForTransaction(TX_HASH, 'CREATE_POOL')
       })
 
       expect(mockWaitForTransactionReceipt).toHaveBeenCalledWith({ hash: TX_HASH, timeout: 120_000 })
@@ -117,12 +136,42 @@ describe('useTransactionMonitoring', () => {
       const { result } = renderHook(() => useTransactionMonitoring())
 
       await act(async () => {
-        await result.current.waitForTransaction(TX_HASH)
+        await result.current.waitForTransaction(TX_HASH, 'CREATE_POOL')
       })
 
       expect(storedStatus()).toBe('confirmed')
       expect(pendingTransactionsStore.transactions[0].result).toEqual({ poolId: 7, poolAddress: POOL_ADDRESS })
       expect(pendingTransactionsStore.confirmedUnindexed).toHaveLength(1)
+    })
+
+    it('decodes a contribution from its FundsDeposited log', async () => {
+      // The type given here is what picks the decoder. Passing the wrong one
+      // finds no log and marks a perfectly good deposit failed.
+      await pendingTransactionsStore.reset()
+      await pendingTransactionsStore.addPendingTransaction(makeContributeTransaction())
+      mockWaitForTransactionReceipt.mockResolvedValue(makeReceipt({ logs: [makeFundsDepositedLog(5_000_000_000_000_000_000n)] }))
+      const { result } = renderHook(() => useTransactionMonitoring())
+
+      let outcome
+      await act(async () => {
+        outcome = await result.current.waitForTransaction(TX_HASH, 'CONTRIBUTE')
+      })
+
+      expect(outcome).toEqual({ amount: '5000000000000000000', txHash: TX_HASH })
+      expect(storedStatus()).toBe('confirmed')
+    })
+
+    it('fails a contribution whose receipt carries no deposit log', async () => {
+      await pendingTransactionsStore.reset()
+      await pendingTransactionsStore.addPendingTransaction(makeContributeTransaction())
+      mockWaitForTransactionReceipt.mockResolvedValue(makeReceipt({ logs: [] }))
+      const { result } = renderHook(() => useTransactionMonitoring())
+
+      await act(async () => {
+        await expect(result.current.waitForTransaction(TX_HASH, 'CONTRIBUTE')).rejects.toThrow('did not record a deposit')
+      })
+
+      expect(storedStatus()).toBe('failed')
     })
   })
 
@@ -132,7 +181,7 @@ describe('useTransactionMonitoring', () => {
       const { result } = renderHook(() => useTransactionMonitoring())
 
       await act(async () => {
-        await expect(result.current.waitForTransaction(TX_HASH)).rejects.toThrow('Transaction was reverted')
+        await expect(result.current.waitForTransaction(TX_HASH, 'CREATE_POOL')).rejects.toThrow('Transaction was reverted')
       })
 
       expect(storedStatus()).toBe('failed')
@@ -145,7 +194,7 @@ describe('useTransactionMonitoring', () => {
       const { result } = renderHook(() => useTransactionMonitoring())
 
       await act(async () => {
-        await expect(result.current.waitForTransaction(TX_HASH)).rejects.toThrow('did not create a pool')
+        await expect(result.current.waitForTransaction(TX_HASH, 'CREATE_POOL')).rejects.toThrow('did not create a pool')
       })
 
       expect(storedStatus()).toBe('failed')
@@ -159,7 +208,7 @@ describe('useTransactionMonitoring', () => {
       const { result } = renderHook(() => useTransactionMonitoring())
 
       await act(async () => {
-        await expect(result.current.waitForTransaction(TX_HASH)).rejects.toThrow('Still waiting for the network')
+        await expect(result.current.waitForTransaction(TX_HASH, 'CREATE_POOL')).rejects.toThrow('Still waiting for the network')
       })
 
       expect(storedStatus()).toBe('submitted')
@@ -173,7 +222,7 @@ describe('useTransactionMonitoring', () => {
       const { result } = renderHook(() => useTransactionMonitoring())
 
       await act(async () => {
-        await expect(result.current.waitForTransaction(TX_HASH)).rejects.toThrow()
+        await expect(result.current.waitForTransaction(TX_HASH, 'CREATE_POOL')).rejects.toThrow()
       })
 
       expect(storedStatus()).toBe('submitted')
@@ -185,7 +234,7 @@ describe('useTransactionMonitoring', () => {
       const { result } = renderHook(() => useTransactionMonitoring())
 
       await act(async () => {
-        await expect(result.current.waitForTransaction(TX_HASH)).rejects.toThrow('No connection to the network')
+        await expect(result.current.waitForTransaction(TX_HASH, 'CREATE_POOL')).rejects.toThrow('No connection to the network')
       })
 
       expect(storedStatus()).toBe('submitted')
@@ -199,7 +248,7 @@ describe('useTransactionMonitoring', () => {
 
     let outcome
     await act(async () => {
-      outcome = await result.current.waitForTransaction(TX_HASH)
+      outcome = await result.current.waitForTransaction(TX_HASH, 'CREATE_POOL')
     })
 
     expect(outcome).toEqual({ poolId: 7, poolAddress: POOL_ADDRESS, txHash: TX_HASH })

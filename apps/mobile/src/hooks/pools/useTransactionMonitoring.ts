@@ -1,28 +1,48 @@
 import { useCallback, useState } from 'react'
 import { WaitForTransactionReceiptTimeoutError } from 'viem'
 import { usePublicClient } from 'wagmi'
-import { extractPoolCreatedResult, pendingTransactionsStore } from '../../stores/PendingTransactionsStore'
-import { describePoolCreationError } from './usePoolCreation'
+import {
+  type ContributeResult,
+  type CreatePoolResult,
+  extractResult,
+  pendingTransactionsStore,
+  type PendingTransactionType,
+} from '../../stores/PendingTransactionsStore'
+import { describeTransactionError } from './transactionErrors'
 
 /** How long to watch a transaction before handing it back to startup recovery. */
 const RECEIPT_TIMEOUT_MS = 120_000
 
-export interface TransactionResult {
-  poolId: number
-  poolAddress: `0x${string}`
-  txHash: `0x${string}`
+/** What a confirmed transaction of each type yields. */
+export type ResultFor<T extends PendingTransactionType> = T extends 'CREATE_POOL' ? CreatePoolResult : ContributeResult
+
+export type TransactionOutcome<T extends PendingTransactionType> = ResultFor<T> & { txHash: `0x${string}` }
+
+/**
+ * What it means for a confirmed transaction to have produced nothing. The
+ * transaction succeeded in both cases, so the wording has to say what is
+ * actually missing rather than claim a failure.
+ */
+const MISSING_LOG_MESSAGE: Record<PendingTransactionType, string> = {
+  CREATE_POOL: 'The transaction confirmed but did not create a pool',
+  CONTRIBUTE: 'The transaction confirmed but did not record a deposit',
 }
 
 export interface UseTransactionMonitoringReturn {
-  /** Resolves once the pool exists on chain; rejects on revert, timeout or RPC failure. */
-  waitForTransaction: (txHash: `0x${string}`) => Promise<TransactionResult>
+  /** Resolves once the chain has accepted the transaction; rejects on revert, timeout or RPC failure. */
+  waitForTransaction: <T extends PendingTransactionType>(txHash: `0x${string}`, type: T) => Promise<TransactionOutcome<T>>
   isWaiting: boolean
   error: string | null
 }
 
 /**
- * Watches a submitted pool-creation transaction to confirmation and records the
- * outcome on `PendingTransactionsStore`.
+ * Watches a submitted transaction to confirmation and records the outcome on
+ * `PendingTransactionsStore`.
+ *
+ * The type is passed in rather than looked up on the store, because the caller
+ * always knows what it submitted and the record is not guaranteed to be there —
+ * persistence failures are swallowed by design, and a monitor that could not
+ * find its record would otherwise have to guess which event to decode.
  *
  * How each failure moves the stored status matters, because only `submitted`
  * transactions are re-checked at startup and only `confirmed` ones are handed to
@@ -35,9 +55,10 @@ export interface UseTransactionMonitoringReturn {
  *   from then on. (The plan for this task said to mark it failed — this is a
  *   deliberate departure.)
  * - **RPC or transport error** → left `submitted`, for the same reason.
- * - **Confirmed but no `PoolCreated` log** → `failed`. The transaction succeeded,
- *   so this is not literally true, but no pool was created and none ever will be:
- *   leaving it `confirmed` would queue it for indexing that can never succeed.
+ * - **Confirmed but the expected event is absent** → `failed`. The transaction
+ *   succeeded, so this is not literally true, but nothing was produced and
+ *   nothing ever will be: leaving it `confirmed` would queue it for indexing
+ *   that can never succeed.
  */
 export const useTransactionMonitoring = (): UseTransactionMonitoringReturn => {
   const publicClient = usePublicClient()
@@ -46,7 +67,7 @@ export const useTransactionMonitoring = (): UseTransactionMonitoringReturn => {
   const [error, setError] = useState<string | null>(null)
 
   const waitForTransaction = useCallback(
-    async (txHash: `0x${string}`): Promise<TransactionResult> => {
+    async <T extends PendingTransactionType>(txHash: `0x${string}`, type: T): Promise<TransactionOutcome<T>> => {
       const fail = (message: string): never => {
         setError(message)
         setIsWaiting(false)
@@ -68,7 +89,7 @@ export const useTransactionMonitoring = (): UseTransactionMonitoringReturn => {
           return fail('Still waiting for the network to confirm this transaction')
         }
 
-        return fail(describePoolCreationError(waitError))
+        return fail(describeTransactionError(waitError, {}, 'Could not confirm the transaction'))
       }
 
       if (receipt.status === 'reverted') {
@@ -77,18 +98,21 @@ export const useTransactionMonitoring = (): UseTransactionMonitoringReturn => {
         return fail('Transaction was reverted')
       }
 
-      const result = extractPoolCreatedResult(receipt)
+      const result = extractResult(type, receipt)
       if (!result) {
         await pendingTransactionsStore.updateTransactionStatus(txHash, 'failed')
 
-        return fail('The transaction confirmed but did not create a pool')
+        return fail(MISSING_LOG_MESSAGE[type])
       }
 
       await pendingTransactionsStore.updateTransactionStatus(txHash, 'confirmed', result)
 
       setIsWaiting(false)
 
-      return { ...result, txHash }
+      // `extractResult` dispatches on the same `type` this call was given, so
+      // the result is the one the signature promises; the compiler cannot follow
+      // that through the runtime dispatch, hence the widening step.
+      return { ...result, txHash } as unknown as TransactionOutcome<T>
     },
     [publicClient]
   )

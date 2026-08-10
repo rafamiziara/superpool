@@ -127,8 +127,8 @@ describe('CreatePoolScreen', () => {
         interestRate: 500,
         loanDuration: 2_592_000,
       })
-      expect(mockWaitForTransaction).toHaveBeenCalledWith(TX_HASH)
-      expect(mockTriggerIndexing).toHaveBeenCalledWith(TX_HASH)
+      expect(mockWaitForTransaction).toHaveBeenCalledWith(TX_HASH, 'CREATE_POOL')
+      expect(mockTriggerIndexing).toHaveBeenCalledWith(TX_HASH, 'CREATE_POOL')
 
       expect(mockCreatePool.mock.invocationCallOrder[0]).toBeLessThan(mockWaitForTransaction.mock.invocationCallOrder[0])
       expect(mockWaitForTransaction.mock.invocationCallOrder[0]).toBeLessThan(mockTriggerIndexing.mock.invocationCallOrder[0])

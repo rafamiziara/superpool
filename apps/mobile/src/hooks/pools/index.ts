@@ -1,3 +1,11 @@
+export { describeTransactionError } from './transactionErrors'
+export {
+  describeContributionError,
+  useContribution,
+  validateContributionParams,
+  type ContributionParams,
+  type UseContributionReturn,
+} from './useContribution'
 export {
   describePoolCreationError,
   usePoolCreation,
@@ -6,4 +14,9 @@ export {
   type UsePoolCreationReturn,
 } from './usePoolCreation'
 export { usePoolIndexing, type UsePoolIndexingReturn } from './usePoolIndexing'
-export { useTransactionMonitoring, type TransactionResult, type UseTransactionMonitoringReturn } from './useTransactionMonitoring'
+export {
+  useTransactionMonitoring,
+  type ResultFor,
+  type TransactionOutcome,
+  type UseTransactionMonitoringReturn,
+} from './useTransactionMonitoring'

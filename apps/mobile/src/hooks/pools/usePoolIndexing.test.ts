@@ -1,6 +1,12 @@
 import { act, renderHook } from '@testing-library/react-native'
 import type { Address } from 'viem'
-import { LOCALHOST_CHAIN_ID, makePendingTransaction, OTHER_TX_HASH, TX_HASH } from '../../__tests__/fixtures/pendingTransaction'
+import {
+  LOCALHOST_CHAIN_ID,
+  makeContributeTransaction,
+  makePendingTransaction,
+  OTHER_TX_HASH,
+  TX_HASH,
+} from '../../__tests__/fixtures/pendingTransaction'
 import { mockFirebaseCallable, mockWagmiUseAccount } from '../../__tests__/mocks'
 import { type CreatePoolTransaction, pendingTransactionsStore } from '../../stores/PendingTransactionsStore'
 import { poolStore } from '../../stores/PoolStore'
@@ -74,7 +80,7 @@ describe('usePoolIndexing', () => {
       const { result } = renderHook(() => usePoolIndexing())
 
       await act(async () => {
-        await result.current.triggerIndexing(TX_HASH)
+        await result.current.triggerIndexing(TX_HASH, 'CREATE_POOL')
       })
 
       expect(mockFirebaseCallable).toHaveBeenCalledWith(expect.anything(), 'indexPool')
@@ -86,7 +92,7 @@ describe('usePoolIndexing', () => {
       const { result } = renderHook(() => usePoolIndexing())
 
       await act(async () => {
-        await result.current.triggerIndexing(TX_HASH, 80002)
+        await result.current.triggerIndexing(TX_HASH, 'CREATE_POOL', 80002)
       })
 
       expect(indexPoolCallable).toHaveBeenCalledWith({ txHash: TX_HASH, chainId: 80002 })
@@ -97,7 +103,7 @@ describe('usePoolIndexing', () => {
       const { result } = renderHook(() => usePoolIndexing())
 
       await act(async () => {
-        await result.current.triggerIndexing(TX_HASH)
+        await result.current.triggerIndexing(TX_HASH, 'CREATE_POOL')
       })
 
       expect(indexPoolCallable).toHaveBeenCalledWith({ txHash: TX_HASH, chainId: 31337 })
@@ -107,7 +113,7 @@ describe('usePoolIndexing', () => {
       const { result } = renderHook(() => usePoolIndexing())
 
       await act(async () => {
-        await result.current.triggerIndexing(TX_HASH)
+        await result.current.triggerIndexing(TX_HASH, 'CREATE_POOL')
       })
 
       expect(refreshPools).toHaveBeenCalled()
@@ -119,7 +125,7 @@ describe('usePoolIndexing', () => {
       const { result } = renderHook(() => usePoolIndexing())
 
       await act(async () => {
-        await expect(result.current.triggerIndexing(TX_HASH)).resolves.toBeUndefined()
+        await expect(result.current.triggerIndexing(TX_HASH, 'CREATE_POOL')).resolves.toBeUndefined()
       })
 
       expect(warnSpy).toHaveBeenCalled()
@@ -133,7 +139,7 @@ describe('usePoolIndexing', () => {
       const { result } = renderHook(() => usePoolIndexing())
 
       await act(async () => {
-        await expect(result.current.triggerIndexing(TX_HASH)).resolves.toBeUndefined()
+        await expect(result.current.triggerIndexing(TX_HASH, 'CREATE_POOL')).resolves.toBeUndefined()
       })
 
       expect(pendingTransactionsStore.transactions).toHaveLength(1)
@@ -144,10 +150,44 @@ describe('usePoolIndexing', () => {
       const { result } = renderHook(() => usePoolIndexing())
 
       await act(async () => {
-        await result.current.triggerIndexing(TX_HASH)
+        await result.current.triggerIndexing(TX_HASH, 'CREATE_POOL')
       })
 
       expect(pendingTransactionsStore.transactions).toHaveLength(0)
+    })
+  })
+
+  describe('routing by transaction type', () => {
+    it('sends a contribution to indexContribution, not indexPool', async () => {
+      await pendingTransactionsStore.addPendingTransaction(
+        makeContributeTransaction({ status: 'confirmed', result: { amount: '5000000000000000000' } })
+      )
+      const { result } = renderHook(() => usePoolIndexing())
+
+      await act(async () => {
+        await result.current.indexConfirmed()
+      })
+
+      expect(mockFirebaseCallable).toHaveBeenCalledWith(expect.anything(), 'indexContribution')
+      expect(mockFirebaseCallable).not.toHaveBeenCalledWith(expect.anything(), 'indexPool')
+      expect(pendingTransactionsStore.transactions).toHaveLength(0)
+    })
+
+    it('routes a mixed drain to both callables', async () => {
+      // Startup recovery can confirm a creation and a deposit in the same pass;
+      // the type on each record is what decides where it goes.
+      await pendingTransactionsStore.addPendingTransaction(makeConfirmed())
+      await pendingTransactionsStore.addPendingTransaction(
+        makeContributeTransaction({ txHash: OTHER_TX_HASH, status: 'confirmed', result: { amount: '1' } })
+      )
+      const { result } = renderHook(() => usePoolIndexing())
+
+      await act(async () => {
+        await result.current.indexConfirmed()
+      })
+
+      expect(mockFirebaseCallable).toHaveBeenCalledWith(expect.anything(), 'indexPool')
+      expect(mockFirebaseCallable).toHaveBeenCalledWith(expect.anything(), 'indexContribution')
     })
   })
 

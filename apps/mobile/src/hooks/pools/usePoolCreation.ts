@@ -1,13 +1,13 @@
 import type { PreparePoolCreationRequest, PreparePoolCreationResponse } from '@superpool/types'
 import { httpsCallable } from 'firebase/functions'
 import { useCallback, useState } from 'react'
-import { BaseError, ContractFunctionRevertedError, InsufficientFundsError, UserRejectedRequestError } from 'viem'
 import { useAccount, usePublicClient, useWriteContract } from 'wagmi'
 import { FIREBASE_FUNCTIONS } from '../../config/firebase'
 import { DEFAULT_CHAIN_ID, getPoolFactoryAddress } from '../../config/contracts'
 import { PoolFactoryABI } from '../../constants/abis'
 import { MAX_INTEREST_RATE_BPS } from '../../constants/pools'
 import { pendingTransactionsStore } from '../../stores/PendingTransactionsStore'
+import { describeTransactionError } from './transactionErrors'
 
 /**
  * Head-room added to the estimated gas. The estimate is taken against the
@@ -68,36 +68,9 @@ export function validatePoolCreationParams(params: PoolCreationParams): string |
   return null
 }
 
-/**
- * Turns a wallet, RPC or contract failure into something worth showing a user.
- *
- * Viem nests the cause that matters inside a `BaseError`, so `walk` is used
- * rather than an `instanceof` on the thrown value — a rejected signature arrives
- * wrapped in several layers and would otherwise read as a generic failure.
- */
+/** `PoolFactory`'s failures, in the wording a pool creator should see. */
 export function describePoolCreationError(error: unknown): string {
-  if (error instanceof BaseError) {
-    if (error.walk((cause) => cause instanceof UserRejectedRequestError)) return 'Transaction cancelled'
-    if (error.walk((cause) => cause instanceof InsufficientFundsError)) return 'Insufficient balance for gas'
-
-    const reverted = error.walk((cause) => cause instanceof ContractFunctionRevertedError)
-    if (reverted instanceof ContractFunctionRevertedError) {
-      const errorName = reverted.data?.errorName
-      if (errorName && CONTRACT_ERROR_MESSAGES[errorName]) return CONTRACT_ERROR_MESSAGES[errorName]
-      if (reverted.reason) return reverted.reason
-    }
-
-    return error.shortMessage
-  }
-
-  if (error instanceof Error) {
-    // Connectors that predate Viem's error types still signal rejection by message.
-    if (error.message.includes('User rejected')) return 'Transaction cancelled'
-
-    return error.message
-  }
-
-  return 'Failed to create pool'
+  return describeTransactionError(error, CONTRACT_ERROR_MESSAGES, 'Failed to create pool')
 }
 
 /**

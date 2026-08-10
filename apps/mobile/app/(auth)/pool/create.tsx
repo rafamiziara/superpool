@@ -59,7 +59,7 @@ function CreatePoolScreen() {
 
     try {
       setStage('confirming')
-      const result = await waitForTransaction(txHash)
+      const result = await waitForTransaction(txHash, 'CREATE_POOL')
       setPoolId(result.poolId)
     } catch (error) {
       // The transaction is on chain; only its outcome is unresolved. The record
@@ -72,7 +72,7 @@ function CreatePoolScreen() {
 
     // Never throws: indexing is best-effort, and the scheduled sync is the net.
     setStage('indexing')
-    await triggerIndexing(txHash)
+    await triggerIndexing(txHash, 'CREATE_POOL')
 
     setStage('done')
   }
