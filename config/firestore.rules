@@ -58,6 +58,19 @@ service cloud.firestore {
       allow write: if false; // backend-only (event indexer)
     }
 
+    // --- contributions -----------------------------------------------------
+    // Liquidity deposits indexed from on-chain FundsDeposited events. Same
+    // reasoning as pools: the data mirrors public chain state, so reads are
+    // gated on authentication rather than ownership — a contributor is not the
+    // only party with a legitimate interest in a pool's liquidity. Writes come
+    // from the indexer.
+
+    match /contributions/{contributionId} {
+      allow get: if isSignedIn();
+      allow list: if isSignedIn() && request.query.limit <= 100; // mirrors listContributions' own cap
+      allow write: if false; // backend-only (contribution indexer)
+    }
+
     // --- auth_nonces -------------------------------------------------------
     // Single-use login challenges. Readable nonces would let an attacker who
     // has any authenticated session harvest challenges for other wallets, and

@@ -8,7 +8,9 @@ setGlobalOptions({ maxInstances: 10 })
 export {
   customAppCheckMinter,
   generateAuthMessage,
+  indexContribution,
   indexPool,
+  listContributions,
   listPools,
   preparePoolCreation,
   syncPoolEvents,
