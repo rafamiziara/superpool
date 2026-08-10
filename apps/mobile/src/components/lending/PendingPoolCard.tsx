@@ -23,11 +23,16 @@ const STATUS_COPY: Record<PendingTransaction['status'], { badge: string; note: s
 export interface PendingPoolCardProps {
   transaction: PendingTransaction
   onPress?: () => void
+  /**
+   * Clears the record. Nothing else ever removes a failed transaction — indexing
+   * only drops the ones it succeeds on — so without this the card is permanent.
+   */
+  onDismiss?: () => void
   /** Fixed width for horizontal carousels; defaults to full width. */
   carousel?: boolean
 }
 
-export function PendingPoolCard({ transaction, onPress, carousel = false }: PendingPoolCardProps) {
+export function PendingPoolCard({ transaction, onPress, onDismiss, carousel = false }: PendingPoolCardProps) {
   const { params, status } = transaction
   const copy = STATUS_COPY[status]
   const hasFailed = status === 'failed'
@@ -78,10 +83,17 @@ export function PendingPoolCard({ transaction, onPress, carousel = false }: Pend
         </View>
       </View>
 
-      <View className={`mt-4 rounded-2xl border-continuous px-4 py-3 ${hasFailed ? 'bg-coral-deep' : 'bg-raised'}`}>
-        <Text className={`text-xs ${hasFailed ? 'text-coral' : 'text-fog'}`} testID={`pending-pool-note-${transaction.txHash}`}>
+      <View
+        className={`mt-4 flex-row items-center gap-3 rounded-2xl border-continuous px-4 py-3 ${hasFailed ? 'bg-coral-deep' : 'bg-raised'}`}
+      >
+        <Text className={`flex-1 text-xs ${hasFailed ? 'text-coral' : 'text-fog'}`} testID={`pending-pool-note-${transaction.txHash}`}>
           {copy.note}
         </Text>
+        {onDismiss && (
+          <Pressable onPress={onDismiss} className="active:opacity-70" testID={`pending-pool-dismiss-${transaction.txHash}`}>
+            <Text className="text-xs font-semibold text-snow">Dismiss</Text>
+          </Pressable>
+        )}
       </View>
     </Pressable>
   )

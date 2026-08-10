@@ -29,7 +29,9 @@ function PoolDetailScreen() {
     )
   }
 
-  const isOwner = pool.poolOwner === poolStore.userAddress
+  // Case-insensitive: the backend stores addresses lowercased, wallets report
+  // them checksummed, so a strict compare hides the admin controls from the owner.
+  const isOwner = pool.poolOwner.toLowerCase() === poolStore.userAddress.toLowerCase()
 
   const stats = [
     { label: 'Max loan', value: `${formatToken(pool.maxLoanAmount)} POL` },

@@ -1,6 +1,8 @@
 import React from 'react'
+import { mockFirebaseCallable, mockWagmiUseAccount } from '../../../../src/__tests__/mocks'
 import { mockRouterPush } from '../../../../src/__tests__/setup'
-import { fireEvent, render } from '../../../../src/__tests__/test-utils'
+import { act, fireEvent, render, waitFor } from '../../../../src/__tests__/test-utils'
+import { type PendingTransaction, pendingTransactionsStore } from '../../../../src/stores/PendingTransactionsStore'
 import { poolStore } from '../../../../src/stores/PoolStore'
 import PoolsScreen from './index'
 
@@ -8,9 +10,37 @@ jest.mock('expo-status-bar', () => ({
   StatusBar: () => null,
 }))
 
+const CHAIN_ID = 31337
+
+const buildTransaction = (overrides: Partial<PendingTransaction> = {}): PendingTransaction => ({
+  txHash: '0xabc',
+  chainId: CHAIN_ID,
+  type: 'CREATE_POOL',
+  status: 'submitted',
+  timestamp: Date.now(),
+  params: {
+    name: 'Weekend Circle',
+    description: 'A pool for the weekend crew',
+    maxLoanAmount: '1000000000000000000',
+    interestRate: 500,
+    loanDuration: 2_592_000,
+  },
+  ...overrides,
+})
+
+/** Makes every callable reject, so a confirmed record survives the drain. */
+const failIndexing = () => {
+  mockFirebaseCallable.mockReturnValue(jest.fn().mockRejectedValue(new Error('emulator offline')))
+}
+
 describe('PoolsScreen', () => {
   beforeEach(async () => {
     jest.clearAllMocks()
+    // Restored per test rather than reset: `mockFirebaseCallable` is shared by
+    // every suite, and resetting it would strip the implementation for good.
+    mockFirebaseCallable.mockReturnValue(jest.fn().mockResolvedValue({ data: { poolId: 99, alreadyIndexed: false, stored: true } }))
+    mockWagmiUseAccount.mockReturnValue({ isConnected: true, isConnecting: false, address: undefined, chainId: CHAIN_ID })
+    await pendingTransactionsStore.reset()
     await poolStore.fetchPools()
   })
 
@@ -54,5 +84,178 @@ describe('PoolsScreen', () => {
     fireEvent.press(getByTestId('create-pool-card'))
 
     expect(mockRouterPush).toHaveBeenCalledWith('/(auth)/pool/create')
+  })
+
+  describe('pending pools', () => {
+    it('shows a pending card for a submitted transaction', async () => {
+      await pendingTransactionsStore.addPendingTransaction(buildTransaction())
+
+      const { getByTestId } = render(<PoolsScreen />)
+
+      expect(getByTestId('pending-pool-card-0xabc')).toBeTruthy()
+      expect(getByTestId('pending-pool-badge-submitted')).toBeTruthy()
+    })
+
+    it('shows the syncing state while a confirmed transaction is unindexed', async () => {
+      failIndexing()
+      await pendingTransactionsStore.addPendingTransaction(
+        buildTransaction({ status: 'confirmed', result: { poolId: 99, poolAddress: '0xdef' } })
+      )
+
+      const { getByTestId } = render(<PoolsScreen />)
+
+      await waitFor(() => expect(mockFirebaseCallable).toHaveBeenCalledWith(expect.anything(), 'indexPool'))
+      expect(getByTestId('pending-pool-badge-confirmed')).toBeTruthy()
+    })
+
+    it('hides a confirmed transaction once its pool is listed', async () => {
+      // The record is deliberately still in the store — indexing fails here — so
+      // this proves the screen dedupes rather than the drain having removed it.
+      failIndexing()
+      const listed = poolStore.pools[0].poolId
+      await pendingTransactionsStore.addPendingTransaction(
+        buildTransaction({ status: 'confirmed', result: { poolId: listed, poolAddress: '0xdef' } })
+      )
+
+      const { queryByTestId, getByTestId } = render(<PoolsScreen />)
+
+      await waitFor(() => expect(mockFirebaseCallable).toHaveBeenCalled())
+      expect(queryByTestId('pending-pool-card-0xabc')).toBeNull()
+      expect(getByTestId(`pool-card-${listed}`)).toBeTruthy()
+    })
+
+    it('ignores pending transactions from another chain', async () => {
+      await pendingTransactionsStore.addPendingTransaction(buildTransaction({ chainId: 80002 }))
+
+      const { queryByTestId } = render(<PoolsScreen />)
+
+      expect(queryByTestId('pending-pool-card-0xabc')).toBeNull()
+    })
+
+    it('asks the backend to index transactions confirmed while the app was closed', async () => {
+      await pendingTransactionsStore.addPendingTransaction(
+        buildTransaction({ status: 'confirmed', result: { poolId: 99, poolAddress: '0xdef' } })
+      )
+
+      render(<PoolsScreen />)
+
+      await waitFor(() => expect(mockFirebaseCallable).toHaveBeenCalledWith(expect.anything(), 'indexPool'))
+      // A successful index drops the local record; the listed pool replaces it.
+      await waitFor(() => expect(pendingTransactionsStore.transactions).toHaveLength(0))
+    })
+
+    it('dismisses a failed transaction', async () => {
+      await pendingTransactionsStore.addPendingTransaction(buildTransaction({ status: 'failed' }))
+
+      const { getByTestId, queryByTestId } = render(<PoolsScreen />)
+
+      await act(async () => {
+        fireEvent.press(getByTestId('pending-pool-dismiss-0xabc'))
+      })
+
+      expect(queryByTestId('pending-pool-card-0xabc')).toBeNull()
+      expect(pendingTransactionsStore.transactions).toHaveLength(0)
+    })
+
+    it('offers no dismiss action while a transaction is still in flight', async () => {
+      await pendingTransactionsStore.addPendingTransaction(buildTransaction())
+
+      const { queryByTestId } = render(<PoolsScreen />)
+
+      expect(queryByTestId('pending-pool-dismiss-0xabc')).toBeNull()
+    })
+  })
+
+  describe('load states', () => {
+    it('shows a loading state on the first load', () => {
+      poolStore.reset()
+      poolStore.isLoading = true
+
+      const { getByTestId } = render(<PoolsScreen />)
+
+      expect(getByTestId('pools-loading')).toBeTruthy()
+    })
+
+    it('keeps the list on screen while a refresh runs', () => {
+      poolStore.isRefreshing = true
+
+      const { getByTestId, queryByTestId } = render(<PoolsScreen />)
+
+      expect(queryByTestId('pools-loading')).toBeNull()
+      expect(getByTestId('pool-card-1')).toBeTruthy()
+
+      poolStore.isRefreshing = false
+    })
+
+    it('refreshes pools and drains confirmed transactions on pull-to-refresh', async () => {
+      // Indexing fails on mount so the record is still there to retry, which is
+      // the case pull-to-refresh exists for.
+      failIndexing()
+      poolStore.lastFetchedAt = null
+      await pendingTransactionsStore.addPendingTransaction(
+        buildTransaction({ status: 'confirmed', result: { poolId: 99, poolAddress: '0xdef' } })
+      )
+
+      const { getByTestId } = render(<PoolsScreen />)
+      // Reached through the ScrollView's prop: a RefreshControl is not rendered
+      // as a queryable node, so there is no testID to fire the event on.
+      const { onRefresh } = getByTestId('pools-scroll').props.refreshControl.props
+
+      await waitFor(() => expect(mockFirebaseCallable).toHaveBeenCalled())
+      mockFirebaseCallable.mockClear()
+      await act(async () => {
+        await onRefresh()
+      })
+
+      expect(poolStore.lastFetchedAt).not.toBeNull()
+      expect(mockFirebaseCallable).toHaveBeenCalledWith(expect.anything(), 'indexPool')
+    })
+
+    it('shows an empty state when there is nothing to list', () => {
+      poolStore.reset()
+
+      const { getByTestId, queryByText } = render(<PoolsScreen />)
+
+      expect(getByTestId('pools-empty')).toBeTruthy()
+      expect(getByTestId('create-pool-card')).toBeTruthy()
+      // The count line would only say "0 circles" — the empty state says it better.
+      expect(queryByText("0 circles you're part of")).toBeNull()
+    })
+  })
+
+  describe('errors', () => {
+    it('takes over the screen when the load failed with nothing cached', () => {
+      poolStore.reset()
+      poolStore.error = 'Could not reach SuperPool'
+
+      const { getByTestId, getByText } = render(<PoolsScreen />)
+
+      expect(getByTestId('pools-error')).toBeTruthy()
+      expect(getByText('Could not reach SuperPool')).toBeTruthy()
+    })
+
+    it('retries the load from the error state', async () => {
+      poolStore.reset()
+      poolStore.error = 'Could not reach SuperPool'
+
+      const { getByTestId } = render(<PoolsScreen />)
+
+      await act(async () => {
+        fireEvent.press(getByTestId('pools-error-retry'))
+      })
+
+      expect(getByTestId('pools-screen')).toBeTruthy()
+      expect(poolStore.error).toBeNull()
+    })
+
+    it('degrades to a banner when pools are already on screen', () => {
+      poolStore.error = 'Could not reach SuperPool'
+
+      const { getByTestId, queryByTestId } = render(<PoolsScreen />)
+
+      expect(getByTestId('pools-error-banner')).toBeTruthy()
+      expect(queryByTestId('pools-error')).toBeNull()
+      expect(getByTestId('pool-card-1')).toBeTruthy()
+    })
   })
 })
