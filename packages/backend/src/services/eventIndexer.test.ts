@@ -290,14 +290,14 @@ describe('indexPoolEvent', () => {
       expect.objectContaining({
         poolId: 3,
         poolAddress: parsedPool.poolAddress,
-        poolOwner: parsedPool.poolOwner,
+        poolOwner: parsedPool.poolOwner.toLowerCase(),
         name: parsedPool.name,
         description: '',
         maxLoanAmount: parsedPool.maxLoanAmount,
         interestRate: parsedPool.interestRate,
         loanDuration: parsedPool.loanDuration,
         chainId: CHAIN_ID,
-        createdBy: parsedPool.poolOwner,
+        createdBy: parsedPool.poolOwner.toLowerCase(),
         createdAt: parsedPool.createdAt,
         transactionHash: parsedPool.transactionHash,
         isActive: true,
@@ -326,7 +326,24 @@ describe('indexPoolEvent', () => {
     await indexPoolEvent(parsedPool, mockFs)
 
     // Assert
-    expect(mockDocRef.set).toHaveBeenCalledWith(expect.objectContaining({ createdBy: '0xCreatorAddr' }))
+    expect(mockDocRef.set).toHaveBeenCalledWith(expect.objectContaining({ createdBy: '0xcreatoraddr' }))
+  })
+
+  it('should store addresses lowercased, so the listPools owner filter can match', async () => {
+    // Arrange
+    const { mockFs, mockDocRef } = buildMockFirestore(false)
+    const parsedPool = buildParsedPool({ poolId: 10, poolOwner: '0x9965507D1a55bcC2695C58ba16FB37d819B0A4dc' })
+
+    // Act
+    await indexPoolEvent(parsedPool, mockFs)
+
+    // Assert
+    expect(mockDocRef.set).toHaveBeenCalledWith(
+      expect.objectContaining({
+        poolOwner: '0x9965507d1a55bcc2695c58ba16fb37d819b0a4dc',
+        createdBy: '0x9965507d1a55bcc2695c58ba16fb37d819b0a4dc',
+      })
+    )
   })
 
   it('should log success after writing a new pool', async () => {

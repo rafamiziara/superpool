@@ -92,7 +92,11 @@ export interface PoolInfo {
   loanDuration: number
   chainId: number
   createdBy: string
-  createdAt: Date
+  /**
+   * ISO 8601, not a Date. Firebase callables encode objects by their enumerable
+   * keys, and a Date has none — returning one serialises it to `{}` on the wire.
+   */
+  createdAt: string
   transactionHash: string
   isActive: boolean
 }

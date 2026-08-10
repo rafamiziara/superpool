@@ -1,5 +1,9 @@
 import 'react-native-get-random-values'
 
+// Screens are exercised against the mock pool data by default; the tests that
+// cover the live `listPools` path opt out per case.
+process.env.EXPO_PUBLIC_USE_MOCK_POOLS = 'true'
+
 import mockAsyncStorage from '@react-native-async-storage/async-storage/jest/async-storage-mock'
 
 // Export router mock functions for tests that need to access them

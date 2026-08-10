@@ -17,7 +17,7 @@ describe('PoolDetailScreen', () => {
   beforeEach(async () => {
     jest.clearAllMocks()
     mockLocalSearchParams.mockReturnValue({ id: OTHER_OWNED })
-    await poolStore.loadPools()
+    await poolStore.fetchPools()
   })
 
   it('renders the pool detail for the route param', () => {

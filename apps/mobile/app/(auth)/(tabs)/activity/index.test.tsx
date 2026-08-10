@@ -14,7 +14,7 @@ const daysAgo = (n: number) => new Date(Date.now() - n * 86_400_000)
 describe('ActivityScreen', () => {
   beforeEach(async () => {
     jest.clearAllMocks()
-    await poolStore.loadPools()
+    await poolStore.fetchPools()
   })
 
   it('renders a row for every non-cancelled transaction', () => {

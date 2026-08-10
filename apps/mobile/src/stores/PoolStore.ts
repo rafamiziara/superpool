@@ -1,40 +1,133 @@
-import type { ListPoolsRequest, Loan, PoolInfo, PoolMember, Transaction } from '@superpool/types'
+import type { ListPoolsRequest, ListPoolsResponse, Loan, PoolInfo, PoolMember, Transaction } from '@superpool/types'
 import { LoanStatus, MemberStatus, TransactionStatus } from '@superpool/types'
+import { httpsCallable } from 'firebase/functions'
 import { makeAutoObservable, runInAction } from 'mobx'
+import { DEFAULT_CHAIN_ID } from '../config/contracts'
+import { FIREBASE_FUNCTIONS } from '../config/firebase'
 import { MOCK_LOANS, MOCK_MEMBERSHIPS, MOCK_POOLS, MOCK_TRANSACTIONS, MOCK_USER_ADDRESS } from '../mocks/lending'
+import { authStore } from './AuthStore'
 
 /**
- * Lending pool state. Method signatures mirror the backend contract
- * (`listPools` Cloud Function, Firestore `pools` collection) so screens
- * won't change when the mock layer is swapped for real calls.
+ * Mock pools are opt-in. The backend is the default source; set
+ * `EXPO_PUBLIC_USE_MOCK_POOLS=true` to work on the UI without the Functions
+ * emulator running.
+ *
+ * Read per call rather than once at import: a module-level constant would freeze
+ * the choice before any test could change it.
+ */
+function usingMockPools(): boolean {
+  return process.env.EXPO_PUBLIC_USE_MOCK_POOLS === 'true'
+}
+
+const DEFAULT_PAGE_SIZE = 50
+
+/**
+ * Lending pool state.
+ *
+ * Pools come from the `listPools` Cloud Function. Memberships, loans and
+ * transactions are still mock-backed — no backend serves them yet — so a load
+ * is deliberately hybrid rather than all-or-nothing.
  */
 export class PoolStore {
   pools: PoolInfo[] = []
   memberships: PoolMember[] = []
   loans: Loan[] = []
   transactions: Transaction[] = []
+
+  /** Initial loads. Pull-to-refresh uses `isRefreshing` so the list is not torn down. */
   isLoading = false
+  isRefreshing = false
+  error: string | null = null
+  lastFetchedAt: Date | null = null
 
   constructor() {
     makeAutoObservable(this)
   }
 
-  // TODO: stand-in for authStore.walletAddress until mocks are replaced
+  /** The connected wallet, or the mock user when running on mock data. */
   get userAddress(): string {
-    return MOCK_USER_ADDRESS
+    if (authStore.walletAddress) return authStore.walletAddress
+
+    return usingMockPools() ? MOCK_USER_ADDRESS : ''
   }
 
-  loadPools = async (_params: ListPoolsRequest = {}): Promise<void> => {
-    this.isLoading = true
-    // TODO: swap for httpsCallable('listPools')(params) + Firestore queries when wiring the backend
-    await Promise.resolve()
+  get hasError(): boolean {
+    return this.error !== null
+  }
+
+  get isEmpty(): boolean {
+    return !this.isLoading && this.pools.length === 0
+  }
+
+  get poolCount(): number {
+    return this.pools.length
+  }
+
+  /** Loads pools for an initial render. Never throws — failures land in `error`. */
+  fetchPools = async (params: ListPoolsRequest = {}): Promise<void> => {
+    await this.load(params, 'initial')
+  }
+
+  /** Same as `fetchPools`, but leaves the current list on screen while it runs. */
+  refreshPools = async (params: ListPoolsRequest = {}): Promise<void> => {
+    await this.load(params, 'refresh')
+  }
+
+  reset = (): void => {
     runInAction(() => {
-      this.pools = MOCK_POOLS
-      this.memberships = MOCK_MEMBERSHIPS
-      this.loans = MOCK_LOANS
-      this.transactions = MOCK_TRANSACTIONS
+      this.pools = []
+      this.memberships = []
+      this.loans = []
+      this.transactions = []
       this.isLoading = false
+      this.isRefreshing = false
+      this.error = null
+      this.lastFetchedAt = null
     })
+  }
+
+  private load = async (params: ListPoolsRequest, mode: 'initial' | 'refresh'): Promise<void> => {
+    runInAction(() => {
+      if (mode === 'refresh') this.isRefreshing = true
+      else this.isLoading = true
+      this.error = null
+    })
+
+    try {
+      const pools = usingMockPools() ? MOCK_POOLS : await this.requestPools(params)
+
+      runInAction(() => {
+        this.pools = pools
+        this.lastFetchedAt = new Date()
+        // Everything below is still mock-backed; see the note on the class.
+        this.memberships = MOCK_MEMBERSHIPS
+        this.loans = MOCK_LOANS
+        this.transactions = MOCK_TRANSACTIONS
+      })
+    } catch (error) {
+      // Screens read `error`; a store that throws would take the screen with it.
+      runInAction(() => {
+        this.error = error instanceof Error ? error.message : 'Could not load pools'
+      })
+    } finally {
+      runInAction(() => {
+        this.isLoading = false
+        this.isRefreshing = false
+      })
+    }
+  }
+
+  private requestPools = async (params: ListPoolsRequest): Promise<PoolInfo[]> => {
+    const listPools = httpsCallable<ListPoolsRequest, ListPoolsResponse>(FIREBASE_FUNCTIONS, 'listPools')
+
+    const response = await listPools({
+      chainId: authStore.chainId ?? DEFAULT_CHAIN_ID,
+      activeOnly: true,
+      limit: DEFAULT_PAGE_SIZE,
+      ...params,
+    })
+
+    return response.data.pools
   }
 
   poolById = (poolId: number): PoolInfo | undefined => {
@@ -49,10 +142,20 @@ export class PoolStore {
     return this.recentTransactions.filter((tx) => tx.poolId === String(poolId))
   }
 
-  /** Pools the user belongs to (any membership status), newest first. */
+  /**
+   * Pools the user belongs to or owns, newest first.
+   *
+   * Ownership counts on its own: a pool you just created is yours to see before
+   * any membership record exists for it. Addresses are compared case-insensitively
+   * because the backend stores them lowercased and wallets report them checksummed.
+   */
   get myPools(): PoolInfo[] {
     const memberPoolIds = new Set(this.memberships.map((member) => member.poolId))
-    return this.pools.filter((pool) => memberPoolIds.has(String(pool.poolId)))
+    const address = this.userAddress.toLowerCase()
+
+    return this.pools.filter(
+      (pool) => memberPoolIds.has(String(pool.poolId)) || (address !== '' && pool.poolOwner.toLowerCase() === address)
+    )
   }
 
   /** Sum of the user's active balances across pools (wei). */

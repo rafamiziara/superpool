@@ -1,6 +1,12 @@
 import { PoolInfo } from '@superpool/types'
 import { mockLogger } from '../../__tests__/setup'
 
+/**
+ * A pool as Firestore stores it, which is not what the callable returns:
+ * `createdAt` is a Timestamp there and an ISO string on the wire.
+ */
+type StoredPool = Omit<PoolInfo, 'createdAt'> & { createdAt: Date }
+
 // Import mocked services (already mocked in setup.ts)
 const { firestore } = require('../../services')
 
@@ -8,7 +14,7 @@ const { firestore } = require('../../services')
 const { listPoolsHandler } = require('./listPools')
 
 describe('listPoolsHandler', () => {
-  const mockPools: PoolInfo[] = [
+  const mockPools: StoredPool[] = [
     {
       poolId: 1,
       poolAddress: '0xPoolAddress1',
@@ -42,7 +48,7 @@ describe('listPoolsHandler', () => {
   ]
 
   // Helper to create mock query chain
-  const createMockQuery = (docs: PoolInfo[], totalCount: number) => {
+  const createMockQuery = (docs: StoredPool[], totalCount: number) => {
     const mockDocs = docs.map((pool) => ({
       data: () => ({
         ...pool,
@@ -88,7 +94,9 @@ describe('listPoolsHandler', () => {
     expect(mockQuery.offset).toHaveBeenCalledWith(0)
     expect(mockQuery.limit).toHaveBeenCalledWith(20)
     expect(result).toEqual({
-      pools: mockPools,
+      // createdAt crosses the wire as an ISO string, so the fixtures' Dates are
+      // not what the handler returns.
+      pools: mockPools.map((pool) => ({ ...pool, createdAt: pool.createdAt.toISOString() })),
       totalCount: 2,
       page: 1,
       limit: 20,
@@ -332,7 +340,9 @@ describe('listPoolsHandler', () => {
     const result = await listPoolsHandler(request)
 
     // Assert
-    expect(result.pools[0].createdAt).toBeInstanceOf(Date)
+    // An ISO string, not a Date: a Date returned from a callable is encoded to `{}`.
+    expect(typeof result.pools[0].createdAt).toBe('string')
+    expect(new Date(result.pools[0].createdAt).getTime()).not.toBeNaN()
   })
 
   // Test Case: Error handling - Non-Error object thrown

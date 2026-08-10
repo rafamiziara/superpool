@@ -11,7 +11,7 @@ jest.mock('expo-status-bar', () => ({
 describe('PoolsScreen', () => {
   beforeEach(async () => {
     jest.clearAllMocks()
-    await poolStore.loadPools()
+    await poolStore.fetchPools()
   })
 
   it('renders a card for every pool the user belongs to', () => {
@@ -30,6 +30,9 @@ describe('PoolsScreen', () => {
   })
 
   it('uses the singular form for a single pool', () => {
+    // myPools counts membership *or* ownership, so both have to be trimmed to
+    // leave exactly one: mock pool 2 is owned by the mock user.
+    poolStore.pools = poolStore.pools.slice(0, 1)
     poolStore.memberships = poolStore.memberships.slice(0, 1)
 
     const { getByText } = render(<PoolsScreen />)

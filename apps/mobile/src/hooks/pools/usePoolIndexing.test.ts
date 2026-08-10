@@ -19,10 +19,10 @@ jest.mock('../../config/contracts', () => ({
 // Replaced wholesale rather than spied on: MobX defines store actions as
 // non-configurable, so jest.spyOn cannot redefine them.
 jest.mock('../../stores/PoolStore', () => ({
-  poolStore: { loadPools: jest.fn() },
+  poolStore: { refreshPools: jest.fn() },
 }))
 
-const loadPools = jest.mocked(poolStore.loadPools)
+const refreshPools = jest.mocked(poolStore.refreshPools)
 
 function makeTransaction(overrides: Partial<PendingTransaction> = {}): PendingTransaction {
   return {
@@ -54,7 +54,7 @@ describe('usePoolIndexing', () => {
 
     logSpy = jest.spyOn(console, 'log').mockImplementation(() => undefined)
     warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => undefined)
-    loadPools.mockResolvedValue(undefined)
+    refreshPools.mockResolvedValue(undefined)
 
     mockWagmiUseAccount.mockReturnValue({
       isConnected: true,
@@ -123,7 +123,7 @@ describe('usePoolIndexing', () => {
         await result.current.triggerIndexing(TX_HASH)
       })
 
-      expect(loadPools).toHaveBeenCalled()
+      expect(refreshPools).toHaveBeenCalled()
       expect(pendingTransactionsStore.transactions).toHaveLength(0)
     })
 
@@ -142,7 +142,7 @@ describe('usePoolIndexing', () => {
     })
 
     it('keeps the record when the refresh fails, so indexing is retried', async () => {
-      loadPools.mockRejectedValue(new Error('network down'))
+      refreshPools.mockRejectedValue(new Error('network down'))
       const { result } = renderHook(() => usePoolIndexing())
 
       await act(async () => {

@@ -27,7 +27,9 @@ interface PoolCardProps {
 
 export function PoolCard({ pool, membership, onPress, carousel = false }: PoolCardProps) {
   const accent = accentStyles[ACCENT_CYCLE[pool.poolId % ACCENT_CYCLE.length]]
-  const isOwner = pool.poolOwner === poolStore.userAddress
+  // Case-insensitive: the backend stores addresses lowercased, wallets report
+  // them checksummed.
+  const isOwner = pool.poolOwner.toLowerCase() === poolStore.userAddress.toLowerCase()
   const isPending = membership?.status === MemberStatus.PENDING
 
   return (

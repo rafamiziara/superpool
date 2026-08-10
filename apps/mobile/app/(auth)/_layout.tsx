@@ -11,7 +11,7 @@ export default observer(function AuthLayout() {
 
   useEffect(() => {
     if (isAuthenticated) {
-      poolStore.loadPools()
+      poolStore.fetchPools()
     }
   }, [isAuthenticated])
 

@@ -96,14 +96,16 @@ export async function indexPoolEvent(parsedPool: ParsedPoolEvent, firestore: Fir
   await docRef.set({
     poolId: parsedPool.poolId,
     poolAddress: parsedPool.poolAddress,
-    poolOwner: parsedPool.poolOwner,
+    // Lowercased on write: `listPools` lowercases the ownerAddress it filters
+    // by, so storing the checksummed form would make that filter match nothing.
+    poolOwner: parsedPool.poolOwner.toLowerCase(),
     name: parsedPool.name,
     description: parsedPool.description,
     maxLoanAmount: parsedPool.maxLoanAmount,
     interestRate: parsedPool.interestRate,
     loanDuration: parsedPool.loanDuration,
     chainId: parsedPool.chainId,
-    createdBy: parsedPool.poolOwner, // poolOwner === msg.sender at creation time
+    createdBy: parsedPool.poolOwner.toLowerCase(), // poolOwner === msg.sender at creation time
     createdAt: parsedPool.createdAt,
     transactionHash: parsedPool.transactionHash,
     isActive: parsedPool.isActive,

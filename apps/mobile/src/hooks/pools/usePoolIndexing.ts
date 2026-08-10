@@ -43,10 +43,7 @@ export const usePoolIndexing = (): UsePoolIndexingReturn => {
 
         // Refresh before dropping the pending record, so the pool never
         // disappears from the UI in the gap between the two.
-        //
-        // PoolStore still reads from mocks (task 11): this is the seam, and it
-        // starts doing real work once fetchPools is wired to `listPools`.
-        await poolStore.loadPools()
+        await poolStore.refreshPools()
         await pendingTransactionsStore.removePendingTransaction(txHash)
       } catch (error) {
         // Deliberately not surfaced — see the note on this hook.

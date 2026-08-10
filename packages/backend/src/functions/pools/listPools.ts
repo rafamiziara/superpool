@@ -51,7 +51,8 @@ export const listPoolsHandler = async (request: CallableRequest<ListPoolsRequest
         loanDuration: data.loanDuration,
         chainId: data.chainId,
         createdBy: data.createdBy,
-        createdAt: data.createdAt?.toDate() || new Date(),
+        // ISO string, not a Date: the callable encoder turns a Date into `{}`.
+        createdAt: (data.createdAt?.toDate() || new Date()).toISOString(),
         transactionHash: data.transactionHash,
         isActive: data.isActive,
       }

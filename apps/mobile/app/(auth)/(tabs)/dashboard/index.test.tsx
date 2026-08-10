@@ -13,7 +13,7 @@ jest.mock('expo-status-bar', () => ({
 describe('DashboardScreen', () => {
   beforeEach(async () => {
     jest.clearAllMocks()
-    await poolStore.loadPools()
+    await poolStore.fetchPools()
   })
 
   it('renders the dashboard structure', () => {
