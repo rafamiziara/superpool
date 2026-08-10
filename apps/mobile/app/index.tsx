@@ -16,8 +16,8 @@ export default observer(function NavigationController() {
 
   // Shown only while the state is still settling.
   return (
-    <View className="flex-1 bg-white items-center justify-center">
-      <Text className="text-3xl font-extrabold text-primary">SUPERPOOL</Text>
+    <View className="flex-1 bg-abyss items-center justify-center">
+      <Text className="text-3xl font-extrabold text-mint">SUPERPOOL</Text>
     </View>
   )
 })

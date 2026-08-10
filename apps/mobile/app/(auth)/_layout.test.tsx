@@ -3,6 +3,11 @@ import React from 'react'
 import { authStore } from '../../src/stores/AuthStore'
 import AuthLayout from './_layout'
 
+// The header constants pull in AppKit, whose ES modules do not survive Jest.
+jest.mock('@reown/appkit-wagmi-react-native', () => ({
+  AppKitButton: () => null,
+}))
+
 // Mock authStore
 jest.mock('../../src/stores/AuthStore', () => ({
   authStore: {

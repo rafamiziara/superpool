@@ -16,8 +16,9 @@ jest.mock('@tanstack/react-query', () => ({
 // Mock Expo Router Stack
 jest.mock('expo-router', () => {
   const MockStack = ({ children, screenOptions }: { children?: React.ReactNode; screenOptions?: Record<string, unknown> }) => {
-    // Verify screenOptions prop
-    expect(screenOptions).toEqual({ headerShown: false })
+    // Verify screenOptions prop. The dark content background is what keeps a
+    // freshly pushed screen from flashing the white window behind it.
+    expect(screenOptions).toEqual({ headerShown: false, contentStyle: { backgroundColor: '#060b16' } })
     return <>{children}</>
   }
   MockStack.Screen = ({ name, options }: { name: string; options?: Record<string, unknown> }) => {
@@ -130,11 +131,12 @@ describe('RootLayout', () => {
     expect(authScreenOptions.children[0]).toContain('fade')
   })
 
-  it('should render StatusBar with auto style', () => {
+  it('should render StatusBar pinned to the dark theme', () => {
     const { getByTestId } = render(<RootLayout />)
 
     expect(getByTestId('status-bar')).toBeTruthy()
-    expect(getByTestId('status-bar-style')).toBeTruthy()
+    // Not "auto": the app never follows the device colour scheme.
+    expect(getByTestId('status-bar-style').children[0]).toBe('light')
   })
 
   it('should render AppKit component', () => {

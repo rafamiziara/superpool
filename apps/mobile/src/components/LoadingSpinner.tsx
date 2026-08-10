@@ -1,5 +1,6 @@
 import React from 'react'
 import { ActivityIndicator, Text, View } from 'react-native'
+import { palette } from '../constants/palette'
 
 export interface LoadingSpinnerProps {
   size?: 'small' | 'large'
@@ -12,7 +13,7 @@ export interface LoadingSpinnerProps {
 
 export const LoadingSpinner: React.FC<LoadingSpinnerProps> = ({
   size = 'large',
-  color = '#2563eb', // Primary blue from design system
+  color = palette.mint, // Primary action colour of the dark theme
   className = '',
   showText = false,
   text = 'Loading...',
@@ -26,7 +27,7 @@ export const LoadingSpinner: React.FC<LoadingSpinnerProps> = ({
     <View className={`items-center justify-center ${containerSize} ${className}`} testID={testID}>
       <ActivityIndicator size={spinnerSize} color={color} testID={`${testID}-indicator`} />
       {showText && (
-        <Text className={`text-muted-foreground ${textSize} mt-2 text-center`} testID={`${testID}-text`}>
+        <Text className={`text-fog ${textSize} mt-2 text-center`} testID={`${testID}-text`}>
           {text}
         </Text>
       )}
@@ -39,6 +40,6 @@ export const LoadingSpinnerVariants = {
   small: (props?: Partial<LoadingSpinnerProps>) => <LoadingSpinner size="small" {...props} />,
   large: (props?: Partial<LoadingSpinnerProps>) => <LoadingSpinner size="large" {...props} />,
   withText: (text: string, props?: Partial<LoadingSpinnerProps>) => <LoadingSpinner showText text={text} {...props} />,
-  primary: (props?: Partial<LoadingSpinnerProps>) => <LoadingSpinner color="#2563eb" {...props} />,
-  muted: (props?: Partial<LoadingSpinnerProps>) => <LoadingSpinner color="#64748b" {...props} />,
+  primary: (props?: Partial<LoadingSpinnerProps>) => <LoadingSpinner color={palette.mint} {...props} />,
+  muted: (props?: Partial<LoadingSpinnerProps>) => <LoadingSpinner color={palette.mist} {...props} />,
 }

@@ -41,13 +41,13 @@ export const ProgressIndicator: React.FC<ProgressIndicatorProps> = ({
 
     if (index < currentStep) {
       // Completed step
-      return `${baseClass} bg-primary ${completedDotClassName}`
+      return `${baseClass} bg-mint ${completedDotClassName}`
     } else if (index === currentStep) {
       // Current/active step
-      return `${baseClass} bg-primary ${activeDotClassName}`
+      return `${baseClass} bg-mint ${activeDotClassName}`
     } else {
-      // Future/pending step - make more visible
-      return `${baseClass} bg-gray-300`
+      // Future/pending step - readable against the dark surfaces
+      return `${baseClass} bg-veil`
     }
   }
 

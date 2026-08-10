@@ -19,8 +19,8 @@ export default observer(function AuthLayout() {
   // but provides a fallback if someone tries to access auth routes directly
   if (!isAuthenticated) {
     return (
-      <View className="flex-1 bg-white items-center justify-center">
-        <Text className="text-muted-foreground">Redirecting to authentication...</Text>
+      <View className="flex-1 bg-abyss items-center justify-center">
+        <Text className="text-fog">Redirecting to authentication...</Text>
       </View>
     )
   }

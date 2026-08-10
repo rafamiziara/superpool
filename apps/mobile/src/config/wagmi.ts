@@ -36,4 +36,8 @@ createAppKit({
   wagmiConfig,
   defaultChain: polygon,
   enableAnalytics: true,
+  // The app is dark-only, so pin the modal rather than let it follow the system
+  // scheme. The accent is deliberately left at AppKit's own indigo: its buttons
+  // hardcode white label text, which our mint would leave unreadable.
+  themeMode: 'dark',
 })

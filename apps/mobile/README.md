@@ -90,9 +90,17 @@ behind both.
 of this** — it covers the three indexing paths and the chain-shaped traps that
 the mocked tests do not catch.
 
-## Post-login UI
+## UI
 
-Dark-first "Abyss & Aurora" theme defined in `global.css` (Tailwind v4 `@theme` tokens: `abyss`/`surface`/`raised` depth scale, `mint`/`amber`/`iris`/`coral` accents). Screens live under `app/(auth)/`:
+Dark-only "Abyss & Aurora" theme defined in `global.css` (Tailwind v4 `@theme` tokens: `abyss`/`surface`/`raised` depth scale, `mint`/`amber`/`iris`/`coral` accents), used by every screen including the pre-login ones (`index`, `onboarding`, `connecting`).
+
+The app never follows the device colour scheme. Three things pin it, and all three are needed — dropping any one leaves a white flash or a light system bar:
+
+- `userInterfaceStyle: "dark"` in `app.json` resolves native chrome (status bar, tab bar, sheets) dark, and the splash background matches `abyss`.
+- Every navigator sets `contentStyle.backgroundColor` to `abyss`, so a screen has the right background before it renders.
+- `createAppKit({ themeMode: 'dark' })` pins the wallet modal, which would otherwise follow the system. Its accent stays AppKit's own indigo: their buttons hardcode white label text, which `mint` cannot carry.
+
+Post-login screens live under `app/(auth)/`:
 
 - **`(tabs)/dashboard`** - Balance hero, horizontal pool macro-cards, active loan, quick actions, pending-transaction banner
 - **`(tabs)/pools`** - Pool list with pending/syncing cards, pull-to-refresh, loading/empty/error states
@@ -100,7 +108,7 @@ Dark-first "Abyss & Aurora" theme defined in `global.css` (Tailwind v4 `@theme` 
 - **`pool/[id]`** - Pool detail with stats, your position, thumb-zone action bar
 - **`pool/create`** - Create-pool form and submission flow
 
-Navigation uses Expo Router **NativeTabs** (SF Symbols on iOS, Material icons on Android) with a per-tab native **Stack**: the dashboard header shows the SuperPool logo + `AppKitButton`, Pools/Activity use native large titles, and pool detail pushes over the tabs with a native back button. Shared header styling lives in `src/constants/navigation.ts`.
+Navigation uses Expo Router **NativeTabs** (SF Symbols on iOS, Material icons on Android) with a per-tab native **Stack**. All three tabs share one header — SuperPool logo left, `AppKitButton` right, no per-tab title, since the tab bar already names the screen. Pool detail pushes over the tabs with a native back button. The shared header and its styling are `brandHeader` / `darkHeader` in `src/constants/navigation.tsx`.
 
 ## Network Configuration
 
@@ -145,7 +153,7 @@ Configured in `src/config/wagmi.ts`:
 - **@superpool/assets** - Shared logos and onboarding illustrations
 
 > There is no shared UI or design-token package in this repo. The app's theme
-> lives in `global.css` — see [Post-login UI](#post-login-ui).
+> lives in `global.css` — see [UI](#ui).
 
 > **Jest stays on 29 here while `packages/backend` is on 30.** This is a
 > toolchain constraint, not drift: `jest-expo` builds on jest 29 internals

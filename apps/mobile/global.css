@@ -5,7 +5,9 @@
  * SuperPool mobile theme — "Abyss & Aurora"
  * Deep ink-navy atmosphere with a luminous mint accent (aurora light on dark
  * water), warm amber for lending/yield moments, coral for danger.
- * Dark-first: the post-login experience uses these tokens exclusively.
+ * Dark-only: every screen, pre- and post-login, uses these tokens exclusively.
+ * `userInterfaceStyle` is pinned to `dark` in app.json so system chrome (status
+ * bar, tab bar, sheets) resolves to match rather than following the device.
  */
 @theme {
   /* Depth scale (backgrounds, from deepest to most elevated) */
@@ -28,11 +30,6 @@
   --color-coral-deep: #3d1a1e;
   --color-iris: #8b9dff; /* secondary accent (variety on cards) */
   --color-iris-deep: #1e2547;
-
-  /* Legacy tokens still used by the pre-login (light) auth screens */
-  --color-primary: #2563eb;
-  --color-destructive: #ef4444;
-  --color-muted-foreground: #64748b;
 }
 
 /* Platform-correct monospace for amounts, addresses and hashes */

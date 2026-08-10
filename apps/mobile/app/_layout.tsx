@@ -12,6 +12,7 @@ import { FirebaseInitializer } from '../src/components/FirebaseInitializer'
 import { PendingTransactionsInitializer } from '../src/components/PendingTransactionsInitializer'
 import { WalletListener } from '../src/components/WalletListener'
 import { wagmiConfig } from '../src/config'
+import { palette } from '../src/constants/palette'
 import '../src/stores/NavigationStore'
 
 const queryClient = new QueryClient()
@@ -24,7 +25,7 @@ function AppContent() {
       <WalletListener />
       <PendingTransactionsInitializer />
 
-      <Stack screenOptions={{ headerShown: false }}>
+      <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: palette.abyss } }}>
         {/* Navigation screens */}
         <Stack.Screen name="index" />
         <Stack.Screen name="onboarding" />
@@ -46,7 +47,8 @@ export default function RootLayout() {
       <WagmiProvider config={wagmiConfig}>
         <QueryClientProvider client={queryClient}>
           <AppContent />
-          <StatusBar style="auto" />
+          {/* The app is dark-only; "auto" would follow the system scheme. */}
+          <StatusBar style="light" />
           <AppKit />
         </QueryClientProvider>
       </WagmiProvider>
