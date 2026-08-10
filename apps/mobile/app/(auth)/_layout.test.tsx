@@ -23,6 +23,8 @@ jest.mock('expo-router', () => {
 
   return {
     Stack: MockStack,
+    // The shared header constants build the app's navigation theme from this.
+    DarkTheme: { dark: true, colors: {}, fonts: {} },
   }
 })
 

@@ -34,6 +34,9 @@ jest.mock('expo-router', () => {
 
   return {
     Stack: MockStack,
+    // The root layout builds the app's navigation theme by extending this one.
+    DarkTheme: { dark: true, colors: {}, fonts: {} },
+    ThemeProvider: ({ children }: { children?: React.ReactNode }) => <>{children}</>,
   }
 })
 
