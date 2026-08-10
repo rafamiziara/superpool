@@ -27,3 +27,9 @@ export const POOLS_COLLECTION = 'pools'
  * The name of the Firestore collection used to store event sync state per chain.
  */
 export const EVENT_SYNC_STATE_COLLECTION = 'event_sync_state'
+
+/**
+ * The name of the Firestore collection used to store indexed liquidity
+ * contributions (`FundsDeposited` events).
+ */
+export const CONTRIBUTIONS_COLLECTION = 'contributions'

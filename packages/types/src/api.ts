@@ -132,6 +132,61 @@ export interface IndexPoolResponse {
   stored: boolean
 }
 
+/**
+ * One `FundsDeposited` event: a member adding liquidity to a pool.
+ *
+ * There is no on-chain membership register, so a contribution record is also
+ * what makes someone a member of a pool as far as the app is concerned.
+ */
+export interface ContributionInfo {
+  /** `${chainId}-${transactionHash}-${logIndex}` — the document id, and stable. */
+  id: string
+  poolId: number
+  poolAddress: string
+  /** Lowercased on write; compare case-insensitively. */
+  contributor: string
+  /** Wei, as a decimal string — JSON has no bigint. */
+  amount: string
+  chainId: number
+  transactionHash: string
+  /** Position of the `FundsDeposited` log within its transaction. */
+  logIndex: number
+  blockNumber: number
+  /**
+   * ISO 8601, not a Date. Firebase callables encode objects by their enumerable
+   * keys, and a Date has none — returning one serialises it to `{}` on the wire.
+   */
+  contributedAt: string
+}
+
+export interface IndexContributionRequest {
+  txHash: string
+  chainId?: number
+}
+
+export interface IndexContributionResponse {
+  /** One entry per `FundsDeposited` log in the transaction. */
+  contributions: ContributionInfo[]
+  /** How many were written by this call; the rest were already stored. */
+  storedCount: number
+  alreadyIndexed: boolean
+}
+
+export interface ListContributionsRequest {
+  chainId?: number
+  /** Restrict to one pool. Omit for every pool on the chain. */
+  poolId?: number
+  /** Restrict to one wallet. Matched case-insensitively. */
+  contributor?: string
+  limit?: number
+}
+
+export interface ListContributionsResponse {
+  contributions: ContributionInfo[]
+  totalCount: number
+  limit: number
+}
+
 // Dev/Testing API types (emulator only)
 export interface SignMessageRequest {
   nonce: string
