@@ -102,6 +102,13 @@ Detailed documentation for each component:
 - [Design System](packages/design/README.md) - Design tokens and configuration
 - [Assets](packages/assets/README.md) - Brand assets and illustrations
 
+**Guides:**
+
+- [Getting Started](docs/GETTING_STARTED.md) - Full setup walkthrough
+- [Pool Creation](docs/POOL_CREATION.md) - How a pool goes from a form to a listed pool, end to end
+- [Sprint Plan](docs/SPRINT_PLAN.md) - What is built and what is next
+- [Roadmap](docs/ROADMAP.md) - Post-MVP direction
+
 ## 🚀 Getting Started
 
 ### Quick Start

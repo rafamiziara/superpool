@@ -176,7 +176,7 @@ For project structure overview, see the [Architecture section in README.md](READ
 - **Chain Support**: Ethereum Mainnet, Polygon, Arbitrum, Base, BSC, Polygon Amoy, Localhost (dev mode)
 - **Firebase Integration**: Authentication, Firestore, Cloud Functions
 - **Architecture**: Expo Router with TypeScript and shared type definitions
-- **Store Architecture**: AuthStore, NavigationStore, PoolStore singletons in `src/stores/`
+- **Store Architecture**: AuthStore, NavigationStore, PoolStore, PendingTransactionsStore singletons in `src/stores/`
 - **React Integration**: mobx-react-lite with observer components and React Context
 - **Configuration**: React Native batching, development mode validation
 - **Assets**: References shared onboarding illustrations and brand assets
@@ -486,9 +486,27 @@ When users request code examples, setup instructions, configuration steps, or li
 
 For sprint planning, feature prioritization, and development roadmap tasks, refer to [`docs/SPRINT_PLAN.md`](docs/SPRINT_PLAN.md).
 
+## Pool Creation
+
+For anything touching pool creation, indexing or pending transactions, read
+[`docs/POOL_CREATION.md`](docs/POOL_CREATION.md) first. It documents the three
+indexing paths, the idempotency guarantees, and the chain-shaped traps that
+mocked tests do not catch.
+
 ## UI & Frontend Interface Design
 
-For UI & frontend interface design tasks, refer to the comprehensive guidelines in [`docs/SUPERDESIGN.md`](docs/SUPERDESIGN.md).
+Two palettes coexist, and they are not interchangeable:
+
+- **Mobile** ships the dark "Abyss & Aurora" theme. Tokens are in
+  `apps/mobile/global.css` (Tailwind v4 `@theme`, applied via uniwind classNames)
+  with raw values mirrored in `apps/mobile/src/constants/palette.ts` for props
+  that cannot take a className. Match the surrounding screens.
+- **Web and shared packages** use the DeFi Blue tokens in
+  [`packages/design`](packages/design/README.md).
+
+Reconciling the two is the job of the workspace-level design overhaul
+(`../DESIGN_OVERHAUL.md`); until then, follow whichever applies to the app you
+are in rather than introducing a third.
 
 ## EXTREMELY IMPORTANT: Testing & Code Quality Requirements
 

@@ -15,8 +15,10 @@ packages/backend/
 │   │   ├── auth/          # Wallet authentication functions
 │   │   ├── app-check/     # Device verification functions
 │   │   ├── pools/         # Pool management functions
+│   │   ├── events/        # Scheduled chain-event sync
 │   │   └── dev/           # Development/testing functions
 │   ├── services/          # Business logic services
+│   │   └── eventIndexer.ts # Shared pool indexing, used by both indexing paths
 │   ├── utils/             # Shared utilities
 │   │   ├── auth.ts        # Authentication helpers
 │   │   └── blockchain.ts  # Blockchain interaction utilities
@@ -103,11 +105,34 @@ Required for local development and Firebase Admin SDK:
 - Whitelists user automatically (backend pays gas)
 - Returns whitelisting status and transaction details
 
+**`indexPool`**
+
+- Called by the mobile app as soon as a creation transaction is confirmed
+- Fetches the receipt, parses the `PoolCreated` event, writes the pool to Firestore
+- Idempotent: the document id is `${chainId}-${poolId}`, so re-indexing an
+  already-stored pool reports `alreadyIndexed` and writes nothing
+- Requires authentication
+
+**`syncPoolEvents`** (scheduled)
+
+- Backfills anything the immediate path missed — a user who closed the app, a
+  failed callable, a transaction confirmed while offline
+- Scans `PoolCreated` events from the last processed block and updates
+  `event_sync_state` per chain
+- Shares `services/eventIndexer.ts` with `indexPool`, so both paths agree
+- ⚠️ Unit-tested but never exercised against a live chain
+
 **`listPools`**
 
 - Lists pools from Firestore with pagination
 - Filters by chain ID, owner address, active status
 - Returns pool metadata with pagination info
+- `createdAt` is an **ISO string, not a `Date`** — the callable encoder maps
+  objects by their enumerable keys, and a `Date` has none, so it would arrive as
+  `{}`. Addresses come back **lowercased**; compare them case-insensitively.
+
+See [`docs/POOL_CREATION.md`](../../docs/POOL_CREATION.md) for how these fit
+together with the mobile app.
 
 ### Development Functions
 

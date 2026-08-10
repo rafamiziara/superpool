@@ -67,20 +67,38 @@ MobX singleton stores configured in `src/stores/`:
 
 - **`AuthStore`** - User authentication, wallet state and session
 - **`NavigationStore`** - Auth-driven routing decisions
-- **`PoolStore`** - Lending pools, memberships, loans and transactions (currently mock data shaped on the real backend/contract payloads — `listPools` Cloud Function `PoolInfo`, shared `@superpool/types`)
+- **`PoolStore`** - Pools come from the `listPools` Cloud Function; memberships, loans and transactions are still mock-backed, so a load is deliberately hybrid. Set `EXPO_PUBLIC_USE_MOCK_POOLS=true` to run the whole screen on mocks without the Functions emulator.
+- **`PendingTransactionsStore`** - Pool creations that are submitted but not yet confirmed and indexed, persisted to AsyncStorage so they survive an app restart
 
 ```typescript
 import { authStore, poolStore } from '../src/stores'
 ```
 
+## Pool Creation
+
+`src/hooks/pools/` drives the flow, one hook per stage:
+
+- **`usePoolCreation`** - lazy whitelisting via `preparePoolCreation`, gas estimate and balance check, then the `createPool` transaction
+- **`useTransactionMonitoring`** - waits for the receipt and decodes `PoolCreated`
+- **`usePoolIndexing`** - hands confirmed transactions to the backend; `indexConfirmed()` drains whatever startup recovery resolved
+
+Pending work is visible while it is in flight: `PendingPoolCard` on the pools
+list, `PendingTransactionBanner` on the dashboard, and `TransactionStatusModal`
+behind both.
+
+**Read [`docs/POOL_CREATION.md`](../../docs/POOL_CREATION.md) before changing any
+of this** — it covers the three indexing paths and the chain-shaped traps that
+the mocked tests do not catch.
+
 ## Post-login UI
 
 Dark-first "Abyss & Aurora" theme defined in `global.css` (Tailwind v4 `@theme` tokens: `abyss`/`surface`/`raised` depth scale, `mint`/`amber`/`iris`/`coral` accents). Screens live under `app/(auth)/`:
 
-- **`(tabs)/dashboard`** - Balance hero, horizontal pool macro-cards, active loan, quick actions
-- **`(tabs)/pools`** - Pool list + create-pool placeholder
+- **`(tabs)/dashboard`** - Balance hero, horizontal pool macro-cards, active loan, quick actions, pending-transaction banner
+- **`(tabs)/pools`** - Pool list with pending/syncing cards, pull-to-refresh, loading/empty/error states
 - **`(tabs)/activity`** - Transaction feed grouped by day
 - **`pool/[id]`** - Pool detail with stats, your position, thumb-zone action bar
+- **`pool/create`** - Create-pool form and submission flow
 
 Navigation uses Expo Router **NativeTabs** (SF Symbols on iOS, Material icons on Android) with a per-tab native **Stack**: the dashboard header shows the SuperPool logo + `AppKitButton`, Pools/Activity use native large titles, and pool detail pushes over the tabs with a native back button. Shared header styling lives in `src/constants/navigation.ts`.
 

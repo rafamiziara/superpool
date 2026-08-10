@@ -87,37 +87,45 @@ To build a functional micro-lending decentralized application on Polygon where u
 
 **Sprint Goal:** Implement smart contract architecture and UI for creating new lending pools.
 
+See [`POOL_CREATION.md`](POOL_CREATION.md) for how the shipped system works.
+
 ### Features:
 
-- **Smart Contract Development**
+- **Smart Contract Development** ✅
   - Develop and deploy `PoolFactory.sol` with upgradeable proxy pattern
   - Implement `LendingPool.sol` core structure and initialization
   - Create pool creation functions with parameter validation
   - Multi-sig Safe integration for admin controls
 
-- **Backend Integration**
-  - Cloud Functions to interact with PoolFactory
-  - Event listeners for pool creation events
+- **Backend Integration** ✅
+  - Cloud Functions to interact with PoolFactory (`preparePoolCreation`, `indexPool`, `listPools`)
+  - Event listeners for pool creation events (`syncPoolEvents` — written, not yet run against a live chain)
   - Off-chain pool metadata storage in Firestore
   - Admin authentication and authorization
 
-- **Mobile App Implementation**
+- **Mobile App Implementation** ✅
   - Pool creator UI for inputting pool parameters
   - Pool creation form validation and user feedback
   - Integration with smart contracts via backend
   - Pool creation success and error handling
 
-- **Deployment & Verification**
-  - Automated deployment scripts for Polygon
-  - Contract verification on Polygonscan
-  - Multi-sig ownership transfer automation
+- **Deployment & Verification** 🚧
+  - Automated deployment scripts for Polygon — localhost only; Amoy needs a funded deployer
+  - Contract verification on Polygonscan — not started
+  - Multi-sig ownership transfer automation — scripted, not run on a testnet
 
 ### Expected Deliverables:
 
-- Pool creators can deploy new lending pools via the dApp
-- PoolFactory contract deployed, verified, and owned by multi-sig Safe
-- Pool creation UI integrated with smart contracts
-- Off-chain pool data management system
+- Pool creators can deploy new lending pools via the dApp — ✅ verified end to end against a local Hardhat node and the Firebase emulators
+- PoolFactory contract deployed, verified, and owned by multi-sig Safe — 🚧 local only
+- Pool creation UI integrated with smart contracts — ✅
+- Off-chain pool data management system — ✅
+
+### Current Status: **Feature complete locally; blocked on testnet deployment** 🚧
+
+Two things gate the rest: no funded Amoy deployer or backend wallet, and the
+backend resolving exactly one chain at a time (`getChainConfig` matches only the
+configured chain), which makes the app's multi-chain support presentational.
 
 ---
 

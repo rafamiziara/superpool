@@ -124,8 +124,9 @@ Detailed setup and usage for each package:
 
 - **[CLAUDE.md](../CLAUDE.md)** - AI development guidelines and commands
 - **[Architecture Overview](../README.md#-architecture-overview)** - Project structure
+- **[Pool Creation](POOL_CREATION.md)** - How pool creation and indexing work end to end
 - **[Sprint Planning](SPRINT_PLAN.md)** - Development roadmap
-- **[Design Guidelines](SUPERDESIGN.md)** - UI/UX specifications
+- **[Design System](../packages/design/README.md)** - Shared tokens and Tailwind config
 
 ## Need Help?
 
