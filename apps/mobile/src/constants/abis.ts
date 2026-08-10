@@ -1,15 +1,15 @@
 /**
- * ABI definitions for smart contracts.
+ * Contract ABIs for encoding transactions with Wagmi/Viem.
  *
  * These are not written by hand — they are generated from the compiled contract
- * artifacts into `abis.generated.ts`, and the mobile app receives a byte-identical
+ * artifacts into `abis.generated.ts`, and the backend receives a byte-identical
  * copy. After changing a contract, run:
  *
  *   pnpm --filter contracts abis:generate
  *
  * `packages/contracts/test/AbiSync.test.ts` fails if the generated files drift.
- * This module stays as the import surface so consumers are unaffected by how the
- * ABIs are produced.
+ * The `as const` on the generated arrays is what gives Viem its argument and
+ * return-type inference, so import from here rather than widening to `Abi`.
  */
 
 export { PoolFactoryABI, SampleLendingPoolABI } from './abis.generated'

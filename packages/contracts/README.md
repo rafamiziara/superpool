@@ -104,16 +104,35 @@ pnpm verify <IMPLEMENTATION_ADDRESS>
 
 ## Available Scripts
 
-| Command            | Description                                          |
-| ------------------ | ---------------------------------------------------- |
-| `pnpm compile`     | Compile all Solidity contracts                       |
-| `pnpm test`        | Run the complete test suite                          |
-| `pnpm test:gas`    | Run tests with gas usage reporting                   |
-| `pnpm coverage`    | Generate test coverage report                        |
-| `pnpm deploy:amoy` | Deploy contracts to Polygon Amoy testnet             |
-| `pnpm verify`      | Verify contracts using Etherscan API v2 (multichain) |
-| `pnpm lint`        | Run Solidity and TypeScript linting                  |
-| `pnpm clean`       | Clean compilation artifacts                          |
+| Command              | Description                                          |
+| -------------------- | ---------------------------------------------------- |
+| `pnpm compile`       | Compile all Solidity contracts                       |
+| `pnpm abis:generate` | Regenerate consumer ABIs from the compiled artifacts |
+| `pnpm test`          | Run the complete test suite                          |
+| `pnpm test:gas`      | Run tests with gas usage reporting                   |
+| `pnpm coverage`      | Generate test coverage report                        |
+| `pnpm deploy:amoy`   | Deploy contracts to Polygon Amoy testnet             |
+| `pnpm verify`        | Verify contracts using Etherscan API v2 (multichain) |
+| `pnpm lint`          | Run Solidity and TypeScript linting                  |
+| `pnpm clean`         | Clean compilation artifacts                          |
+
+## Contract ABIs
+
+The backend and mobile app do not hand-maintain ABIs. `pnpm abis:generate` reads the
+compiled Hardhat artifacts — the single source of truth — and writes a byte-identical
+`abis.generated.ts` to each consumer:
+
+- `packages/backend/src/constants/abis.generated.ts`
+- `apps/mobile/src/constants/abis.generated.ts`
+
+Each consumer re-exports it from its own `constants/abis.ts`, which is the import
+surface; never edit the generated files. **After changing a contract's interface, run
+`pnpm abis:generate` and commit the result** — `test/AbiSync.test.ts` re-renders from
+the artifacts and fails the suite if either copy has drifted.
+
+The comparison covers the full ABI, not just function selectors: a struct whose fields
+were reordered, or an event that lost an `indexed` flag, keeps its selector while
+decoding to the wrong values.
 
 ## Project Structure
 

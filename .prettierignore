@@ -16,5 +16,8 @@ packages/contracts/cache
 next-env.d.ts
 uniwind-types.d.ts
 
+# Contract ABIs (rewritten by `pnpm --filter contracts abis:generate`)
+**/abis.generated.ts
+
 # Ignore lock files
 pnpm-lock.yaml

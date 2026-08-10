@@ -22,7 +22,8 @@ packages/backend/
 │   │   └── blockchain.ts  # Blockchain interaction utilities
 │   ├── config/            # Firebase configuration
 │   ├── constants/         # ABIs, chain configs, Firestore collections
-│   │   ├── abis.ts        # Smart contract ABIs
+│   │   ├── abis.ts        # Import surface for the contract ABIs
+│   │   ├── abis.generated.ts # Generated — do not edit (see below)
 │   │   ├── chains.ts      # Blockchain network configs
 │   │   └── firestore.ts   # Firestore collection names
 │   └── __tests__/         # Test mocks and setup
@@ -31,6 +32,19 @@ packages/backend/
 │   └── signMessage.ts     # Sign auth messages
 └── test/                  # Jest test suite (root level)
 ```
+
+## Contract ABIs
+
+`constants/abis.generated.ts` is generated from the compiled contract artifacts and must
+not be hand-edited — that is exactly how the backend's ABIs silently drifted from the
+contracts in five places. After any change to a contract's interface, run:
+
+```bash
+pnpm --filter contracts abis:generate
+```
+
+The contracts test suite (`test/AbiSync.test.ts`) fails if the file has drifted. The
+mobile app receives a byte-identical copy from the same generator.
 
 ## Environment Setup
 

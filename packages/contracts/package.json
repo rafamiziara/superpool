@@ -4,6 +4,7 @@
   "description": "Smart contracts for SuperPool decentralized lending platform",
   "scripts": {
     "compile": "hardhat compile",
+    "abis:generate": "hardhat run scripts/generate-abis.ts",
     "type-check": "tsc --noEmit",
     "test": "hardhat test",
     "test:gas": "cross-env REPORT_GAS=true hardhat test",

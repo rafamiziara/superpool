@@ -26,6 +26,7 @@ export default [
       '**/cache/**',
       '**/next-env.d.ts',
       '**/uniwind-types.d.ts',
+      '**/abis.generated.ts',
 
       // Coverage reports
       '**/coverage/**',
