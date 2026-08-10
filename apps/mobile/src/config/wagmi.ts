@@ -1,7 +1,7 @@
 import '@walletconnect/react-native-compat'
 
 import { createAppKit, defaultWagmiConfig } from '@reown/appkit-wagmi-react-native'
-import { arbitrum, base, bsc, localhost, mainnet, polygon, polygonAmoy } from 'wagmi/chains'
+import { arbitrum, base, bsc, hardhat, mainnet, polygon, polygonAmoy } from 'wagmi/chains'
 
 // Get environment variables with validation
 const projectId = process.env.EXPO_PUBLIC_REOWN_PROJECT_ID
@@ -9,9 +9,12 @@ if (!projectId) {
   throw new Error('EXPO_PUBLIC_REOWN_PROJECT_ID is required')
 }
 
-// Create localhost chain for development
+// Create localhost chain for development.
+// Based on Viem's `hardhat` (chain 31337), not `localhost` (1337): the Hardhat
+// node reports 31337, and a mismatched id makes the wallet refuse every
+// transaction sent to it.
 const localhostChain = {
-  ...localhost,
+  ...hardhat,
   name: 'Localhost',
   nativeCurrency: {
     name: 'Ether',

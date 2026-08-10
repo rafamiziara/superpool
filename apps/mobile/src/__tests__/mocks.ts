@@ -15,6 +15,18 @@ export const mockWagmiUseSignMessage = jest.fn(() => ({
   isPending: false,
 }))
 
+export const mockWriteContractAsync = jest.fn()
+export const mockEstimateContractGas = jest.fn()
+
+export const mockWagmiUseWriteContract = jest.fn(() => ({
+  writeContractAsync: mockWriteContractAsync,
+  isPending: false,
+}))
+
+export const mockWagmiUsePublicClient = jest.fn((): { estimateContractGas: jest.Mock } | undefined => ({
+  estimateContractGas: mockEstimateContractGas,
+}))
+
 // Firebase service mocks
 export const mockFirebaseAuth = {
   getReactNativePersistence: jest.fn(() => ({})),
@@ -48,6 +60,8 @@ export const mockWagmiProvider = ({ children }: { children: React.ReactNode }) =
 jest.mock('wagmi', () => ({
   useAccount: mockWagmiUseAccount,
   useSignMessage: mockWagmiUseSignMessage,
+  usePublicClient: mockWagmiUsePublicClient,
+  useWriteContract: mockWagmiUseWriteContract,
   WagmiProvider: mockWagmiProvider,
 }))
 
