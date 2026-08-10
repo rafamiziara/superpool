@@ -9,7 +9,7 @@ import type {
   PoolMember,
   Transaction,
 } from '@superpool/types'
-import { LoanStatus, MemberStatus, TransactionStatus } from '@superpool/types'
+import { LoanStatus, MemberStatus, TransactionStatus, TransactionType } from '@superpool/types'
 import { httpsCallable } from 'firebase/functions'
 import { makeAutoObservable, runInAction } from 'mobx'
 import { DEFAULT_CHAIN_ID } from '../config/contracts'
@@ -36,8 +36,10 @@ const DEFAULT_PAGE_SIZE = 50
  * Lending pool state.
  *
  * Pools and contributions come from the `listPools` and `listContributions`
- * Cloud Functions. Loans and transactions are still mock-backed — no backend
- * serves them yet — so a load is deliberately hybrid rather than all-or-nothing.
+ * Cloud Functions. Activity is derived from the contributions rather than
+ * fetched — there is no transactions collection. Loans are still mock-backed,
+ * no backend serves them yet, so a load is deliberately hybrid rather than
+ * all-or-nothing.
  */
 export class PoolStore {
   pools: PoolInfo[] = []
@@ -116,9 +118,11 @@ export class PoolStore {
         this.pools = pools
         this.contributions = contributions
         this.lastFetchedAt = new Date()
-        // Loans and transactions are still mock-backed; see the note on the class.
+        // Loans are still mock-backed; see the note on the class.
         this.loans = MOCK_LOANS
-        this.transactions = MOCK_TRANSACTIONS
+        // Activity is derived from contributions when they are real — see
+        // `contributionActivity`. The fixtures only stand in for mock mode.
+        this.transactions = usingMockPools() ? MOCK_TRANSACTIONS : []
       })
     } catch (error) {
       // Screens read `error`; a store that throws would take the screen with it.
@@ -268,8 +272,43 @@ export class PoolStore {
     return this.loans.find((loan) => loan.status === LoanStatus.REQUESTED && sameAddress(loan.borrower, this.userAddress))
   }
 
+  /**
+   * Contributions as activity rows.
+   *
+   * There is no transactions collection and no callable that serves one:
+   * `listContributions` is the only event feed the backend has. Activity is
+   * therefore derived from it, the same way memberships are, rather than shown
+   * from fixtures. Withdrawals, loans and repayments join this list once
+   * something indexes them — each is a separate `TransactionType`, so the rows
+   * merge without changing this shape.
+   *
+   * The contribution id is already `${chainId}-${txHash}-${logIndex}`, so it
+   * carries over as the row key unchanged and stays stable across refetches.
+   */
+  get contributionActivity(): Transaction[] {
+    return this.contributions.map((contribution) => {
+      const contributedAt = new Date(contribution.contributedAt)
+
+      return {
+        id: contribution.id,
+        poolId: String(contribution.poolId),
+        from: contribution.contributor,
+        to: contribution.poolAddress,
+        type: TransactionType.CONTRIBUTION,
+        amount: BigInt(contribution.amount),
+        // Only mined events are indexed, so anything here is confirmed. In-flight
+        // deposits live in PendingTransactionsStore and surface as pending cards.
+        status: TransactionStatus.CONFIRMED,
+        txHash: contribution.transactionHash,
+        blockNumber: contribution.blockNumber,
+        createdAt: contributedAt,
+        confirmedAt: contributedAt,
+      }
+    })
+  }
+
   get recentTransactions(): Transaction[] {
-    return [...this.transactions]
+    return [...this.transactions, ...this.contributionActivity]
       .filter((tx) => tx.status !== TransactionStatus.CANCELLED)
       .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
   }

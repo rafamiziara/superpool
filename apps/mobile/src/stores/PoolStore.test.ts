@@ -1,5 +1,5 @@
 import type { PoolInfo } from '@superpool/types'
-import { LoanStatus, MemberStatus } from '@superpool/types'
+import { LoanStatus, MemberStatus, TransactionStatus, TransactionType } from '@superpool/types'
 import { parseEther } from 'viem'
 import { mockFirebaseCallable } from '../__tests__/mocks'
 import { MOCK_USER_ADDRESS } from '../mocks/lending'
@@ -397,6 +397,43 @@ describe('PoolStore contributions', () => {
     await loadWith([{ ...LIVE_CONTRIBUTION, contributor: OTHER_WALLET }])
 
     expect(store.memberships[0].isAdmin).toBe(false)
+  })
+
+  it('shows a contribution as activity instead of a fixture', async () => {
+    // Activity used to be MOCK_TRANSACTIONS regardless of what was indexed.
+    await loadWith([LIVE_CONTRIBUTION])
+
+    expect(store.recentTransactions).toHaveLength(1)
+    const [activity] = store.recentTransactions
+    expect(activity.id).toBe(LIVE_CONTRIBUTION.id)
+    expect(activity.type).toBe(TransactionType.CONTRIBUTION)
+    expect(activity.status).toBe(TransactionStatus.CONFIRMED)
+    expect(activity.amount).toBe(parseEther('2'))
+    expect(activity.from).toBe(CONTRIBUTOR)
+    expect(activity.poolId).toBe('12')
+    expect(activity.txHash).toBe(LIVE_CONTRIBUTION.transactionHash)
+    expect(activity.createdAt).toEqual(new Date(LIVE_CONTRIBUTION.contributedAt))
+  })
+
+  it('shows no activity when nothing has been indexed', async () => {
+    await loadWith([])
+
+    expect(store.recentTransactions).toEqual([])
+  })
+
+  it('sorts derived activity newest first', async () => {
+    await loadWith([
+      LIVE_CONTRIBUTION,
+      { ...LIVE_CONTRIBUTION, id: 'earlier', transactionHash: '0xeeee', contributedAt: '2026-01-01T00:00:00.000Z' },
+    ])
+
+    expect(store.recentTransactions.map((tx) => tx.id)).toEqual([LIVE_CONTRIBUTION.id, 'earlier'])
+  })
+
+  it('filters derived activity by pool', async () => {
+    await loadWith([LIVE_CONTRIBUTION, { ...LIVE_CONTRIBUTION, id: 'other-pool', poolId: 99 }])
+
+    expect(store.transactionsFor(12).map((tx) => tx.id)).toEqual([LIVE_CONTRIBUTION.id])
   })
 
   it('counts a pool the user contributed to as one of mine', async () => {

@@ -40,6 +40,15 @@ function ActivityScreen() {
           <Text className="text-sm text-fog">Every move, on-chain and auditable</Text>
         </View>
 
+        {groups.length === 0 && (
+          <View className="mt-8 items-center px-6" testID="activity-empty">
+            <Text className="text-center text-base font-semibold text-white">Nothing here yet</Text>
+            <Text className="mt-2 text-center text-sm text-fog">
+              Contributions, loans and repayments show up here once you make your first move.
+            </Text>
+          </View>
+        )}
+
         <View className="mt-4 gap-6 px-6">
           {groups.map((group) => (
             <View key={group.label}>
