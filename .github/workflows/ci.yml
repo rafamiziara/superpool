@@ -36,9 +36,7 @@ jobs:
       # packages/*/dist and packages/contracts/typechain-types are gitignored,
       # so a fresh checkout has to generate them before anything type-checks.
       - name: Build shared packages
-        run: |
-          pnpm --filter @superpool/types build
-          pnpm --filter @superpool/ui build
+        run: pnpm --filter @superpool/types build
 
       - name: Compile contracts (generates typechain-types)
         run: pnpm --filter contracts compile
@@ -55,7 +53,6 @@ jobs:
       - name: Type-check all packages
         run: |
           pnpm --filter @superpool/types type-check
-          pnpm --filter @superpool/ui type-check
           pnpm --filter backend type-check
           pnpm --filter contracts type-check
           pnpm --filter mobile type-check
@@ -82,9 +79,7 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Build shared packages
-        run: |
-          pnpm --filter @superpool/types build
-          pnpm --filter @superpool/ui build
+        run: pnpm --filter @superpool/types build
 
       # No .env is provisioned: hardhat.config.ts falls back to public RPC URLs,
       # and neither the backend nor the mobile jest setup reads the environment.
@@ -110,9 +105,7 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Build shared packages
-        run: |
-          pnpm --filter @superpool/types build
-          pnpm --filter @superpool/ui build
+        run: pnpm --filter @superpool/types build
 
       - name: Build landing page
         run: pnpm --filter @superpool/landing build

@@ -28,18 +28,27 @@ SuperPool explores community-driven micro-lending through blockchain technology:
 
 Ideal for exploring DeFi lending mechanics, studying trust-based financial networks, or learning modern Web3 development patterns with a production-grade monorepo structure.
 
-### Key Features:
+### What Works Today
 
-- **🔐 Wallet-Based Authentication:** Secure signature-based login system supporting 500+ wallet providers through WalletConnect protocol.
-- **🌐 Multi-Chain Support:** Compatible with Ethereum Mainnet, Polygon, Arbitrum, Base, BSC, and Polygon Amoy testnet.
-- **📱 Cross-Platform Mobile App:** React Native/Expo application with comprehensive user onboarding flow.
-- **🏗️ Multi-Pool Architecture:** Create multiple independent lending pools, each with its own members and unique parameters.
-- **👥 Permissioned Membership:** Pool administrators approve members before they can contribute or borrow.
-- **💰 Liquidity Contribution:** Pool members can contribute native tokens or ERC-20 tokens to provide liquidity for loans.
-- **📋 Loan Request & Approval:** Members request loans which are reviewed by an AI agent and approved by pool admins.
-- **💸 Loan Repayment & Management:** Borrowers can repay loans while admins manage defaults and pool health.
-- **🔐 Multi-Sig Administration:** Core protocol contracts controlled by multi-signature Safe for enhanced security and decentralization.
-- **📦 Monorepo Structure:** Streamlined development environment with all project components in a single repository.
+These are implemented end to end and verified against a live chain:
+
+- **🔐 Wallet-Based Authentication:** Signature-based login through WalletConnect (Reown AppKit), with nonce expiry and replay protection.
+- **📲 Device Verification:** Firebase App Check tokens issued only to devices linked to an authenticated wallet.
+- **🏗️ Pool Creation:** A user creates their own lending pool from the mobile app — form → `PoolFactory.createPool` → receipt parsing → an indexed Firestore document, with three independent indexing paths and idempotent writes ([how it works](docs/POOL_CREATION.md)).
+- **⏳ Pending Transaction Tracking:** Submitted transactions survive an app restart; startup recovery resolves them and drains them into the pool list.
+- **📱 Cross-Platform Mobile App:** React Native/Expo application with onboarding, wallet connection and a live pool list.
+- **🔐 Multi-Sig Administration:** `PoolFactory` ownership transfers to a Safe; admin actions are executed through it.
+- **📦 Monorepo Structure:** pnpm workspaces with shared types, CI running lint, type-check and the test matrix.
+
+### Planned
+
+Designed and partly scaffolded, but **not** functional yet — the mobile screens for these are placeholders:
+
+- **👥 Permissioned Membership:** Pool administrators approving members before they can contribute or borrow.
+- **💰 Liquidity Contribution:** Members contributing native or ERC-20 tokens as pool liquidity.
+- **📋 Loan Request & Approval:** Members requesting loans, reviewed and approved by pool admins.
+- **💸 Loan Repayment & Management:** Repayment, default handling and pool health.
+- **🌐 Multi-Chain Support:** The contracts are chain-agnostic and the wallet offers Ethereum, Polygon, Arbitrum, Base and BSC, but the backend currently resolves exactly one configured chain at a time. Only a local Hardhat node is deployed today; Polygon Amoy is next.
 
 ## ⚙️ Tech Stack
 
@@ -50,7 +59,7 @@ Ideal for exploring DeFi lending mechanics, studying trust-based financial netwo
 - **Wallet Integration:** Reown AppKit with WalletConnect protocol supporting 500+ wallets
 - **Blockchain Interaction:** Wagmi hooks, Viem, Typechain for type-safe contract bindings
 - **Backend:** Firebase Cloud Functions, Firestore, wallet-based authentication
-- **Shared Packages:** Design system (`@superpool/design`), UI components (`@superpool/ui`), TypeScript types (`@superpool/types`)
+- **Shared Packages:** TypeScript types (`@superpool/types`), brand assets (`@superpool/assets`)
 - **Monorepo Management:** pnpm workspaces, TypeScript project references
 - **Testing:** Jest, Hardhat test suite with local/forked network support
 
@@ -66,9 +75,7 @@ superpool/
 ├── packages/
 │ ├── contracts/        # Solidity smart contracts (PoolFactory, LendingPool)
 │ ├── backend/          # Firebase Cloud Functions & backend logic
-│ ├── design/           # Design system tokens and configuration
 │ ├── assets/           # Shared brand assets and media
-│ ├── ui/               # Shared React components library
 │ └── types/            # Shared TypeScript interfaces
 ├── .gitignore
 ├── pnpm-workspace.yaml
@@ -79,7 +86,9 @@ superpool/
 └── package.json (root)
 ```
 
-The monorepo structure enables seamless development with shared packages for design, UI components, and TypeScript types across web and mobile applications. Smart contracts are deployable on multiple EVM chains, with backend Cloud Functions handling wallet authentication and off-chain data storage.
+The monorepo structure enables seamless development with shared TypeScript types and brand assets across web and mobile applications. Smart contracts are deployable on multiple EVM chains, with backend Cloud Functions handling wallet authentication and off-chain data storage.
+
+Each app owns its own styling: the mobile app's dark theme lives in `apps/mobile/global.css`, the landing page's in `apps/landing/src/app/globals.css`. Unifying them is the job of the workspace-level design overhaul.
 
 ## Package Documentation
 
@@ -97,9 +106,7 @@ Detailed documentation for each component:
 
 **Shared Packages:**
 
-- [UI Components](packages/ui/README.md) - React component library
 - [TypeScript Types](packages/types/README.md) - Shared type definitions
-- [Design System](packages/design/README.md) - Design tokens and configuration
 - [Assets](packages/assets/README.md) - Brand assets and illustrations
 
 **Guides:**
@@ -147,7 +154,6 @@ Once configured, start the full development environment with `pnpm dev`.
 - **No Guarantees:** There are no guarantees of security, correctness, or functionality for real-world financial transactions.
 - **Use at Your Own Risk:** Any interaction with deployed smart contracts is done at your own risk. **Only use testnet deployments.**
 - **Testnet Only:** Always use dedicated testnet private keys for development and testing. **NEVER use mainnet private keys or real funds.**
-- **AI Agent:** The AI loan assessment component is a basic implementation for demonstration purposes and does not replace robust financial risk assessment.
 
 **For Developers:** This codebase is intended for educational and development purposes. Comprehensive security audits, bug bounties, and significant hardening are required before any production deployment.
 

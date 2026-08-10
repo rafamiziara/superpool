@@ -110,4 +110,4 @@ All assets should follow the SuperPool design system:
 
 ---
 
-**Related**: See `packages/design/README.md` for design system documentation
+**Related**: See the [root README](../../README.md) for how the packages fit together.

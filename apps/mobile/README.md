@@ -144,9 +144,8 @@ Configured in `src/config/wagmi.ts`:
 - **@superpool/types** - Shared TypeScript types
 - **@superpool/assets** - Shared logos and onboarding illustrations
 
-> The mobile app does not consume `@superpool/ui` (React DOM components) or
-> `@superpool/design` (Tailwind v3 config + web tokens). Its theme lives in
-> `global.css` — see [Post-login UI](#post-login-ui).
+> There is no shared UI or design-token package in this repo. The app's theme
+> lives in `global.css` — see [Post-login UI](#post-login-ui).
 
 > **Jest stays on 29 here while `packages/backend` is on 30.** This is a
 > toolchain constraint, not drift: `jest-expo` builds on jest 29 internals

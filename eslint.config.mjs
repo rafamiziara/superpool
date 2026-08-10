@@ -45,7 +45,6 @@ export default [
 
       // Packages without TypeScript files
       'packages/assets/**',
-      'packages/design/**',
     ],
   },
 
@@ -81,7 +80,6 @@ export default [
           './packages/backend/tsconfig.json',
           './packages/contracts/tsconfig.json',
           './packages/types/tsconfig.json',
-          './packages/ui/tsconfig.json',
         ],
       },
       globals: {

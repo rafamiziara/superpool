@@ -1,6 +1,3 @@
-export { ErrorDisplay } from './ErrorDisplay'
-export type { ErrorDisplayProps } from './ErrorDisplay'
-
 export { FirebaseInitializer } from './FirebaseInitializer'
 
 export { LoadingSpinner, LoadingSpinnerVariants } from './LoadingSpinner'

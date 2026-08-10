@@ -8,11 +8,10 @@ This comprehensive guide covers all the ways to interact with your SuperPool sma
 2. [Method 1: Hardhat Console (Recommended)](#method-1-hardhat-console-recommended)
 3. [Method 2: Custom Scripts](#method-2-custom-scripts)
 4. [Method 3: Mobile App Integration](#method-3-mobile-app-integration)
-5. [Method 4: Test Utilities](#method-4-test-utilities)
-6. [Method 5: Frontend Integration](#method-5-frontend-integration)
-7. [Common Workflows](#common-workflows)
-8. [Monitoring & Debugging](#monitoring--debugging)
-9. [Reference](#reference)
+5. [Method 4: Frontend Integration](#method-4-frontend-integration)
+6. [Common Workflows](#common-workflows)
+7. [Monitoring & Debugging](#monitoring--debugging)
+8. [Reference](#reference)
 
 ---
 
@@ -439,89 +438,7 @@ EXPO_PUBLIC_LOCALHOST_RPC_URL=http://127.0.0.1:8545
 
 ---
 
-## Method 4: Test Utilities
-
-Use our custom test utility functions for comprehensive testing.
-
-### 🛠️ Available Utilities
-
-```javascript
-// In Hardhat console
-const utils = require('./scripts/test-utils.ts')
-
-// === ACCOUNT MANAGEMENT ===
-// Display all test accounts with roles and balances
-await utils.printTestAccounts()
-
-// Fund all test accounts with ETH
-await utils.fundTestAccounts('100') // 100 ETH each
-
-// === ENVIRONMENT SETUP ===
-// Setup complete test environment
-const env = await utils.setupTestEnvironment(
-  'FACTORY_ADDRESS',
-  true, // createPools
-  true // fundAccounts
-)
-
-console.log(`Setup complete! Created ${env.pools.length} pools`)
-console.log(`Available accounts: ${env.accounts.length}`)
-
-// === POOL INFORMATION ===
-// Get detailed pool information
-await utils.printPoolInfo('POOL_ADDRESS')
-
-// Get pool data programmatically
-const poolInfo = await utils.getPoolInfo('POOL_ADDRESS')
-if (poolInfo) {
-  console.log(`Pool has ${poolInfo.totalFunds} ETH available`)
-  console.log(`Next loan ID will be: ${poolInfo.nextLoanId}`)
-}
-
-// === LOAN CREATION ===
-// Create sample loans for testing
-const borrowers = env.accounts.slice(4, 7).map((acc) => acc.signer) // Get borrower accounts
-await utils.createSampleLoans('POOL_ADDRESS', borrowers)
-
-// === DEVELOPMENT HELP ===
-// Show available commands
-utils.printDevHelp()
-```
-
-### 🔄 Complete Test Workflow
-
-```javascript
-// 1. Setup environment
-const env = await utils.setupTestEnvironment('FACTORY_ADDRESS')
-
-// 2. Get a pool to work with
-const testPool = env.pools[0]
-console.log(`Working with pool: ${testPool.name} at ${testPool.address}`)
-
-// 3. Fund the pool
-const pool = await ethers.getContractAt('SampleLendingPool', testPool.address)
-const lender = env.accounts[6].signer // Get lender account
-await pool.connect(lender).depositFunds({ value: ethers.parseEther('100') })
-
-// 4. Create loans
-const borrowers = env.accounts.slice(4, 6).map((acc) => acc.signer)
-await utils.createSampleLoans(testPool.address, borrowers)
-
-// 5. Check pool status
-await utils.printPoolInfo(testPool.address)
-
-// 6. Repay a loan
-const borrower = borrowers[0]
-const loanId = 1 // First loan
-const repaymentAmount = await pool.calculateRepaymentAmount(loanId)
-await pool.connect(borrower).repayLoan(loanId, { value: repaymentAmount })
-
-console.log('✅ Complete workflow executed!')
-```
-
----
-
-## Method 5: Frontend Integration
+## Method 4: Frontend Integration
 
 ### 🌐 Web Integration with ethers.js
 

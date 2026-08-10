@@ -82,5 +82,4 @@ pnpm build
 - **React 19** - UI library
 - **Tailwind CSS v4** - Styling
 - **GSAP** - Scroll animations (ScrollTrigger)
-- **@superpool/design** - Design token reference
 - **@superpool/assets** - Brand assets

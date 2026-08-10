@@ -202,4 +202,4 @@ These types work across all SuperPool applications:
 
 ---
 
-**Related**: See `packages/design/README.md` for design system documentation
+**Related**: See the [root README](../../README.md) for how the packages fit together.

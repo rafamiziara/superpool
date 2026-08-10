@@ -23,11 +23,12 @@
 
 ### Emergency Contacts
 
-| Role       | Primary            | Secondary                    |
-| ---------- | ------------------ | ---------------------------- |
-| Tech Lead  | Slack: @techlead   | Phone: +1-XXX-XXX-XXXX       |
-| Security   | Discord: @security | Email: security@superpool.io |
-| Operations | Slack: @ops        | SMS Alert System             |
+This is a single-maintainer proof-of-concept; there is no on-call rotation.
+
+| Role                     | Contact                                                                                                       |
+| ------------------------ | ------------------------------------------------------------------------------------------------------------- |
+| Maintainer               | Rafael Miziara — contact@rm30.dev                                                                             |
+| Vulnerability disclosure | A [GitHub issue](https://github.com/rm30-dev/superpool/issues), or the email above if it should not be public |
 
 ## 🔧 Common Emergency Scenarios
 

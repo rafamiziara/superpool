@@ -18,10 +18,11 @@ SuperPool is a proof-of-concept multi-chain decentralized micro-lending platform
 
 ### Shared Packages
 
-- **Design System** (`packages/design/`) - Design tokens, colors, typography, Tailwind config
 - **Assets** (`packages/assets/`) - Brand assets, illustrations, onboarding images
-- **UI Components** (`packages/ui/`) - Reusable React components (Button, Card, Input)
 - **Types** (`packages/types/`) - Shared TypeScript interfaces for all applications
+
+There is no shared UI or design-token package: each app owns its own theme (see
+[UI & Frontend Interface Design](#ui--frontend-interface-design) below).
 
 ## Common Commands
 
@@ -88,27 +89,11 @@ pnpm web             # Run on web
 
 ### Shared Packages
 
-#### Design System (`packages/design/`)
-
-```bash
-# No build needed - contains CSS tokens and Tailwind config
-# Used by importing: @superpool/design/tokens.css
-```
-
 #### Assets (`packages/assets/`)
 
 ```bash
 # No build needed - contains static assets
 # Used by importing: @superpool/assets/images/...
-```
-
-#### UI Components (`packages/ui/`)
-
-```bash
-pnpm build           # Build components library
-pnpm dev             # Watch mode for development
-pnpm type-check      # TypeScript type checking
-pnpm lint            # ESLint
 ```
 
 #### Types (`packages/types/`)
@@ -125,7 +110,7 @@ For project structure overview, see the [Architecture section in README.md](READ
 
 - [Mobile App](apps/mobile/README.md) | [Landing Page](apps/landing/README.md)
 - [Smart Contracts](packages/contracts/README.md) | [Backend](packages/backend/README.md)
-- [UI Components](packages/ui/README.md) | [Types](packages/types/README.md) | [Design System](packages/design/README.md) | [Assets](packages/assets/README.md)
+- [Types](packages/types/README.md) | [Assets](packages/assets/README.md)
 
 **IMPORTANT**: When making structural changes to a package, always update its README to reflect the changes.
 
@@ -155,16 +140,14 @@ For project structure overview, see the [Architecture section in README.md](READ
 
 **Shared Package System:**
 
-- **Design System** (`@superpool/design`): DeFi Blue palette, Contemporary Tech typography, Tailwind configuration
 - **Assets** (`@superpool/assets`): Onboarding illustrations, brand assets, shared media
-- **UI Components** (`@superpool/ui`): Button, Card, Input components with TypeScript support
 - **Types** (`@superpool/types`): Authentication, lending, blockchain, and API interfaces
 
 **Landing Page** (Next.js 16):
 
 - **Framework**: Next.js with App Router and React 19 support
-- **Styling**: Tailwind CSS v4 with shared design system integration
-- **Components**: Uses shared UI components from `@superpool/ui`
+- **Styling**: Tailwind CSS v4, theme tokens in `src/app/globals.css`
+- **Components**: Local components under `src/components/`
 - **Features**: Responsive design showcasing SuperPool's 4 core features
 
 **Mobile Application:**
@@ -316,7 +299,6 @@ The mobile app automatically includes localhost (chain ID 31337) in development 
 
 #### Advanced Local Development Features
 
-- **Test Utilities**: Use `scripts/test-utils.ts` for comprehensive testing helpers
 - **Pre-funded Accounts**: 10 accounts with defined roles (deployer, pool owners, borrowers, lenders)
 - **Sample Data**: 3 pools automatically created with different configurations
 - **Interactive Guide**: Complete `INTERACTION_GUIDE.md` with examples for all interaction methods
@@ -389,24 +371,6 @@ pnpm transfer:ownership:amoy  # Transfer PoolFactory ownership to Safe
 - **Security**: Transfer ownership to multi-sig Safe post-deployment
 
 ## Shared Package Development
-
-### Design System (`@superpool/design`)
-
-Contains the core design tokens and configurations:
-
-- **Colors**: DeFi Blue palette (#2563eb primary, #06b6d4 accent, #0f172a secondary)
-- **Typography**: Plus Jakarta Sans (primary), Space Mono (monospace), Geist (accent)
-- **Tailwind Config**: Shared configuration extending base design tokens
-- **Usage**: Import `@superpool/design/tokens.css` and extend Tailwind config
-
-### UI Components (`@superpool/ui`)
-
-Reusable React components with consistent styling:
-
-- **Button**: Multiple variants (primary, secondary, ghost), sizes, loading states
-- **Card**: Container component with header, content, footer sub-components
-- **Input**: Form inputs with validation states and addon support
-- **Usage**: `import { Button, Card, Input } from '@superpool/ui'`
 
 ### Shared Assets (`@superpool/assets`)
 
@@ -495,14 +459,16 @@ mocked tests do not catch.
 
 ## UI & Frontend Interface Design
 
-Two palettes coexist, and they are not interchangeable:
+There is **no shared design package**. Each app owns its theme, and the two are
+not interchangeable — they reuse some token names with different values, so
+never copy a value across:
 
 - **Mobile** ships the dark "Abyss & Aurora" theme. Tokens are in
   `apps/mobile/global.css` (Tailwind v4 `@theme`, applied via uniwind classNames)
   with raw values mirrored in `apps/mobile/src/constants/palette.ts` for props
   that cannot take a className. Match the surrounding screens.
-- **Web and shared packages** use the DeFi Blue tokens in
-  [`packages/design`](packages/design/README.md).
+- **Landing** has its own darker palette in `apps/landing/src/app/globals.css`
+  (Tailwind v4, plain classNames).
 
 Reconciling the two is the job of the workspace-level design overhaul
 (`../DESIGN_OVERHAUL.md`); until then, follow whichever applies to the app you

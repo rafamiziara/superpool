@@ -96,9 +96,7 @@ Detailed setup and usage for each package:
 
 ### Shared Packages
 
-- **[UI Components](../packages/ui/README.md)** - React component library
 - **[TypeScript Types](../packages/types/README.md)** - Shared type definitions
-- **[Design System](../packages/design/README.md)** - Design tokens and configuration
 - **[Assets](../packages/assets/README.md)** - Brand assets and illustrations
 
 ## Common Issues
@@ -126,7 +124,6 @@ Detailed setup and usage for each package:
 - **[Architecture Overview](../README.md#-architecture-overview)** - Project structure
 - **[Pool Creation](POOL_CREATION.md)** - How pool creation and indexing work end to end
 - **[Sprint Planning](SPRINT_PLAN.md)** - Development roadmap
-- **[Design System](../packages/design/README.md)** - Shared tokens and Tailwind config
 
 ## Need Help?
 
