@@ -1,12 +1,18 @@
 export { AuthStore, authStore } from './AuthStore'
 export { NavigationStore, navigationStore } from './NavigationStore'
 export {
+  extractFundsDepositedResult,
   extractPoolCreatedResult,
+  extractResult,
   PendingTransactionsStore,
   pendingTransactionsStore,
+  type ContributeParams,
+  type ContributeResult,
+  type ContributeTransaction,
+  type CreatePoolParams,
+  type CreatePoolResult,
+  type CreatePoolTransaction,
   type PendingTransaction,
-  type PendingTransactionParams,
-  type PendingTransactionResult,
   type PendingTransactionStatus,
   type PendingTransactionType,
   type TransactionReceiptReader,

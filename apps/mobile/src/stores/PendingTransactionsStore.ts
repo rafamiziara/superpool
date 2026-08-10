@@ -1,7 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import { makeAutoObservable, runInAction } from 'mobx'
 import { parseEventLogs, type TransactionReceipt } from 'viem'
-import { PoolFactoryABI } from '../constants/abis'
+import { PoolFactoryABI, SampleLendingPoolABI } from '../constants/abis'
 import { logger } from '../utils/logger'
 
 /** AsyncStorage key holding the serialised transaction list. */
@@ -9,15 +9,15 @@ const STORAGE_KEY = '@superpool/pending_transactions'
 
 /**
  * Upper bound on persisted transactions. The normal flow removes each entry once
- * its pool is indexed, so this only bounds storage if the app is killed mid-flow
- * repeatedly. Oldest entries are dropped first.
+ * the backend has indexed it, so this only bounds storage if the app is killed
+ * mid-flow repeatedly. Oldest entries are dropped first.
  */
 const MAX_STORED_TRANSACTIONS = 50
 
 export type PendingTransactionStatus = 'submitted' | 'confirmed' | 'failed'
-export type PendingTransactionType = 'CREATE_POOL'
+export type PendingTransactionType = 'CREATE_POOL' | 'CONTRIBUTE'
 
-export interface PendingTransactionParams {
+export interface CreatePoolParams {
   name: string
   description: string
   /** Wei, as a decimal string — this record is persisted as JSON, which has no bigint. */
@@ -28,21 +28,56 @@ export interface PendingTransactionParams {
   loanDuration: number
 }
 
+export interface ContributeParams {
+  poolId: number
+  poolAddress: `0x${string}`
+  /**
+   * Denormalised so a pending card can name the pool without a store lookup —
+   * the record has to render at startup, before any pool has been fetched.
+   */
+  poolName: string
+  /** Wei, as a decimal string. */
+  amount: string
+}
+
 /** Populated once the transaction is confirmed and its `PoolCreated` log is decoded. */
-export interface PendingTransactionResult {
+export interface CreatePoolResult {
   poolId: number
   poolAddress: `0x${string}`
 }
 
-export interface PendingTransaction {
+/** Populated once the transaction is confirmed and its `FundsDeposited` log is decoded. */
+export interface ContributeResult {
+  /** Wei, as the chain recorded it — authoritative over the submitted params. */
+  amount: string
+}
+
+interface PendingTransactionBase {
   txHash: `0x${string}`
   chainId: number
-  type: PendingTransactionType
   status: PendingTransactionStatus
   timestamp: number
-  params: PendingTransactionParams
-  result?: PendingTransactionResult
 }
+
+export interface CreatePoolTransaction extends PendingTransactionBase {
+  type: 'CREATE_POOL'
+  params: CreatePoolParams
+  result?: CreatePoolResult
+}
+
+export interface ContributeTransaction extends PendingTransactionBase {
+  type: 'CONTRIBUTE'
+  params: ContributeParams
+  result?: ContributeResult
+}
+
+/**
+ * Discriminated on `type`, because the two flows carry genuinely different
+ * payloads: a pool creation has terms and produces an id, a contribution has an
+ * amount and a pool it went into. Widening both into one optional-everything
+ * shape would push the narrowing into every consumer instead.
+ */
+export type PendingTransaction = CreatePoolTransaction | ContributeTransaction
 
 /**
  * The slice of a Viem `PublicClient` this store needs. Injected rather than
@@ -66,7 +101,7 @@ function isJsonObject(value: JsonValue | undefined): value is { [key: string]: J
   return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
 
-function toParams(value: JsonValue | undefined): PendingTransactionParams | null {
+function toCreatePoolParams(value: JsonValue | undefined): CreatePoolParams | null {
   if (!isJsonObject(value)) return null
 
   const { name, description, maxLoanAmount, interestRate, loanDuration } = value
@@ -77,7 +112,7 @@ function toParams(value: JsonValue | undefined): PendingTransactionParams | null
   return { name, description, maxLoanAmount, interestRate, loanDuration }
 }
 
-function toResult(value: JsonValue | undefined): PendingTransactionResult | null {
+function toCreatePoolResult(value: JsonValue | undefined): CreatePoolResult | null {
   if (!isJsonObject(value)) return null
 
   const { poolId, poolAddress } = value
@@ -86,6 +121,27 @@ function toResult(value: JsonValue | undefined): PendingTransactionResult | null
   if (typeof poolAddress !== 'string' || !isHexString(poolAddress)) return null
 
   return { poolId, poolAddress }
+}
+
+function toContributeParams(value: JsonValue | undefined): ContributeParams | null {
+  if (!isJsonObject(value)) return null
+
+  const { poolId, poolAddress, poolName, amount } = value
+
+  if (typeof poolId !== 'number' || typeof poolName !== 'string' || typeof amount !== 'string') return null
+  if (typeof poolAddress !== 'string' || !isHexString(poolAddress)) return null
+
+  return { poolId, poolAddress, poolName, amount }
+}
+
+function toContributeResult(value: JsonValue | undefined): ContributeResult | null {
+  if (!isJsonObject(value)) return null
+
+  const { amount } = value
+
+  if (typeof amount !== 'string') return null
+
+  return { amount }
 }
 
 /**
@@ -101,18 +157,35 @@ function toPendingTransaction(value: JsonValue): PendingTransaction | null {
 
   if (typeof txHash !== 'string' || !isHexString(txHash)) return null
   if (typeof chainId !== 'number' || typeof timestamp !== 'number') return null
-  if (type !== 'CREATE_POOL') return null
   if (status !== 'submitted' && status !== 'confirmed' && status !== 'failed') return null
 
-  const parsedParams = toParams(params)
-  if (!parsedParams) return null
+  const base = { txHash, chainId, status, timestamp } as const
 
-  const transaction: PendingTransaction = { txHash, chainId, type, status, timestamp, params: parsedParams }
+  if (type === 'CREATE_POOL') {
+    const parsedParams = toCreatePoolParams(params)
+    if (!parsedParams) return null
 
-  const parsedResult = toResult(result)
-  if (parsedResult) transaction.result = parsedResult
+    const transaction: CreatePoolTransaction = { ...base, type, params: parsedParams }
 
-  return transaction
+    const parsedResult = toCreatePoolResult(result)
+    if (parsedResult) transaction.result = parsedResult
+
+    return transaction
+  }
+
+  if (type === 'CONTRIBUTE') {
+    const parsedParams = toContributeParams(params)
+    if (!parsedParams) return null
+
+    const transaction: ContributeTransaction = { ...base, type, params: parsedParams }
+
+    const parsedResult = toContributeResult(result)
+    if (parsedResult) transaction.result = parsedResult
+
+    return transaction
+  }
+
+  return null
 }
 
 /**
@@ -122,7 +195,7 @@ function toPendingTransaction(value: JsonValue): PendingTransaction | null {
  * undecodable: the identifiers are for display only, and the backend's
  * `indexPool` re-derives them from the transaction hash regardless.
  */
-export function extractPoolCreatedResult(receipt: TransactionReceipt): PendingTransactionResult | undefined {
+export function extractPoolCreatedResult(receipt: TransactionReceipt): CreatePoolResult | undefined {
   try {
     const [event] = parseEventLogs({ abi: PoolFactoryABI, eventName: 'PoolCreated', logs: receipt.logs })
     if (!event) return undefined
@@ -134,8 +207,41 @@ export function extractPoolCreatedResult(receipt: TransactionReceipt): PendingTr
 }
 
 /**
- * Pool creation transactions that have been submitted but are not yet confirmed
- * and indexed, persisted to AsyncStorage so they survive an app restart.
+ * Reads the deposited amount out of a confirmed receipt's `FundsDeposited` log.
+ *
+ * Both of that event's parameters are `indexed`, so the values come from the log
+ * topics; `parseEventLogs` handles that from the ABI without special casing.
+ */
+export function extractFundsDepositedResult(receipt: TransactionReceipt): ContributeResult | undefined {
+  try {
+    const [event] = parseEventLogs({ abi: SampleLendingPoolABI, eventName: 'FundsDeposited', logs: receipt.logs })
+    if (!event) return undefined
+
+    return { amount: event.args.amount.toString() }
+  } catch {
+    return undefined
+  }
+}
+
+/**
+ * The result extractor for a transaction's type.
+ *
+ * Startup recovery resolves records of both kinds against the chain and has only
+ * the stored `type` to tell them apart, so the dispatch lives here rather than
+ * at each call site.
+ */
+export function extractResult(type: PendingTransactionType, receipt: TransactionReceipt): CreatePoolResult | ContributeResult | undefined {
+  return type === 'CREATE_POOL' ? extractPoolCreatedResult(receipt) : extractFundsDepositedResult(receipt)
+}
+
+/**
+ * Wallet transactions that have been submitted but are not yet confirmed and
+ * indexed, persisted to AsyncStorage so they survive an app restart.
+ *
+ * Holds both pool creations and contributions. The two share every mechanic —
+ * submission, receipt polling, startup recovery, indexing, dismissal — and
+ * differ only in the payload each carries, so they share the store rather than
+ * duplicating it.
  *
  * Every write is mirrored to storage; persistence failures are logged and
  * swallowed, since losing the local record must not fail a transaction that is
@@ -190,14 +296,16 @@ export class PendingTransactionsStore {
   updateTransactionStatus = async (
     txHash: `0x${string}`,
     status: PendingTransactionStatus,
-    result?: PendingTransactionResult
+    result?: CreatePoolResult | ContributeResult
   ): Promise<void> => {
     const transaction = this.transactions.find((existing) => existing.txHash === txHash)
     if (!transaction) return
 
     runInAction(() => {
       transaction.status = status
-      if (result) transaction.result = result
+      // The result shape follows the transaction's own type; the caller is the
+      // monitor, which extracted it from that type's event in the first place.
+      if (result) transaction.result = result as typeof transaction.result
     })
 
     await this.persist()
@@ -232,7 +340,7 @@ export class PendingTransactionsStore {
       if (!receipt) continue
 
       if (receipt.status === 'success') {
-        await this.updateTransactionStatus(transaction.txHash, 'confirmed', extractPoolCreatedResult(receipt))
+        await this.updateTransactionStatus(transaction.txHash, 'confirmed', extractResult(transaction.type, receipt))
       } else {
         await this.updateTransactionStatus(transaction.txHash, 'failed')
       }

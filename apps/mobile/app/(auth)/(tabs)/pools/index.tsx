@@ -11,7 +11,11 @@ import { TransactionStatusModal } from '../../../../src/components/lending/Trans
 import { DEFAULT_CHAIN_ID } from '../../../../src/config/contracts'
 import { palette } from '../../../../src/constants/palette'
 import { usePoolIndexing } from '../../../../src/hooks/pools/usePoolIndexing'
-import { type PendingTransaction, pendingTransactionsStore } from '../../../../src/stores/PendingTransactionsStore'
+import {
+  type CreatePoolTransaction,
+  type PendingTransaction,
+  pendingTransactionsStore,
+} from '../../../../src/stores/PendingTransactionsStore'
 import { poolStore } from '../../../../src/stores/PoolStore'
 
 /**
@@ -26,10 +30,11 @@ import { poolStore } from '../../../../src/stores/PoolStore'
  * A `submitted` transaction has no `poolId` yet and needs no dedupe: nothing it
  * produced can be listed until it is mined.
  */
-function unlistedTransactions(chainId: number): PendingTransaction[] {
+function unlistedPoolCreations(chainId: number): CreatePoolTransaction[] {
   const listed = new Set(poolStore.pools.map((pool) => pool.poolId))
 
   return pendingTransactionsStore.transactions
+    .filter((transaction): transaction is CreatePoolTransaction => transaction.type === 'CREATE_POOL')
     .filter((transaction) => transaction.chainId === chainId)
     .filter((transaction) => transaction.result === undefined || !listed.has(transaction.result.poolId))
     .sort((a, b) => b.timestamp - a.timestamp)
@@ -41,7 +46,7 @@ function PoolsScreen() {
 
   const activeChainId = chainId ?? DEFAULT_CHAIN_ID
   const pools = poolStore.myPools
-  const pending = unlistedTransactions(activeChainId)
+  const pending = unlistedPoolCreations(activeChainId)
 
   /** The transaction the status modal is describing; `null` keeps it closed. */
   const [detail, setDetail] = useState<PendingTransaction | null>(null)

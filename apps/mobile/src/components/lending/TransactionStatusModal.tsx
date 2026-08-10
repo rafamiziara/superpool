@@ -2,7 +2,7 @@ import { FontAwesome } from '@expo/vector-icons'
 import React from 'react'
 import { ActivityIndicator, Linking, Modal, Pressable, Text, View } from 'react-native'
 import { palette } from '../../constants/palette'
-import type { PendingTransaction, PendingTransactionStatus } from '../../stores/PendingTransactionsStore'
+import type { PendingTransaction, PendingTransactionStatus, PendingTransactionType } from '../../stores/PendingTransactionsStore'
 import { bpsToPercent, formatDuration, formatToken } from '../../utils/format'
 import { chainName, transactionUrl } from '../../utils/explorer'
 
@@ -18,8 +18,8 @@ interface Step {
  * The three things that have to happen, and how far a given status has got.
  *
  * Listing is the last step because a transaction is not done when the chain
- * accepts it — the pool only reaches the user's list once the backend has
- * indexed it, and that is the step most likely to lag.
+ * accepts it — it only reaches the user's list once the backend has indexed it,
+ * and that is the step most likely to lag.
  */
 function stepsFor(status: PendingTransactionStatus): Step[] {
   return [
@@ -42,16 +42,41 @@ const STEP_ICON: Record<StepState, { name: 'check' | 'times' | 'circle-o'; color
   pending: { name: 'circle-o', color: palette.mist },
 }
 
-const HEADLINE: Record<PendingTransactionStatus, string> = {
-  submitted: 'Creating your pool',
-  confirmed: 'Almost there',
-  failed: 'That transaction failed',
-}
-
-const SUMMARY: Record<PendingTransactionStatus, string> = {
-  submitted: 'The network is confirming your transaction. You can leave this screen — it carries on without you.',
-  confirmed: 'Your pool exists on chain. It joins your circles as soon as SuperPool has indexed it.',
-  failed: 'Nothing was created and no funds moved beyond the network fee. You can safely try again.',
+/**
+ * Wording per transaction type.
+ *
+ * The failure copy differs in the part that matters most: a failed pool creation
+ * moved no funds beyond the fee, whereas a failed contribution has to say the
+ * deposit itself was not taken — that is the reassurance the user is looking for.
+ */
+const COPY: Record<
+  PendingTransactionType,
+  { headline: Record<PendingTransactionStatus, string>; summary: Record<PendingTransactionStatus, string> }
+> = {
+  CREATE_POOL: {
+    headline: {
+      submitted: 'Creating your pool',
+      confirmed: 'Almost there',
+      failed: 'That transaction failed',
+    },
+    summary: {
+      submitted: 'The network is confirming your transaction. You can leave this screen — it carries on without you.',
+      confirmed: 'Your pool exists on chain. It joins your circles as soon as SuperPool has indexed it.',
+      failed: 'Nothing was created and no funds moved beyond the network fee. You can safely try again.',
+    },
+  },
+  CONTRIBUTE: {
+    headline: {
+      submitted: 'Adding your contribution',
+      confirmed: 'Almost there',
+      failed: 'That contribution failed',
+    },
+    summary: {
+      submitted: 'The network is confirming your deposit. You can leave this screen — it carries on without you.',
+      confirmed: 'Your funds are in the pool. The balance updates as soon as SuperPool has indexed it.',
+      failed: 'Your deposit was not taken and no funds moved beyond the network fee. You can safely try again.',
+    },
+  },
 }
 
 function StepRow({ step }: { step: Step }) {
@@ -72,6 +97,44 @@ function StepRow({ step }: { step: Step }) {
   )
 }
 
+/** A label/value pair in the summary block. */
+interface DetailRow {
+  label: string
+  value: string
+  mono?: boolean
+}
+
+/**
+ * The rows that describe what this transaction is, which is the one place the
+ * two types genuinely diverge: a pool creation is defined by its terms, a
+ * contribution by its amount and destination.
+ */
+function detailsFor(transaction: PendingTransaction): DetailRow[] {
+  if (transaction.type === 'CONTRIBUTE') {
+    const { params, result } = transaction
+
+    return [
+      { label: 'Pool', value: params.poolName },
+      // The chain's figure once confirmed, the submitted one before that. They
+      // agree in practice; preferring the receipt keeps the display honest if
+      // they ever do not.
+      { label: 'Amount', value: `${formatToken(result?.amount ?? params.amount)} POL`, mono: true },
+    ]
+  }
+
+  const { params, result } = transaction
+
+  return [
+    { label: 'Pool', value: params.name },
+    {
+      label: 'Terms',
+      value: `${formatToken(params.maxLoanAmount)} POL · ${bpsToPercent(params.interestRate)} · ${formatDuration(params.loanDuration)}`,
+      mono: true,
+    },
+    ...(result ? [{ label: 'Pool ID', value: `#${result.poolId}`, mono: true }] : []),
+  ]
+}
+
 export interface TransactionStatusModalProps {
   /** The transaction to describe; `null` keeps the modal closed. */
   transaction: PendingTransaction | null
@@ -81,18 +144,19 @@ export interface TransactionStatusModalProps {
 }
 
 /**
- * The detail view for one pool-creation transaction.
+ * The detail view for one pending transaction, of either kind.
  *
  * Deliberately read-only apart from dismissal: the flow that drives a
  * transaction forward lives in the hooks, and this is the window onto it. It is
- * reachable from anywhere the transaction is summarised — the pending banner and
- * the pending pool cards — because "what is happening to my pool" is the
- * question both of those raise without answering.
+ * reachable from anywhere a transaction is summarised — the pending banner and
+ * the pending cards — because "what is happening to this" is the question all
+ * of those raise without answering.
  */
 export function TransactionStatusModal({ transaction, onClose, onDismiss }: TransactionStatusModalProps) {
   // Kept mounted with `visible={false}` rather than returning null, so the modal
   // animates out instead of vanishing.
   const status = transaction?.status ?? 'submitted'
+  const copy = COPY[transaction?.type ?? 'CREATE_POOL']
   const explorerUrl = transaction ? transactionUrl(transaction.chainId, transaction.txHash) : undefined
 
   return (
@@ -106,8 +170,8 @@ export function TransactionStatusModal({ transaction, onClose, onDismiss }: Tran
                 <View className="h-1 w-10 rounded-full bg-veil" />
               </View>
 
-              <Text className="mt-6 text-xl font-bold text-snow">{HEADLINE[status]}</Text>
-              <Text className="mt-2 text-sm leading-6 text-fog">{SUMMARY[status]}</Text>
+              <Text className="mt-6 text-xl font-bold text-snow">{copy.headline[status]}</Text>
+              <Text className="mt-2 text-sm leading-6 text-fog">{copy.summary[status]}</Text>
 
               <View className="mt-6 gap-4 rounded-2xl border-continuous bg-raised px-4 py-4">
                 {stepsFor(status).map((step) => (
@@ -116,29 +180,21 @@ export function TransactionStatusModal({ transaction, onClose, onDismiss }: Tran
               </View>
 
               <View className="mt-6 gap-3">
-                <View className="flex-row justify-between">
-                  <Text className="text-xs text-mist">Pool</Text>
-                  <Text className="max-w-[60%] text-xs font-semibold text-snow" numberOfLines={1}>
-                    {transaction.params.name}
-                  </Text>
-                </View>
-                <View className="flex-row justify-between">
-                  <Text className="text-xs text-mist">Terms</Text>
-                  <Text className="font-mono text-xs text-snow">
-                    {formatToken(transaction.params.maxLoanAmount)} POL · {bpsToPercent(transaction.params.interestRate)} ·{' '}
-                    {formatDuration(transaction.params.loanDuration)}
-                  </Text>
-                </View>
+                {detailsFor(transaction).map((row) => (
+                  <View key={row.label} className="flex-row justify-between">
+                    <Text className="text-xs text-mist">{row.label}</Text>
+                    <Text
+                      className={row.mono ? 'font-mono text-xs text-snow' : 'max-w-[60%] text-xs font-semibold text-snow'}
+                      numberOfLines={1}
+                    >
+                      {row.value}
+                    </Text>
+                  </View>
+                ))}
                 <View className="flex-row justify-between">
                   <Text className="text-xs text-mist">Network</Text>
                   <Text className="text-xs text-snow">{chainName(transaction.chainId)}</Text>
                 </View>
-                {transaction.result && (
-                  <View className="flex-row justify-between">
-                    <Text className="text-xs text-mist">Pool ID</Text>
-                    <Text className="font-mono text-xs text-snow">#{transaction.result.poolId}</Text>
-                  </View>
-                )}
                 <View className="flex-row items-center justify-between">
                   <Text className="text-xs text-mist">Transaction</Text>
                   {/* No explorer on a local node, so the hash is shown plain. */}

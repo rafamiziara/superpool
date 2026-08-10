@@ -2,7 +2,7 @@ import { act, renderHook } from '@testing-library/react-native'
 import type { Address } from 'viem'
 import { LOCALHOST_CHAIN_ID, makePendingTransaction, OTHER_TX_HASH, TX_HASH } from '../../__tests__/fixtures/pendingTransaction'
 import { mockFirebaseCallable, mockWagmiUseAccount } from '../../__tests__/mocks'
-import { type PendingTransaction, pendingTransactionsStore } from '../../stores/PendingTransactionsStore'
+import { type CreatePoolTransaction, pendingTransactionsStore } from '../../stores/PendingTransactionsStore'
 import { poolStore } from '../../stores/PoolStore'
 import { usePoolIndexing } from './usePoolIndexing'
 
@@ -26,7 +26,7 @@ const refreshPools = jest.mocked(poolStore.refreshPools)
  * Indexing only ever runs against a record the chain has already confirmed, so
  * that — not the fixture's default `submitted` — is this suite's starting point.
  */
-function makeConfirmed(overrides: Partial<PendingTransaction> = {}): PendingTransaction {
+function makeConfirmed(overrides: Partial<CreatePoolTransaction> = {}): CreatePoolTransaction {
   return makePendingTransaction({ status: 'confirmed', result: { poolId: 7, poolAddress: POOL_ADDRESS }, ...overrides })
 }
 

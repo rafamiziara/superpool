@@ -2,7 +2,7 @@ import { FontAwesome } from '@expo/vector-icons'
 import React from 'react'
 import { ActivityIndicator, Pressable, Text, View } from 'react-native'
 import { palette } from '../../constants/palette'
-import type { PendingTransaction } from '../../stores/PendingTransactionsStore'
+import type { CreatePoolTransaction, PendingTransactionStatus } from '../../stores/PendingTransactionsStore'
 import { bpsToPercent, formatDuration, formatToken } from '../../utils/format'
 
 /**
@@ -12,16 +12,19 @@ import { bpsToPercent, formatDuration, formatToken } from '../../utils/format'
  * state has no id, address or owner record, so every field `PoolCard` reads
  * would have to become optional to accommodate it. The two share a visual
  * language, not a data shape.
+ *
+ * Takes a `CreatePoolTransaction` specifically, not any pending transaction — a
+ * contribution has no terms to show and gets its own card.
  */
 
-const STATUS_COPY: Record<PendingTransaction['status'], { badge: string; note: string }> = {
+const STATUS_COPY: Record<PendingTransactionStatus, { badge: string; note: string }> = {
   submitted: { badge: 'Pending', note: 'Waiting for the network to confirm your transaction' },
   confirmed: { badge: 'Syncing', note: 'Confirmed on chain — adding it to your circles' },
   failed: { badge: 'Failed', note: 'This transaction did not go through' },
 }
 
 export interface PendingPoolCardProps {
-  transaction: PendingTransaction
+  transaction: CreatePoolTransaction
   onPress?: () => void
   /**
    * Clears the record. Nothing else ever removes a failed transaction — indexing

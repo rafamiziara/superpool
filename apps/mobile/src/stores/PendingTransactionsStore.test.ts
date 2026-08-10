@@ -1,9 +1,10 @@
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import { createPublicClient, encodeAbiParameters, encodeEventTopics, http, type TransactionReceipt } from 'viem'
 import { hardhat } from 'viem/chains'
-import { makePendingTransaction, OTHER_TX_HASH, TX_HASH } from '../__tests__/fixtures/pendingTransaction'
-import { PoolFactoryABI } from '../constants/abis'
+import { makeContributeTransaction, makePendingTransaction, OTHER_TX_HASH, TX_HASH } from '../__tests__/fixtures/pendingTransaction'
+import { PoolFactoryABI, SampleLendingPoolABI } from '../constants/abis'
 import {
+  extractFundsDepositedResult,
   extractPoolCreatedResult,
   type PendingTransaction,
   PendingTransactionsStore,
@@ -68,6 +69,33 @@ function makePoolCreatedLog(poolId: bigint, poolAddress: `0x${string}`): Receipt
     address: FACTORY_ADDRESS,
     topics,
     data,
+    blockHash: '0xdead000000000000000000000000000000000000000000000000000000000001',
+    blockNumber: 42n,
+    logIndex: 0,
+    transactionHash: TX_HASH,
+    transactionIndex: 0,
+    removed: false,
+  } as ReceiptLog
+}
+
+/**
+ * Builds a `FundsDeposited` log the same way — through the shipped ABI.
+ *
+ * Both of that event's parameters are `indexed`, so everything lands in
+ * `topics` and `data` is empty. A fixture that put the amount in `data` would
+ * decode to nothing against the real ABI.
+ */
+function makeFundsDepositedLog(depositor: `0x${string}`, amount: bigint): ReceiptLog {
+  const topics = encodeEventTopics({
+    abi: SampleLendingPoolABI,
+    eventName: 'FundsDeposited',
+    args: { depositor, amount },
+  })
+
+  return {
+    address: POOL_ADDRESS,
+    topics,
+    data: '0x',
     blockHash: '0xdead000000000000000000000000000000000000000000000000000000000001',
     blockNumber: 42n,
     logIndex: 0,
@@ -309,6 +337,49 @@ describe('PendingTransactionsStore', () => {
       expect(store.transactions[0].result).toBeUndefined()
     })
 
+    it('restores a contribution record', async () => {
+      await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify([makeContributeTransaction()]))
+
+      await store.loadFromStorage()
+
+      expect(store.transactions).toHaveLength(1)
+      expect(store.transactions[0].type).toBe('CONTRIBUTE')
+      expect(store.transactions[0].params).toEqual(makeContributeTransaction().params)
+    })
+
+    it('restores a contribution result', async () => {
+      const confirmed = makeContributeTransaction({ status: 'confirmed', result: { amount: '5000000000000000000' } })
+      await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify([confirmed]))
+
+      await store.loadFromStorage()
+
+      expect(store.transactions[0].result).toEqual({ amount: '5000000000000000000' })
+    })
+
+    it.each([
+      ['a numeric amount', { ...makeContributeTransaction(), params: { ...makeContributeTransaction().params, amount: 5 } }],
+      ['a string poolId', { ...makeContributeTransaction(), params: { ...makeContributeTransaction().params, poolId: '1' } }],
+      ['a non-hex poolAddress', { ...makeContributeTransaction(), params: { ...makeContributeTransaction().params, poolAddress: 'nope' } }],
+      ['a missing poolName', { ...makeContributeTransaction(), params: { ...makeContributeTransaction().params, poolName: undefined } }],
+    ])('drops a malformed contribution entry: %s', async (_label, entry) => {
+      await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify([entry, makeContributeTransaction({ txHash: OTHER_TX_HASH })]))
+
+      await store.loadFromStorage()
+
+      expect(store.transactions.map((transaction) => transaction.txHash)).toEqual([OTHER_TX_HASH])
+    })
+
+    it('does not accept pool-creation params on a contribution record', async () => {
+      // The types are discriminated, so a record whose `type` and `params`
+      // disagree is corrupt and must be dropped rather than half-restored.
+      const mismatched = { ...makeContributeTransaction(), params: makePendingTransaction().params }
+      await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify([mismatched]))
+
+      await store.loadFromStorage()
+
+      expect(store.transactions).toHaveLength(0)
+    })
+
     it('caps a stored list that grew beyond the limit', async () => {
       const stored = Array.from({ length: 60 }, (_unused, index) =>
         makePendingTransaction({ txHash: `0x${String(index).padStart(64, '0')}` })
@@ -334,6 +405,19 @@ describe('PendingTransactionsStore', () => {
       expect(store.transactions[0].result).toEqual({ poolId: 7, poolAddress: POOL_ADDRESS })
       expect(store.confirmedUnindexed).toHaveLength(1)
       expect(store.hasPending).toBe(false)
+    })
+
+    it('confirms a contribution by decoding its FundsDeposited log, not PoolCreated', async () => {
+      // Recovery has only the stored `type` to tell the two apart, so the wrong
+      // extractor here would mark every recovered deposit failed.
+      await store.reset()
+      await store.addPendingTransaction(makeContributeTransaction())
+      const receipt = makeReceipt({ logs: [makeFundsDepositedLog(POOL_OWNER, 5_000_000_000_000_000_000n)] })
+
+      await store.checkPendingTransactions(makeClient({ [TX_HASH]: receipt }, 31337))
+
+      expect(store.transactions[0].status).toBe('confirmed')
+      expect(store.transactions[0].result).toEqual({ amount: '5000000000000000000' })
     })
 
     it('marks a reverted transaction failed', async () => {
@@ -430,5 +514,31 @@ describe('extractPoolCreatedResult', () => {
 
   it('returns undefined when there are no logs', () => {
     expect(extractPoolCreatedResult(makeReceipt({ logs: [] }))).toBeUndefined()
+  })
+})
+
+describe('extractFundsDepositedResult', () => {
+  it('decodes the amount from a FundsDeposited log', () => {
+    const receipt = makeReceipt({ logs: [makeFundsDepositedLog(POOL_OWNER, 5_000_000_000_000_000_000n)] })
+
+    expect(extractFundsDepositedResult(receipt)).toEqual({ amount: '5000000000000000000' })
+  })
+
+  it('reads an indexed amount out of the topics, where the event actually puts it', () => {
+    // Both parameters are `indexed`, so a decoder that only looked at `data`
+    // would return zero for every deposit.
+    const receipt = makeReceipt({ logs: [makeFundsDepositedLog(POOL_OWNER, 1n)] })
+
+    expect(extractFundsDepositedResult(receipt)).toEqual({ amount: '1' })
+  })
+
+  it('ignores a PoolCreated log', () => {
+    const receipt = makeReceipt({ logs: [makePoolCreatedLog(1n, POOL_ADDRESS)] })
+
+    expect(extractFundsDepositedResult(receipt)).toBeUndefined()
+  })
+
+  it('returns undefined when there are no logs', () => {
+    expect(extractFundsDepositedResult(makeReceipt({ logs: [] }))).toBeUndefined()
   })
 })
