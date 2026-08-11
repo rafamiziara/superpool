@@ -179,11 +179,11 @@ on the log, so nothing is written twice.
 A pool that is paid for but not yet listed still appears, as a `PendingPoolCard`
 above the real ones:
 
-| Transaction status | Card says | Means                     |
-| ------------------ | --------- | ------------------------- |
-| `submitted`        | Pending   | Waiting for the network   |
-| `confirmed`        | Syncing   | On chain; not yet indexed |
-| `failed`           | Failed    | Rejected; dismissible     |
+| Transaction status | Card says | Means                     | Dismissible |
+| ------------------ | --------- | ------------------------- | ----------- |
+| `submitted`        | Pending   | Waiting for the network   | no          |
+| `confirmed`        | Syncing   | On chain; not yet indexed | yes         |
+| `failed`           | Failed    | Rejected                  | yes         |
 
 The dashboard has no such card, so a `PendingTransactionBanner` reports the same
 thing in one line there. Both open `TransactionStatusModal`, which shows the
@@ -191,8 +191,23 @@ three steps — sent, confirmed, listed — plus an explorer link where the chai
 one. Progress deliberately ends at _listed_, not at _confirmed_: the pool is not
 useful to the user until it reaches their list.
 
-A failed transaction is only ever removed by the user. Indexing removes the ones
-it succeeds on; nothing else clears the record.
+`isDismissable` is the rule, and it is `status !== 'submitted'` rather than
+`status === 'failed'`. Both settled states are safe to clear: a failed
+transaction did nothing, and a confirmed one is on chain regardless, so the
+scheduled sweep re-derives it whether the local record survives or not. Only
+`submitted` must stay, because it is the sole trace of a transaction still in
+flight.
+
+**Confirmed had to become dismissible, not merely could.** Indexing normally
+drops a confirmed record within seconds, so the case looks theoretical — until
+the transaction touches something the backend cannot read. A borrow against a
+pre-beacon clone confirms on chain and then fails indexing forever: it retried
+on every drain and, while dismissal was gated on `failed`, could not be removed
+at all. Found in the app, not in the tests.
+
+The retries themselves are still unbounded. A record the backend can never index
+is attempted on every `indexConfirmed()`; bounding it needs somewhere to record
+the attempt, and the persisted shape has no room for one.
 
 ## Traps
 

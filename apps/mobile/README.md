@@ -68,19 +68,26 @@ MobX singleton stores configured in `src/stores/`:
 - **`AuthStore`** - User authentication, wallet state and session
 - **`NavigationStore`** - Auth-driven routing decisions
 - **`PoolStore`** - Pools, contributions, withdrawals and loans come from Cloud Functions in one snapshot. Memberships, positions and liquidity are derived on read rather than stored, so nothing can fall out of step with the chain. Set `EXPO_PUBLIC_USE_MOCK_POOLS=true` to run the whole screen on mocks without the Functions emulator.
-- **`PendingTransactionsStore`** - Pool creations that are submitted but not yet confirmed and indexed, persisted to AsyncStorage so they survive an app restart
+- **`PendingTransactionsStore`** - Every wallet transaction that is submitted but not yet confirmed and indexed — pool creations, contributions, withdrawals and the six loan actions — persisted to AsyncStorage so they survive an app restart. Discriminated on `type`; `isDismissable` decides what the user may clear by hand
 
 ```typescript
 import { authStore, poolStore } from '../src/stores'
 ```
 
-## Pool Creation
+## Transaction Flows
 
-`src/hooks/pools/` drives the flow, one hook per stage:
+`src/hooks/pools/` drives every write, one hook per stage:
 
 - **`usePoolCreation`** - lazy whitelisting via `preparePoolCreation`, gas estimate and balance check, then the `createPool` transaction
-- **`useTransactionMonitoring`** - waits for the receipt and decodes `PoolCreated`
+- **`useTransactionMonitoring`** - waits for the receipt and decodes the event for the transaction's type
 - **`usePoolIndexing`** - hands confirmed transactions to the backend; `indexConfirmed()` drains whatever startup recovery resolved
+
+The same three stages carry every other write: `useContribution`, `useWithdrawal`
+and `useLoan` — which covers borrowing, repaying, requesting, approving,
+rejecting and cancelling in one hook, because the contract holds a single
+`activeLoanId` per member per pool. `usePoolSettings` is the exception and sits
+outside the pending-transaction machinery entirely: nothing indexes a pool
+setting, so there is nothing to recover and it waits for its own receipt.
 
 Pending work is visible while it is in flight: `PendingPoolCard` on the pools
 list, `PendingTransactionBanner` on the dashboard, and `TransactionStatusModal`
@@ -88,7 +95,10 @@ behind both.
 
 **Read [`docs/POOL_CREATION.md`](../../docs/POOL_CREATION.md) before changing any
 of this** — it covers the three indexing paths and the chain-shaped traps that
-the mocked tests do not catch.
+the mocked tests do not catch. For anything touching loans, read
+[`docs/LOANS.md`](../../docs/LOANS.md) too: a loan is not an event like a
+contribution, its state is re-read from `getLoan` rather than inferred from which
+log arrived, and `isRepaid` means nothing until `status` is `disbursed`.
 
 ## UI
 
@@ -102,14 +112,25 @@ The app never follows the device colour scheme. Three things pin it, and all thr
 
 Post-login screens live under `app/(auth)/`:
 
-- **`(tabs)/dashboard`** - Balance hero, horizontal pool macro-cards, active loan, quick actions, pending-transaction banner
-- **`pool/borrow`** - Borrowing and repaying in one screen; the contract allows a single open
-  loan per member per pool, so it decides which of the two to show
+- **`(tabs)/dashboard`** - Balance hero, horizontal pool macro-cards, active loan, quick actions,
+  pending-transaction banner, and a card per pool with loan requests waiting on you
 - **`(tabs)/pools`** - Pool list with pending/syncing cards, loading/empty/error states, and a
   pull-to-refresh that sweeps the chain before reloading, so pools created outside this app appear
-- **`(tabs)/activity`** - Transaction feed grouped by day
-- **`pool/[id]`** - Pool detail with stats, your position, thumb-zone action bar
+- **`(tabs)/activity`** - The connected wallet's own transactions, grouped by day
+- **`pool/[id]`** - Pool detail with stats, your position, the pool's own activity, thumb-zone
+  action bar, and the owner's entry points to approvals and settings
 - **`pool/create`** - Create-pool form and submission flow
+- **`pool/contribute`** / **`pool/withdraw`** - Depositing into a pool and taking it back out
+- **`pool/borrow`** - Three states in one screen, mutually exclusive because the contract holds a
+  single `activeLoanId` per member per pool: repay an outstanding loan, withdraw a request waiting
+  on the owner, or borrow — sent as `createLoan` or `requestLoan` depending on the pool
+- **`pool/approvals`** - Owner only. The queue of loan requests, approved or declined one at a
+  time, since two signature prompts from one wallet race for a nonce
+- **`pool/settings`** - Owner only. Whether this pool reviews requests before lending
+
+The activity feed is signed from the pool's side on `pool/[id]` and from the
+wallet's on the dashboard and activity tab — see
+[`docs/LOANS.md`](../../docs/LOANS.md#the-sign-depends-on-whose-feed-it-is).
 
 Navigation uses Expo Router **NativeTabs** (SF Symbols on iOS, Material icons on Android) with a per-tab native **Stack**. All three tabs share one header — SuperPool logo left, `AppKitButton` right, no per-tab title, since the tab bar already names the screen. Pool detail pushes over the tabs with a native back button. The shared header and its styling are `brandHeader` / `darkHeader` in `src/constants/navigation.tsx`.
 

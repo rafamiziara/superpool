@@ -36,7 +36,9 @@ These are implemented end to end and verified against a live chain:
 - **📲 Device Verification:** Firebase App Check tokens issued only to devices linked to an authenticated wallet.
 - **🏗️ Pool Creation:** A user creates their own lending pool from the mobile app — form → `PoolFactory.createPool` → receipt parsing → an indexed Firestore document, with three independent indexing paths and idempotent writes ([how it works](docs/POOL_CREATION.md)).
 - **💰 Liquidity Contribution:** A member deposits native currency into a pool — form → `depositFunds` → `FundsDeposited` indexed into Firestore → the pool's liquidity and the member's position, both summed from the events rather than stored as totals ([how it works](docs/CONTRIBUTIONS.md)).
-- **⏳ Pending Transaction Tracking:** Submitted transactions of either kind survive an app restart; startup recovery resolves them and drains them into the pool list.
+- **⏳ Pending Transaction Tracking:** Submitted transactions of every kind survive an app restart; startup recovery resolves them and drains them into the pool list. A settled record can be cleared by hand — the chain has it either way, so the sweep re-derives it.
+- **📋 Loan Request & Approval:** Each pool chooses whether to review requests before lending (`setRequiresApproval`, owner-only, off by default). With it on, borrowing is `requestLoan` → `approveLoan` / `rejectLoan`, plus `cancelLoanRequest` for the borrower; with it off, `createLoan` disburses in one call to any member who has contributed. Owners get a queue, members get a status ([how it works](docs/LOANS.md)).
+- **💸 Loan Repayment:** Principal plus flat interest in one transaction — interest is fixed at disbursement and does not accrue, so repaying early costs the same.
 - **📱 Cross-Platform Mobile App:** React Native/Expo application with onboarding, wallet connection and a live pool list.
 - **🔐 Multi-Sig Administration:** `PoolFactory` ownership transfers to a Safe; admin actions are executed through it.
 - **📦 Monorepo Structure:** pnpm workspaces with shared types, CI running lint, type-check and the test matrix.
@@ -47,8 +49,8 @@ Designed and partly scaffolded, but **not** functional yet — the mobile screen
 
 - **👥 Permissioned Membership:** Pool administrators approving members before they can contribute or borrow. There is no membership register on chain today — contributing to a pool is what makes you a member of it.
 - **🪙 ERC-20 Liquidity:** Contributions are native currency only; token deposits need contract work.
-- **📋 Loan Request & Approval:** Members requesting loans, reviewed and approved by pool admins. `createLoan` exists but is permissionless and self-funding, so it is not exposed in the app.
-- **💸 Loan Repayment & Management:** Repayment, default handling and pool health.
+- **💸 Default Handling & Pool Health:** A loan's term is recorded and shown, but nothing on chain enforces it — there is no liquidation, no penalty and no default state.
+- **💰 Interest Distribution:** Repaid interest reaches the pool's balance but cannot be credited to the members who funded the loan, so lifetime earnings are zero for everyone.
 - **🌐 Multi-Chain Support:** The contracts are chain-agnostic and the wallet offers Ethereum, Polygon, Arbitrum, Base and BSC, but the backend currently resolves exactly one configured chain at a time. Only a local Hardhat node is deployed today; Polygon Amoy is next.
 
 ## ⚙️ Tech Stack

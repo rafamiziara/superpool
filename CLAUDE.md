@@ -484,6 +484,20 @@ indexes it.
 pending request too, so anything that reads it without checking `status` first
 treats a request as an outstanding debt.
 
+## Activity feeds
+
+`ActivityRow` takes a `perspective`, and picking the wrong one marks money the
+user received as negative. It follows from **who the feed is about**:
+
+- **`pool`** (the default) for `pool/[id]`, which lists everything that happened
+  to that pool including other members' — so "did this leave my wallet" is a
+  question most of its rows cannot answer.
+- **`wallet`** for the dashboard and activity tab, which are narrowed to the
+  connected wallet by `PoolStore.myActivity`.
+
+A feed that has not been narrowed must use `pool`. `PoolStore.recentTransactions`
+is pool-wide by construction, because every source it merges covers all members.
+
 ## UI & Frontend Interface Design
 
 There is **no shared design package**. Each app owns its theme, and the two are

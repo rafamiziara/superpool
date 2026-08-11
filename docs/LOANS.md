@@ -218,6 +218,73 @@ offered: the setting it carries decides whether a queue can exist at all, so
 hiding it until something happens would make the feature unreachable. The
 approvals link, by contrast, appears only when a request is waiting.
 
+## Where an owner finds out somebody is waiting
+
+A request costs the borrower nothing to make and the owner everything to miss, so
+it is announced in three places rather than only inside the pool:
+
+| Surface                      | Reads                                  |
+| ---------------------------- | -------------------------------------- |
+| Dashboard, one card per pool | `PoolStore.poolsAwaitingMyDecision`    |
+| Dashboard hero chip          | `PoolStore.requestsAwaitingMyDecision` |
+| `PoolCard`, in every list    | `PoolStore.pendingLoansFor(poolId)`    |
+
+One card per pool rather than a combined summary: the queue and the screen that
+clears it are both per pool, so a single card has nowhere to go when two pools
+are waiting. The card markup is `ApprovalsLink`, shared with the pool page —
+written twice is how a count ends up right in one place and stale in the other.
+
+The filter is **ownership, not membership**: you can be a member of a pool whose
+requests are none of your business.
+
+`PoolCard` is an `observer` for this. It reads the store directly rather than
+taking everything as props, and loan records change without its props changing —
+without it a request lands and the card carries on saying nothing.
+
+## Loans in the activity feed
+
+`PoolStore.loanActivity` puts loans in the same feed as contributions and
+withdrawals, but **one row per loan, not one per event**. A contribution is a log
+and dates itself; a loan is an entity with a single timestamp — one that
+`startTime` rewrites on approval — and a single transaction hash.
+
+- A `requested` loan is a row awaiting a decision. `TransactionStatus.PENDING`
+  there means "waiting on the owner", not "not yet mined" as it does everywhere
+  else: a request is on chain the moment it is made.
+- A `disbursed` loan is money leaving the pool, dated when it did, and stays that
+  row once repaid.
+- `rejected` and cancelled requests are left out. Nothing moved, the request is
+  over, and `TransactionType` has no member that says so.
+
+**There is no repayment row, and that is a limitation rather than a choice.**
+`LoanRepaid` is not stored as its own record and the loan document keeps the
+_creating_ transaction's block, so a repayment has no date to be placed at;
+reusing `startedAt` would file it at the moment the money went the other way.
+Fixing it properly means the backend storing `repaidAt` when it sees the event.
+
+### The sign depends on whose feed it is
+
+`ActivityRow` takes a `perspective`, and the two tables are exact mirrors:
+
+| Feed                       | Perspective | A contribution | A disbursed loan |
+| -------------------------- | ----------- | -------------- | ---------------- |
+| Pool page, "Pool activity" | `pool`      | `+` arrives    | `−` leaves       |
+| Dashboard, activity tab    | `wallet`    | `−` you sent   | `+` you received |
+
+Which one is not cosmetic: it follows from **who the feed is about**. The pool's
+page lists everything that happened to that pool, including other members', so
+"did this leave my wallet" is a question most of its rows cannot answer. The
+dashboard and activity tab are narrowed to the connected wallet by
+`PoolStore.myActivity`, where the opposite holds — a disbursed loan there is
+money the user received, and the pool's sign would mark it negative.
+
+`myActivity` matches on **either end** of the row, because which end holds the
+member depends on direction: a contribution comes from them, a withdrawal and a
+disbursed loan go to them. With no wallet connected it is empty rather than
+everything, since `sameAddress` refuses to match an empty address.
+
+The default is `pool`, the only safe answer for a feed nobody has narrowed.
+
 ## Traps
 
 - **All five loan events carry the same three `indexed` parameters**, so
