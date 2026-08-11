@@ -1,4 +1,4 @@
-import type { PoolInfo } from '@superpool/types'
+import type { LoanInfo, PoolInfo } from '@superpool/types'
 import { LoanStatus, MemberStatus, TransactionStatus, TransactionType } from '@superpool/types'
 import { parseEther } from 'viem'
 import { mockFirebaseCallable } from '../__tests__/mocks'
@@ -833,5 +833,172 @@ describe('PoolStore myPools', () => {
 
     expect(store.poolLiquidity(32)).toBe(parseEther('7'))
     expect(store.myPools.map((pool) => pool.poolId)).toEqual([30])
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Loan states.
+//
+// A request that is still waiting on the pool owner has `isRepaid === false`,
+// exactly like a live loan, because repayment is the only thing that field
+// describes. Anything that reads it without first checking `status` treats a
+// request as a debt: the repay panel offers to settle money that never left the
+// pool, and the pool reports liquidity as lent while it is still sitting there.
+// ---------------------------------------------------------------------------
+
+const LIVE_LOAN: LoanInfo = {
+  id: '31337-12-1',
+  loanId: 1,
+  poolId: 12,
+  poolAddress: LIVE_POOL.poolAddress,
+  // Lowercased, as the indexer stores it.
+  borrower: USER_WALLET,
+  amount: parseEther('3').toString(),
+  interestRate: 500,
+  duration: 2_592_000,
+  startedAt: '2026-08-11T09:00:00.000Z',
+  isRepaid: false,
+  status: 'disbursed',
+  chainId: 31337,
+  transactionHash: '0xeeee',
+  blockNumber: 110,
+}
+
+/** The same borrower's request in a pool whose owner reviews before funding. */
+const REQUESTED_LOAN: LoanInfo = { ...LIVE_LOAN, id: '31337-12-2', loanId: 2, status: 'requested' }
+const REJECTED_LOAN: LoanInfo = { ...LIVE_LOAN, id: '31337-12-3', loanId: 3, status: 'rejected' }
+const REPAID_LOAN: LoanInfo = { ...LIVE_LOAN, id: '31337-12-4', loanId: 4, isRepaid: true }
+
+describe('PoolStore loan states', () => {
+  let store: PoolStore
+  let listLoansCallable: jest.Mock
+
+  async function loadWithLoans(loans: LoanInfo[]) {
+    listLoansCallable.mockResolvedValue({ data: { loans, totalCount: loans.length, limit: 50 } })
+    await store.fetchPools()
+  }
+
+  beforeEach(() => {
+    jest.clearAllMocks()
+    delete process.env.EXPO_PUBLIC_USE_MOCK_POOLS
+
+    authStore.walletAddress = USER_WALLET
+    authStore.chainId = 31337
+
+    store = new PoolStore()
+    listLoansCallable = jest.fn().mockResolvedValue({ data: { loans: [], totalCount: 0, limit: 50 } })
+    mockFirebaseCallable.mockImplementation((_functions?: unknown, name?: string) => {
+      if (name === 'listLoans') return listLoansCallable
+      if (name === 'listContributions') return jest.fn().mockResolvedValue({ data: { contributions: [], totalCount: 0, limit: 50 } })
+      if (name === 'listWithdrawals') return jest.fn().mockResolvedValue({ data: { withdrawals: [], totalCount: 0, limit: 50 } })
+      return jest.fn().mockResolvedValue({
+        data: { pools: [LIVE_POOL], totalCount: 1, page: 1, limit: 50, hasNextPage: false, hasPreviousPage: false },
+      })
+    })
+  })
+
+  afterEach(() => {
+    process.env.EXPO_PUBLIC_USE_MOCK_POOLS = 'true'
+    authStore.walletAddress = null
+    authStore.chainId = null
+  })
+
+  it('does not offer to repay a request that was never funded', async () => {
+    // The regression: a pending request has `isRepaid === false` too.
+    await loadWithLoans([REQUESTED_LOAN])
+
+    expect(store.activeLoanFor(12)).toBeUndefined()
+  })
+
+  it('finds the disbursed loan to repay', async () => {
+    await loadWithLoans([LIVE_LOAN])
+
+    expect(store.activeLoanFor(12)?.loanId).toBe(1)
+  })
+
+  it('leaves a repaid loan out of the repay panel', async () => {
+    await loadWithLoans([REPAID_LOAN])
+
+    expect(store.activeLoanFor(12)).toBeUndefined()
+  })
+
+  it('leaves a rejected request out of both panels', async () => {
+    await loadWithLoans([REJECTED_LOAN])
+
+    expect(store.activeLoanFor(12)).toBeUndefined()
+    expect(store.pendingLoanFor(12)).toBeUndefined()
+  })
+
+  it('finds the request waiting on the owner, with its id to cancel', async () => {
+    await loadWithLoans([REQUESTED_LOAN])
+
+    expect(store.pendingLoanFor(12)?.loanId).toBe(2)
+  })
+
+  it('matches the borrower case-insensitively', async () => {
+    // Loans are stored lowercased; a connected wallet is checksummed.
+    authStore.walletAddress = '0x15D34AAf54267DB7D7c367839AAf71A00a2C6A65'
+    await loadWithLoans([LIVE_LOAN, REQUESTED_LOAN])
+
+    expect(store.activeLoanFor(12)?.loanId).toBe(1)
+    expect(store.pendingLoanFor(12)?.loanId).toBe(2)
+  })
+
+  it('does not claim another wallet’s loan', async () => {
+    await loadWithLoans([{ ...LIVE_LOAN, borrower: STRANGER_WALLET }])
+
+    expect(store.activeLoanFor(12)).toBeUndefined()
+  })
+
+  it('counts only disbursed principal as lent out', async () => {
+    // A request has moved nothing. Counting it would report liquidity as lent
+    // while it is still in the pool.
+    await loadWithLoans([LIVE_LOAN, REQUESTED_LOAN, REJECTED_LOAN, REPAID_LOAN])
+
+    expect(store.outstandingDebt(12)).toBe(parseEther('3'))
+  })
+
+  it('lists every borrower’s pending request for the pool owner', async () => {
+    // The approvals screen is not filtered by the connected wallet: the owner
+    // is deciding on other people's requests.
+    await loadWithLoans([REQUESTED_LOAN, { ...REQUESTED_LOAN, id: '31337-12-5', loanId: 5, borrower: STRANGER_WALLET }, LIVE_LOAN])
+
+    expect(store.pendingLoansFor(12).map((loan) => loan.loanId)).toEqual([2, 5])
+  })
+
+  it('maps each chain state to the app’s status', async () => {
+    await loadWithLoans([LIVE_LOAN, REQUESTED_LOAN, REJECTED_LOAN, REPAID_LOAN])
+
+    expect(store.loans.map((loan) => loan.status)).toEqual([
+      LoanStatus.DISBURSED,
+      LoanStatus.REQUESTED,
+      LoanStatus.REJECTED,
+      LoanStatus.REPAID,
+    ])
+  })
+
+  it('dates approval and disbursement only once funds have moved', async () => {
+    await loadWithLoans([REQUESTED_LOAN])
+
+    const [loan] = store.loans
+    expect(loan.requestedAt).toEqual(new Date(REQUESTED_LOAN.startedAt))
+    expect(loan.approvedAt).toBeUndefined()
+    expect(loan.disbursedAt).toBeUndefined()
+    // Nothing is due on a request that may never be funded.
+    expect(loan.dueDate).toBeUndefined()
+  })
+
+  it('reports nothing repaid on a request', async () => {
+    // `isRepaid` is false either way; only a disbursed loan can be settled.
+    await loadWithLoans([REQUESTED_LOAN])
+
+    expect(store.loans[0].amountRepaid).toBe(0n)
+  })
+
+  it('surfaces the request as the user’s pending loan', async () => {
+    await loadWithLoans([REQUESTED_LOAN])
+
+    expect(store.pendingLoan?.id).toBe(REQUESTED_LOAN.id)
+    expect(store.activeLoan).toBeUndefined()
   })
 })

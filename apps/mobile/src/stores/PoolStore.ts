@@ -42,6 +42,26 @@ function usingMockPools(): boolean {
 const DEFAULT_PAGE_SIZE = 50
 
 /**
+ * The indexed record's state in the app's vocabulary.
+ *
+ * `isRepaid` only means anything once the loan was actually funded: the field
+ * is false on a request that is still waiting and on one that was turned down,
+ * neither of which is an outstanding debt. Reading the two fields in the wrong
+ * order is what made a pending request look like a loan to repay.
+ */
+function loanStatusOf(loan: LoanInfo): LoanStatus {
+  if (loan.status === 'requested') return LoanStatus.REQUESTED
+  if (loan.status === 'rejected') return LoanStatus.REJECTED
+
+  return loan.isRepaid ? LoanStatus.REPAID : LoanStatus.DISBURSED
+}
+
+/** Funded and not yet settled — the only state that owes the pool money. */
+function isOutstanding(loan: LoanInfo): boolean {
+  return loan.status === 'disbursed' && !loan.isRepaid
+}
+
+/**
  * Lending pool state.
  *
  * Pools, contributions and withdrawals come from the `listPools`,
@@ -430,12 +450,12 @@ export class PoolStore {
   /**
    * Indexed loans in the app's `Loan` shape.
    *
-   * The contract implements far less than this interface describes — there is
-   * no approval step, no partial repayment and no accrual — so the mapping is
-   * mostly about being honest where it cannot fill a field:
+   * The contract implements less than this interface describes — no partial
+   * repayment and no accrual — so the mapping is partly about being honest where
+   * it cannot fill a field:
    *
-   * - `status` is `REPAID` or `DISBURSED` and nothing else. `createLoan`
-   *   disburses immediately, so `REQUESTED` and `APPROVED` never occur, and
+   * - `status` never reaches `APPROVED` or `DEFAULTED`. Approval disburses in
+   *   the same transaction, so an approved loan is already `DISBURSED`, and
    *   nothing on chain marks a loan defaulted.
    * - `interestAccrued` is the whole fixed interest from the moment the loan
    *   exists, because that is genuinely what is owed — it does not grow.
@@ -449,6 +469,7 @@ export class PoolStore {
       const amount = BigInt(loan.amount)
       const interest = (amount * BigInt(loan.interestRate)) / 10_000n
       const startedAt = new Date(loan.startedAt)
+      const isDisbursed = loan.status === 'disbursed'
 
       return {
         id: loan.id,
@@ -457,14 +478,15 @@ export class PoolStore {
         amount,
         interestRate: loan.interestRate,
         duration: loan.duration,
-        status: loan.isRepaid ? LoanStatus.REPAID : LoanStatus.DISBURSED,
-        amountRepaid: loan.isRepaid ? amount + interest : 0n,
+        status: loanStatusOf(loan),
+        amountRepaid: isDisbursed && loan.isRepaid ? amount + interest : 0n,
         interestAccrued: interest,
         requestedAt: startedAt,
-        // The three moments the app models separately are one moment on chain.
-        approvedAt: startedAt,
-        disbursedAt: startedAt,
-        dueDate: new Date(startedAt.getTime() + loan.duration * 1000),
+        // Approval and disbursement are one moment on chain, and neither has
+        // happened while the request is still waiting or after it was refused.
+        approvedAt: isDisbursed ? startedAt : undefined,
+        disbursedAt: isDisbursed ? startedAt : undefined,
+        dueDate: isDisbursed ? new Date(startedAt.getTime() + loan.duration * 1000) : undefined,
         // Never known: `LoanRepaid` is not stored as its own record, and the
         // loan document keeps the *creating* transaction's block so the
         // activity feed dates it consistently.
@@ -478,12 +500,11 @@ export class PoolStore {
   }
 
   /**
-   * Always undefined against real data, and deliberately kept.
+   * The user's request still waiting on a pool owner, anywhere.
    *
-   * `createLoan` disburses in the same transaction that creates the loan, so
-   * there is no requested-but-not-yet-funded state to be in. The getter stays
-   * because mock mode still exercises the UI for one, and because an approval
-   * step is the obvious next contract change.
+   * Only pools whose owner turned review on can produce one: elsewhere
+   * `createLoan` disburses in the same transaction, so there is no
+   * requested-but-not-yet-funded state to be in.
    */
   get pendingLoan(): Loan | undefined {
     return this.loans.find((loan) => loan.status === LoanStatus.REQUESTED && sameAddress(loan.borrower, this.userAddress))
@@ -496,14 +517,44 @@ export class PoolStore {
    * borrow screen needs `loanId` — `repayLoan` takes the id, and the app's
    * `Loan` has no field for it. At most one can exist: the contract rejects a
    * second loan while one is open.
+   *
+   * **Disbursed only.** A pending request also has `isRepaid === false`, and
+   * matching it here would offer to repay money that never left the pool.
+   * A request is `pendingLoanFor`, which is a different panel.
    */
   activeLoanFor = (poolId: number): LoanInfo | undefined => {
-    return this.loanRecords.find((loan) => loan.poolId === poolId && !loan.isRepaid && sameAddress(loan.borrower, this.userAddress))
+    return this.loanRecords.find((loan) => loan.poolId === poolId && isOutstanding(loan) && sameAddress(loan.borrower, this.userAddress))
   }
 
-  /** Principal currently lent out of one pool, in wei. */
+  /**
+   * The user's request in one pool that the owner has not decided on.
+   *
+   * The counterpart to `activeLoanFor`, and mutually exclusive with it: the
+   * contract holds one `activeLoanId` per borrower, so a wallet cannot have both
+   * a request and a live loan in the same pool. Carries the `loanId` because
+   * `cancelLoanRequest` takes it.
+   */
+  pendingLoanFor = (poolId: number): LoanInfo | undefined => {
+    return this.loanRecords.find(
+      (loan) => loan.poolId === poolId && loan.status === 'requested' && sameAddress(loan.borrower, this.userAddress)
+    )
+  }
+
+  /** Every request in one pool awaiting the owner's decision, for the approvals screen. */
+  pendingLoansFor = (poolId: number): LoanInfo[] => {
+    return this.loanRecords.filter((loan) => loan.poolId === poolId && loan.status === 'requested')
+  }
+
+  /**
+   * Principal currently lent out of one pool, in wei.
+   *
+   * Requests are excluded: nothing has moved until an owner approves, so
+   * counting them would report liquidity as lent while it is still in the pool.
+   */
   outstandingDebt = (poolId: number): bigint => {
-    return this.loanRecords.filter((loan) => loan.poolId === poolId && !loan.isRepaid).reduce((sum, loan) => sum + BigInt(loan.amount), 0n)
+    return this.loanRecords
+      .filter((loan) => loan.poolId === poolId && isOutstanding(loan))
+      .reduce((sum, loan) => sum + BigInt(loan.amount), 0n)
   }
 
   /**
