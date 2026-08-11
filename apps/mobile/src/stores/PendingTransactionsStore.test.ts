@@ -1,11 +1,21 @@
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import { createPublicClient, encodeAbiParameters, encodeEventTopics, http, type TransactionReceipt } from 'viem'
 import { hardhat } from 'viem/chains'
-import { makeContributeTransaction, makePendingTransaction, OTHER_TX_HASH, TX_HASH } from '../__tests__/fixtures/pendingTransaction'
+import {
+  LOAN_PARAMS,
+  makeContributeTransaction,
+  makeLoanTransaction,
+  makePendingTransaction,
+  OTHER_TX_HASH,
+  TX_HASH,
+} from '../__tests__/fixtures/pendingTransaction'
 import { PoolFactoryABI, SampleLendingPoolABI } from '../constants/abis'
 import {
   extractFundsDepositedResult,
+  extractLoanResult,
   extractPoolCreatedResult,
+  extractResult,
+  isLoanTransactionType,
   type PendingTransaction,
   PendingTransactionsStore,
   type TransactionReceiptReader,
@@ -380,6 +390,74 @@ describe('PendingTransactionsStore', () => {
       expect(store.transactions).toHaveLength(0)
     })
 
+    it.each(['BORROW', 'REPAY', 'REQUEST_LOAN', 'APPROVE_LOAN', 'REJECT_LOAN', 'CANCEL_LOAN_REQUEST'] as const)(
+      'restores a %s record',
+      async (type) => {
+        // The regression: loan records were dropped on restore, so an app killed
+        // after signing lost the only trace of the transaction and startup
+        // recovery had nothing to resolve against the chain.
+        await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify([makeLoanTransaction({ type })]))
+
+        await store.loadFromStorage()
+
+        expect(store.transactions).toHaveLength(1)
+        expect(store.transactions[0].type).toBe(type)
+      }
+    )
+
+    it('restores the loan id and borrower an owner decision carries', async () => {
+      const entry = makeLoanTransaction({ type: 'APPROVE_LOAN', params: { ...LOAN_PARAMS, loanId: 7, borrower: POOL_OWNER } })
+      await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify([entry]))
+
+      await store.loadFromStorage()
+
+      expect(store.transactions[0].params).toMatchObject({ loanId: 7, borrower: POOL_OWNER })
+    })
+
+    it('restores a borrow with no loan id, which is a valid state', async () => {
+      // The contract assigns the id, so it is genuinely absent until the receipt
+      // arrives — a validator that demanded it would drop every live borrow.
+      await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify([makeLoanTransaction({ type: 'BORROW' })]))
+
+      await store.loadFromStorage()
+
+      expect(store.transactions).toHaveLength(1)
+      expect(store.transactions[0].params).not.toHaveProperty('loanId')
+    })
+
+    it('restores a loan result', async () => {
+      const confirmed = makeLoanTransaction({ status: 'confirmed', result: { loanId: 3, amount: '5000000000000000000' } })
+      await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify([confirmed]))
+
+      await store.loadFromStorage()
+
+      expect(store.transactions[0].result).toEqual({ loanId: 3, amount: '5000000000000000000' })
+    })
+
+    it.each([
+      ['a string loanId', { ...LOAN_PARAMS, loanId: '3' }],
+      ['a numeric amount', { ...LOAN_PARAMS, amount: 5 }],
+      ['a non-hex poolAddress', { ...LOAN_PARAMS, poolAddress: 'nope' }],
+    ])('drops a malformed loan entry: %s', async (_label, params) => {
+      const entry = { ...makeLoanTransaction(), params }
+      await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify([entry, makeContributeTransaction({ txHash: OTHER_TX_HASH })]))
+
+      await store.loadFromStorage()
+
+      expect(store.transactions.map((transaction) => transaction.txHash)).toEqual([OTHER_TX_HASH])
+    })
+
+    it('does not accept contribution params on a loan record', async () => {
+      // A loan record needs no id, so the shapes overlap — but a result with no
+      // `loanId` is still corrupt and must not be half-restored.
+      const mismatched = { ...makeLoanTransaction({ status: 'confirmed' }), result: { amount: '1' } }
+      await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify([mismatched]))
+
+      await store.loadFromStorage()
+
+      expect(store.transactions[0].result).toBeUndefined()
+    })
+
     it('caps a stored list that grew beyond the limit', async () => {
       const stored = Array.from({ length: 60 }, (_unused, index) =>
         makePendingTransaction({ txHash: `0x${String(index).padStart(64, '0')}` })
@@ -540,5 +618,97 @@ describe('extractFundsDepositedResult', () => {
 
   it('returns undefined when there are no logs', () => {
     expect(extractFundsDepositedResult(makeReceipt({ logs: [] }))).toBeUndefined()
+  })
+})
+
+// ---------------------------------------------------------------------------
+// The loan actions.
+//
+// All five events carry the same three indexed parameters, so one extractor
+// serves every action — but only if each event name is actually in the list it
+// tries. A missing name yields no result, and "no result" is what the monitor
+// reads as a confirmed transaction that produced nothing.
+// ---------------------------------------------------------------------------
+
+/** Any of the five loan events, encoded through the shipped ABI. */
+function makeLoanLog(
+  eventName: 'LoanCreated' | 'LoanRepaid' | 'LoanRequested' | 'LoanApproved' | 'LoanRejected',
+  loanId: bigint,
+  amount: bigint
+): ReceiptLog {
+  const topics = encodeEventTopics({
+    abi: SampleLendingPoolABI,
+    eventName,
+    args: { loanId, borrower: POOL_OWNER, amount },
+  })
+
+  return {
+    address: POOL_ADDRESS,
+    topics,
+    // All three parameters are `indexed`, as with `FundsDeposited`.
+    data: '0x',
+    blockHash: '0xdead000000000000000000000000000000000000000000000000000000000001',
+    blockNumber: 42n,
+    logIndex: 0,
+    transactionHash: TX_HASH,
+    transactionIndex: 0,
+    removed: false,
+  } as ReceiptLog
+}
+
+describe('extractLoanResult', () => {
+  it.each(['LoanCreated', 'LoanRepaid', 'LoanRequested', 'LoanApproved', 'LoanRejected'] as const)(
+    'decodes the id and amount from a %s log',
+    (eventName) => {
+      const receipt = makeReceipt({ logs: [makeLoanLog(eventName, 4n, 3_000_000_000_000_000_000n)] })
+
+      expect(extractLoanResult(receipt)).toEqual({ loanId: 4, amount: '3000000000000000000' })
+    }
+  )
+
+  it('reads a cancellation, which emits LoanRejected rather than an event of its own', () => {
+    // The record tracks the state, not who ended the request.
+    const receipt = makeReceipt({ logs: [makeLoanLog('LoanRejected', 9n, 1n)] })
+
+    expect(extractLoanResult(receipt)).toEqual({ loanId: 9, amount: '1' })
+  })
+
+  it('ignores a deposit', () => {
+    const receipt = makeReceipt({ logs: [makeFundsDepositedLog(POOL_OWNER, 1n)] })
+
+    expect(extractLoanResult(receipt)).toBeUndefined()
+  })
+
+  it('returns undefined when there are no logs', () => {
+    expect(extractLoanResult(makeReceipt({ logs: [] }))).toBeUndefined()
+  })
+})
+
+describe('extractResult dispatch', () => {
+  it.each(['BORROW', 'REPAY', 'REQUEST_LOAN', 'APPROVE_LOAN', 'REJECT_LOAN', 'CANCEL_LOAN_REQUEST'] as const)(
+    'routes %s to the loan extractor',
+    (type) => {
+      // Startup recovery has only the stored type to go on, and picking the
+      // wrong extractor finds no log.
+      const receipt = makeReceipt({ logs: [makeLoanLog('LoanApproved', 2n, 5n)] })
+
+      expect(extractResult(type, receipt)).toEqual({ loanId: 2, amount: '5' })
+    }
+  )
+
+  it('does not route a contribution to the loan extractor', () => {
+    const receipt = makeReceipt({ logs: [makeFundsDepositedLog(POOL_OWNER, 5n)] })
+
+    expect(extractResult('CONTRIBUTE', receipt)).toEqual({ amount: '5' })
+  })
+})
+
+describe('isLoanTransactionType', () => {
+  it.each(['BORROW', 'REPAY', 'REQUEST_LOAN', 'APPROVE_LOAN', 'REJECT_LOAN', 'CANCEL_LOAN_REQUEST'] as const)('claims %s', (type) => {
+    expect(isLoanTransactionType(type)).toBe(true)
+  })
+
+  it.each(['CREATE_POOL', 'CONTRIBUTE', 'WITHDRAW'] as const)('does not claim %s', (type) => {
+    expect(isLoanTransactionType(type)).toBe(false)
   })
 })

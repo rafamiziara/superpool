@@ -6,9 +6,9 @@ import { pendingTransactionsStore } from '../../stores/PendingTransactionsStore'
 import { describeTransactionError } from './transactionErrors'
 
 /**
- * Head-room added to the estimated gas. Both calls write a handful of storage
- * slots and make one transfer, so the estimate is small and stable — but it is
- * still taken a block or more before the wallet broadcasts.
+ * Head-room added to the estimated gas. Every call here writes a handful of
+ * storage slots and at most one transfer, so the estimate is small and stable —
+ * but it is still taken a block or more before the wallet broadcasts.
  */
 const GAS_BUFFER_PERCENT = 20n
 
@@ -34,10 +34,39 @@ export interface RepayParams {
   amount: bigint
 }
 
+/**
+ * Acting on a request that already exists: approving, rejecting or withdrawing
+ * it.
+ *
+ * The amount is carried rather than read, because the pending card has to name
+ * it before anything is indexed. `borrower` is set only on the owner's
+ * decisions — on the borrower's own cancellation it would just repeat the
+ * sender.
+ */
+export interface LoanDecisionParams {
+  poolId: number
+  poolAddress: `0x${string}`
+  poolName: string
+  /** The request being acted on. */
+  loanId: number
+  /** Principal requested, in wei. Nothing moves for a rejection or a cancellation. */
+  amount: bigint
+  /** Whose request this is. Set by the owner's screens; omitted by the borrower's. */
+  borrower?: string
+}
+
 export interface UseLoanReturn {
   /** Resolves to the transaction hash once the wallet has broadcast it. */
   borrow: (params: BorrowParams) => Promise<`0x${string}`>
   repay: (params: RepayParams) => Promise<`0x${string}`>
+  /** Asks a pool that reviews before it lends. Same params as borrowing — nothing moves yet. */
+  requestLoan: (params: BorrowParams) => Promise<`0x${string}`>
+  /** Owner only: approves a request, which disburses in the same transaction. */
+  approveLoan: (params: LoanDecisionParams) => Promise<`0x${string}`>
+  /** Owner only: turns a request down. */
+  rejectLoan: (params: LoanDecisionParams) => Promise<`0x${string}`>
+  /** Borrower only: withdraws their own request before it is decided. */
+  cancelLoanRequest: (params: LoanDecisionParams) => Promise<`0x${string}`>
   /** True while the wallet is signing and broadcasting. */
   isSubmitting: boolean
   error: string | null
@@ -73,6 +102,10 @@ const BORROW_ERROR_MESSAGES: Record<string, string> = {
   PoolNotActive: 'This pool is not lending at the moment',
   EnforcedPause: 'This pool is not lending at the moment',
   TransferFailed: 'The transfer to your wallet failed',
+  // Only reachable if the owner turned review on between the screen reading
+  // `requiresApproval` and the user signing. The app routes to `requestLoan` on
+  // this, so the wording is a fallback rather than something normally seen.
+  ApprovalRequired: 'This pool now reviews requests before lending',
 }
 
 const REPAY_ERROR_MESSAGES: Record<string, string> = {
@@ -82,12 +115,71 @@ const REPAY_ERROR_MESSAGES: Record<string, string> = {
   EnforcedPause: 'This pool is not processing repayments at the moment',
 }
 
+/**
+ * Requesting is borrowing minus the liquidity rules.
+ *
+ * `InsufficientFunds` is deliberately absent: the contract does not check the
+ * balance at request time, because the pool that is empty now may be fundable
+ * by the time the owner decides.
+ */
+const REQUEST_ERROR_MESSAGES: Record<string, string> = {
+  UnauthorizedBorrower: 'Contribute to this pool before asking to borrow from it',
+  LoanOutstanding: 'You already have a loan or a request in this pool',
+  ExceedsMaxLoanAmount: 'That is more than this pool lends at once',
+  InvalidAmount: 'Enter an amount greater than zero',
+  PoolNotActive: 'This pool is not lending at the moment',
+  EnforcedPause: 'This pool is not lending at the moment',
+}
+
+/**
+ * The owner's side.
+ *
+ * `LoanNotPending` is the one that will actually be hit: two owners on one pool,
+ * or a borrower cancelling while the decision is in flight, both land here — so
+ * it has to read as a race rather than a fault.
+ */
+const APPROVE_ERROR_MESSAGES: Record<string, string> = {
+  LoanNotPending: 'This request has already been decided',
+  InsufficientFunds: 'The pool does not have that much available right now',
+  OwnableUnauthorizedAccount: 'Only the pool owner can approve requests',
+  EnforcedPause: 'This pool is not lending at the moment',
+  TransferFailed: 'The transfer to the borrower failed',
+}
+
+const REJECT_ERROR_MESSAGES: Record<string, string> = {
+  LoanNotPending: 'This request has already been decided',
+  OwnableUnauthorizedAccount: 'Only the pool owner can decide on requests',
+  EnforcedPause: 'This pool is not processing decisions at the moment',
+}
+
+const CANCEL_ERROR_MESSAGES: Record<string, string> = {
+  LoanNotPending: 'This request has already been decided',
+  UnauthorizedBorrower: 'This request belongs to another wallet',
+  EnforcedPause: 'This pool is not processing requests at the moment',
+}
+
 export function describeBorrowError(error: unknown): string {
   return describeTransactionError(error, BORROW_ERROR_MESSAGES, 'Failed to borrow')
 }
 
 export function describeRepayError(error: unknown): string {
   return describeTransactionError(error, REPAY_ERROR_MESSAGES, 'Failed to repay')
+}
+
+export function describeRequestError(error: unknown): string {
+  return describeTransactionError(error, REQUEST_ERROR_MESSAGES, 'Failed to send the request')
+}
+
+export function describeApproveError(error: unknown): string {
+  return describeTransactionError(error, APPROVE_ERROR_MESSAGES, 'Failed to approve the request')
+}
+
+export function describeRejectError(error: unknown): string {
+  return describeTransactionError(error, REJECT_ERROR_MESSAGES, 'Failed to turn down the request')
+}
+
+export function describeCancelError(error: unknown): string {
+  return describeTransactionError(error, CANCEL_ERROR_MESSAGES, 'Failed to withdraw the request')
 }
 
 /**
@@ -112,15 +204,22 @@ export function validateBorrowParams(params: BorrowParams, limits: { maxLoanAmou
 }
 
 /**
- * Borrowing from and repaying to a pool, both sent from the user's own wallet.
+ * Every way a loan moves, sent from the user's own wallet.
  *
- * One hook rather than two because the pair is a single lifecycle: the contract
- * allows one open loan per member per pool, so a screen that can borrow is the
- * same screen that can repay, and they share every mechanic below the call.
+ * One hook rather than six because it is a single lifecycle: the contract holds
+ * one `activeLoanId` per member per pool, so borrowing, requesting, cancelling
+ * and repaying are all the same slot in different states, and the owner's two
+ * decisions are what move it between them. They share every mechanic below the
+ * call.
+ *
+ * Which path a pool takes is its own `requiresApproval` setting: with it off,
+ * `createLoan` pays out immediately; with it on, that call reverts and the flow
+ * is `requestLoan` → `approveLoan` / `rejectLoan`. Read the flag from the chain
+ * rather than from indexed data — it can be changed at any time by the owner.
  *
  * There is no backend preparation step, as with contributions and withdrawals —
- * the borrower is spending against their own recorded contribution, so there is
- * nothing to authorise off chain.
+ * the borrower is spending against their own recorded contribution and the
+ * owner against their own pool, so there is nothing to authorise off chain.
  *
  * Validation failures throw without setting `error`, leaving field-level
  * messages to the form; everything after that sets `error` and rethrows.
@@ -275,5 +374,187 @@ export const useLoan = (): UseLoanReturn => {
     [address, chainId, publicClient, writeContractAsync]
   )
 
-  return { borrow, repay, isSubmitting, error, reset }
+  /**
+   * Every call below sends one loan id and moves the request to its next state.
+   *
+   * Factored because the four differ only in the function called, the wording of
+   * a failure, the transaction type recorded and — for approval — that money
+   * moves. The mechanics either side of that are identical, and writing them out
+   * four more times is how the estimate or the pending record goes missing from
+   * one of them.
+   */
+  const sendLoanDecision = useCallback(
+    async (
+      params: LoanDecisionParams,
+      functionName: 'approveLoan' | 'rejectLoan' | 'cancelLoanRequest',
+      type: 'APPROVE_LOAN' | 'REJECT_LOAN' | 'CANCEL_LOAN_REQUEST',
+      describe: (error: unknown) => string,
+      notConnected: string
+    ): Promise<`0x${string}`> => {
+      const activeChainId = chainId ?? DEFAULT_CHAIN_ID
+
+      const fail = (message: string): never => {
+        setError(message)
+        setIsSubmitting(false)
+        throw new Error(message)
+      }
+
+      if (!address) return fail(notConnected)
+
+      setError(null)
+      setIsSubmitting(true)
+
+      try {
+        // The estimate is what catches a request someone else already decided,
+        // and — on approval — a pool that cannot cover it. Both revert, and both
+        // are worth catching before the user is asked to sign.
+        let gas: bigint | undefined
+        if (publicClient) {
+          const estimate = await publicClient.estimateContractGas({
+            address: params.poolAddress,
+            abi: SampleLendingPoolABI,
+            functionName,
+            args: [BigInt(params.loanId)],
+            account: address,
+          })
+          gas = estimate + (estimate * GAS_BUFFER_PERCENT) / 100n
+        }
+
+        const txHash = await writeContractAsync({
+          address: params.poolAddress,
+          abi: SampleLendingPoolABI,
+          functionName,
+          args: [BigInt(params.loanId)],
+          chainId: activeChainId,
+          ...(gas === undefined ? {} : { gas }),
+        })
+
+        await pendingTransactionsStore.addPendingTransaction({
+          txHash,
+          chainId: activeChainId,
+          type,
+          status: 'submitted',
+          timestamp: Date.now(),
+          params: {
+            poolId: params.poolId,
+            poolAddress: params.poolAddress,
+            poolName: params.poolName,
+            amount: params.amount.toString(),
+            loanId: params.loanId,
+            ...(params.borrower === undefined ? {} : { borrower: params.borrower }),
+          },
+        })
+
+        setIsSubmitting(false)
+
+        return txHash
+      } catch (submitError) {
+        return fail(describe(submitError))
+      }
+    },
+    [address, chainId, publicClient, writeContractAsync]
+  )
+
+  /**
+   * Asking a pool that reviews before it lends.
+   *
+   * Deliberately not folded into `borrow` behind a flag: the two produce
+   * different outcomes from the user's point of view — funds now, or an answer
+   * later — and the screen already knows which it is from the pool's
+   * `requiresApproval`.
+   *
+   * The pool's liquidity is not checked, here or in the contract: what matters
+   * is whether it can cover the loan when the owner decides, not now.
+   */
+  const requestLoan = useCallback(
+    async (params: BorrowParams): Promise<`0x${string}`> => {
+      const validationError = validateBorrowParams(params)
+      if (validationError) throw new Error(validationError)
+
+      const activeChainId = chainId ?? DEFAULT_CHAIN_ID
+
+      const fail = (message: string): never => {
+        setError(message)
+        setIsSubmitting(false)
+        throw new Error(message)
+      }
+
+      if (!address) return fail('Connect a wallet before requesting a loan')
+
+      setError(null)
+      setIsSubmitting(true)
+
+      try {
+        let gas: bigint | undefined
+        if (publicClient) {
+          const estimate = await publicClient.estimateContractGas({
+            address: params.poolAddress,
+            abi: SampleLendingPoolABI,
+            functionName: 'requestLoan',
+            args: [params.amount],
+            account: address,
+          })
+          gas = estimate + (estimate * GAS_BUFFER_PERCENT) / 100n
+        }
+
+        const txHash = await writeContractAsync({
+          address: params.poolAddress,
+          abi: SampleLendingPoolABI,
+          functionName: 'requestLoan',
+          args: [params.amount],
+          chainId: activeChainId,
+          ...(gas === undefined ? {} : { gas }),
+        })
+
+        // No `loanId`: a request is assigned one by the contract, exactly as a
+        // borrow is, and it comes back on the receipt.
+        await pendingTransactionsStore.addPendingTransaction({
+          txHash,
+          chainId: activeChainId,
+          type: 'REQUEST_LOAN',
+          status: 'submitted',
+          timestamp: Date.now(),
+          params: {
+            poolId: params.poolId,
+            poolAddress: params.poolAddress,
+            poolName: params.poolName,
+            amount: params.amount.toString(),
+          },
+        })
+
+        setIsSubmitting(false)
+
+        return txHash
+      } catch (submitError) {
+        return fail(describeRequestError(submitError))
+      }
+    },
+    [address, chainId, publicClient, writeContractAsync]
+  )
+
+  const approveLoan = useCallback(
+    (params: LoanDecisionParams): Promise<`0x${string}`> =>
+      sendLoanDecision(params, 'approveLoan', 'APPROVE_LOAN', describeApproveError, 'Connect a wallet before approving'),
+    [sendLoanDecision]
+  )
+
+  const rejectLoan = useCallback(
+    (params: LoanDecisionParams): Promise<`0x${string}`> =>
+      sendLoanDecision(params, 'rejectLoan', 'REJECT_LOAN', describeRejectError, 'Connect a wallet before deciding'),
+    [sendLoanDecision]
+  )
+
+  const cancelLoanRequest = useCallback(
+    (params: LoanDecisionParams): Promise<`0x${string}`> =>
+      sendLoanDecision(
+        params,
+        'cancelLoanRequest',
+        'CANCEL_LOAN_REQUEST',
+        describeCancelError,
+        'Connect a wallet before withdrawing your request'
+      ),
+    [sendLoanDecision]
+  )
+
+  return { borrow, repay, requestLoan, approveLoan, rejectLoan, cancelLoanRequest, isSubmitting, error, reset }
 }

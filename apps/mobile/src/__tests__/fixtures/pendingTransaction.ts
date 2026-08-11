@@ -1,4 +1,10 @@
-import type { ContributeTransaction, CreatePoolTransaction } from '../../stores/PendingTransactionsStore'
+import type {
+  ContributeTransaction,
+  CreatePoolTransaction,
+  LoanParams,
+  LoanTransaction,
+  LoanTransactionType,
+} from '../../stores/PendingTransactionsStore'
 
 /**
  * The one place a `PendingTransaction` is built for tests.
@@ -62,6 +68,38 @@ export function makeContributeTransaction(overrides: Partial<ContributeTransacti
       poolName: 'Neighbourhood Fund',
       amount: '5000000000000000000',
     },
+    ...overrides,
+  }
+}
+
+/** Whoever the owner is deciding about, when a fixture needs a borrower named. */
+export const BORROWER_ADDRESS = '0x15d34aaf54267db7d7c367839aaf71a00a2c6a65'
+
+export const LOAN_PARAMS: LoanParams = {
+  poolId: 1,
+  poolAddress: POOL_ADDRESS,
+  poolName: 'Neighbourhood Fund',
+  amount: '5000000000000000000',
+}
+
+/**
+ * One loan action, out of the same pool as the fixtures above.
+ *
+ * A single builder here rather than six, unlike the pattern above, because the
+ * six share `LoanParams` exactly — the `type` is the only thing that varies, and
+ * it is what the caller is usually testing.
+ *
+ * Defaults to a borrow, whose params carry **no** `loanId`: the contract assigns
+ * it, so its absence is the normal state rather than an incomplete fixture.
+ */
+export function makeLoanTransaction(overrides: Partial<LoanTransaction<LoanTransactionType>> = {}): LoanTransaction<LoanTransactionType> {
+  return {
+    txHash: TX_HASH,
+    chainId: LOCALHOST_CHAIN_ID,
+    type: 'BORROW',
+    status: 'submitted',
+    timestamp: TIMESTAMP,
+    params: LOAN_PARAMS,
     ...overrides,
   }
 }

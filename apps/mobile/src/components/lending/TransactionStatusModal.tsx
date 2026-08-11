@@ -2,8 +2,13 @@ import { FontAwesome } from '@expo/vector-icons'
 import React from 'react'
 import { ActivityIndicator, Linking, Modal, Pressable, Text, View } from 'react-native'
 import { palette } from '../../constants/palette'
-import type { PendingTransaction, PendingTransactionStatus, PendingTransactionType } from '../../stores/PendingTransactionsStore'
-import { bpsToPercent, formatDuration, formatToken } from '../../utils/format'
+import {
+  isLoanTransaction,
+  type PendingTransaction,
+  type PendingTransactionStatus,
+  type PendingTransactionType,
+} from '../../stores/PendingTransactionsStore'
+import { bpsToPercent, formatDuration, formatToken, shortAddress } from '../../utils/format'
 import { chainName, transactionUrl } from '../../utils/explorer'
 
 /** Where a step is, which is all the row needs to render itself. */
@@ -77,6 +82,58 @@ const COPY: Record<
       failed: 'The repayment was not taken and the loan is still outstanding.',
     },
   },
+  // The four below belong to pools whose owner reviews before lending. What
+  // separates them from BORROW is that no money moves when the transaction
+  // confirms — the answer comes later, from someone else — so the confirmed
+  // copy must not imply the funds are on their way.
+  REQUEST_LOAN: {
+    headline: {
+      submitted: 'Sending your request',
+      confirmed: 'Waiting on the pool owner',
+      failed: 'That request failed',
+    },
+    summary: {
+      submitted: 'The network is confirming your request. You can leave this screen — it carries on without you.',
+      confirmed: 'Your request is with the pool owner. You will see the funds if and when they approve it.',
+      failed: 'No request was made and no funds moved beyond the network fee. You can safely try again.',
+    },
+  },
+  APPROVE_LOAN: {
+    headline: {
+      submitted: 'Approving the request',
+      confirmed: 'Almost there',
+      failed: 'That approval failed',
+    },
+    summary: {
+      submitted: 'Your wallet has sent the approval. The pool pays the borrower as soon as the network confirms it.',
+      confirmed: 'The loan is on chain. The pool balance updates in a moment.',
+      failed: 'Nothing was paid out and the request is still waiting on you.',
+    },
+  },
+  REJECT_LOAN: {
+    headline: {
+      submitted: 'Turning down the request',
+      confirmed: 'Almost there',
+      failed: 'That decision failed',
+    },
+    summary: {
+      submitted: 'The network is confirming your decision. No funds leave the pool either way.',
+      confirmed: 'The request is closed. The borrower is free to ask again.',
+      failed: 'The request is still waiting on you. You can safely try again.',
+    },
+  },
+  CANCEL_LOAN_REQUEST: {
+    headline: {
+      submitted: 'Withdrawing your request',
+      confirmed: 'Almost there',
+      failed: 'That transaction failed',
+    },
+    summary: {
+      submitted: 'The network is confirming this. Nothing was borrowed, so there is nothing to return.',
+      confirmed: 'Your request is withdrawn. You can borrow from this pool again whenever you like.',
+      failed: 'Your request still stands and no funds moved beyond the network fee.',
+    },
+  },
   CREATE_POOL: {
     headline: {
       submitted: 'Creating your pool',
@@ -146,14 +203,17 @@ interface DetailRow {
  * contribution or withdrawal by its amount and the pool it moved through.
  */
 function detailsFor(transaction: PendingTransaction): DetailRow[] {
-  if (transaction.type === 'BORROW' || transaction.type === 'REPAY') {
+  if (isLoanTransaction(transaction)) {
     const { params, result } = transaction
 
     return [
       { label: 'Pool', value: params.poolName },
+      // Only on the owner's decisions, where the request being acted on is
+      // someone else's — see `LoanParams.borrower`.
+      ...(params.borrower ? [{ label: 'Borrower', value: shortAddress(params.borrower), mono: true }] : []),
       { label: 'Amount', value: `${formatToken(result?.amount ?? params.amount)} POL`, mono: true },
-      // Absent while borrowing: the contract assigns the id, so it only exists
-      // once the receipt is in hand.
+      // Absent while borrowing or requesting: the contract assigns the id, so it
+      // only exists once the receipt is in hand.
       ...(result || params.loanId !== undefined ? [{ label: 'Loan ID', value: `#${result?.loanId ?? params.loanId}`, mono: true }] : []),
     ]
   }

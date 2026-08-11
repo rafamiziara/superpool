@@ -1,6 +1,12 @@
 import React from 'react'
 import { Linking } from 'react-native'
-import { makePendingTransaction, TX_HASH } from '../../__tests__/fixtures/pendingTransaction'
+import {
+  BORROWER_ADDRESS,
+  LOAN_PARAMS,
+  makeLoanTransaction,
+  makePendingTransaction,
+  TX_HASH,
+} from '../../__tests__/fixtures/pendingTransaction'
 import { fireEvent, render } from '../../__tests__/test-utils'
 import { TransactionStatusModal } from './TransactionStatusModal'
 
@@ -82,6 +88,67 @@ describe('TransactionStatusModal', () => {
       fireEvent.press(getByTestId('transaction-explorer-link'))
 
       expect(openURL).toHaveBeenCalledWith(`https://amoy.polygonscan.com/tx/${TX_HASH}`)
+    })
+  })
+
+  describe('the loan actions', () => {
+    it.each([
+      ['BORROW', 'Requesting your loan'],
+      ['REPAY', 'Repaying your loan'],
+      ['REQUEST_LOAN', 'Sending your request'],
+      ['APPROVE_LOAN', 'Approving the request'],
+      ['REJECT_LOAN', 'Turning down the request'],
+      ['CANCEL_LOAN_REQUEST', 'Withdrawing your request'],
+    ] as const)('has its own wording for %s', (type, headline) => {
+      const { getByText } = render(<TransactionStatusModal transaction={makeLoanTransaction({ type })} onClose={jest.fn()} />)
+
+      expect(getByText(headline)).toBeTruthy()
+    })
+
+    it('does not promise funds when a request only reaches the owner', () => {
+      // Confirmation is not the outcome here: the answer comes later, from
+      // someone else. Reusing the borrow copy would say the money is on its way.
+      const transaction = makeLoanTransaction({ type: 'REQUEST_LOAN', status: 'confirmed', result: { loanId: 4, amount: '1' } })
+
+      const { getByText } = render(<TransactionStatusModal transaction={transaction} onClose={jest.fn()} />)
+
+      expect(getByText('Waiting on the pool owner')).toBeTruthy()
+    })
+
+    it('shows the pool and the amount', () => {
+      const { getByText } = render(<TransactionStatusModal transaction={makeLoanTransaction()} onClose={jest.fn()} />)
+
+      expect(getByText('Neighbourhood Fund')).toBeTruthy()
+      expect(getByText('5 POL')).toBeTruthy()
+    })
+
+    it('names the borrower on an owner’s decision', () => {
+      // The sender is the owner, so without this the card names the wrong person.
+      const transaction = makeLoanTransaction({ type: 'APPROVE_LOAN', params: { ...LOAN_PARAMS, loanId: 7, borrower: BORROWER_ADDRESS } })
+
+      const { getByText } = render(<TransactionStatusModal transaction={transaction} onClose={jest.fn()} />)
+
+      expect(getByText('Borrower')).toBeTruthy()
+    })
+
+    it('omits the borrower row on the borrower’s own call', () => {
+      const { queryByText } = render(<TransactionStatusModal transaction={makeLoanTransaction()} onClose={jest.fn()} />)
+
+      expect(queryByText('Borrower')).toBeNull()
+    })
+
+    it('shows no loan id until the chain has assigned one', () => {
+      const { queryByText } = render(<TransactionStatusModal transaction={makeLoanTransaction()} onClose={jest.fn()} />)
+
+      expect(queryByText('Loan ID')).toBeNull()
+    })
+
+    it('shows the loan id once the receipt has been decoded', () => {
+      const transaction = makeLoanTransaction({ status: 'confirmed', result: { loanId: 12, amount: '5000000000000000000' } })
+
+      const { getByText } = render(<TransactionStatusModal transaction={transaction} onClose={jest.fn()} />)
+
+      expect(getByText('#12')).toBeTruthy()
     })
   })
 

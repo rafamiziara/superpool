@@ -5,6 +5,8 @@ import {
   type ContributeResult,
   type CreatePoolResult,
   extractResult,
+  type LoanResult,
+  type LoanTransactionType,
   pendingTransactionsStore,
   type PendingTransactionType,
   type WithdrawResult,
@@ -19,7 +21,9 @@ export type ResultFor<T extends PendingTransactionType> = T extends 'CREATE_POOL
   ? CreatePoolResult
   : T extends 'WITHDRAW'
     ? WithdrawResult
-    : ContributeResult
+    : T extends LoanTransactionType
+      ? LoanResult
+      : ContributeResult
 
 export type TransactionOutcome<T extends PendingTransactionType> = ResultFor<T> & { txHash: `0x${string}` }
 
@@ -34,6 +38,10 @@ const MISSING_LOG_MESSAGE: Record<PendingTransactionType, string> = {
   WITHDRAW: 'The transaction confirmed but did not record a withdrawal',
   BORROW: 'The transaction confirmed but did not record a loan',
   REPAY: 'The transaction confirmed but did not record a repayment',
+  REQUEST_LOAN: 'The transaction confirmed but did not record a request',
+  APPROVE_LOAN: 'The transaction confirmed but did not record an approval',
+  REJECT_LOAN: 'The transaction confirmed but did not record a decision',
+  CANCEL_LOAN_REQUEST: 'The transaction confirmed but did not withdraw the request',
 }
 
 export interface UseTransactionMonitoringReturn {

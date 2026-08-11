@@ -13,8 +13,13 @@ import { pendingTransactionsStore } from '../../stores/PendingTransactionsStore'
 import {
   type BorrowParams,
   calculateRepayment,
+  describeApproveError,
   describeBorrowError,
+  describeCancelError,
+  describeRejectError,
   describeRepayError,
+  describeRequestError,
+  type LoanDecisionParams,
   type RepayParams,
   useLoan,
   validateBorrowParams,
@@ -47,6 +52,17 @@ function makeRepayParams(overrides: Partial<RepayParams> = {}): RepayParams {
     poolName: 'Neighbourhood Fund',
     loanId: 3,
     amount: 5_250_000_000_000_000_000n,
+    ...overrides,
+  }
+}
+
+function makeDecisionParams(overrides: Partial<LoanDecisionParams> = {}): LoanDecisionParams {
+  return {
+    poolId: 1,
+    poolAddress: POOL_ADDRESS,
+    poolName: 'Neighbourhood Fund',
+    loanId: 7,
+    amount: 5_000_000_000_000_000_000n,
     ...overrides,
   }
 }
@@ -357,6 +373,243 @@ describe('useLoan repay', () => {
     })
 
     expect(result.current.error).toMatch(/already been repaid/)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// The approval flow.
+//
+// Only pools whose owner turned review on take this path: `createLoan` reverts
+// with `ApprovalRequired` there, and the request is decided later by someone
+// else. What separates these from borrowing is that confirmation is not the
+// outcome — nothing moves until the owner approves.
+// ---------------------------------------------------------------------------
+
+describe('describeRequestError', () => {
+  it.each([
+    ['UnauthorizedBorrower', /Contribute to this pool/],
+    ['LoanOutstanding', /already have a loan or a request/],
+    ['ExceedsMaxLoanAmount', /more than this pool lends/],
+    ['InvalidAmount', /greater than zero/],
+  ])('should explain %s in the requester’s terms', (name, expected) => {
+    expect(describeRequestError(wrapped(revertedWith(name, 'requestLoan')))).toMatch(expected)
+  })
+})
+
+describe('describeApproveError', () => {
+  it('should read LoanNotPending as a race, not a fault', () => {
+    // Two owners, or a borrower cancelling while the decision is in flight.
+    expect(describeApproveError(wrapped(revertedWith('LoanNotPending', 'approveLoan')))).toMatch(/already been decided/)
+  })
+
+  it('should explain a pool that cannot cover the request', () => {
+    // Liquidity is checked at approval, not at request time — the pool that was
+    // empty when asked may be fundable by now, and the reverse.
+    expect(describeApproveError(wrapped(revertedWith('InsufficientFunds', 'approveLoan')))).toMatch(/does not have that much/)
+  })
+})
+
+describe('describeRejectError and describeCancelError', () => {
+  it('should both read LoanNotPending as already decided', () => {
+    expect(describeRejectError(wrapped(revertedWith('LoanNotPending', 'rejectLoan')))).toMatch(/already been decided/)
+    expect(describeCancelError(wrapped(revertedWith('LoanNotPending', 'cancelLoanRequest')))).toMatch(/already been decided/)
+  })
+
+  it('should read UnauthorizedBorrower on a cancellation as someone else’s request', () => {
+    expect(describeCancelError(wrapped(revertedWith('UnauthorizedBorrower', 'cancelLoanRequest')))).toMatch(/another wallet/)
+  })
+})
+
+describe('useLoan requestLoan', () => {
+  it('should call requestLoan with the amount, not createLoan', async () => {
+    const { result } = renderHook(() => useLoan())
+
+    let txHash: string | undefined
+    await act(async () => {
+      txHash = await result.current.requestLoan(makeBorrowParams())
+    })
+
+    expect(txHash).toBe(TX_HASH)
+    expect(mockWriteContractAsync).toHaveBeenCalledWith(
+      expect.objectContaining({
+        address: POOL_ADDRESS,
+        functionName: 'requestLoan',
+        args: [5_000_000_000_000_000_000n],
+        chainId: LOCALHOST_CHAIN_ID,
+      })
+    )
+  })
+
+  it('should record it as a request, distinct from a borrow', async () => {
+    // The two differ to the user — funds now, or an answer later — so the copy,
+    // the card and the status modal all key on this.
+    const { result } = renderHook(() => useLoan())
+
+    await act(async () => {
+      await result.current.requestLoan(makeBorrowParams())
+    })
+
+    const stored = pendingTransactionsStore.transactions.find((tx) => tx.txHash === TX_HASH)
+    expect(stored).toMatchObject({ type: 'REQUEST_LOAN', status: 'submitted' })
+  })
+
+  it('should not claim a loan id it does not have yet', async () => {
+    // A request is assigned an id by the contract exactly as a borrow is.
+    const { result } = renderHook(() => useLoan())
+
+    await act(async () => {
+      await result.current.requestLoan(makeBorrowParams())
+    })
+
+    const stored = pendingTransactionsStore.transactions.find((tx) => tx.txHash === TX_HASH)
+    expect(stored?.type === 'REQUEST_LOAN' && stored.params.loanId).toBeUndefined()
+  })
+
+  it('should estimate before asking for a signature', async () => {
+    const { result } = renderHook(() => useLoan())
+
+    await act(async () => {
+      await result.current.requestLoan(makeBorrowParams())
+    })
+
+    expect(mockEstimateContractGas).toHaveBeenCalledWith(expect.objectContaining({ functionName: 'requestLoan', account: WALLET_ADDRESS }))
+  })
+
+  it('should reject a zero amount without touching the wallet', async () => {
+    const { result } = renderHook(() => useLoan())
+
+    await act(async () => {
+      await expect(result.current.requestLoan(makeBorrowParams({ amount: 0n }))).rejects.toThrow(/greater than zero/)
+    })
+
+    expect(mockWriteContractAsync).not.toHaveBeenCalled()
+    expect(result.current.error).toBeNull()
+  })
+
+  it('should refuse without a connected wallet', async () => {
+    mockWagmiUseAccount.mockReturnValue({ isConnected: false, isConnecting: false, address: undefined, chainId: undefined })
+    const { result } = renderHook(() => useLoan())
+
+    await act(async () => {
+      await expect(result.current.requestLoan(makeBorrowParams())).rejects.toThrow(/Connect a wallet/)
+    })
+  })
+
+  it('should surface a revert in requesting wording', async () => {
+    mockEstimateContractGas.mockRejectedValue(wrapped(revertedWith('LoanOutstanding', 'requestLoan')))
+    const { result } = renderHook(() => useLoan())
+
+    await act(async () => {
+      await expect(result.current.requestLoan(makeBorrowParams())).rejects.toThrow()
+    })
+
+    expect(result.current.error).toMatch(/already have a loan or a request/)
+  })
+})
+
+describe('useLoan owner decisions', () => {
+  it.each([
+    ['approveLoan', 'APPROVE_LOAN'],
+    ['rejectLoan', 'REJECT_LOAN'],
+    ['cancelLoanRequest', 'CANCEL_LOAN_REQUEST'],
+  ] as const)('should call %s with the loan id and record it as %s', async (functionName, type) => {
+    const { result } = renderHook(() => useLoan())
+
+    await act(async () => {
+      await result.current[functionName](makeDecisionParams())
+    })
+
+    expect(mockWriteContractAsync).toHaveBeenCalledWith(expect.objectContaining({ functionName, args: [7n] }))
+    expect(pendingTransactionsStore.transactions.find((tx) => tx.txHash === TX_HASH)).toMatchObject({ type, params: { loanId: 7 } })
+  })
+
+  it.each(['approveLoan', 'rejectLoan', 'cancelLoanRequest'] as const)('should send nothing as value from %s', async (functionName) => {
+    // None of the three is payable. Approval moves money, but out of the pool's
+    // own balance — the owner is not funding it from their wallet.
+    const { result } = renderHook(() => useLoan())
+
+    await act(async () => {
+      await result.current[functionName](makeDecisionParams())
+    })
+
+    expect(mockWriteContractAsync).toHaveBeenCalledWith(expect.not.objectContaining({ value: expect.anything() }))
+  })
+
+  it.each(['approveLoan', 'rejectLoan', 'cancelLoanRequest'] as const)(
+    'should estimate before %s reaches the wallet',
+    async (functionName) => {
+      // The estimate is what catches a request someone else already decided.
+      const { result } = renderHook(() => useLoan())
+
+      await act(async () => {
+        await result.current[functionName](makeDecisionParams())
+      })
+
+      expect(mockEstimateContractGas).toHaveBeenCalledWith(expect.objectContaining({ functionName, account: WALLET_ADDRESS }))
+      expect(mockWriteContractAsync).toHaveBeenCalledWith(expect.objectContaining({ gas: 120_000n }))
+    }
+  )
+
+  it('should record whose request the owner is deciding', async () => {
+    // The card has to name the borrower; the sender's own address is the owner.
+    const borrower = '0x15d34AAf54267DB7D7c367839AAf71A00a2C6A65'
+    const { result } = renderHook(() => useLoan())
+
+    await act(async () => {
+      await result.current.approveLoan(makeDecisionParams({ borrower }))
+    })
+
+    expect(pendingTransactionsStore.transactions.find((tx) => tx.txHash === TX_HASH)).toMatchObject({ params: { borrower } })
+  })
+
+  it('should leave the borrower out of a cancellation', async () => {
+    // The borrower is the sender there, so naming them would just repeat it.
+    const { result } = renderHook(() => useLoan())
+
+    await act(async () => {
+      await result.current.cancelLoanRequest(makeDecisionParams())
+    })
+
+    const stored = pendingTransactionsStore.transactions.find((tx) => tx.txHash === TX_HASH)
+    expect(stored?.type === 'CANCEL_LOAN_REQUEST' && stored.params.borrower).toBeUndefined()
+  })
+
+  it.each([
+    ['approveLoan', /Connect a wallet before approving/],
+    ['rejectLoan', /Connect a wallet before deciding/],
+    ['cancelLoanRequest', /Connect a wallet before withdrawing/],
+  ] as const)('should refuse %s without a connected wallet', async (functionName, expected) => {
+    mockWagmiUseAccount.mockReturnValue({ isConnected: false, isConnecting: false, address: undefined, chainId: undefined })
+    const { result } = renderHook(() => useLoan())
+
+    await act(async () => {
+      await expect(result.current[functionName](makeDecisionParams())).rejects.toThrow(expected)
+    })
+
+    expect(result.current.error).toMatch(expected)
+  })
+
+  it('should surface an approval revert in the owner’s wording', async () => {
+    mockEstimateContractGas.mockRejectedValue(wrapped(revertedWith('LoanNotPending', 'approveLoan')))
+    const { result } = renderHook(() => useLoan())
+
+    await act(async () => {
+      await expect(result.current.approveLoan(makeDecisionParams())).rejects.toThrow()
+    })
+
+    expect(result.current.error).toMatch(/already been decided/)
+    expect(result.current.isSubmitting).toBe(false)
+  })
+
+  it('should leave the estimate to the wallet when no client is configured', async () => {
+    mockWagmiUsePublicClient.mockReturnValue(undefined)
+    const { result } = renderHook(() => useLoan())
+
+    await act(async () => {
+      await result.current.approveLoan(makeDecisionParams())
+    })
+
+    expect(mockWriteContractAsync).toHaveBeenCalledWith(expect.not.objectContaining({ gas: expect.anything() }))
   })
 })
 

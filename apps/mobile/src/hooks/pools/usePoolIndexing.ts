@@ -30,10 +30,15 @@ const CALLABLE_NAME: Record<PendingTransactionType, string> = {
   CREATE_POOL: 'indexPool',
   CONTRIBUTE: 'indexContribution',
   WITHDRAW: 'indexWithdrawal',
-  // Both directions go to one callable: the record it writes is the loan's
-  // state afterwards either way, so nothing there needs to know which happened.
+  // Every loan action goes to one callable: it re-reads the loan through
+  // `getLoan` and stores the state afterwards, so nothing there needs to know
+  // which of the six happened — only which loan to look at.
   BORROW: 'indexLoan',
   REPAY: 'indexLoan',
+  REQUEST_LOAN: 'indexLoan',
+  APPROVE_LOAN: 'indexLoan',
+  REJECT_LOAN: 'indexLoan',
+  CANCEL_LOAN_REQUEST: 'indexLoan',
 }
 
 /**

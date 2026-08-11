@@ -3,6 +3,7 @@ import type { Address } from 'viem'
 import {
   LOCALHOST_CHAIN_ID,
   makeContributeTransaction,
+  makeLoanTransaction,
   makePendingTransaction,
   OTHER_TX_HASH,
   TX_HASH,
@@ -189,6 +190,25 @@ describe('usePoolIndexing', () => {
       expect(mockFirebaseCallable).toHaveBeenCalledWith(expect.anything(), 'indexPool')
       expect(mockFirebaseCallable).toHaveBeenCalledWith(expect.anything(), 'indexContribution')
     })
+
+    it.each(['BORROW', 'REPAY', 'REQUEST_LOAN', 'APPROVE_LOAN', 'REJECT_LOAN', 'CANCEL_LOAN_REQUEST'] as const)(
+      'sends %s to indexLoan',
+      async (type) => {
+        // The callable re-reads the loan through `getLoan` and stores the state
+        // afterwards, so all six actions resolve to the same record.
+        await pendingTransactionsStore.addPendingTransaction(
+          makeLoanTransaction({ type, status: 'confirmed', result: { loanId: 1, amount: '1' } })
+        )
+        const { result } = renderHook(() => usePoolIndexing())
+
+        await act(async () => {
+          await result.current.indexConfirmed()
+        })
+
+        expect(mockFirebaseCallable).toHaveBeenCalledWith(expect.anything(), 'indexLoan')
+        expect(pendingTransactionsStore.transactions).toHaveLength(0)
+      }
+    )
   })
 
   describe('indexConfirmed', () => {
