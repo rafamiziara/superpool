@@ -142,19 +142,38 @@ Required for local development and Firebase Admin SDK:
 
 **`indexLoan`**
 
-- Called by the mobile app after a borrow _or_ a repayment is confirmed — one
-  callable for both, since the record written is the loan's state afterwards
-  either way
+- Called by the mobile app after any of the six loan actions is confirmed —
+  borrow, request, approve, reject, cancel or repay. One callable for all of
+  them, since the record written is the loan's state afterwards whichever
+  happened
+- Matches all five loan events (`LoanCreated`, `LoanRequested`, `LoanApproved`,
+  `LoanRejected`, `LoanRepaid`). A cancellation has no event of its own — it
+  emits `LoanRejected`, because the record tracks the state and not who ended
+  the request
 - Reads `getLoan` rather than decoding the log, so the stored record cannot
-  disagree with the chain whichever event triggered it
+  disagree with the chain whichever event triggered it. This also means indexing
+  an **old** transaction stores the loan's state _now_, not then
+- `status` comes from the Solidity enum by ordinal, and `LOAN_STATUS` must track
+  it by index — `Disbursed` is 0 so that loans written before the field existed
+  read as disbursed, which is what they were
 - Idempotent: reports `alreadyIndexed` when the stored record already matches
 - Requires authentication
+- **Cannot read pools created before the beacon migration.** Those clones return
+  the pre-approval `Loan` struct and `getLoan` fails to decode, so a sweep skips
+  them silently
 
 **`listLoans`**
 
-- Lists indexed loans, newest first, filterable by pool, borrower and
-  `activeOnly` (which is exactly `isRepaid == false`)
-- A repaid loan stays in the list as history; `startedAt` is an **ISO string**
+- Lists indexed loans, newest first, filterable by pool, borrower,
+  `activeOnly` and `pendingOnly`
+- `activeOnly` is `status == 'disbursed' && isRepaid == false` — outstanding
+  debt. It is **not** `isRepaid == false`, which would also match a request the
+  owner has not decided on, and so report money that never left the pool
+- `pendingOnly` is `status == 'requested'` — the pool owner's queue. It is not
+  filtered by borrower, because the owner is deciding on other people's requests
+- A repaid or rejected loan stays in the list as history; `startedAt` is an
+  **ISO string**, and it is rewritten on approval, so it means "requested at"
+  while pending and "disbursed at" afterwards
 - Requires authentication
 
 **`listPools`**

@@ -466,11 +466,23 @@ contributions, and liquidity is summed from events rather than stored.
 
 ## Loans
 
-For anything touching borrowing, repayment or the `loans` collection, read
-[`docs/LOANS.md`](docs/LOANS.md). Note especially that a loan is **not** an
-event like a contribution: one document is written twice, its state is read back
-from `getLoan` rather than inferred from which log arrived, and the app's `Loan`
-type describes an approval workflow the contract does not implement.
+For anything touching borrowing, repayment, loan approval or the `loans`
+collection, read [`docs/LOANS.md`](docs/LOANS.md). Note especially that a loan is
+**not** an event like a contribution: one document is rewritten by every event
+that touches it, and its state is read back from `getLoan` rather than inferred
+from which log arrived — so re-indexing an old transaction reports the loan as it
+is _now_.
+
+Each pool chooses whether to review requests before lending
+(`setRequiresApproval`, owner-only, **off by default**). With it on, `createLoan`
+reverts and the flow is `requestLoan` → `approveLoan` / `rejectLoan`, plus
+`cancelLoanRequest` for the borrower. Read that flag from the chain, never from
+an indexed pool record — the owner can change it at any moment and nothing
+indexes it.
+
+`isRepaid` is meaningless unless `status` is `disbursed`: it is `false` on a
+pending request too, so anything that reads it without checking `status` first
+treats a request as an outstanding debt.
 
 ## UI & Frontend Interface Design
 

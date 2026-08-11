@@ -105,9 +105,21 @@ async function countOnChain(provider: JsonRpcProvider) {
 
   // A loan is an entity, not an event: `LoanCreated` and `LoanRepaid` both
   // describe the same record, so the count is of distinct loans rather than logs.
+  //
+  // Two events bring a loan into existence, though. A pool that lends on demand
+  // emits `LoanCreated`; one whose owner reviews first emits `LoanRequested` and
+  // may never emit `LoanCreated` at all. Counting only the former reports zero
+  // loans on chain for an approval pool holding several, which turns the loan
+  // check below into an assertion that always passes.
   const created = await countOwnedLogs(provider, lendingPoolInterface.getEvent('LoanCreated')!.topicHash)
+  const requested = await countOwnedLogs(provider, lendingPoolInterface.getEvent('LoanRequested')!.topicHash)
 
-  return { currentBlock, pools: pools.length, deposits, withdrawals, loans: created }
+  const loans = {
+    owned: created.owned + requested.owned,
+    foreign: [...created.foreign, ...requested.foreign],
+  }
+
+  return { currentBlock, pools: pools.length, deposits, withdrawals, loans }
 }
 
 /** Pools whose stored `isActive` disagrees with the factory. */
