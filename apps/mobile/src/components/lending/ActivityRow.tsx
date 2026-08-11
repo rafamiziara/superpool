@@ -6,14 +6,33 @@ import { Text, View } from 'react-native'
 import { palette } from '../../constants/palette'
 import { formatToken, timeAgo } from '../../utils/format'
 
+/** Which way the money moved, **from the pool's side of it**. */
 type Direction = 'in' | 'out' | 'neutral'
 
+/**
+ * Every feed this row appears in — the pool page, the activity tab, the
+ * dashboard — lists what happened to *pools*, not to the person looking. The
+ * store derives those rows from all contributions, all withdrawals and all
+ * loans, because a pool's liquidity is the sum of everyone's, so most rows
+ * belong to somebody else.
+ *
+ * So the sign is the pool's: a contribution arrives (`+`), a withdrawal and a
+ * disbursed loan leave (`−`), a repayment comes back (`+`). Written the other
+ * way round — from the wallet's side, where contributing is money going out —
+ * it reads backwards on every screen, and reads as nonsense on the rows that
+ * are not yours to begin with.
+ *
+ * The arrows follow the sign rather than the balance: `in` arrives, `out`
+ * leaves. "Loan disbursed" rather than "Loan received" for the same reason —
+ * received by whom, on a feed of other people's loans.
+ */
 const txConfig: Record<TransactionType, { icon: keyof typeof FontAwesome.glyphMap; label: string; direction: Direction }> = {
-  [TransactionType.CONTRIBUTION]: { icon: 'arrow-up', label: 'Contribution', direction: 'out' },
-  [TransactionType.WITHDRAWAL]: { icon: 'arrow-down', label: 'Withdrawal', direction: 'in' },
+  [TransactionType.CONTRIBUTION]: { icon: 'arrow-down', label: 'Contribution', direction: 'in' },
+  [TransactionType.WITHDRAWAL]: { icon: 'arrow-up', label: 'Withdrawal', direction: 'out' },
+  // A request moves nothing until somebody decides, so it gets no sign at all.
   [TransactionType.LOAN_REQUEST]: { icon: 'hourglass-half', label: 'Loan request', direction: 'neutral' },
-  [TransactionType.LOAN_DISBURSEMENT]: { icon: 'handshake-o', label: 'Loan received', direction: 'in' },
-  [TransactionType.LOAN_REPAYMENT]: { icon: 'refresh', label: 'Repayment', direction: 'out' },
+  [TransactionType.LOAN_DISBURSEMENT]: { icon: 'handshake-o', label: 'Loan disbursed', direction: 'out' },
+  [TransactionType.LOAN_REPAYMENT]: { icon: 'refresh', label: 'Repayment', direction: 'in' },
   [TransactionType.POOL_CREATION]: { icon: 'flag', label: 'Pool created', direction: 'neutral' },
 }
 
