@@ -872,6 +872,7 @@ const REPAID_LOAN: LoanInfo = { ...LIVE_LOAN, id: '31337-12-4', loanId: 4, isRep
 describe('PoolStore loan states', () => {
   let store: PoolStore
   let listLoansCallable: jest.Mock
+  let listContributionsCallable: jest.Mock
 
   async function loadWithLoans(loans: LoanInfo[]) {
     listLoansCallable.mockResolvedValue({ data: { loans, totalCount: loans.length, limit: 50 } })
@@ -887,9 +888,10 @@ describe('PoolStore loan states', () => {
 
     store = new PoolStore()
     listLoansCallable = jest.fn().mockResolvedValue({ data: { loans: [], totalCount: 0, limit: 50 } })
+    listContributionsCallable = jest.fn().mockResolvedValue({ data: { contributions: [], totalCount: 0, limit: 50 } })
     mockFirebaseCallable.mockImplementation((_functions?: unknown, name?: string) => {
       if (name === 'listLoans') return listLoansCallable
-      if (name === 'listContributions') return jest.fn().mockResolvedValue({ data: { contributions: [], totalCount: 0, limit: 50 } })
+      if (name === 'listContributions') return listContributionsCallable
       if (name === 'listWithdrawals') return jest.fn().mockResolvedValue({ data: { withdrawals: [], totalCount: 0, limit: 50 } })
       return jest.fn().mockResolvedValue({
         data: { pools: [LIVE_POOL], totalCount: 1, page: 1, limit: 50, hasNextPage: false, hasPreviousPage: false },
@@ -1000,5 +1002,93 @@ describe('PoolStore loan states', () => {
 
     expect(store.pendingLoan?.id).toBe(REQUESTED_LOAN.id)
     expect(store.activeLoan).toBeUndefined()
+  })
+
+  // -------------------------------------------------------------------------
+  // Loans in the activity feed.
+  //
+  // One row per loan, not one per event: the record carries a single timestamp
+  // and a single transaction hash, so a repayment has no date to be shown at.
+  // -------------------------------------------------------------------------
+
+  describe('loanActivity', () => {
+    it('shows a disbursed loan as money leaving the pool', async () => {
+      await loadWithLoans([LIVE_LOAN])
+
+      const [row] = store.loanActivity
+      expect(row.type).toBe(TransactionType.LOAN_DISBURSEMENT)
+      expect(row.amount).toBe(parseEther('3'))
+      expect(row.from).toBe(LIVE_LOAN.poolAddress)
+      expect(row.to).toBe(LIVE_LOAN.borrower)
+    })
+
+    it('shows a request as awaiting a decision', async () => {
+      // `PENDING` means "waiting on the owner" here, not "not yet mined" — a
+      // request is on chain the moment it is made.
+      await loadWithLoans([REQUESTED_LOAN])
+
+      const [row] = store.loanActivity
+      expect(row.type).toBe(TransactionType.LOAN_REQUEST)
+      expect(row.status).toBe(TransactionStatus.PENDING)
+    })
+
+    it('points a request from the borrower at the pool', async () => {
+      // Nothing moves, so the direction only states who is asking whom.
+      await loadWithLoans([REQUESTED_LOAN])
+
+      expect(store.loanActivity[0].from).toBe(REQUESTED_LOAN.borrower)
+      expect(store.loanActivity[0].to).toBe(REQUESTED_LOAN.poolAddress)
+    })
+
+    it('leaves a rejected request out', async () => {
+      // Nothing moved and the request is over; a `LOAN_REQUEST` row would claim
+      // it is still waiting.
+      await loadWithLoans([REJECTED_LOAN])
+
+      expect(store.loanActivity).toEqual([])
+    })
+
+    it('keeps a repaid loan as the disbursement it was', async () => {
+      // There is no repayment timestamp anywhere, so a repayment row would have
+      // to borrow the disbursement's date and land in the wrong place.
+      await loadWithLoans([REPAID_LOAN])
+
+      expect(store.loanActivity).toHaveLength(1)
+      expect(store.loanActivity[0].type).toBe(TransactionType.LOAN_DISBURSEMENT)
+    })
+
+    it('emits one row per loan, not one per event', async () => {
+      await loadWithLoans([LIVE_LOAN, REQUESTED_LOAN, REJECTED_LOAN, REPAID_LOAN])
+
+      expect(store.loanActivity).toHaveLength(3)
+    })
+
+    it('reaches the pool’s activity feed', async () => {
+      // The regression: loans were indexed and shown everywhere except here.
+      await loadWithLoans([LIVE_LOAN])
+
+      expect(store.transactionsFor(12).map((tx) => tx.type)).toContain(TransactionType.LOAN_DISBURSEMENT)
+    })
+
+    it('merges with contributions in date order', async () => {
+      listContributionsCallable.mockResolvedValue({
+        data: { contributions: [{ ...LIVE_CONTRIBUTION, contributedAt: '2026-08-12T00:00:00.000Z' }], totalCount: 1, limit: 50 },
+      })
+      await loadWithLoans([LIVE_LOAN])
+
+      const times = store.recentTransactions.map((tx) => tx.createdAt.getTime())
+      expect(times).toEqual([...times].sort((a, b) => b - a))
+      expect(store.recentTransactions).toHaveLength(2)
+    })
+
+    it('does not collide with a contribution id', async () => {
+      // Loans key on `${chainId}-${poolId}-${loanId}`, contributions on the log.
+      // A collision would drop a row, since the feed is keyed by id.
+      listContributionsCallable.mockResolvedValue({ data: { contributions: [LIVE_CONTRIBUTION], totalCount: 1, limit: 50 } })
+      await loadWithLoans([LIVE_LOAN])
+
+      const ids = store.recentTransactions.map((tx) => tx.id)
+      expect(new Set(ids).size).toBe(ids.length)
+    })
   })
 })

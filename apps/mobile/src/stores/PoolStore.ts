@@ -563,9 +563,8 @@ export class PoolStore {
    * There is no transactions collection and no callable that serves one:
    * `listContributions` is the only event feed the backend has. Activity is
    * therefore derived from it, the same way memberships are, rather than shown
-   * from fixtures. Withdrawals, loans and repayments join this list once
-   * something indexes them — each is a separate `TransactionType`, so the rows
-   * merge without changing this shape.
+   * from fixtures. Withdrawals and loans join it from their own feeds — each is
+   * a separate `TransactionType`, so the rows merge without changing this shape.
    *
    * The contribution id is already `${chainId}-${txHash}-${logIndex}`, so it
    * carries over as the row key unchanged and stays stable across refetches.
@@ -613,8 +612,60 @@ export class PoolStore {
     })
   }
 
+  /**
+   * Loans as activity rows.
+   *
+   * Unlike the two above, this is **one row per loan, not one per event**. A
+   * contribution is a log and dates itself; a loan is an entity carrying a
+   * single timestamp that `startTime` rewrites on approval, and a single
+   * `transactionHash` from whichever call created it. There is no repayment
+   * timestamp anywhere — `LoanRepaid` is not stored as its own record — so a
+   * repayment cannot be given a date, and inventing one by reusing `startedAt`
+   * would put it in the feed at the moment the loan went *out*.
+   *
+   * So each loan appears once, typed by where it currently stands:
+   *
+   * - `requested` → a request awaiting the owner. `PENDING` here means "awaiting
+   *   a decision", not "not yet mined" as it does everywhere else — a request is
+   *   confirmed on chain the moment it is made. It is the one honest reading of
+   *   the badge for a loan, and the alternative is a row that looks settled
+   *   while somebody is still waiting on it.
+   * - `disbursed` → the funds left the pool, dated when they did. A repaid loan
+   *   stays this row: the disbursement is the part that happened at a time we
+   *   know.
+   *
+   * A rejected or cancelled request is left out. Nothing moved, the request is
+   * over, and `TransactionType` has no member that says so — a `LOAN_REQUEST`
+   * row would claim it is still waiting.
+   */
+  get loanActivity(): Transaction[] {
+    return this.loanRecords.flatMap((loan) => {
+      if (loan.status === 'rejected') return []
+
+      const startedAt = new Date(loan.startedAt)
+      const isRequest = loan.status === 'requested'
+
+      return [
+        {
+          id: loan.id,
+          poolId: String(loan.poolId),
+          // A request moves nothing; the direction states who is asking whom.
+          from: isRequest ? loan.borrower : loan.poolAddress,
+          to: isRequest ? loan.poolAddress : loan.borrower,
+          type: isRequest ? TransactionType.LOAN_REQUEST : TransactionType.LOAN_DISBURSEMENT,
+          amount: BigInt(loan.amount),
+          status: isRequest ? TransactionStatus.PENDING : TransactionStatus.CONFIRMED,
+          txHash: loan.transactionHash,
+          blockNumber: loan.blockNumber,
+          createdAt: startedAt,
+          confirmedAt: startedAt,
+        },
+      ]
+    })
+  }
+
   get recentTransactions(): Transaction[] {
-    return [...this.transactions, ...this.contributionActivity, ...this.withdrawalActivity]
+    return [...this.transactions, ...this.contributionActivity, ...this.withdrawalActivity, ...this.loanActivity]
       .filter((tx) => tx.status !== TransactionStatus.CANCELLED)
       .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
   }
