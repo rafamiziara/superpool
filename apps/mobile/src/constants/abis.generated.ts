@@ -1199,6 +1199,11 @@ export const PoolFactoryABI = [
 export const SampleLendingPoolABI = [
   {
     "inputs": [],
+    "name": "ApprovalRequired",
+    "type": "error"
+  },
+  {
+    "inputs": [],
     "name": "EnforcedPause",
     "type": "error"
   },
@@ -1250,6 +1255,11 @@ export const SampleLendingPoolABI = [
   {
     "inputs": [],
     "name": "LoanAlreadyRepaid",
+    "type": "error"
+  },
+  {
+    "inputs": [],
+    "name": "LoanNotPending",
     "type": "error"
   },
   {
@@ -1308,6 +1318,19 @@ export const SampleLendingPoolABI = [
     "inputs": [],
     "name": "UnauthorizedBorrower",
     "type": "error"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "bool",
+        "name": "requiresApproval",
+        "type": "bool"
+      }
+    ],
+    "name": "ApprovalRequirementChanged",
+    "type": "event"
   },
   {
     "anonymous": false,
@@ -1382,6 +1405,31 @@ export const SampleLendingPoolABI = [
         "type": "uint256"
       }
     ],
+    "name": "LoanApproved",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "uint256",
+        "name": "loanId",
+        "type": "uint256"
+      },
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "borrower",
+        "type": "address"
+      },
+      {
+        "indexed": true,
+        "internalType": "uint256",
+        "name": "amount",
+        "type": "uint256"
+      }
+    ],
     "name": "LoanCreated",
     "type": "event"
   },
@@ -1407,7 +1455,57 @@ export const SampleLendingPoolABI = [
         "type": "uint256"
       }
     ],
+    "name": "LoanRejected",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "uint256",
+        "name": "loanId",
+        "type": "uint256"
+      },
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "borrower",
+        "type": "address"
+      },
+      {
+        "indexed": true,
+        "internalType": "uint256",
+        "name": "amount",
+        "type": "uint256"
+      }
+    ],
     "name": "LoanRepaid",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "uint256",
+        "name": "loanId",
+        "type": "uint256"
+      },
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "borrower",
+        "type": "address"
+      },
+      {
+        "indexed": true,
+        "internalType": "uint256",
+        "name": "amount",
+        "type": "uint256"
+      }
+    ],
+    "name": "LoanRequested",
     "type": "event"
   },
   {
@@ -1507,6 +1605,19 @@ export const SampleLendingPoolABI = [
         "type": "uint256"
       }
     ],
+    "name": "approveLoan",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "_loanId",
+        "type": "uint256"
+      }
+    ],
     "name": "calculateRepaymentAmount",
     "outputs": [
       {
@@ -1516,6 +1627,19 @@ export const SampleLendingPoolABI = [
       }
     ],
     "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "_loanId",
+        "type": "uint256"
+      }
+    ],
+    "name": "cancelLoanRequest",
+    "outputs": [],
+    "stateMutability": "nonpayable",
     "type": "function"
   },
   {
@@ -1584,6 +1708,11 @@ export const SampleLendingPoolABI = [
             "internalType": "bool",
             "name": "isRepaid",
             "type": "bool"
+          },
+          {
+            "internalType": "enum SampleLendingPool.LoanStatus",
+            "name": "status",
+            "type": "uint8"
           },
           {
             "internalType": "uint256",
@@ -1661,6 +1790,11 @@ export const SampleLendingPoolABI = [
         "internalType": "bool",
         "name": "isRepaid",
         "type": "bool"
+      },
+      {
+        "internalType": "enum SampleLendingPool.LoanStatus",
+        "name": "status",
+        "type": "uint8"
       },
       {
         "internalType": "uint256",
@@ -1755,9 +1889,27 @@ export const SampleLendingPoolABI = [
         "internalType": "bool",
         "name": "isActive",
         "type": "bool"
+      },
+      {
+        "internalType": "bool",
+        "name": "requiresApproval",
+        "type": "bool"
       }
     ],
     "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "_loanId",
+        "type": "uint256"
+      }
+    ],
+    "name": "rejectLoan",
+    "outputs": [],
+    "stateMutability": "nonpayable",
     "type": "function"
   },
   {
@@ -1778,6 +1930,38 @@ export const SampleLendingPoolABI = [
     "name": "repayLoan",
     "outputs": [],
     "stateMutability": "payable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "_amount",
+        "type": "uint256"
+      }
+    ],
+    "name": "requestLoan",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "bool",
+        "name": "_requiresApproval",
+        "type": "bool"
+      }
+    ],
+    "name": "setRequiresApproval",
+    "outputs": [],
+    "stateMutability": "nonpayable",
     "type": "function"
   },
   {

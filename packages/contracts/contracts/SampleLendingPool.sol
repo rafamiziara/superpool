@@ -34,12 +34,37 @@ contract SampleLendingPool is
         uint256 interestRate;
         uint256 loanDuration;
         bool isActive;
+        /**
+         * @dev Whether borrowing needs the pool owner's approval. Packs into
+         * `isActive`'s slot, and reads false on every pool that predates it —
+         * which preserves the old behaviour of lending on demand.
+         */
+        bool requiresApproval;
     }
 
     /// @dev Loan information - optimized for gas efficiency
+    /**
+     * @notice Where a loan is in its lifecycle
+     * @dev `Disbursed` is deliberately zero. This field was added to `Loan`
+     * after pools were already holding loans, and a struct field that did not
+     * exist reads as zero — so every pre-existing loan has to mean "disbursed",
+     * which is exactly what they all were. Reordering this enum silently
+     * relabels every historical loan.
+     *
+     * Repayment stays on the separate `isRepaid` flag rather than becoming a
+     * fourth state, for the same reason: it predates this and already carries
+     * that meaning.
+     */
+    enum LoanStatus {
+        Disbursed,
+        Requested,
+        Rejected
+    }
+
     struct Loan {
         address borrower;         // 20 bytes
         bool isRepaid;           // 1 byte - fits in same slot (21 bytes total)
+        LoanStatus status;       // 1 byte - packs into the same slot (22 bytes)
         uint256 amount;          // 32 bytes - new slot
         uint256 interestRate;    // 32 bytes - new slot
         uint256 startTime;       // 32 bytes - new slot
@@ -125,6 +150,44 @@ contract SampleLendingPool is
         address indexed borrower,
         uint256 indexed amount
     );
+    /**
+     * @notice Emitted when a member asks to borrow and the pool needs approval
+     * @param loanId Unique identifier of the requested loan
+     * @param borrower Address of the requesting member
+     * @param amount Amount requested
+     */
+    event LoanRequested(
+        uint256 indexed loanId,
+        address indexed borrower,
+        uint256 indexed amount
+    );
+    /**
+     * @notice Emitted when the pool owner approves a request and funds go out
+     * @param loanId Unique identifier of the approved loan
+     * @param borrower Address of the borrower
+     * @param amount Amount disbursed
+     */
+    event LoanApproved(
+        uint256 indexed loanId,
+        address indexed borrower,
+        uint256 indexed amount
+    );
+    /**
+     * @notice Emitted when a request is turned down, by the owner or the borrower
+     * @param loanId Unique identifier of the rejected request
+     * @param borrower Address of the requesting member
+     * @param amount Amount that was requested
+     */
+    event LoanRejected(
+        uint256 indexed loanId,
+        address indexed borrower,
+        uint256 indexed amount
+    );
+    /**
+     * @notice Emitted when the pool owner turns approval on or off
+     * @param requiresApproval Whether borrowing now needs approval
+     */
+    event ApprovalRequirementChanged(bool indexed requiresApproval);
 
     /// @notice Errors
     error InsufficientFunds();
@@ -140,6 +203,10 @@ contract SampleLendingPool is
     error TransferFailed();
     error RefundFailed();
     error InvalidImplementation();
+    /// @dev `createLoan` on a pool whose owner reviews requests; use `requestLoan`.
+    error ApprovalRequired();
+    /// @dev The loan is not awaiting a decision — already approved, or rejected.
+    error LoanNotPending();
 
     /**
      * @notice Initialize the contract (replaces constructor for upgradeable contracts)
@@ -162,7 +229,11 @@ contract SampleLendingPool is
             maxLoanAmount: _maxLoanAmount,
             interestRate: _interestRate,
             loanDuration: _loanDuration,
-            isActive: true
+            isActive: true,
+            // Off by default: a new pool lends on demand until its owner asks
+            // to review requests, which keeps the factory's `createPool`
+            // signature — and every caller of it — unchanged.
+            requiresApproval: false
         });
 
         nextLoanId = 1;
@@ -254,6 +325,10 @@ contract SampleLendingPool is
     ) external whenNotPaused nonReentrant returns (uint256) {
         if (!poolConfig.isActive) revert PoolNotActive();
 
+        // A pool that reviews requests must not have a side door that skips the
+        // review. The app routes to `requestLoan` on this error.
+        if (poolConfig.requiresApproval) revert ApprovalRequired();
+
         if (contributions[msg.sender] == 0) revert UnauthorizedBorrower();
 
         if (activeLoanId[msg.sender] != 0) revert LoanOutstanding();
@@ -275,7 +350,8 @@ contract SampleLendingPool is
             interestRate: poolConfig.interestRate,
             startTime: block.timestamp,
             duration: poolConfig.loanDuration,
-            isRepaid: false
+            isRepaid: false,
+            status: LoanStatus.Disbursed
         });
 
         totalFunds -= _amount;
@@ -289,6 +365,136 @@ contract SampleLendingPool is
         if (!success) revert TransferFailed();
 
         return loanId;
+    }
+
+    /**
+     * @notice Turn owner approval on or off for this pool
+     * @param _requiresApproval Whether borrowing should need a decision
+     * @dev Off by default, which is how every pool created before this behaved.
+     * Turning it on does not touch loans already outstanding, and turning it off
+     * leaves any pending request pending — the owner still has to decide, since
+     * the funds were never reserved.
+     */
+    function setRequiresApproval(bool _requiresApproval) external onlyOwner {
+        poolConfig.requiresApproval = _requiresApproval;
+
+        emit ApprovalRequirementChanged(_requiresApproval);
+    }
+
+    /**
+     * @notice Ask to borrow, for the pool owner to decide on
+     * @param _amount Loan amount requested
+     * @return loanId The ID of the request
+     * @dev Every check `createLoan` makes runs here except the liquidity one:
+     * a request reserves nothing, so what matters is whether the pool can cover
+     * it at the moment of approval, which is where it is checked. Requesting
+     * against an empty pool is allowed on purpose — members can fund it while
+     * the request sits.
+     *
+     * The request takes the borrower's `activeLoanId` slot, so a member has one
+     * open request *or* one open loan, never both. `cancelLoanRequest` is what
+     * frees them if the owner never decides.
+     */
+    function requestLoan(
+        uint256 _amount
+    ) external whenNotPaused nonReentrant returns (uint256) {
+        if (!poolConfig.isActive) revert PoolNotActive();
+
+        if (contributions[msg.sender] == 0) revert UnauthorizedBorrower();
+
+        if (activeLoanId[msg.sender] != 0) revert LoanOutstanding();
+
+        if (_amount == 0) revert InvalidAmount();
+
+        if (_amount > poolConfig.maxLoanAmount) revert ExceedsMaxLoanAmount();
+
+        uint256 loanId = nextLoanId++;
+
+        loans[loanId] = Loan({
+            borrower: msg.sender,
+            amount: _amount,
+            interestRate: poolConfig.interestRate,
+            // Stamped again on approval: the term should run from when the
+            // money actually arrives, not from when it was asked for.
+            startTime: block.timestamp,
+            duration: poolConfig.loanDuration,
+            isRepaid: false,
+            status: LoanStatus.Requested
+        });
+
+        activeLoanId[msg.sender] = loanId;
+
+        emit LoanRequested(loanId, msg.sender, _amount);
+
+        return loanId;
+    }
+
+    /**
+     * @notice Approve a pending request and disburse it
+     * @param _loanId The request to approve
+     * @dev Only the pool owner. Liquidity is checked here rather than at request
+     * time because that is when the funds actually move — a pool that was empty
+     * when asked may be fundable by now, and one that was full may not be.
+     */
+    function approveLoan(
+        uint256 _loanId
+    ) external onlyOwner whenNotPaused nonReentrant {
+        Loan storage loan = loans[_loanId];
+
+        if (loan.status != LoanStatus.Requested) revert LoanNotPending();
+
+        uint256 amount = loan.amount;
+        if (amount > totalFunds) revert InsufficientFunds();
+
+        address borrower = loan.borrower;
+
+        // Complete all state changes before the external call (CEI pattern)
+        loan.status = LoanStatus.Disbursed;
+        loan.startTime = block.timestamp;
+        totalFunds -= amount;
+
+        emit LoanApproved(_loanId, borrower, amount);
+
+        (bool success, ) = payable(borrower).call{value: amount}("");
+        if (!success) revert TransferFailed();
+    }
+
+    /**
+     * @notice Turn down a pending request
+     * @param _loanId The request to reject
+     * @dev Only the pool owner. Nothing moves — a request never held funds — so
+     * this only frees the borrower to ask again.
+     */
+    function rejectLoan(uint256 _loanId) external onlyOwner whenNotPaused {
+        Loan storage loan = loans[_loanId];
+
+        if (loan.status != LoanStatus.Requested) revert LoanNotPending();
+
+        loan.status = LoanStatus.Rejected;
+        delete activeLoanId[loan.borrower];
+
+        emit LoanRejected(_loanId, loan.borrower, loan.amount);
+    }
+
+    /**
+     * @notice Withdraw your own pending request
+     * @param _loanId The request to cancel
+     * @dev Without this a borrower whose owner never decides is stuck: the
+     * request holds their `activeLoanId`, so they can neither borrow nor ask
+     * again. Emits the same event as a rejection — the outcome is identical and
+     * the record only tracks the state, not who ended it.
+     */
+    function cancelLoanRequest(uint256 _loanId) external whenNotPaused {
+        Loan storage loan = loans[_loanId];
+
+        if (loan.borrower != msg.sender) revert UnauthorizedBorrower();
+
+        if (loan.status != LoanStatus.Requested) revert LoanNotPending();
+
+        loan.status = LoanStatus.Rejected;
+        delete activeLoanId[msg.sender];
+
+        emit LoanRejected(_loanId, msg.sender, loan.amount);
     }
 
     /**

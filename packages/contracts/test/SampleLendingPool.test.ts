@@ -556,4 +556,166 @@ describe('SampleLendingPool', function () {
       expect(pool.upgradeToAndCall).to.be.undefined
     })
   })
+  describe('Loan approval', function () {
+    const requested = ethers.parseEther('5')
+
+    beforeEach(async function () {
+      // Both parties must be members: borrowing at all requires a contribution.
+      await lendingPool.connect(lender).depositFunds({ value: ethers.parseEther('50') })
+      await lendingPool.connect(borrower).depositFunds({ value: ethers.parseEther('10') })
+    })
+
+    it('lends on demand until the owner asks to review requests', async function () {
+      // The default has to stay what every earlier pool did, or turning this on
+      // by accident would be a silent behaviour change.
+      expect((await lendingPool.poolConfig()).requiresApproval).to.be.false
+
+      await expect(lendingPool.connect(borrower).createLoan(requested)).to.not.be.reverted
+    })
+
+    it('closes the side door once approval is on', async function () {
+      await lendingPool.connect(owner).setRequiresApproval(true)
+
+      await expect(lendingPool.connect(borrower).createLoan(requested)).to.be.revertedWithCustomError(lendingPool, 'ApprovalRequired')
+    })
+
+    it('only lets the owner change the requirement', async function () {
+      await expect(lendingPool.connect(borrower).setRequiresApproval(true)).to.be.reverted
+    })
+
+    it('records a request without moving any funds', async function () {
+      // A request reserves nothing, which is why liquidity is checked at
+      // approval instead.
+      await lendingPool.connect(owner).setRequiresApproval(true)
+      const fundsBefore = await lendingPool.totalFunds()
+
+      await expect(lendingPool.connect(borrower).requestLoan(requested))
+        .to.emit(lendingPool, 'LoanRequested')
+        .withArgs(1, borrower.address, requested)
+
+      expect(await lendingPool.totalFunds()).to.equal(fundsBefore)
+      const loan = await lendingPool.getLoan(1)
+      expect(loan.status).to.equal(1) // Requested
+      expect(loan.isRepaid).to.be.false
+    })
+
+    it('disburses on approval and starts the term then', async function () {
+      await lendingPool.connect(owner).setRequiresApproval(true)
+      await lendingPool.connect(borrower).requestLoan(requested)
+      const requestedAt = (await lendingPool.getLoan(1)).startTime
+
+      await ethers.provider.send('evm_increaseTime', [3600])
+      await expect(lendingPool.connect(owner).approveLoan(1)).to.changeEtherBalance(borrower, requested)
+
+      const loan = await lendingPool.getLoan(1)
+      expect(loan.status).to.equal(0) // Disbursed
+      // The clock runs from when the money arrived, not from when it was asked for.
+      expect(loan.startTime).to.be.greaterThan(requestedAt)
+    })
+
+    it('refuses to approve more than the pool holds', async function () {
+      // Checked at approval, not at request: the balance moves in between.
+      await lendingPool.connect(owner).setRequiresApproval(true)
+      // A member with a small stake asks for the full cap, so the others can
+      // withdraw everything else and leave the pool unable to cover it. The
+      // requester's own stake is locked by the request, hence the small one.
+      await lendingPool.connect(otherAccount).depositFunds({ value: ethers.parseEther('1') })
+      await lendingPool.connect(otherAccount).requestLoan(maxLoanAmount)
+
+      await lendingPool.connect(lender).withdraw(ethers.parseEther('50'))
+      await lendingPool.connect(borrower).withdraw(ethers.parseEther('10'))
+
+      await expect(lendingPool.connect(owner).approveLoan(1)).to.be.revertedWithCustomError(lendingPool, 'InsufficientFunds')
+    })
+
+    it('only lets the owner approve', async function () {
+      await lendingPool.connect(owner).setRequiresApproval(true)
+      await lendingPool.connect(borrower).requestLoan(requested)
+
+      await expect(lendingPool.connect(borrower).approveLoan(1)).to.be.reverted
+    })
+
+    it('frees the borrower when a request is rejected', async function () {
+      await lendingPool.connect(owner).setRequiresApproval(true)
+      await lendingPool.connect(borrower).requestLoan(requested)
+
+      await expect(lendingPool.connect(owner).rejectLoan(1)).to.emit(lendingPool, 'LoanRejected').withArgs(1, borrower.address, requested)
+
+      expect((await lendingPool.getLoan(1)).status).to.equal(2) // Rejected
+      expect(await lendingPool.activeLoanId(borrower.address)).to.equal(0)
+      await expect(lendingPool.connect(borrower).requestLoan(requested)).to.not.be.reverted
+    })
+
+    it('lets a borrower withdraw their own request', async function () {
+      // Without this a borrower whose owner never decides is stuck forever:
+      // the request holds their one open-loan slot.
+      await lendingPool.connect(owner).setRequiresApproval(true)
+      await lendingPool.connect(borrower).requestLoan(requested)
+
+      await expect(lendingPool.connect(borrower).cancelLoanRequest(1)).to.emit(lendingPool, 'LoanRejected')
+
+      expect(await lendingPool.activeLoanId(borrower.address)).to.equal(0)
+    })
+
+    it('does not let one member cancel a request that is not theirs', async function () {
+      await lendingPool.connect(owner).setRequiresApproval(true)
+      await lendingPool.connect(borrower).requestLoan(requested)
+
+      await expect(lendingPool.connect(lender).cancelLoanRequest(1)).to.be.revertedWithCustomError(lendingPool, 'UnauthorizedBorrower')
+    })
+
+    it('allows one open request or loan, never both', async function () {
+      await lendingPool.connect(owner).setRequiresApproval(true)
+      await lendingPool.connect(borrower).requestLoan(requested)
+
+      await expect(lendingPool.connect(borrower).requestLoan(requested)).to.be.revertedWithCustomError(lendingPool, 'LoanOutstanding')
+    })
+
+    it('refuses to act twice on the same request', async function () {
+      await lendingPool.connect(owner).setRequiresApproval(true)
+      await lendingPool.connect(borrower).requestLoan(requested)
+      await lendingPool.connect(owner).approveLoan(1)
+
+      await expect(lendingPool.connect(owner).approveLoan(1)).to.be.revertedWithCustomError(lendingPool, 'LoanNotPending')
+      await expect(lendingPool.connect(owner).rejectLoan(1)).to.be.revertedWithCustomError(lendingPool, 'LoanNotPending')
+    })
+
+    it('refuses a request from someone who has never contributed', async function () {
+      await lendingPool.connect(owner).setRequiresApproval(true)
+
+      await expect(lendingPool.connect(otherAccount).requestLoan(requested)).to.be.revertedWithCustomError(
+        lendingPool,
+        'UnauthorizedBorrower'
+      )
+    })
+
+    it('refuses a request above the per-loan cap', async function () {
+      await lendingPool.connect(owner).setRequiresApproval(true)
+
+      await expect(lendingPool.connect(borrower).requestLoan(maxLoanAmount + 1n)).to.be.revertedWithCustomError(
+        lendingPool,
+        'ExceedsMaxLoanAmount'
+      )
+    })
+
+    it('reads a loan created before the status field as disbursed', async function () {
+      // The enum zero value. A loan written before `status` existed reads zero
+      // for it, and every one of those was disbursed on creation, so
+      // reordering the enum would silently relabel them all.
+      await lendingPool.connect(borrower).createLoan(requested)
+
+      expect((await lendingPool.getLoan(1)).status).to.equal(0)
+    })
+
+    it('repays an approved loan like any other', async function () {
+      await lendingPool.connect(owner).setRequiresApproval(true)
+      await lendingPool.connect(borrower).requestLoan(requested)
+      await lendingPool.connect(owner).approveLoan(1)
+
+      const due = await lendingPool.calculateRepaymentAmount(1)
+      await expect(lendingPool.connect(borrower).repayLoan(1, { value: due })).to.emit(lendingPool, 'LoanRepaid')
+
+      expect((await lendingPool.getLoan(1)).isRepaid).to.be.true
+    })
+  })
 })
