@@ -212,6 +212,30 @@ export interface IndexWithdrawalResponse {
   alreadyIndexed: boolean
 }
 
+export interface SyncPoolEventsRequest {
+  chainId?: number
+  /**
+   * Re-scan from this block instead of resuming from the stored sync state.
+   * `0` sweeps the whole chain. Safe to repeat: every indexer keys on the log,
+   * so a re-scan re-writes nothing.
+   */
+  fromBlock?: number
+}
+
+export interface SyncPoolEventsResponse {
+  chainId: number
+  fromBlock: number
+  /** The last block actually swept — below the head when the run hit its budget. */
+  toBlock: number
+  currentBlock: number
+  /** False when the sweep stopped on its range budget before reaching the head. */
+  caughtUp: boolean
+  /** How many documents this run wrote, per feed; already-indexed logs are not counted. */
+  pools: number
+  contributions: number
+  withdrawals: number
+}
+
 export interface ListWithdrawalsRequest {
   chainId?: number
   /** Restrict to one pool. Omit for every pool on the chain. */

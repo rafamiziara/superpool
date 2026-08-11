@@ -110,14 +110,18 @@ prompt rather than after it.
 ## Known limitations
 
 - **Native currency only.** ERC-20 deposits need contract work.
-- **Nothing can be withdrawn.** `SampleLendingPool` has no withdrawal function,
-  so a member's balance only ever grows. `currentBalance` equals
-  `totalContributed` for that reason, and `totalEarned` is 0 — no interest
-  accrues to anyone yet.
-- **No scheduled sync for deposits.** `syncPoolEvents` covers `PoolCreated`
-  only, so a contribution whose immediate indexing fails waits for the user to
-  reopen the app, where startup recovery drains it. The pool-creation net does
-  not catch this one.
+- **No interest accrues yet**, so `totalEarned` is 0 for everyone. Members can
+  withdraw (`SampleLendingPool.withdraw` → `FundsWithdrawn` → the `withdrawals`
+  collection), and `currentBalance` is deposits minus withdrawals, while
+  `totalContributed` stays lifetime deposits — so someone who withdrew
+  everything still reads as a past member.
+- **The scheduled sweep has never run on its schedule.** `syncPoolEvents` does
+  now cover `FundsDeposited` and `FundsWithdrawn` alongside `PoolCreated`, so a
+  contribution whose immediate indexing fails is caught by the net rather than
+  waiting for the user to reopen the app. But scheduled functions do not fire in
+  the emulator and nothing is deployed yet, so locally the sweep only runs when
+  something triggers it: the `syncPoolEventsNow` callable, or `pnpm testSweep`
+  from `packages/backend`. See [Sweeping](POOL_CREATION.md#sweeping).
 - **The backend serves one chain at a time**, exactly as for pool creation.
 - The `contributions` composite indexes are declared in
   `config/firestore.indexes.json`. The emulator does not enforce them, so a

@@ -12,6 +12,7 @@
     "generateKey": "ts-node scripts/generateKey.ts",
     "signMessage": "ts-node scripts/signMessage.ts",
     "testIndexer": "ts-node scripts/testEventIndexer.ts",
+    "testSweep": "ts-node scripts/testEventSweep.ts",
     "test": "jest",
     "format": "prettier --write . --ignore-path ../../.prettierignore",
     "type-check": "tsc --noEmit",

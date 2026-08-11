@@ -69,9 +69,11 @@ are three independent paths to indexing it. All three funnel into the same
 
 1. **Immediately**, via the `indexPool` callable, once the app sees the receipt.
    This is the fast path and the one that runs in practice.
-2. **On a schedule**, via `syncPoolEvents`, which scans `PoolCreated` events from
-   the last processed block. This is the net for anything the app missed —
-   including a user who closed the app right after signing.
+2. **On a schedule**, via `syncPoolEvents`, which sweeps every SuperPool event —
+   `PoolCreated`, `FundsDeposited` and `FundsWithdrawn` — from the last processed
+   block to the chain head. This is the net for anything the app missed:
+   a user who closed the app right after signing, a seeding script, or a pool
+   created straight against the contract. See [Sweeping](#sweeping) below.
 3. **At app startup**, via `PendingTransactionsInitializer`, which resolves every
    still-`submitted` transaction against the chain and hands whatever confirmed
    to `indexConfirmed()` on the pools screen.
@@ -81,6 +83,68 @@ Idempotency is what makes retrying safe: the Firestore document id is
 reports `alreadyIndexed`. Indexing failures are deliberately silent in the UI —
 the pool exists either way, and the scheduled sync will pick it up, so an error
 message would report a problem the user cannot act on.
+
+## Sweeping
+
+`syncPoolEvents` is the only path that does not need the app to have been
+watching. It is not pool-specific: balances are derived by summing deposits and
+subtracting withdrawals, so a net that caught pools alone would leave every
+figure computed from an incomplete history.
+
+```
+syncPoolEvents (every 5 min)          syncPoolEventsNow (callable)
+        │                                        │
+        └──────────────┬─────────────────────────┘
+                       ▼
+            syncPoolEventsHandler
+        reads event_sync_state/{chainId}
+                       │
+       walks the gap in 500-block ranges
+                       ▼
+              sweepBlockRange
+     PoolCreated → FundsDeposited → FundsWithdrawn
+                       │
+        indexPoolEvent / indexContributionEvent
+              / indexWithdrawalEvent
+```
+
+Things worth knowing before changing it:
+
+- **`FundsDeposited` and `FundsWithdrawn` are queried by topic with no address
+  filter.** They are emitted by each pool contract, not the factory, and the set
+  of pools is exactly what the sweep is still discovering — an address filter
+  would miss a deposit into a pool created in the same range. `resolvePoolId`
+  then proves the emitter is one of ours; anything the factory does not know is
+  skipped silently, because a sweep sees other contracts' logs routinely.
+- **The order within a range is pools → deposits → withdrawals**, so a reader
+  polling mid-sweep never sees a contribution pointing at a pool it cannot find.
+- **The cursor is persisted after every range**, not once at the end, and never
+  moves backwards. A run that dies mid-backfill keeps what it indexed.
+- **A failed `getLogs` stops the run without advancing the cursor**; a single
+  undecodable log is logged and skipped, so it cannot wedge the sweep forever.
+- **One invocation sweeps at most 100 ranges (50,000 blocks).** A long backfill
+  converges over consecutive runs instead of running past the timeout.
+- **A first run with no `START_BLOCK` sweeps a local chain from genesis** and any
+  other chain from `currentBlock - 1000`, with a warning. On a real deployment,
+  set `START_BLOCK` to the factory's deployment block or history older than that
+  window is unreachable.
+
+### Running it locally
+
+Scheduled functions never fire in the Firebase emulator, so the schedule is dead
+locally. Two ways to run the same sweep:
+
+```bash
+# the callable — unauthenticated in the emulator only
+curl -X POST http://127.0.0.1:5001/<project>/us-central1/syncPoolEventsNow \
+  -H "Content-Type: application/json" -d '{"data":{"fromBlock":0}}'
+
+# or the integration script, which also checks the result against the chain
+pnpm --filter backend testSweep
+```
+
+`fromBlock: 0` re-scans from genesis and is safe to repeat — every indexer keys
+on the log, so nothing is written twice.
 
 ## What the user sees
 
@@ -138,8 +202,11 @@ reason this section exists.
   app's multi-chain support is presentational until this changes.
 - **Amoy is undeployed.** Local is the only working environment; it needs a
   funded deployer key and a funded backend wallet.
-- **`syncPoolEvents` has never run against a live chain.** Only the on-demand
-  path is verified end to end.
+- **`syncPoolEvents` has never run on its schedule.** The sweep itself is
+  verified end to end against a live local node — `pnpm --filter backend
+testSweep` backfilled 11 pools, 11 contributions and 4 withdrawals that the
+  on-demand path had missed — but the `onSchedule` trigger only exists in a
+  deployed environment, and there is not one yet.
 - **No gas estimate is shown before signing.** `CreatePoolForm` accepts a
   `gasEstimate` prop that nothing feeds. The estimate still happens inside
   `usePoolCreation` before the wallet opens, so an unaffordable transaction is
@@ -157,7 +224,7 @@ pnpm --filter contracts node:local
 pnpm --filter contracts deploy:local
 
 # terminal 3 — from config/
-npx firebase-tools emulators:start --only functions,firestore,auth --project demo-superpool
+npx firebase-tools emulators:start --only functions,firestore,auth --project genesis-super-pool
 ```
 
 The factory address changes on every redeploy. Update `POOL_FACTORY_ADDRESS` in

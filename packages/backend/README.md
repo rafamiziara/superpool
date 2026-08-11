@@ -113,14 +113,28 @@ Required for local development and Firebase Admin SDK:
   already-stored pool reports `alreadyIndexed` and writes nothing
 - Requires authentication
 
-**`syncPoolEvents`** (scheduled)
+**`syncPoolEvents`** (scheduled, every 5 minutes)
 
 - Backfills anything the immediate path missed — a user who closed the app, a
-  failed callable, a transaction confirmed while offline
-- Scans `PoolCreated` events from the last processed block and updates
-  `event_sync_state` per chain
-- Shares `services/eventIndexer.ts` with `indexPool`, so both paths agree
-- ⚠️ Unit-tested but never exercised against a live chain
+  failed callable, a transaction confirmed while offline, a seeding script
+- Sweeps `PoolCreated`, `FundsDeposited` and `FundsWithdrawn` from the last
+  processed block to the chain head, in 500-block ranges, updating
+  `event_sync_state` per chain after each one
+- Shares `services/eventIndexer.ts`, `contributionIndexer.ts` and
+  `withdrawalIndexer.ts` with the on-demand callables, so every path agrees
+- Set `START_BLOCK` on a deployed chain — a first run without it only looks back
+  1000 blocks
+- ⚠️ Scheduled functions do not fire in the emulator; use `syncPoolEventsNow`
+
+**`syncPoolEventsNow`** (callable)
+
+- Runs the same sweep on demand: the only way to exercise it locally, and how a
+  chain whose history predates the sync state gets backfilled
+- `fromBlock: 0` re-scans from genesis; safe to repeat, since every indexer keys
+  on the log
+- Requires authentication except in the emulator
+- `pnpm testSweep` runs the sweep against a live local node and checks the
+  result against the chain
 
 **`listPools`**
 
