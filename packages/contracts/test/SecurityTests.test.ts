@@ -3,6 +3,25 @@ import { expect } from 'chai'
 import { ethers, upgrades } from 'hardhat'
 import { SampleLendingPool } from '../typechain-types'
 
+/**
+ * Deploys a pool the way the factory does: behind a beacon proxy.
+ *
+ * Not `deployProxy`/UUPS any more — pools are beacon proxies now, and the
+ * implementation deliberately no longer inherits `UUPSUpgradeable`, so a UUPS
+ * deployment is rejected outright. Testing through a beacon is also the only
+ * way these tests exercise the delegation path production actually uses.
+ */
+async function deployPoolBehindBeacon(args: unknown[]): Promise<SampleLendingPool> {
+  const SampleLendingPool = await ethers.getContractFactory('SampleLendingPool')
+  const beacon = await upgrades.deployBeacon(SampleLendingPool)
+  await beacon.waitForDeployment()
+
+  const pool = (await upgrades.deployBeaconProxy(beacon, SampleLendingPool, args)) as unknown as SampleLendingPool
+  await pool.waitForDeployment()
+
+  return pool
+}
+
 describe('Security Tests', function () {
   let lendingPool: SampleLendingPool
   let owner: SignerWithAddress
@@ -16,12 +35,7 @@ describe('Security Tests', function () {
   beforeEach(async function () {
     ;[owner, borrower, lender] = await ethers.getSigners()
 
-    const SampleLendingPool = await ethers.getContractFactory('SampleLendingPool')
-    lendingPool = (await upgrades.deployProxy(SampleLendingPool, [owner.address, maxLoanAmount, interestRate, loanDuration], {
-      initializer: 'initialize',
-      kind: 'uups',
-      unsafeAllowCustomTypes: true,
-    })) as unknown as SampleLendingPool
+    lendingPool = await deployPoolBehindBeacon([owner.address, maxLoanAmount, interestRate, loanDuration])
 
     await lendingPool.waitForDeployment()
 
@@ -109,16 +123,7 @@ describe('Security Tests', function () {
       const largeLoanAmount = ethers.parseEther('1000') // 1000 tokens
       const highInterestRate = 9999 // 99.99%
 
-      const LargeLendingPool = await ethers.getContractFactory('SampleLendingPool')
-      const largeLendingPool = (await upgrades.deployProxy(
-        LargeLendingPool,
-        [owner.address, largeLoanAmount, highInterestRate, loanDuration],
-        {
-          initializer: 'initialize',
-          kind: 'uups',
-          unsafeAllowCustomTypes: true,
-        }
-      )) as unknown as SampleLendingPool
+      const largeLendingPool = await deployPoolBehindBeacon([owner.address, largeLoanAmount, highInterestRate, loanDuration])
 
       await largeLendingPool.waitForDeployment()
 
@@ -149,12 +154,7 @@ describe('Security Tests', function () {
       const maxSafeAmount = ethers.parseEther('100') // 100 tokens
       const maxInterestRate = 10000 // 100%
 
-      const TestPool = await ethers.getContractFactory('SampleLendingPool')
-      const testPool = (await upgrades.deployProxy(TestPool, [owner.address, maxSafeAmount, maxInterestRate, loanDuration], {
-        initializer: 'initialize',
-        kind: 'uups',
-        unsafeAllowCustomTypes: true,
-      })) as unknown as SampleLendingPool
+      const testPool = await deployPoolBehindBeacon([owner.address, maxSafeAmount, maxInterestRate, loanDuration])
 
       await testPool.waitForDeployment()
       await testPool.connect(lender).depositFunds({ value: ethers.parseEther('200') })
@@ -178,12 +178,7 @@ describe('Security Tests', function () {
       ]
 
       for (const testCase of testCases) {
-        const TestPool = await ethers.getContractFactory('SampleLendingPool')
-        const testPool = (await upgrades.deployProxy(TestPool, [owner.address, ethers.parseEther('10'), testCase.rate, loanDuration], {
-          initializer: 'initialize',
-          kind: 'uups',
-          unsafeAllowCustomTypes: true,
-        })) as unknown as SampleLendingPool
+        const testPool = await deployPoolBehindBeacon([owner.address, ethers.parseEther('10'), testCase.rate, loanDuration])
 
         await testPool.waitForDeployment()
         await testPool.connect(lender).depositFunds({ value: ethers.parseEther('20') })
@@ -244,21 +239,12 @@ describe('Security Tests', function () {
 
   describe('Edge Cases and Boundary Testing', function () {
     it('Should handle zero interest rate correctly', async function () {
-      const ZeroInterestPool = await ethers.getContractFactory('SampleLendingPool')
-      const zeroPool = (await upgrades.deployProxy(
-        ZeroInterestPool,
-        [
-          owner.address,
-          ethers.parseEther('10'),
-          0, // 0% interest
-          loanDuration,
-        ],
-        {
-          initializer: 'initialize',
-          kind: 'uups',
-          unsafeAllowCustomTypes: true,
-        }
-      )) as unknown as SampleLendingPool
+      const zeroPool = await deployPoolBehindBeacon([
+        owner.address,
+        ethers.parseEther('10'),
+        0, // 0% interest
+        loanDuration,
+      ])
 
       await zeroPool.waitForDeployment()
       await zeroPool.connect(lender).depositFunds({ value: ethers.parseEther('20') })

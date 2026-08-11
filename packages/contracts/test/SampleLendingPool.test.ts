@@ -3,6 +3,25 @@ import { ethers, upgrades } from 'hardhat'
 import { SignerWithAddress } from '@nomicfoundation/hardhat-ethers/signers'
 import { SampleLendingPool } from '../typechain-types'
 
+/**
+ * Deploys a pool the way the factory does: behind a beacon proxy.
+ *
+ * Not `deployProxy`/UUPS any more — pools are beacon proxies now, and the
+ * implementation deliberately no longer inherits `UUPSUpgradeable`, so a UUPS
+ * deployment is rejected outright. Testing through a beacon is also the only
+ * way these tests exercise the delegation path production actually uses.
+ */
+async function deployPoolBehindBeacon(args: unknown[]): Promise<SampleLendingPool> {
+  const SampleLendingPool = await ethers.getContractFactory('SampleLendingPool')
+  const beacon = await upgrades.deployBeacon(SampleLendingPool)
+  await beacon.waitForDeployment()
+
+  const pool = (await upgrades.deployBeaconProxy(beacon, SampleLendingPool, args)) as unknown as SampleLendingPool
+  await pool.waitForDeployment()
+
+  return pool
+}
+
 describe('SampleLendingPool', function () {
   let lendingPool: SampleLendingPool
   let owner: SignerWithAddress
@@ -19,11 +38,7 @@ describe('SampleLendingPool', function () {
     ;[owner, borrower, lender, otherAccount] = await ethers.getSigners()
 
     // Deploy the contract
-    const SampleLendingPool = await ethers.getContractFactory('SampleLendingPool')
-    lendingPool = (await upgrades.deployProxy(SampleLendingPool, [owner.address, maxLoanAmount, interestRate, loanDuration], {
-      initializer: 'initialize',
-      kind: 'uups',
-    })) as unknown as SampleLendingPool
+    lendingPool = await deployPoolBehindBeacon([owner.address, maxLoanAmount, interestRate, loanDuration])
 
     await lendingPool.waitForDeployment()
   })
@@ -496,10 +511,49 @@ describe('SampleLendingPool', function () {
   })
 
   describe('Upgradeability', function () {
-    it('Should be upgradeable by owner', async function () {
-      const SampleLendingPoolV2 = await ethers.getContractFactory('SampleLendingPool')
+    it('Should upgrade every pool on the beacon at once', async function () {
+      // The whole reason for the beacon. Under ERC-1167 clones each pool
+      // hardcoded its implementation, so an upgrade reached only pools created
+      // afterwards and the population forked on every change.
+      const SampleLendingPool = await ethers.getContractFactory('SampleLendingPool')
+      const beacon = await upgrades.deployBeacon(SampleLendingPool)
+      await beacon.waitForDeployment()
 
-      await expect(upgrades.upgradeProxy(await lendingPool.getAddress(), SampleLendingPoolV2)).to.not.be.reverted
+      const first = (await upgrades.deployBeaconProxy(beacon, SampleLendingPool, [
+        owner.address,
+        maxLoanAmount,
+        interestRate,
+        loanDuration,
+      ])) as unknown as SampleLendingPool
+      const second = (await upgrades.deployBeaconProxy(beacon, SampleLendingPool, [
+        owner.address,
+        maxLoanAmount,
+        interestRate,
+        loanDuration,
+      ])) as unknown as SampleLendingPool
+
+      const before = await upgrades.beacon.getImplementationAddress(await beacon.getAddress())
+
+      await upgrades.upgradeBeacon(beacon, SampleLendingPool, { redeployImplementation: 'always' })
+
+      const after = await upgrades.beacon.getImplementationAddress(await beacon.getAddress())
+      expect(after).to.not.equal(before)
+
+      // Both pools follow the beacon without being touched individually, and
+      // their state survives — the point of upgrading rather than redeploying.
+      expect(await first.owner()).to.equal(owner.address)
+      expect(await second.owner()).to.equal(owner.address)
+      expect((await first.poolConfig()).maxLoanAmount).to.equal(maxLoanAmount)
+    })
+
+    it('Should not pretend to be individually upgradeable', async function () {
+      // The implementation used to inherit UUPSUpgradeable while being deployed
+      // as a minimal clone, so `upgradeToAndCall` existed, wrote the ERC-1967
+      // slot that a clone never reads, and reported success having changed
+      // nothing. Removing it is what makes the upgrade path honest.
+      const pool = lendingPool as unknown as { upgradeToAndCall?: unknown }
+
+      expect(pool.upgradeToAndCall).to.be.undefined
     })
   })
 })

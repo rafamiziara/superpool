@@ -301,6 +301,8 @@ async function main() {
       whitelistMode: await poolFactory.isWhitelistEnabled(),
       contracts: {
         lendingPoolImplementation: implementationAddress,
+        // Every pool proxies through this; upgrading it upgrades them all.
+        poolBeacon: await poolFactory.poolBeacon(),
         poolFactory: {
           proxy: factoryAddress,
           implementation: factoryImplementationAddress,

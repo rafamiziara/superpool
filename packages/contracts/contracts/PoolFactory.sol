@@ -10,19 +10,32 @@ import {
 import {ReentrancyGuardTransient} from "@openzeppelin/contracts/utils/ReentrancyGuardTransient.sol";
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
-import {Clones} from "@openzeppelin/contracts/proxy/Clones.sol";
+import {BeaconProxy} from "@openzeppelin/contracts/proxy/beacon/BeaconProxy.sol";
+import {
+    UpgradeableBeacon
+} from "@openzeppelin/contracts/proxy/beacon/UpgradeableBeacon.sol";
 import {SampleLendingPool} from "./SampleLendingPool.sol";
 
 /**
  * @title PoolFactory
- * @notice Factory contract for deploying and managing lending pools using minimal proxies
+ * @notice Factory contract for deploying and managing lending pools behind a shared beacon
  * @author SuperPool Team
- * @dev Factory contract for deploying and managing lending pools using minimal proxies
- * This contract enables creation of multiple lending pools with different configurations
- * while maintaining upgradability and efficient deployment through proxy patterns.
+ * @dev Pools are BeaconProxy instances pointing at one UpgradeableBeacon that this
+ * factory owns, so upgrading the beacon upgrades every pool at once.
+ *
+ * This replaced ERC-1167 minimal clones, which hardcode their implementation in
+ * bytecode and can never be upgraded: pools created before an implementation
+ * change were stranded on the old code forever, and each change forked the pool
+ * population again. `SampleLendingPool` also inherited `UUPSUpgradeable` under
+ * that scheme, which advertised an upgrade path it did not have — calling
+ * `upgradeToAndCall` on a clone wrote the ERC-1967 slot that a minimal proxy
+ * never reads, so it reported success and changed nothing.
+ *
+ * Pools created before this change keep their old implementation permanently;
+ * nothing can reach them. Everything created from here on upgrades together.
  *
  * Features:
- * - Creates lending pools using minimal proxy pattern (ERC-1167)
+ * - Creates lending pools as beacon proxies, upgradeable as a set
  * - Maintains registry of all deployed pools
  * - Supports both ERC20 and native POL pools
  * - Owner-controlled pool creation with multi-sig compatibility
@@ -35,8 +48,6 @@ contract PoolFactory is
     ReentrancyGuardTransient,
     UUPSUpgradeable
 {
-    using Clones for address;
-
     /// @dev Pool creation parameters
     struct PoolParams {
         uint256 maxLoanAmount;
@@ -82,6 +93,14 @@ contract PoolFactory is
 
     /// @notice Whether pool creation is restricted to whitelist only
     bool public isWhitelistEnabled;
+
+    /**
+     * @notice The beacon every pool proxies through
+     * @dev Appended after `isWhitelistEnabled` on purpose: this factory is itself
+     * behind a UUPS proxy, so storage may only ever grow at the end. Owned by the
+     * factory, which is what lets `updateImplementation` stay `onlyOwner`.
+     */
+    UpgradeableBeacon public poolBeacon;
 
     /// @notice Events
     /**
@@ -149,6 +168,8 @@ contract PoolFactory is
     error EmptyName();
     error ImplementationNotSet();
     error PoolCreationFailed();
+    /// @dev `migrateToBeacon` is a one-time migration; a second call is a mistake.
+    error BeaconAlreadySet();
     error UnauthorizedCreator();
 
     /// @notice Modifier to check if pool exists
@@ -196,6 +217,10 @@ contract PoolFactory is
         __Ownable2Step_init();
         __Pausable_init();
 
+        // The beacon owns the upgrade path for every pool this factory creates.
+        // `lendingPoolImplementation` is kept in step with it so existing readers
+        // — scripts, tests, the backend — keep working unchanged.
+        poolBeacon = new UpgradeableBeacon(_implementation, address(this));
         lendingPoolImplementation = _implementation;
         poolCount = 0;
 
@@ -247,11 +272,12 @@ contract PoolFactory is
         if (_params.interestRate > 10000) revert InvalidInterestRate(); // Max 100%
         if (_params.loanDuration == 0) revert InvalidLoanDuration();
         if (bytes(_params.name).length == 0) revert EmptyName();
-        if (lendingPoolImplementation == address(0))
-            revert ImplementationNotSet();
+        if (address(poolBeacon) == address(0)) revert ImplementationNotSet();
 
-        // Deploy minimal proxy
-        poolAddress = lendingPoolImplementation.clone();
+        // Deploy a beacon proxy. Unlike a clone this keeps no implementation of
+        // its own — it asks the beacon on every call — which is what lets one
+        // upgrade reach every pool.
+        poolAddress = address(new BeaconProxy(address(poolBeacon), ""));
         if (poolAddress == address(0)) revert PoolCreationFailed();
 
         // Initialize the new pool (msg.sender becomes pool owner)
@@ -421,9 +447,33 @@ contract PoolFactory is
         if (_newImplementation == address(0)) revert ImplementationNotSet();
 
         address oldImplementation = lendingPoolImplementation;
+
+        // This is the whole point of the beacon: one write, and every pool ever
+        // created through it runs the new code — including pools that already
+        // exist. Under the old clone scheme this only affected future pools.
+        poolBeacon.upgradeTo(_newImplementation);
         lendingPoolImplementation = _newImplementation;
 
         emit ImplementationUpdated(oldImplementation, _newImplementation);
+    }
+
+    /**
+     * @notice Create the beacon for a factory deployed before beacons existed
+     * @dev A factory upgraded in place has no beacon: `initialize` already ran,
+     * so the constructor-time creation above never happened for it. This runs
+     * once, seeded from whatever implementation the factory was last pointed at.
+     * Pools created before it stay on their hardcoded clone implementation —
+     * nothing can move them.
+     */
+    function migrateToBeacon() external onlyOwner reinitializer(2) {
+        if (address(poolBeacon) != address(0)) revert BeaconAlreadySet();
+        if (lendingPoolImplementation == address(0))
+            revert ImplementationNotSet();
+
+        poolBeacon = new UpgradeableBeacon(
+            lendingPoolImplementation,
+            address(this)
+        );
     }
 
     /**

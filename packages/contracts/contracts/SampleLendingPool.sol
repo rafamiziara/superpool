@@ -9,7 +9,6 @@ import {
 } from "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 import {ReentrancyGuardTransient} from "@openzeppelin/contracts/utils/ReentrancyGuardTransient.sol";
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
-import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
 /**
@@ -18,7 +17,7 @@ import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
  * @author SuperPool Team
  * @dev A sample upgradeable lending pool contract for SuperPool platform
  * This contract demonstrates the basic structure for a lending pool with:
- * - Upgradeable patterns using OpenZeppelin
+ * - Upgraded as a set through the factory's beacon, not per instance
  * - Access control with ownership
  * - Pausable functionality for emergency stops
  * - Reentrancy protection
@@ -27,8 +26,7 @@ contract SampleLendingPool is
     Initializable,
     OwnableUpgradeable,
     PausableUpgradeable,
-    ReentrancyGuardTransient,
-    UUPSUpgradeable
+    ReentrancyGuardTransient
 {
     /// @dev Pool configuration
     struct PoolConfig {
@@ -170,21 +168,6 @@ contract SampleLendingPool is
         nextLoanId = 1;
 
         emit PoolConfigured(_maxLoanAmount, _interestRate, _loanDuration);
-    }
-
-    /**
-     * @notice Authorize contract upgrades (only owner)
-     * @dev Required by UUPSUpgradeable to authorize upgrades
-     * @param newImplementation Address of the new implementation contract
-     */
-    function _authorizeUpgrade(
-        address newImplementation
-    ) internal view override onlyOwner {
-        // Only owner can authorize upgrades
-        // Additional upgrade logic can be added here if needed
-        // For now, the onlyOwner modifier provides sufficient access control
-        // Validation of newImplementation address could be added here
-        if (newImplementation == address(0)) revert InvalidImplementation();
     }
 
     /**
