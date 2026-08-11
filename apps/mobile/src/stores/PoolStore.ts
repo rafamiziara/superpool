@@ -546,6 +546,29 @@ export class PoolStore {
   }
 
   /**
+   * The user's own pools that have somebody waiting on them.
+   *
+   * Owner-side work is otherwise invisible until you open the pool, which is the
+   * wrong way round: a request costs the borrower nothing to make and the owner
+   * everything to miss. This is what lets the dashboard and the pool cards say
+   * so without either of them re-deriving it.
+   *
+   * Ownership is the filter, not membership — you can be a member of a pool
+   * whose requests are none of your business.
+   */
+  get poolsAwaitingMyDecision(): { pool: PoolInfo; requests: LoanInfo[] }[] {
+    return this.pools
+      .filter((pool) => sameAddress(pool.poolOwner, this.userAddress))
+      .map((pool) => ({ pool, requests: this.pendingLoansFor(pool.poolId) }))
+      .filter((entry) => entry.requests.length > 0)
+  }
+
+  /** How many requests are waiting on the user across every pool they own. */
+  get requestsAwaitingMyDecision(): number {
+    return this.poolsAwaitingMyDecision.reduce((total, entry) => total + entry.requests.length, 0)
+  }
+
+  /**
    * Principal currently lent out of one pool, in wei.
    *
    * Requests are excluded: nothing has moved until an owner approves, so

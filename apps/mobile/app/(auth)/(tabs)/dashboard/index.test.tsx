@@ -126,6 +126,77 @@ describe('DashboardScreen', () => {
     MOCK_LOANS.push(...restore)
   })
 
+  // -------------------------------------------------------------------------
+  // Requests waiting on the user.
+  //
+  // Owner-side work was reachable only by opening each pool in turn, so a
+  // request could sit unseen indefinitely.
+  // -------------------------------------------------------------------------
+
+  describe('loan requests waiting on you', () => {
+    /** Pool 2 in the mock data is the one the mock user owns. */
+    function requestOnMyPool(overrides: Record<string, unknown> = {}) {
+      return {
+        id: '31337-2-5',
+        loanId: 5,
+        poolId: 2,
+        poolAddress: poolStore.poolById(2)!.poolAddress,
+        borrower: '0x0000000000000000000000000000000000000042',
+        amount: '4000000000000000000',
+        interestRate: 500,
+        duration: 2_592_000,
+        startedAt: '2026-08-11T09:00:00.000Z',
+        isRepaid: false,
+        status: 'requested' as const,
+        chainId: 31337,
+        transactionHash: '0xaaa',
+        blockNumber: 100,
+        ...overrides,
+      }
+    }
+
+    it('surfaces them on the dashboard, not only inside the pool', () => {
+      poolStore.loanRecords = [requestOnMyPool()]
+
+      const { getByTestId } = render(<DashboardScreen />)
+
+      expect(getByTestId('dashboard-approvals')).toBeTruthy()
+      expect(getByTestId('dashboard-awaiting-chip')).toBeTruthy()
+    })
+
+    it('opens the queue for the pool the request belongs to', () => {
+      poolStore.loanRecords = [requestOnMyPool()]
+
+      const { getByTestId } = render(<DashboardScreen />)
+      fireEvent.press(getByTestId('dashboard-approvals-2'))
+
+      expect(mockRouterPush).toHaveBeenCalledWith('/(auth)/pool/approvals?poolId=2')
+    })
+
+    it('gives each waiting pool its own card', () => {
+      // A single summary would have nowhere to go with two pools waiting: the
+      // queue and the screen that clears it are both per pool. Only pool 2 is
+      // owned by the mock user, so the second one is added here.
+      const second = { ...poolStore.poolById(2)!, poolId: 99, name: 'Second Circle' }
+      poolStore.pools = [...poolStore.pools, second]
+      poolStore.loanRecords = [requestOnMyPool(), requestOnMyPool({ id: '31337-99-1', poolId: 99, loanId: 1 })]
+
+      const { getByTestId } = render(<DashboardScreen />)
+
+      expect(getByTestId('dashboard-approvals-2')).toBeTruthy()
+      expect(getByTestId('dashboard-approvals-99')).toBeTruthy()
+    })
+
+    it('stays silent when nothing is waiting', () => {
+      poolStore.loanRecords = []
+
+      const { queryByTestId } = render(<DashboardScreen />)
+
+      expect(queryByTestId('dashboard-approvals')).toBeNull()
+      expect(queryByTestId('dashboard-awaiting-chip')).toBeNull()
+    })
+  })
+
   describe('pending pool creations', () => {
     it('shows no banner when nothing is in flight', () => {
       const { queryByTestId } = render(<DashboardScreen />)

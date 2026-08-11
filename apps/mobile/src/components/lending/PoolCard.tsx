@@ -1,6 +1,7 @@
 import { FontAwesome } from '@expo/vector-icons'
 import type { PoolInfo, PoolMember } from '@superpool/types'
 import { MemberStatus } from '@superpool/types'
+import { observer } from 'mobx-react-lite'
 import React from 'react'
 import { Pressable, Text, View } from 'react-native'
 import { palette } from '../../constants/palette'
@@ -25,10 +26,19 @@ interface PoolCardProps {
   carousel?: boolean
 }
 
-export function PoolCard({ pool, membership, onPress, carousel = false }: PoolCardProps) {
+/**
+ * An `observer` because it reads the store directly rather than taking
+ * everything as props: the connected wallet decides whether this is your pool,
+ * and the loan records decide whether anyone is waiting on you. Both change
+ * without the props changing, so without this the card keeps a stale answer —
+ * which is how a request lands and the card carries on saying nothing.
+ */
+function PoolCardComponent({ pool, membership, onPress, carousel = false }: PoolCardProps) {
   const accent = accentStyles[ACCENT_CYCLE[pool.poolId % ACCENT_CYCLE.length]]
   const isOwner = sameAddress(pool.poolOwner, poolStore.userAddress)
   const isPending = membership?.status === MemberStatus.PENDING
+  // Only the owner can act on these, so only the owner is told about them.
+  const awaiting = isOwner ? poolStore.pendingLoansFor(pool.poolId).length : 0
 
   return (
     <Pressable
@@ -90,6 +100,24 @@ export function PoolCard({ pool, membership, onPress, carousel = false }: PoolCa
           <Text className="text-xs text-amber">Awaiting admin approval</Text>
         </View>
       )}
+      {/*
+        Below the balance rather than replacing it: an owner is usually a member
+        too, and what they have in the pool and what is waiting on them are
+        different questions.
+      */}
+      {awaiting > 0 && (
+        <View
+          className="mt-3 flex-row items-center gap-2 rounded-2xl border-continuous border-hairline border-amber/20 bg-amber-deep px-4 py-3"
+          testID={`pool-card-awaiting-${pool.poolId}`}
+        >
+          <FontAwesome name="gavel" size={12} color={palette.amber} />
+          <Text className="text-xs font-semibold text-amber">
+            {awaiting === 1 ? '1 loan request waiting on you' : `${awaiting} loan requests waiting on you`}
+          </Text>
+        </View>
+      )}
     </Pressable>
   )
 }
+
+export const PoolCard = observer(PoolCardComponent)

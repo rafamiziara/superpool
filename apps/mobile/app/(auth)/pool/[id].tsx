@@ -5,6 +5,7 @@ import { observer } from 'mobx-react-lite'
 import React, { useState } from 'react'
 import { Pressable, ScrollView, Text, View } from 'react-native'
 import { ActivityRow } from '../../../src/components/lending/ActivityRow'
+import { ApprovalsLink } from '../../../src/components/lending/ApprovalsLink'
 import { PendingContributionCard } from '../../../src/components/lending/PendingContributionCard'
 import { TransactionStatusModal } from '../../../src/components/lending/TransactionStatusModal'
 import { palette } from '../../../src/constants/palette'
@@ -126,22 +127,11 @@ function PoolDetailScreen() {
         */}
         {isOwner && pendingRequests.length > 0 && (
           <View className="mt-6 px-6">
-            <Pressable
+            <ApprovalsLink
+              count={pendingRequests.length}
               onPress={() => router.push(`/(auth)/pool/approvals?poolId=${pool.poolId}`)}
-              className="flex-row items-center gap-4 rounded-3xl border-continuous border-hairline border-amber/20 bg-amber-deep px-5 py-4 active:opacity-80"
               testID="pool-approvals-link"
-            >
-              <View className="h-10 w-10 items-center justify-center rounded-2xl border-continuous bg-amber/10">
-                <FontAwesome name="gavel" size={16} color={palette.amber} />
-              </View>
-              <View className="flex-1">
-                <Text className="text-base font-bold text-snow">
-                  {pendingRequests.length === 1 ? '1 loan request' : `${pendingRequests.length} loan requests`}
-                </Text>
-                <Text className="mt-0.5 text-xs text-fog">Waiting on your decision</Text>
-              </View>
-              <FontAwesome name="chevron-right" size={12} color={palette.mist} />
-            </Pressable>
+            />
           </View>
         )}
 

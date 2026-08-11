@@ -5,6 +5,7 @@ import { observer } from 'mobx-react-lite'
 import React, { useState } from 'react'
 import { Pressable, ScrollView, Text, View } from 'react-native'
 import { ActivityRow } from '../../../../src/components/lending/ActivityRow'
+import { ApprovalsLink } from '../../../../src/components/lending/ApprovalsLink'
 import { PendingTransactionBanner } from '../../../../src/components/lending/PendingTransactionBanner'
 import { PoolCard } from '../../../../src/components/lending/PoolCard'
 import { TransactionStatusModal } from '../../../../src/components/lending/TransactionStatusModal'
@@ -59,11 +60,38 @@ function DashboardScreen() {
                 <Text className="text-xs font-semibold text-iris">1 request in review</Text>
               </View>
             )}
+            {/* Your own borrowing above; what other people need from you here. */}
+            {poolStore.requestsAwaitingMyDecision > 0 && (
+              <View className="rounded-full border-hairline border-veil bg-surface px-4 py-2" testID="dashboard-awaiting-chip">
+                <Text className="text-xs font-semibold text-amber">
+                  {poolStore.requestsAwaitingMyDecision === 1 ? '1 to review' : `${poolStore.requestsAwaitingMyDecision} to review`}
+                </Text>
+              </View>
+            )}
           </View>
         </View>
 
         {/* Pool creations that have not landed yet — invisible on this screen otherwise */}
         <PendingTransactionBanner className="mx-6 mt-6" onPress={setDetail} />
+
+        {/*
+          One card per pool with somebody waiting, rather than a single summary:
+          the queues are per pool and so is the screen that clears them, so a
+          combined card would have nowhere to go when two pools are waiting.
+        */}
+        {poolStore.poolsAwaitingMyDecision.length > 0 && (
+          <View className="mt-6 gap-3 px-6" testID="dashboard-approvals">
+            {poolStore.poolsAwaitingMyDecision.map(({ pool, requests }) => (
+              <ApprovalsLink
+                key={pool.poolId}
+                count={requests.length}
+                poolName={pool.name}
+                onPress={() => router.push(`/(auth)/pool/approvals?poolId=${pool.poolId}`)}
+                testID={`dashboard-approvals-${pool.poolId}`}
+              />
+            ))}
+          </View>
+        )}
 
         {/* Your pools: horizontal macro-cards */}
         <View className="mt-10" testID="dashboard-pools">

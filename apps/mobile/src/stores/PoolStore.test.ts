@@ -1115,6 +1115,31 @@ describe('PoolStore loan states', () => {
       expect(store.myActivity).toHaveLength(1)
     })
 
+    it('lists the pools with somebody waiting on the user', async () => {
+      // LIVE_POOL's owner is not the user, so ownership has to be the filter —
+      // being a member of a pool does not make its queue yours.
+      authStore.walletAddress = LIVE_POOL.poolOwner
+      await loadWithLoans([REQUESTED_LOAN, { ...REQUESTED_LOAN, id: '31337-12-7', loanId: 7, borrower: STRANGER_WALLET }])
+
+      expect(store.poolsAwaitingMyDecision.map((entry) => entry.pool.poolId)).toEqual([12])
+      expect(store.requestsAwaitingMyDecision).toBe(2)
+    })
+
+    it('says nothing is waiting on a pool the user does not own', async () => {
+      authStore.walletAddress = STRANGER_WALLET
+      await loadWithLoans([REQUESTED_LOAN])
+
+      expect(store.poolsAwaitingMyDecision).toEqual([])
+      expect(store.requestsAwaitingMyDecision).toBe(0)
+    })
+
+    it('counts only requests, not loans already decided', async () => {
+      authStore.walletAddress = LIVE_POOL.poolOwner
+      await loadWithLoans([REQUESTED_LOAN, LIVE_LOAN, REJECTED_LOAN, REPAID_LOAN])
+
+      expect(store.requestsAwaitingMyDecision).toBe(1)
+    })
+
     it('does not collide with a contribution id', async () => {
       // Loans key on `${chainId}-${poolId}-${loanId}`, contributions on the log.
       // A collision would drop a row, since the feed is keyed by id.
