@@ -103,7 +103,8 @@ The app never follows the device colour scheme. Three things pin it, and all thr
 Post-login screens live under `app/(auth)/`:
 
 - **`(tabs)/dashboard`** - Balance hero, horizontal pool macro-cards, active loan, quick actions, pending-transaction banner
-- **`(tabs)/pools`** - Pool list with pending/syncing cards, pull-to-refresh, loading/empty/error states
+- **`(tabs)/pools`** - Pool list with pending/syncing cards, loading/empty/error states, and a
+  pull-to-refresh that sweeps the chain before reloading, so pools created outside this app appear
 - **`(tabs)/activity`** - Transaction feed grouped by day
 - **`pool/[id]`** - Pool detail with stats, your position, thumb-zone action bar
 - **`pool/create`** - Create-pool form and submission flow

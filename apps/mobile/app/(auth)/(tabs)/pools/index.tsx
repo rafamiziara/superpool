@@ -73,8 +73,18 @@ function PoolsScreen() {
     void indexConfirmed()
   }, [confirmedHashes, indexConfirmed])
 
+  /**
+   * A pull reaches the chain, not just Firestore: `syncAndRefresh` has the
+   * backend sweep for events nobody indexed — a pool someone else created, a
+   * deposit whose immediate indexing failed — before reloading the list.
+   *
+   * `indexConfirmed` still runs after it. The sweep covers the same events, but
+   * only the per-transaction path clears this device's pending records, so
+   * without it a confirmed creation would keep its "Syncing" card next to the
+   * pool the sweep had just listed.
+   */
   const handleRefresh = useCallback(async () => {
-    await poolStore.refreshPools()
+    await poolStore.syncAndRefresh()
     await indexConfirmed()
   }, [indexConfirmed])
 

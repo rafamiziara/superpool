@@ -9,6 +9,8 @@ import type {
   Loan,
   PoolInfo,
   PoolMember,
+  SyncPoolEventsRequest,
+  SyncPoolEventsResponse,
   Transaction,
   WithdrawalInfo,
 } from '@superpool/types'
@@ -19,6 +21,7 @@ import { DEFAULT_CHAIN_ID } from '../config/contracts'
 import { FIREBASE_FUNCTIONS } from '../config/firebase'
 import { MOCK_LOANS, MOCK_MEMBERSHIPS, MOCK_POOLS, MOCK_TRANSACTIONS, MOCK_USER_ADDRESS } from '../mocks/lending'
 import { sameAddress } from '../utils/format'
+import { logger } from '../utils/logger'
 import { authStore } from './AuthStore'
 
 /**
@@ -90,6 +93,59 @@ export class PoolStore {
   /** Same as `fetchPools`, but leaves the current list on screen while it runs. */
   refreshPools = async (params: ListPoolsRequest = {}): Promise<void> => {
     await this.load(params, 'refresh')
+  }
+
+  /**
+   * Pull-to-refresh: sweep the chain for events the backend has not seen, then
+   * reload.
+   *
+   * Ordered that way so one pull is enough — reloading first would list what
+   * Firestore already had and only show the swept events on the *next* pull.
+   *
+   * `isRefreshing` is raised here rather than left to `load`, so the spinner
+   * covers the sweep as well. Without it the control snaps back and the screen
+   * sits still through the slower half of the refresh.
+   *
+   * Kept separate from `refreshPools` because that one also runs straight after
+   * a transaction the app just indexed itself, where a sweep would be a slow way
+   * to re-fetch work that is already done.
+   */
+  syncAndRefresh = async (params: ListPoolsRequest = {}): Promise<void> => {
+    runInAction(() => {
+      this.isRefreshing = true
+    })
+
+    await this.syncFromChain(params)
+    await this.load(params, 'refresh')
+  }
+
+  /**
+   * Ask the backend to index anything on chain it has not stored yet.
+   *
+   * `listPools` and its siblings read Firestore, so whatever happened outside
+   * this app — a pool created from a script, a deposit whose immediate indexing
+   * failed, a transaction confirmed while the app was closed — stays invisible
+   * until something sweeps it in. `syncPoolEvents` is that something on a
+   * schedule; this is the user asking for it now.
+   *
+   * Best effort, and never throws: the pools already in Firestore load either
+   * way, and a sweep that could not reach the chain is not a problem the user
+   * can act on. Same reasoning as `usePoolIndexing`, and the same reason the
+   * caller does not need a `try`.
+   */
+  syncFromChain = async (params: ListPoolsRequest = {}): Promise<void> => {
+    if (usingMockPools()) return
+
+    try {
+      const syncPoolEventsNow = httpsCallable<SyncPoolEventsRequest, SyncPoolEventsResponse>(FIREBASE_FUNCTIONS, 'syncPoolEventsNow')
+
+      const response = await syncPoolEventsNow({ chainId: params.chainId ?? authStore.chainId ?? DEFAULT_CHAIN_ID })
+
+      logger.debug('🧹 Swept chain events:', response.data)
+    } catch (error) {
+      // Deliberately not surfaced — see the note on this method.
+      logger.warn('Chain sync failed; listing what is already indexed:', error)
+    }
   }
 
   reset = (): void => {

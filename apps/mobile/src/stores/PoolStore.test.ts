@@ -580,3 +580,142 @@ describe('PoolStore contributions', () => {
     expect(store.hasError).toBe(false)
   })
 })
+
+// ---------------------------------------------------------------------------
+// Sweeping the chain on pull-to-refresh.
+// ---------------------------------------------------------------------------
+
+const SWEEP_RESULT = {
+  chainId: 31337,
+  fromBlock: 60,
+  toBlock: 64,
+  currentBlock: 64,
+  caughtUp: true,
+  pools: 1,
+  contributions: 2,
+  withdrawals: 0,
+}
+
+describe('PoolStore chain sync', () => {
+  let store: PoolStore
+  let listPoolsCallable: jest.Mock
+  let syncCallable: jest.Mock
+  /** Every callable invoked, in order, so ordering can be asserted. */
+  let calls: string[]
+
+  beforeEach(() => {
+    jest.clearAllMocks()
+    delete process.env.EXPO_PUBLIC_USE_MOCK_POOLS
+
+    authStore.walletAddress = null
+    authStore.chainId = 31337
+    calls = []
+
+    store = new PoolStore()
+    listPoolsCallable = jest.fn().mockImplementation(() => {
+      calls.push('listPools')
+      return Promise.resolve({
+        data: { pools: [LIVE_POOL], totalCount: 1, page: 1, limit: 50, hasNextPage: false, hasPreviousPage: false },
+      })
+    })
+    syncCallable = jest.fn().mockImplementation(() => {
+      calls.push('syncPoolEventsNow')
+      return Promise.resolve({ data: SWEEP_RESULT })
+    })
+
+    mockFirebaseCallable.mockImplementation((_functions?: unknown, name?: string) => {
+      if (name === 'syncPoolEventsNow') return syncCallable
+      if (name === 'listContributions') return jest.fn().mockResolvedValue({ data: { contributions: [], totalCount: 0, limit: 50 } })
+      if (name === 'listWithdrawals') return jest.fn().mockResolvedValue({ data: { withdrawals: [], totalCount: 0, limit: 50 } })
+      return listPoolsCallable
+    })
+  })
+
+  afterEach(() => {
+    process.env.EXPO_PUBLIC_USE_MOCK_POOLS = 'true'
+    authStore.walletAddress = null
+    authStore.chainId = null
+  })
+
+  it('sweeps the chain before listing, so one pull is enough', async () => {
+    // Listing first would show what Firestore already had and only surface the
+    // swept events on the next pull.
+    await store.syncAndRefresh()
+
+    expect(calls[0]).toBe('syncPoolEventsNow')
+    expect(calls).toContain('listPools')
+  })
+
+  it('sweeps the connected chain', async () => {
+    await store.syncAndRefresh()
+
+    expect(mockFirebaseCallable).toHaveBeenCalledWith(expect.anything(), 'syncPoolEventsNow')
+    expect(syncCallable).toHaveBeenCalledWith({ chainId: 31337 })
+  })
+
+  it('falls back to the default chain when the wallet reports none', async () => {
+    authStore.chainId = null
+
+    await store.syncAndRefresh()
+
+    expect(syncCallable).toHaveBeenCalledWith({ chainId: 31337 })
+  })
+
+  it('shows the refresh spinner for the sweep too, not just the reload', async () => {
+    // Without this the control snaps back and the screen sits still through the
+    // slower half of the refresh.
+    let refreshingDuringSweep: boolean | null = null
+    syncCallable.mockImplementation(() => {
+      refreshingDuringSweep = store.isRefreshing
+      return Promise.resolve({ data: SWEEP_RESULT })
+    })
+
+    await store.syncAndRefresh()
+
+    expect(refreshingDuringSweep).toBe(true)
+    expect(store.isRefreshing).toBe(false)
+  })
+
+  it('still lists what is indexed when the sweep fails', async () => {
+    // A sweep that could not reach the chain is not a problem the user can act
+    // on; the pools already in Firestore are still worth showing.
+    syncCallable.mockRejectedValue(new Error('functions/internal'))
+
+    await expect(store.syncAndRefresh()).resolves.toBeUndefined()
+
+    expect(store.pools).toHaveLength(1)
+    expect(store.hasError).toBe(false)
+    expect(store.isRefreshing).toBe(false)
+  })
+
+  it('leaves the list on screen while it sweeps', async () => {
+    await store.fetchPools()
+    let poolsDuringSweep: number | null = null
+    syncCallable.mockImplementation(() => {
+      poolsDuringSweep = store.pools.length
+      return Promise.resolve({ data: SWEEP_RESULT })
+    })
+
+    await store.syncAndRefresh()
+
+    expect(poolsDuringSweep).toBe(1)
+  })
+
+  it('does not sweep on mock pools', async () => {
+    // Mock mode exists to work on the UI with no emulators running.
+    process.env.EXPO_PUBLIC_USE_MOCK_POOLS = 'true'
+
+    await store.syncAndRefresh()
+
+    expect(syncCallable).not.toHaveBeenCalled()
+  })
+
+  it('does not sweep on an ordinary refresh', async () => {
+    // `refreshPools` also runs straight after a transaction the app indexed
+    // itself, where a sweep is a slow way to re-fetch finished work.
+    await store.refreshPools()
+
+    expect(syncCallable).not.toHaveBeenCalled()
+    expect(calls).toEqual(['listPools'])
+  })
+})

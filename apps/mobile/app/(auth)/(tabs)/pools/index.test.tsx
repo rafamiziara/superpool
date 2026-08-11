@@ -222,6 +222,36 @@ describe('PoolsScreen', () => {
       expect(mockFirebaseCallable).toHaveBeenCalledWith(expect.anything(), 'indexPool')
     })
 
+    it('reaches the chain on pull-to-refresh, not just Firestore', async () => {
+      // The whole point of the pull: re-reading Firestore alone would leave a
+      // pool created outside this app invisible however many times the user
+      // pulled. Mock pools are off for this one test because the sweep is
+      // deliberately skipped on them.
+      delete process.env.EXPO_PUBLIC_USE_MOCK_POOLS
+      mockFirebaseCallable.mockImplementation((_functions?: unknown, name?: string) => {
+        if (name === 'listPools') {
+          return jest.fn().mockResolvedValue({
+            data: { pools: [], totalCount: 0, page: 1, limit: 50, hasNextPage: false, hasPreviousPage: false },
+          })
+        }
+        if (name === 'listContributions') return jest.fn().mockResolvedValue({ data: { contributions: [], totalCount: 0, limit: 50 } })
+        if (name === 'listWithdrawals') return jest.fn().mockResolvedValue({ data: { withdrawals: [], totalCount: 0, limit: 50 } })
+
+        return jest.fn().mockResolvedValue({ data: { caughtUp: true, pools: 0, contributions: 0, withdrawals: 0 } })
+      })
+
+      const { getByTestId } = render(<PoolsScreen />)
+      const { onRefresh } = getByTestId('pools-scroll').props.refreshControl.props
+
+      await act(async () => {
+        await onRefresh()
+      })
+
+      expect(mockFirebaseCallable).toHaveBeenCalledWith(expect.anything(), 'syncPoolEventsNow')
+
+      process.env.EXPO_PUBLIC_USE_MOCK_POOLS = 'true'
+    })
+
     it('shows an empty state when there is nothing to list', () => {
       poolStore.reset()
 

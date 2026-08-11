@@ -129,10 +129,22 @@ Things worth knowing before changing it:
   set `START_BLOCK` to the factory's deployment block or history older than that
   window is unreachable.
 
+### Who triggers it
+
+- **The schedule**, every 5 minutes, in a deployed environment.
+- **Pull-to-refresh on the pools screen**, via `PoolStore.syncAndRefresh`. The
+  sweep runs _before_ the list reloads, so one pull is enough — reloading first
+  would show what Firestore already had and surface the swept events only on the
+  next pull. A failed sweep is silent: the indexed pools still load, and a
+  backend that could not reach the chain is not a problem the user can act on.
+  `refreshPools` deliberately does **not** sweep, because it also runs straight
+  after a transaction the app indexed itself.
+
 ### Running it locally
 
 Scheduled functions never fire in the Firebase emulator, so the schedule is dead
-locally. Two ways to run the same sweep:
+locally — pull-to-refresh is the only trigger the app has. Two more ways to run
+the same sweep by hand:
 
 ```bash
 # the callable — unauthenticated in the emulator only
