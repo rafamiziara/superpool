@@ -6,27 +6,33 @@ import { Text, View } from 'react-native'
 import { palette } from '../../constants/palette'
 import { formatToken, timeAgo } from '../../utils/format'
 
-/** Which way the money moved, **from the pool's side of it**. */
+/** Which way the money moved, relative to whoever the feed is about. */
 type Direction = 'in' | 'out' | 'neutral'
 
 /**
- * Every feed this row appears in — the pool page, the activity tab, the
- * dashboard — lists what happened to *pools*, not to the person looking. The
- * store derives those rows from all contributions, all withdrawals and all
- * loans, because a pool's liquidity is the sum of everyone's, so most rows
- * belong to somebody else.
+ * Whose side of the transaction the row is written from.
  *
- * So the sign is the pool's: a contribution arrives (`+`), a withdrawal and a
- * disbursed loan leave (`−`), a repayment comes back (`+`). Written the other
- * way round — from the wallet's side, where contributing is money going out —
- * it reads backwards on every screen, and reads as nonsense on the rows that
- * are not yours to begin with.
- *
- * The arrows follow the sign rather than the balance: `in` arrives, `out`
- * leaves. "Loan disbursed" rather than "Loan received" for the same reason —
- * received by whom, on a feed of other people's loans.
+ * Not decoration: the two are exact opposites, and the same event is a gain
+ * under one and a loss under the other. A feed that picks the wrong one marks
+ * money you received as negative.
  */
-const txConfig: Record<TransactionType, { icon: keyof typeof FontAwesome.glyphMap; label: string; direction: Direction }> = {
+export type ActivityPerspective = 'pool' | 'wallet'
+
+interface RowConfig {
+  icon: keyof typeof FontAwesome.glyphMap
+  label: string
+  direction: Direction
+}
+
+/**
+ * A pool's own ledger, for a feed listing everything that happened to it.
+ *
+ * `PoolStore` derives those rows from all contributions, all withdrawals and all
+ * loans — a pool's liquidity is the sum of everyone's — so most of them belong
+ * to somebody else, and "did this leave my wallet" is not a question they can
+ * answer. Hence "Loan disbursed" rather than "Loan received": received by whom.
+ */
+const POOL_VIEW: Record<TransactionType, RowConfig> = {
   [TransactionType.CONTRIBUTION]: { icon: 'arrow-down', label: 'Contribution', direction: 'in' },
   [TransactionType.WITHDRAWAL]: { icon: 'arrow-up', label: 'Withdrawal', direction: 'out' },
   // A request moves nothing until somebody decides, so it gets no sign at all.
@@ -36,15 +42,41 @@ const txConfig: Record<TransactionType, { icon: keyof typeof FontAwesome.glyphMa
   [TransactionType.POOL_CREATION]: { icon: 'flag', label: 'Pool created', direction: 'neutral' },
 }
 
+/**
+ * The member's own ledger, and the mirror image of the table above.
+ *
+ * Only correct on a feed already narrowed to one wallet — `PoolStore.myActivity`
+ * — because it reads every row as something that happened to *you*. On an
+ * unfiltered feed it would describe a stranger's deposit as your outgoing money.
+ */
+const WALLET_VIEW: Record<TransactionType, RowConfig> = {
+  [TransactionType.CONTRIBUTION]: { icon: 'arrow-up', label: 'Contribution', direction: 'out' },
+  [TransactionType.WITHDRAWAL]: { icon: 'arrow-down', label: 'Withdrawal', direction: 'in' },
+  [TransactionType.LOAN_REQUEST]: { icon: 'hourglass-half', label: 'Loan request', direction: 'neutral' },
+  [TransactionType.LOAN_DISBURSEMENT]: { icon: 'handshake-o', label: 'Loan received', direction: 'in' },
+  [TransactionType.LOAN_REPAYMENT]: { icon: 'refresh', label: 'Repayment', direction: 'out' },
+  [TransactionType.POOL_CREATION]: { icon: 'flag', label: 'Pool created', direction: 'neutral' },
+}
+
+const VIEWS: Record<ActivityPerspective, Record<TransactionType, RowConfig>> = {
+  pool: POOL_VIEW,
+  wallet: WALLET_VIEW,
+}
+
 const iconColor: Record<Direction, string> = { in: palette.mint, out: palette.fog, neutral: palette.iris }
 
 interface ActivityRowProps {
   tx: Transaction
   poolName?: string
+  /**
+   * Whose ledger this row belongs to. Defaults to the pool's, which is the only
+   * safe answer for a feed that has not been narrowed to one wallet.
+   */
+  perspective?: ActivityPerspective
 }
 
-export function ActivityRow({ tx, poolName }: ActivityRowProps) {
-  const config = txConfig[tx.type]
+export function ActivityRow({ tx, poolName, perspective = 'pool' }: ActivityRowProps) {
+  const config = VIEWS[perspective][tx.type]
   const isPending = tx.status === TransactionStatus.PENDING
 
   return (

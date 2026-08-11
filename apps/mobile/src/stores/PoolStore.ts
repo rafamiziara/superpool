@@ -664,10 +664,37 @@ export class PoolStore {
     })
   }
 
+  /**
+   * Everything that happened to every pool, newest first.
+   *
+   * Pool-wide by construction: the feeds it merges each cover all members,
+   * because a pool's liquidity is the sum of everyone's. Right for a pool's own
+   * page; wrong for anything headed "your activity", which wants `myActivity`.
+   */
   get recentTransactions(): Transaction[] {
     return [...this.transactions, ...this.contributionActivity, ...this.withdrawalActivity, ...this.loanActivity]
       .filter((tx) => tx.status !== TransactionStatus.CANCELLED)
       .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
+  }
+
+  /**
+   * The connected wallet's own activity, newest first.
+   *
+   * Matched on either end of the row rather than on `from` alone, because which
+   * end holds the member depends on the direction: a contribution comes *from*
+   * them, a withdrawal and a disbursed loan go *to* them. The other end is
+   * always the pool, so a row can never match on the wrong side.
+   *
+   * With no wallet connected `userAddress` is `''`, and `sameAddress` refuses to
+   * match an empty address against anything — so this is empty rather than
+   * everything, which is the failure worth having.
+   *
+   * Rows from here must be rendered with the `wallet` perspective: on this feed
+   * a disbursed loan is money the user *received*, and the pool's sign for it
+   * would mark it negative.
+   */
+  get myActivity(): Transaction[] {
+    return this.recentTransactions.filter((tx) => sameAddress(tx.from, this.userAddress) || sameAddress(tx.to, this.userAddress))
   }
 }
 

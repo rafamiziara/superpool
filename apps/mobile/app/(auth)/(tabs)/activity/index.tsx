@@ -29,7 +29,9 @@ function groupTransactions(transactions: Transaction[]): { label: string; items:
 }
 
 function ActivityScreen() {
-  const groups = groupTransactions(poolStore.recentTransactions)
+  // The user's own, not every pool's: the empty state below promises this is
+  // about them, and the rows are signed from their wallet's side to match.
+  const groups = groupTransactions(poolStore.myActivity)
 
   return (
     <View className="flex-1 bg-abyss" testID="activity-screen">
@@ -55,7 +57,7 @@ function ActivityScreen() {
               <Text className="mb-3 text-xs font-semibold uppercase tracking-widest text-mist">{group.label}</Text>
               <View className="rounded-3xl border-continuous border-hairline border-veil bg-surface py-1">
                 {group.items.map((tx) => (
-                  <ActivityRow key={tx.id} tx={tx} poolName={poolStore.poolById(Number(tx.poolId))?.name} />
+                  <ActivityRow key={tx.id} tx={tx} poolName={poolStore.poolById(Number(tx.poolId))?.name} perspective="wallet" />
                 ))}
               </View>
             </View>

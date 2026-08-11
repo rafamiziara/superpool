@@ -1081,6 +1081,40 @@ describe('PoolStore loan states', () => {
       expect(store.recentTransactions).toHaveLength(2)
     })
 
+    it('narrows to the connected wallet for a personal feed', async () => {
+      // The pool feed is everyone's by construction; anything headed "your
+      // activity" has to filter, or it shows strangers' deposits as yours.
+      await loadWithLoans([LIVE_LOAN, { ...LIVE_LOAN, id: '31337-12-9', loanId: 9, borrower: STRANGER_WALLET }])
+
+      expect(store.recentTransactions).toHaveLength(2)
+      expect(store.myActivity.map((tx) => tx.id)).toEqual([LIVE_LOAN.id])
+    })
+
+    it('matches the member on whichever end of the row they are', async () => {
+      // A contribution comes *from* them, a disbursed loan goes *to* them.
+      listContributionsCallable.mockResolvedValue({
+        data: { contributions: [{ ...LIVE_CONTRIBUTION, contributor: USER_WALLET }], totalCount: 1, limit: 50 },
+      })
+      await loadWithLoans([LIVE_LOAN])
+
+      expect(store.myActivity).toHaveLength(2)
+    })
+
+    it('is empty with no wallet connected, rather than everything', async () => {
+      authStore.walletAddress = null
+      await loadWithLoans([LIVE_LOAN])
+
+      expect(store.recentTransactions.length).toBeGreaterThan(0)
+      expect(store.myActivity).toEqual([])
+    })
+
+    it('matches the wallet case-insensitively', async () => {
+      authStore.walletAddress = USER_WALLET.toUpperCase().replace('0X', '0x')
+      await loadWithLoans([LIVE_LOAN])
+
+      expect(store.myActivity).toHaveLength(1)
+    })
+
     it('does not collide with a contribution id', async () => {
       // Loans key on `${chainId}-${poolId}-${loanId}`, contributions on the log.
       // A collision would drop a row, since the feed is keyed by id.

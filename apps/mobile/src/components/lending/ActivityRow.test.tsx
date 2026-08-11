@@ -87,6 +87,43 @@ describe('ActivityRow signs', () => {
     expect(getByText('Pending')).toBeTruthy()
   })
 
+  describe('the wallet perspective', () => {
+    // Only correct on a feed already narrowed to one wallet. The same event is a
+    // gain under one perspective and a loss under the other.
+    it('reads a contribution as money the member sent', () => {
+      const { getByText } = render(<ActivityRow tx={makeTx({ type: TransactionType.CONTRIBUTION })} perspective="wallet" />)
+
+      expect(getByText('−3 POL')).toBeTruthy()
+    })
+
+    it('reads a disbursed loan as money the member received', () => {
+      // The reason the prop exists: the pool's sign would mark this negative.
+      const { getByText } = render(<ActivityRow tx={makeTx({ type: TransactionType.LOAN_DISBURSEMENT })} perspective="wallet" />)
+
+      expect(getByText('+3 POL')).toBeTruthy()
+      expect(getByText('Loan received')).toBeTruthy()
+    })
+
+    it('mirrors the pool exactly', () => {
+      for (const type of [TransactionType.CONTRIBUTION, TransactionType.WITHDRAWAL, TransactionType.LOAN_DISBURSEMENT]) {
+        const asPool = render(<ActivityRow tx={makeTx({ type })} />)
+          .getByText(/POL/)
+          .props.children.join('')
+        const asWallet = render(<ActivityRow tx={makeTx({ type })} perspective="wallet" />)
+          .getByText(/POL/)
+          .props.children.join('')
+
+        expect(asPool.startsWith('+')).toBe(asWallet.startsWith('−'))
+      }
+    })
+
+    it('leaves a request unsigned either way', () => {
+      const { getByText } = render(<ActivityRow tx={makeTx({ type: TransactionType.LOAN_REQUEST })} perspective="wallet" />)
+
+      expect(getByText('3 POL')).toBeTruthy()
+    })
+  })
+
   it('names the pool when given one', () => {
     const { getByText } = render(<ActivityRow tx={makeTx()} poolName="Neighbourhood Circle" />)
 

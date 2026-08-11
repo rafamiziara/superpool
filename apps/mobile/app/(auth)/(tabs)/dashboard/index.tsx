@@ -166,8 +166,9 @@ function DashboardScreen() {
             </Pressable>
           </View>
           <View className="mt-4 rounded-3xl border-continuous border-hairline border-veil bg-surface py-1">
-            {poolStore.recentTransactions.slice(0, 3).map((tx) => (
-              <ActivityRow key={tx.id} tx={tx} poolName={poolStore.poolById(Number(tx.poolId))?.name} />
+            {/* Yours, since this sits under your own balances. */}
+            {poolStore.myActivity.slice(0, 3).map((tx) => (
+              <ActivityRow key={tx.id} tx={tx} poolName={poolStore.poolById(Number(tx.poolId))?.name} perspective="wallet" />
             ))}
           </View>
         </View>
