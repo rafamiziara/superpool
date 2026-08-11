@@ -42,8 +42,35 @@ the change.
 
 **Read the flag from the chain, never from an indexed pool record.** The owner
 can flip it at any moment and nothing indexes that, so a stale answer sends
-`createLoan` at a pool that now reverts. `pool/borrow.tsx` reads
-`poolConfig()` and takes `requiresApproval` from index **4** of the tuple.
+`createLoan` at a pool that now reverts. `pool/borrow.tsx` and
+`pool/settings.tsx` both read `poolConfig()` and take `requiresApproval` from
+index **4** of the tuple.
+
+`pool/settings.tsx` is where an owner turns it on, via `usePoolSettings`. That
+hook is deliberately **outside** the `PendingTransactionsStore` machinery every
+other write goes through: that machinery exists so a transaction the backend has
+not seen yet still shows up, survives an app kill and gets indexed afterwards,
+and none of it applies here. Nothing indexes `ApprovalRequirementChanged` — the
+pool document has no `requiresApproval` field — and every screen that cares reads
+the chain on render, so there is nothing to recover. The hook waits for its own
+receipt instead, because a screen that claimed success before the chain agreed
+would contradict the borrow screen a moment later.
+
+The screen sends the **target value**, not a flip. Writing the value the pool
+already holds is harmless (verified live), whereas a toggle would race a change
+made from elsewhere.
+
+Two things it promises that the contract guarantees, both verified live:
+
+- **Turning approval off leaves requests already waiting exactly where they
+  were.** They stay `Requested`, nothing is disbursed, and the owner can still
+  approve or reject them — a request never reserved funds, so there is nothing
+  for the switch to release.
+- **A pool created before the approval step cannot have one turned on.** Its
+  `poolConfig` does not decode against the current ABI, so the screen says so
+  rather than offering a switch that reverts. `isLoading` is what separates
+  "still reading" from "read, and this pool is too old" — collapsing the two
+  would show the wrong message on every first render.
 
 Where liquidity is checked differs between the two, and deliberately:
 `createLoan` checks `totalFunds` up front, while `requestLoan` does not check it
@@ -186,6 +213,11 @@ inviting an `onlyOwner` revert, and **serialises decisions**: each is a separate
 transaction from the same wallet, and two signature prompts in flight race for one
 nonce — the second replaces the first rather than following it.
 
+`pool/settings.tsx` is the third owner-facing surface, and the only one always
+offered: the setting it carries decides whether a queue can exist at all, so
+hiding it until something happens would make the feature unreachable. The
+approvals link, by contrast, appears only when a request is waiting.
+
 ## Traps
 
 - **All five loan events carry the same three `indexed` parameters**, so
@@ -237,9 +269,9 @@ Same environment as pool creation — see
 pool behind the beacon that you have contributed to; `pnpm --filter backend
 testSweep` reports loans alongside the other feeds.
 
-To exercise the approval path you need a pool with the flag on. There is no UI
-for it — `setRequiresApproval` is owner-only and not exposed — so set it from the
-console:
+To exercise the approval path you need a pool with the flag on. Open the pool as
+its owner and use **Pool settings → Review requests before lending**. From a
+script or an older pool, the same thing from the console:
 
 ```bash
 npx hardhat console --network localhost

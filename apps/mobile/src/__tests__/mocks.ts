@@ -32,10 +32,16 @@ export const mockWagmiUseBalance = jest.fn((): { data?: { value: bigint } } => (
  * screen. Tests dispatch on `functionName` rather than on call order, so adding
  * a read does not shift what an existing assertion sees.
  */
-export const mockWagmiUseReadContract = jest.fn((_config?: { functionName?: string }): { data?: unknown; refetch: jest.Mock } => ({
-  data: undefined,
-  refetch: jest.fn().mockResolvedValue({ data: undefined }),
-}))
+export const mockWagmiUseReadContract = jest.fn(
+  (_config?: { functionName?: string }): { data?: unknown; isLoading?: boolean; refetch: jest.Mock } => ({
+    data: undefined,
+    // Declared so a screen can distinguish "still reading" from "read, and the
+    // answer is nothing" — the two mean different things wherever a contract
+    // getter can legitimately fail to decode.
+    isLoading: false,
+    refetch: jest.fn().mockResolvedValue({ data: undefined }),
+  })
+)
 
 export type MockPublicClient = {
   chain?: { id: number }

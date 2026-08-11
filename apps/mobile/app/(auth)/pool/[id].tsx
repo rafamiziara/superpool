@@ -145,6 +145,30 @@ function PoolDetailScreen() {
           </View>
         )}
 
+        {/*
+          Settings, unlike the queue above, are always offered to the owner: the
+          one setting there is decides whether a queue can exist at all, so
+          hiding it until something happens would make the feature unreachable.
+        */}
+        {isOwner && (
+          <View className="mt-3 px-6">
+            <Pressable
+              onPress={() => router.push(`/(auth)/pool/settings?poolId=${pool.poolId}`)}
+              className="flex-row items-center gap-4 rounded-3xl border-continuous border-hairline border-veil bg-surface px-5 py-4 active:opacity-80"
+              testID="pool-settings-link"
+            >
+              <View className="h-10 w-10 items-center justify-center rounded-2xl border-continuous bg-raised">
+                <FontAwesome name="sliders" size={16} color={palette.mist} />
+              </View>
+              <View className="flex-1">
+                <Text className="text-base font-bold text-snow">Pool settings</Text>
+                <Text className="mt-0.5 text-xs text-fog">Choose whether you review loan requests</Text>
+              </View>
+              <FontAwesome name="chevron-right" size={12} color={palette.mist} />
+            </Pressable>
+          </View>
+        )}
+
         {/* Contributions still in flight — invisible in the liquidity figure until indexed */}
         {pending.length > 0 && (
           <View className="mt-6 gap-3 px-6" testID="pool-pending-contributions">

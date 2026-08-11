@@ -194,6 +194,37 @@ describe('PoolDetailScreen', () => {
     })
   })
 
+  describe('pool settings', () => {
+    it('offers settings to the owner', () => {
+      mockLocalSearchParams.mockReturnValue({ id: SELF_OWNED })
+
+      const { getByTestId } = render(<PoolDetailScreen />)
+
+      fireEvent.press(getByTestId('pool-settings-link'))
+
+      expect(mockRouterPush).toHaveBeenCalledWith('/(auth)/pool/settings?poolId=2')
+    })
+
+    it('offers them even with nothing waiting', () => {
+      // Unlike the approvals queue: the one setting there is decides whether a
+      // queue can exist at all, so hiding it would make the feature unreachable.
+      mockLocalSearchParams.mockReturnValue({ id: SELF_OWNED })
+
+      const { getByTestId, queryByTestId } = render(<PoolDetailScreen />)
+
+      expect(getByTestId('pool-settings-link')).toBeTruthy()
+      expect(queryByTestId('pool-approvals-link')).toBeNull()
+    })
+
+    it('hides them from anyone who is not the owner', () => {
+      mockLocalSearchParams.mockReturnValue({ id: OTHER_OWNED })
+
+      const { queryByTestId } = render(<PoolDetailScreen />)
+
+      expect(queryByTestId('pool-settings-link')).toBeNull()
+    })
+  })
+
   describe('contributions still in flight', () => {
     afterEach(async () => {
       await pendingTransactionsStore.reset()
