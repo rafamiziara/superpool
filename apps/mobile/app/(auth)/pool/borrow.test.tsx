@@ -1,5 +1,6 @@
 import { act, fireEvent, render, waitFor } from '@testing-library/react-native'
 import React from 'react'
+import { mockWagmiUseReadContract } from '../../../src/__tests__/mocks'
 import { mockLocalSearchParams, mockRouterDismissTo } from '../../../src/__tests__/setup'
 import { poolStore } from '../../../src/stores/PoolStore'
 import BorrowScreen from './borrow'
@@ -10,7 +11,9 @@ const TX_HASH = '0xaaaa000000000000000000000000000000000000000000000000000000000
 const POOL_ID = '1'
 
 const mockBorrow = jest.fn()
+const mockRequestLoan = jest.fn()
 const mockRepay = jest.fn()
+const mockCancelLoanRequest = jest.fn()
 const mockWaitForTransaction = jest.fn()
 const mockTriggerIndexing = jest.fn()
 const mockReset = jest.fn()
@@ -24,12 +27,31 @@ jest.mock('../../../src/hooks/pools/useLoan', () => ({
   ...jest.requireActual('../../../src/hooks/pools/useLoan'),
   useLoan: () => ({
     borrow: mockBorrow,
+    requestLoan: mockRequestLoan,
     repay: mockRepay,
+    cancelLoanRequest: mockCancelLoanRequest,
     isSubmitting: false,
     error: mockLoanError,
     reset: mockReset,
   }),
 }))
+
+/**
+ * Answers the screen's two chain reads.
+ *
+ * `poolConfig` is a five-member tuple and `requiresApproval` is the last of
+ * them; the screen reads it positionally, so the fixture has to be the same
+ * shape the ABI decodes to rather than an object.
+ */
+function mockChainReads({ requiresApproval = false, available = 100_000_000_000_000_000_000n } = {}) {
+  mockWagmiUseReadContract.mockImplementation((config?: { functionName?: string }) => {
+    if (config?.functionName === 'poolConfig') {
+      return { data: [10_000_000_000_000_000_000n, 500n, 2_592_000n, true, requiresApproval], refetch: jest.fn() }
+    }
+
+    return { data: available, refetch: jest.fn() }
+  })
+}
 
 jest.mock('../../../src/hooks/pools/useTransactionMonitoring', () => ({
   useTransactionMonitoring: () => ({ waitForTransaction: mockWaitForTransaction, isWaiting: false, error: null }),
@@ -65,9 +87,12 @@ beforeEach(async () => {
   mockLoanError = null
   mockLocalSearchParams.mockReturnValue({ poolId: POOL_ID })
   mockBorrow.mockResolvedValue(TX_HASH)
+  mockRequestLoan.mockResolvedValue(TX_HASH)
   mockRepay.mockResolvedValue(TX_HASH)
+  mockCancelLoanRequest.mockResolvedValue(TX_HASH)
   mockWaitForTransaction.mockResolvedValue({ loanId: 3, amount: '5000000000000000000' })
   mockTriggerIndexing.mockResolvedValue(undefined)
+  mockChainReads()
   await poolStore.fetchPools()
   poolStore.loanRecords = []
 })
@@ -223,6 +248,168 @@ describe('BorrowScreen', () => {
 
       expect(getByTestId('borrow-form')).toBeTruthy()
       expect(queryByTestId('repay-panel')).toBeNull()
+    })
+  })
+
+  // -------------------------------------------------------------------------
+  // Pools whose owner reviews before lending.
+  //
+  // `requiresApproval` is read from the chain on every render, not from the
+  // indexed pool record: the owner can flip it at any moment and nothing
+  // indexes that, so a stale answer sends `createLoan` at a pool that now
+  // reverts with `ApprovalRequired`.
+  // -------------------------------------------------------------------------
+
+  describe('requesting', () => {
+    beforeEach(() => {
+      mockChainReads({ requiresApproval: true })
+    })
+
+    it('sends requestLoan rather than createLoan', async () => {
+      const { getByTestId } = render(<BorrowScreen />)
+
+      fireEvent.changeText(getByTestId('borrow-amount'), '5')
+      await act(async () => {
+        fireEvent.press(getByTestId('borrow-submit'))
+      })
+
+      expect(mockRequestLoan).toHaveBeenCalledWith(expect.objectContaining({ poolId: 1, amount: 5_000_000_000_000_000_000n }))
+      expect(mockBorrow).not.toHaveBeenCalled()
+    })
+
+    it('borrows directly when the pool does not review', async () => {
+      mockChainReads({ requiresApproval: false })
+      const { getByTestId } = render(<BorrowScreen />)
+
+      fireEvent.changeText(getByTestId('borrow-amount'), '5')
+      await act(async () => {
+        fireEvent.press(getByTestId('borrow-submit'))
+      })
+
+      expect(mockBorrow).toHaveBeenCalled()
+      expect(mockRequestLoan).not.toHaveBeenCalled()
+    })
+
+    it('indexes it as a request, not a borrow', async () => {
+      const { getByTestId } = render(<BorrowScreen />)
+
+      fireEvent.changeText(getByTestId('borrow-amount'), '5')
+      await act(async () => {
+        fireEvent.press(getByTestId('borrow-submit'))
+      })
+
+      await waitFor(() => expect(mockTriggerIndexing).toHaveBeenCalledWith(TX_HASH, 'REQUEST_LOAN'))
+    })
+
+    it('does not claim the funds are on their way', async () => {
+      // Nothing moved. Saying otherwise is the one thing this screen must not do.
+      const { getByTestId, getByText, queryByText } = render(<BorrowScreen />)
+
+      fireEvent.changeText(getByTestId('borrow-amount'), '5')
+      await act(async () => {
+        fireEvent.press(getByTestId('borrow-submit'))
+      })
+
+      await waitFor(() => expect(getByTestId('borrow-success')).toBeTruthy())
+      expect(getByText('Request sent')).toBeTruthy()
+      expect(queryByText('Loan disbursed')).toBeNull()
+    })
+
+    it('does not block the form on liquidity the contract will not check', async () => {
+      // `requestLoan` ignores the balance — what matters is whether the pool can
+      // cover it when the owner decides — so refusing on today's figure would
+      // turn away a request the contract would have taken.
+      mockWagmiUseReadContract.mockImplementation((config?: { functionName?: string }) => {
+        if (config?.functionName === 'poolConfig') {
+          return { data: [10_000_000_000_000_000_000n, 500n, 2_592_000n, true, true], refetch: jest.fn() }
+        }
+
+        return { data: 1n, refetch: jest.fn() }
+      })
+      const { getByTestId, queryByTestId } = render(<BorrowScreen />)
+
+      fireEvent.changeText(getByTestId('borrow-amount'), '5')
+
+      expect(queryByTestId('borrow-exceeds-available')).toBeNull()
+      await act(async () => {
+        fireEvent.press(getByTestId('borrow-submit'))
+      })
+      expect(mockRequestLoan).toHaveBeenCalled()
+    })
+  })
+
+  describe('a request waiting on the owner', () => {
+    beforeEach(() => {
+      poolStore.loanRecords = [outstandingLoan({ loanId: 5, status: 'requested' })]
+    })
+
+    it('shows the waiting panel instead of the form', () => {
+      const { getByTestId, queryByTestId } = render(<BorrowScreen />)
+
+      expect(getByTestId('pending-request-panel')).toBeTruthy()
+      expect(queryByTestId('borrow-form')).toBeNull()
+    })
+
+    it('does not offer to repay it', () => {
+      // The regression `activeLoanFor` used to have: a request is not repaid,
+      // but nothing was ever disbursed to repay.
+      const { queryByTestId } = render(<BorrowScreen />)
+
+      expect(queryByTestId('repay-panel')).toBeNull()
+    })
+
+    it('withdraws the request with its id', async () => {
+      const { getByTestId } = render(<BorrowScreen />)
+
+      await act(async () => {
+        fireEvent.press(getByTestId('cancel-request-submit'))
+      })
+
+      expect(mockCancelLoanRequest).toHaveBeenCalledWith(expect.objectContaining({ loanId: 5, amount: 4_000_000_000_000_000_000n }))
+      await waitFor(() => expect(mockTriggerIndexing).toHaveBeenCalledWith(TX_HASH, 'CANCEL_LOAN_REQUEST'))
+    })
+
+    it('says the request was withdrawn, not that a loan was repaid', async () => {
+      const { getByTestId, getByText } = render(<BorrowScreen />)
+
+      await act(async () => {
+        fireEvent.press(getByTestId('cancel-request-submit'))
+      })
+
+      await waitFor(() => expect(getByTestId('borrow-success')).toBeTruthy())
+      expect(getByText('Request withdrawn')).toBeTruthy()
+    })
+
+    it('surfaces a failed cancellation without leaving the panel', async () => {
+      mockCancelLoanRequest.mockRejectedValue(new Error('This request has already been decided'))
+      const { getByTestId } = render(<BorrowScreen />)
+
+      await act(async () => {
+        fireEvent.press(getByTestId('cancel-request-submit'))
+      })
+
+      expect(getByTestId('cancel-request-error')).toBeTruthy()
+      expect(getByTestId('pending-request-panel')).toBeTruthy()
+    })
+
+    it('ignores another wallet’s request in the same pool', async () => {
+      poolStore.loanRecords = [outstandingLoan({ status: 'requested', borrower: '0x0000000000000000000000000000000000000042' })]
+
+      const { getByTestId, queryByTestId } = render(<BorrowScreen />)
+
+      expect(getByTestId('borrow-form')).toBeTruthy()
+      expect(queryByTestId('pending-request-panel')).toBeNull()
+    })
+
+    it('ignores a request that was turned down', async () => {
+      // A rejection frees the borrower to ask again, so the form is what they
+      // need — not a panel about a request that is over.
+      poolStore.loanRecords = [outstandingLoan({ status: 'rejected' })]
+
+      const { getByTestId, queryByTestId } = render(<BorrowScreen />)
+
+      expect(getByTestId('borrow-form')).toBeTruthy()
+      expect(queryByTestId('pending-request-panel')).toBeNull()
     })
   })
 

@@ -1,3 +1,4 @@
+import { FontAwesome } from '@expo/vector-icons'
 import { router, Stack, useLocalSearchParams } from 'expo-router'
 import { StatusBar } from 'expo-status-bar'
 import { observer } from 'mobx-react-lite'
@@ -6,6 +7,7 @@ import { Pressable, ScrollView, Text, View } from 'react-native'
 import { ActivityRow } from '../../../src/components/lending/ActivityRow'
 import { PendingContributionCard } from '../../../src/components/lending/PendingContributionCard'
 import { TransactionStatusModal } from '../../../src/components/lending/TransactionStatusModal'
+import { palette } from '../../../src/constants/palette'
 import { type ContributeTransaction, type PendingTransaction, pendingTransactionsStore } from '../../../src/stores/PendingTransactionsStore'
 import { poolStore } from '../../../src/stores/PoolStore'
 import { bpsToPercent, formatDuration, formatToken, sameAddress, shortAddress } from '../../../src/utils/format'
@@ -29,6 +31,9 @@ function PoolDetailScreen() {
   const pool = poolStore.poolById(Number(id))
   const membership = pool ? poolStore.membershipFor(pool.poolId) : undefined
   const outstandingLoan = pool ? poolStore.activeLoanFor(pool.poolId) : undefined
+  /** Every member's request awaiting a decision — the owner's queue, not the user's. */
+  const pendingRequests = pool ? poolStore.pendingLoansFor(pool.poolId) : []
+  const myRequest = pool ? poolStore.pendingLoanFor(pool.poolId) : undefined
   const transactions = pool ? poolStore.transactionsFor(pool.poolId) : []
 
   /** Deposits into this pool that the backend has not indexed yet. */
@@ -113,6 +118,33 @@ function PoolDetailScreen() {
           </View>
         )}
 
+        {/*
+          The owner's queue. Shown only when something is actually waiting: a
+          pool that lends on demand never produces a request, so a permanent
+          entry point would be dead weight on most pools. Counting is not
+          filtered by wallet — the owner is deciding on other people's requests.
+        */}
+        {isOwner && pendingRequests.length > 0 && (
+          <View className="mt-6 px-6">
+            <Pressable
+              onPress={() => router.push(`/(auth)/pool/approvals?poolId=${pool.poolId}`)}
+              className="flex-row items-center gap-4 rounded-3xl border-continuous border-hairline border-amber/20 bg-amber-deep px-5 py-4 active:opacity-80"
+              testID="pool-approvals-link"
+            >
+              <View className="h-10 w-10 items-center justify-center rounded-2xl border-continuous bg-amber/10">
+                <FontAwesome name="gavel" size={16} color={palette.amber} />
+              </View>
+              <View className="flex-1">
+                <Text className="text-base font-bold text-snow">
+                  {pendingRequests.length === 1 ? '1 loan request' : `${pendingRequests.length} loan requests`}
+                </Text>
+                <Text className="mt-0.5 text-xs text-fog">Waiting on your decision</Text>
+              </View>
+              <FontAwesome name="chevron-right" size={12} color={palette.mist} />
+            </Pressable>
+          </View>
+        )}
+
         {/* Contributions still in flight — invisible in the liquidity figure until indexed */}
         {pending.length > 0 && (
           <View className="mt-6 gap-3 px-6" testID="pool-pending-contributions">
@@ -165,9 +197,12 @@ function PoolDetailScreen() {
           className="flex-1 items-center justify-center rounded-2xl border-continuous border-hairline border-veil bg-raised py-4 active:scale-[0.97] active:opacity-80"
           testID="pool-request-loan-button"
         >
-          {/* One screen for both directions: the contract allows a single open
-              loan per member per pool, so there is nothing to choose between. */}
-          <Text className="text-sm font-bold text-snow">{outstandingLoan ? 'Repay loan' : 'Request loan'}</Text>
+          {/* One screen for all three: the contract holds a single activeLoanId
+              per member per pool, so whatever is in that slot is the only thing
+              there is to act on. */}
+          <Text className="text-sm font-bold text-snow">
+            {outstandingLoan ? 'Repay loan' : myRequest ? 'Your request' : 'Request loan'}
+          </Text>
         </Pressable>
       </View>
 

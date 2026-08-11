@@ -30,8 +30,21 @@ export interface BorrowFormProps {
   interestRate: number
   /** Seconds. Shown as the term, though nothing on chain enforces it. */
   loanDuration: number
-  /** Liquidity the pool currently holds, in wei, when known. */
+  /**
+   * Liquidity the pool currently holds, in wei, when known.
+   *
+   * Omitted when the pool reviews requests: `requestLoan` does not check the
+   * balance, so blocking on today's figure would refuse a request the contract
+   * would have taken.
+   */
   available?: bigint
+  /**
+   * Whether this pool's owner reviews requests before lending.
+   *
+   * Changes what the form promises, not what it collects — the amount and the
+   * repayment total are the same question either way.
+   */
+  requiresApproval?: boolean
   onSubmit: (amount: bigint) => void | Promise<void>
   isSubmitting?: boolean
   /** Shown above the button — the flow's error, not a field's. */
@@ -53,6 +66,7 @@ export function BorrowForm({
   interestRate,
   loanDuration,
   available,
+  requiresApproval = false,
   onSubmit,
   isSubmitting = false,
   error,
@@ -86,7 +100,9 @@ export function BorrowForm({
   return (
     <View className="gap-5" testID="borrow-form">
       <View className="rounded-3xl border-continuous border-hairline border-veil bg-surface p-5">
-        <Text className="text-[10px] font-semibold uppercase tracking-widest text-mist">Borrowing from</Text>
+        <Text className="text-[10px] font-semibold uppercase tracking-widest text-mist">
+          {requiresApproval ? 'Requesting from' : 'Borrowing from'}
+        </Text>
         <Text className="mt-2 text-lg font-bold text-snow" numberOfLines={1}>
           {poolName}
         </Text>
@@ -135,7 +151,11 @@ export function BorrowForm({
           <Text className="text-sm text-fog">
             You will repay <Text className="font-mono font-bold text-snow">{formatToken(repayment)}</Text> POL in total.
           </Text>
-          <Text className="mt-1 text-xs text-mist">Interest is fixed when the loan is created — repaying early costs the same.</Text>
+          <Text className="mt-1 text-xs text-mist">
+            {requiresApproval
+              ? 'At this pool’s current rate. Interest is fixed when the owner approves, so it can change before then.'
+              : 'Interest is fixed when the loan is created — repaying early costs the same.'}
+          </Text>
         </View>
       )}
 
@@ -172,7 +192,9 @@ export function BorrowForm({
         accessibilityState={{ disabled: !canSubmit }}
         className="items-center justify-center rounded-2xl border-continuous bg-mint px-6 py-4 shadow-glow-mint active:opacity-90 disabled:bg-veil disabled:shadow-none"
       >
-        <Text className="text-base font-bold text-abyss disabled:text-mist">{isSubmitting ? 'Submitting…' : 'Borrow'}</Text>
+        <Text className="text-base font-bold text-abyss disabled:text-mist">
+          {isSubmitting ? 'Submitting…' : requiresApproval ? 'Request loan' : 'Borrow'}
+        </Text>
       </Pressable>
     </View>
   )

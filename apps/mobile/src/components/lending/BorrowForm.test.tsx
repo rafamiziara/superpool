@@ -123,4 +123,46 @@ describe('BorrowForm', () => {
 
     expect(getByTestId('borrow-error')).toBeTruthy()
   })
+
+  describe('when the pool reviews requests first', () => {
+    it('asks rather than borrows', () => {
+      const { getByText } = renderForm({ requiresApproval: true })
+
+      expect(getByText('Request loan')).toBeTruthy()
+      expect(getByText('Requesting from')).toBeTruthy()
+    })
+
+    it('does not promise the rate is fixed yet', () => {
+      // Interest is set when the owner approves, which may be days later at a
+      // rate they have since changed.
+      const { getByTestId, getByText } = renderForm({ requiresApproval: true })
+
+      fireEvent.changeText(getByTestId('borrow-amount'), '4')
+
+      expect(getByText(/fixed when the owner approves/)).toBeTruthy()
+    })
+
+    it('still collects the same amount and total', () => {
+      // 4 POL at 500 bps = 4.2. What is being asked for does not change.
+      const { getByTestId, onSubmit } = renderForm({ requiresApproval: true })
+
+      fireEvent.changeText(getByTestId('borrow-amount'), '4')
+      expect(getByTestId('borrow-repayment')).toBeTruthy()
+
+      fireEvent.press(getByTestId('borrow-submit'))
+
+      expect(onSubmit).toHaveBeenCalledWith(4_000_000_000_000_000_000n)
+    })
+
+    it('still enforces the per-loan cap', () => {
+      // `requestLoan` checks `maxLoanAmount` even though it skips liquidity.
+      const { getByTestId, onSubmit } = renderForm({ requiresApproval: true })
+
+      fireEvent.changeText(getByTestId('borrow-amount'), '11')
+      fireEvent.press(getByTestId('borrow-submit'))
+
+      expect(getByTestId('borrow-exceeds-max')).toBeTruthy()
+      expect(onSubmit).not.toHaveBeenCalled()
+    })
+  })
 })

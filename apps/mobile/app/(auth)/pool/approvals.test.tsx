@@ -1,0 +1,238 @@
+import type { LoanInfo } from '@superpool/types'
+import { act, fireEvent, render, waitFor } from '@testing-library/react-native'
+import React from 'react'
+import { mockWagmiUseReadContract } from '../../../src/__tests__/mocks'
+import { mockLocalSearchParams } from '../../../src/__tests__/setup'
+import { MOCK_USER_ADDRESS } from '../../../src/mocks/lending'
+import { authStore } from '../../../src/stores/AuthStore'
+import { poolStore } from '../../../src/stores/PoolStore'
+import ApprovalsScreen from './approvals'
+
+const TX_HASH = '0xaaaa000000000000000000000000000000000000000000000000000000000001'
+
+/** Pool 2 in the mock data is the one the mock user owns. */
+const POOL_ID = '2'
+/** Pool 1 belongs to someone else — the subject for the not-owner path. */
+const POOL_I_DO_NOT_OWN = '1'
+const STRANGER = '0x0000000000000000000000000000000000000042'
+
+const mockApproveLoan = jest.fn()
+const mockRejectLoan = jest.fn()
+const mockWaitForTransaction = jest.fn()
+const mockTriggerIndexing = jest.fn()
+const mockReset = jest.fn()
+let mockLoanError: string | null = null
+
+jest.mock('expo-status-bar', () => ({
+  StatusBar: () => null,
+}))
+
+jest.mock('../../../src/hooks/pools/useLoan', () => ({
+  ...jest.requireActual('../../../src/hooks/pools/useLoan'),
+  useLoan: () => ({
+    approveLoan: mockApproveLoan,
+    rejectLoan: mockRejectLoan,
+    isSubmitting: false,
+    error: mockLoanError,
+    reset: mockReset,
+  }),
+}))
+
+jest.mock('../../../src/hooks/pools/useTransactionMonitoring', () => ({
+  useTransactionMonitoring: () => ({ waitForTransaction: mockWaitForTransaction, isWaiting: false, error: null }),
+}))
+
+jest.mock('../../../src/hooks/pools/usePoolIndexing', () => ({
+  usePoolIndexing: () => ({ triggerIndexing: mockTriggerIndexing, indexConfirmed: jest.fn(), isIndexing: false }),
+}))
+
+function makeRequest(overrides: Partial<LoanInfo> = {}): LoanInfo {
+  return {
+    id: '31337-2-5',
+    loanId: 5,
+    poolId: 2,
+    poolAddress: poolStore.poolById(2)!.poolAddress,
+    borrower: STRANGER,
+    amount: '4000000000000000000',
+    interestRate: 500,
+    duration: 2_592_000,
+    startedAt: '2026-08-11T09:00:00.000Z',
+    isRepaid: false,
+    status: 'requested',
+    chainId: 31337,
+    transactionHash: '0xaaa',
+    blockNumber: 100,
+    ...overrides,
+  }
+}
+
+beforeEach(async () => {
+  jest.clearAllMocks()
+  mockLoanError = null
+  mockLocalSearchParams.mockReturnValue({ poolId: POOL_ID })
+  mockApproveLoan.mockResolvedValue(TX_HASH)
+  mockRejectLoan.mockResolvedValue(TX_HASH)
+  mockWaitForTransaction.mockResolvedValue({ loanId: 5, amount: '4000000000000000000' })
+  mockTriggerIndexing.mockResolvedValue(undefined)
+  mockWagmiUseReadContract.mockReturnValue({ data: 100_000_000_000_000_000_000n, refetch: jest.fn().mockResolvedValue({ data: 0n }) })
+  authStore.walletAddress = null
+  await poolStore.fetchPools()
+  poolStore.loanRecords = []
+})
+
+afterEach(() => {
+  poolStore.loanRecords = []
+  authStore.walletAddress = null
+})
+
+describe('ApprovalsScreen', () => {
+  it('says so when the pool is not available', () => {
+    mockLocalSearchParams.mockReturnValue({ poolId: '9999' })
+
+    const { getByTestId } = render(<ApprovalsScreen />)
+
+    expect(getByTestId('approvals-pool-not-found')).toBeTruthy()
+  })
+
+  it('turns away anyone who is not the pool owner', () => {
+    // `approveLoan` and `rejectLoan` are `onlyOwner`, so showing the queue would
+    // invite a transaction that reverts.
+    mockLocalSearchParams.mockReturnValue({ poolId: POOL_I_DO_NOT_OWN })
+    poolStore.loanRecords = [makeRequest({ id: '31337-1-5', poolId: 1 })]
+
+    const { getByTestId, queryByTestId } = render(<ApprovalsScreen />)
+
+    expect(getByTestId('approvals-not-owner')).toBeTruthy()
+    expect(queryByTestId('loan-request-card-5')).toBeNull()
+  })
+
+  it('lets the owner in whatever case their wallet reports', () => {
+    // Indexed addresses are lowercased; a connected wallet is checksummed. A
+    // strict compare would lock an owner out of their own pool.
+    authStore.walletAddress = MOCK_USER_ADDRESS.toLowerCase()
+
+    const { getByTestId } = render(<ApprovalsScreen />)
+
+    expect(getByTestId('approvals-screen')).toBeTruthy()
+  })
+
+  it('says there is nothing to decide when the queue is empty', () => {
+    const { getByTestId } = render(<ApprovalsScreen />)
+
+    expect(getByTestId('approvals-empty')).toBeTruthy()
+  })
+
+  it('lists every member’s request, not just the owner’s own', () => {
+    // The whole point of the screen: the owner is deciding on other people's
+    // requests, so filtering by the connected wallet would empty it.
+    poolStore.loanRecords = [makeRequest(), makeRequest({ id: '31337-2-6', loanId: 6 })]
+
+    const { getByTestId } = render(<ApprovalsScreen />)
+
+    expect(getByTestId('loan-request-card-5')).toBeTruthy()
+    expect(getByTestId('loan-request-card-6')).toBeTruthy()
+  })
+
+  it('leaves out loans that are already disbursed or decided', () => {
+    poolStore.loanRecords = [
+      makeRequest(),
+      makeRequest({ id: '31337-2-7', loanId: 7, status: 'disbursed' }),
+      makeRequest({ id: '31337-2-8', loanId: 8, status: 'rejected' }),
+    ]
+
+    const { getByTestId, queryByTestId } = render(<ApprovalsScreen />)
+
+    expect(getByTestId('loan-request-card-5')).toBeTruthy()
+    expect(queryByTestId('loan-request-card-7')).toBeNull()
+    expect(queryByTestId('loan-request-card-8')).toBeNull()
+  })
+
+  it('leaves out another pool’s requests', () => {
+    poolStore.loanRecords = [makeRequest({ id: '31337-3-5', poolId: 3 })]
+
+    const { getByTestId } = render(<ApprovalsScreen />)
+
+    expect(getByTestId('approvals-empty')).toBeTruthy()
+  })
+
+  describe('deciding', () => {
+    beforeEach(() => {
+      poolStore.loanRecords = [makeRequest()]
+    })
+
+    it('approves with the loan id and names the borrower', async () => {
+      // The sender is the owner, so without the borrower every card in this
+      // queue would report the decider as the person who asked.
+      const { getByTestId } = render(<ApprovalsScreen />)
+
+      await act(async () => {
+        fireEvent.press(getByTestId('loan-request-approve-5'))
+      })
+
+      expect(mockApproveLoan).toHaveBeenCalledWith(
+        expect.objectContaining({ poolId: 2, loanId: 5, amount: 4_000_000_000_000_000_000n, borrower: STRANGER })
+      )
+    })
+
+    it('indexes an approval as an approval', async () => {
+      const { getByTestId } = render(<ApprovalsScreen />)
+
+      await act(async () => {
+        fireEvent.press(getByTestId('loan-request-approve-5'))
+      })
+
+      await waitFor(() => expect(mockTriggerIndexing).toHaveBeenCalledWith(TX_HASH, 'APPROVE_LOAN'))
+    })
+
+    it('sends a decline through rejectLoan', async () => {
+      const { getByTestId } = render(<ApprovalsScreen />)
+
+      await act(async () => {
+        fireEvent.press(getByTestId('loan-request-reject-5'))
+      })
+
+      expect(mockRejectLoan).toHaveBeenCalledWith(expect.objectContaining({ loanId: 5 }))
+      expect(mockApproveLoan).not.toHaveBeenCalled()
+      await waitFor(() => expect(mockTriggerIndexing).toHaveBeenCalledWith(TX_HASH, 'REJECT_LOAN'))
+    })
+
+    it('re-reads the pool balance after a decision', async () => {
+      // An approval moves money out, so the figure the remaining cards are
+      // judged against has just changed.
+      const refetch = jest.fn().mockResolvedValue({ data: 0n })
+      mockWagmiUseReadContract.mockReturnValue({ data: 100_000_000_000_000_000_000n, refetch })
+      const { getByTestId } = render(<ApprovalsScreen />)
+
+      await act(async () => {
+        fireEvent.press(getByTestId('loan-request-approve-5'))
+      })
+
+      await waitFor(() => expect(refetch).toHaveBeenCalled())
+    })
+
+    it('surfaces a refused signature and leaves the queue in place', async () => {
+      mockApproveLoan.mockRejectedValue(new Error('This request has already been decided'))
+      const { getByTestId } = render(<ApprovalsScreen />)
+
+      await act(async () => {
+        fireEvent.press(getByTestId('loan-request-approve-5'))
+      })
+
+      expect(getByTestId('approvals-error')).toBeTruthy()
+      expect(getByTestId('loan-request-card-5')).toBeTruthy()
+    })
+
+    it('does not index a decision it could not confirm', async () => {
+      // The pending record survives, so startup recovery finishes it.
+      mockWaitForTransaction.mockRejectedValue(new Error('Timed out'))
+      const { getByTestId } = render(<ApprovalsScreen />)
+
+      await act(async () => {
+        fireEvent.press(getByTestId('loan-request-approve-5'))
+      })
+
+      expect(mockTriggerIndexing).not.toHaveBeenCalled()
+      expect(getByTestId('approvals-error')).toBeTruthy()
+    })
+  })
+})

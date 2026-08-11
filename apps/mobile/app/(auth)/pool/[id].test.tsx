@@ -111,6 +111,89 @@ describe('PoolDetailScreen', () => {
     expect(mockRouterPush).toHaveBeenCalledWith('/(auth)/pool/borrow?poolId=1')
   })
 
+  // -------------------------------------------------------------------------
+  // The owner's queue of loan requests.
+  //
+  // Only pools whose owner turned review on ever produce one, so the entry
+  // point is conditional on there actually being something to decide rather
+  // than on the pool existing.
+  // -------------------------------------------------------------------------
+
+  describe('loan requests waiting on the owner', () => {
+    afterEach(() => {
+      poolStore.loanRecords = []
+    })
+
+    function pendingRequest(overrides: Record<string, unknown> = {}) {
+      return {
+        id: '31337-2-5',
+        loanId: 5,
+        poolId: 2,
+        poolAddress: poolStore.poolById(2)!.poolAddress,
+        borrower: '0x0000000000000000000000000000000000000042',
+        amount: '4000000000000000000',
+        interestRate: 500,
+        duration: 2_592_000,
+        startedAt: '2026-08-11T09:00:00.000Z',
+        isRepaid: false,
+        status: 'requested' as const,
+        chainId: 31337,
+        transactionHash: '0xaaa',
+        blockNumber: 100,
+        ...overrides,
+      }
+    }
+
+    it('offers the queue to the owner when something is waiting', () => {
+      mockLocalSearchParams.mockReturnValue({ id: SELF_OWNED })
+      poolStore.loanRecords = [pendingRequest()]
+
+      const { getByTestId } = render(<PoolDetailScreen />)
+
+      fireEvent.press(getByTestId('pool-approvals-link'))
+
+      expect(mockRouterPush).toHaveBeenCalledWith('/(auth)/pool/approvals?poolId=2')
+    })
+
+    it('counts every member’s request, not the owner’s own', () => {
+      mockLocalSearchParams.mockReturnValue({ id: SELF_OWNED })
+      poolStore.loanRecords = [pendingRequest(), pendingRequest({ id: '31337-2-6', loanId: 6 })]
+
+      const { getByText } = render(<PoolDetailScreen />)
+
+      expect(getByText('2 loan requests')).toBeTruthy()
+    })
+
+    it('stays hidden when nothing is waiting', () => {
+      // A pool that lends on demand never produces a request, so a permanent
+      // entry point would be dead weight on most pools.
+      mockLocalSearchParams.mockReturnValue({ id: SELF_OWNED })
+
+      const { queryByTestId } = render(<PoolDetailScreen />)
+
+      expect(queryByTestId('pool-approvals-link')).toBeNull()
+    })
+
+    it('stays hidden from anyone who is not the owner', () => {
+      // Deciding is `onlyOwner`; offering it to a member invites a revert.
+      mockLocalSearchParams.mockReturnValue({ id: OTHER_OWNED })
+      poolStore.loanRecords = [pendingRequest({ id: '31337-1-5', poolId: 1 })]
+
+      const { queryByTestId } = render(<PoolDetailScreen />)
+
+      expect(queryByTestId('pool-approvals-link')).toBeNull()
+    })
+
+    it('sends the borrower to their own request rather than a new one', () => {
+      mockLocalSearchParams.mockReturnValue({ id: SELF_OWNED })
+      poolStore.loanRecords = [pendingRequest({ borrower: poolStore.userAddress })]
+
+      const { getByText } = render(<PoolDetailScreen />)
+
+      expect(getByText('Your request')).toBeTruthy()
+    })
+  })
+
   describe('contributions still in flight', () => {
     afterEach(async () => {
       await pendingTransactionsStore.reset()
