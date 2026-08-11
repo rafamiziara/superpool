@@ -3,13 +3,15 @@ import { Firestore } from 'firebase-admin/firestore'
 import { logger } from 'firebase-functions/v2'
 import { PoolFactoryABI, SampleLendingPoolABI } from '../constants'
 import { indexContributionEvent, parseFundsDepositedLog, resolvePoolId } from './contributionIndexer'
-import { fetchPoolDescription, indexPoolEvent, parsePoolCreatedLog } from './eventIndexer'
+import { fetchPoolActive, fetchPoolDescription, indexPoolEvent, parsePoolCreatedLog, updatePoolActive } from './eventIndexer'
 import { indexWithdrawalEvent, parseFundsWithdrawnLog } from './withdrawalIndexer'
 
 const poolFactoryInterface = new Interface([...PoolFactoryABI])
 const lendingPoolInterface = new Interface([...SampleLendingPoolABI])
 
 const POOL_CREATED_TOPIC = poolFactoryInterface.getEvent('PoolCreated')!.topicHash
+const POOL_DEACTIVATED_TOPIC = poolFactoryInterface.getEvent('PoolDeactivated')!.topicHash
+const POOL_REACTIVATED_TOPIC = poolFactoryInterface.getEvent('PoolReactivated')!.topicHash
 const FUNDS_DEPOSITED_TOPIC = lendingPoolInterface.getEvent('FundsDeposited')!.topicHash
 const FUNDS_WITHDRAWN_TOPIC = lendingPoolInterface.getEvent('FundsWithdrawn')!.topicHash
 
@@ -21,6 +23,8 @@ export interface SweepCounts {
   pools: number
   contributions: number
   withdrawals: number
+  /** Pools whose stored `isActive` disagreed with the chain and was corrected. */
+  statusUpdates: number
 }
 
 export interface SweepBlockRangeOptions {
@@ -83,7 +87,13 @@ async function getPoolId(poolAddress: string, factoryAddress: string, provider: 
  * of ours, which it has to do regardless since anyone can emit a log of the
  * same shape from their own contract.
  */
-async function queryLogs(provider: Provider, topic: string, fromBlock: number, toBlock: number, address?: string): Promise<Log[]> {
+async function queryLogs(
+  provider: Provider,
+  topic: string | string[],
+  fromBlock: number,
+  toBlock: number,
+  address?: string
+): Promise<Log[]> {
   return provider.getLogs({ fromBlock, toBlock, topics: [topic], ...(address ? { address } : {}) })
 }
 
@@ -115,6 +125,42 @@ async function sweepPoolCreated(options: SweepBlockRangeOptions, caches: SweepCa
   }
 
   return stored
+}
+
+/**
+ * Reconcile the active flag of every pool whose status changed in the range.
+ *
+ * Both events are fetched in one query — `topics: [[a, b]]` is a topic-OR — but
+ * that is for economy, not ordering: the flag is read from the factory rather
+ * than inferred from which event arrived, so a pool toggled twice in one range
+ * only needs looking up once, and the answer is the same whichever order the
+ * logs came in. Hence the dedupe by pool id.
+ */
+async function sweepPoolStatus(options: SweepBlockRangeOptions): Promise<number> {
+  const { provider, firestore, chainId, factoryAddress, fromBlock, toBlock } = options
+
+  const logs = await queryLogs(provider, [POOL_DEACTIVATED_TOPIC, POOL_REACTIVATED_TOPIC], fromBlock, toBlock, factoryAddress)
+
+  // `poolId` is the first indexed parameter of both events, so it is topic 1.
+  const poolIds = new Set(logs.map((log) => Number(BigInt(log.topics[1]))))
+
+  let updated = 0
+
+  for (const poolId of poolIds) {
+    try {
+      const isActive = await fetchPoolActive(poolId, factoryAddress, provider)
+
+      if (await updatePoolActive(poolId, chainId, isActive, firestore)) updated++
+    } catch (error) {
+      logger.error('Failed to sweep pool status change', {
+        chainId,
+        poolId,
+        error: error instanceof Error ? error.message : String(error),
+      })
+    }
+  }
+
+  return updated
 }
 
 async function sweepFundsDeposited(options: SweepBlockRangeOptions, caches: SweepCaches): Promise<number> {
@@ -185,11 +231,13 @@ async function sweepFundsWithdrawn(options: SweepBlockRangeOptions, caches: Swee
 /**
  * Index every SuperPool event in one block range.
  *
- * The three feeds are swept in dependency order — pools, then deposits, then
- * withdrawals — so that a pool created and funded within the same range is
- * already in Firestore by the time its deposits land. Nothing enforces that
- * order downstream, but a reader that polls mid-sweep should never see a
- * contribution pointing at a pool it cannot find.
+ * The feeds are swept in dependency order — pools, then their status, then
+ * deposits and withdrawals — so that a pool created and funded within the same
+ * range is already in Firestore by the time its deposits land, and a pool
+ * created and deactivated in one range gets its flag corrected rather than
+ * being listed as active. Nothing enforces that order downstream, but a reader
+ * that polls mid-sweep should never see a contribution pointing at a pool it
+ * cannot find.
  *
  * A failed `getLogs` throws, so the caller can leave the sync cursor where it
  * was and retry the range. Failures on a single log do not: they are logged and
@@ -199,8 +247,9 @@ export async function sweepBlockRange(options: SweepBlockRangeOptions): Promise<
   const caches: SweepCaches = { blockTimestamps: new Map(), poolIds: new Map() }
 
   const pools = await sweepPoolCreated(options, caches)
+  const statusUpdates = await sweepPoolStatus(options)
   const contributions = await sweepFundsDeposited(options, caches)
   const withdrawals = await sweepFundsWithdrawn(options, caches)
 
-  return { pools, contributions, withdrawals }
+  return { pools, contributions, withdrawals, statusUpdates }
 }

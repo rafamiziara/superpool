@@ -19,11 +19,15 @@ jest.mock('ethers', () => {
       decodeEventLog: mockDecodeEventLog,
       getEvent: mockGetEvent,
     })),
+    // Delegates to the real Contract by default so the suites that predate this
+    // mock behave exactly as before; the pool-status tests override it.
+    Contract: jest.fn().mockImplementation((...args: unknown[]) => new actual.Contract(...(args as [string, object, object]))),
   }
 })
 
 // Import AFTER mocks are registered
-const { parsePoolCreatedLog, indexPoolEvent, indexPoolByTxHash } = require('./eventIndexer')
+const { parsePoolCreatedLog, indexPoolEvent, indexPoolByTxHash, fetchPoolActive, updatePoolActive } = require('./eventIndexer')
+const { Contract } = require('ethers')
 
 // ---------------------------------------------------------------------------
 // Shared test constants
@@ -557,5 +561,130 @@ describe('indexPoolByTxHash', () => {
 
     // Assert — the poolId comes from decodeEventLog BigInt(1) = 1
     expect(result.poolId).toBe(1)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Pool status reconciliation.
+//
+// `isActive` is written true when a pool is first indexed. Nothing else ever
+// touched it, so a pool deactivated on chain was listed forever — these two are
+// what closes that.
+// ---------------------------------------------------------------------------
+
+describe('fetchPoolActive', () => {
+  const FACTORY_ADDRESS = '0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512'
+  const defaultContract = Contract.getMockImplementation()
+
+  afterEach(() => {
+    Contract.mockImplementation(defaultContract)
+  })
+
+  it.each([
+    ['active', true],
+    ['inactive', false],
+  ])('should return the factory answer for a pool that is %s', async (_name, isActive) => {
+    // Arrange
+    const mockIsPoolActive = jest.fn().mockResolvedValue(isActive)
+    Contract.mockImplementation(() => ({ isPoolActive: mockIsPoolActive }))
+
+    // Act
+    const result = await fetchPoolActive(7, FACTORY_ADDRESS, {})
+
+    // Assert
+    expect(result).toBe(isActive)
+    expect(mockIsPoolActive).toHaveBeenCalledWith(7)
+  })
+
+  it('should let a failed read surface rather than guessing a flag', async () => {
+    // Arrange
+    // Defaulting to `true` here would silently re-activate a deactivated pool;
+    // the caller logs and skips instead, leaving the stored value alone.
+    Contract.mockImplementation(() => ({ isPoolActive: jest.fn().mockRejectedValue(new Error('call reverted')) }))
+
+    // Act & Assert
+    await expect(fetchPoolActive(7, FACTORY_ADDRESS, {})).rejects.toThrow('call reverted')
+  })
+})
+
+describe('updatePoolActive', () => {
+  function buildMockFirestore(options: { exists?: boolean; storedIsActive?: boolean } = {}) {
+    const { exists = true, storedIsActive = true } = options
+    const mockUpdate = jest.fn().mockResolvedValue(undefined)
+    const mockDocRef = {
+      get: jest.fn().mockResolvedValue({ exists, data: () => (exists ? { isActive: storedIsActive } : null) }),
+      update: mockUpdate,
+    }
+    const mockCollection = jest.fn().mockReturnValue({ doc: jest.fn().mockReturnValue(mockDocRef) })
+
+    return { mockFs: { collection: mockCollection }, mockDocRef, mockCollection }
+  }
+
+  it('should write the new flag and report the change', async () => {
+    // Arrange
+    const { mockFs, mockDocRef } = buildMockFirestore({ storedIsActive: true })
+
+    // Act
+    const changed = await updatePoolActive(7, CHAIN_ID, false, mockFs)
+
+    // Assert
+    expect(changed).toBe(true)
+    expect(mockDocRef.update).toHaveBeenCalledWith({ isActive: false })
+  })
+
+  it('should reactivate a pool that came back', async () => {
+    // Arrange
+    const { mockFs, mockDocRef } = buildMockFirestore({ storedIsActive: false })
+
+    // Act
+    const changed = await updatePoolActive(7, CHAIN_ID, true, mockFs)
+
+    // Assert
+    expect(changed).toBe(true)
+    expect(mockDocRef.update).toHaveBeenCalledWith({ isActive: true })
+  })
+
+  it('should not write when the stored flag already agrees', async () => {
+    // Arrange
+    // Every sweep re-reads settled history; writing each time would make the
+    // reported counts meaningless and cost a write per pool per run.
+    const { mockFs, mockDocRef } = buildMockFirestore({ storedIsActive: false })
+
+    // Act
+    const changed = await updatePoolActive(7, CHAIN_ID, false, mockFs)
+
+    // Assert
+    expect(changed).toBe(false)
+    expect(mockDocRef.update).not.toHaveBeenCalled()
+  })
+
+  it('should skip a pool that was never indexed rather than create a stub', async () => {
+    // Arrange
+    // The pool's creation predates the sync window. A status-only document
+    // would put a pool with no name, owner or terms in front of the user.
+    const { mockFs, mockDocRef } = buildMockFirestore({ exists: false })
+
+    // Act
+    const changed = await updatePoolActive(7, CHAIN_ID, false, mockFs)
+
+    // Assert
+    expect(changed).toBe(false)
+    expect(mockDocRef.update).not.toHaveBeenCalled()
+    expect(mockLogger.warn).toHaveBeenCalledWith(
+      'Pool status changed for a pool that was never indexed; skipping',
+      expect.objectContaining({ poolId: 7, chainId: CHAIN_ID })
+    )
+  })
+
+  it('should address the document by chain and pool id', async () => {
+    // Arrange
+    const { mockFs, mockCollection } = buildMockFirestore()
+
+    // Act
+    await updatePoolActive(7, CHAIN_ID, false, mockFs)
+
+    // Assert
+    expect(mockCollection).toHaveBeenCalledWith('pools')
+    expect(mockCollection.mock.results[0].value.doc).toHaveBeenCalledWith(`${CHAIN_ID}-7`)
   })
 })

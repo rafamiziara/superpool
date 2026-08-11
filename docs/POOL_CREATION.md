@@ -70,8 +70,8 @@ are three independent paths to indexing it. All three funnel into the same
 1. **Immediately**, via the `indexPool` callable, once the app sees the receipt.
    This is the fast path and the one that runs in practice.
 2. **On a schedule**, via `syncPoolEvents`, which sweeps every SuperPool event —
-   `PoolCreated`, `FundsDeposited` and `FundsWithdrawn` — from the last processed
-   block to the chain head. This is the net for anything the app missed:
+   `PoolCreated`, `PoolDeactivated`/`PoolReactivated`, `FundsDeposited` and
+   `FundsWithdrawn` — from the last processed block to the chain head. This is the net for anything the app missed:
    a user who closed the app right after signing, a seeding script, or a pool
    created straight against the contract. See [Sweeping](#sweeping) below.
 3. **At app startup**, via `PendingTransactionsInitializer`, which resolves every
@@ -102,10 +102,11 @@ syncPoolEvents (every 5 min)          syncPoolEventsNow (callable)
        walks the gap in 500-block ranges
                        ▼
               sweepBlockRange
-     PoolCreated → FundsDeposited → FundsWithdrawn
+   PoolCreated → Pool(De|Re)activated → FundsDeposited
+                       → FundsWithdrawn
                        │
-        indexPoolEvent / indexContributionEvent
-              / indexWithdrawalEvent
+        indexPoolEvent / updatePoolActive
+   / indexContributionEvent / indexWithdrawalEvent
 ```
 
 Things worth knowing before changing it:
@@ -116,8 +117,18 @@ Things worth knowing before changing it:
   would miss a deposit into a pool created in the same range. `resolvePoolId`
   then proves the emitter is one of ours; anything the factory does not know is
   skipped silently, because a sweep sees other contracts' logs routinely.
-- **The order within a range is pools → deposits → withdrawals**, so a reader
-  polling mid-sweep never sees a contribution pointing at a pool it cannot find.
+- **The order within a range is pools → status → deposits → withdrawals**, so a
+  reader polling mid-sweep never sees a contribution pointing at a pool it cannot
+  find, and a pool created and deactivated inside one range exists before its
+  flag is applied.
+- **`isActive` is read from the factory, not inferred from the event.**
+  `PoolDeactivated` and `PoolReactivated` carry no state, so the sweep calls
+  `isPoolActive` and writes today's answer. That makes the result independent of
+  the order logs are processed in and makes re-scanning old blocks harmless — a
+  replayed deactivation from block 40 cannot un-do a reactivation at block 90.
+  It is also the only path that ever revisits `isActive`: the flag is written
+  `true` at creation and no on-demand callable touches it, so before this a pool
+  deactivated on chain was listed forever.
 - **The cursor is persisted after every range**, not once at the end, and never
   moves backwards. A run that dies mid-backfill keeps what it indexed.
 - **A failed `getLogs` stops the run without advancing the cursor**; a single

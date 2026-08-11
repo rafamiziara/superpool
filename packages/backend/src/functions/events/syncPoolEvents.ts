@@ -80,8 +80,10 @@ export function resolveInitialFromBlock(currentBlock: number, chainId: number): 
  * and `indexWithdrawal` each cover one transaction the app just watched confirm,
  * and anything that happened outside the app — seeding scripts, a direct
  * contract call, a transaction the app missed the receipt for — exists only on
- * chain until this runs. All three feeds are covered, because a sweep that
- * caught pools alone left balances derived from an incomplete history.
+ * chain until this runs. Every feed is covered, because a sweep that caught
+ * pools alone left balances derived from an incomplete history — and pool
+ * deactivation has no on-demand path at all, so this is the only thing that
+ * ever reconciles it.
  *
  * @throws {Error} If the provider or the chain head cannot be reached at all.
  *   Per-range and per-log failures are logged and do not throw — the cursor
@@ -111,7 +113,7 @@ export const syncPoolEventsHandler = async (options: SyncPoolEventsOptions = {})
     fromBlock = resolveInitialFromBlock(currentBlock, chainId)
   }
 
-  const totals: SweepCounts = { pools: 0, contributions: 0, withdrawals: 0 }
+  const totals: SweepCounts = { pools: 0, contributions: 0, withdrawals: 0, statusUpdates: 0 }
 
   if (fromBlock > currentBlock) {
     logger.info('Already synced up to current block, nothing to do', { chainId, lastProcessedBlock, currentBlock })
@@ -145,6 +147,7 @@ export const syncPoolEventsHandler = async (options: SyncPoolEventsOptions = {})
     totals.pools += counts.pools
     totals.contributions += counts.contributions
     totals.withdrawals += counts.withdrawals
+    totals.statusUpdates += counts.statusUpdates
     lastSweptBlock = toBlock
 
     // Persisted per range, not once at the end: a run that times out or dies
@@ -163,6 +166,7 @@ export const syncPoolEventsHandler = async (options: SyncPoolEventsOptions = {})
           totalPoolsIndexed: FieldValue.increment(counts.pools),
           totalContributionsIndexed: FieldValue.increment(counts.contributions),
           totalWithdrawalsIndexed: FieldValue.increment(counts.withdrawals),
+          totalPoolStatusUpdates: FieldValue.increment(counts.statusUpdates),
         },
         { merge: true }
       )

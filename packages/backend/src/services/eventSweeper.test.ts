@@ -12,7 +12,7 @@ jest.mock('./withdrawalIndexer')
 // from the shipped ABIs, and a stubbed Interface would agree with whatever the
 // test invented rather than with the contracts.
 const { sweepBlockRange } = require('./eventSweeper')
-const { fetchPoolDescription, indexPoolEvent, parsePoolCreatedLog } = require('./eventIndexer')
+const { fetchPoolActive, fetchPoolDescription, indexPoolEvent, parsePoolCreatedLog, updatePoolActive } = require('./eventIndexer')
 const { indexContributionEvent, parseFundsDepositedLog, resolvePoolId } = require('./contributionIndexer')
 const { indexWithdrawalEvent, parseFundsWithdrawnLog } = require('./withdrawalIndexer')
 
@@ -31,6 +31,8 @@ const BLOCK_TIMESTAMP = 1700000000
 const POOL_CREATED_TOPIC = new Interface([...PoolFactoryABI]).getEvent('PoolCreated')!.topicHash
 const FUNDS_DEPOSITED_TOPIC = new Interface([...SampleLendingPoolABI]).getEvent('FundsDeposited')!.topicHash
 const FUNDS_WITHDRAWN_TOPIC = new Interface([...SampleLendingPoolABI]).getEvent('FundsWithdrawn')!.topicHash
+const POOL_DEACTIVATED_TOPIC = new Interface([...PoolFactoryABI]).getEvent('PoolDeactivated')!.topicHash
+const POOL_REACTIVATED_TOPIC = new Interface([...PoolFactoryABI]).getEvent('PoolReactivated')!.topicHash
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -47,10 +49,22 @@ function buildLog(overrides: Partial<{ blockNumber: number; address: string; ind
   }
 }
 
+/**
+ * A `PoolDeactivated` / `PoolReactivated` log. `poolId` is the first indexed
+ * parameter of both, so it lives in topic 1 and the sweep reads it from there.
+ */
+function buildStatusLog(poolId: number, topic: string = POOL_DEACTIVATED_TOPIC, blockNumber = 120) {
+  return {
+    ...buildLog({ blockNumber, address: FACTORY_ADDRESS }),
+    topics: [topic, `0x${poolId.toString(16).padStart(64, '0')}`],
+  }
+}
+
 interface ProviderLogs {
   pools?: object[]
   deposits?: object[]
   withdrawals?: object[]
+  status?: object[]
 }
 
 /**
@@ -66,7 +80,13 @@ function buildMockProvider(logs: ProviderLogs = {}, options: { blockTimestamp?: 
   }
 
   return {
-    getLogs: jest.fn().mockImplementation((filter: { topics: string[] }) => Promise.resolve(byTopic[filter.topics[0]] ?? [])),
+    // `topics[0]` is an array for the status query — a topic-OR — so it is
+    // matched by shape rather than by key.
+    getLogs: jest.fn().mockImplementation((filter: { topics: (string | string[])[] }) => {
+      if (Array.isArray(filter.topics[0])) return Promise.resolve(logs.status ?? [])
+
+      return Promise.resolve(byTopic[filter.topics[0] as string] ?? [])
+    }),
     getBlock: jest.fn().mockResolvedValue({ timestamp: options.blockTimestamp ?? BLOCK_TIMESTAMP }),
   }
 }
@@ -104,6 +124,9 @@ beforeEach(() => {
   parseFundsWithdrawnLog.mockImplementation(() => ({ poolAddress: POOL_ADDRESS, member: '0xabc', amount: '1' }))
   indexWithdrawalEvent.mockResolvedValue({ id: 'w1', poolId: 1, alreadyIndexed: false, stored: true })
 
+  fetchPoolActive.mockResolvedValue(false)
+  updatePoolActive.mockResolvedValue(true)
+
   resolvePoolId.mockResolvedValue(7)
 })
 
@@ -125,7 +148,7 @@ describe('sweepBlockRange', () => {
       const counts = await sweep(provider)
 
       // Assert
-      expect(counts).toEqual({ pools: 2, contributions: 1, withdrawals: 3 })
+      expect(counts).toEqual({ pools: 2, contributions: 1, withdrawals: 3, statusUpdates: 0 })
     })
 
     it('should return zeroes when the range holds no events', async () => {
@@ -136,7 +159,7 @@ describe('sweepBlockRange', () => {
       const counts = await sweep(provider)
 
       // Assert
-      expect(counts).toEqual({ pools: 0, contributions: 0, withdrawals: 0 })
+      expect(counts).toEqual({ pools: 0, contributions: 0, withdrawals: 0, statusUpdates: 0 })
       expect(indexPoolEvent).not.toHaveBeenCalled()
     })
 
@@ -153,7 +176,7 @@ describe('sweepBlockRange', () => {
       const counts = await sweep(provider)
 
       // Assert
-      expect(counts).toEqual({ pools: 0, contributions: 0, withdrawals: 0 })
+      expect(counts).toEqual({ pools: 0, contributions: 0, withdrawals: 0, statusUpdates: 0 })
       expect(indexPoolEvent).toHaveBeenCalledTimes(1)
     })
   })
@@ -246,7 +269,7 @@ describe('sweepBlockRange', () => {
 
       // Assert
       expect(getIndexer()).not.toHaveBeenCalled()
-      expect(counts).toEqual({ pools: 0, contributions: 0, withdrawals: 0 })
+      expect(counts).toEqual({ pools: 0, contributions: 0, withdrawals: 0, statusUpdates: 0 })
     })
 
     it('should skip foreign logs silently rather than as errors', async () => {
@@ -375,6 +398,138 @@ describe('sweepBlockRange', () => {
       // Assert
       expect(counts.pools).toBe(1)
       expect(indexPoolEvent).toHaveBeenCalledWith(expect.objectContaining({ description: '' }), expect.anything())
+    })
+  })
+
+  describe('pool status', () => {
+    it('should correct a pool whose stored flag disagrees with the chain', async () => {
+      // Arrange
+      // Nothing else ever touches `isActive` after a pool is first indexed, so
+      // without this a pool deactivated on chain is listed forever.
+      const provider = buildMockProvider({ status: [buildStatusLog(7)] })
+
+      // Act
+      const counts = await sweep(provider)
+
+      // Assert
+      expect(counts.statusUpdates).toBe(1)
+      expect(updatePoolActive).toHaveBeenCalledWith(7, CHAIN_ID, false, expect.anything())
+    })
+
+    it('should read the flag from the factory rather than infer it from the event', async () => {
+      // Arrange
+      // `PoolDeactivated` carries no state. Asking the chain makes the result
+      // independent of the order the logs are processed in.
+      fetchPoolActive.mockResolvedValue(true)
+      const provider = buildMockProvider({ status: [buildStatusLog(7, POOL_DEACTIVATED_TOPIC)] })
+
+      // Act
+      await sweep(provider)
+
+      // Assert
+      expect(fetchPoolActive).toHaveBeenCalledWith(7, FACTORY_ADDRESS, provider)
+      expect(updatePoolActive).toHaveBeenCalledWith(7, CHAIN_ID, true, expect.anything())
+    })
+
+    it('should look a pool up once however many times it toggled', async () => {
+      // Arrange
+      // The end state is the same whichever order the toggles came in, so the
+      // pool only needs asking about once.
+      const provider = buildMockProvider({
+        status: [
+          buildStatusLog(7, POOL_DEACTIVATED_TOPIC, 120),
+          buildStatusLog(7, POOL_REACTIVATED_TOPIC, 121),
+          buildStatusLog(7, POOL_DEACTIVATED_TOPIC, 122),
+        ],
+      })
+
+      // Act
+      const counts = await sweep(provider)
+
+      // Assert
+      expect(fetchPoolActive).toHaveBeenCalledTimes(1)
+      expect(counts.statusUpdates).toBe(1)
+    })
+
+    it('should handle several pools changing in one range', async () => {
+      // Arrange
+      const provider = buildMockProvider({ status: [buildStatusLog(7), buildStatusLog(9), buildStatusLog(11)] })
+
+      // Act
+      const counts = await sweep(provider)
+
+      // Assert
+      expect(counts.statusUpdates).toBe(3)
+      expect(fetchPoolActive.mock.calls.map((call: [number]) => call[0])).toEqual([7, 9, 11])
+    })
+
+    it('should count only the pools whose stored flag actually changed', async () => {
+      // Arrange
+      // Re-scanning settled history must report no work, the same guarantee
+      // `create()` gives the other feeds.
+      updatePoolActive.mockResolvedValue(false)
+      const provider = buildMockProvider({ status: [buildStatusLog(7)] })
+
+      // Act
+      const counts = await sweep(provider)
+
+      // Assert
+      expect(counts.statusUpdates).toBe(0)
+    })
+
+    it('should fetch both status events in one query against the factory', async () => {
+      // Arrange
+      const provider = buildMockProvider()
+
+      // Act
+      await sweep(provider)
+
+      // Assert
+      const call = provider.getLogs.mock.calls.find(([f]: [{ topics: unknown[] }]) => Array.isArray(f.topics[0]))
+      expect(call?.[0]).toEqual({
+        address: FACTORY_ADDRESS,
+        fromBlock: FROM_BLOCK,
+        toBlock: TO_BLOCK,
+        topics: [[POOL_DEACTIVATED_TOPIC, POOL_REACTIVATED_TOPIC]],
+      })
+    })
+
+    it('should keep sweeping after one pool status update fails', async () => {
+      // Arrange
+      updatePoolActive.mockRejectedValueOnce(new Error('Firestore unavailable'))
+      const provider = buildMockProvider({ status: [buildStatusLog(7), buildStatusLog(9)] })
+
+      // Act
+      const counts = await sweep(provider)
+
+      // Assert
+      expect(counts.statusUpdates).toBe(1)
+      expect(mockLogger.error).toHaveBeenCalledWith(
+        'Failed to sweep pool status change',
+        expect.objectContaining({ poolId: 7, error: 'Firestore unavailable' })
+      )
+    })
+
+    it('should index a pool before reconciling its status', async () => {
+      // Arrange
+      // A pool created and deactivated inside one range must exist in Firestore
+      // before the flag is applied, or the update finds nothing to correct.
+      const order: string[] = []
+      indexPoolEvent.mockImplementation(async () => {
+        order.push('create')
+        return { poolId: 7, alreadyIndexed: false, stored: true }
+      })
+      updatePoolActive.mockImplementation(async () => {
+        order.push('status')
+        return true
+      })
+      const provider = buildMockProvider({ pools: [buildLog()], status: [buildStatusLog(7)] })
+
+      // Act
+      await sweep(provider)
+
+      // Assert
+      expect(order).toEqual(['create', 'status'])
     })
   })
 })

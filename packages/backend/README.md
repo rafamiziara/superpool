@@ -117,9 +117,12 @@ Required for local development and Firebase Admin SDK:
 
 - Backfills anything the immediate path missed — a user who closed the app, a
   failed callable, a transaction confirmed while offline, a seeding script
-- Sweeps `PoolCreated`, `FundsDeposited` and `FundsWithdrawn` from the last
-  processed block to the chain head, in 500-block ranges, updating
-  `event_sync_state` per chain after each one
+- Sweeps `PoolCreated`, `PoolDeactivated`/`PoolReactivated`, `FundsDeposited`
+  and `FundsWithdrawn` from the last processed block to the chain head, in
+  500-block ranges, updating `event_sync_state` per chain after each one
+- The only thing that reconciles a pool's `isActive`: it is written `true` at
+  creation and no on-demand callable revisits it, so a pool deactivated on chain
+  keeps being listed until a sweep runs
 - Shares `services/eventIndexer.ts`, `contributionIndexer.ts` and
   `withdrawalIndexer.ts` with the on-demand callables, so every path agrees
 - Set `START_BLOCK` on a deployed chain — a first run without it only looks back

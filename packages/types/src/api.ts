@@ -234,6 +234,8 @@ export interface SyncPoolEventsResponse {
   pools: number
   contributions: number
   withdrawals: number
+  /** Pools whose stored `isActive` disagreed with the chain and was corrected. */
+  statusUpdates: number
 }
 
 export interface ListWithdrawalsRequest {

@@ -24,7 +24,7 @@ const CURRENT_BLOCK = 5000
 const LAST_PROCESSED_BLOCK = 4900
 const MAX_BLOCK_RANGE = 500
 
-const NO_COUNTS = { pools: 0, contributions: 0, withdrawals: 0 }
+const NO_COUNTS = { pools: 0, contributions: 0, withdrawals: 0, statusUpdates: 0 }
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -227,14 +227,14 @@ describe('syncPoolEventsHandler', () => {
       setupFirestore({ lastProcessedBlock: -1 })
       getProvider.mockReturnValue(buildMockProvider(600))
       sweepBlockRange
-        .mockResolvedValueOnce({ pools: 2, contributions: 3, withdrawals: 1 })
-        .mockResolvedValueOnce({ pools: 1, contributions: 0, withdrawals: 4 })
+        .mockResolvedValueOnce({ pools: 2, contributions: 3, withdrawals: 1, statusUpdates: 1 })
+        .mockResolvedValueOnce({ pools: 1, contributions: 0, withdrawals: 4, statusUpdates: 2 })
 
       // Act
       const result = await syncPoolEventsHandler({ fromBlock: 0 })
 
       // Assert
-      expect(result).toMatchObject({ pools: 3, contributions: 3, withdrawals: 5, caughtUp: true })
+      expect(result).toMatchObject({ pools: 3, contributions: 3, withdrawals: 5, statusUpdates: 3, caughtUp: true })
     })
   })
 
@@ -256,7 +256,7 @@ describe('syncPoolEventsHandler', () => {
     it('should increment a counter per feed', async () => {
       // Arrange
       const { syncStateRef } = setupFirestore()
-      sweepBlockRange.mockResolvedValue({ pools: 1, contributions: 2, withdrawals: 3 })
+      sweepBlockRange.mockResolvedValue({ pools: 1, contributions: 2, withdrawals: 3, statusUpdates: 4 })
 
       // Act
       await syncPoolEventsHandler()
@@ -268,6 +268,7 @@ describe('syncPoolEventsHandler', () => {
           totalPoolsIndexed: expect.anything(),
           totalContributionsIndexed: expect.anything(),
           totalWithdrawalsIndexed: expect.anything(),
+          totalPoolStatusUpdates: expect.anything(),
         }),
         { merge: true }
       )
@@ -345,7 +346,9 @@ describe('syncPoolEventsHandler', () => {
       // good — nothing revisits them.
       const { syncStateRef } = setupFirestore({ lastProcessedBlock: -1 })
       getProvider.mockReturnValue(buildMockProvider(1200))
-      sweepBlockRange.mockResolvedValueOnce({ pools: 1, contributions: 0, withdrawals: 0 }).mockRejectedValueOnce(new Error('RPC down'))
+      sweepBlockRange
+        .mockResolvedValueOnce({ pools: 1, contributions: 0, withdrawals: 0, statusUpdates: 0 })
+        .mockRejectedValueOnce(new Error('RPC down'))
 
       // Act
       const result = await syncPoolEventsHandler({ fromBlock: 0 })
@@ -365,7 +368,9 @@ describe('syncPoolEventsHandler', () => {
       // Arrange
       setupFirestore({ lastProcessedBlock: -1 })
       getProvider.mockReturnValue(buildMockProvider(1200))
-      sweepBlockRange.mockResolvedValueOnce({ pools: 2, contributions: 1, withdrawals: 0 }).mockRejectedValueOnce(new Error('RPC down'))
+      sweepBlockRange
+        .mockResolvedValueOnce({ pools: 2, contributions: 1, withdrawals: 0, statusUpdates: 0 })
+        .mockRejectedValueOnce(new Error('RPC down'))
 
       // Act
       const result = await syncPoolEventsHandler({ fromBlock: 0 })

@@ -78,6 +78,57 @@ export async function fetchPoolDescription(poolId: number, factoryAddress: strin
   }
 }
 
+/**
+ * Read a pool's active flag from the factory.
+ *
+ * `PoolDeactivated` and `PoolReactivated` carry no state — only the pool they
+ * concern — so the sweep asks the chain what the flag is *now* rather than
+ * replaying the events in order. Two things fall out of that: the result does
+ * not depend on the order logs happen to be processed in, and re-scanning old
+ * blocks is harmless, because it writes today's truth rather than the truth as
+ * of some block in the past.
+ */
+export async function fetchPoolActive(poolId: number, factoryAddress: string, provider: Provider): Promise<boolean> {
+  const factory = new Contract(factoryAddress, [...PoolFactoryABI], provider)
+
+  return (await factory.isPoolActive(poolId)) as boolean
+}
+
+/**
+ * Apply a pool's active flag to its Firestore document.
+ *
+ * `isActive` is written `true` when a pool is first indexed and was, until this
+ * existed, never touched again — so a pool deactivated on chain kept appearing
+ * in `listPools` forever. This is what reconciles it.
+ *
+ * Returns true only when the stored value actually changed, so a sweep over
+ * settled history reports no work — the same guarantee `create()` gives the
+ * other indexers.
+ *
+ * A missing document is skipped rather than created. It means the pool's own
+ * creation was never indexed, and a status-only document would put a pool with
+ * no name, owner or terms in front of the user.
+ */
+export async function updatePoolActive(poolId: number, chainId: number, isActive: boolean, firestore: Firestore): Promise<boolean> {
+  const docId = `${chainId}-${poolId}`
+  const docRef = firestore.collection(POOLS_COLLECTION).doc(docId)
+  const doc = await docRef.get()
+
+  if (!doc.exists) {
+    logger.warn('Pool status changed for a pool that was never indexed; skipping', { poolId, chainId, docId })
+
+    return false
+  }
+
+  if (doc.data()!.isActive === isActive) return false
+
+  await docRef.update({ isActive })
+
+  logger.info('Pool active flag updated', { poolId, chainId, docId, isActive })
+
+  return true
+}
+
 /** Firestore's gRPC status for a `create()` against a document that exists. */
 const ALREADY_EXISTS = 6
 

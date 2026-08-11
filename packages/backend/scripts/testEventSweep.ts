@@ -106,6 +106,24 @@ async function countOnChain(provider: JsonRpcProvider) {
   return { currentBlock, pools: pools.length, deposits, withdrawals }
 }
 
+/** Pools whose stored `isActive` disagrees with the factory. */
+async function activeFlagDrift(provider: JsonRpcProvider): Promise<{ poolId: number; onChain: boolean; indexed: boolean }[]> {
+  const factory = new Contract(FACTORY_ADDRESS, [...PoolFactoryABI], provider)
+  const snapshot = await firestore.collection(POOLS_COLLECTION).where('chainId', '==', CHAIN_ID).get()
+
+  const drifted: { poolId: number; onChain: boolean; indexed: boolean }[] = []
+
+  for (const doc of snapshot.docs) {
+    const poolId = doc.data().poolId as number
+    const indexed = doc.data().isActive as boolean
+    const onChain = (await factory.isPoolActive(poolId)) as boolean
+
+    if (onChain !== indexed) drifted.push({ poolId, onChain, indexed })
+  }
+
+  return drifted
+}
+
 async function countInFirestore() {
   const [pools, contributions, withdrawals] = await Promise.all([
     firestore.collection(POOLS_COLLECTION).where('chainId', '==', CHAIN_ID).count().get(),
@@ -157,7 +175,10 @@ async function main() {
   const result = await syncPoolEventsHandler({ fromBlock: 0 })
 
   info(`Blocks ${result.fromBlock}–${result.toBlock} of ${result.currentBlock} (caught up: ${result.caughtUp})`)
-  info(`Newly indexed → pools ${result.pools}, contributions ${result.contributions}, withdrawals ${result.withdrawals}`)
+  info(
+    `Newly indexed → pools ${result.pools}, contributions ${result.contributions}, ` +
+      `withdrawals ${result.withdrawals}, status corrections ${result.statusUpdates}`
+  )
 
   separator('After — did the sweep close the gap?')
 
@@ -183,6 +204,19 @@ async function main() {
   if (!result.caughtUp) {
     fail('Sweep did not reach the chain head')
     failures++
+  }
+
+  // `isActive` is the one field that is not append-only, so it is the one that
+  // can silently drift: it is written true at creation and only the sweep ever
+  // revisits it. Comparing every stored flag against the factory is what proves
+  // a deactivated pool actually stops being listed.
+  const drifted = await activeFlagDrift(provider)
+
+  if (drifted.length === 0) {
+    ok(`Active flags: all ${after.pools} pools agree with the factory`)
+  } else {
+    for (const d of drifted) fail(`Pool ${d.poolId}: chain says ${d.onChain}, Firestore says ${d.indexed}`)
+    failures += drifted.length
   }
 
   separator('Idempotency — a second sweep must write nothing')

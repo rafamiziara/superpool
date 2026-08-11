@@ -21,6 +21,7 @@ const SWEEP_RESULT = {
   pools: 11,
   contributions: 12,
   withdrawals: 4,
+  statusUpdates: 2,
 }
 
 // ---------------------------------------------------------------------------
