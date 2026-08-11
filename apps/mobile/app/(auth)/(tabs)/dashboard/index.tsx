@@ -10,7 +10,7 @@ import { PendingTransactionBanner } from '../../../../src/components/lending/Pen
 import { PoolCard } from '../../../../src/components/lending/PoolCard'
 import { TransactionStatusModal } from '../../../../src/components/lending/TransactionStatusModal'
 import { palette } from '../../../../src/constants/palette'
-import { type PendingTransaction, pendingTransactionsStore } from '../../../../src/stores/PendingTransactionsStore'
+import { isDismissable, type PendingTransaction, pendingTransactionsStore } from '../../../../src/stores/PendingTransactionsStore'
 import { poolStore } from '../../../../src/stores/PoolStore'
 import { daysUntil, formatToken } from '../../../../src/utils/format'
 
@@ -206,7 +206,7 @@ function DashboardScreen() {
         transaction={detail}
         onClose={() => setDetail(null)}
         onDismiss={
-          detail?.status === 'failed'
+          detail && isDismissable(detail)
             ? () => {
                 const { txHash } = detail
                 setDetail(null)

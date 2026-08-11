@@ -9,7 +9,12 @@ import { ApprovalsLink } from '../../../src/components/lending/ApprovalsLink'
 import { PendingContributionCard } from '../../../src/components/lending/PendingContributionCard'
 import { TransactionStatusModal } from '../../../src/components/lending/TransactionStatusModal'
 import { palette } from '../../../src/constants/palette'
-import { type ContributeTransaction, type PendingTransaction, pendingTransactionsStore } from '../../../src/stores/PendingTransactionsStore'
+import {
+  type ContributeTransaction,
+  isDismissable,
+  type PendingTransaction,
+  pendingTransactionsStore,
+} from '../../../src/stores/PendingTransactionsStore'
 import { poolStore } from '../../../src/stores/PoolStore'
 import { bpsToPercent, formatDuration, formatToken, sameAddress, shortAddress } from '../../../src/utils/format'
 
@@ -224,7 +229,7 @@ function PoolDetailScreen() {
         transaction={detail}
         onClose={() => setDetail(null)}
         onDismiss={
-          detail?.status === 'failed'
+          detail && isDismissable(detail)
             ? () => {
                 const { txHash } = detail
                 setDetail(null)

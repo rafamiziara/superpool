@@ -62,11 +62,13 @@ export function PendingContributionCard({ transaction, onPress, onDismiss }: Pen
         </Text>
       </View>
 
-      {onDismiss ? (
-        <Pressable onPress={onDismiss} className="active:opacity-70" testID={`pending-contribution-dismiss-${transaction.txHash}`}>
-          <Text className="text-xs font-semibold text-snow">Dismiss</Text>
-        </Pressable>
-      ) : (
+      {/*
+        Both, not one or the other. Dismissal is offered on a confirmed record
+        too — one whose pool the backend cannot read never indexes and would
+        otherwise sit here forever — and on those the badge is the only thing
+        saying why it is still on screen.
+      */}
+      <View className="items-end gap-1.5">
         <View
           className={`flex-row items-center gap-2 rounded-full px-3 py-1 ${hasFailed ? 'bg-coral-deep' : 'bg-amber-deep'}`}
           testID={`pending-contribution-badge-${status}`}
@@ -74,7 +76,12 @@ export function PendingContributionCard({ transaction, onPress, onDismiss }: Pen
           {!hasFailed && <ActivityIndicator size="small" colorClassName="accent-amber" />}
           <Text className={`text-xs font-semibold ${hasFailed ? 'text-coral' : 'text-amber'}`}>{copy.badge}</Text>
         </View>
-      )}
+        {onDismiss && (
+          <Pressable onPress={onDismiss} className="active:opacity-70" testID={`pending-contribution-dismiss-${transaction.txHash}`}>
+            <Text className="text-xs font-semibold text-mist">Dismiss</Text>
+          </Pressable>
+        )}
+      </View>
     </Pressable>
   )
 }

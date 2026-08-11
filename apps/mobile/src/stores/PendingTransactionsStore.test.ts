@@ -15,6 +15,7 @@ import {
   extractLoanResult,
   extractPoolCreatedResult,
   extractResult,
+  isDismissable,
   isLoanTransactionType,
   type PendingTransaction,
   PendingTransactionsStore,
@@ -655,6 +656,37 @@ function makeLoanLog(
     removed: false,
   } as ReceiptLog
 }
+
+// ---------------------------------------------------------------------------
+// What the user may clear by hand.
+//
+// A confirmed record normally drops itself the moment indexing succeeds. The
+// ones that do not — a transaction whose pool the backend cannot read — would
+// otherwise retry forever with no way out.
+// ---------------------------------------------------------------------------
+
+describe('isDismissable', () => {
+  it('refuses a transaction still in flight', () => {
+    // The local record is its only trace; dropping it loses the ability to
+    // resolve it at all.
+    expect(isDismissable(makeLoanTransaction({ status: 'submitted' }))).toBe(false)
+  })
+
+  it('allows a failed one, which did nothing', () => {
+    expect(isDismissable(makeLoanTransaction({ status: 'failed' }))).toBe(true)
+  })
+
+  it('allows a confirmed one, because the chain already has it', () => {
+    // The sweep re-derives it whether the local record survives or not, so
+    // clearing it loses nothing.
+    expect(isDismissable(makeLoanTransaction({ status: 'confirmed' }))).toBe(true)
+  })
+
+  it('does not care which kind of transaction it is', () => {
+    expect(isDismissable(makeContributeTransaction({ status: 'confirmed' }))).toBe(true)
+    expect(isDismissable(makePendingTransaction({ status: 'submitted' }))).toBe(false)
+  })
+})
 
 describe('extractLoanResult', () => {
   it.each(['LoanCreated', 'LoanRepaid', 'LoanRequested', 'LoanApproved', 'LoanRejected'] as const)(

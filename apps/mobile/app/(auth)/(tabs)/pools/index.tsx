@@ -13,6 +13,7 @@ import { palette } from '../../../../src/constants/palette'
 import { usePoolIndexing } from '../../../../src/hooks/pools/usePoolIndexing'
 import {
   type CreatePoolTransaction,
+  isDismissable,
   type PendingTransaction,
   pendingTransactionsStore,
 } from '../../../../src/stores/PendingTransactionsStore'
@@ -154,7 +155,7 @@ function PoolsScreen() {
               key={transaction.txHash}
               transaction={transaction}
               onPress={() => setDetail(transaction)}
-              onDismiss={transaction.status === 'failed' ? () => dismiss(transaction) : undefined}
+              onDismiss={isDismissable(transaction) ? () => dismiss(transaction) : undefined}
             />
           ))}
 
@@ -191,7 +192,7 @@ function PoolsScreen() {
       <TransactionStatusModal
         transaction={detail}
         onClose={() => setDetail(null)}
-        onDismiss={detail?.status === 'failed' ? () => dismiss(detail) : undefined}
+        onDismiss={detail && isDismissable(detail) ? () => dismiss(detail) : undefined}
       />
     </View>
   )

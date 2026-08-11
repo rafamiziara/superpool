@@ -184,6 +184,25 @@ export type CancelLoanRequestTransaction = LoanTransaction<'CANCEL_LOAN_REQUEST'
 export type PendingTransaction = CreatePoolTransaction | ContributeTransaction | WithdrawTransaction | LoanTransaction<LoanTransactionType>
 
 /**
+ * Whether the user may clear this record by hand.
+ *
+ * Anything the chain has already answered — confirmed or failed — is safe to
+ * remove: a failed transaction did nothing, and a confirmed one exists on chain
+ * regardless, so the scheduled sweep re-derives it whether the local record
+ * survives or not. Only `submitted` must stay, because it is the sole trace of
+ * a transaction still in flight and dropping it loses the ability to resolve it.
+ *
+ * Confirmed records normally disappear within seconds, when indexing succeeds
+ * and drops them. The ones that do not are the reason this exists: a
+ * transaction whose pool the backend cannot read — a pre-beacon clone, or a
+ * pool from a factory the backend no longer points at — will never index, and
+ * without a way out it retries forever and sits in the list permanently.
+ */
+export function isDismissable(transaction: PendingTransaction): boolean {
+  return transaction.status !== 'submitted'
+}
+
+/**
  * Narrows a transaction to the loan actions in one step.
  *
  * Testing `type` alone narrows the discriminant without narrowing the record it

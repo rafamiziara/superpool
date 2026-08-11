@@ -58,4 +58,13 @@ describe('PendingContributionCard', () => {
     expect(getByTestId('pending-contribution-badge-submitted')).toBeTruthy()
     expect(queryByTestId(`pending-contribution-dismiss-${TX_HASH}`)).toBeNull()
   })
+
+  it('keeps the status badge alongside the dismiss button', () => {
+    // Dismissal is offered on confirmed records now, and there the badge is the
+    // only thing explaining why the row is still on screen.
+    const { getByTestId } = renderCard({ status: 'confirmed' }, { onDismiss: jest.fn() })
+
+    expect(getByTestId('pending-contribution-badge-confirmed')).toBeTruthy()
+    expect(getByTestId(`pending-contribution-dismiss-${TX_HASH}`)).toBeTruthy()
+  })
 })
