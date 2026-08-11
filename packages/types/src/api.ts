@@ -212,6 +212,78 @@ export interface IndexWithdrawalResponse {
   alreadyIndexed: boolean
 }
 
+/**
+ * One loan, as the chain currently describes it.
+ *
+ * Unlike a contribution or a withdrawal — each of which *is* one event — a loan
+ * is an entity with a lifecycle, touched by `LoanCreated` and later
+ * `LoanRepaid`. So the record is not a log; it is the answer `getLoan` gives
+ * now, re-read whenever either event is seen.
+ *
+ * Deliberately thinner than the app's `Loan` interface, which describes an
+ * approval workflow the contract does not implement. `createLoan` disburses
+ * immediately and `repayLoan` demands the full amount in one transaction, so
+ * there is no requested state, no partial repayment and no accrual — only
+ * borrowed or repaid.
+ */
+export interface LoanInfo {
+  /** `${chainId}-${poolId}-${loanId}` — the document id, and stable. */
+  id: string
+  /** Per-pool, not global: each pool contract counts its own loans from 1. */
+  loanId: number
+  poolId: number
+  poolAddress: string
+  /** Lowercased on write; compare case-insensitively. */
+  borrower: string
+  /** Principal in wei, as a decimal string — JSON has no bigint. */
+  amount: string
+  /** Basis points, fixed at creation from the pool's rate. */
+  interestRate: number
+  /** Seconds. `startedAt + duration` is the due date; nothing on chain enforces it. */
+  duration: number
+  /** ISO 8601 — the block timestamp the contract recorded as `startTime`. */
+  startedAt: string
+  /**
+   * The contract's only lifecycle bit. Repayment is all-or-nothing, so this is
+   * the whole of a loan's state: false means outstanding, true means settled.
+   */
+  isRepaid: boolean
+  chainId: number
+  /** The transaction that created the loan. */
+  transactionHash: string
+  blockNumber: number
+}
+
+export interface IndexLoanRequest {
+  txHash: string
+  chainId?: number
+}
+
+export interface IndexLoanResponse {
+  /** One entry per loan event in the transaction, in its post-transaction state. */
+  loans: LoanInfo[]
+  /** How many records this call wrote or changed; the rest were already current. */
+  storedCount: number
+  alreadyIndexed: boolean
+}
+
+export interface ListLoansRequest {
+  chainId?: number
+  /** Restrict to one pool. Omit for every pool on the chain. */
+  poolId?: number
+  /** Restrict to one wallet. Matched case-insensitively. */
+  borrower?: string
+  /** Only loans that are still outstanding. */
+  activeOnly?: boolean
+  limit?: number
+}
+
+export interface ListLoansResponse {
+  loans: LoanInfo[]
+  totalCount: number
+  limit: number
+}
+
 export interface SyncPoolEventsRequest {
   chainId?: number
   /**
@@ -234,6 +306,8 @@ export interface SyncPoolEventsResponse {
   pools: number
   contributions: number
   withdrawals: number
+  /** Loans created or settled — the record is re-read from the chain either way. */
+  loans: number
   /** Pools whose stored `isActive` disagreed with the chain and was corrected. */
   statusUpdates: number
 }

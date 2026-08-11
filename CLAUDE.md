@@ -464,6 +464,14 @@ For anything touching deposits, pool liquidity or membership, read
 **no membership register on chain** — memberships are derived from
 contributions, and liquidity is summed from events rather than stored.
 
+## Loans
+
+For anything touching borrowing, repayment or the `loans` collection, read
+[`docs/LOANS.md`](docs/LOANS.md). Note especially that a loan is **not** an
+event like a contribution: one document is written twice, its state is read back
+from `getLoan` rather than inferred from which log arrived, and the app's `Loan`
+type describes an approval workflow the contract does not implement.
+
 ## UI & Frontend Interface Design
 
 There is **no shared design package**. Each app owns its theme, and the two are

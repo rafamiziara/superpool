@@ -27,7 +27,7 @@ dotenv.config()
 
 import { Contract, Interface, JsonRpcProvider } from 'ethers'
 import { PoolFactoryABI, SampleLendingPoolABI } from '../src/constants/abis'
-import { CONTRIBUTIONS_COLLECTION, POOLS_COLLECTION, WITHDRAWALS_COLLECTION } from '../src/constants/firestore'
+import { CONTRIBUTIONS_COLLECTION, LOANS_COLLECTION, POOLS_COLLECTION, WITHDRAWALS_COLLECTION } from '../src/constants/firestore'
 import { syncPoolEventsHandler } from '../src/functions/events/syncPoolEvents'
 import { firestore } from '../src/services'
 
@@ -103,7 +103,11 @@ async function countOnChain(provider: JsonRpcProvider) {
   const deposits = await countOwnedLogs(provider, lendingPoolInterface.getEvent('FundsDeposited')!.topicHash)
   const withdrawals = await countOwnedLogs(provider, lendingPoolInterface.getEvent('FundsWithdrawn')!.topicHash)
 
-  return { currentBlock, pools: pools.length, deposits, withdrawals }
+  // A loan is an entity, not an event: `LoanCreated` and `LoanRepaid` both
+  // describe the same record, so the count is of distinct loans rather than logs.
+  const created = await countOwnedLogs(provider, lendingPoolInterface.getEvent('LoanCreated')!.topicHash)
+
+  return { currentBlock, pools: pools.length, deposits, withdrawals, loans: created }
 }
 
 /** Pools whose stored `isActive` disagrees with the factory. */
@@ -125,16 +129,18 @@ async function activeFlagDrift(provider: JsonRpcProvider): Promise<{ poolId: num
 }
 
 async function countInFirestore() {
-  const [pools, contributions, withdrawals] = await Promise.all([
+  const [pools, contributions, withdrawals, loans] = await Promise.all([
     firestore.collection(POOLS_COLLECTION).where('chainId', '==', CHAIN_ID).count().get(),
     firestore.collection(CONTRIBUTIONS_COLLECTION).where('chainId', '==', CHAIN_ID).count().get(),
     firestore.collection(WITHDRAWALS_COLLECTION).where('chainId', '==', CHAIN_ID).count().get(),
+    firestore.collection(LOANS_COLLECTION).where('chainId', '==', CHAIN_ID).count().get(),
   ])
 
   return {
     pools: pools.data().count,
     contributions: contributions.data().count,
     withdrawals: withdrawals.data().count,
+    loans: loans.data().count,
   }
 }
 
@@ -162,6 +168,7 @@ async function main() {
   info(`Pools:        ${onChain.pools} on chain, ${before.pools} indexed`)
   info(`Deposits:     ${onChain.deposits.owned} on chain, ${before.contributions} indexed`)
   info(`Withdrawals:  ${onChain.withdrawals.owned} on chain, ${before.withdrawals} indexed`)
+  info(`Loans:        ${onChain.loans.owned} on chain, ${before.loans} indexed`)
 
   for (const address of [...onChain.deposits.foreign, ...onChain.withdrawals.foreign]) {
     info(`Ignored (not a SuperPool pool): ${address}`)
@@ -177,7 +184,7 @@ async function main() {
   info(`Blocks ${result.fromBlock}–${result.toBlock} of ${result.currentBlock} (caught up: ${result.caughtUp})`)
   info(
     `Newly indexed → pools ${result.pools}, contributions ${result.contributions}, ` +
-      `withdrawals ${result.withdrawals}, status corrections ${result.statusUpdates}`
+      `withdrawals ${result.withdrawals}, loans ${result.loans}, status corrections ${result.statusUpdates}`
   )
 
   separator('After — did the sweep close the gap?')
@@ -190,6 +197,7 @@ async function main() {
     ['Pools', after.pools, onChain.pools],
     ['Contributions', after.contributions, onChain.deposits.owned],
     ['Withdrawals', after.withdrawals, onChain.withdrawals.owned],
+    ['Loans', after.loans, onChain.loans.owned],
   ]
 
   for (const [label, indexed, expected] of checks) {
@@ -224,17 +232,21 @@ async function main() {
   const second = await syncPoolEventsHandler({ fromBlock: 0 })
   const afterSecond = await countInFirestore()
 
-  if (second.pools === 0 && second.contributions === 0 && second.withdrawals === 0) {
+  if (second.pools === 0 && second.contributions === 0 && second.withdrawals === 0 && second.loans === 0) {
     ok('Second sweep wrote 0 new documents')
   } else {
-    fail(`Second sweep wrote pools ${second.pools}, contributions ${second.contributions}, withdrawals ${second.withdrawals}`)
+    fail(
+      `Second sweep wrote pools ${second.pools}, contributions ${second.contributions}, ` +
+        `withdrawals ${second.withdrawals}, loans ${second.loans}`
+    )
     failures++
   }
 
   if (
     afterSecond.pools === after.pools &&
     afterSecond.contributions === after.contributions &&
-    afterSecond.withdrawals === after.withdrawals
+    afterSecond.withdrawals === after.withdrawals &&
+    afterSecond.loans === after.loans
   ) {
     ok('Document counts unchanged after the second sweep')
   } else {

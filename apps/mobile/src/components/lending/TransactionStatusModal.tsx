@@ -53,6 +53,30 @@ const COPY: Record<
   PendingTransactionType,
   { headline: Record<PendingTransactionStatus, string>; summary: Record<PendingTransactionStatus, string> }
 > = {
+  BORROW: {
+    headline: {
+      submitted: 'Requesting your loan',
+      confirmed: 'Almost there',
+      failed: 'That transaction failed',
+    },
+    summary: {
+      submitted: 'Your wallet has sent the request. The pool pays out as soon as the network confirms it.',
+      confirmed: 'The loan is on chain. It will appear in your dashboard in a moment.',
+      failed: 'No funds were borrowed and nothing was taken from the pool beyond the network fee.',
+    },
+  },
+  REPAY: {
+    headline: {
+      submitted: 'Repaying your loan',
+      confirmed: 'Almost there',
+      failed: 'That transaction failed',
+    },
+    summary: {
+      submitted: 'Your wallet has sent the repayment. The loan clears as soon as the network confirms it.',
+      confirmed: 'The repayment is on chain. Your loan will clear in a moment.',
+      failed: 'The repayment was not taken and the loan is still outstanding.',
+    },
+  },
   CREATE_POOL: {
     headline: {
       submitted: 'Creating your pool',
@@ -122,6 +146,18 @@ interface DetailRow {
  * contribution or withdrawal by its amount and the pool it moved through.
  */
 function detailsFor(transaction: PendingTransaction): DetailRow[] {
+  if (transaction.type === 'BORROW' || transaction.type === 'REPAY') {
+    const { params, result } = transaction
+
+    return [
+      { label: 'Pool', value: params.poolName },
+      { label: 'Amount', value: `${formatToken(result?.amount ?? params.amount)} POL`, mono: true },
+      // Absent while borrowing: the contract assigns the id, so it only exists
+      // once the receipt is in hand.
+      ...(result || params.loanId !== undefined ? [{ label: 'Loan ID', value: `#${result?.loanId ?? params.loanId}`, mono: true }] : []),
+    ]
+  }
+
   if (transaction.type === 'CONTRIBUTE' || transaction.type === 'WITHDRAW') {
     const { params, result } = transaction
 

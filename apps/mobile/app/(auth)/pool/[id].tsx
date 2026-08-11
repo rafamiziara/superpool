@@ -3,17 +3,12 @@ import { StatusBar } from 'expo-status-bar'
 import { observer } from 'mobx-react-lite'
 import React, { useState } from 'react'
 import { Pressable, ScrollView, Text, View } from 'react-native'
-import Toast from 'react-native-toast-message'
 import { ActivityRow } from '../../../src/components/lending/ActivityRow'
 import { PendingContributionCard } from '../../../src/components/lending/PendingContributionCard'
 import { TransactionStatusModal } from '../../../src/components/lending/TransactionStatusModal'
 import { type ContributeTransaction, type PendingTransaction, pendingTransactionsStore } from '../../../src/stores/PendingTransactionsStore'
 import { poolStore } from '../../../src/stores/PoolStore'
 import { bpsToPercent, formatDuration, formatToken, sameAddress, shortAddress } from '../../../src/utils/format'
-
-function comingSoon(action: string) {
-  Toast.show({ type: 'info', text1: `${action} is coming soon` })
-}
 
 /**
  * This pool's deposits that are not yet reflected in its liquidity, newest first.
@@ -33,6 +28,7 @@ function PoolDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>()
   const pool = poolStore.poolById(Number(id))
   const membership = pool ? poolStore.membershipFor(pool.poolId) : undefined
+  const outstandingLoan = pool ? poolStore.activeLoanFor(pool.poolId) : undefined
   const transactions = pool ? poolStore.transactionsFor(pool.poolId) : []
 
   /** Deposits into this pool that the backend has not indexed yet. */
@@ -165,11 +161,13 @@ function PoolDetailScreen() {
           </Pressable>
         )}
         <Pressable
-          onPress={() => comingSoon('Loan request')}
+          onPress={() => router.push(`/(auth)/pool/borrow?poolId=${pool.poolId}`)}
           className="flex-1 items-center justify-center rounded-2xl border-continuous border-hairline border-veil bg-raised py-4 active:scale-[0.97] active:opacity-80"
           testID="pool-request-loan-button"
         >
-          <Text className="text-sm font-bold text-snow">Request loan</Text>
+          {/* One screen for both directions: the contract allows a single open
+              loan per member per pool, so there is nothing to choose between. */}
+          <Text className="text-sm font-bold text-snow">{outstandingLoan ? 'Repay loan' : 'Request loan'}</Text>
         </Pressable>
       </View>
 

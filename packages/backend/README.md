@@ -117,9 +117,10 @@ Required for local development and Firebase Admin SDK:
 
 - Backfills anything the immediate path missed — a user who closed the app, a
   failed callable, a transaction confirmed while offline, a seeding script
-- Sweeps `PoolCreated`, `PoolDeactivated`/`PoolReactivated`, `FundsDeposited`
-  and `FundsWithdrawn` from the last processed block to the chain head, in
-  500-block ranges, updating `event_sync_state` per chain after each one
+- Sweeps `PoolCreated`, `PoolDeactivated`/`PoolReactivated`, `FundsDeposited`,
+  `FundsWithdrawn`, `LoanCreated` and `LoanRepaid` from the last processed block
+  to the chain head, in 500-block ranges, updating `event_sync_state` per chain
+  after each one
 - The only thing that reconciles a pool's `isActive`: it is written `true` at
   creation and no on-demand callable revisits it, so a pool deactivated on chain
   keeps being listed until a sweep runs
@@ -138,6 +139,23 @@ Required for local development and Firebase Admin SDK:
 - Requires authentication except in the emulator
 - `pnpm testSweep` runs the sweep against a live local node and checks the
   result against the chain
+
+**`indexLoan`**
+
+- Called by the mobile app after a borrow _or_ a repayment is confirmed — one
+  callable for both, since the record written is the loan's state afterwards
+  either way
+- Reads `getLoan` rather than decoding the log, so the stored record cannot
+  disagree with the chain whichever event triggered it
+- Idempotent: reports `alreadyIndexed` when the stored record already matches
+- Requires authentication
+
+**`listLoans`**
+
+- Lists indexed loans, newest first, filterable by pool, borrower and
+  `activeOnly` (which is exactly `isRepaid == false`)
+- A repaid loan stays in the list as history; `startedAt` is an **ISO string**
+- Requires authentication
 
 **`listPools`**
 

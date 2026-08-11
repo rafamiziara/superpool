@@ -4,6 +4,7 @@ import { logger } from 'firebase-functions/v2'
 import { PoolFactoryABI, SampleLendingPoolABI } from '../constants'
 import { indexContributionEvent, parseFundsDepositedLog, resolvePoolId } from './contributionIndexer'
 import { fetchPoolActive, fetchPoolDescription, indexPoolEvent, parsePoolCreatedLog, updatePoolActive } from './eventIndexer'
+import { indexLoanFromLog, LOAN_CREATED_TOPIC, LOAN_REPAID_TOPIC } from './loanIndexer'
 import { indexWithdrawalEvent, parseFundsWithdrawnLog } from './withdrawalIndexer'
 
 const poolFactoryInterface = new Interface([...PoolFactoryABI])
@@ -23,6 +24,8 @@ export interface SweepCounts {
   pools: number
   contributions: number
   withdrawals: number
+  /** Loans written — created or settled. A loan already current is not counted. */
+  loans: number
   /** Pools whose stored `isActive` disagreed with the chain and was corrected. */
   statusUpdates: number
 }
@@ -229,10 +232,48 @@ async function sweepFundsWithdrawn(options: SweepBlockRangeOptions, caches: Swee
 }
 
 /**
+ * Index every loan touched in the range, borrowed or repaid alike.
+ *
+ * Both events are fetched in one topic-OR query and take the same path, because
+ * the record written is the loan's state afterwards either way — `indexLoanFromLog`
+ * re-reads it from `getLoan` rather than inferring it from which log arrived.
+ * That is what makes a repayment swept before its creation, or a re-scan of
+ * either, land on the right answer.
+ *
+ * Emitted by the pool contracts, not the factory, so there is no address to
+ * filter on; `indexLoanFromLog` returns null for a contract the factory does
+ * not know, which is a silent skip for the same reason deposits are.
+ */
+async function sweepLoans(options: SweepBlockRangeOptions): Promise<number> {
+  const { provider, firestore, chainId, factoryAddress, fromBlock, toBlock } = options
+
+  const logs = await queryLogs(provider, [LOAN_CREATED_TOPIC, LOAN_REPAID_TOPIC], fromBlock, toBlock)
+
+  let stored = 0
+
+  for (const log of logs) {
+    try {
+      const indexed = await indexLoanFromLog(log, chainId, factoryAddress, provider, firestore)
+
+      if (indexed?.result.stored) stored++
+    } catch (error) {
+      logger.error('Failed to sweep loan log', {
+        chainId,
+        blockNumber: log.blockNumber,
+        transactionHash: log.transactionHash,
+        error: error instanceof Error ? error.message : String(error),
+      })
+    }
+  }
+
+  return stored
+}
+
+/**
  * Index every SuperPool event in one block range.
  *
  * The feeds are swept in dependency order — pools, then their status, then
- * deposits and withdrawals — so that a pool created and funded within the same
+ * deposits, withdrawals and loans — so that a pool created and funded within the same
  * range is already in Firestore by the time its deposits land, and a pool
  * created and deactivated in one range gets its flag corrected rather than
  * being listed as active. Nothing enforces that order downstream, but a reader
@@ -250,6 +291,7 @@ export async function sweepBlockRange(options: SweepBlockRangeOptions): Promise<
   const statusUpdates = await sweepPoolStatus(options)
   const contributions = await sweepFundsDeposited(options, caches)
   const withdrawals = await sweepFundsWithdrawn(options, caches)
+  const loans = await sweepLoans(options)
 
-  return { pools, contributions, withdrawals, statusUpdates }
+  return { pools, contributions, withdrawals, loans, statusUpdates }
 }

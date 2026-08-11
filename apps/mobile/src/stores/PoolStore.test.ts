@@ -627,6 +627,7 @@ describe('PoolStore chain sync', () => {
       if (name === 'syncPoolEventsNow') return syncCallable
       if (name === 'listContributions') return jest.fn().mockResolvedValue({ data: { contributions: [], totalCount: 0, limit: 50 } })
       if (name === 'listWithdrawals') return jest.fn().mockResolvedValue({ data: { withdrawals: [], totalCount: 0, limit: 50 } })
+      if (name === 'listLoans') return jest.fn().mockResolvedValue({ data: { loans: [], totalCount: 0, limit: 50 } })
       return listPoolsCallable
     })
   })

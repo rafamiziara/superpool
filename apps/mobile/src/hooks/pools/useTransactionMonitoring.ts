@@ -32,6 +32,8 @@ const MISSING_LOG_MESSAGE: Record<PendingTransactionType, string> = {
   CREATE_POOL: 'The transaction confirmed but did not create a pool',
   CONTRIBUTE: 'The transaction confirmed but did not record a deposit',
   WITHDRAW: 'The transaction confirmed but did not record a withdrawal',
+  BORROW: 'The transaction confirmed but did not record a loan',
+  REPAY: 'The transaction confirmed but did not record a repayment',
 }
 
 export interface UseTransactionMonitoringReturn {

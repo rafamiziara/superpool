@@ -11,7 +11,7 @@ Cross-platform mobile app supporting 500+ wallets via WalletConnect with MobX st
 - 🔐 Wallet-based authentication (MetaMask, Coinbase, WalletConnect, etc.)
 - 🌐 Multi-chain support (Ethereum, Polygon, Arbitrum, Base, BSC, Polygon Amoy)
 - 🏊 Lending pool creation and management
-- 💰 Liquidity contributions and loan requests
+- 💰 Liquidity contributions, withdrawals, borrowing and repayment
 - 📱 Onboarding flow with feature showcase
 - 🔄 Real-time blockchain synchronization
 
@@ -67,7 +67,7 @@ MobX singleton stores configured in `src/stores/`:
 
 - **`AuthStore`** - User authentication, wallet state and session
 - **`NavigationStore`** - Auth-driven routing decisions
-- **`PoolStore`** - Pools come from the `listPools` Cloud Function; memberships, loans and transactions are still mock-backed, so a load is deliberately hybrid. Set `EXPO_PUBLIC_USE_MOCK_POOLS=true` to run the whole screen on mocks without the Functions emulator.
+- **`PoolStore`** - Pools, contributions, withdrawals and loans come from Cloud Functions in one snapshot. Memberships, positions and liquidity are derived on read rather than stored, so nothing can fall out of step with the chain. Set `EXPO_PUBLIC_USE_MOCK_POOLS=true` to run the whole screen on mocks without the Functions emulator.
 - **`PendingTransactionsStore`** - Pool creations that are submitted but not yet confirmed and indexed, persisted to AsyncStorage so they survive an app restart
 
 ```typescript
@@ -103,6 +103,8 @@ The app never follows the device colour scheme. Three things pin it, and all thr
 Post-login screens live under `app/(auth)/`:
 
 - **`(tabs)/dashboard`** - Balance hero, horizontal pool macro-cards, active loan, quick actions, pending-transaction banner
+- **`pool/borrow`** - Borrowing and repaying in one screen; the contract allows a single open
+  loan per member per pool, so it decides which of the two to show
 - **`(tabs)/pools`** - Pool list with pending/syncing cards, loading/empty/error states, and a
   pull-to-refresh that sweeps the chain before reloading, so pools created outside this app appear
 - **`(tabs)/activity`** - Transaction feed grouped by day

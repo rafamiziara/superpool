@@ -70,8 +70,9 @@ are three independent paths to indexing it. All three funnel into the same
 1. **Immediately**, via the `indexPool` callable, once the app sees the receipt.
    This is the fast path and the one that runs in practice.
 2. **On a schedule**, via `syncPoolEvents`, which sweeps every SuperPool event —
-   `PoolCreated`, `PoolDeactivated`/`PoolReactivated`, `FundsDeposited` and
-   `FundsWithdrawn` — from the last processed block to the chain head. This is the net for anything the app missed:
+   `PoolCreated`, `PoolDeactivated`/`PoolReactivated`, `FundsDeposited`,
+   `FundsWithdrawn`, `LoanCreated` and `LoanRepaid` — from the last processed
+   block to the chain head. This is the net for anything the app missed:
    a user who closed the app right after signing, a seeding script, or a pool
    created straight against the contract. See [Sweeping](#sweeping) below.
 3. **At app startup**, via `PendingTransactionsInitializer`, which resolves every
@@ -103,10 +104,11 @@ syncPoolEvents (every 5 min)          syncPoolEventsNow (callable)
                        ▼
               sweepBlockRange
    PoolCreated → Pool(De|Re)activated → FundsDeposited
-                       → FundsWithdrawn
+            → FundsWithdrawn → Loan(Created|Repaid)
                        │
         indexPoolEvent / updatePoolActive
    / indexContributionEvent / indexWithdrawalEvent
+              / indexLoanFromLog
 ```
 
 Things worth knowing before changing it:
@@ -117,7 +119,10 @@ Things worth knowing before changing it:
   would miss a deposit into a pool created in the same range. `resolvePoolId`
   then proves the emitter is one of ours; anything the factory does not know is
   skipped silently, because a sweep sees other contracts' logs routinely.
-- **The order within a range is pools → status → deposits → withdrawals**, so a
+- **Loans are the one feed that rewrites a document.** Every other record is one
+  event; a loan is created and later settled, so its state is read from
+  `getLoan` and written over the same document. See [`LOANS.md`](LOANS.md).
+- **The order within a range is pools → status → deposits → withdrawals → loans**, so a
   reader polling mid-sweep never sees a contribution pointing at a pool it cannot
   find, and a pool created and deactivated inside one range exists before its
   flag is applied.

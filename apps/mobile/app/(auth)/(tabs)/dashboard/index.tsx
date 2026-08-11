@@ -4,7 +4,6 @@ import { StatusBar } from 'expo-status-bar'
 import { observer } from 'mobx-react-lite'
 import React, { useState } from 'react'
 import { Pressable, ScrollView, Text, View } from 'react-native'
-import Toast from 'react-native-toast-message'
 import { ActivityRow } from '../../../../src/components/lending/ActivityRow'
 import { PendingTransactionBanner } from '../../../../src/components/lending/PendingTransactionBanner'
 import { PoolCard } from '../../../../src/components/lending/PoolCard'
@@ -16,10 +15,6 @@ import { daysUntil, formatToken } from '../../../../src/utils/format'
 
 const CARD_WIDTH = 288 // w-72
 const CARD_GAP = 16
-
-function comingSoon(action: string) {
-  Toast.show({ type: 'info', text1: `${action} is coming soon` })
-}
 
 function DashboardScreen() {
   const loan = poolStore.activeLoan
@@ -127,7 +122,7 @@ function DashboardScreen() {
                   <Text className="font-mono">{formatToken(loanTotal)}</Text> POL repaid
                 </Text>
                 <Pressable
-                  onPress={() => comingSoon('Repayment')}
+                  onPress={() => router.push(`/(auth)/pool/borrow?poolId=${loan.poolId}`)}
                   className="rounded-full bg-amber px-5 py-2.5 active:scale-95 active:opacity-90"
                   testID="repay-button"
                 >
@@ -151,12 +146,14 @@ function DashboardScreen() {
             <Text className="text-sm font-bold text-abyss">Contribute</Text>
           </Pressable>
           <Pressable
-            onPress={() => comingSoon('Loan request')}
+            // With a loan open, this is the way to settle it; without one, the
+            // pools list is where a pool to borrow from gets picked.
+            onPress={() => (loan ? router.push(`/(auth)/pool/borrow?poolId=${loan.poolId}`) : router.replace('/(auth)/(tabs)/pools'))}
             className="flex-1 flex-row items-center justify-center gap-2 rounded-2xl border-continuous border-hairline border-veil bg-raised py-4 active:scale-[0.97] active:opacity-80"
             testID="request-loan-button"
           >
             <FontAwesome name="handshake-o" size={14} color={palette.snow} />
-            <Text className="text-sm font-bold text-snow">Request loan</Text>
+            <Text className="text-sm font-bold text-snow">{loan ? 'Repay loan' : 'Request loan'}</Text>
           </Pressable>
         </View>
 

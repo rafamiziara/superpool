@@ -2,11 +2,14 @@ import type {
   ContributionInfo,
   ListContributionsRequest,
   ListContributionsResponse,
+  ListLoansRequest,
+  ListLoansResponse,
   ListPoolsRequest,
   ListPoolsResponse,
   ListWithdrawalsRequest,
   ListWithdrawalsResponse,
   Loan,
+  LoanInfo,
   PoolInfo,
   PoolMember,
   SyncPoolEventsRequest,
@@ -53,7 +56,8 @@ export class PoolStore {
   pools: PoolInfo[] = []
   contributions: ContributionInfo[] = []
   withdrawals: WithdrawalInfo[] = []
-  loans: Loan[] = []
+  /** Indexed loans, newest first. Mock fixtures stand in only in mock mode. */
+  loanRecords: LoanInfo[] = []
   transactions: Transaction[] = []
 
   /** Initial loads. Pull-to-refresh uses `isRefreshing` so the list is not torn down. */
@@ -153,7 +157,7 @@ export class PoolStore {
       this.pools = []
       this.contributions = []
       this.withdrawals = []
-      this.loans = []
+      this.loanRecords = []
       this.transactions = []
       this.isLoading = false
       this.isRefreshing = false
@@ -173,17 +177,21 @@ export class PoolStore {
       // Fetched together so pools and the positions in them are one snapshot:
       // a balance shown against a pool that is not in the list, or vice versa,
       // reads as a bug even though each half was individually correct.
-      const [pools, contributions, withdrawals]: [PoolInfo[], ContributionInfo[], WithdrawalInfo[]] = usingMockPools()
-        ? [MOCK_POOLS, [], []]
-        : await Promise.all([this.requestPools(params), this.requestContributions(params), this.requestWithdrawals(params)])
+      const [pools, contributions, withdrawals, loans]: [PoolInfo[], ContributionInfo[], WithdrawalInfo[], LoanInfo[]] = usingMockPools()
+        ? [MOCK_POOLS, [], [], []]
+        : await Promise.all([
+            this.requestPools(params),
+            this.requestContributions(params),
+            this.requestWithdrawals(params),
+            this.requestLoans(params),
+          ])
 
       runInAction(() => {
         this.pools = pools
         this.contributions = contributions
         this.withdrawals = withdrawals
+        this.loanRecords = loans
         this.lastFetchedAt = new Date()
-        // Loans are still mock-backed; see the note on the class.
-        this.loans = MOCK_LOANS
         // Activity is derived from contributions when they are real — see
         // `contributionActivity`. The fixtures only stand in for mock mode.
         this.transactions = usingMockPools() ? MOCK_TRANSACTIONS : []
@@ -249,6 +257,23 @@ export class PoolStore {
     })
 
     return response.data.withdrawals ?? []
+  }
+
+  /**
+   * Every loan on the chain, not just the user's.
+   *
+   * Filtered by wallet only where it is shown as *yours* — a pool's page names
+   * how much of its liquidity is currently lent out, which is everyone's loans.
+   */
+  private requestLoans = async (params: ListPoolsRequest): Promise<LoanInfo[]> => {
+    const listLoans = httpsCallable<ListLoansRequest, ListLoansResponse>(FIREBASE_FUNCTIONS, 'listLoans')
+
+    const response = await listLoans({
+      chainId: params.chainId ?? authStore.chainId ?? DEFAULT_CHAIN_ID,
+      limit: DEFAULT_PAGE_SIZE,
+    })
+
+    return response.data.loans ?? []
   }
 
   poolById = (poolId: number): PoolInfo | undefined => {
@@ -402,12 +427,83 @@ export class PoolStore {
     return this.memberships.filter((member) => member.status === MemberStatus.ACTIVE && sameAddress(member.walletAddress, this.userAddress))
   }
 
+  /**
+   * Indexed loans in the app's `Loan` shape.
+   *
+   * The contract implements far less than this interface describes — there is
+   * no approval step, no partial repayment and no accrual — so the mapping is
+   * mostly about being honest where it cannot fill a field:
+   *
+   * - `status` is `REPAID` or `DISBURSED` and nothing else. `createLoan`
+   *   disburses immediately, so `REQUESTED` and `APPROVED` never occur, and
+   *   nothing on chain marks a loan defaulted.
+   * - `interestAccrued` is the whole fixed interest from the moment the loan
+   *   exists, because that is genuinely what is owed — it does not grow.
+   * - `amountRepaid` is all or nothing, since `repayLoan` takes the full sum.
+   * - `dueDate` is `startedAt + duration`, which nothing on chain enforces.
+   */
+  get loans(): Loan[] {
+    if (usingMockPools()) return MOCK_LOANS
+
+    return this.loanRecords.map((loan) => {
+      const amount = BigInt(loan.amount)
+      const interest = (amount * BigInt(loan.interestRate)) / 10_000n
+      const startedAt = new Date(loan.startedAt)
+
+      return {
+        id: loan.id,
+        poolId: String(loan.poolId),
+        borrower: loan.borrower,
+        amount,
+        interestRate: loan.interestRate,
+        duration: loan.duration,
+        status: loan.isRepaid ? LoanStatus.REPAID : LoanStatus.DISBURSED,
+        amountRepaid: loan.isRepaid ? amount + interest : 0n,
+        interestAccrued: interest,
+        requestedAt: startedAt,
+        // The three moments the app models separately are one moment on chain.
+        approvedAt: startedAt,
+        disbursedAt: startedAt,
+        dueDate: new Date(startedAt.getTime() + loan.duration * 1000),
+        // Never known: `LoanRepaid` is not stored as its own record, and the
+        // loan document keeps the *creating* transaction's block so the
+        // activity feed dates it consistently.
+        repaidAt: undefined,
+      }
+    })
+  }
+
   get activeLoan(): Loan | undefined {
     return this.loans.find((loan) => loan.status === LoanStatus.DISBURSED && sameAddress(loan.borrower, this.userAddress))
   }
 
+  /**
+   * Always undefined against real data, and deliberately kept.
+   *
+   * `createLoan` disburses in the same transaction that creates the loan, so
+   * there is no requested-but-not-yet-funded state to be in. The getter stays
+   * because mock mode still exercises the UI for one, and because an approval
+   * step is the obvious next contract change.
+   */
   get pendingLoan(): Loan | undefined {
     return this.loans.find((loan) => loan.status === LoanStatus.REQUESTED && sameAddress(loan.borrower, this.userAddress))
+  }
+
+  /**
+   * The user's outstanding loan in one pool, as the chain records it.
+   *
+   * Returns the indexed record rather than the mapped `Loan`, because the
+   * borrow screen needs `loanId` — `repayLoan` takes the id, and the app's
+   * `Loan` has no field for it. At most one can exist: the contract rejects a
+   * second loan while one is open.
+   */
+  activeLoanFor = (poolId: number): LoanInfo | undefined => {
+    return this.loanRecords.find((loan) => loan.poolId === poolId && !loan.isRepaid && sameAddress(loan.borrower, this.userAddress))
+  }
+
+  /** Principal currently lent out of one pool, in wei. */
+  outstandingDebt = (poolId: number): bigint => {
+    return this.loanRecords.filter((loan) => loan.poolId === poolId && !loan.isRepaid).reduce((sum, loan) => sum + BigInt(loan.amount), 0n)
   }
 
   /**

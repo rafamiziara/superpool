@@ -7,6 +7,12 @@ import { PoolFactoryABI, SampleLendingPoolABI } from '../constants'
 jest.mock('./eventIndexer')
 jest.mock('./contributionIndexer')
 jest.mock('./withdrawalIndexer')
+jest.mock('./loanIndexer', () => {
+  // The topics are real: the sweep routes on them, and stubbing them would let
+  // the test agree with itself rather than with the shipped ABI.
+  const actual = jest.requireActual('./loanIndexer')
+  return { ...actual, indexLoanFromLog: jest.fn() }
+})
 
 // ethers is deliberately NOT mocked: the sweep routes on topic hashes derived
 // from the shipped ABIs, and a stubbed Interface would agree with whatever the
@@ -15,6 +21,7 @@ const { sweepBlockRange } = require('./eventSweeper')
 const { fetchPoolActive, fetchPoolDescription, indexPoolEvent, parsePoolCreatedLog, updatePoolActive } = require('./eventIndexer')
 const { indexContributionEvent, parseFundsDepositedLog, resolvePoolId } = require('./contributionIndexer')
 const { indexWithdrawalEvent, parseFundsWithdrawnLog } = require('./withdrawalIndexer')
+const { indexLoanFromLog, LOAN_CREATED_TOPIC, LOAN_REPAID_TOPIC } = require('./loanIndexer')
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -65,6 +72,7 @@ interface ProviderLogs {
   deposits?: object[]
   withdrawals?: object[]
   status?: object[]
+  loans?: object[]
 }
 
 /**
@@ -83,9 +91,15 @@ function buildMockProvider(logs: ProviderLogs = {}, options: { blockTimestamp?: 
     // `topics[0]` is an array for the status query — a topic-OR — so it is
     // matched by shape rather than by key.
     getLogs: jest.fn().mockImplementation((filter: { topics: (string | string[])[] }) => {
-      if (Array.isArray(filter.topics[0])) return Promise.resolve(logs.status ?? [])
+      const topic = filter.topics[0]
 
-      return Promise.resolve(byTopic[filter.topics[0] as string] ?? [])
+      // Two topic-OR queries now — pool status and loans — told apart by which
+      // topics they ask for rather than by call order.
+      if (Array.isArray(topic)) {
+        return Promise.resolve(topic.includes(LOAN_CREATED_TOPIC) ? (logs.loans ?? []) : (logs.status ?? []))
+      }
+
+      return Promise.resolve(byTopic[topic as string] ?? [])
     }),
     getBlock: jest.fn().mockResolvedValue({ timestamp: options.blockTimestamp ?? BLOCK_TIMESTAMP }),
   }
@@ -127,6 +141,8 @@ beforeEach(() => {
   fetchPoolActive.mockResolvedValue(false)
   updatePoolActive.mockResolvedValue(true)
 
+  indexLoanFromLog.mockResolvedValue({ loan: { loanId: 1, poolId: 7 }, result: { stored: true } })
+
   resolvePoolId.mockResolvedValue(7)
 })
 
@@ -148,7 +164,7 @@ describe('sweepBlockRange', () => {
       const counts = await sweep(provider)
 
       // Assert
-      expect(counts).toEqual({ pools: 2, contributions: 1, withdrawals: 3, statusUpdates: 0 })
+      expect(counts).toEqual({ pools: 2, contributions: 1, withdrawals: 3, loans: 0, statusUpdates: 0 })
     })
 
     it('should return zeroes when the range holds no events', async () => {
@@ -159,7 +175,7 @@ describe('sweepBlockRange', () => {
       const counts = await sweep(provider)
 
       // Assert
-      expect(counts).toEqual({ pools: 0, contributions: 0, withdrawals: 0, statusUpdates: 0 })
+      expect(counts).toEqual({ pools: 0, contributions: 0, withdrawals: 0, loans: 0, statusUpdates: 0 })
       expect(indexPoolEvent).not.toHaveBeenCalled()
     })
 
@@ -176,7 +192,7 @@ describe('sweepBlockRange', () => {
       const counts = await sweep(provider)
 
       // Assert
-      expect(counts).toEqual({ pools: 0, contributions: 0, withdrawals: 0, statusUpdates: 0 })
+      expect(counts).toEqual({ pools: 0, contributions: 0, withdrawals: 0, loans: 0, statusUpdates: 0 })
       expect(indexPoolEvent).toHaveBeenCalledTimes(1)
     })
   })
@@ -269,7 +285,7 @@ describe('sweepBlockRange', () => {
 
       // Assert
       expect(getIndexer()).not.toHaveBeenCalled()
-      expect(counts).toEqual({ pools: 0, contributions: 0, withdrawals: 0, statusUpdates: 0 })
+      expect(counts).toEqual({ pools: 0, contributions: 0, withdrawals: 0, loans: 0, statusUpdates: 0 })
     })
 
     it('should skip foreign logs silently rather than as errors', async () => {
@@ -530,6 +546,98 @@ describe('sweepBlockRange', () => {
 
       // Assert
       expect(order).toEqual(['create', 'status'])
+    })
+  })
+  describe('loans', () => {
+    it('should index every loan log in the range', async () => {
+      // Arrange
+      const provider = buildMockProvider({ loans: [buildLog(), buildLog({ index: 1 })] })
+
+      // Act
+      const counts = await sweep(provider)
+
+      // Assert
+      expect(counts.loans).toBe(2)
+      expect(indexLoanFromLog).toHaveBeenCalledTimes(2)
+    })
+
+    it('should fetch borrows and repayments in one query, with no address filter', async () => {
+      // Arrange
+      // Emitted by each pool contract, so there is no single address; the
+      // indexer proves the emitter is ours.
+      const provider = buildMockProvider()
+
+      // Act
+      await sweep(provider)
+
+      // Assert
+      const call = provider.getLogs.mock.calls.find(
+        ([f]: [{ topics: unknown[] }]) => Array.isArray(f.topics[0]) && (f.topics[0] as string[]).includes(LOAN_CREATED_TOPIC)
+      )
+      expect(call?.[0]).toEqual({
+        fromBlock: FROM_BLOCK,
+        toBlock: TO_BLOCK,
+        topics: [[LOAN_CREATED_TOPIC, LOAN_REPAID_TOPIC]],
+      })
+    })
+
+    it('should take the same path for a borrow and a repayment', async () => {
+      // Arrange
+      // The record written is the loan's state afterwards either way, so
+      // nothing in the sweep needs to know which event it is looking at.
+      const provider = buildMockProvider({
+        loans: [
+          { ...buildLog(), topics: [LOAN_CREATED_TOPIC, '0x01'] },
+          { ...buildLog({ index: 1 }), topics: [LOAN_REPAID_TOPIC, '0x01'] },
+        ],
+      })
+
+      // Act
+      const counts = await sweep(provider)
+
+      // Assert
+      expect(counts.loans).toBe(2)
+    })
+
+    it('should skip a loan from a contract the factory does not know', async () => {
+      // Arrange
+      // `indexLoanFromLog` returns null for one, the same silent skip deposits get.
+      indexLoanFromLog.mockResolvedValue(null)
+      const provider = buildMockProvider({ loans: [buildLog()] })
+
+      // Act
+      const counts = await sweep(provider)
+
+      // Assert
+      expect(counts.loans).toBe(0)
+      expect(mockLogger.error).not.toHaveBeenCalled()
+    })
+
+    it('should not count a loan whose record was already current', async () => {
+      // Arrange
+      // A sweep re-reads the `LoanCreated` log on every pass, long after the
+      // loan was repaid; counting that would report phantom work forever.
+      indexLoanFromLog.mockResolvedValue({ loan: { loanId: 1 }, result: { stored: false } })
+      const provider = buildMockProvider({ loans: [buildLog()] })
+
+      // Act
+      const counts = await sweep(provider)
+
+      // Assert
+      expect(counts.loans).toBe(0)
+    })
+
+    it('should keep sweeping after one loan fails', async () => {
+      // Arrange
+      indexLoanFromLog.mockRejectedValueOnce(new Error('getLoan reverted'))
+      const provider = buildMockProvider({ loans: [buildLog(), buildLog({ index: 1 })] })
+
+      // Act
+      const counts = await sweep(provider)
+
+      // Assert
+      expect(counts.loans).toBe(1)
+      expect(mockLogger.error).toHaveBeenCalledWith('Failed to sweep loan log', expect.objectContaining({ error: 'getLoan reverted' }))
     })
   })
 })

@@ -15,7 +15,7 @@ const STORAGE_KEY = '@superpool/pending_transactions'
 const MAX_STORED_TRANSACTIONS = 50
 
 export type PendingTransactionStatus = 'submitted' | 'confirmed' | 'failed'
-export type PendingTransactionType = 'CREATE_POOL' | 'CONTRIBUTE' | 'WITHDRAW'
+export type PendingTransactionType = 'CREATE_POOL' | 'CONTRIBUTE' | 'WITHDRAW' | 'BORROW' | 'REPAY'
 
 export interface CreatePoolParams {
   name: string
@@ -58,6 +58,31 @@ export interface WithdrawResult {
   amount: string
 }
 
+/**
+ * A borrow or a repayment.
+ *
+ * `loanId` is absent when borrowing — the contract assigns it — and required
+ * when repaying, since `repayLoan` takes the id rather than an amount.
+ */
+export interface LoanParams {
+  poolId: number
+  poolAddress: `0x${string}`
+  /** Denormalised so a pending card can name the pool before any pool is fetched. */
+  poolName: string
+  /** Wei, as a decimal string: the principal borrowed, or the total being repaid. */
+  amount: string
+  /** Per-pool loan id. Set for a repayment; assigned by the chain on a borrow. */
+  loanId?: number
+}
+
+/** Populated once a loan transaction is confirmed and its log is decoded. */
+export interface LoanResult {
+  /** The id the chain assigned (borrow) or settled (repayment). */
+  loanId: number
+  /** Wei, as the chain recorded it — authoritative over the submitted params. */
+  amount: string
+}
+
 interface PendingTransactionBase {
   txHash: `0x${string}`
   chainId: number
@@ -84,6 +109,18 @@ export interface WithdrawTransaction extends PendingTransactionBase {
   result?: WithdrawResult
 }
 
+export interface BorrowTransaction extends PendingTransactionBase {
+  type: 'BORROW'
+  params: LoanParams
+  result?: LoanResult
+}
+
+export interface RepayTransaction extends PendingTransactionBase {
+  type: 'REPAY'
+  params: LoanParams
+  result?: LoanResult
+}
+
 /**
  * Discriminated on `type`, because the flows carry genuinely different
  * payloads: a pool creation has terms and produces an id, a contribution has an
@@ -93,8 +130,12 @@ export interface WithdrawTransaction extends PendingTransactionBase {
  * A withdrawal reuses `ContributeParams` — it is the same amount moving the
  * other way — but keeps its own `type`, since the extractor, the copy and
  * eventually the indexer all differ.
+ *
+ * Borrowing and repaying share `LoanParams` for the same reason and stay
+ * separate types: they move money in opposite directions and read as different
+ * things to the user, even though both resolve to one loan record.
  */
-export type PendingTransaction = CreatePoolTransaction | ContributeTransaction | WithdrawTransaction
+export type PendingTransaction = CreatePoolTransaction | ContributeTransaction | WithdrawTransaction | BorrowTransaction | RepayTransaction
 
 /**
  * The slice of a Viem `PublicClient` this store needs. Injected rather than
@@ -270,6 +311,31 @@ export function extractFundsWithdrawnResult(receipt: TransactionReceipt): Withdr
 }
 
 /**
+ * Reads the loan id and amount out of a confirmed receipt.
+ *
+ * One extractor for both directions: `LoanCreated` and `LoanRepaid` carry the
+ * same three indexed parameters, and a transaction contains exactly one of
+ * them, so trying each in turn is unambiguous. The amount differs in meaning —
+ * principal borrowed versus total repaid — but both are what the chain
+ * recorded, which is what the pending card shows.
+ */
+export function extractLoanResult(receipt: TransactionReceipt): LoanResult | undefined {
+  for (const eventName of ['LoanCreated', 'LoanRepaid'] as const) {
+    try {
+      const [event] = parseEventLogs({ abi: SampleLendingPoolABI, eventName, logs: receipt.logs })
+      if (!event) continue
+
+      return { loanId: Number(event.args.loanId), amount: event.args.amount.toString() }
+    } catch {
+      // Try the other one; an undecodable log is not a reason to give up on a
+      // receipt that may still hold the sibling event.
+    }
+  }
+
+  return undefined
+}
+
+/**
  * The result extractor for a transaction's type.
  *
  * Startup recovery resolves records of every kind against the chain and has only
@@ -280,9 +346,10 @@ export function extractFundsWithdrawnResult(receipt: TransactionReceipt): Withdr
 export function extractResult(
   type: PendingTransactionType,
   receipt: TransactionReceipt
-): CreatePoolResult | ContributeResult | WithdrawResult | undefined {
+): CreatePoolResult | ContributeResult | WithdrawResult | LoanResult | undefined {
   if (type === 'CREATE_POOL') return extractPoolCreatedResult(receipt)
   if (type === 'WITHDRAW') return extractFundsWithdrawnResult(receipt)
+  if (type === 'BORROW' || type === 'REPAY') return extractLoanResult(receipt)
 
   return extractFundsDepositedResult(receipt)
 }
@@ -349,7 +416,7 @@ export class PendingTransactionsStore {
   updateTransactionStatus = async (
     txHash: `0x${string}`,
     status: PendingTransactionStatus,
-    result?: CreatePoolResult | ContributeResult
+    result?: CreatePoolResult | ContributeResult | WithdrawResult | LoanResult
   ): Promise<void> => {
     const transaction = this.transactions.find((existing) => existing.txHash === txHash)
     if (!transaction) return

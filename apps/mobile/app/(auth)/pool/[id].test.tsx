@@ -5,7 +5,6 @@ import {
   POOL_ADDRESS,
   TX_HASH,
 } from '../../../src/__tests__/fixtures/pendingTransaction'
-import { mockToast } from '../../../src/__tests__/mocks'
 import { mockLocalSearchParams, mockRouterBack, mockRouterPush } from '../../../src/__tests__/setup'
 import { fireEvent, render } from '../../../src/__tests__/test-utils'
 import { pendingTransactionsStore } from '../../../src/stores/PendingTransactionsStore'
@@ -104,12 +103,12 @@ describe('PoolDetailScreen', () => {
     expect(mockRouterPush).toHaveBeenCalledWith('/(auth)/pool/contribute?poolId=1')
   })
 
-  it('still shows a coming-soon toast for loan requests', () => {
+  it('opens the borrow screen from the pool', () => {
     const { getByTestId } = render(<PoolDetailScreen />)
 
     fireEvent.press(getByTestId('pool-request-loan-button'))
 
-    expect(mockToast.show).toHaveBeenCalledWith({ type: 'info', text1: 'Loan request is coming soon' })
+    expect(mockRouterPush).toHaveBeenCalledWith('/(auth)/pool/borrow?poolId=1')
   })
 
   describe('contributions still in flight', () => {

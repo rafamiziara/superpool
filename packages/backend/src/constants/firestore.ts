@@ -35,6 +35,15 @@ export const EVENT_SYNC_STATE_COLLECTION = 'event_sync_state'
 export const CONTRIBUTIONS_COLLECTION = 'contributions'
 
 /**
+ * The name of the Firestore collection used to store indexed loans.
+ *
+ * Unlike contributions and withdrawals, a document here is not one event: a
+ * loan is created and later repaid, so the record is the loan's current state
+ * as `getLoan` reports it, rewritten whenever either event is seen.
+ */
+export const LOANS_COLLECTION = 'loans'
+
+/**
  * The name of the Firestore collection used to store indexed liquidity
  * withdrawals (`FundsWithdrawn` events).
  *

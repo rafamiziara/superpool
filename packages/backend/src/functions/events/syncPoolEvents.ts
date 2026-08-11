@@ -113,7 +113,7 @@ export const syncPoolEventsHandler = async (options: SyncPoolEventsOptions = {})
     fromBlock = resolveInitialFromBlock(currentBlock, chainId)
   }
 
-  const totals: SweepCounts = { pools: 0, contributions: 0, withdrawals: 0, statusUpdates: 0 }
+  const totals: SweepCounts = { pools: 0, contributions: 0, withdrawals: 0, loans: 0, statusUpdates: 0 }
 
   if (fromBlock > currentBlock) {
     logger.info('Already synced up to current block, nothing to do', { chainId, lastProcessedBlock, currentBlock })
@@ -147,6 +147,7 @@ export const syncPoolEventsHandler = async (options: SyncPoolEventsOptions = {})
     totals.pools += counts.pools
     totals.contributions += counts.contributions
     totals.withdrawals += counts.withdrawals
+    totals.loans += counts.loans
     totals.statusUpdates += counts.statusUpdates
     lastSweptBlock = toBlock
 
@@ -166,6 +167,7 @@ export const syncPoolEventsHandler = async (options: SyncPoolEventsOptions = {})
           totalPoolsIndexed: FieldValue.increment(counts.pools),
           totalContributionsIndexed: FieldValue.increment(counts.contributions),
           totalWithdrawalsIndexed: FieldValue.increment(counts.withdrawals),
+          totalLoansIndexed: FieldValue.increment(counts.loans),
           totalPoolStatusUpdates: FieldValue.increment(counts.statusUpdates),
         },
         { merge: true }

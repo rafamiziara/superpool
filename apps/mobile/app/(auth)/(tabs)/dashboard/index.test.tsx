@@ -1,7 +1,8 @@
 import React from 'react'
 import { LOCALHOST_CHAIN_ID, makePendingTransaction } from '../../../../src/__tests__/fixtures/pendingTransaction'
-import { mockToast, mockWagmiUseAccount } from '../../../../src/__tests__/mocks'
+import { mockWagmiUseAccount } from '../../../../src/__tests__/mocks'
 import { mockRouterPush, mockRouterReplace } from '../../../../src/__tests__/setup'
+import { MOCK_LOANS } from '../../../../src/mocks/lending'
 import { fireEvent, render } from '../../../../src/__tests__/test-utils'
 import { pendingTransactionsStore } from '../../../../src/stores/PendingTransactionsStore'
 import { poolStore } from '../../../../src/stores/PoolStore'
@@ -69,14 +70,29 @@ describe('DashboardScreen', () => {
     expect(mockRouterReplace).toHaveBeenCalledWith('/(auth)/(tabs)/pools')
   })
 
-  it('shows coming-soon toasts for the actions that are still unimplemented', () => {
+  it('opens the borrow screen for the pool the active loan came from', () => {
+    // Both buttons lead to the same screen: with a loan open there is nothing
+    // to choose between borrowing and repaying, so the screen decides.
+    const { getByTestId } = render(<DashboardScreen />)
+    const poolId = poolStore.activeLoan!.poolId
+
+    fireEvent.press(getByTestId('repay-button'))
+    expect(mockRouterPush).toHaveBeenCalledWith(`/(auth)/pool/borrow?poolId=${poolId}`)
+
+    fireEvent.press(getByTestId('request-loan-button'))
+    expect(mockRouterPush).toHaveBeenCalledWith(`/(auth)/pool/borrow?poolId=${poolId}`)
+  })
+
+  it('sends someone with no loan to the pools list to pick one', () => {
+    poolStore.loanRecords = []
+    const restore = MOCK_LOANS.splice(0, MOCK_LOANS.length)
+
     const { getByTestId } = render(<DashboardScreen />)
 
     fireEvent.press(getByTestId('request-loan-button'))
-    expect(mockToast.show).toHaveBeenCalledWith({ type: 'info', text1: 'Loan request is coming soon' })
+    expect(mockRouterReplace).toHaveBeenCalledWith('/(auth)/(tabs)/pools')
 
-    fireEvent.press(getByTestId('repay-button'))
-    expect(mockToast.show).toHaveBeenCalledWith({ type: 'info', text1: 'Repayment is coming soon' })
+    MOCK_LOANS.push(...restore)
   })
 
   it('navigates from the "see all" links to the matching tabs', () => {
@@ -98,12 +114,16 @@ describe('DashboardScreen', () => {
   })
 
   it('hides the loan section when the user has no active loan', () => {
-    poolStore.loans = []
+    // `loans` is derived now, so the fixtures behind it are what has to go.
+    poolStore.loanRecords = []
+    const restore = MOCK_LOANS.splice(0, MOCK_LOANS.length)
 
     const { queryByTestId } = render(<DashboardScreen />)
 
     expect(queryByTestId('dashboard-loan')).toBeNull()
     expect(queryByTestId('repay-button')).toBeNull()
+
+    MOCK_LOANS.push(...restore)
   })
 
   describe('pending pool creations', () => {

@@ -83,6 +83,18 @@ service cloud.firestore {
       allow write: if false; // backend-only (withdrawal indexer)
     }
 
+    // --- loans -------------------------------------------------------------
+    // Loans indexed from on-chain LoanCreated / LoanRepaid events. Unlike the
+    // other feeds a document here is mutable — it is rewritten when the loan is
+    // repaid — but only ever by the indexer, so the client rules are the same:
+    // public chain state, gated on authentication, capped queries, no writes.
+
+    match /loans/{loanId} {
+      allow get: if isSignedIn();
+      allow list: if isSignedIn() && request.query.limit <= 100; // mirrors listLoans' own cap
+      allow write: if false; // backend-only (loan indexer)
+    }
+
     // --- auth_nonces -------------------------------------------------------
     // Single-use login challenges. Readable nonces would let an attacker who
     // has any authenticated session harvest challenges for other wallets, and
