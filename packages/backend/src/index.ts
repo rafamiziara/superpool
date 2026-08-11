@@ -4,7 +4,11 @@ import { setGlobalOptions } from 'firebase-functions'
 dotenv.config()
 setGlobalOptions({ maxInstances: 10 })
 
-// Production functions
+// Production functions.
+//
+// Named explicitly rather than `export *`: this list is what Firebase deploys,
+// so a function added to `./functions` and not added here exists in the build,
+// passes every test, and is simply never served. Add both.
 export {
   customAppCheckMinter,
   generateAuthMessage,
@@ -16,6 +20,7 @@ export {
   listWithdrawals,
   preparePoolCreation,
   syncPoolEvents,
+  syncPoolEventsNow,
   verifySignatureAndLogin,
 } from './functions'
 
