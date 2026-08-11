@@ -719,3 +719,118 @@ describe('PoolStore chain sync', () => {
     expect(calls).toEqual(['listPools'])
   })
 })
+
+// ---------------------------------------------------------------------------
+// Whose pools count as "mine".
+//
+// `memberships` deliberately covers every depositor, because pool liquidity is
+// summed across all of them. `myPools` has to narrow that to the connected
+// wallet, and the failure mode is silent: with only one depositor indexed, an
+// unfiltered version looks exactly right.
+// ---------------------------------------------------------------------------
+
+const USER_WALLET = '0x15d34aaf54267db7d7c367839aaf71a00a2c6a65'
+const STRANGER_WALLET = '0x0000000000000000000000000000000000000042'
+
+/** Owned by the user, with nothing deposited into it yet. */
+const POOL_I_OWN = { ...LIVE_POOL, poolId: 30, name: 'Mine By Ownership', poolOwner: USER_WALLET, createdBy: USER_WALLET }
+/** Someone else's pool that the user has put money into. */
+const POOL_I_FUNDED = { ...LIVE_POOL, poolId: 31, name: 'Mine By Deposit', poolOwner: STRANGER_WALLET, createdBy: STRANGER_WALLET }
+/** Someone else's pool, funded only by them. */
+const POOL_THEIRS = { ...LIVE_POOL, poolId: 32, name: 'Not Mine', poolOwner: STRANGER_WALLET, createdBy: STRANGER_WALLET }
+
+describe('PoolStore myPools', () => {
+  let store: PoolStore
+  let listContributionsCallable: jest.Mock
+
+  async function loadWithContributions(contributions: (typeof LIVE_CONTRIBUTION)[]) {
+    listContributionsCallable.mockResolvedValue({
+      data: { contributions, totalCount: contributions.length, limit: 50 },
+    })
+    await store.fetchPools()
+  }
+
+  beforeEach(() => {
+    jest.clearAllMocks()
+    delete process.env.EXPO_PUBLIC_USE_MOCK_POOLS
+
+    authStore.walletAddress = USER_WALLET
+    authStore.chainId = 31337
+
+    store = new PoolStore()
+    const listPoolsCallable = jest.fn().mockResolvedValue({
+      data: {
+        pools: [POOL_I_OWN, POOL_I_FUNDED, POOL_THEIRS],
+        totalCount: 3,
+        page: 1,
+        limit: 50,
+        hasNextPage: false,
+        hasPreviousPage: false,
+      },
+    })
+    listContributionsCallable = jest.fn().mockResolvedValue({ data: { contributions: [], totalCount: 0, limit: 50 } })
+    const listWithdrawalsCallable = jest.fn().mockResolvedValue({ data: { withdrawals: [], totalCount: 0, limit: 50 } })
+    mockFirebaseCallable.mockImplementation((_functions?: unknown, name?: string) => {
+      if (name === 'listContributions') return listContributionsCallable
+      if (name === 'listWithdrawals') return listWithdrawalsCallable
+      return listPoolsCallable
+    })
+  })
+
+  afterEach(() => {
+    process.env.EXPO_PUBLIC_USE_MOCK_POOLS = 'true'
+    authStore.walletAddress = null
+    authStore.chainId = null
+  })
+
+  it('does not claim a pool just because someone else funded it', async () => {
+    // The regression. `memberships` spans every depositor, so mapping it
+    // wholesale turns this list into every funded pool on the chain.
+    await loadWithContributions([
+      { ...LIVE_CONTRIBUTION, poolId: 31, contributor: USER_WALLET },
+      { ...LIVE_CONTRIBUTION, id: '31337-0xdddd-0', poolId: 32, contributor: STRANGER_WALLET },
+    ])
+
+    expect(store.myPools.map((pool) => pool.poolId)).toEqual([30, 31])
+  })
+
+  it('claims a pool the user owns even with no deposits in it', async () => {
+    // A pool you just created is yours to see before any membership exists.
+    await loadWithContributions([])
+
+    expect(store.myPools.map((pool) => pool.poolId)).toEqual([30])
+  })
+
+  it('claims a pool the user funded but does not own', async () => {
+    await loadWithContributions([{ ...LIVE_CONTRIBUTION, poolId: 31, contributor: USER_WALLET }])
+
+    expect(store.myPools.map((pool) => pool.poolId)).toEqual([30, 31])
+  })
+
+  it('matches the depositor case-insensitively', async () => {
+    // Contributions are stored lowercased; a connected wallet is checksummed.
+    authStore.walletAddress = '0x15D34AAf54267DB7D7c367839AAf71A00a2C6A65'
+    await loadWithContributions([{ ...LIVE_CONTRIBUTION, poolId: 31, contributor: USER_WALLET }])
+
+    expect(store.myPools.map((pool) => pool.poolId)).toEqual([30, 31])
+  })
+
+  it('claims nothing when every pool belongs to someone else', async () => {
+    authStore.walletAddress = '0x0000000000000000000000000000000000000099'
+    await loadWithContributions([
+      { ...LIVE_CONTRIBUTION, poolId: 31, contributor: STRANGER_WALLET },
+      { ...LIVE_CONTRIBUTION, id: '31337-0xdddd-0', poolId: 32, contributor: STRANGER_WALLET },
+    ])
+
+    expect(store.myPools).toEqual([])
+  })
+
+  it('still counts every depositor towards pool liquidity', async () => {
+    // The filter belongs in `myPools`, not in `memberships` — narrowing the
+    // source would make other people's pools read as empty.
+    await loadWithContributions([{ ...LIVE_CONTRIBUTION, poolId: 32, contributor: STRANGER_WALLET, amount: parseEther('7').toString() }])
+
+    expect(store.poolLiquidity(32)).toBe(parseEther('7'))
+    expect(store.myPools.map((pool) => pool.poolId)).toEqual([30])
+  })
+})

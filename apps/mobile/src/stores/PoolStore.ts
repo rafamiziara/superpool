@@ -359,9 +359,18 @@ export class PoolStore {
    *
    * Ownership counts on its own: a pool you just created is yours to see before
    * any membership record exists for it.
+   *
+   * `memberships` covers **every** member of every pool — it has to, because
+   * pool liquidity is summed across all depositors — so it must be narrowed to
+   * this wallet here. Mapping it wholesale yields "every pool anyone has ever
+   * deposited into", which quietly turns this list into every funded pool on the
+   * chain. That reads as correct for as long as the user is the only depositor
+   * indexed, and stops the moment anyone else is.
    */
   get myPools(): PoolInfo[] {
-    const memberPoolIds = new Set(this.memberships.map((member) => member.poolId))
+    const memberPoolIds = new Set(
+      this.memberships.filter((member) => sameAddress(member.walletAddress, this.userAddress)).map((member) => member.poolId)
+    )
 
     return this.pools.filter((pool) => memberPoolIds.has(String(pool.poolId)) || sameAddress(pool.poolOwner, this.userAddress))
   }
