@@ -26,6 +26,7 @@ describe('listLoansHandler', () => {
       interestRate: 500,
       duration: 2_592_000,
       isRepaid: false,
+      status: 'disbursed',
       chainId: CHAIN_ID,
       transactionHash: '0xaaa',
       blockNumber: 100,
@@ -41,6 +42,7 @@ describe('listLoansHandler', () => {
       interestRate: 750,
       duration: 1_209_600,
       isRepaid: true,
+      status: 'disbursed',
       chainId: CHAIN_ID,
       transactionHash: '0xbbb',
       blockNumber: 101,
@@ -137,11 +139,29 @@ describe('listLoansHandler', () => {
   })
 
   it('should restrict to outstanding loans when activeOnly is set', async () => {
-    // `isRepaid` is the contract's only lifecycle bit, so "outstanding" is
-    // exactly its negation.
+    // Both halves: a pending request is not repaid either, so filtering on
+    // `isRepaid` alone would report unfunded requests as active debt.
     await listLoansHandler(buildRequest({ data: { activeOnly: true } }) as never)
 
+    expect(mockQuery.where).toHaveBeenCalledWith('status', '==', 'disbursed')
     expect(mockQuery.where).toHaveBeenCalledWith('isRepaid', '==', false)
+  })
+
+  it('should restrict to requests awaiting the owner when pendingOnly is set', async () => {
+    await listLoansHandler(buildRequest({ data: { pendingOnly: true } }) as never)
+
+    expect(mockQuery.where).toHaveBeenCalledWith('status', '==', 'requested')
+  })
+
+  it('should read a record stored before the approval step as disbursed', async () => {
+    // Those loans have no `status` field at all, and every one was disbursed.
+    mockQuery.get.mockResolvedValue({
+      docs: [{ id: '31337-1-1', data: () => ({ ...mockLoans[0], status: undefined, startedAt: { toDate: () => new Date() } }) }],
+    })
+
+    const result = await listLoansHandler(buildRequest() as never)
+
+    expect(result.loans[0].status).toBe('disbursed')
   })
 
   it('should not filter on isRepaid when activeOnly is absent', async () => {

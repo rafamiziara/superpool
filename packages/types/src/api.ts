@@ -216,15 +216,13 @@ export interface IndexWithdrawalResponse {
  * One loan, as the chain currently describes it.
  *
  * Unlike a contribution or a withdrawal — each of which *is* one event — a loan
- * is an entity with a lifecycle, touched by `LoanCreated` and later
- * `LoanRepaid`. So the record is not a log; it is the answer `getLoan` gives
- * now, re-read whenever either event is seen.
+ * is an entity with a lifecycle: requested, approved or rejected, then repaid.
+ * So the record is not a log; it is the answer `getLoan` gives now, re-read
+ * whenever any of those events is seen.
  *
- * Deliberately thinner than the app's `Loan` interface, which describes an
- * approval workflow the contract does not implement. `createLoan` disburses
- * immediately and `repayLoan` demands the full amount in one transaction, so
- * there is no requested state, no partial repayment and no accrual — only
- * borrowed or repaid.
+ * Still thinner than the app's `Loan` interface. The contract has an approval
+ * step, but `repayLoan` demands the full amount in one transaction and interest
+ * is fixed at disbursement, so there is no partial repayment and no accrual.
  */
 export interface LoanInfo {
   /** `${chainId}-${poolId}-${loanId}` — the document id, and stable. */
@@ -244,10 +242,19 @@ export interface LoanInfo {
   /** ISO 8601 — the block timestamp the contract recorded as `startTime`. */
   startedAt: string
   /**
-   * The contract's only lifecycle bit. Repayment is all-or-nothing, so this is
-   * the whole of a loan's state: false means outstanding, true means settled.
+   * Whether a disbursed loan has been settled. Repayment is all-or-nothing, so
+   * there is no partial state. Meaningless unless `status` is `disbursed`.
    */
   isRepaid: boolean
+  /**
+   * Where the loan is before repayment.
+   *
+   * Only pools whose owner turned on review ever produce `requested` or
+   * `rejected`; a pool that lends on demand goes straight to `disbursed`. Loans
+   * written before the field existed also read `disbursed`, which is what they
+   * were — see the enum note in `SampleLendingPool`.
+   */
+  status: 'disbursed' | 'requested' | 'rejected'
   chainId: number
   /** The transaction that created the loan. */
   transactionHash: string
@@ -273,8 +280,10 @@ export interface ListLoansRequest {
   poolId?: number
   /** Restrict to one wallet. Matched case-insensitively. */
   borrower?: string
-  /** Only loans that are still outstanding. */
+  /** Only loans that are disbursed and not yet repaid. */
   activeOnly?: boolean
+  /** Only requests still waiting on the pool owner. */
+  pendingOnly?: boolean
   limit?: number
 }
 

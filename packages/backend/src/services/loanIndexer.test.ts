@@ -60,7 +60,7 @@ function buildLog(overrides: Partial<{ topic: string; loanId: number; address: s
   }
 }
 
-function buildChainLoan(overrides: Partial<{ isRepaid: boolean; amount: bigint }> = {}) {
+function buildChainLoan(overrides: Partial<{ isRepaid: boolean; amount: bigint; status: number }> = {}) {
   return {
     borrower: BORROWER,
     isRepaid: overrides.isRepaid ?? false,
@@ -68,14 +68,16 @@ function buildChainLoan(overrides: Partial<{ isRepaid: boolean; amount: bigint }
     interestRate: 500n,
     startTime: BigInt(START_TIME),
     duration: 2_592_000n,
+    // The contract enum, by ordinal: 0 = Disbursed.
+    status: BigInt(overrides.status ?? 0),
   }
 }
 
-function buildFirestore(options: { exists?: boolean; storedIsRepaid?: boolean } = {}) {
-  const { exists = false, storedIsRepaid = false } = options
+function buildFirestore(options: { exists?: boolean; storedIsRepaid?: boolean; storedStatus?: string } = {}) {
+  const { exists = false, storedIsRepaid = false, storedStatus = 'disbursed' } = options
   const mockSet = jest.fn().mockResolvedValue(undefined)
   const mockDocRef = {
-    get: jest.fn().mockResolvedValue({ exists, data: () => (exists ? { isRepaid: storedIsRepaid } : null) }),
+    get: jest.fn().mockResolvedValue({ exists, data: () => (exists ? { isRepaid: storedIsRepaid, status: storedStatus } : null) }),
     set: mockSet,
   }
   const mockDoc = jest.fn().mockReturnValue(mockDocRef)
@@ -100,6 +102,7 @@ const parsedLoan = {
   duration: 2_592_000,
   startedAt: new Date(START_TIME * 1000),
   isRepaid: false,
+  status: 'disbursed' as const,
   chainId: CHAIN_ID,
   transactionHash: TX_HASH,
   blockNumber: 120,
@@ -156,6 +159,7 @@ describe('fetchLoan', () => {
       duration: 2_592_000,
       startedAt: new Date(START_TIME * 1000),
       isRepaid: false,
+      status: 'disbursed',
     })
   })
 
@@ -216,6 +220,17 @@ describe('indexLoan', () => {
     expect(mockDocRef.set).not.toHaveBeenCalled()
     expect(result).toMatchObject({ alreadyIndexed: true, stored: false })
     expect(mockLogger.info).toHaveBeenCalledWith('Loan already current, skipping', expect.objectContaining({ loanId: LOAN_ID }))
+  })
+
+  it('should rewrite a request that has since been approved', async () => {
+    // `isRepaid` is false either way, so comparing that alone would leave the
+    // record stuck at `requested` for the life of the loan.
+    const { mockFs, mockDocRef } = buildFirestore({ exists: true, storedStatus: 'requested' })
+
+    const result = await indexLoan({ ...parsedLoan, status: 'disbursed' }, mockFs)
+
+    expect(mockDocRef.set).toHaveBeenCalledWith(expect.objectContaining({ status: 'disbursed' }), { merge: true })
+    expect(result.stored).toBe(true)
   })
 
   it('should write nothing on a repeated repayment either', async () => {

@@ -43,6 +43,7 @@ function buildLoan(overrides: Partial<ParsedLoan> = {}): ParsedLoan {
     duration: 2_592_000,
     startedAt: STARTED_AT,
     isRepaid: false,
+    status: 'disbursed',
     chainId: SUPPORTED_CHAIN_ID,
     transactionHash: VALID_TX_HASH,
     blockNumber: 120,
@@ -109,6 +110,17 @@ describe('indexLoanHandler', () => {
       const result = await indexLoanHandler(buildRequest() as never)
 
       expect(result.loans[0].startedAt).toBe(STARTED_AT.toISOString())
+    })
+
+    it('should carry the lifecycle state across the wire', async () => {
+      // A pending request has to be distinguishable from a funded loan; both
+      // are `isRepaid: false`.
+      resolveWith([buildLoan({ status: 'requested' })])
+
+      const result = await indexLoanHandler(buildRequest() as never)
+
+      expect(result.loans[0].status).toBe('requested')
+      expect(result.loans[0].isRepaid).toBe(false)
     })
 
     it('should treat a repayment exactly like a borrow', async () => {

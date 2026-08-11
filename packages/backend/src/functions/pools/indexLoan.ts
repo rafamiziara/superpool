@@ -21,6 +21,7 @@ function toLoanInfo(loan: ParsedLoan): LoanInfo {
     duration: loan.duration,
     startedAt: loan.startedAt.toISOString(),
     isRepaid: loan.isRepaid,
+    status: loan.status,
     chainId: loan.chainId,
     transactionHash: loan.transactionHash,
     blockNumber: loan.blockNumber,

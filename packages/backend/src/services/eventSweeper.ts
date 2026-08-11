@@ -4,7 +4,7 @@ import { logger } from 'firebase-functions/v2'
 import { PoolFactoryABI, SampleLendingPoolABI } from '../constants'
 import { indexContributionEvent, parseFundsDepositedLog, resolvePoolId } from './contributionIndexer'
 import { fetchPoolActive, fetchPoolDescription, indexPoolEvent, parsePoolCreatedLog, updatePoolActive } from './eventIndexer'
-import { indexLoanFromLog, LOAN_CREATED_TOPIC, LOAN_REPAID_TOPIC } from './loanIndexer'
+import { indexLoanFromLog, LOAN_TOPICS } from './loanIndexer'
 import { indexWithdrawalEvent, parseFundsWithdrawnLog } from './withdrawalIndexer'
 
 const poolFactoryInterface = new Interface([...PoolFactoryABI])
@@ -234,11 +234,11 @@ async function sweepFundsWithdrawn(options: SweepBlockRangeOptions, caches: Swee
 /**
  * Index every loan touched in the range, borrowed or repaid alike.
  *
- * Both events are fetched in one topic-OR query and take the same path, because
- * the record written is the loan's state afterwards either way — `indexLoanFromLog`
- * re-reads it from `getLoan` rather than inferring it from which log arrived.
- * That is what makes a repayment swept before its creation, or a re-scan of
- * either, land on the right answer.
+ * All five loan events are fetched in one topic-OR query and take the same
+ * path, because the record written is the loan's state afterwards whichever it
+ * was — `indexLoanFromLog` re-reads it from `getLoan` rather than inferring it
+ * from which log arrived. That is what makes an approval swept before its
+ * request, or a re-scan of either, land on the right answer.
  *
  * Emitted by the pool contracts, not the factory, so there is no address to
  * filter on; `indexLoanFromLog` returns null for a contract the factory does
@@ -247,7 +247,7 @@ async function sweepFundsWithdrawn(options: SweepBlockRangeOptions, caches: Swee
 async function sweepLoans(options: SweepBlockRangeOptions): Promise<number> {
   const { provider, firestore, chainId, factoryAddress, fromBlock, toBlock } = options
 
-  const logs = await queryLogs(provider, [LOAN_CREATED_TOPIC, LOAN_REPAID_TOPIC], fromBlock, toBlock)
+  const logs = await queryLogs(provider, [...LOAN_TOPICS], fromBlock, toBlock)
 
   let stored = 0
 

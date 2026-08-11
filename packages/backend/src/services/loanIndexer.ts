@@ -9,10 +9,10 @@ import { resolvePoolId } from './contributionIndexer'
  * One loan, read from the chain rather than decoded from a log.
  *
  * Contributions and withdrawals are events: one log, one immutable record. A
- * loan is not — it is created by `LoanCreated` and later settled by
- * `LoanRepaid`, so the same entity is described by two logs at different
- * blocks. Replaying those in order would work only if they always arrive in
- * order, which a re-scan or a topic-split query cannot guarantee.
+ * loan is not — it is requested, approved or rejected, then repaid, so the same
+ * entity is described by several logs at different blocks. Replaying those in
+ * order would work only if they always arrive in order, which a re-scan or a
+ * topic-split query cannot guarantee.
  *
  * So the logs are used only to learn *which* loan changed, and `getLoan` is
  * asked what that loan looks like now. Same reasoning as the pool active flag.
@@ -28,6 +28,7 @@ export interface ParsedLoan {
   duration: number
   startedAt: Date
   isRepaid: boolean
+  status: LoanStatus
   chainId: number
   transactionHash: string
   blockNumber: number
@@ -43,10 +44,34 @@ export interface IndexLoanResult {
   stored: boolean
 }
 
+/** The wire form of `SampleLendingPool.LoanStatus`. */
+export type LoanStatus = 'disbursed' | 'requested' | 'rejected'
+
+/**
+ * The contract's enum, by ordinal.
+ *
+ * `Disbursed` is index 0 on purpose — a loan written before the field existed
+ * reads zero, and every one of those was disbursed. Reordering this relabels
+ * history, so it must track the Solidity enum exactly.
+ */
+const LOAN_STATUS: readonly LoanStatus[] = ['disbursed', 'requested', 'rejected']
+
 const lendingPoolInterface = new Interface([...SampleLendingPoolABI])
 
 export const LOAN_CREATED_TOPIC = lendingPoolInterface.getEvent('LoanCreated')!.topicHash
 export const LOAN_REPAID_TOPIC = lendingPoolInterface.getEvent('LoanRepaid')!.topicHash
+export const LOAN_REQUESTED_TOPIC = lendingPoolInterface.getEvent('LoanRequested')!.topicHash
+export const LOAN_APPROVED_TOPIC = lendingPoolInterface.getEvent('LoanApproved')!.topicHash
+export const LOAN_REJECTED_TOPIC = lendingPoolInterface.getEvent('LoanRejected')!.topicHash
+
+/**
+ * Every event that touches a loan.
+ *
+ * All five are treated identically: the log says *which* loan changed and
+ * `getLoan` says what it now is, so nothing downstream branches on which one
+ * arrived.
+ */
+export const LOAN_TOPICS = [LOAN_CREATED_TOPIC, LOAN_REPAID_TOPIC, LOAN_REQUESTED_TOPIC, LOAN_APPROVED_TOPIC, LOAN_REJECTED_TOPIC] as const
 
 /** `getPoolId` returns 0 for an unknown address — pool ids start at 1. */
 const UNKNOWN_POOL_ID = 0
@@ -99,7 +124,18 @@ export async function fetchLoan(
     duration: Number(loan.duration),
     startedAt: new Date(Number(loan.startTime) * 1000),
     isRepaid: loan.isRepaid as boolean,
+    // Out-of-range would mean the contract grew a state this build does not
+    // know; reading it as disbursed would be a lie, so it fails loudly.
+    status: statusFromOrdinal(Number(loan.status)),
   }
+}
+
+function statusFromOrdinal(ordinal: number): LoanStatus {
+  const status = LOAN_STATUS[ordinal]
+
+  if (!status) throw new Error(`Unknown LoanStatus ordinal from chain: ${ordinal}`)
+
+  return status
 }
 
 /**
@@ -121,7 +157,10 @@ export async function indexLoan(loan: ParsedLoan, firestore: Firestore): Promise
   const docRef = firestore.collection(LOANS_COLLECTION).doc(docId)
   const existing = await docRef.get()
 
-  if (existing.exists && existing.data()!.isRepaid === loan.isRepaid) {
+  // Both halves of the lifecycle: a request that has since been approved has
+  // the same `isRepaid` as when it was requested, so comparing that alone would
+  // leave the record stuck at `requested` forever.
+  if (existing.exists && existing.data()!.isRepaid === loan.isRepaid && existing.data()!.status === loan.status) {
     logger.info('Loan already current, skipping', { docId, loanId: loan.loanId, poolId: loan.poolId })
 
     return { id: docId, loanId: loan.loanId, poolId: loan.poolId, alreadyIndexed: true, stored: false }
@@ -138,6 +177,7 @@ export async function indexLoan(loan: ParsedLoan, firestore: Firestore): Promise
       duration: loan.duration,
       startedAt: loan.startedAt,
       isRepaid: loan.isRepaid,
+      status: loan.status,
       chainId: loan.chainId,
       transactionHash: loan.transactionHash,
       blockNumber: loan.blockNumber,
@@ -147,7 +187,13 @@ export async function indexLoan(loan: ParsedLoan, firestore: Firestore): Promise
     { merge: true }
   )
 
-  logger.info('Loan indexed successfully', { docId, loanId: loan.loanId, poolId: loan.poolId, isRepaid: loan.isRepaid })
+  logger.info('Loan indexed successfully', {
+    docId,
+    loanId: loan.loanId,
+    poolId: loan.poolId,
+    status: loan.status,
+    isRepaid: loan.isRepaid,
+  })
 
   return { id: docId, loanId: loan.loanId, poolId: loan.poolId, alreadyIndexed: false, stored: true }
 }
@@ -193,9 +239,10 @@ export interface IndexLoansByTxHashResult {
 /**
  * Index every loan touched by a transaction, borrowing or repaying alike.
  *
- * Both events are matched in one pass because the caller does not need to know
- * which happened — the record written is the loan's state afterwards either
- * way, so a borrow and a repayment take exactly the same path.
+ * Every loan event is matched in one pass because the caller does not need to
+ * know which happened — the record written is the loan's state afterwards
+ * whichever it was, so requesting, approving, rejecting, borrowing and repaying
+ * all take exactly the same path.
  */
 export async function indexLoansByTxHash(
   txHash: string,
@@ -214,7 +261,7 @@ export async function indexLoansByTxHash(
     throw new HttpsError('failed-precondition', `Transaction was reverted or failed: ${txHash}`)
   }
 
-  const matchingLogs = receipt.logs.filter((log) => log.topics[0] === LOAN_CREATED_TOPIC || log.topics[0] === LOAN_REPAID_TOPIC)
+  const matchingLogs = receipt.logs.filter((log) => (LOAN_TOPICS as readonly string[]).includes(log.topics[0]))
 
   if (matchingLogs.length === 0) {
     throw new HttpsError('not-found', `No loan event found in transaction: ${txHash}`)

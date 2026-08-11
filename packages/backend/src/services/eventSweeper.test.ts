@@ -21,7 +21,7 @@ const { sweepBlockRange } = require('./eventSweeper')
 const { fetchPoolActive, fetchPoolDescription, indexPoolEvent, parsePoolCreatedLog, updatePoolActive } = require('./eventIndexer')
 const { indexContributionEvent, parseFundsDepositedLog, resolvePoolId } = require('./contributionIndexer')
 const { indexWithdrawalEvent, parseFundsWithdrawnLog } = require('./withdrawalIndexer')
-const { indexLoanFromLog, LOAN_CREATED_TOPIC, LOAN_REPAID_TOPIC } = require('./loanIndexer')
+const { indexLoanFromLog, LOAN_CREATED_TOPIC, LOAN_REPAID_TOPIC, LOAN_TOPICS } = require('./loanIndexer')
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -577,7 +577,8 @@ describe('sweepBlockRange', () => {
       expect(call?.[0]).toEqual({
         fromBlock: FROM_BLOCK,
         toBlock: TO_BLOCK,
-        topics: [[LOAN_CREATED_TOPIC, LOAN_REPAID_TOPIC]],
+        // All five loan events, since every one of them takes the same path.
+        topics: [[...LOAN_TOPICS]],
       })
     })
 

@@ -52,6 +52,7 @@ function outstandingLoan(overrides: Record<string, unknown> = {}) {
     duration: 2_592_000,
     startedAt: '2026-08-01T00:00:00.000Z',
     isRepaid: false,
+    status: 'disbursed' as const,
     chainId: 31337,
     transactionHash: '0xaaa',
     blockNumber: 100,

@@ -33,10 +33,16 @@ export const listLoansHandler = async (request: CallableRequest<ListLoansRequest
       query = query.where('borrower', '==', borrower)
     }
 
-    // `isRepaid` is the contract's only lifecycle bit — repayment is
-    // all-or-nothing — so "outstanding" is exactly its negation.
+    // Outstanding debt: disbursed and not yet settled. Both halves matter now
+    // that a loan can exist without having been funded — a pending request is
+    // not repaid either, and would otherwise read as active.
     if (request.data.activeOnly) {
-      query = query.where('isRepaid', '==', false)
+      query = query.where('status', '==', 'disbursed').where('isRepaid', '==', false)
+    }
+
+    // What a pool owner has to decide on.
+    if (request.data.pendingOnly) {
+      query = query.where('status', '==', 'requested')
     }
 
     const totalSnapshot = await query.count().get()
@@ -58,6 +64,9 @@ export const listLoansHandler = async (request: CallableRequest<ListLoansRequest
         // ISO string, not a Date: the callable encoder turns a Date into `{}`.
         startedAt: (data.startedAt?.toDate() || new Date()).toISOString(),
         isRepaid: data.isRepaid,
+        // Absent on loans indexed before the approval step shipped; they were
+        // all disbursed, which is what the contract's enum zero means too.
+        status: data.status ?? 'disbursed',
         chainId: data.chainId,
         transactionHash: data.transactionHash,
         blockNumber: data.blockNumber,
@@ -80,9 +89,9 @@ export const listLoansHandler = async (request: CallableRequest<ListLoansRequest
 /**
  * Cloud Function to list indexed loans.
  *
- * Each record is a loan's current state rather than an event, so a repaid loan
- * stays in the list with `isRepaid` true — the app shows it as history and uses
- * `activeOnly` when it wants only outstanding debt.
+ * Each record is a loan's current state rather than an event, so a repaid or
+ * rejected loan stays in the list as history. `activeOnly` narrows to
+ * outstanding debt, `pendingOnly` to requests awaiting the pool owner.
  *
  * @param {CallableRequest<ListLoansRequest>} request Filtering options
  * @returns {Promise<ListLoansResponse>} Matching loans, newest first
