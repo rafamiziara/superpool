@@ -4,10 +4,12 @@ import { StatusBar } from 'expo-status-bar'
 import { observer } from 'mobx-react-lite'
 import React, { useState } from 'react'
 import { Pressable, ScrollView, Text, View } from 'react-native'
+import { useReadContract } from 'wagmi'
 import { ActivityRow } from '../../../src/components/lending/ActivityRow'
 import { ApprovalsLink } from '../../../src/components/lending/ApprovalsLink'
 import { PendingContributionCard } from '../../../src/components/lending/PendingContributionCard'
 import { TransactionStatusModal } from '../../../src/components/lending/TransactionStatusModal'
+import { SampleLendingPoolABI } from '../../../src/constants/abis'
 import { palette } from '../../../src/constants/palette'
 import {
   type ContributeTransaction,
@@ -41,6 +43,30 @@ function PoolDetailScreen() {
   const pendingRequests = pool ? poolStore.pendingLoansFor(pool.poolId) : []
   const myRequest = pool ? poolStore.pendingLoanFor(pool.poolId) : undefined
   const transactions = pool ? poolStore.transactionsFor(pool.poolId) : []
+
+  /** Who is waiting to be let in — the owner's queue, not the user's. */
+  const pendingMembers = pool ? poolStore.pendingMembersFor(pool.poolId) : []
+
+  /**
+   * The register's own word on the connected wallet, which is not the same
+   * question as `membership` above. That one merges in money and defaults a
+   * contributor to active; this one can tell a rejected applicant from a
+   * stranger, and they must not see the same screen.
+   */
+  const standing = pool ? poolStore.registerStandingFor(pool.poolId) : undefined
+
+  // Read from the chain, never from the indexed pool record: the owner can flip
+  // this at any moment and nothing indexes it.
+  const { data: config } = useReadContract({
+    address: pool?.poolAddress as `0x${string}` | undefined,
+    abi: SampleLendingPoolABI,
+    functionName: 'poolConfig',
+    query: { enabled: Boolean(pool?.poolAddress) },
+  })
+
+  // The sixth member of the tuple. A pool that predates the field decodes to
+  // nothing, and open is the right answer for those.
+  const requiresMembership = Array.isArray(config) ? config[5] === true : false
 
   /** Deposits into this pool that the backend has not indexed yet. */
   const pending = pool ? pendingContributionsFor(pool.poolId) : []
@@ -157,8 +183,41 @@ function PoolDetailScreen() {
               </View>
               <View className="flex-1">
                 <Text className="text-base font-bold text-snow">Pool settings</Text>
-                <Text className="mt-0.5 text-xs text-fog">Choose whether you review loan requests</Text>
+                <Text className="mt-0.5 text-xs text-fog">Choose who joins, and whether you review loan requests</Text>
               </View>
+              <FontAwesome name="chevron-right" size={12} color={palette.mist} />
+            </Pressable>
+          </View>
+        )}
+
+        {/*
+          Members, always offered to the owner rather than only when someone is
+          waiting: the roster is the other half of what this screen is for, and
+          removing a member has no other entry point.
+        */}
+        {isOwner && (
+          <View className="mt-3 px-6">
+            <Pressable
+              onPress={() => router.push(`/(auth)/pool/members?poolId=${pool.poolId}`)}
+              className="flex-row items-center gap-4 rounded-3xl border-continuous border-hairline border-veil bg-surface px-5 py-4 active:opacity-80"
+              testID="pool-members-link"
+            >
+              <View className="h-10 w-10 items-center justify-center rounded-2xl border-continuous bg-raised">
+                <FontAwesome name="users" size={16} color={palette.mist} />
+              </View>
+              <View className="flex-1">
+                <Text className="text-base font-bold text-snow">Members</Text>
+                <Text className="mt-0.5 text-xs text-fog">
+                  {pendingMembers.length > 0
+                    ? `${pendingMembers.length} ${pendingMembers.length === 1 ? 'person is' : 'people are'} waiting to join`
+                    : 'See who is in, and who is waiting'}
+                </Text>
+              </View>
+              {pendingMembers.length > 0 && (
+                <View className="rounded-full bg-amber-deep px-2 py-0.5">
+                  <Text className="text-xs font-bold text-amber">{pendingMembers.length}</Text>
+                </View>
+              )}
               <FontAwesome name="chevron-right" size={12} color={palette.mist} />
             </Pressable>
           </View>
@@ -186,44 +245,80 @@ function PoolDetailScreen() {
         )}
       </ScrollView>
 
-      {/* Fixed thumb-zone action bar */}
-      <View className="absolute inset-x-0 bottom-safe-offset-4 flex-row gap-3 px-6" testID="pool-actions">
-        <Pressable
-          onPress={() => router.push(`/(auth)/pool/contribute?poolId=${pool.poolId}`)}
-          className="flex-1 items-center justify-center rounded-2xl border-continuous bg-mint py-4 shadow-glow-mint active:scale-[0.97] active:opacity-90"
-          testID="pool-contribute-button"
-        >
-          <Text className="text-sm font-bold text-abyss">Contribute</Text>
-        </Pressable>
-        {/*
+      {/*
+        Fixed thumb-zone action bar.
+
+        A private pool the user has not been let into offers one thing: asking.
+        `depositFunds` and `createLoan` both revert for a non-member, so showing
+        Contribute and Borrow would be an invitation to a transaction that
+        fails. The owner is exempt — they are `Active` in their own pool from
+        the moment they fund it, and locking them out of their own screen on a
+        chain read that has not landed yet would be worse than the alternative.
+      */}
+      {requiresMembership && !isOwner && standing?.status !== 'active' ? (
+        <View className="absolute inset-x-0 bottom-safe-offset-4 px-6" testID="pool-join-actions">
+          <Pressable
+            onPress={() => router.push(`/(auth)/pool/join?poolId=${pool.poolId}`)}
+            disabled={standing?.status === 'requested'}
+            accessibilityRole="button"
+            accessibilityState={{ disabled: standing?.status === 'requested' }}
+            testID="pool-join-button"
+            className={
+              standing?.status === 'requested'
+                ? 'items-center justify-center rounded-2xl border-continuous border-hairline border-veil bg-raised py-4'
+                : 'items-center justify-center rounded-2xl border-continuous bg-mint py-4 shadow-glow-mint active:scale-[0.97] active:opacity-90'
+            }
+          >
+            <Text className={standing?.status === 'requested' ? 'text-sm font-bold text-mist' : 'text-sm font-bold text-abyss'}>
+              {standing?.status === 'requested'
+                ? 'Waiting to be let in'
+                : standing?.status === 'rejected'
+                  ? 'Ask again'
+                  : standing?.status === 'removed'
+                    ? 'Ask to rejoin'
+                    : 'Ask to join'}
+            </Text>
+          </Pressable>
+        </View>
+      ) : (
+        <View className="absolute inset-x-0 bottom-safe-offset-4 flex-row gap-3 px-6" testID="pool-actions">
+          <Pressable
+            onPress={() => router.push(`/(auth)/pool/contribute?poolId=${pool.poolId}`)}
+            className="flex-1 items-center justify-center rounded-2xl border-continuous bg-mint py-4 shadow-glow-mint active:scale-[0.97] active:opacity-90"
+            testID="pool-contribute-button"
+          >
+            <Text className="text-sm font-bold text-abyss">Contribute</Text>
+          </Pressable>
+          {/*
           Only offered to members. Someone who never contributed has nothing to
           take out, and `withdraw` would revert on them. The membership is
           derived from indexed deposits, so it answers "has this wallet ever
           funded this pool" — the withdrawable amount itself is read from the
           chain on the next screen, where it has to be exact.
         */}
-        {membership && (
+          {membership && (
+            <Pressable
+              onPress={() => router.push(`/(auth)/pool/withdraw?poolId=${pool.poolId}`)}
+              className="flex-1 items-center justify-center rounded-2xl border-continuous border-hairline border-veil bg-raised py-4 active:scale-[0.97] active:opacity-80"
+              testID="pool-withdraw-button"
+            >
+              <Text className="text-sm font-bold text-snow">Withdraw</Text>
+            </Pressable>
+          )}
           <Pressable
-            onPress={() => router.push(`/(auth)/pool/withdraw?poolId=${pool.poolId}`)}
+            onPress={() => router.push(`/(auth)/pool/borrow?poolId=${pool.poolId}`)}
             className="flex-1 items-center justify-center rounded-2xl border-continuous border-hairline border-veil bg-raised py-4 active:scale-[0.97] active:opacity-80"
-            testID="pool-withdraw-button"
+            testID="pool-request-loan-button"
           >
-            <Text className="text-sm font-bold text-snow">Withdraw</Text>
-          </Pressable>
-        )}
-        <Pressable
-          onPress={() => router.push(`/(auth)/pool/borrow?poolId=${pool.poolId}`)}
-          className="flex-1 items-center justify-center rounded-2xl border-continuous border-hairline border-veil bg-raised py-4 active:scale-[0.97] active:opacity-80"
-          testID="pool-request-loan-button"
-        >
-          {/* One screen for all three: the contract holds a single activeLoanId
+            {/* One screen for all three: the contract holds a single activeLoanId
               per member per pool, so whatever is in that slot is the only thing
               there is to act on. */}
-          <Text className="text-sm font-bold text-snow">
-            {outstandingLoan ? 'Repay loan' : myRequest ? 'Your request' : 'Request loan'}
-          </Text>
-        </Pressable>
-      </View>
+            <Text className="text-sm font-bold text-snow">
+              {outstandingLoan ? 'Repay loan' : myRequest ? 'Your request' : 'Request loan'}
+            </Text>
+          </Pressable>
+        </View>
+      )}
 
       <TransactionStatusModal
         transaction={detail}
