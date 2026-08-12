@@ -2,6 +2,7 @@ import { AuthenticationData } from '@superpool/types'
 import { useEffect } from 'react'
 import { Platform } from 'react-native'
 import { FIREBASE_AUTH } from '../../config/firebase'
+import { registerForPushNotifications } from '../../services/pushNotifications'
 import { authStore } from '../../stores/AuthStore'
 import { getUniqueDeviceId } from '../../utils/deviceId'
 import { logger } from '../../utils/logger'
@@ -94,6 +95,14 @@ export const useAutoAuth = (): void => {
         authStore.setUser(user)
 
         logger.debug('✅ Auto-authentication complete!')
+
+        // Deliberately after the step is reported complete, and deliberately
+        // not awaited into the auth result: this needs a signed-in caller (the
+        // callable takes the wallet from `request.auth.uid`), but a sign-in
+        // that worked must not be reported as failed because a push token
+        // could not be arranged. It prompts for nothing — with no permission
+        // granted there is simply no token to register.
+        void registerForPushNotifications()
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : 'Auto-authentication failed'
         logger.error('❌ Auto-authentication failed:', errorMessage)

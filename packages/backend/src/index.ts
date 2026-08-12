@@ -25,8 +25,10 @@ export {
   listPools,
   listWithdrawals,
   preparePoolCreation,
+  registerPushToken,
   syncPoolEvents,
   syncPoolEventsNow,
+  unregisterPushToken,
   verifySignatureAndLogin,
 } from './functions'
 

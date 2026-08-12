@@ -119,6 +119,25 @@ function ApprovalsScreen() {
     setStage('idle')
   }
 
+  /*
+    Still loading is not the same as not there.
+
+    A notification tap can open this screen on a cold start, where the auth
+    group has only just kicked off `fetchPools`. Answering "that pool is not
+    available" — or worse, "only the owner can decide" — to the owner who just
+    tapped a notification about their own pool is a definitive answer to a
+    question nothing has resolved yet.
+  */
+  if (!pool && poolStore.isLoading) {
+    return (
+      <View className="flex-1 items-center justify-center gap-4 bg-abyss" testID="approvals-loading">
+        <Stack.Screen options={{ title: 'Loan requests' }} />
+        <ActivityIndicator colorClassName="accent-mint" />
+        <Text className="text-sm text-fog">Opening the queue</Text>
+      </View>
+    )
+  }
+
   if (!pool) {
     return (
       <View className="flex-1 items-center justify-center gap-4 bg-abyss px-10" testID="approvals-pool-not-found">

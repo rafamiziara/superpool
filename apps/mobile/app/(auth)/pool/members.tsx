@@ -121,6 +121,17 @@ function MembersScreen() {
     setStage('idle')
   }
 
+  // Still loading is not the same as not there — see the note in approvals.tsx.
+  if (!pool && poolStore.isLoading) {
+    return (
+      <View className="flex-1 items-center justify-center gap-4 bg-abyss" testID="members-loading">
+        <Stack.Screen options={{ title: 'Members' }} />
+        <ActivityIndicator colorClassName="accent-mint" />
+        <Text className="text-sm text-fog">Opening the register</Text>
+      </View>
+    )
+  }
+
   if (!pool) {
     return (
       <View className="flex-1 items-center justify-center gap-4 bg-abyss px-10" testID="members-pool-not-found">

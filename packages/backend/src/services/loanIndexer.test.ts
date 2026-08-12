@@ -15,6 +15,18 @@ jest.mock('ethers', () => {
   }
 })
 
+/**
+ * Notifications are dispatched from `indexLoanFromLog`, so the sweep notifies
+ * as well as the callable. Mocked here to keep this suite about indexing —
+ * `poolNotifications.test.ts` covers what it decides to send.
+ */
+const mockNotifyLoanRequested = jest.fn()
+
+jest.mock('./poolNotifications', () => ({
+  ...jest.requireActual('./poolNotifications'),
+  notifyLoanRequested: (...args: unknown[]) => mockNotifyLoanRequested(...args),
+}))
+
 const {
   fetchLoan,
   indexLoan,
@@ -145,6 +157,8 @@ const parsedLoan = {
 beforeEach(() => {
   mockGetLoan.mockResolvedValue(buildChainLoan())
   mockGetPoolId.mockResolvedValue(BigInt(POOL_ID))
+  mockNotifyLoanRequested.mockReset()
+  mockNotifyLoanRequested.mockResolvedValue(undefined)
 })
 
 // ---------------------------------------------------------------------------
@@ -499,5 +513,196 @@ describe('indexLoansByTxHash', () => {
     const provider = buildProvider(buildReceipt([buildLog()]))
 
     await expect(indexLoansByTxHash(TX_HASH, CHAIN_ID, FACTORY_ADDRESS, provider, mockFs)).rejects.toMatchObject({ code: 'not-found' })
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Transitions.
+//
+// What the notification service triggers on, and deliberately not `stored`.
+// The distinction matters more here than for memberships: this indexer writes
+// the document when only the transaction reference moved to an earlier block,
+// so a notification on `stored` would tell a borrower their loan was approved
+// because a sweep tidied up a hash.
+// ---------------------------------------------------------------------------
+
+describe('indexLoan transitions', () => {
+  it('reports a request from a loan with no record', async () => {
+    const { mockFs } = buildFirestore({ exists: false })
+
+    const result = await indexLoan({ ...parsedLoan, status: 'requested' }, mockFs)
+
+    expect(result.transition).toBe('requested')
+  })
+
+  it('reports a borrow from a pool that lends on demand', async () => {
+    // `createLoan` disburses in the same transaction, so there was never a
+    // request to observe and absent → disbursed is the whole story.
+    const { mockFs } = buildFirestore({ exists: false })
+
+    const result = await indexLoan(parsedLoan, mockFs)
+
+    expect(result.transition).toBe('disbursed')
+  })
+
+  it('reports the owner approving a request', async () => {
+    const { mockFs } = buildFirestore({ exists: true, storedStatus: 'requested' })
+
+    const result = await indexLoan(parsedLoan, mockFs)
+
+    expect(result.transition).toBe('disbursed')
+  })
+
+  it('reports the owner rejecting a request', async () => {
+    const { mockFs } = buildFirestore({ exists: true, storedStatus: 'requested' })
+
+    const result = await indexLoan({ ...parsedLoan, status: 'rejected' }, mockFs)
+
+    expect(result.transition).toBe('rejected')
+  })
+
+  it('reports a repayment', async () => {
+    const { mockFs } = buildFirestore({ exists: true, storedStatus: 'disbursed', storedIsRepaid: false })
+
+    const result = await indexLoan({ ...parsedLoan, isRepaid: true, repaidAt: REPAID_AT }, mockFs)
+
+    expect(result.transition).toBe('repaid')
+  })
+
+  it('reports the repayment when a loan is created and settled between sweeps', async () => {
+    // Both facts are new; the settlement is the later one and the one somebody
+    // is waiting on.
+    const { mockFs } = buildFirestore({ exists: false })
+
+    const result = await indexLoan({ ...parsedLoan, isRepaid: true, repaidAt: REPAID_AT }, mockFs)
+
+    expect(result.transition).toBe('repaid')
+  })
+
+  // The regression this whole field exists for.
+  it('reports nothing when only the transaction reference moved', async () => {
+    const { mockFs, mockDocRef } = buildFirestore({ exists: true, storedStatus: 'requested', storedBlockNumber: 200 })
+
+    const result = await indexLoan({ ...parsedLoan, status: 'requested', blockNumber: 100, transactionHash: OTHER_TX_HASH }, mockFs)
+
+    // The write still happens — the reference genuinely is being corrected.
+    expect(mockDocRef.set).toHaveBeenCalled()
+    expect(result.stored).toBe(true)
+    // But nothing happened that anybody needs telling about.
+    expect(result.transition).toBeNull()
+  })
+
+  it('reports nothing when the record already matches the chain', async () => {
+    const { mockFs } = buildFirestore({ exists: true, storedStatus: 'disbursed', storedIsRepaid: false })
+
+    const result = await indexLoan(parsedLoan, mockFs)
+
+    expect(result).toMatchObject({ alreadyIndexed: true, stored: false, transition: null })
+  })
+
+  it('reports nothing when a repaid loan is re-scanned', async () => {
+    // The sweep sees `LoanCreated` on every pass, long after the repayment.
+    const { mockFs } = buildFirestore({
+      exists: true,
+      storedStatus: 'disbursed',
+      storedIsRepaid: true,
+      storedRepaidAt: REPAID_AT,
+    })
+
+    const result = await indexLoan({ ...parsedLoan, isRepaid: true, repaidAt: REPAID_AT }, mockFs)
+
+    expect(result.transition).toBeNull()
+  })
+
+  it('reports a rejection of a request never indexed as one', async () => {
+    // A borrower who cancels before any sweep saw the request: the record is
+    // created straight at `rejected`.
+    const { mockFs } = buildFirestore({ exists: false })
+
+    const result = await indexLoan({ ...parsedLoan, status: 'rejected' }, mockFs)
+
+    expect(result.transition).toBe('rejected')
+  })
+
+  it('treats a record written before `status` existed as absent', async () => {
+    // It has no previous state to have moved from, so whatever the chain says
+    // now is the news. Built inline because the shared helper always supplies a
+    // status, which is exactly what this record does not have.
+    const mockFs = {
+      collection: () => ({
+        doc: () => ({
+          get: async () => ({ exists: true, data: () => ({ isRepaid: false, blockNumber: 120 }) }),
+          set: jest.fn().mockResolvedValue(undefined),
+        }),
+      }),
+    }
+
+    const result = await indexLoan({ ...parsedLoan, status: 'requested' }, mockFs)
+
+    expect(result.transition).toBe('requested')
+  })
+
+  it('reports nothing further about a rejected loan', async () => {
+    // Rejection is final; nothing moves out of it.
+    const { mockFs } = buildFirestore({ exists: true, storedStatus: 'rejected' })
+
+    const result = await indexLoan({ ...parsedLoan, status: 'rejected' }, mockFs)
+
+    expect(result.transition).toBeNull()
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Notification dispatch.
+//
+// Wired into `indexLoanFromLog` rather than into the callable, so a request
+// made while the app was closed — which only the sweep will see — still reaches
+// the owner.
+// ---------------------------------------------------------------------------
+
+describe('indexLoanFromLog notifications', () => {
+  it('offers every indexed loan to the notification service', async () => {
+    const { mockFs } = buildFirestore({ exists: false })
+
+    await indexLoanFromLog(buildLog(), CHAIN_ID, FACTORY_ADDRESS, buildProvider(), mockFs)
+
+    expect(mockNotifyLoanRequested).toHaveBeenCalledWith(
+      expect.objectContaining({ transition: expect.anything() }),
+      expect.objectContaining({ loanId: LOAN_ID }),
+      mockFs
+    )
+  })
+
+  it('indexes the loan even when the notification fails', async () => {
+    // Indexing is the job; push is an enhancement. An unreachable Expo must not
+    // turn a successful index into an error the user is shown.
+    mockNotifyLoanRequested.mockRejectedValue(new Error('expo unreachable'))
+    const { mockFs, mockDocRef } = buildFirestore({ exists: false })
+
+    const indexed = await indexLoanFromLog(buildLog(), CHAIN_ID, FACTORY_ADDRESS, buildProvider(), mockFs)
+
+    expect(indexed).not.toBeNull()
+    expect(indexed!.result.stored).toBe(true)
+    expect(mockDocRef.set).toHaveBeenCalled()
+    expect(mockLogger.error).toHaveBeenCalled()
+  })
+
+  it('logs a notification failure that was not thrown as an Error', async () => {
+    // A rejected promise carrying a string still has to be loggable.
+    mockNotifyLoanRequested.mockRejectedValue('expo unreachable')
+    const { mockFs } = buildFirestore({ exists: false })
+
+    const indexed = await indexLoanFromLog(buildLog(), CHAIN_ID, FACTORY_ADDRESS, buildProvider(), mockFs)
+
+    expect(indexed!.result.stored).toBe(true)
+    expect(mockLogger.error).toHaveBeenCalled()
+  })
+
+  it('does not reach the notification service for a contract the factory disowns', async () => {
+    mockGetPoolId.mockResolvedValue(BigInt(0))
+    const { mockFs } = buildFirestore({ exists: false })
+
+    await expect(indexLoanFromLog(buildLog(), CHAIN_ID, FACTORY_ADDRESS, buildProvider(), mockFs)).resolves.toBeNull()
+    expect(mockNotifyLoanRequested).not.toHaveBeenCalled()
   })
 })

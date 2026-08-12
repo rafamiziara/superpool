@@ -73,3 +73,31 @@ export const MEMBERSHIPS_COLLECTION = 'memberships'
  * figure that is read from the chain.
  */
 export const INTEREST_CLAIMS_COLLECTION = 'interest_claims'
+
+/**
+ * The name of the Firestore collection used to store Expo push tokens.
+ *
+ * Its own collection rather than a field on `approved_devices`, which is
+ * otherwise exactly the (device, wallet) join a token wants:
+ * `DeviceVerificationService.approveDevice` writes that document with `set()`
+ * and no merge, so a token kept there would be wiped by the next
+ * authentication — and that happens on every cold start. The failure would
+ * look like notifications quietly stopping after a while, which is the worst
+ * kind of bug to go looking for.
+ *
+ * Keyed by the token itself. Both directions are many-to-many — one wallet on
+ * two phones, two wallets on one phone in development — so neither address nor
+ * device can be the key.
+ */
+export const PUSH_TOKENS_COLLECTION = 'push_tokens'
+
+/**
+ * The name of the Firestore collection used to remember which notifications
+ * have already been sent.
+ *
+ * One document per (record, transition). `syncPoolEvents` re-scans ranges on
+ * purpose and a failed scheduled run is retried, so without this a re-scan of
+ * genesis — a supported operation here — would produce a push for every
+ * request ever made.
+ */
+export const NOTIFICATIONS_SENT_COLLECTION = 'notifications_sent'

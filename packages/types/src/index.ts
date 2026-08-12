@@ -11,3 +11,6 @@ export * from './blockchain'
 
 // API types
 export * from './api'
+
+// Push notification types
+export * from './notifications'

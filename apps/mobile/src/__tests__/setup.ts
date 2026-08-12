@@ -41,6 +41,39 @@ jest.mock('expo-router', () => {
   }
 })
 
+/**
+ * Push notifications.
+ *
+ * Denied by default, which is what an unprompted install actually is — so a
+ * screen that asks for permission takes the "no" branch unless a test opts in.
+ * That keeps every other suite from wandering into token registration.
+ *
+ * Exported so the notification tests can drive the answers and assert on the
+ * listeners; `addNotification*Listener` returns a subscription because the
+ * component calls `.remove()` on unmount.
+ */
+export const mockGetPermissions = jest.fn(async () => ({ status: 'denied', canAskAgain: true }))
+export const mockRequestPermissions = jest.fn(async () => ({ status: 'denied', canAskAgain: true }))
+export const mockGetExpoPushToken = jest.fn(async () => ({ data: 'ExponentPushToken[test-token]' }))
+export const mockAddNotificationReceivedListener = jest.fn(() => ({ remove: jest.fn() }))
+export const mockAddNotificationResponseReceivedListener = jest.fn(() => ({ remove: jest.fn() }))
+export const mockSetNotificationChannel = jest.fn(async () => undefined)
+
+jest.mock('expo-notifications', () => ({
+  getPermissionsAsync: (...args: unknown[]) => mockGetPermissions(...(args as [])),
+  requestPermissionsAsync: (...args: unknown[]) => mockRequestPermissions(...(args as [])),
+  getExpoPushTokenAsync: (...args: unknown[]) => mockGetExpoPushToken(...(args as [])),
+  setNotificationChannelAsync: (...args: unknown[]) => mockSetNotificationChannel(...(args as [])),
+  setNotificationHandler: jest.fn(),
+  addNotificationReceivedListener: (...args: unknown[]) => mockAddNotificationReceivedListener(...(args as [])),
+  addNotificationResponseReceivedListener: (...args: unknown[]) => mockAddNotificationResponseReceivedListener(...(args as [])),
+  AndroidImportance: { DEFAULT: 3 },
+}))
+
+// A physical device by default: `registerForPushNotifications` bails out early
+// otherwise, which would make every registration test pass for the wrong reason.
+jest.mock('expo-device', () => ({ isDevice: true }))
+
 // Mock uniwind (styles are compiled by Metro, not available in jest)
 jest.mock('uniwind', () => ({
   Uniwind: {

@@ -4,6 +4,7 @@ import { logger } from 'firebase-functions/v2'
 import { HttpsError } from 'firebase-functions/v2/https'
 import { LOANS_COLLECTION, SampleLendingPoolABI } from '../constants'
 import { resolvePoolId } from './contributionIndexer'
+import { notifyLoanRequested } from './poolNotifications'
 
 /**
  * One loan, read from the chain rather than decoded from a log.
@@ -44,7 +45,29 @@ export interface IndexLoanResult {
   alreadyIndexed: boolean
   /** True when this call wrote the document, whether creating or settling it. */
   stored: boolean
+  /**
+   * What actually changed about the loan, if anything worth telling somebody.
+   *
+   * Reported separately from `stored` because **`stored` is not news.** A write
+   * also happens when nothing about the loan changed and only its transaction
+   * reference moved to an earlier block (see `datesTheLoan`), so a notification
+   * triggered on `stored` would tell a borrower their loan was approved because
+   * a sweep tidied up a hash.
+   *
+   * This is the only place both halves of a transition exist — the indexer
+   * already reads the previous document to decide whether to write at all.
+   */
+  transition: LoanTransition
 }
+
+/**
+ * A change worth telling somebody about, or `null` for a write that only
+ * corrected bookkeeping.
+ *
+ * Named for the state arrived at, not the event observed, because the event is
+ * deliberately not consulted anywhere in this indexer — `getLoan` is.
+ */
+export type LoanTransition = 'requested' | 'disbursed' | 'rejected' | 'repaid' | null
 
 /** The wire form of `SampleLendingPool.LoanStatus`. */
 export type LoanStatus = 'disbursed' | 'requested' | 'rejected'
@@ -176,6 +199,39 @@ function datesTheLoan(stored: StoredLoan | undefined, loan: ParsedLoan): boolean
 }
 
 /**
+ * What changed between the stored record and the chain.
+ *
+ * Repayment is checked first: a loan can be created and repaid between two
+ * sweeps, and of the two facts the settlement is the later one and the one
+ * somebody is waiting on.
+ *
+ * A record that already exists and is still `requested` yields `null` even
+ * though `indexLoan` may well write it — that write is the transaction
+ * reference being corrected, which is precisely the case this exists to keep
+ * quiet.
+ */
+function transitionOf(stored: StoredLoan | undefined, loan: ParsedLoan): LoanTransition {
+  if (loan.isRepaid && !stored?.isRepaid) return 'repaid'
+
+  // Absent → whatever it is now, which every `LoanStatus` is a transition to.
+  // A pool that reviews requests produces `requested` here; one that lends on
+  // demand produces `disbursed`, because `createLoan` disburses in the same
+  // transaction and there was never a request to observe.
+  //
+  // A stored record with no `status` counts as absent: it was written before
+  // the field existed, and it has no previous state to have moved from.
+  if (!stored?.status) return loan.status
+
+  if (stored.status === loan.status) return null
+
+  // `requested` is the only state anything moves out of: a disbursed loan is
+  // settled by repayment, which is handled above, and a rejected one is final.
+  if (stored.status !== 'requested') return null
+
+  return loan.status
+}
+
+/**
  * The chain's repayment stamp, or nothing.
  *
  * `uint64` seconds, and 0 for a loan that has not been repaid — so this is the
@@ -238,8 +294,11 @@ export async function indexLoan(loan: ParsedLoan, firestore: Firestore): Promise
   ) {
     logger.info('Loan already current, skipping', { docId, loanId: loan.loanId, poolId: loan.poolId })
 
-    return { id: docId, loanId: loan.loanId, poolId: loan.poolId, alreadyIndexed: true, stored: false }
+    return { id: docId, loanId: loan.loanId, poolId: loan.poolId, alreadyIndexed: true, stored: false, transition: null }
   }
+
+  // Computed before the write, which is the only moment both halves exist.
+  const transition = transitionOf(stored, loan)
 
   await docRef.set(
     {
@@ -278,9 +337,10 @@ export async function indexLoan(loan: ParsedLoan, firestore: Firestore): Promise
     poolId: loan.poolId,
     status: loan.status,
     isRepaid: loan.isRepaid,
+    transition,
   })
 
-  return { id: docId, loanId: loan.loanId, poolId: loan.poolId, alreadyIndexed: false, stored: true }
+  return { id: docId, loanId: loan.loanId, poolId: loan.poolId, alreadyIndexed: false, stored: true, transition }
 }
 
 /**
@@ -313,7 +373,21 @@ export async function indexLoanFromLog(
     blockNumber: log.blockNumber,
   }
 
-  return { loan, result: await indexLoan(loan, firestore) }
+  const result = await indexLoan(loan, firestore)
+
+  // Here rather than in the callable, so the sweep notifies too — a request
+  // made while the app was closed is exactly the one the owner needs telling
+  // about. Failures are swallowed: the record is indexed either way, and an
+  // unreachable push service must not turn a successful index into an error the
+  // user is shown.
+  await notifyLoanRequested(result, loan, firestore).catch((error: unknown) => {
+    logger.error('Loan notification failed; indexing stands', {
+      docId: result.id,
+      error: error instanceof Error ? error.message : String(error),
+    })
+  })
+
+  return { loan, result }
 }
 
 export interface IndexLoansByTxHashResult {

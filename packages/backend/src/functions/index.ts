@@ -1,5 +1,6 @@
 export * from './app-check'
 export * from './auth'
 export * from './events'
+export * from './notifications'
 export * from './pools'
 export * from './dev'

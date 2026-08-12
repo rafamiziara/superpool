@@ -4,6 +4,7 @@ import { logger } from 'firebase-functions/v2'
 import { HttpsError } from 'firebase-functions/v2/https'
 import { MEMBERSHIPS_COLLECTION, SampleLendingPoolABI } from '../constants'
 import { resolvePoolId } from './contributionIndexer'
+import { notifyMembershipRequested } from './poolNotifications'
 
 /**
  * Where one address stands with one pool, read from the chain rather than
@@ -38,7 +39,26 @@ export interface IndexMembershipResult {
   alreadyIndexed: boolean
   /** True when this call wrote the document. */
   stored: boolean
+  /**
+   * What actually changed, if anything worth telling somebody.
+   *
+   * Kept separate from `stored` for the same reason as loans: the write is a
+   * bookkeeping fact, the transition is the news. Here the two nearly always
+   * agree — this indexer skips a write when the status is unchanged — but the
+   * distinction is worth preserving so both indexers report the same shape and
+   * the notification service never has to know which one it is reading.
+   */
+  transition: MembershipTransition
 }
+
+/**
+ * A change worth telling somebody about, or `null`.
+ *
+ * `active` reached from nothing is not a transition anyone needs: that is
+ * `MemberJoined`, an open pool enrolling whoever deposited, and there was no
+ * decision to report.
+ */
+export type MembershipTransition = 'requested' | 'active' | 'rejected' | 'removed' | 'left' | null
 
 /** The wire form of `SampleLendingPool.Membership`. */
 export type MembershipStatus = 'none' | 'requested' | 'active' | 'rejected' | 'removed' | 'left'
@@ -146,8 +166,11 @@ export async function indexMembership(membership: ParsedMembership, firestore: F
   if (existing.exists && existing.data()!.status === membership.status) {
     logger.info('Membership already current, skipping', { docId, account: membership.account, poolId: membership.poolId })
 
-    return { id: docId, poolId: membership.poolId, account: membership.account, alreadyIndexed: true, stored: false }
+    return { id: docId, poolId: membership.poolId, account: membership.account, alreadyIndexed: true, stored: false, transition: null }
   }
+
+  // Computed before the write, which is the only moment both halves exist.
+  const transition = transitionOf(existing.exists ? (existing.data()!.status as MembershipStatus) : undefined, membership.status)
 
   await docRef.set(
     {
@@ -171,9 +194,27 @@ export async function indexMembership(membership: ParsedMembership, firestore: F
     account: membership.account,
     poolId: membership.poolId,
     status: membership.status,
+    transition,
   })
 
-  return { id: docId, poolId: membership.poolId, account: membership.account, alreadyIndexed: false, stored: true }
+  return { id: docId, poolId: membership.poolId, account: membership.account, alreadyIndexed: false, stored: true, transition }
+}
+
+/**
+ * What changed between the stored standing and the chain's.
+ *
+ * `none` is filtered out at both ends: it is the contract's zero value for an
+ * address nobody has heard of, so arriving at it is not something that happened
+ * to anyone, and leaving it is the same as having no record at all.
+ */
+function transitionOf(stored: MembershipStatus | undefined, status: MembershipStatus): MembershipTransition {
+  if (status === 'none' || stored === status) return null
+
+  // Absent → `active` is `MemberJoined`: an open pool enrolling whoever funded
+  // it. Nobody decided anything, so there is nothing to report.
+  if (!stored || stored === 'none') return status === 'requested' ? 'requested' : null
+
+  return status
 }
 
 /**
@@ -212,7 +253,19 @@ export async function indexMembershipFromLog(
     blockNumber: log.blockNumber,
   }
 
-  return { membership, result: await indexMembership(membership, firestore) }
+  const result = await indexMembership(membership, firestore)
+
+  // Here rather than in the callable, so the sweep notifies too. Failures are
+  // swallowed — the record is indexed either way, and an unreachable push
+  // service must not turn a successful index into an error the user is shown.
+  await notifyMembershipRequested(result, membership, firestore).catch((error: unknown) => {
+    logger.error('Membership notification failed; indexing stands', {
+      docId: result.id,
+      error: error instanceof Error ? error.message : String(error),
+    })
+  })
+
+  return { membership, result }
 }
 
 export interface IndexMembershipsByTxHashResult {

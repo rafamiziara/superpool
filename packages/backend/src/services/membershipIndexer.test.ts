@@ -1,4 +1,5 @@
 import { Interface } from 'ethers'
+import { mockLogger } from '../__tests__/setup'
 import { SampleLendingPoolABI } from '../constants'
 
 const mockMembership = jest.fn()
@@ -13,6 +14,18 @@ jest.mock('ethers', () => {
     Contract: jest.fn().mockImplementation(() => ({ membership: mockMembership, getPoolId: mockGetPoolId })),
   }
 })
+
+/**
+ * Notifications are dispatched from `indexMembershipFromLog`, so the sweep
+ * notifies as well as the callable. Mocked here to keep this suite about
+ * indexing — `poolNotifications.test.ts` covers what it decides to send.
+ */
+const mockNotifyMembershipRequested = jest.fn()
+
+jest.mock('./poolNotifications', () => ({
+  ...jest.requireActual('./poolNotifications'),
+  notifyMembershipRequested: (...args: unknown[]) => mockNotifyMembershipRequested(...args),
+}))
 
 const {
   fetchMembership,
@@ -100,6 +113,8 @@ const parsedMembership = {
 beforeEach(() => {
   mockMembership.mockResolvedValue(BigInt(ACTIVE))
   mockGetPoolId.mockResolvedValue(BigInt(POOL_ID))
+  mockNotifyMembershipRequested.mockReset()
+  mockNotifyMembershipRequested.mockResolvedValue(undefined)
 })
 
 // ---------------------------------------------------------------------------
@@ -295,5 +310,155 @@ describe('indexMembershipsByTxHash', () => {
     await expect(indexMembershipsByTxHash(TX_HASH, CHAIN_ID, FACTORY_ADDRESS, buildProvider(null), mockFs)).rejects.toThrow(
       'receipt not found'
     )
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Transitions.
+//
+// What the notification service triggers on, and deliberately not `stored`:
+// a write is a bookkeeping fact, a transition is the news. Getting this wrong
+// produces visibly wrong notifications rather than none.
+// ---------------------------------------------------------------------------
+
+describe('indexMembership transitions', () => {
+  it('reports a request from an address with no record', async () => {
+    mockMembership.mockResolvedValue(BigInt(REQUESTED))
+    const { mockFs } = buildFirestore({ exists: false })
+
+    const result = await indexMembership({ ...parsedMembership, status: 'requested' }, mockFs)
+
+    expect(result.transition).toBe('requested')
+  })
+
+  it('reports nothing when a deposit enrolled somebody automatically', async () => {
+    // `MemberJoined` on an open pool: absent → active, with nobody deciding
+    // anything. An owner notified about this would be told about a member they
+    // never had the chance to admit or refuse.
+    const { mockFs } = buildFirestore({ exists: false })
+
+    const result = await indexMembership({ ...parsedMembership, status: 'active' }, mockFs)
+
+    expect(result.transition).toBeNull()
+  })
+
+  it('reports the owner admitting an applicant', async () => {
+    const { mockFs } = buildFirestore({ exists: true, storedStatus: 'requested' })
+
+    const result = await indexMembership({ ...parsedMembership, status: 'active' }, mockFs)
+
+    expect(result.transition).toBe('active')
+  })
+
+  it('reports the owner turning an applicant down', async () => {
+    const { mockFs } = buildFirestore({ exists: true, storedStatus: 'requested' })
+
+    const result = await indexMembership({ ...parsedMembership, status: 'rejected' }, mockFs)
+
+    expect(result.transition).toBe('rejected')
+  })
+
+  it('reports a removal', async () => {
+    const { mockFs } = buildFirestore({ exists: true, storedStatus: 'active' })
+
+    const result = await indexMembership({ ...parsedMembership, status: 'removed' }, mockFs)
+
+    expect(result.transition).toBe('removed')
+  })
+
+  it('reports nothing when the standing is unchanged', async () => {
+    // The re-scan case. This is the one that must stay silent however many
+    // times the sweep passes over the same block.
+    const { mockFs } = buildFirestore({ exists: true, storedStatus: 'active' })
+
+    const result = await indexMembership({ ...parsedMembership, status: 'active' }, mockFs)
+
+    expect(result).toMatchObject({ alreadyIndexed: true, stored: false, transition: null })
+  })
+
+  it('reports nothing for an address arriving at none', async () => {
+    // The contract's zero value for somebody nobody has heard of. Arriving at
+    // it is not something that happened to anyone.
+    const { mockFs } = buildFirestore({ exists: true, storedStatus: 'active' })
+
+    const result = await indexMembership({ ...parsedMembership, status: 'none' }, mockFs)
+
+    expect(result.transition).toBeNull()
+  })
+
+  it('treats a stored none as no record at all', async () => {
+    const { mockFs } = buildFirestore({ exists: true, storedStatus: 'none' })
+
+    const result = await indexMembership({ ...parsedMembership, status: 'requested' }, mockFs)
+
+    expect(result.transition).toBe('requested')
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Notification dispatch.
+//
+// Wired into `indexMembershipFromLog` rather than into the callable, so a
+// request made while the app was closed — which only the sweep will see — still
+// reaches the owner.
+// ---------------------------------------------------------------------------
+
+describe('indexMembershipFromLog notifications', () => {
+  it('offers every indexed membership to the notification service', async () => {
+    mockMembership.mockResolvedValue(BigInt(REQUESTED))
+    const { mockFs } = buildFirestore({ exists: false })
+
+    await indexMembershipFromLog(buildLog(), CHAIN_ID, FACTORY_ADDRESS, buildProvider(), mockFs)
+
+    expect(mockNotifyMembershipRequested).toHaveBeenCalledWith(
+      expect.objectContaining({ transition: 'requested' }),
+      expect.objectContaining({ account: ACCOUNT.toLowerCase() }),
+      mockFs
+    )
+  })
+
+  it('indexes the membership even when the notification fails', async () => {
+    // Indexing is the job; push is an enhancement.
+    mockNotifyMembershipRequested.mockRejectedValue(new Error('expo unreachable'))
+    const { mockFs, mockDocRef } = buildFirestore({ exists: false })
+
+    const indexed = await indexMembershipFromLog(buildLog(), CHAIN_ID, FACTORY_ADDRESS, buildProvider(), mockFs)
+
+    expect(indexed).not.toBeNull()
+    expect(indexed!.result.stored).toBe(true)
+    expect(mockDocRef.set).toHaveBeenCalled()
+    expect(mockLogger.error).toHaveBeenCalled()
+  })
+
+  it('logs a notification failure that was not thrown as an Error', async () => {
+    mockNotifyMembershipRequested.mockRejectedValue('expo unreachable')
+    const { mockFs } = buildFirestore({ exists: false })
+
+    const indexed = await indexMembershipFromLog(buildLog(), CHAIN_ID, FACTORY_ADDRESS, buildProvider(), mockFs)
+
+    expect(indexed!.result.stored).toBe(true)
+    expect(mockLogger.error).toHaveBeenCalled()
+  })
+
+  it('does not reach the notification service for a contract the factory disowns', async () => {
+    mockGetPoolId.mockResolvedValue(BigInt(0))
+    const { mockFs } = buildFirestore({ exists: false })
+
+    await expect(indexMembershipFromLog(buildLog(), CHAIN_ID, FACTORY_ADDRESS, buildProvider(), mockFs)).resolves.toBeNull()
+    expect(mockNotifyMembershipRequested).not.toHaveBeenCalled()
+  })
+})
+
+describe('indexMembershipsByTxHash guards', () => {
+  it('should reject a membership from a pool this factory did not deploy', async () => {
+    // Anyone can emit an identically-shaped event; indexing one would put a
+    // stranger's pool in a user's register.
+    mockGetPoolId.mockResolvedValue(BigInt(0))
+    const { mockFs } = buildFirestore({ exists: false })
+    const provider = buildProvider({ status: 1, logs: [buildLog()] })
+
+    await expect(indexMembershipsByTxHash(TX_HASH, CHAIN_ID, FACTORY_ADDRESS, provider, mockFs)).rejects.toMatchObject({
+      code: 'not-found',
+    })
   })
 })

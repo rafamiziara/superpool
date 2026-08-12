@@ -146,6 +146,28 @@ service cloud.firestore {
       allow read, write: if false; // backend-only
     }
 
+    // --- push_tokens -------------------------------------------------------
+    // Expo push tokens, keyed by the token itself and holding the wallet they
+    // belong to. Closed in both directions: readable tokens would let any
+    // authenticated session enumerate every device in the system and send to
+    // them directly through Expo, which needs no credential beyond the token.
+    // Registration goes through the `registerPushToken` callable, which takes
+    // the wallet from `request.auth.uid` rather than from the request body.
+
+    match /push_tokens/{token} {
+      allow read, write: if false; // backend-only
+    }
+
+    // --- notifications_sent ------------------------------------------------
+    // One marker per (record, transition) that has already been pushed. These
+    // are what stop a re-scan of history from notifying twice, so client write
+    // access would let anyone either silence a pool's owner or replay a
+    // thousand notifications at them.
+
+    match /notifications_sent/{markerId} {
+      allow read, write: if false; // backend-only
+    }
+
     // --- event_sync_state --------------------------------------------------
     // Per-chain indexer cursors (last processed block). Tampering with these
     // would let an attacker skip or replay blockchain event ranges.

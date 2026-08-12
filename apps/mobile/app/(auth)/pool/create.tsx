@@ -10,6 +10,7 @@ import { type PoolCreationParams, usePoolCreation } from '../../../src/hooks/poo
 import { usePoolIndexing } from '../../../src/hooks/pools/usePoolIndexing'
 import { useTransactionMonitoring } from '../../../src/hooks/pools/useTransactionMonitoring'
 import { palette } from '../../../src/constants/palette'
+import { registerForPushNotifications, requestNotificationPermission } from '../../../src/services/pushNotifications'
 import { shortAddress } from '../../../src/utils/format'
 
 /**
@@ -75,6 +76,27 @@ function CreatePoolScreen() {
     await triggerIndexing(txHash, 'CREATE_POOL')
 
     setStage('done')
+
+    /*
+      The one place the app asks for notification permission.
+
+      The prompt is a one-shot — on iOS a denial cannot be re-asked in-app, only
+      redirected to Settings — so it has to be spent where the user has just
+      created an expectation of being told something. Having just opened a pool
+      for other people to join is exactly that: from here on, everything the
+      owner is meant to do arrives unannounced.
+
+      Not asked when *joining* or *borrowing*, though both are equally moments
+      of expecting an answer: only the two owner-facing notifications exist, so
+      prompting an asker would spend their one permission on a channel that
+      currently delivers nothing to them.
+
+      After the success screen is showing, so the prompt lands on top of good
+      news rather than interrupting the flow.
+    */
+    if (await requestNotificationPermission()) {
+      await registerForPushNotifications()
+    }
   }
 
   if (!isSupportedChain) {

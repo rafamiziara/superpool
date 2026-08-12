@@ -9,6 +9,7 @@ import Toast from 'react-native-toast-message'
 import { Uniwind } from 'uniwind'
 import { WagmiProvider } from 'wagmi'
 import { FirebaseInitializer } from '../src/components/FirebaseInitializer'
+import { NotificationListener } from '../src/components/NotificationListener'
 import { PendingTransactionsInitializer } from '../src/components/PendingTransactionsInitializer'
 import { WalletListener } from '../src/components/WalletListener'
 import { wagmiConfig } from '../src/config'
@@ -24,6 +25,7 @@ function AppContent() {
       {/* Global state initialization */}
       <FirebaseInitializer />
       <WalletListener />
+      <NotificationListener />
       <PendingTransactionsInitializer />
 
       <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: palette.abyss } }}>
