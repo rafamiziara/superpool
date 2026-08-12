@@ -145,6 +145,7 @@ interface StoredLoan {
   status?: LoanStatus
   startedAt?: Timestamp
   repaidAt?: Timestamp
+  blockNumber?: number
 }
 
 function millisOf(stamp: Timestamp | undefined): number | undefined {
@@ -154,14 +155,24 @@ function millisOf(stamp: Timestamp | undefined): number | undefined {
 /**
  * Whether this event is the one the record should point at.
  *
- * True when the loan's date is moving, which is what `requestLoan` and
- * `approveLoan` do and what `repayLoan` deliberately does not. A first sighting
- * counts too — including the case where that sighting is a repayment, which
- * leaves the reference on the only transaction anyone has seen. That is
- * unavoidable without scanning history, and better than no reference at all.
+ * The reference should always be the transaction that put the loan into the
+ * dating it now carries, so that a row's date and its link are the same block.
+ * Two ways an event earns it:
+ *
+ * - **The date moved**, which is what `requestLoan` and `approveLoan` do and
+ *   what `repayLoan` deliberately does not.
+ * - **It is earlier than what is stored and carries the same date.** Events do
+ *   not have to arrive in order — a loan first seen at its repayment points at
+ *   the repayment, and the creation log turning up later is what corrects it.
+ *   Verified live: without this the reference sticks to whichever transaction
+ *   happened to be indexed first, forever.
  */
 function datesTheLoan(stored: StoredLoan | undefined, loan: ParsedLoan): boolean {
-  return !stored || millisOf(stored.startedAt) !== loan.startedAt.getTime()
+  if (!stored) return true
+
+  if (millisOf(stored.startedAt) !== loan.startedAt.getTime()) return true
+
+  return stored.blockNumber === undefined || loan.blockNumber < stored.blockNumber
 }
 
 /**
@@ -219,7 +230,11 @@ export async function indexLoan(loan: ParsedLoan, firestore: Firestore): Promise
     stored.isRepaid === loan.isRepaid &&
     stored.status === loan.status &&
     millisOf(stored.repaidAt) === loan.repaidAt?.getTime() &&
-    millisOf(stored.startedAt) === loan.startedAt.getTime()
+    millisOf(stored.startedAt) === loan.startedAt.getTime() &&
+    // A record whose state is right but whose reference points at a later
+    // transaction than this one is not current: nothing else would ever go
+    // back and correct it, because every field it compares already matches.
+    !datesTheLoan(stored, loan)
   ) {
     logger.info('Loan already current, skipping', { docId, loanId: loan.loanId, poolId: loan.poolId })
 

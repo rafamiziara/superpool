@@ -85,7 +85,14 @@ function timestampOf(date: Date) {
 }
 
 function buildFirestore(
-  options: { exists?: boolean; storedIsRepaid?: boolean; storedStatus?: string; storedRepaidAt?: Date; storedStartedAt?: Date } = {}
+  options: {
+    exists?: boolean
+    storedIsRepaid?: boolean
+    storedStatus?: string
+    storedRepaidAt?: Date
+    storedStartedAt?: Date
+    storedBlockNumber?: number
+  } = {}
 ) {
   const {
     exists = false,
@@ -93,12 +100,14 @@ function buildFirestore(
     storedStatus = 'disbursed',
     storedRepaidAt,
     storedStartedAt = new Date(START_TIME * 1000),
+    storedBlockNumber = 120,
   } = options
   const mockSet = jest.fn().mockResolvedValue(undefined)
   const storedData = {
     isRepaid: storedIsRepaid,
     status: storedStatus,
     startedAt: timestampOf(storedStartedAt),
+    blockNumber: storedBlockNumber,
     ...(storedRepaidAt ? { repaidAt: timestampOf(storedRepaidAt) } : {}),
   }
   const mockDocRef = {
@@ -344,6 +353,32 @@ describe('indexLoan', () => {
         expect.objectContaining({ transactionHash: OTHER_TX_HASH, blockNumber: 500, startedAt: approvedAt }),
         { merge: true }
       )
+    })
+
+    it('should move to an earlier transaction carrying the same date', async () => {
+      // Live-found. A loan first seen at its repayment points at the
+      // repayment, and nothing would ever correct that — every field the
+      // currency check compares already matches — so a row would show the
+      // disbursement's date beside a link to the settlement. Events do not
+      // have to arrive in order, and the earliest one carrying the loan's
+      // current date is the one that set it.
+      const { mockFs, mockDocRef } = buildFirestore({ exists: true, storedIsRepaid: true, storedBlockNumber: 500 })
+
+      const result = await indexLoan({ ...parsedLoan, isRepaid: true, blockNumber: 120 }, mockFs)
+
+      expect(mockDocRef.set).toHaveBeenCalledWith(expect.objectContaining({ transactionHash: TX_HASH, blockNumber: 120 }), {
+        merge: true,
+      })
+      expect(result.stored).toBe(true)
+    })
+
+    it('should report a record already pointing at the earliest event as current', async () => {
+      const { mockFs, mockDocRef } = buildFirestore({ exists: true, storedIsRepaid: true, storedBlockNumber: 120 })
+
+      const result = await indexLoan({ ...parsedLoan, isRepaid: true, blockNumber: 120 }, mockFs)
+
+      expect(mockDocRef.set).not.toHaveBeenCalled()
+      expect(result).toMatchObject({ alreadyIndexed: true, stored: false })
     })
 
     it('should be set on a loan seen for the first time', async () => {

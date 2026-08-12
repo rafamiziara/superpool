@@ -14,6 +14,7 @@
     "testIndexer": "ts-node scripts/testEventIndexer.ts",
     "testSweep": "ts-node scripts/testEventSweep.ts",
     "testInterest": "ts-node scripts/testInterestClaims.ts",
+    "testHistory": "ts-node scripts/testBorrowerHistory.ts",
     "test": "jest",
     "format": "prettier --write . --ignore-path ../../.prettierignore",
     "type-check": "tsc --noEmit",
