@@ -20,7 +20,7 @@ To build a functional micro-lending decentralized application on Polygon where u
 | 8 · Withdrawals                | ✅ Complete                                         |
 | 9 · Reputations                | ❌ Not started                                      |
 | 10 · Loan Management           | 🚧 Decisions work; decision support not started     |
-| 11 · Interest Distribution     | ❌ Not started — **next**                           |
+| 11 · Interest Distribution     | ✅ Complete                                         |
 | 12 · Notifications             | ❌ Not started                                      |
 
 Sprints 4–10 were shipped in a different order than planned. Membership (4)
