@@ -286,6 +286,15 @@ export interface LoanInfo {
    */
   isRepaid: boolean
   /**
+   * ISO 8601 — when the repayment landed, from the chain's own stamp.
+   *
+   * Absent while the loan is outstanding, and absent on a loan repaid before
+   * the contract recorded this at all: `isRepaid` stays the authority on
+   * *whether*, and this only answers *when*. Together with `startedAt` and
+   * `duration` it is what makes "repaid on time" a question anything can ask.
+   */
+  repaidAt?: string
+  /**
    * Where the loan is before repayment.
    *
    * Only pools whose owner turned on review ever produce `requested` or

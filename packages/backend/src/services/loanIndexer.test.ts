@@ -37,7 +37,11 @@ const POOL_ADDRESS = '0x5FbDB2315678afecb367f032d93F642f64180aa3'
 const FACTORY_ADDRESS = '0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512'
 const BORROWER = '0x9965507D1a55bcC2695C58ba16FB37d819B0A4dc'
 const TX_HASH = `0x${'a'.repeat(64)}`
+/** A second transaction, so "which one does the record point at" can be asked. */
+const OTHER_TX_HASH = `0x${'b'.repeat(64)}`
 const START_TIME = 1_700_000_000
+/** Ten days into a thirty-day term. */
+const REPAID_AT = new Date((START_TIME + 10 * 24 * 60 * 60) * 1000)
 
 /** Real topic hashes, so the fixtures agree with the shipped ABI rather than with the test. */
 const REAL_CREATED_TOPIC = new Interface([...SampleLendingPoolABI]).getEvent('LoanCreated')!.topicHash
@@ -60,10 +64,12 @@ function buildLog(overrides: Partial<{ topic: string; loanId: number; address: s
   }
 }
 
-function buildChainLoan(overrides: Partial<{ isRepaid: boolean; amount: bigint; status: number }> = {}) {
+function buildChainLoan(overrides: Partial<{ isRepaid: boolean; amount: bigint; status: number; repaidAt: number }> = {}) {
   return {
     borrower: BORROWER,
     isRepaid: overrides.isRepaid ?? false,
+    // Seconds, and 0 for a loan nobody has repaid — the contract's own zero.
+    repaidAt: BigInt(overrides.repaidAt ?? 0),
     amount: overrides.amount ?? 5_000_000_000_000_000_000n,
     interestRate: 500n,
     startTime: BigInt(START_TIME),
@@ -73,11 +79,30 @@ function buildChainLoan(overrides: Partial<{ isRepaid: boolean; amount: bigint; 
   }
 }
 
-function buildFirestore(options: { exists?: boolean; storedIsRepaid?: boolean; storedStatus?: string } = {}) {
-  const { exists = false, storedIsRepaid = false, storedStatus = 'disbursed' } = options
+/** Firestore hands timestamps back as `Timestamp`, not `Date`. */
+function timestampOf(date: Date) {
+  return { toDate: () => date }
+}
+
+function buildFirestore(
+  options: { exists?: boolean; storedIsRepaid?: boolean; storedStatus?: string; storedRepaidAt?: Date; storedStartedAt?: Date } = {}
+) {
+  const {
+    exists = false,
+    storedIsRepaid = false,
+    storedStatus = 'disbursed',
+    storedRepaidAt,
+    storedStartedAt = new Date(START_TIME * 1000),
+  } = options
   const mockSet = jest.fn().mockResolvedValue(undefined)
+  const storedData = {
+    isRepaid: storedIsRepaid,
+    status: storedStatus,
+    startedAt: timestampOf(storedStartedAt),
+    ...(storedRepaidAt ? { repaidAt: timestampOf(storedRepaidAt) } : {}),
+  }
   const mockDocRef = {
-    get: jest.fn().mockResolvedValue({ exists, data: () => (exists ? { isRepaid: storedIsRepaid, status: storedStatus } : null) }),
+    get: jest.fn().mockResolvedValue({ exists, data: () => (exists ? storedData : undefined) }),
     set: mockSet,
   }
   const mockDoc = jest.fn().mockReturnValue(mockDocRef)
@@ -146,6 +171,25 @@ describe('parseLoanIdFromLog', () => {
 })
 
 describe('fetchLoan', () => {
+  it('should read the repayment stamp from the chain', async () => {
+    // From state rather than the `LoanRepaid` log's block: the sweep sees
+    // `LoanCreated` on every pass, so a date taken from whichever log arrived
+    // would depend on which one that was.
+    mockGetLoan.mockResolvedValue(buildChainLoan({ isRepaid: true, repaidAt: REPAID_AT.getTime() / 1000 }))
+
+    const loan = await fetchLoan(LOAN_ID, POOL_ADDRESS, {})
+
+    expect(loan.repaidAt).toEqual(REPAID_AT)
+  })
+
+  it('should report no stamp at all for an outstanding loan', async () => {
+    // The contract's zero is "not repaid", and dating a settlement to 1970 is
+    // exactly the kind of thing a reputation query would then count as late.
+    const loan = await fetchLoan(LOAN_ID, POOL_ADDRESS, {})
+
+    expect(loan.repaidAt).toBeUndefined()
+  })
+
   it('should return the chain state, not the log', async () => {
     const loan = await fetchLoan(LOAN_ID, POOL_ADDRESS, {})
 
@@ -200,9 +244,7 @@ describe('indexLoan', () => {
     expect(result.stored).toBe(true)
   })
 
-  it('should merge rather than replace, so the creating transaction survives', async () => {
-    // The activity feed dates a loan by the transaction that created it; a full
-    // overwrite on repayment would move that date to the settlement.
+  it('should merge rather than replace', async () => {
     const { mockFs, mockDocRef } = buildFirestore({ exists: true })
 
     await indexLoan({ ...parsedLoan, isRepaid: true }, mockFs)
@@ -234,12 +276,85 @@ describe('indexLoan', () => {
   })
 
   it('should write nothing on a repeated repayment either', async () => {
-    const { mockFs, mockDocRef } = buildFirestore({ exists: true, storedIsRepaid: true })
+    const { mockFs, mockDocRef } = buildFirestore({ exists: true, storedIsRepaid: true, storedRepaidAt: REPAID_AT })
 
-    const result = await indexLoan({ ...parsedLoan, isRepaid: true }, mockFs)
+    const result = await indexLoan({ ...parsedLoan, isRepaid: true, repaidAt: REPAID_AT }, mockFs)
 
     expect(mockDocRef.set).not.toHaveBeenCalled()
     expect(result.stored).toBe(false)
+  })
+
+  describe('repaidAt', () => {
+    it('should store the repayment stamp', async () => {
+      const { mockFs, mockDocRef } = buildFirestore({ exists: true, storedIsRepaid: false })
+
+      await indexLoan({ ...parsedLoan, isRepaid: true, repaidAt: REPAID_AT }, mockFs)
+
+      expect(mockDocRef.set).toHaveBeenCalledWith(expect.objectContaining({ repaidAt: REPAID_AT }), { merge: true })
+    })
+
+    it('should leave the field out entirely while the loan is outstanding', async () => {
+      // Not written as undefined: Firestore rejects that outright, so a loan
+      // that has not been repaid would fail to index at all.
+      const { mockFs, mockDocRef } = buildFirestore({ exists: false })
+
+      await indexLoan(parsedLoan, mockFs)
+
+      expect(mockDocRef.set.mock.calls[0][0]).not.toHaveProperty('repaidAt')
+    })
+
+    it('should backfill a record that predates the field', async () => {
+      // Settled before the contract recorded a stamp, so `isRepaid` and
+      // `status` both already agree with the chain. Comparing only those would
+      // report the record as current and never pick the date up.
+      const { mockFs, mockDocRef } = buildFirestore({ exists: true, storedIsRepaid: true })
+
+      const result = await indexLoan({ ...parsedLoan, isRepaid: true, repaidAt: REPAID_AT }, mockFs)
+
+      expect(mockDocRef.set).toHaveBeenCalledWith(expect.objectContaining({ repaidAt: REPAID_AT }), { merge: true })
+      expect(result.stored).toBe(true)
+    })
+  })
+
+  describe('the transaction a record points at', () => {
+    it('should stay on the loan when a repayment settles it', async () => {
+      // `merge` alone does not do this — both fields are in the payload — so a
+      // settlement would otherwise move the reference to the repayment while
+      // the row went on showing the date the money went out.
+      const { mockFs, mockDocRef } = buildFirestore({ exists: true, storedIsRepaid: false })
+
+      await indexLoan({ ...parsedLoan, isRepaid: true, repaidAt: REPAID_AT, transactionHash: OTHER_TX_HASH, blockNumber: 500 }, mockFs)
+
+      const written = mockDocRef.set.mock.calls[0][0]
+
+      expect(written).not.toHaveProperty('transactionHash')
+      expect(written).not.toHaveProperty('blockNumber')
+    })
+
+    it('should follow the loan when approval restamps its date', async () => {
+      // `approveLoan` rewrites `startTime`, so the record is now dated by the
+      // approval and has to link to it — pointing at the request would show a
+      // date and a transaction from different blocks.
+      const approvedAt = new Date((START_TIME + 3600) * 1000)
+      const { mockFs, mockDocRef } = buildFirestore({ exists: true, storedStatus: 'requested' })
+
+      await indexLoan({ ...parsedLoan, startedAt: approvedAt, transactionHash: OTHER_TX_HASH, blockNumber: 500 }, mockFs)
+
+      expect(mockDocRef.set).toHaveBeenCalledWith(
+        expect.objectContaining({ transactionHash: OTHER_TX_HASH, blockNumber: 500, startedAt: approvedAt }),
+        { merge: true }
+      )
+    })
+
+    it('should be set on a loan seen for the first time', async () => {
+      const { mockFs, mockDocRef } = buildFirestore({ exists: false })
+
+      await indexLoan(parsedLoan, mockFs)
+
+      expect(mockDocRef.set).toHaveBeenCalledWith(expect.objectContaining({ transactionHash: TX_HASH, blockNumber: 120 }), {
+        merge: true,
+      })
+    })
   })
 })
 

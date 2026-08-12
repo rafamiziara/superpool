@@ -64,6 +64,11 @@ export const listLoansHandler = async (request: CallableRequest<ListLoansRequest
         // ISO string, not a Date: the callable encoder turns a Date into `{}`.
         startedAt: (data.startedAt?.toDate() || new Date()).toISOString(),
         isRepaid: data.isRepaid,
+        // Left off entirely rather than sent as null when the loan is
+        // outstanding: the field means "settled at this moment", and there is
+        // no moment. Also absent on a loan repaid before the contract recorded
+        // one, which is why `isRepaid` and not this says whether it was repaid.
+        ...(data.repaidAt ? { repaidAt: data.repaidAt.toDate().toISOString() } : {}),
         // Absent on loans indexed before the approval step shipped; they were
         // all disbursed, which is what the contract's enum zero means too.
         status: data.status ?? 'disbursed',

@@ -6,7 +6,7 @@ import { mockLogger } from '../../__tests__/setup'
  * `startedAt` is a Timestamp there and an ISO string on the wire, and `id` is
  * the document key rather than a field.
  */
-type StoredLoan = Omit<LoanInfo, 'startedAt' | 'id'> & { id: string; startedAt: Date }
+type StoredLoan = Omit<LoanInfo, 'startedAt' | 'repaidAt' | 'id'> & { id: string; startedAt: Date; repaidAt?: Date }
 
 const { firestore } = require('../../services')
 const { listLoansHandler } = require('./listLoans')
@@ -47,13 +47,18 @@ describe('listLoansHandler', () => {
       transactionHash: '0xbbb',
       blockNumber: 101,
       startedAt: new Date('2026-08-02T00:00:00.000Z'),
+      repaidAt: new Date('2026-08-09T00:00:00.000Z'),
     },
   ]
 
   const createMockQuery = (docs: StoredLoan[], totalCount: number) => {
     const mockDocs = docs.map((loan) => ({
       id: loan.id,
-      data: () => ({ ...loan, startedAt: { toDate: () => loan.startedAt } }),
+      data: () => ({
+        ...loan,
+        startedAt: { toDate: () => loan.startedAt },
+        ...(loan.repaidAt ? { repaidAt: { toDate: () => loan.repaidAt } } : {}),
+      }),
     }))
 
     return {
@@ -110,6 +115,21 @@ describe('listLoansHandler', () => {
     const result = await listLoansHandler(buildRequest() as never)
 
     expect(result.loans.some((loan: LoanInfo) => loan.isRepaid)).toBe(true)
+  })
+
+  it('should send the repayment date as an ISO string too', async () => {
+    const result = await listLoansHandler(buildRequest() as never)
+
+    expect(result.loans[1].repaidAt).toBe('2026-08-09T00:00:00.000Z')
+  })
+
+  it('should omit the repayment date on an outstanding loan', async () => {
+    // Not null, and above all not the epoch: "settled at this moment" has no
+    // answer for a loan nobody has settled, and a date invented here is one a
+    // borrower's history would go on to read as a repayment.
+    const result = await listLoansHandler(buildRequest() as never)
+
+    expect(result.loans[0].repaidAt).toBeUndefined()
   })
 
   it('should order by when the loan started, newest first', async () => {

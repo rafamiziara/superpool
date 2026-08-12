@@ -1,5 +1,5 @@
 import { Contract, Interface, JsonRpcProvider, Log, Provider } from 'ethers'
-import { Firestore } from 'firebase-admin/firestore'
+import { Firestore, Timestamp } from 'firebase-admin/firestore'
 import { logger } from 'firebase-functions/v2'
 import { HttpsError } from 'firebase-functions/v2/https'
 import { LOANS_COLLECTION, SampleLendingPoolABI } from '../constants'
@@ -28,6 +28,8 @@ export interface ParsedLoan {
   duration: number
   startedAt: Date
   isRepaid: boolean
+  /** When the repayment landed. Undefined while the loan is outstanding. */
+  repaidAt?: Date
   status: LoanStatus
   chainId: number
   transactionHash: string
@@ -124,10 +126,55 @@ export async function fetchLoan(
     duration: Number(loan.duration),
     startedAt: new Date(Number(loan.startTime) * 1000),
     isRepaid: loan.isRepaid as boolean,
+    // Read from state like everything else here, rather than taken from the
+    // `LoanRepaid` log's block. That is what makes it survive a re-scan: the
+    // sweep sees `LoanCreated` on every pass, and a timestamp derived from
+    // whichever log happened to arrive would be overwritten by the wrong one.
+    // Zero means either not repaid or repaid before the field existed; both
+    // are "no date", and `isRepaid` is what says which.
+    repaidAt: repaidAtFrom(loan.repaidAt as bigint),
     // Out-of-range would mean the contract grew a state this build does not
     // know; reading it as disbursed would be a lie, so it fails loudly.
     status: statusFromOrdinal(Number(loan.status)),
   }
+}
+
+/** The fields of a stored loan that decide what a fresh write has to change. */
+interface StoredLoan {
+  isRepaid?: boolean
+  status?: LoanStatus
+  startedAt?: Timestamp
+  repaidAt?: Timestamp
+}
+
+function millisOf(stamp: Timestamp | undefined): number | undefined {
+  return stamp?.toDate().getTime()
+}
+
+/**
+ * Whether this event is the one the record should point at.
+ *
+ * True when the loan's date is moving, which is what `requestLoan` and
+ * `approveLoan` do and what `repayLoan` deliberately does not. A first sighting
+ * counts too — including the case where that sighting is a repayment, which
+ * leaves the reference on the only transaction anyone has seen. That is
+ * unavoidable without scanning history, and better than no reference at all.
+ */
+function datesTheLoan(stored: StoredLoan | undefined, loan: ParsedLoan): boolean {
+  return !stored || millisOf(stored.startedAt) !== loan.startedAt.getTime()
+}
+
+/**
+ * The chain's repayment stamp, or nothing.
+ *
+ * `uint64` seconds, and 0 for a loan that has not been repaid — so this is the
+ * one place the zero has to be turned back into an absence, before anything
+ * downstream dates a settlement to 1970.
+ */
+function repaidAtFrom(stamp: bigint | undefined): Date | undefined {
+  if (!stamp) return undefined
+
+  return new Date(Number(stamp) * 1000)
 }
 
 function statusFromOrdinal(ordinal: number): LoanStatus {
@@ -151,16 +198,29 @@ function statusFromOrdinal(ordinal: number): LoanStatus {
  * of settled history free, and it is why `isRepaid` is compared rather than
  * assumed: a sweep sees the `LoanCreated` log on every pass, long after the
  * loan was repaid.
+ *
+ * The one thing merging does *not* do by itself is preserve a field the write
+ * also carries — `transactionHash` and `blockNumber` are both in the payload,
+ * so they are held back deliberately instead. See `datesTheLoan`.
  */
 export async function indexLoan(loan: ParsedLoan, firestore: Firestore): Promise<IndexLoanResult> {
   const docId = loanDocId(loan.chainId, loan.poolId, loan.loanId)
   const docRef = firestore.collection(LOANS_COLLECTION).doc(docId)
   const existing = await docRef.get()
+  const stored = existing.data() as StoredLoan | undefined
 
-  // Both halves of the lifecycle: a request that has since been approved has
-  // the same `isRepaid` as when it was requested, so comparing that alone would
-  // leave the record stuck at `requested` forever.
-  if (existing.exists && existing.data()!.isRepaid === loan.isRepaid && existing.data()!.status === loan.status) {
+  // Every field the chain can change, not just the obvious one. A request that
+  // has since been approved has the same `isRepaid` as when it was requested,
+  // so comparing that alone would leave the record stuck at `requested`
+  // forever; and a record written before `repaidAt` existed has to be allowed
+  // to pick it up rather than being reported as already current.
+  if (
+    stored &&
+    stored.isRepaid === loan.isRepaid &&
+    stored.status === loan.status &&
+    millisOf(stored.repaidAt) === loan.repaidAt?.getTime() &&
+    millisOf(stored.startedAt) === loan.startedAt.getTime()
+  ) {
     logger.info('Loan already current, skipping', { docId, loanId: loan.loanId, poolId: loan.poolId })
 
     return { id: docId, loanId: loan.loanId, poolId: loan.poolId, alreadyIndexed: true, stored: false }
@@ -177,13 +237,23 @@ export async function indexLoan(loan: ParsedLoan, firestore: Firestore): Promise
       duration: loan.duration,
       startedAt: loan.startedAt,
       isRepaid: loan.isRepaid,
+      // Omitted rather than written as undefined while the loan is
+      // outstanding: Firestore rejects an undefined value, and under `merge`
+      // an absent key leaves whatever is already there — which is what a
+      // stamp the chain still reports would be anyway.
+      ...(loan.repaidAt ? { repaidAt: loan.repaidAt } : {}),
       status: loan.status,
       chainId: loan.chainId,
-      transactionHash: loan.transactionHash,
-      blockNumber: loan.blockNumber,
+      // The transaction and block always describe the moment `startedAt`
+      // names, so a row can date itself and link to itself without the two
+      // disagreeing. `startTime` is written by `requestLoan` and rewritten by
+      // `approveLoan`, and those are exactly the transactions worth pointing
+      // at; a repayment moves the loan without moving its date, so it must not
+      // take the reference with it. (Merge alone does not do this — both
+      // fields are in the payload, so every write would otherwise overwrite
+      // them.)
+      ...(datesTheLoan(stored, loan) ? { transactionHash: loan.transactionHash, blockNumber: loan.blockNumber } : {}),
     },
-    // Merged so a settlement keeps the creating transaction's hash and block,
-    // which is what the activity feed dates the loan by.
     { merge: true }
   )
 
