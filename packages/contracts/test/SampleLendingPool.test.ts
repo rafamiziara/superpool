@@ -1,7 +1,28 @@
+import { time } from '@nomicfoundation/hardhat-network-helpers'
 import { expect } from 'chai'
 import { ethers, upgrades } from 'hardhat'
 import { SignerWithAddress } from '@nomicfoundation/hardhat-ethers/signers'
 import { SampleLendingPool } from '../typechain-types'
+
+/**
+ * Where `loans[loanId]` starts in storage, found rather than hardcoded.
+ *
+ * The declaration index of the `loans` mapping is not something a test should
+ * know: it moves whenever a state variable is added above it, and a stale
+ * constant would read some unrelated word and pass by reading zero. So the
+ * candidate slots are tried until one hashes to a word whose low 20 bytes are
+ * the borrower — which only the loan's own first slot can be.
+ */
+async function findLoanSlot(poolAddress: string, loanId: number, borrower: string): Promise<bigint> {
+  for (let declared = 0; declared < 32; declared++) {
+    const slot = BigInt(ethers.solidityPackedKeccak256(['uint256', 'uint256'], [loanId, declared]))
+    const word = BigInt(await ethers.provider.getStorage(poolAddress, slot))
+
+    if ((word & ((1n << 160n) - 1n)) === BigInt(borrower)) return slot
+  }
+
+  throw new Error(`No storage slot holds loan ${loanId} for ${borrower}`)
+}
 
 /**
  * Deploys a pool the way the factory does: behind a beacon proxy.
@@ -455,6 +476,68 @@ describe('SampleLendingPool', function () {
         lendingPool,
         'LoanAlreadyRepaid'
       )
+    })
+
+    /**
+     * When a loan was repaid, which is the one fact reputation is made of.
+     *
+     * `isRepaid` says whether, and said only that until now: a borrower who
+     * settled on day 2 and one who settled on day 400 were the same record. The
+     * log cannot fill the gap either — `LoanRepaid` carries no timestamp, and a
+     * later reader has no way to ask the chain for a log by loan id.
+     */
+    describe('repaidAt', function () {
+      it('Should be zero while the loan is outstanding', async function () {
+        expect((await lendingPool.getLoan(loanId)).repaidAt).to.equal(0)
+      })
+
+      it('Should be stamped with the repaying block', async function () {
+        const repaymentAmount = await lendingPool.calculateRepaymentAmount(loanId)
+
+        const tx = await lendingPool.connect(borrower).repayLoan(loanId, { value: repaymentAmount })
+        const receipt = await tx.wait()
+        const block = await ethers.provider.getBlock(receipt!.blockNumber)
+
+        expect((await lendingPool.getLoan(loanId)).repaidAt).to.equal(block!.timestamp)
+      })
+
+      it('Should let a repayment after the term be told from one inside it', async function () {
+        const repaymentAmount = await lendingPool.calculateRepaymentAmount(loanId)
+        const { startTime, duration } = await lendingPool.getLoan(loanId)
+
+        // A day past the due date. Nothing on chain stops this — the term is
+        // recorded and unenforced — so the only trace it leaves is the stamp.
+        await time.increaseTo(startTime + duration + BigInt(24 * 60 * 60))
+        await lendingPool.connect(borrower).repayLoan(loanId, { value: repaymentAmount })
+
+        const loan = await lendingPool.getLoan(loanId)
+
+        expect(loan.isRepaid).to.be.true
+        expect(loan.repaidAt).to.be.greaterThan(loan.startTime + loan.duration)
+      })
+
+      it('Should pack into the slot the borrower already sits in', async function () {
+        const repaymentAmount = await lendingPool.calculateRepaymentAmount(loanId)
+        await lendingPool.connect(borrower).repayLoan(loanId, { value: repaymentAmount })
+
+        const address = await lendingPool.getAddress()
+        const slot = await findLoanSlot(address, loanId, borrower.address)
+        const packed = BigInt(await ethers.provider.getStorage(address, slot))
+        const loan = await lendingPool.getLoan(loanId)
+
+        // What the packing claim actually means: `borrower`, `isRepaid`,
+        // `status` and `repaidAt` share one word, so the struct still spans
+        // five slots and a pool already holding loans reads them unchanged
+        // after the upgrade. Appending the field instead would have widened the
+        // stride and shifted every loan's `amount` out from under its reader.
+        expect(packed & ((1n << 160n) - 1n)).to.equal(BigInt(borrower.address))
+        expect((packed >> 160n) & 0xffn).to.equal(1n) // isRepaid
+        expect((packed >> 168n) & 0xffn).to.equal(0n) // LoanStatus.Disbursed
+        expect((packed >> 176n) & ((1n << 64n) - 1n)).to.equal(loan.repaidAt)
+
+        // The very next word is still `amount`, which is the stride assertion.
+        expect(BigInt(await ethers.provider.getStorage(address, slot + 1n))).to.equal(loanAmount)
+      })
     })
   })
 

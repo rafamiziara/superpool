@@ -1921,6 +1921,11 @@ export const SampleLendingPoolABI = [
             "type": "uint8"
           },
           {
+            "internalType": "uint64",
+            "name": "repaidAt",
+            "type": "uint64"
+          },
+          {
             "internalType": "uint256",
             "name": "amount",
             "type": "uint256"
@@ -2032,6 +2037,11 @@ export const SampleLendingPoolABI = [
         "internalType": "enum SampleLendingPool.LoanStatus",
         "name": "status",
         "type": "uint8"
+      },
+      {
+        "internalType": "uint64",
+        "name": "repaidAt",
+        "type": "uint64"
       },
       {
         "internalType": "uint256",

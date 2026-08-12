@@ -88,10 +88,30 @@ contract SampleLendingPool is
         Rejected
     }
 
+    // The gas hint reads the 2 bytes left over in the first slot as waste, but
+    // there is no rearrangement that removes them: everything else here is a
+    // full word. Packing `repaidAt` in was the cheap option, not the costly one.
+    // solhint-disable-next-line gas-struct-packing
     struct Loan {
         address borrower;         // 20 bytes
         bool isRepaid;           // 1 byte - fits in same slot (21 bytes total)
         LoanStatus status;       // 1 byte - packs into the same slot (22 bytes)
+        /**
+         * @dev When the loan was repaid, or 0 while it is not. Declared here
+         * rather than at the end of the struct so it lands in the 10 bytes left
+         * over in the first slot: the struct still spans five slots, so nothing
+         * that already holds a `Loan` reads differently, and `repayLoan` writes
+         * it in the same `SSTORE` that sets `isRepaid`.
+         *
+         * `uint64` for the same reason — it is what fits, and it dates
+         * repayments until the year 2554. Everything else in the app treats
+         * timestamps as `uint256`, so this is the one place that narrows.
+         *
+         * 0 is "not repaid" and also, on a loan repaid before this field
+         * existed, "repaid, date unknown" — which is why `isRepaid` stays the
+         * authority on *whether* and this only answers *when*.
+         */
+        uint64 repaidAt;         // 8 bytes - packs into the same slot (30 bytes)
         uint256 amount;          // 32 bytes - new slot
         uint256 interestRate;    // 32 bytes - new slot
         uint256 startTime;       // 32 bytes - new slot
@@ -644,6 +664,7 @@ contract SampleLendingPool is
             startTime: block.timestamp,
             duration: poolConfig.loanDuration,
             isRepaid: false,
+            repaidAt: 0,
             status: LoanStatus.Disbursed
         });
 
@@ -831,6 +852,7 @@ contract SampleLendingPool is
             startTime: block.timestamp,
             duration: poolConfig.loanDuration,
             isRepaid: false,
+            repaidAt: 0,
             status: LoanStatus.Requested
         });
 
@@ -938,6 +960,11 @@ contract SampleLendingPool is
 
         // Complete all state changes before external call (CEI pattern)
         loan.isRepaid = true;
+        // Free, in the sense that matters: same slot as `isRepaid`, so this is
+        // the same write. It is also the only record that a repayment happened
+        // at a particular moment — `LoanRepaid` carries no timestamp, and a log
+        // is not something a later reader can ask the chain for by loan id.
+        loan.repaidAt = uint64(block.timestamp);
         totalFunds += totalRepayment;
 
         // Share the interest out across the contributions standing behind the
