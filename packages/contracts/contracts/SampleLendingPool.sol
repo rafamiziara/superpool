@@ -149,6 +149,56 @@ contract SampleLendingPool is
      */
     uint256 public memberCount;
 
+    /**
+     * @notice Interest accrued per unit of contribution since the pool began,
+     * scaled by `PRECISION`
+     * @dev Appended in v3, together with the three slots below. This is the
+     * accumulator half of the standard "distribute to an unbounded set without
+     * looping" pattern: repayments raise one number, and each member's share is
+     * read off it on demand. The pool keeps no member array to walk (see
+     * `memberCount`), and adding one would make every repayment cost gas
+     * proportional to the membership.
+     *
+     * Only ever increases.
+     */
+    uint256 public accInterestPerShare;
+
+    /**
+     * @notice Sum of every member's outstanding contribution
+     * @dev **Not `totalFunds`.** `totalFunds` falls when money is lent out —
+     * which is precisely when interest is being earned — so dividing a
+     * repayment's interest by it would pay a wildly inflated rate on any pool
+     * with a loan outstanding. This is the denominator, and it changes only in
+     * `depositFunds` and `withdraw`.
+     *
+     * There is nothing to reconcile it against: it is maintained, not derived,
+     * and summing the `contributions` mapping is impossible on chain. A pool
+     * upgraded from v2 while already holding deposits would start this at zero
+     * and under-count for ever — which is survivable only because no pool
+     * exists outside a disposable local chain yet.
+     */
+    uint256 public totalContributions;
+
+    /**
+     * @notice What each member had already accrued when their stake last changed
+     * @dev The other half of the accumulator pattern, and the part that is easy
+     * to leave out: without it, a deposit made after a repayment would earn a
+     * share of that repayment. Restamped to `contributions * accInterestPerShare`
+     * every time the stake moves, so the difference against the accumulator is
+     * always exactly what accrued while the current stake was in place.
+     */
+    mapping(address => uint256) public interestDebt;
+
+    /// @notice Interest credited to a member and not yet taken out
+    mapping(address => uint256) public unclaimedInterest;
+
+    /**
+     * @dev Fixed-point scale for `accInterestPerShare`. Interest divided by the
+     * pool's total contributions is otherwise zero in integer arithmetic for
+     * any realistic pool.
+     */
+    uint256 private constant PRECISION = 1e18;
+
     /// @notice Events
     /**
      * @notice Emitted when the pool configuration is updated
@@ -277,6 +327,15 @@ contract SampleLendingPool is
      * @param requiresMembership Whether joining now needs approval
      */
     event MembershipRequirementChanged(bool indexed requiresMembership);
+    /**
+     * @notice Emitted when a repayment's interest is shared out to contributors
+     * @param loanId The loan whose repayment produced the interest
+     * @param amount The interest distributed, in wei
+     * @dev Both parameters indexed, like every other event here: `data` is
+     * empty and everything comes from the topics. Not emitted when the pool has
+     * no contributions to share against — see `repayLoan`.
+     */
+    event InterestDistributed(uint256 indexed loanId, uint256 indexed amount);
 
     /// @notice Errors
     error InsufficientFunds();
@@ -370,8 +429,17 @@ contract SampleLendingPool is
             emit MemberJoined(msg.sender);
         }
 
+        // Credit whatever the existing stake has earned before the stake
+        // changes, then restamp against the new one — otherwise this deposit
+        // would retroactively earn a share of every past repayment.
+        _settle(msg.sender);
+
         totalFunds += msg.value;
         contributions[msg.sender] += msg.value;
+        totalContributions += msg.value;
+
+        _restampDebt(msg.sender);
+
         emit FundsDeposited(msg.sender, msg.value);
     }
 
@@ -385,9 +453,10 @@ contract SampleLendingPool is
      * than the pool holds, and outstanding loans therefore delay some
      * withdrawals rather than failing them permanently.
      *
-     * Interest earned through `repayLoan` is deliberately *not* withdrawable:
-     * it raises `totalFunds` without crediting any contribution, so it
-     * accumulates unclaimed. Distributing it is a separate milestone.
+     * Interest is *not* part of this. It is credited separately, through
+     * `accInterestPerShare`, and taken out with `claimInterest` — so taking a
+     * contribution back leaves everything it earned while it was in the pool
+     * still claimable.
      *
      * **This is never gated on membership, and must not become so.** Removing a
      * member takes away what they may do next, not what they already put in;
@@ -403,9 +472,16 @@ contract SampleLendingPool is
         if (_amount > balance) revert InsufficientBalance();
         if (_amount > totalFunds) revert InsufficientLiquidity();
 
+        // Bank what this stake has earned before shrinking it, or the accrual
+        // leaves with the principal.
+        _settle(msg.sender);
+
         // Complete all state changes before external call (CEI pattern)
         contributions[msg.sender] = balance - _amount;
+        totalContributions -= _amount;
         totalFunds -= _amount;
+
+        _restampDebt(msg.sender);
 
         // Emit event before external call
         emit FundsWithdrawn(msg.sender, _amount);
@@ -425,6 +501,55 @@ contract SampleLendingPool is
         address _member
     ) external view returns (uint256) {
         return Math.min(contributions[_member], totalFunds);
+    }
+
+    /**
+     * @notice Interest an account has earned and not yet taken out
+     * @param _account Address to query
+     * @return Credited interest plus whatever has accrued since it was last settled
+     * @dev Deliberately **not** capped by free liquidity, unlike
+     * `withdrawableAmount`. This is what the account has earned, and an
+     * outstanding loan should not make a dashboard's earnings figure drop.
+     * `claimInterest` applies the liquidity bound at payout time.
+     */
+    function claimable(address _account) external view returns (uint256) {
+        return
+            unclaimedInterest[_account] +
+            (_accruedInterest(_account) - interestDebt[_account]);
+    }
+
+    /**
+     * @dev Moves everything the account's current stake has accrued into
+     * `unclaimedInterest`. Must run *before* any change to `contributions`,
+     * with `_restampDebt` after it — settling alone leaves the debt stamped
+     * against a stake that no longer exists.
+     *
+     * Idempotent, and the subtraction cannot underflow: `interestDebt` is only
+     * ever written as `_accruedInterest` at some earlier accumulator value, and
+     * `accInterestPerShare` only grows.
+     */
+    function _settle(address _account) private {
+        uint256 accrued = _accruedInterest(_account);
+
+        unclaimedInterest[_account] += accrued - interestDebt[_account];
+        interestDebt[_account] = accrued;
+    }
+
+    /// @dev Re-anchors an account after its stake changed. See `_settle`.
+    function _restampDebt(address _account) private {
+        interestDebt[_account] = _accruedInterest(_account);
+    }
+
+    /// @dev Lifetime interest owed to the account's *current* stake.
+    function _accruedInterest(
+        address _account
+    ) private view returns (uint256) {
+        return
+            Math.mulDiv(
+                contributions[_account],
+                accInterestPerShare,
+                PRECISION
+            );
     }
 
     /**
@@ -583,6 +708,11 @@ contract SampleLendingPool is
      * nothing else. Their contribution is untouched and remains withdrawable in
      * full; see `withdraw`. An outstanding loan also survives, and stays
      * repayable, because `repayLoan` asks only who the borrower is.
+     *
+     * Nothing is settled here on purpose: removal does not touch
+     * `contributions`, so the accumulator keeps crediting a stake that is still
+     * funding the pool's loans, and `claimInterest` is ungated for the same
+     * reason `withdraw` is. Someone who wants out entirely withdraws.
      */
     function removeMember(address _account) external onlyOwner whenNotPaused {
         if (membership[_account] != Membership.Active) revert NotAMember();
@@ -740,6 +870,11 @@ contract SampleLendingPool is
     /**
      * @notice Repay a loan with interest
      * @param _loanId The ID of the loan to repay
+     * @dev The interest is shared out to contributors here, at the moment it
+     * arrives, rather than being credited to whoever happens to be a member
+     * later. A pool with no contributions left at all — every member having
+     * withdrawn while the loan was out — has no one to share it with, and the
+     * interest stays in the contract as it did before distribution existed.
      */
     function repayLoan(
         uint256 _loanId
@@ -762,6 +897,20 @@ contract SampleLendingPool is
         // Complete all state changes before external call (CEI pattern)
         loan.isRepaid = true;
         totalFunds += totalRepayment;
+
+        // Share the interest out across the contributions standing behind the
+        // loan. The denominator is `totalContributions`, never `totalFunds` —
+        // the latter is missing exactly the money that was lent out.
+        if (interest > 0 && totalContributions > 0) {
+            accInterestPerShare += Math.mulDiv(
+                interest,
+                PRECISION,
+                totalContributions
+            );
+
+            emit InterestDistributed(_loanId, interest);
+        }
+
         // Only clears the lock if this is the tracked loan. A pool upgraded to
         // v2 can hold loans created before `activeLoanId` existed; repaying one
         // of those must not release a lock taken by a newer loan.

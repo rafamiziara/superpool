@@ -1009,4 +1009,227 @@ describe('SampleLendingPool', function () {
       })
     })
   })
+
+  describe('Interest accrual', function () {
+    /** Borrows `amount` and repays it, returning the interest that produced. */
+    async function borrowAndRepay(who: SignerWithAddress, amount: bigint): Promise<bigint> {
+      await lendingPool.connect(who).createLoan(amount)
+      const loanId = (await lendingPool.nextLoanId()) - 1n
+      const due = await lendingPool.calculateRepaymentAmount(loanId)
+      await lendingPool.connect(who).repayLoan(loanId, { value: due })
+
+      return due - amount
+    }
+
+    describe('totalContributions', function () {
+      it('rises with deposits and falls with withdrawals', async function () {
+        await lendingPool.connect(lender).depositFunds({ value: ethers.parseEther('10') })
+        await lendingPool.connect(otherAccount).depositFunds({ value: ethers.parseEther('6') })
+
+        expect(await lendingPool.totalContributions()).to.equal(ethers.parseEther('16'))
+
+        await lendingPool.connect(lender).withdraw(ethers.parseEther('4'))
+
+        expect(await lendingPool.totalContributions()).to.equal(ethers.parseEther('12'))
+      })
+
+      it('does not move when a loan goes out, unlike totalFunds', async function () {
+        // The distinction the whole design turns on: lending money out empties
+        // the pool without reducing what it owes its members.
+        await lendingPool.connect(lender).depositFunds({ value: ethers.parseEther('20') })
+        await lendingPool.connect(borrower).depositFunds({ value: ethers.parseEther('1') })
+
+        await lendingPool.connect(borrower).createLoan(ethers.parseEther('10'))
+
+        expect(await lendingPool.totalFunds()).to.equal(ethers.parseEther('11'))
+        expect(await lendingPool.totalContributions()).to.equal(ethers.parseEther('21'))
+      })
+
+      it('is unchanged by membership decisions', async function () {
+        await lendingPool.connect(lender).depositFunds({ value: ethers.parseEther('10') })
+
+        await lendingPool.connect(owner).removeMember(lender.address)
+
+        expect(await lendingPool.totalContributions()).to.equal(ethers.parseEther('10'))
+      })
+    })
+
+    describe('distribution', function () {
+      beforeEach(async function () {
+        await lendingPool.connect(lender).depositFunds({ value: ethers.parseEther('20') })
+        await lendingPool.connect(borrower).depositFunds({ value: ethers.parseEther('1') })
+      })
+
+      it('credits the whole interest out, and never more', async function () {
+        const interest = await borrowAndRepay(borrower, ethers.parseEther('10'))
+
+        const total = (await lendingPool.claimable(lender.address)) + (await lendingPool.claimable(borrower.address))
+
+        // Integer division leaves dust in the pool; it never overpays.
+        expect(total).to.be.lte(interest)
+        expect(total).to.be.closeTo(interest, 100n)
+      })
+
+      it('splits pro rata between unequal contributors', async function () {
+        const interest = await borrowAndRepay(borrower, ethers.parseEther('10'))
+
+        // 20 : 1, so the lender takes twenty twenty-firsts.
+        expect(await lendingPool.claimable(lender.address)).to.be.closeTo((interest * 20n) / 21n, 100n)
+        expect(await lendingPool.claimable(borrower.address)).to.be.closeTo(interest / 21n, 100n)
+      })
+
+      it('emits InterestDistributed with the interest alone, not the repayment', async function () {
+        await lendingPool.connect(borrower).createLoan(ethers.parseEther('10'))
+        const due = await lendingPool.calculateRepaymentAmount(1)
+        const interest = due - ethers.parseEther('10')
+
+        await expect(lendingPool.connect(borrower).repayLoan(1, { value: due }))
+          .to.emit(lendingPool, 'InterestDistributed')
+          .withArgs(1, interest)
+      })
+
+      it('distributes correctly while another loan is still outstanding', async function () {
+        // The check that catches `totalFunds` being used as the denominator:
+        // with 10 of 21 lent out, that mistake would pay roughly double.
+        await lendingPool.connect(otherAccount).depositFunds({ value: ethers.parseEther('9') })
+        await lendingPool.connect(otherAccount).createLoan(ethers.parseEther('10'))
+
+        const interest = await borrowAndRepay(borrower, ethers.parseEther('10'))
+
+        // 30 contributed in total, of which the lender put in 20.
+        expect(await lendingPool.claimable(lender.address)).to.be.closeTo((interest * 20n) / 30n, 100n)
+      })
+
+      it('leaves the interest in the pool when nobody is contributing', async function () {
+        // Only reachable because an admitted member can borrow without lending:
+        // that lets every contributor leave while a loan is still running.
+        await lendingPool.connect(lender).withdraw(ethers.parseEther('20'))
+        await lendingPool.connect(borrower).withdraw(ethers.parseEther('1'))
+        expect(await lendingPool.totalContributions()).to.equal(0)
+
+        await lendingPool.connect(otherAccount).depositFunds({ value: ethers.parseEther('10') })
+        await lendingPool.connect(borrower).createLoan(ethers.parseEther('5'))
+        await lendingPool.connect(otherAccount).withdraw(ethers.parseEther('5'))
+
+        const due = await lendingPool.calculateRepaymentAmount(1)
+        await lendingPool.connect(borrower).repayLoan(1, { value: due })
+        await lendingPool.connect(otherAccount).withdraw(ethers.parseEther('5'))
+        expect(await lendingPool.totalContributions()).to.equal(0)
+
+        // A second loan out of what is left, repaid into an empty register.
+        const stranded = await lendingPool.totalFunds()
+        const accBefore = await lendingPool.accInterestPerShare()
+
+        await lendingPool.connect(borrower).createLoan(stranded)
+        const due2 = await lendingPool.calculateRepaymentAmount(2)
+        await expect(lendingPool.connect(borrower).repayLoan(2, { value: due2 })).to.not.emit(lendingPool, 'InterestDistributed')
+
+        expect(await lendingPool.accInterestPerShare()).to.equal(accBefore)
+      })
+    })
+
+    describe('interestDebt', function () {
+      beforeEach(async function () {
+        await lendingPool.connect(lender).depositFunds({ value: ethers.parseEther('20') })
+        await lendingPool.connect(borrower).depositFunds({ value: ethers.parseEther('1') })
+      })
+
+      it('earns nothing from a repayment that predates the deposit', async function () {
+        // The test the design turns on. Without `interestDebt`, a latecomer
+        // would take a share of every repayment the pool ever collected.
+        await borrowAndRepay(borrower, ethers.parseEther('10'))
+
+        await lendingPool.connect(otherAccount).depositFunds({ value: ethers.parseEther('20') })
+
+        expect(await lendingPool.claimable(otherAccount.address)).to.equal(0)
+      })
+
+      it('earns from repayments after the deposit, at the new weight', async function () {
+        await borrowAndRepay(borrower, ethers.parseEther('10'))
+        await lendingPool.connect(otherAccount).depositFunds({ value: ethers.parseEther('21') })
+
+        const before = await lendingPool.claimable(lender.address)
+        const interest = await borrowAndRepay(borrower, ethers.parseEther('10'))
+
+        // 42 contributed now, half of it the newcomer's.
+        expect(await lendingPool.claimable(otherAccount.address)).to.be.closeTo(interest / 2n, 100n)
+        expect((await lendingPool.claimable(lender.address)) - before).to.be.closeTo((interest * 20n) / 42n, 100n)
+      })
+
+      it('does not multiply what a second deposit earned before it', async function () {
+        const interest = await borrowAndRepay(borrower, ethers.parseEther('10'))
+        const earned = await lendingPool.claimable(lender.address)
+
+        await lendingPool.connect(lender).depositFunds({ value: ethers.parseEther('20') })
+
+        // Topping up banks the accrual; it does not re-scale it against the
+        // larger stake.
+        expect(await lendingPool.claimable(lender.address)).to.equal(earned)
+        expect(earned).to.be.closeTo((interest * 20n) / 21n, 100n)
+      })
+
+      it('keeps the accrual when the contribution is withdrawn', async function () {
+        await borrowAndRepay(borrower, ethers.parseEther('10'))
+        const earned = await lendingPool.claimable(lender.address)
+        expect(earned).to.be.gt(0)
+
+        await lendingPool.connect(lender).withdraw(ethers.parseEther('20'))
+
+        expect(await lendingPool.contributions(lender.address)).to.equal(0)
+        expect(await lendingPool.claimable(lender.address)).to.equal(earned)
+      })
+
+      it('stops accruing once the stake is gone', async function () {
+        await borrowAndRepay(borrower, ethers.parseEther('10'))
+        await lendingPool.connect(lender).withdraw(ethers.parseEther('20'))
+        const earned = await lendingPool.claimable(lender.address)
+
+        // Small: the lender just took 20 of the pool's liquidity out with them.
+        await borrowAndRepay(borrower, ethers.parseEther('1'))
+
+        expect(await lendingPool.claimable(lender.address)).to.equal(earned)
+      })
+
+      it('keeps accruing for a removed member whose stake is still in', async function () {
+        // Removal takes away what you may do next, not what your money is
+        // still doing for the pool.
+        await lendingPool.connect(owner).removeMember(lender.address)
+
+        const interest = await borrowAndRepay(borrower, ethers.parseEther('10'))
+
+        expect(await lendingPool.claimable(lender.address)).to.be.closeTo((interest * 20n) / 21n, 100n)
+      })
+    })
+
+    describe('claimable', function () {
+      it('is zero for an address that never contributed', async function () {
+        await lendingPool.connect(lender).depositFunds({ value: ethers.parseEther('20') })
+        await lendingPool.connect(borrower).depositFunds({ value: ethers.parseEther('1') })
+        await borrowAndRepay(borrower, ethers.parseEther('10'))
+
+        expect(await lendingPool.claimable(otherAccount.address)).to.equal(0)
+      })
+
+      it('is zero before any repayment', async function () {
+        await lendingPool.connect(lender).depositFunds({ value: ethers.parseEther('20') })
+
+        expect(await lendingPool.claimable(lender.address)).to.equal(0)
+      })
+
+      it('is not capped by free liquidity', async function () {
+        // Unlike `withdrawableAmount`: an outstanding loan must not make an
+        // earnings figure appear to shrink.
+        await lendingPool.connect(lender).depositFunds({ value: ethers.parseEther('20') })
+        await lendingPool.connect(borrower).depositFunds({ value: ethers.parseEther('1') })
+        await borrowAndRepay(borrower, ethers.parseEther('10'))
+
+        const earned = await lendingPool.claimable(lender.address)
+        await lendingPool.connect(borrower).createLoan(ethers.parseEther('10'))
+        await lendingPool.connect(lender).withdraw(await lendingPool.totalFunds())
+
+        expect(await lendingPool.totalFunds()).to.equal(0)
+        expect(await lendingPool.claimable(lender.address)).to.equal(earned)
+      })
+    })
+  })
 })
