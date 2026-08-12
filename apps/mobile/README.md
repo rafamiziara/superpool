@@ -119,6 +119,9 @@ Post-login screens live under `app/(auth)/`:
   pending-transaction banner, and a card per pool with loan requests waiting on you
 - **`(tabs)/pools`** - Pool list with pending/syncing cards, loading/empty/error states, and a
   pull-to-refresh that sweeps the chain before reloading, so pools created outside this app appear
+- **`(tabs)/discover`** - Pools the user has no standing in, searchable by name or description and
+  sortable by age, liquidity, rate or loan size. The complement of the Pools tab, so the two
+  partition the chain and nothing appears in both
 - **`(tabs)/activity`** - The connected wallet's own transactions, grouped by day
 - **`pool/[id]`** - Pool detail with stats, your position, the pool's own activity, thumb-zone
   action bar, and the owner's entry points to approvals and settings
@@ -135,7 +138,7 @@ The activity feed is signed from the pool's side on `pool/[id]` and from the
 wallet's on the dashboard and activity tab — see
 [`docs/LOANS.md`](../../docs/LOANS.md#the-sign-depends-on-whose-feed-it-is).
 
-Navigation uses Expo Router **NativeTabs** (SF Symbols on iOS, Material icons on Android) with a per-tab native **Stack**. All three tabs share one header — SuperPool logo left, `AppKitButton` right, no per-tab title, since the tab bar already names the screen. Pool detail pushes over the tabs with a native back button. The shared header and its styling are `brandHeader` / `darkHeader` in `src/constants/navigation.tsx`.
+Navigation uses Expo Router **NativeTabs** (SF Symbols on iOS, Material icons on Android) with a per-tab native **Stack**. All four tabs share one header — SuperPool logo left, `AppKitButton` right, no per-tab title, since the tab bar already names the screen. Pool detail pushes over the tabs with a native back button. The shared header and its styling are `brandHeader` / `darkHeader` in `src/constants/navigation.tsx`.
 
 ## Network Configuration
 

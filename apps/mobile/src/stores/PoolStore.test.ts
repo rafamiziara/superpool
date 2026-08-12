@@ -1,4 +1,4 @@
-import type { LoanInfo, PoolInfo } from '@superpool/types'
+import type { LoanInfo, MemberInfo, PoolInfo } from '@superpool/types'
 import { LoanStatus, MemberStatus, TransactionStatus, TransactionType } from '@superpool/types'
 import { parseEther } from 'viem'
 import { mockFirebaseCallable } from '../__tests__/mocks'
@@ -984,6 +984,196 @@ describe('PoolStore myPools', () => {
 
     expect(store.poolLiquidity(32)).toBe(parseEther('7'))
     expect(store.myPools.map((pool) => pool.poolId)).toEqual([30])
+  })
+})
+
+// ---------------------------------------------------------------------------
+// What Discover offers.
+//
+// The complement of `myPools`, so the two tabs partition the chain's pools and
+// nothing shows up in both. The cases worth pinning are the standings that are
+// not membership: a pending request, a rejection and a removal all leave a
+// record, and all of them belong on the tab that can explain what happened
+// rather than in a list of strangers.
+// ---------------------------------------------------------------------------
+
+describe('PoolStore discoverablePools', () => {
+  let store: PoolStore
+  let listContributionsCallable: jest.Mock
+  let listMembersCallable: jest.Mock
+
+  async function loadWith(contributions: (typeof LIVE_CONTRIBUTION)[], members: MemberInfo[] = []) {
+    listContributionsCallable.mockResolvedValue({
+      data: { contributions, totalCount: contributions.length, limit: 50 },
+    })
+    listMembersCallable.mockResolvedValue({ data: { members, totalCount: members.length, limit: 50 } })
+    await store.fetchPools()
+  }
+
+  function member(poolId: number, account: string, status: MemberInfo['status']): MemberInfo {
+    return {
+      id: `31337-${poolId}-${account}`,
+      poolId,
+      poolAddress: LIVE_POOL.poolAddress,
+      account,
+      status,
+      joinedAt: '2026-08-10T08:00:00.000Z',
+      chainId: 31337,
+      transactionHash: '0xcccc',
+      blockNumber: 102,
+    }
+  }
+
+  beforeEach(() => {
+    jest.clearAllMocks()
+    delete process.env.EXPO_PUBLIC_USE_MOCK_POOLS
+
+    authStore.walletAddress = USER_WALLET
+    authStore.chainId = 31337
+
+    store = new PoolStore()
+    const listPoolsCallable = jest.fn().mockResolvedValue({
+      data: {
+        pools: [POOL_I_OWN, POOL_I_FUNDED, POOL_THEIRS],
+        totalCount: 3,
+        page: 1,
+        limit: 50,
+        hasNextPage: false,
+        hasPreviousPage: false,
+      },
+    })
+    listContributionsCallable = jest.fn().mockResolvedValue({ data: { contributions: [], totalCount: 0, limit: 50 } })
+    listMembersCallable = jest.fn().mockResolvedValue({ data: { members: [], totalCount: 0, limit: 50 } })
+    const listWithdrawalsCallable = jest.fn().mockResolvedValue({ data: { withdrawals: [], totalCount: 0, limit: 50 } })
+    mockFirebaseCallable.mockImplementation((_functions?: unknown, name?: string) => {
+      if (name === 'listContributions') return listContributionsCallable
+      if (name === 'listWithdrawals') return listWithdrawalsCallable
+      if (name === 'listMembers') return listMembersCallable
+      return listPoolsCallable
+    })
+  })
+
+  afterEach(() => {
+    process.env.EXPO_PUBLIC_USE_MOCK_POOLS = 'true'
+    authStore.walletAddress = null
+    authStore.chainId = null
+  })
+
+  it('offers the pools the user has no standing in', async () => {
+    await loadWith([{ ...LIVE_CONTRIBUTION, poolId: 31, contributor: USER_WALLET }])
+
+    expect(store.discoverablePools.map((pool) => pool.poolId)).toEqual([32])
+  })
+
+  it('never offers a pool the user owns', async () => {
+    await loadWith([])
+
+    expect(store.discoverablePools.map((pool) => pool.poolId)).toEqual([31, 32])
+  })
+
+  // The partition. Anything in one list must be absent from the other, or a
+  // pool shows up twice under two different framings.
+  it('partitions the chain with myPools', async () => {
+    await loadWith([{ ...LIVE_CONTRIBUTION, poolId: 31, contributor: USER_WALLET }])
+
+    const mine = store.myPools.map((pool) => pool.poolId)
+    const theirs = store.discoverablePools.map((pool) => pool.poolId)
+
+    expect([...mine, ...theirs].sort()).toEqual([30, 31, 32])
+    expect(mine.filter((poolId) => theirs.includes(poolId))).toEqual([])
+  })
+
+  it('drops a pool the user has asked to join', async () => {
+    // Discover cannot say "waiting to be let in"; the Pools tab can.
+    await loadWith([], [member(32, USER_WALLET, 'requested')])
+
+    expect(store.discoverablePools.map((pool) => pool.poolId)).toEqual([31])
+  })
+
+  it('drops a pool that turned the user down', async () => {
+    // A rejected applicant is not a stranger — the pool screen offers "Ask
+    // again", which only makes sense where the rejection is visible.
+    await loadWith([], [member(32, USER_WALLET, 'rejected')])
+
+    expect(store.discoverablePools.map((pool) => pool.poolId)).toEqual([31])
+  })
+
+  it('drops a pool the user was removed from', async () => {
+    await loadWith([], [member(32, USER_WALLET, 'removed')])
+
+    expect(store.discoverablePools.map((pool) => pool.poolId)).toEqual([31])
+  })
+
+  it('ignores other people’s standings', async () => {
+    // The register spans every member of every pool, so an unfiltered version
+    // hides pools because a stranger joined them.
+    await loadWith([], [member(31, STRANGER_WALLET, 'active'), member(32, STRANGER_WALLET, 'active')])
+
+    expect(store.discoverablePools.map((pool) => pool.poolId)).toEqual([31, 32])
+  })
+
+  it('matches the user case-insensitively', async () => {
+    authStore.walletAddress = USER_WALLET.toUpperCase().replace('0X', '0x')
+    await loadWith([], [member(32, USER_WALLET, 'active')])
+
+    expect(store.discoverablePools.map((pool) => pool.poolId)).toEqual([31])
+  })
+
+  it('offers nothing when the user is in every pool', async () => {
+    await loadWith(
+      [
+        { ...LIVE_CONTRIBUTION, poolId: 31, contributor: USER_WALLET },
+        { ...LIVE_CONTRIBUTION, id: '31337-0xdddd-0', poolId: 32, contributor: USER_WALLET },
+      ],
+      []
+    )
+
+    expect(store.discoverablePools).toEqual([])
+  })
+
+  describe('memberCountFor', () => {
+    it('counts the active members of a pool the user is not in', async () => {
+      await loadWith([], [member(32, STRANGER_WALLET, 'active'), member(32, '0x00000000000000000000000000000000000000aa', 'active')])
+
+      expect(store.memberCountFor(32)).toBe(2)
+    })
+
+    it('counts a depositor with no register entry, which is what depositing has always meant', async () => {
+      await loadWith([{ ...LIVE_CONTRIBUTION, poolId: 32, contributor: STRANGER_WALLET }])
+
+      expect(store.memberCountFor(32)).toBe(1)
+    })
+
+    it('does not count an applicant who has not been let in', async () => {
+      await loadWith([], [member(32, STRANGER_WALLET, 'requested')])
+
+      expect(store.memberCountFor(32)).toBe(0)
+    })
+
+    it('does not count someone rejected, removed or gone', async () => {
+      await loadWith(
+        [],
+        [
+          member(32, STRANGER_WALLET, 'rejected'),
+          member(32, '0x00000000000000000000000000000000000000aa', 'removed'),
+          member(32, '0x00000000000000000000000000000000000000bb', 'left'),
+        ]
+      )
+
+      expect(store.memberCountFor(32)).toBe(0)
+    })
+
+    it('counts only the pool asked about', async () => {
+      await loadWith([], [member(31, STRANGER_WALLET, 'active'), member(32, STRANGER_WALLET, 'active')])
+
+      expect(store.memberCountFor(32)).toBe(1)
+    })
+
+    it('is zero for a pool nobody has joined', async () => {
+      await loadWith([])
+
+      expect(store.memberCountFor(32)).toBe(0)
+    })
   })
 })
 

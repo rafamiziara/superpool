@@ -559,6 +559,31 @@ user received as negative. It follows from **who the feed is about**:
 A feed that has not been narrowed must use `pool`. `PoolStore.recentTransactions`
 is pool-wide by construction, because every source it merges covers all members.
 
+## Discovery
+
+The Pools and Discover tabs **partition** the chain's pools:
+`PoolStore.discoverablePools` is defined as the complement of `myPools`, so one
+rule decides both and nothing appears in both lists. That deliberately covers
+more than membership — a pool the user has asked to join, been rejected from or
+been removed from has a record, and all of them belong on the tab that can say
+what happened rather than in a list of strangers.
+
+Two things to keep in mind:
+
+- **The list is one page, not the chain.** `listPools` has no text filter and
+  Firestore cannot match a substring, so search is client-side over the newest
+  `DEFAULT_PAGE_SIZE` (50) pools. Honest at this scale, wrong at a larger one;
+  the fix is search tokens written onto the pool document by the indexer, not a
+  bigger page.
+- **Discover shows no open/private badge on purpose.** `requiresMembership` is
+  `poolConfig[5]` and has to be read from the chain (see
+  [Membership](#membership)) — one RPC call per card is not a price a scrolling
+  list should pay. `pool/[id]` reads it and shows the right action there.
+
+`DiscoverPoolCard` is separate from `PoolCard` because a non-member has no
+position to report: its footer carries the pool's own size (liquidity and
+`memberCountFor`) where `PoolCard` carries "your balance".
+
 ## UI & Frontend Interface Design
 
 There is **no shared design package**. Each app owns its theme, and the two are

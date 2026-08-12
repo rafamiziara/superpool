@@ -171,7 +171,14 @@ function PoolsScreen() {
           {isEmpty && (
             <View className="items-center gap-2 py-6" testID="pools-empty">
               <Text className="text-base font-semibold text-snow">No circles yet</Text>
-              <Text className="text-center text-sm text-fog">Start your own pool, or pull down to refresh once someone invites you.</Text>
+              <Text className="text-center text-sm text-fog">Browse the circles other people have started, or start one of your own.</Text>
+              <Pressable
+                onPress={() => router.push('/(auth)/(tabs)/discover')}
+                className="mt-2 active:opacity-70"
+                testID="pools-empty-discover"
+              >
+                <Text className="font-semibold text-mint">Discover circles</Text>
+              </Pressable>
             </View>
           )}
 

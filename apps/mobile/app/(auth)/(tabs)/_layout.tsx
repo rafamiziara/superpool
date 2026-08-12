@@ -30,6 +30,10 @@ export default function TabsLayout() {
         <NativeTabs.Trigger.Icon sf={{ default: 'person.2', selected: 'person.2.fill' }} md="group" />
         <NativeTabs.Trigger.Label>Pools</NativeTabs.Trigger.Label>
       </NativeTabs.Trigger>
+      <NativeTabs.Trigger name="discover" contentStyle={contentStyle}>
+        <NativeTabs.Trigger.Icon sf="magnifyingglass" md="search" />
+        <NativeTabs.Trigger.Label>Discover</NativeTabs.Trigger.Label>
+      </NativeTabs.Trigger>
       <NativeTabs.Trigger name="activity" contentStyle={contentStyle}>
         <NativeTabs.Trigger.Icon sf="clock.arrow.circlepath" md="history" />
         <NativeTabs.Trigger.Label>Activity</NativeTabs.Trigger.Label>

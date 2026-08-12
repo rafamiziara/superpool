@@ -555,6 +555,39 @@ export class PoolStore {
     return this.pools.filter((pool) => memberPoolIds.has(String(pool.poolId)) || sameAddress(pool.poolOwner, this.userAddress))
   }
 
+  /**
+   * Pools the user has no standing in at all — what Discover offers.
+   *
+   * Defined as the complement of `myPools` so there is one rule rather than
+   * two: anything the Pools tab shows, this one does not. That deliberately
+   * covers more than "member" — a pool the user has asked to join, been
+   * rejected from, or been removed from all have a record here, and all of them
+   * belong on the tab that can say what happened rather than in a list of
+   * strangers.
+   *
+   * `pools` is already chain-wide: `requestPools` filters by `chainId` and
+   * `activeOnly`, never by wallet, so nothing extra has to be fetched for this.
+   * What it is *not* is exhaustive — the list is one page of
+   * `DEFAULT_PAGE_SIZE`, so on a busy chain this is the newest 50 pools and the
+   * search below searches those. Real discovery needs a server-side query.
+   */
+  get discoverablePools(): PoolInfo[] {
+    const mine = new Set(this.myPools.map((pool) => pool.poolId))
+
+    return this.pools.filter((pool) => !mine.has(pool.poolId))
+  }
+
+  /**
+   * How many members a pool has, for a card that cannot show "your balance".
+   *
+   * Counts everyone the register or the events place in the pool, minus the
+   * standings that mean "not in it": a pending applicant is not a member yet,
+   * and a rejected or removed one is not one any more.
+   */
+  memberCountFor = (poolId: number): number => {
+    return this.memberships.filter((member) => member.poolId === String(poolId) && member.status === MemberStatus.ACTIVE).length
+  }
+
   /** Sum of the user's active balances across pools (wei). */
   get totalBalance(): bigint {
     return this.activeMemberships.reduce((sum, member) => sum + member.currentBalance, 0n)

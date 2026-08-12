@@ -80,6 +80,40 @@ export const MOCK_POOLS: PoolInfo[] = [
     transactionHash: '0x2f3e4d5c6b7a8091f2e3d4c5b6a798012f3e4d5c6b7a8091f2e3d4c5b6a79801',
     isActive: true,
   },
+  // Pools 5 and 6 deliberately have no entry in MOCK_MEMBERSHIPS: they are what
+  // Discover has to show. The mock user belongs to every pool above, so without
+  // these two the tab renders its empty state in mock mode and cannot be worked
+  // on without the emulators — which is the whole point of mock mode.
+  {
+    poolId: 5,
+    poolAddress: '0xC7f1904Ba8D3e26f5A0b7dC91e483F2a6B0d5E37',
+    poolOwner: '0x8B4e2C71fA9d0538E6c1B4a72D95F03e8C6a1B40',
+    name: 'Harvest Collective',
+    description: 'Smallholder farmers pooling for seed and fertiliser ahead of the planting season.',
+    maxLoanAmount: parseEther('750').toString(),
+    interestRate: 600,
+    loanDuration: 90 * 86_400,
+    chainId: CHAIN_ID,
+    createdBy: '0x8B4e2C71fA9d0538E6c1B4a72D95F03e8C6a1B40',
+    createdAt: daysAgo(31).toISOString(),
+    transactionHash: '0x7c6b5a49382716f0e5d4c3b2a1908f7e6d5c4b3a2918070f6e5d4c3b2a190817',
+    isActive: true,
+  },
+  {
+    poolId: 6,
+    poolAddress: '0x3E92aC5d17B04f86C2e9D30bA754F1e8D6c0B293',
+    poolOwner: '0xF06d3B92c81eA475D2f9C6031B84e7a05C3d9E16',
+    name: 'Ride & Repair',
+    description: 'Delivery riders covering bike repairs and phone replacements between shifts.',
+    maxLoanAmount: parseEther('80').toString(),
+    interestRate: 200,
+    loanDuration: 7 * 86_400,
+    chainId: CHAIN_ID,
+    createdBy: '0xF06d3B92c81eA475D2f9C6031B84e7a05C3d9E16',
+    createdAt: daysAgo(3).toISOString(),
+    transactionHash: '0x4d5c6b7a8091f2e3d4c5b6a798012f3e4d5c6b7a8091f2e3d4c5b6a798012f3e',
+    isActive: true,
+  },
 ]
 
 export const MOCK_MEMBERSHIPS: PoolMember[] = [
