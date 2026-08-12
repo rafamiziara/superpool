@@ -13,6 +13,7 @@
     "signMessage": "ts-node scripts/signMessage.ts",
     "testIndexer": "ts-node scripts/testEventIndexer.ts",
     "testSweep": "ts-node scripts/testEventSweep.ts",
+    "testInterest": "ts-node scripts/testInterestClaims.ts",
     "test": "jest",
     "format": "prettier --write . --ignore-path ../../.prettierignore",
     "type-check": "tsc --noEmit",

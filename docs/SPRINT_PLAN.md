@@ -498,6 +498,14 @@ How it works: [`INTEREST.md`](INTEREST.md).
 
 ### Current Status: **COMPLETE** ✅
 
+Live-verified: 66 checks against a Hardhat node and the Firestore emulator —
+40 on the contract arithmetic, 19 on indexing, 7 driving the esbuild-bundled
+mobile decoder over a real receipt. Re-runnable as `pnpm testInterest` from
+`packages/backend`. The check that mattered most: a pool distributing while
+another loan is outstanding, which is the only way to catch `totalFunds` used
+where `totalContributions` belongs — a mistake that pays roughly double and
+that no test with an unborrowed pool can see.
+
 Deliberately not built: **no compounding** — unclaimed interest does not itself
 earn, since that would mean adding it to `contributions` and changing what
 `withdraw` means. **No platform fee** (`ROADMAP.md` Phase 3): the same
