@@ -1199,6 +1199,11 @@ export const PoolFactoryABI = [
 export const SampleLendingPoolABI = [
   {
     "inputs": [],
+    "name": "AlreadyMember",
+    "type": "error"
+  },
+  {
+    "inputs": [],
     "name": "ApprovalRequired",
     "type": "error"
   },
@@ -1265,6 +1270,16 @@ export const SampleLendingPoolABI = [
   {
     "inputs": [],
     "name": "LoanOutstanding",
+    "type": "error"
+  },
+  {
+    "inputs": [],
+    "name": "NoPendingRequest",
+    "type": "error"
+  },
+  {
+    "inputs": [],
+    "name": "NotAMember",
     "type": "error"
   },
   {
@@ -1514,6 +1529,97 @@ export const SampleLendingPoolABI = [
       {
         "indexed": true,
         "internalType": "address",
+        "name": "account",
+        "type": "address"
+      }
+    ],
+    "name": "MemberJoined",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "account",
+        "type": "address"
+      }
+    ],
+    "name": "MembershipApproved",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "account",
+        "type": "address"
+      }
+    ],
+    "name": "MembershipLeft",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "account",
+        "type": "address"
+      }
+    ],
+    "name": "MembershipRejected",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "account",
+        "type": "address"
+      }
+    ],
+    "name": "MembershipRequested",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "bool",
+        "name": "requiresMembership",
+        "type": "bool"
+      }
+    ],
+    "name": "MembershipRequirementChanged",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "account",
+        "type": "address"
+      }
+    ],
+    "name": "MembershipRevoked",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "address",
         "name": "previousOwner",
         "type": "address"
       },
@@ -1606,6 +1712,19 @@ export const SampleLendingPoolABI = [
       }
     ],
     "name": "approveLoan",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "_account",
+        "type": "address"
+      }
+    ],
+    "name": "approveMember",
     "outputs": [],
     "stateMutability": "nonpayable",
     "type": "function"
@@ -1772,6 +1891,13 @@ export const SampleLendingPoolABI = [
     "type": "function"
   },
   {
+    "inputs": [],
+    "name": "leavePool",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
     "inputs": [
       {
         "internalType": "uint256",
@@ -1815,6 +1941,38 @@ export const SampleLendingPoolABI = [
         "internalType": "uint256",
         "name": "duration",
         "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "memberCount",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "name": "membership",
+    "outputs": [
+      {
+        "internalType": "enum SampleLendingPool.Membership",
+        "name": "",
+        "type": "uint8"
       }
     ],
     "stateMutability": "view",
@@ -1894,6 +2052,11 @@ export const SampleLendingPoolABI = [
         "internalType": "bool",
         "name": "requiresApproval",
         "type": "bool"
+      },
+      {
+        "internalType": "bool",
+        "name": "requiresMembership",
+        "type": "bool"
       }
     ],
     "stateMutability": "view",
@@ -1908,6 +2071,32 @@ export const SampleLendingPoolABI = [
       }
     ],
     "name": "rejectLoan",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "_account",
+        "type": "address"
+      }
+    ],
+    "name": "rejectMember",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "_account",
+        "type": "address"
+      }
+    ],
+    "name": "removeMember",
     "outputs": [],
     "stateMutability": "nonpayable",
     "type": "function"
@@ -1952,6 +2141,13 @@ export const SampleLendingPoolABI = [
     "type": "function"
   },
   {
+    "inputs": [],
+    "name": "requestMembership",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
     "inputs": [
       {
         "internalType": "bool",
@@ -1960,6 +2156,19 @@ export const SampleLendingPoolABI = [
       }
     ],
     "name": "setRequiresApproval",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "bool",
+        "name": "_requiresMembership",
+        "type": "bool"
+      }
+    ],
+    "name": "setRequiresMembership",
     "outputs": [],
     "stateMutability": "nonpayable",
     "type": "function"

@@ -718,4 +718,293 @@ describe('SampleLendingPool', function () {
       expect((await lendingPool.getLoan(1)).isRepaid).to.be.true
     })
   })
+
+  describe('Membership', function () {
+    const deposit = ethers.parseEther('10')
+
+    // Membership.None = 0, Requested = 1, Active = 2, Rejected = 3,
+    // Removed = 4, Left = 5
+    const NONE = 0n
+    const REQUESTED = 1n
+    const ACTIVE = 2n
+    const REJECTED = 3n
+    const REMOVED = 4n
+    const LEFT = 5n
+
+    it('starts every address at None with the correct zero value', async function () {
+      // Unlike LoanStatus, this enum gets to put the semantically right value at
+      // zero: an address nobody has heard of has no membership.
+      expect(await lendingPool.membership(otherAccount.address)).to.equal(NONE)
+      expect(await lendingPool.memberCount()).to.equal(0)
+    })
+
+    it('leaves a new pool open, as every pool was before this existed', async function () {
+      expect((await lendingPool.poolConfig()).requiresMembership).to.be.false
+    })
+
+    describe('an open pool', function () {
+      it('enrols a first-time depositor', async function () {
+        await expect(lendingPool.connect(lender).depositFunds({ value: deposit }))
+          .to.emit(lendingPool, 'MemberJoined')
+          .withArgs(lender.address)
+
+        expect(await lendingPool.membership(lender.address)).to.equal(ACTIVE)
+        expect(await lendingPool.memberCount()).to.equal(1)
+      })
+
+      it('does not enrol the same depositor twice', async function () {
+        await lendingPool.connect(lender).depositFunds({ value: deposit })
+        await expect(lendingPool.connect(lender).depositFunds({ value: deposit })).to.not.emit(lendingPool, 'MemberJoined')
+
+        expect(await lendingPool.memberCount()).to.equal(1)
+      })
+
+      it('does not readmit someone the owner removed', async function () {
+        // The gate being off must not undo the owner's decision, or turning it
+        // back on would silently let them in again.
+        await lendingPool.connect(lender).depositFunds({ value: deposit })
+        await lendingPool.connect(owner).removeMember(lender.address)
+
+        await lendingPool.connect(lender).depositFunds({ value: deposit })
+
+        expect(await lendingPool.membership(lender.address)).to.equal(REMOVED)
+        expect(await lendingPool.memberCount()).to.equal(0)
+      })
+
+      it('re-enrols someone who left of their own accord', async function () {
+        await lendingPool.connect(lender).depositFunds({ value: deposit })
+        await lendingPool.connect(lender).leavePool()
+
+        await lendingPool.connect(lender).depositFunds({ value: deposit })
+
+        expect(await lendingPool.membership(lender.address)).to.equal(ACTIVE)
+      })
+    })
+
+    describe('a permissioned pool', function () {
+      beforeEach(async function () {
+        await lendingPool.connect(owner).setRequiresMembership(true)
+      })
+
+      it('refuses a deposit from a non-member', async function () {
+        await expect(lendingPool.connect(otherAccount).depositFunds({ value: deposit })).to.be.revertedWithCustomError(
+          lendingPool,
+          'NotAMember'
+        )
+      })
+
+      it('refuses a deposit from someone merely waiting', async function () {
+        await lendingPool.connect(otherAccount).requestMembership()
+
+        await expect(lendingPool.connect(otherAccount).depositFunds({ value: deposit })).to.be.revertedWithCustomError(
+          lendingPool,
+          'NotAMember'
+        )
+      })
+
+      it('takes a deposit once the owner admits them', async function () {
+        await lendingPool.connect(lender).requestMembership()
+        await lendingPool.connect(owner).approveMember(lender.address)
+
+        await expect(lendingPool.connect(lender).depositFunds({ value: deposit })).to.not.be.reverted
+      })
+
+      it('strands nobody when the owner closes an open pool', async function () {
+        // The whole point of writing the register in both modes: everyone who
+        // deposited while it was open is already Active.
+        await lendingPool.connect(owner).setRequiresMembership(false)
+        await lendingPool.connect(lender).depositFunds({ value: deposit })
+        await lendingPool.connect(owner).setRequiresMembership(true)
+
+        await expect(lendingPool.connect(lender).depositFunds({ value: deposit })).to.not.be.reverted
+      })
+
+      it('only lets the owner change the requirement', async function () {
+        await expect(lendingPool.connect(borrower).setRequiresMembership(false)).to.be.reverted
+      })
+    })
+
+    describe('the request lifecycle', function () {
+      it('records a request', async function () {
+        await expect(lendingPool.connect(otherAccount).requestMembership())
+          .to.emit(lendingPool, 'MembershipRequested')
+          .withArgs(otherAccount.address)
+
+        expect(await lendingPool.membership(otherAccount.address)).to.equal(REQUESTED)
+        // Asking is not joining.
+        expect(await lendingPool.memberCount()).to.equal(0)
+      })
+
+      it('refuses a second request while one is waiting', async function () {
+        await lendingPool.connect(otherAccount).requestMembership()
+
+        await expect(lendingPool.connect(otherAccount).requestMembership()).to.be.revertedWithCustomError(lendingPool, 'AlreadyMember')
+      })
+
+      it('refuses a request from someone already in', async function () {
+        await lendingPool.connect(lender).depositFunds({ value: deposit })
+
+        await expect(lendingPool.connect(lender).requestMembership()).to.be.revertedWithCustomError(lendingPool, 'AlreadyMember')
+      })
+
+      it('admits an applicant', async function () {
+        await lendingPool.connect(otherAccount).requestMembership()
+
+        await expect(lendingPool.connect(owner).approveMember(otherAccount.address))
+          .to.emit(lendingPool, 'MembershipApproved')
+          .withArgs(otherAccount.address)
+
+        expect(await lendingPool.membership(otherAccount.address)).to.equal(ACTIVE)
+        expect(await lendingPool.memberCount()).to.equal(1)
+      })
+
+      it('turns an applicant down', async function () {
+        await lendingPool.connect(otherAccount).requestMembership()
+
+        await expect(lendingPool.connect(owner).rejectMember(otherAccount.address))
+          .to.emit(lendingPool, 'MembershipRejected')
+          .withArgs(otherAccount.address)
+
+        expect(await lendingPool.membership(otherAccount.address)).to.equal(REJECTED)
+        expect(await lendingPool.memberCount()).to.equal(0)
+      })
+
+      it('lets a rejected applicant ask again', async function () {
+        await lendingPool.connect(otherAccount).requestMembership()
+        await lendingPool.connect(owner).rejectMember(otherAccount.address)
+
+        await expect(lendingPool.connect(otherAccount).requestMembership()).to.not.be.reverted
+      })
+
+      it('cannot decide the same request twice', async function () {
+        await lendingPool.connect(otherAccount).requestMembership()
+        await lendingPool.connect(owner).approveMember(otherAccount.address)
+
+        await expect(lendingPool.connect(owner).approveMember(otherAccount.address)).to.be.revertedWithCustomError(
+          lendingPool,
+          'NoPendingRequest'
+        )
+      })
+
+      it('cannot decide on someone who never asked', async function () {
+        await expect(lendingPool.connect(owner).rejectMember(otherAccount.address)).to.be.revertedWithCustomError(
+          lendingPool,
+          'NoPendingRequest'
+        )
+      })
+
+      it('only lets the owner decide', async function () {
+        await lendingPool.connect(otherAccount).requestMembership()
+
+        await expect(lendingPool.connect(borrower).approveMember(otherAccount.address)).to.be.reverted
+      })
+
+      it('queues two applicants independently', async function () {
+        await lendingPool.connect(borrower).requestMembership()
+        await lendingPool.connect(otherAccount).requestMembership()
+
+        await lendingPool.connect(owner).approveMember(borrower.address)
+
+        expect(await lendingPool.membership(borrower.address)).to.equal(ACTIVE)
+        expect(await lendingPool.membership(otherAccount.address)).to.equal(REQUESTED)
+      })
+    })
+
+    describe('leaving and removal', function () {
+      beforeEach(async function () {
+        await lendingPool.connect(lender).depositFunds({ value: deposit })
+      })
+
+      it('removes a member', async function () {
+        await expect(lendingPool.connect(owner).removeMember(lender.address))
+          .to.emit(lendingPool, 'MembershipRevoked')
+          .withArgs(lender.address)
+
+        expect(await lendingPool.membership(lender.address)).to.equal(REMOVED)
+        expect(await lendingPool.memberCount()).to.equal(0)
+      })
+
+      it('lets a member leave', async function () {
+        await expect(lendingPool.connect(lender).leavePool()).to.emit(lendingPool, 'MembershipLeft').withArgs(lender.address)
+
+        expect(await lendingPool.membership(lender.address)).to.equal(LEFT)
+        expect(await lendingPool.memberCount()).to.equal(0)
+      })
+
+      it('cannot remove someone who is not a member', async function () {
+        await expect(lendingPool.connect(owner).removeMember(otherAccount.address)).to.be.revertedWithCustomError(lendingPool, 'NotAMember')
+      })
+
+      it('only lets the owner remove', async function () {
+        await expect(lendingPool.connect(borrower).removeMember(lender.address)).to.be.reverted
+      })
+
+      it('leaves a removed member able to withdraw everything', async function () {
+        // The rule that matters most in this milestone: removal takes away what
+        // you may do next, never what you already put in.
+        await lendingPool.connect(owner).removeMember(lender.address)
+
+        await expect(lendingPool.connect(lender).withdraw(deposit)).to.changeEtherBalance(lender, deposit)
+        expect(await lendingPool.contributions(lender.address)).to.equal(0)
+      })
+
+      it('leaves a departed member able to withdraw everything', async function () {
+        await lendingPool.connect(lender).leavePool()
+
+        await expect(lendingPool.connect(lender).withdraw(deposit)).to.changeEtherBalance(lender, deposit)
+      })
+
+      it('leaves a removed borrower able to repay', async function () {
+        await lendingPool.connect(borrower).depositFunds({ value: deposit })
+        await lendingPool.connect(borrower).createLoan(ethers.parseEther('5'))
+        await lendingPool.connect(owner).removeMember(borrower.address)
+
+        const due = await lendingPool.calculateRepaymentAmount(1)
+        await expect(lendingPool.connect(borrower).repayLoan(1, { value: due })).to.emit(lendingPool, 'LoanRepaid')
+      })
+    })
+
+    describe('the borrow gate', function () {
+      it('refuses a non-member', async function () {
+        await lendingPool.connect(lender).depositFunds({ value: ethers.parseEther('50') })
+
+        await expect(lendingPool.connect(otherAccount).createLoan(ethers.parseEther('5'))).to.be.revertedWithCustomError(
+          lendingPool,
+          'UnauthorizedBorrower'
+        )
+      })
+
+      it('refuses a removed member', async function () {
+        await lendingPool.connect(lender).depositFunds({ value: ethers.parseEther('50') })
+        await lendingPool.connect(borrower).depositFunds({ value: deposit })
+        await lendingPool.connect(owner).removeMember(borrower.address)
+
+        await expect(lendingPool.connect(borrower).createLoan(ethers.parseEther('5'))).to.be.revertedWithCustomError(
+          lendingPool,
+          'UnauthorizedBorrower'
+        )
+      })
+
+      it('allows a member the owner admitted but who never lent', async function () {
+        // The deliberate change: membership is the gate now, not a contribution.
+        // A trust circle can lend to someone who has not funded it.
+        await lendingPool.connect(lender).depositFunds({ value: ethers.parseEther('50') })
+        await lendingPool.connect(owner).setRequiresMembership(true)
+        await lendingPool.connect(borrower).requestMembership()
+        await lendingPool.connect(owner).approveMember(borrower.address)
+
+        expect(await lendingPool.contributions(borrower.address)).to.equal(0)
+        await expect(lendingPool.connect(borrower).createLoan(ethers.parseEther('5'))).to.not.be.reverted
+      })
+
+      it('refuses a non-member asking on a reviewing pool', async function () {
+        await lendingPool.connect(owner).setRequiresApproval(true)
+
+        await expect(lendingPool.connect(otherAccount).requestLoan(ethers.parseEther('5'))).to.be.revertedWithCustomError(
+          lendingPool,
+          'UnauthorizedBorrower'
+        )
+      })
+    })
+  })
 })

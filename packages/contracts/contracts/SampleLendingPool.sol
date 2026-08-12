@@ -40,6 +40,33 @@ contract SampleLendingPool is
          * which preserves the old behaviour of lending on demand.
          */
         bool requiresApproval;
+        /**
+         * @dev Whether joining needs the pool owner's approval. Off leaves the
+         * pool open to anyone, which is what every pool did before this
+         * existed; on makes it the private trust circle the product is about.
+         */
+        bool requiresMembership;
+    }
+
+    /**
+     * @notice Where an address stands with this pool
+     * @dev `None` is deliberately zero: an address nobody has heard of has no
+     * membership, so the default value is also the correct one. (Contrast
+     * `LoanStatus.Disbursed`, which sits at zero only because it was retrofitted
+     * onto pools that already held loans.)
+     *
+     * `Rejected`, `Removed` and `Left` are kept apart rather than collapsed into
+     * `None` because they are decisions, and a decision that reads as "never
+     * heard of them" would be silently undone by the auto-enrol path in an open
+     * pool.
+     */
+    enum Membership {
+        None,
+        Requested,
+        Active,
+        Rejected,
+        Removed,
+        Left
     }
 
     /// @dev Loan information - optimized for gas efficiency
@@ -100,6 +127,27 @@ contract SampleLendingPool is
      * Loan ids start at 1, so 0 is an unambiguous "none".
      */
     mapping(address => uint256) public activeLoanId;
+
+    /**
+     * @notice Where each address stands with this pool
+     * @dev Written on every deposit, whether or not the pool is permissioned:
+     * an open pool enrols a first-time depositor rather than leaving them
+     * unrecorded. That is what keeps this mapping the single answer to "is this
+     * address a member" in both modes — the app derives balances from events,
+     * but never membership — and it is why an owner can turn
+     * `requiresMembership` on later without stranding anyone who already
+     * deposited.
+     */
+    mapping(address => Membership) public membership;
+
+    /**
+     * @notice How many addresses are currently `Active`
+     * @dev A counter rather than an array: nothing on chain needs to enumerate
+     * members, and the app builds its list from the events. Decremented on
+     * `removeMember` and `leavePool`, so it tracks current members rather than
+     * everyone who was ever admitted.
+     */
+    uint256 public memberCount;
 
     /// @notice Events
     /**
@@ -188,6 +236,47 @@ contract SampleLendingPool is
      * @param requiresApproval Whether borrowing now needs approval
      */
     event ApprovalRequirementChanged(bool indexed requiresApproval);
+    /**
+     * @notice Emitted when someone asks to join a permissioned pool
+     * @param account Address of the applicant
+     * @dev Every membership event carries the address alone, and indexed, so
+     * they all decode the same way as `FundsDeposited` and `FundsWithdrawn`:
+     * `data` is empty and the field comes from the topics.
+     */
+    event MembershipRequested(address indexed account);
+    /**
+     * @notice Emitted when the pool owner admits an applicant
+     * @param account Address that is now a member
+     */
+    event MembershipApproved(address indexed account);
+    /**
+     * @notice Emitted when the pool owner turns an applicant down
+     * @param account Address that was turned down
+     */
+    event MembershipRejected(address indexed account);
+    /**
+     * @notice Emitted when the pool owner removes a member
+     * @param account Address that is no longer a member
+     */
+    event MembershipRevoked(address indexed account);
+    /**
+     * @notice Emitted when a member leaves of their own accord
+     * @param account Address that left
+     */
+    event MembershipLeft(address indexed account);
+    /**
+     * @notice Emitted when depositing into an open pool enrols the depositor
+     * @param account Address that became a member by funding the pool
+     * @dev Kept distinct from `MembershipApproved` so the activity feed can tell
+     * "the owner let them in" from "they joined by putting money in", even
+     * though both land on `Active`.
+     */
+    event MemberJoined(address indexed account);
+    /**
+     * @notice Emitted when the pool owner opens or closes membership
+     * @param requiresMembership Whether joining now needs approval
+     */
+    event MembershipRequirementChanged(bool indexed requiresMembership);
 
     /// @notice Errors
     error InsufficientFunds();
@@ -207,6 +296,12 @@ contract SampleLendingPool is
     error ApprovalRequired();
     /// @dev The loan is not awaiting a decision — already approved, or rejected.
     error LoanNotPending();
+    /// @dev The caller is not an `Active` member of a pool that requires one.
+    error NotAMember();
+    /// @dev Asking to join when already `Active` or already `Requested`.
+    error AlreadyMember();
+    /// @dev Deciding on an address that has not asked to join.
+    error NoPendingRequest();
 
     /**
      * @notice Initialize the contract (replaces constructor for upgradeable contracts)
@@ -233,7 +328,13 @@ contract SampleLendingPool is
             // Off by default: a new pool lends on demand until its owner asks
             // to review requests, which keeps the factory's `createPool`
             // signature — and every caller of it — unchanged.
-            requiresApproval: false
+            requiresApproval: false,
+            // Also off here, for now: the factory does not pass a choice yet, so
+            // defaulting this on would make every pool private the moment this
+            // lands and break the open flow that works today. The creator's
+            // choice arrives with the `PoolParams` field, and the register is
+            // populated either way.
+            requiresMembership: false
         });
 
         nextLoanId = 1;
@@ -250,6 +351,23 @@ contract SampleLendingPool is
      */
     function depositFunds() external payable whenNotPaused {
         if (msg.value == 0) revert InvalidAmount();
+
+        if (poolConfig.requiresMembership) {
+            if (membership[msg.sender] != Membership.Active) revert NotAMember();
+        } else if (
+            membership[msg.sender] == Membership.None ||
+            membership[msg.sender] == Membership.Left
+        ) {
+            // An open pool enrols whoever funds it, which is the definition of
+            // membership the app has always used — now recorded rather than
+            // inferred. `Rejected` and `Removed` are deliberately absent from
+            // this list: an owner's decision to keep someone out should survive
+            // the gate being off, or turning it back on would silently readmit
+            // them.
+            _grantMembership(msg.sender);
+            emit MemberJoined(msg.sender);
+        }
+
         totalFunds += msg.value;
         contributions[msg.sender] += msg.value;
         emit FundsDeposited(msg.sender, msg.value);
@@ -268,6 +386,10 @@ contract SampleLendingPool is
      * Interest earned through `repayLoan` is deliberately *not* withdrawable:
      * it raises `totalFunds` without crediting any contribution, so it
      * accumulates unclaimed. Distributing it is a separate milestone.
+     *
+     * **This is never gated on membership, and must not become so.** Removing a
+     * member takes away what they may do next, not what they already put in;
+     * gating here would let an owner strand someone else's money.
      */
     function withdraw(
         uint256 _amount
@@ -307,18 +429,18 @@ contract SampleLendingPool is
      * @notice Create a new loan
      * @param _amount Loan amount requested
      * @return loanId The ID of the created loan
-     * @dev Borrowing is restricted to members — a caller with a non-zero
-     * contribution — which is the same definition of membership the app
-     * already uses, and needs no separate approval flow. Before v2 there was
-     * no check on `msg.sender` at all, so anyone could take `maxLoanAmount`
-     * repeatedly until the pool was empty and never repay.
+     * @dev Borrowing is restricted to `Active` members. This used to mean "has
+     * a non-zero contribution", which was only ever a proxy for membership
+     * while there was no register to ask; now there is one, and a member the
+     * owner admitted can borrow without having lent first — which is the
+     * micro-lending model the product is about, rather than a loosening.
      *
-     * Membership alone is a weak gate, so two limits back it up: one open loan
-     * per borrower, which caps a single borrower's exposure at the owner's
-     * configured `maxLoanAmount`; and a lock on the borrower's contribution
-     * until they repay, so a member cannot borrow and then withdraw their
-     * stake. Note the contribution is *not* collateral — it does not bound the
-     * loan and is not seized on default.
+     * Two limits still back it up: one open loan per borrower, which caps a
+     * single borrower's exposure at the owner's configured `maxLoanAmount`; and
+     * a lock on the borrower's contribution until they repay, so a member
+     * cannot borrow and then withdraw their stake. Note the contribution is
+     * *not* collateral — it does not bound the loan and is not seized on
+     * default.
      */
     function createLoan(
         uint256 _amount
@@ -329,7 +451,9 @@ contract SampleLendingPool is
         // review. The app routes to `requestLoan` on this error.
         if (poolConfig.requiresApproval) revert ApprovalRequired();
 
-        if (contributions[msg.sender] == 0) revert UnauthorizedBorrower();
+        if (membership[msg.sender] != Membership.Active) {
+            revert UnauthorizedBorrower();
+        }
 
         if (activeLoanId[msg.sender] != 0) revert LoanOutstanding();
 
@@ -382,6 +506,118 @@ contract SampleLendingPool is
     }
 
     /**
+     * @notice Open or close membership (only owner)
+     * @param _requiresMembership Whether joining now needs the owner's approval
+     * @dev Turning this on strands nobody: every address that has deposited is
+     * already `Active`, because the register is written in both modes. Turning
+     * it off does not clear anyone's status either, so a `Removed` address
+     * stays out.
+     */
+    function setRequiresMembership(
+        bool _requiresMembership
+    ) external onlyOwner {
+        poolConfig.requiresMembership = _requiresMembership;
+
+        emit MembershipRequirementChanged(_requiresMembership);
+    }
+
+    /**
+     * @notice Ask to join this pool, for the owner to decide on
+     * @dev Open to anyone, including on a pool that is not currently
+     * permissioned — an owner may be about to close it, and a request that has
+     * to wait for that is worse than one that sits harmlessly.
+     *
+     * A previously rejected or removed address may ask again. The owner turned
+     * them down once and can do so again; making rejection permanent would need
+     * a separate ban, and nothing in the product asks for one.
+     */
+    function requestMembership() external whenNotPaused {
+        if (!poolConfig.isActive) revert PoolNotActive();
+
+        Membership current = membership[msg.sender];
+        if (
+            current == Membership.Active || current == Membership.Requested
+        ) revert AlreadyMember();
+
+        membership[msg.sender] = Membership.Requested;
+
+        emit MembershipRequested(msg.sender);
+    }
+
+    /**
+     * @notice Admit an applicant (only owner)
+     * @param _account The address to admit
+     */
+    function approveMember(address _account) external onlyOwner whenNotPaused {
+        if (membership[_account] != Membership.Requested) {
+            revert NoPendingRequest();
+        }
+
+        _grantMembership(_account);
+
+        emit MembershipApproved(_account);
+    }
+
+    /**
+     * @notice Turn an applicant down (only owner)
+     * @param _account The address to turn down
+     * @dev Nothing moves; the applicant never held anything. They are free to
+     * ask again.
+     */
+    function rejectMember(address _account) external onlyOwner whenNotPaused {
+        if (membership[_account] != Membership.Requested) {
+            revert NoPendingRequest();
+        }
+
+        membership[_account] = Membership.Rejected;
+
+        emit MembershipRejected(_account);
+    }
+
+    /**
+     * @notice Remove a member (only owner)
+     * @param _account The member to remove
+     * @dev Takes away what they may do next — depositing and borrowing — and
+     * nothing else. Their contribution is untouched and remains withdrawable in
+     * full; see `withdraw`. An outstanding loan also survives, and stays
+     * repayable, because `repayLoan` asks only who the borrower is.
+     */
+    function removeMember(address _account) external onlyOwner whenNotPaused {
+        if (membership[_account] != Membership.Active) revert NotAMember();
+
+        membership[_account] = Membership.Removed;
+        --memberCount;
+
+        emit MembershipRevoked(_account);
+    }
+
+    /**
+     * @notice Leave this pool
+     * @dev The member's own counterpart to `removeMember`, and with the same
+     * consequences: their balance stays withdrawable and any loan stays
+     * repayable. Leaving with money still in the pool is allowed on purpose —
+     * requiring a withdrawal first would trap anyone whose funds are currently
+     * lent out.
+     */
+    function leavePool() external whenNotPaused {
+        if (membership[msg.sender] != Membership.Active) revert NotAMember();
+
+        membership[msg.sender] = Membership.Left;
+        --memberCount;
+
+        emit MembershipLeft(msg.sender);
+    }
+
+    /**
+     * @dev The one place `Active` is written, so `memberCount` cannot drift
+     * from the mapping.
+     */
+    function _grantMembership(address _account) private {
+        membership[_account] = Membership.Active;
+        ++memberCount;
+    }
+
+    /**
      * @notice Ask to borrow, for the pool owner to decide on
      * @param _amount Loan amount requested
      * @return loanId The ID of the request
@@ -400,7 +636,9 @@ contract SampleLendingPool is
     ) external whenNotPaused nonReentrant returns (uint256) {
         if (!poolConfig.isActive) revert PoolNotActive();
 
-        if (contributions[msg.sender] == 0) revert UnauthorizedBorrower();
+        if (membership[msg.sender] != Membership.Active) {
+            revert UnauthorizedBorrower();
+        }
 
         if (activeLoanId[msg.sender] != 0) revert LoanOutstanding();
 
