@@ -100,6 +100,16 @@ Three consequences, all load-bearing:
   here the second write is the whole point. Idempotency comes instead from
   writing chain truth and reporting no work when the stored record already
   agrees — which is what keeps a re-scan free.
+- **The transaction it points at is chosen, not merged.** Merging preserves only
+  fields a write leaves out, and `transactionHash` and `blockNumber` are both in
+  the payload — so every event would otherwise take the reference with it, and a
+  settled loan would show its disbursement date beside a link to the repayment.
+  `datesTheLoan` holds them back unless the event either moves the loan's date
+  (`requestLoan`, `approveLoan`) or is **earlier** than what is stored while
+  carrying the same date. That second half matters because logs do not have to
+  arrive in order: a loan first seen at its repayment points there until the
+  creation log turns up, and then corrects itself. Found live; without it the
+  reference stuck to whichever transaction was indexed first, forever.
 - **The state is read from `getLoan`, never inferred from which log arrived.**
   A sweep sees the `LoanCreated` log on every pass forever, long after the loan
   was repaid; replaying it would resurrect a settled loan. Asking the chain makes
@@ -136,6 +146,8 @@ now — but three gaps remain:
 | `amountRepaid` grows   | `repayLoan` demands the **full** sum; it is 0 or everything        |
 | `interestAccrued`      | flat `amount × rate / 10000`, fixed at disbursement, never accrues |
 | `dueDate`, `DEFAULTED` | `startTime + duration` is stored; **nothing on chain enforces it** |
+
+`repaidAt` is no longer one of them — see [Borrowing history](#borrowing-history).
 
 `LoanStatus.APPROVED` never occurs either: approval disburses in the same
 transaction, so an approved loan is already `DISBURSED`.
@@ -241,6 +253,77 @@ requests are none of your business.
 taking everything as props, and loan records change without its props changing —
 without it a request lands and the card carries on saying nothing.
 
+## Borrowing history
+
+What a wallet has done with money it borrowed before, and the whole of what this
+project calls reputation. **There is no score**, on chain or off — see
+[`SPRINT_PLAN.md`](SPRINT_PLAN.md) Sprint 9 for why that is a decision rather
+than an omission.
+
+It is made of one fact that did not exist until it was added: **`repaidAt`**, a
+`uint64` on the `Loan` struct, written by `repayLoan` beside `isRepaid`. Before
+it, the contract recorded _whether_ a loan came back and never _when_, and
+neither did the index, so a borrower who settled on day 2 and one who settled on
+day 400 were the same record. `LoanRepaid` could not fill the gap either: it
+carries no timestamp, and a later reader cannot ask the chain for a log by loan
+id.
+
+Three things about the field are load-bearing:
+
+- **It is declared next to `status`, not appended.** It packs into the 10 bytes
+  left over in the struct's first slot, so the struct still spans five slots and
+  a pool that already holds loans reads them unchanged after the upgrade. A
+  contract test pins that by reading raw storage. Appending it would have
+  widened the stride and shifted every existing loan's `amount` out from under
+  its reader — which is why this was worth doing before anything is deployed to
+  a public chain.
+- **The backend reads it from `getLoan`, not from the `LoanRepaid` block.** Same
+  reasoning as every other field here: the sweep sees `LoanCreated` on every
+  pass, so a date taken from whichever log arrived would depend on which one
+  that was.
+- **Zero is an absence, not 1970.** It means "not repaid", and on a loan settled
+  before the field existed it means "repaid, date unknown". `isRepaid` stays the
+  authority on whether; this only answers when.
+
+`PoolStore.borrowerHistory(address)` counts it into a `BorrowerHistory`:
+borrowed, repaid, on time, late, undated, outstanding, overdue, and `isNew`.
+Derived on read from the loans, like liquidity and memberships — nothing about a
+borrower is stored, so nothing about a borrower can go stale.
+
+Three refusals in it are the substance, and each one is a way of being wrong
+that a score would hide:
+
+- **A wallet with no loans is new, not bad.** `isNew` exists so the UI can say
+  "first time" rather than showing a row of zeroes that reads as the worst
+  possible record. This is the one that quietly makes a lending product unusable
+  for the people it is for.
+- **A repayment with no date is neither on time nor late.** It is counted in
+  `repaid` and in `undated`, because the honest answer to when it landed is that
+  nobody knows.
+- **Requests and rejections are not history.** Neither is borrowing, and a
+  request that was turned down says something about the owner who turned it
+  down.
+
+`BorrowerHistoryPanel` shows it in two voices: `owner`, on every card in
+`pool/approvals.tsx` **above the buttons** — a record read after deciding is a
+record read too late — and `self`, on the dashboard, where it is the only place
+in the app that tells you what your borrowing looks like from the outside. The
+self view is hidden when you have never borrowed; the owner view is not, because
+"nothing to go on" is worth reading in a queue.
+
+Two limits worth knowing before trusting a figure:
+
+- **It is per chain.** Loan documents are keyed `${chainId}-${poolId}-${loanId}`
+  and the backend resolves one chain at a time, so a borrower's record on Amoy
+  and on localhost are different objects.
+- **It is bounded by the page size** the feeds are fetched with. A wallet with
+  more loans than that on one chain is summarised from part of its history.
+
+And one thing that is only a trap locally: **overdue is judged against
+`Date.now()`**, the device clock. That is right in production, where block
+timestamps track real time, and wrong on a local node whose clock has been
+pushed forward — which is exactly what producing a late repayment requires.
+
 ## Loans in the activity feed
 
 `PoolStore.loanActivity` puts loans in the same feed as contributions and
@@ -256,11 +339,10 @@ and dates itself; a loan is an entity with a single timestamp — one that
 - `rejected` and cancelled requests are left out. Nothing moved, the request is
   over, and `TransactionType` has no member that says so.
 
-**There is no repayment row, and that is a limitation rather than a choice.**
-`LoanRepaid` is not stored as its own record and the loan document keeps the
-_creating_ transaction's block, so a repayment has no date to be placed at;
-reusing `startedAt` would file it at the moment the money went the other way.
-Fixing it properly means the backend storing `repaidAt` when it sees the event.
+**There is still no repayment row, but it is no longer impossible.** `LoanRepaid`
+is not stored as its own record, and until `repaidAt` existed a repayment had no
+date to be placed at — reusing `startedAt` would have filed it at the moment the
+money went the other way. The date is there now; the row is simply not built.
 
 ### The sign depends on whose feed it is
 
@@ -340,6 +422,12 @@ Same environment as pool creation — see
 [`POOL_CREATION.md`](POOL_CREATION.md#running-it-locally). Borrowing needs a
 pool behind the beacon that you have contributed to; `pnpm --filter backend
 testSweep` reports loans alongside the other feeds.
+
+`pnpm --filter backend testHistory` drives four loans through the node — one
+repaid inside its term, one after it, one left running past its due date, one
+still waiting on the owner — and checks that the stored records can tell them
+apart. It **advances the node's clock by two hours**, which is the only way to
+be late without waiting, and is irreversible for the life of the node.
 
 To exercise the approval path you need a pool with the flag on. Open the pool as
 its owner and use **Pool settings → Review requests before lending**. From a

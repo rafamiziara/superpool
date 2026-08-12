@@ -18,8 +18,8 @@ To build a functional micro-lending decentralized application on Polygon where u
 | 6 · Loan Requests              | 🚧 Request flow complete; AI assessment not started |
 | 7 · Loan Repayments            | ✅ Complete for lump-sum repayment                  |
 | 8 · Withdrawals                | ✅ Complete                                         |
-| 9 · Reputations                | ❌ Not started                                      |
-| 10 · Loan Management           | 🚧 Decisions work; decision support not started     |
+| 9 · Reputations                | 🚧 History shipped; no score, deliberately          |
+| 10 · Loan Management           | 🚧 Decisions and borrower history; AI support not   |
 | 11 · Interest Distribution     | ✅ Complete                                         |
 | 12 · Notifications             | ❌ Not started                                      |
 
@@ -373,38 +373,76 @@ membership**, so a removed member can still take out everything they put in.
 
 **Sprint Goal:** Implement comprehensive reputation tracking system.
 
-### Current Status: **NOT STARTED** ❌
+### Current Status: **PARTIAL** 🚧
 
-Nothing in the repository references reputation in any form. Sprint 10's
-"borrower reputation information display" depends on this sprint, so the two
-have to be sequenced together or Sprint 10 stays permanently partial.
+Borrowing history is real and shown where decisions are made. **No score
+exists, and none is planned yet** — see [`docs/LOANS.md`](LOANS.md#borrowing-history).
+
+The finding that shaped the sprint: **"repaid on time" was not derivable
+anywhere** — the contract recorded whether a loan was repaid and never when, and
+neither did the index. A borrower who settled on day 2 and one who settled on
+day 400 were the same record, so any score built first would have been scoring a
+signal that was not there. The contract stamps `repaidAt` now, live-verified.
 
 ### Features:
 
-- **Reputation Scoring System**
-  - On-chain reputation score updates
-  - Repayment history impact on reputation
-  - Default and liquidation reputation penalties
-  - Reputation recovery mechanisms
+- **Reputation Scoring System** 🚧
+  - **On-chain reputation score updates — ❌ and recommended against.** A score
+    is an analytics artefact: the formula will be wrong the first time and want
+    retuning, which off chain is a recomputation and on chain is a migration
+    plus gas on every loan event. What belongs on chain is what only the chain
+    can witness — a repayment's timing — and that is what was added.
+  - Repayment history impact on reputation ✅ — counted, not scored
+  - Default and liquidation reputation penalties — ❌; there is no liquidation
+    anywhere in the project and default handling is owned by no sprint
+  - Reputation recovery mechanisms — ❌, meaningless until there is a penalty
 
-- **Reputation Integration**
-  - Borrower reputation display in profiles
-  - Reputation-based loan eligibility
-  - Historical reputation tracking
-  - Reputation analytics and insights
+- **Reputation Integration** 🚧
+  - Borrower reputation display in profiles ✅ — the owner's queue and the
+    dashboard, via `BorrowerHistoryPanel`
+  - Reputation-based loan eligibility — ❌ deliberately. The enforcing half is
+    what makes reputation load-bearing, and it should not be built until the
+    figures have been watched against real behaviour.
+  - Historical reputation tracking ✅ — derived on read from the loans
+  - Reputation analytics and insights — ❌
 
-- **Backend Systems**
-  - Event listeners for reputation-affecting events
-  - Complex off-chain reputation profile management
-  - Reputation calculation algorithms
-  - Reputation data storage and retrieval
+- **Backend Systems** 🚧
+  - Event listeners for reputation-affecting events ✅ — the existing loan
+    indexer, which already sees every event that touches a loan
+  - Complex off-chain reputation profile management — ❌ **and not wanted.**
+    Nothing about a borrower is stored, for the same reason liquidity and
+    memberships are not: a figure written down is one that can disagree with
+    the chain.
+  - Reputation calculation algorithms — ❌, no score
+  - Reputation data storage and retrieval ✅ — `repaidAt` on the loan record
 
 ### Expected Deliverables:
 
-- Functional on-chain and off-chain reputation system
-- Reputation-based loan decision support
-- Borrower reputation profiles and history
-- Reputation impact on lending terms
+- Functional on-chain and off-chain reputation system 🚧 — facts, not a score
+- Reputation-based loan decision support ✅ — the counts an owner asks for
+- Borrower reputation profiles and history ✅
+- Reputation impact on lending terms — ❌, see eligibility above
+
+### Live verification
+
+26 checks against a Hardhat node and the Firestore emulator, re-runnable as
+`pnpm testHistory` from `packages/backend`. The pair that matters is a loan
+repaid inside its term and one repaid two hours into a one-minute term reading
+**differently** — before `repaidAt` those two records were identical, and the
+check failed for every input.
+
+It also found a defect the mocked suite could not: a loan first seen at its
+repayment kept pointing at the repayment forever, because every field the
+indexer's currency check compares already matched. The reference now moves to
+the earliest event carrying the loan's current date.
+
+### Not derivable, and worth knowing
+
+Reputation is **per chain**: loan documents are keyed `${chainId}-${poolId}-${loanId}`
+and the backend resolves one chain at a time, so a borrower's record on Amoy and
+on localhost are different objects. It is also bounded by the page size the
+feeds are fetched with — a wallet with more loans than that on one chain would
+be summarised from part of its history.
 
 ---
 
@@ -426,9 +464,10 @@ reputation is still waiting on those sprints.
     because each is a separate transaction from one wallet, and two in flight
     means two signature prompts racing for one nonce.
 
-- **Decision Support System — ❌ NOT STARTED**
+- **Decision Support System 🚧**
   - AI recommendation integration — blocked on Sprint 6
-  - Borrower reputation display — blocked on Sprint 9
+  - Borrower reputation display ✅ — `BorrowerHistoryPanel` on every card in
+    the queue, above the buttons rather than below them
   - Risk assessment summary — blocked on Sprint 6
   - Historical decision tracking and analytics — not started
 

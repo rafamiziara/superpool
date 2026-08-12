@@ -98,7 +98,10 @@ of this** — it covers the three indexing paths and the chain-shaped traps that
 the mocked tests do not catch. For anything touching loans, read
 [`docs/LOANS.md`](../../docs/LOANS.md) too: a loan is not an event like a
 contribution, its state is re-read from `getLoan` rather than inferred from which
-log arrived, and `isRepaid` means nothing until `status` is `disbursed`.
+log arrived, and `isRepaid` means nothing until `status` is `disbursed`. That
+document also covers borrowing history — counts rather than a score, derived on
+read by `PoolStore.borrowerHistory` and shown by `BorrowerHistoryPanel`, where a
+wallet with no loans reads as **new** and never as bad.
 
 ## UI
 

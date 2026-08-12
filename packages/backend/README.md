@@ -174,6 +174,10 @@ Required for local development and Firebase Admin SDK:
 - A repaid or rejected loan stays in the list as history; `startedAt` is an
   **ISO string**, and it is rewritten on approval, so it means "requested at"
   while pending and "disbursed at" afterwards
+- `repaidAt` is an ISO string too, and **absent** rather than null while the
+  loan is outstanding — and also on a loan settled before the contract recorded
+  a date. It is what borrowing history is derived from; see
+  [`docs/LOANS.md`](../../docs/LOANS.md#borrowing-history)
 - Requires authentication
 
 **`listPools`**

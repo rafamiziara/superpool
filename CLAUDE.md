@@ -511,6 +511,13 @@ owner admitted can borrow without having lent first. See
 pending request too, so anything that reads it without checking `status` first
 treats a request as an outstanding debt.
 
+Borrowing history — what this project has instead of a reputation score — is in
+the same document. `repaidAt` is the fact it is made of, and **zero means "no
+date", never 1970**: on a loan that is still running, and on one settled before
+the field existed. Two rules follow from it and are easy to get wrong: a
+repayment with no date is neither on time nor late, and a wallet with no loans
+is a **new** borrower rather than the worst kind. There is no score, deliberately.
+
 ## Interest
 
 For anything touching what a member has earned, read
