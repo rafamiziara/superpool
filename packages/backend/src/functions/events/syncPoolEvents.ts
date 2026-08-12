@@ -1,7 +1,7 @@
 import { FieldValue } from 'firebase-admin/firestore'
 import { logger } from 'firebase-functions/v2'
 import { onSchedule } from 'firebase-functions/v2/scheduler'
-import { ACTIVE_CHAIN_CONFIG, EVENT_SYNC_STATE_COLLECTION } from '../../constants'
+import { DEFAULT_CHAIN_ID, EVENT_SYNC_STATE_COLLECTION, getChainConfig, SUPPORTED_CHAINS } from '../../constants'
 import { firestore } from '../../services'
 import { sweepBlockRange, SweepCounts } from '../../services/eventSweeper'
 import { getProvider } from '../../utils/blockchain'
@@ -40,6 +40,8 @@ export interface SyncPoolEventsResult extends SweepCounts {
 }
 
 export interface SyncPoolEventsOptions {
+  /** Which chain to sweep. Defaults to `DEFAULT_CHAIN_ID`. */
+  chainId?: number
   /** Re-scan from this block instead of resuming from the stored sync state. */
   fromBlock?: number
 }
@@ -55,7 +57,11 @@ export interface SyncPoolEventsOptions {
  * loudly that anything older needs `START_BLOCK` to be reachable.
  */
 export function resolveInitialFromBlock(currentBlock: number, chainId: number): number {
-  const configured = parseInt(process.env.START_BLOCK || '0')
+  // The chain's own `START_BLOCK_<id>` first, then the single-chain
+  // `START_BLOCK`. Without the per-chain form, one chain's deployment block
+  // would be applied to every chain — which on a second chain means either
+  // sweeping from far too early or skipping its history entirely.
+  const configured = getChainConfig(chainId)?.startBlock ?? parseInt(process.env.START_BLOCK || '0')
 
   if (configured > 0) return configured
 
@@ -90,8 +96,14 @@ export function resolveInitialFromBlock(currentBlock: number, chainId: number): 
  *   simply does not advance past a range that failed.
  */
 export const syncPoolEventsHandler = async (options: SyncPoolEventsOptions = {}): Promise<SyncPoolEventsResult> => {
-  const chainId = ACTIVE_CHAIN_CONFIG.chainId
-  const factoryAddress = ACTIVE_CHAIN_CONFIG.poolFactoryAddress
+  const chainId = options.chainId ?? DEFAULT_CHAIN_ID
+  const chainConfig = getChainConfig(chainId)
+
+  if (!chainConfig) {
+    throw new Error(`Unsupported chain ID: ${chainId}`)
+  }
+
+  const factoryAddress = chainConfig.poolFactoryAddress
 
   if (!factoryAddress) {
     throw new Error(`PoolFactory address not configured for chain ${chainId}`)
@@ -206,6 +218,44 @@ export const syncPoolEventsHandler = async (options: SyncPoolEventsOptions = {})
 }
 
 /**
+ * Sweep every chain this backend serves, one after another.
+ *
+ * Sequential rather than concurrent on purpose: the per-range budget exists to
+ * keep one chain's backfill inside the function timeout, and running several
+ * chains in parallel would multiply the RPC pressure while making that budget
+ * meaningless.
+ *
+ * **One chain's failure must not stop the others.** An unreachable RPC is the
+ * ordinary case on a public testnet, and letting it abort the run would mean a
+ * flaky Amoy endpoint silently stopping localhost indexing too. Each chain is
+ * caught on its own and reported in the results.
+ */
+export const syncAllChainsHandler = async (): Promise<SyncPoolEventsResult[]> => {
+  const results: SyncPoolEventsResult[] = []
+
+  for (const chain of SUPPORTED_CHAINS) {
+    // A chain configured without a factory address cannot be swept, and saying
+    // so once per run beats an exception per run.
+    if (!chain.poolFactoryAddress) {
+      logger.warn('Skipping chain with no PoolFactory address configured', { chainId: chain.chainId, name: chain.name })
+      continue
+    }
+
+    try {
+      results.push(await syncPoolEventsHandler({ chainId: chain.chainId }))
+    } catch (error) {
+      logger.error('Event sync failed for chain; continuing with the rest', {
+        chainId: chain.chainId,
+        name: chain.name,
+        error: error instanceof Error ? error.message : String(error),
+      })
+    }
+  }
+
+  return results
+}
+
+/**
  * Scheduled Cloud Function that runs every 5 minutes.
  *
  * Wrapped rather than passed directly: `onSchedule` calls its handler with a
@@ -222,7 +272,7 @@ export const syncPoolEvents = onSchedule(
   },
   async (): Promise<void> => {
     try {
-      await syncPoolEventsHandler()
+      await syncAllChainsHandler()
     } catch (error) {
       // A scheduled run that throws is retried on its own cadence; there is
       // nothing to report back to, so failing loudly in the log is the whole job.

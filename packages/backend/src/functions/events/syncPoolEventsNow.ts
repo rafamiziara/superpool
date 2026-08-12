@@ -1,7 +1,7 @@
 import { SyncPoolEventsRequest, SyncPoolEventsResponse } from '@superpool/types'
 import { logger } from 'firebase-functions/v2'
 import { CallableRequest, HttpsError, onCall } from 'firebase-functions/v2/https'
-import { ACTIVE_CHAIN_CONFIG } from '../../constants'
+import { DEFAULT_CHAIN_ID, getChainConfig, SUPPORTED_CHAIN_IDS } from '../../constants'
 import { syncPoolEventsHandler } from './syncPoolEvents'
 
 export const syncPoolEventsNowHandler = async (request: CallableRequest<SyncPoolEventsRequest>): Promise<SyncPoolEventsResponse> => {
@@ -18,20 +18,23 @@ export const syncPoolEventsNowHandler = async (request: CallableRequest<SyncPool
 
   const { chainId: requestedChainId, fromBlock } = request.data ?? {}
 
-  // Only the active chain is configured; a request for another one would
-  // silently sweep the wrong chain if it were ignored.
-  if (requestedChainId !== undefined && requestedChainId !== ACTIVE_CHAIN_CONFIG.chainId) {
-    throw new HttpsError('invalid-argument', `Unsupported chain ID: ${requestedChainId}`)
+  const chainId = requestedChainId ?? DEFAULT_CHAIN_ID
+
+  // Refused rather than defaulted: a caller that names a chain this backend
+  // does not serve must not have its request quietly answered about a different
+  // one, which is what sweeping the default would be.
+  if (!getChainConfig(chainId)) {
+    throw new HttpsError('invalid-argument', `Unsupported chain ID: ${chainId}. Configured: ${SUPPORTED_CHAIN_IDS.join(', ')}`)
   }
 
   if (fromBlock !== undefined && (!Number.isInteger(fromBlock) || fromBlock < 0)) {
     throw new HttpsError('invalid-argument', 'fromBlock must be a non-negative integer')
   }
 
-  logger.info('Manual event sync requested', { chainId: ACTIVE_CHAIN_CONFIG.chainId, fromBlock })
+  logger.info('Manual event sync requested', { chainId, fromBlock })
 
   try {
-    return await syncPoolEventsHandler({ fromBlock })
+    return await syncPoolEventsHandler({ chainId, fromBlock })
   } catch (error) {
     if (error instanceof HttpsError) throw error
 

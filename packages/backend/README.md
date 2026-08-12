@@ -60,10 +60,43 @@ cp .env.template .env
 Then update values in `.env`:
 
 - **APP_ID_FIREBASE**: Your Firebase app ID
-- **CHAIN_ID/RPC_URL/POOL_FACTORY_ADDRESS**: Blockchain configuration (localhost or Polygon Amoy)
-- **BACKEND_WALLET_PRIVATE_KEY**: Wallet for automated whitelisting (funded with gas)
+- **POOL*FACTORY_ADDRESS*&lt;chainId&gt; / RPC*URL*&lt;chainId&gt;**: one pair per chain
+- **BACKEND_WALLET_PRIVATE_KEY**: Wallet for automated whitelisting (funded with
+  gas on **every** configured chain — it is one key for all of them)
 
 See `.env.template` for detailed configuration examples.
+
+### Chains
+
+The backend serves **every chain configured**, not one at a time. That was not
+always true: `getChainConfig` used to match a single `ACTIVE_CHAIN_CONFIG`, so
+localhost and Amoy could not both be served and the mobile app's network picker
+was presentational — a user who switched networks got `Unsupported chain ID`
+from every callable.
+
+```bash
+POOL_FACTORY_ADDRESS_31337=0x…      # localhost
+RPC_URL_31337=http://127.0.0.1:8545
+
+POOL_FACTORY_ADDRESS_80002=0x…      # Polygon Amoy, served at the same time
+RPC_URL_80002=https://rpc-amoy.polygon.technology/
+START_BLOCK_80002=9000000           # the factory's deployment block
+```
+
+Three things worth knowing:
+
+- **The factory address is what makes a chain servable.** An RPC URL alone is
+  ignored rather than half-configured.
+- **The legacy `CHAIN_ID` / `RPC_URL` / `POOL_FACTORY_ADDRESS` triple still
+  works** and configures one chain, because `pnpm deploy:local` prints those
+  lines to paste after every redeploy. The suffixed form wins for the same id.
+- **`START_BLOCK` is per chain.** One chain's deployment block applied to
+  another means sweeping from far too early, or skipping its history entirely.
+
+The scheduled sweep walks every configured chain in turn, each with its own
+cursor in `event_sync_state`. One chain failing does not stop the rest — an
+unreachable public RPC is ordinary, and it must not silently stop localhost
+indexing too.
 
 ### Service Account Key
 

@@ -545,6 +545,34 @@ than chosen between: claiming moves an amount from one to the other. Claims are
 indexed; accrual is not an event at all and has to be read from the chain per
 pool per wallet.
 
+## Chains
+
+The backend serves **every chain configured**, not one at a time. Configuration
+is per chain, keyed by chain id in the variable name
+(`POOL_FACTORY_ADDRESS_80002`, `RPC_URL_80002`, `START_BLOCK_80002`); the
+factory address is what makes a chain servable. The legacy single-chain
+`CHAIN_ID` / `RPC_URL` / `POOL_FACTORY_ADDRESS` triple still configures one
+chain, because `pnpm deploy:local` prints those lines to paste after every
+redeploy — the suffixed form wins for the same id.
+
+This was `getChainConfig` matching a single `ACTIVE_CHAIN_CONFIG` until
+2026-08-12, which is why the app's network picker was presentational: switching
+networks made every callable answer `Unsupported chain ID`.
+
+Two consequences worth holding on to:
+
+- **Every feed is per chain, by construction.** Documents are keyed
+  `${chainId}-…`, `listPools` and friends filter on it, and the sweep keeps a
+  cursor per chain in `event_sync_state`. So a wallet on Amoy sees Amoy's pools
+  and nothing else — including in Discover. A cross-chain view would be a
+  deliberate feature, not a filter that was forgotten.
+- **The sweep walks the chains in turn and one failure does not stop the rest.**
+  An unreachable public RPC is ordinary and must not silently stop localhost
+  indexing too.
+
+`ACTIVE_CHAIN_CONFIG` still exists for callers that have not moved; anything
+reading it is by definition unable to serve a second chain.
+
 ## Notifications
 
 Push goes through **Expo's push service**, not FCM: `firebase/messaging` in the

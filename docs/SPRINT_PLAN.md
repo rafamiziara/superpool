@@ -150,9 +150,14 @@ See [`POOL_CREATION.md`](POOL_CREATION.md) for how the shipped system works.
 
 ### Current Status: **Feature complete locally; blocked on testnet deployment** 🚧
 
-Two things gate the rest: no funded Amoy deployer or backend wallet, and the
-backend resolving exactly one chain at a time (`getChainConfig` matches only the
-configured chain), which makes the app's multi-chain support presentational.
+One thing gates the rest now: **no funded Amoy deployer or backend wallet.**
+
+The other half of the blocker was code and is fixed — the backend resolved
+exactly one chain at a time, so localhost and Amoy could not both be served and
+the app's network picker was presentational. It now serves every chain
+configured; see the Chains section in [`CLAUDE.md`](../CLAUDE.md). What remains
+is a chequebook, a `hardhat.config.ts` network entry and the per-network
+deployment checklist.
 
 ---
 
@@ -627,10 +632,16 @@ SDK 53.
 ## 📋 Cross-cutting, owned by no sprint
 
 - **Deployment to a public chain.** Sprint 3 names it as blocked but nothing
-  owns fixing it. `getChainConfig` matches only `ACTIVE_CHAIN_CONFIG`, so the
-  backend resolves exactly one chain at a time and the app's multi-chain support
-  is presentational. Amoy also needs a funded deployer and backend wallet. Until
-  this moves, nothing in the project is publicly inspectable.
+  owns fixing it. The backend half is done — it serves every configured chain
+  now — so what is left is a funded deployer and backend wallet, an Amoy entry
+  in `hardhat.config.ts`, and the per-network checklist in
+  [`.dev/contracts-v2/MULTI_CHAIN_IMPLEMENTATION_PLAN.md`](../.dev/contracts-v2/MULTI_CHAIN_IMPLEMENTATION_PLAN.md)
+  §2.2. Until this moves, nothing in the project is publicly inspectable.
+- **Nothing in the app says which chain a pool is on.** Now that the backend can
+  serve several, this is the gap it exposes: pool cards carry no network badge,
+  and joining a pool on another network fails at the wallet rather than being
+  explained. The old multi-chain plan's §3.2 and §4.1 are still the right
+  sketch for it.
 - **Default handling.** A loan's term is recorded and displayed, and nothing on
   chain enforces it — no liquidation, no penalty, no default state. Listed in
   [`ROADMAP.md`](ROADMAP.md) Phase 3, absent from every sprint.

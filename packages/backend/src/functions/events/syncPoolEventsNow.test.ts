@@ -9,7 +9,8 @@ const { syncPoolEventsHandler } = require('./syncPoolEvents')
 // Constants
 // ---------------------------------------------------------------------------
 
-const CHAIN_ID = 31337 // default from ACTIVE_CHAIN_CONFIG
+const CHAIN_ID = 31337 // the default chain, and the only one configured here
+const SUPPORTED_CHAIN_ID = CHAIN_ID
 const AUTH = { uid: '0x9965507D1a55bcC2695C58ba16FB37d819B0A4dc' }
 
 const SWEEP_RESULT = {
@@ -86,7 +87,7 @@ describe('syncPoolEventsNowHandler', () => {
       await syncPoolEventsNowHandler(buildRequest())
 
       // Assert
-      expect(syncPoolEventsHandler).toHaveBeenCalledWith({ fromBlock: undefined })
+      expect(syncPoolEventsHandler).toHaveBeenCalledWith({ chainId: SUPPORTED_CHAIN_ID, fromBlock: undefined })
     })
 
     it('should pass an explicit fromBlock through', async () => {
@@ -94,7 +95,7 @@ describe('syncPoolEventsNowHandler', () => {
       await syncPoolEventsNowHandler(buildRequest({ fromBlock: 0 }))
 
       // Assert
-      expect(syncPoolEventsHandler).toHaveBeenCalledWith({ fromBlock: 0 })
+      expect(syncPoolEventsHandler).toHaveBeenCalledWith({ chainId: SUPPORTED_CHAIN_ID, fromBlock: 0 })
     })
 
     it('should accept the active chain id', async () => {

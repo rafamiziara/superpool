@@ -1,7 +1,10 @@
-// `ACTIVE_CHAIN_CONFIG` reads the environment once, at module load, and the
-// handler refuses to run without a factory address — so this must be set before
-// the first require below.
+// The chain registry reads the environment once, at module load, and the
+// handler refuses to run without a factory address — so these must be set
+// before the first require below. Two chains, because sweeping more than one is
+// the behaviour that matters most here.
 process.env.POOL_FACTORY_ADDRESS = '0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512'
+process.env.POOL_FACTORY_ADDRESS_80002 = '0x0Aa731eD9C24B6f8E3d15C97a40Fb2D6E8391B55'
+process.env.RPC_URL_80002 = 'https://rpc-amoy.example/'
 
 import { mockLogger } from '../../__tests__/setup'
 
@@ -9,7 +12,7 @@ jest.mock('../../utils/blockchain')
 jest.mock('../../services')
 jest.mock('../../services/eventSweeper')
 
-const { syncPoolEventsHandler, resolveInitialFromBlock } = require('./syncPoolEvents')
+const { syncPoolEventsHandler, syncAllChainsHandler, resolveInitialFromBlock } = require('./syncPoolEvents')
 const { getProvider } = require('../../utils/blockchain')
 const { sweepBlockRange } = require('../../services/eventSweeper')
 const { firestore } = require('../../services')
@@ -18,7 +21,9 @@ const { firestore } = require('../../services')
 // Constants
 // ---------------------------------------------------------------------------
 
-const CHAIN_ID = 31337 // default from ACTIVE_CHAIN_CONFIG
+const CHAIN_ID = 31337 // DEFAULT_CHAIN_ID
+const SECOND_CHAIN_ID = 80002
+const SECOND_FACTORY_ADDRESS = '0x0Aa731eD9C24B6f8E3d15C97a40Fb2D6E8391B55'
 const FACTORY_ADDRESS = '0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512'
 const CURRENT_BLOCK = 5000
 const LAST_PROCESSED_BLOCK = 4900
@@ -51,9 +56,11 @@ function setupFirestore(options: FirestoreOptions = {}) {
     set: setError ? jest.fn().mockRejectedValue(setError) : jest.fn().mockResolvedValue(undefined),
   }
 
-  firestore.collection.mockReturnValue({ doc: jest.fn().mockReturnValue(syncStateRef) })
+  const doc = jest.fn().mockReturnValue(syncStateRef)
 
-  return { syncStateRef }
+  firestore.collection.mockReturnValue({ doc })
+
+  return { syncStateRef, doc }
 }
 
 /** The ranges `sweepBlockRange` was asked for, in order. */
@@ -389,5 +396,74 @@ describe('syncPoolEventsHandler', () => {
 
     // Assert
     expect(sweepBlockRange).toHaveBeenCalledWith(expect.objectContaining({ chainId: CHAIN_ID, factoryAddress: FACTORY_ADDRESS }))
+  })
+
+  // -------------------------------------------------------------------------
+  // More than one chain.
+  //
+  // The backend used to sweep exactly one: `getChainConfig` matched only the
+  // configured chain, so localhost and Amoy could not be served at once and the
+  // app's network picker was presentational.
+  // -------------------------------------------------------------------------
+
+  describe('a named chain', () => {
+    it('is swept instead of the default', async () => {
+      setupFirestore()
+
+      await syncPoolEventsHandler({ chainId: SECOND_CHAIN_ID })
+
+      expect(sweepBlockRange).toHaveBeenCalledWith(
+        expect.objectContaining({ chainId: SECOND_CHAIN_ID, factoryAddress: SECOND_FACTORY_ADDRESS })
+      )
+    })
+
+    it('keeps its own cursor', async () => {
+      // The sync state is keyed by chain id, so two chains cannot advance each
+      // other's position — one lagging chain would otherwise skip the other's
+      // history wholesale.
+      const { doc } = setupFirestore()
+
+      await syncPoolEventsHandler({ chainId: SECOND_CHAIN_ID })
+
+      expect(firestore.collection).toHaveBeenCalledWith('event_sync_state')
+      expect(doc).toHaveBeenCalledWith(String(SECOND_CHAIN_ID))
+    })
+
+    it('is refused when this backend does not serve it', async () => {
+      setupFirestore()
+
+      await expect(syncPoolEventsHandler({ chainId: 999 })).rejects.toThrow('Unsupported chain ID: 999')
+      expect(sweepBlockRange).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('syncAllChainsHandler', () => {
+    it('sweeps every configured chain', async () => {
+      setupFirestore()
+
+      const results = await syncAllChainsHandler()
+
+      expect(results.map((result: { chainId: number }) => result.chainId).sort()).toEqual([SECOND_CHAIN_ID, CHAIN_ID].sort())
+    })
+
+    // An unreachable RPC is the ordinary case on a public testnet. Letting it
+    // abort the run would mean a flaky Amoy endpoint silently stopping
+    // localhost indexing too.
+    it('carries on after one chain fails', async () => {
+      setupFirestore()
+      getProvider.mockImplementation((chainId: number) => {
+        if (chainId === SECOND_CHAIN_ID) throw new Error('amoy unreachable')
+
+        return buildMockProvider()
+      })
+
+      const results = await syncAllChainsHandler()
+
+      expect(results.map((result: { chainId: number }) => result.chainId)).toEqual([CHAIN_ID])
+      expect(mockLogger.error).toHaveBeenCalledWith(
+        'Event sync failed for chain; continuing with the rest',
+        expect.objectContaining({ chainId: SECOND_CHAIN_ID })
+      )
+    })
   })
 })
