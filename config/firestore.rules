@@ -95,6 +95,22 @@ service cloud.firestore {
       allow write: if false; // backend-only (loan indexer)
     }
 
+    // --- memberships -------------------------------------------------------
+    // Pool memberships indexed from the on-chain register. Mutable like loans —
+    // one document per pool and address, rewritten by every decision — and
+    // written only by the indexer.
+    //
+    // Note this is the membership *register*, not a private list: the events it
+    // mirrors are public on chain, so a permissioned pool's roster is
+    // discoverable there regardless. Gating on authentication and capping
+    // queries is therefore the same trade the other feeds make, not weaker.
+
+    match /memberships/{membershipId} {
+      allow get: if isSignedIn();
+      allow list: if isSignedIn() && request.query.limit <= 100; // mirrors listMembers' own cap
+      allow write: if false; // backend-only (membership indexer)
+    }
+
     // --- auth_nonces -------------------------------------------------------
     // Single-use login challenges. Readable nonces would let an attacker who
     // has any authenticated session harvest challenges for other wallets, and

@@ -164,7 +164,7 @@ describe('sweepBlockRange', () => {
       const counts = await sweep(provider)
 
       // Assert
-      expect(counts).toEqual({ pools: 2, contributions: 1, withdrawals: 3, loans: 0, statusUpdates: 0 })
+      expect(counts).toEqual({ pools: 2, contributions: 1, withdrawals: 3, loans: 0, memberships: 0, statusUpdates: 0 })
     })
 
     it('should return zeroes when the range holds no events', async () => {
@@ -175,7 +175,7 @@ describe('sweepBlockRange', () => {
       const counts = await sweep(provider)
 
       // Assert
-      expect(counts).toEqual({ pools: 0, contributions: 0, withdrawals: 0, loans: 0, statusUpdates: 0 })
+      expect(counts).toEqual({ pools: 0, contributions: 0, withdrawals: 0, loans: 0, memberships: 0, statusUpdates: 0 })
       expect(indexPoolEvent).not.toHaveBeenCalled()
     })
 
@@ -192,7 +192,7 @@ describe('sweepBlockRange', () => {
       const counts = await sweep(provider)
 
       // Assert
-      expect(counts).toEqual({ pools: 0, contributions: 0, withdrawals: 0, loans: 0, statusUpdates: 0 })
+      expect(counts).toEqual({ pools: 0, contributions: 0, withdrawals: 0, loans: 0, memberships: 0, statusUpdates: 0 })
       expect(indexPoolEvent).toHaveBeenCalledTimes(1)
     })
   })
@@ -285,7 +285,7 @@ describe('sweepBlockRange', () => {
 
       // Assert
       expect(getIndexer()).not.toHaveBeenCalled()
-      expect(counts).toEqual({ pools: 0, contributions: 0, withdrawals: 0, loans: 0, statusUpdates: 0 })
+      expect(counts).toEqual({ pools: 0, contributions: 0, withdrawals: 0, loans: 0, memberships: 0, statusUpdates: 0 })
     })
 
     it('should skip foreign logs silently rather than as errors', async () => {

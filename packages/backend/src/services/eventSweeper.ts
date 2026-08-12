@@ -5,6 +5,7 @@ import { PoolFactoryABI, SampleLendingPoolABI } from '../constants'
 import { indexContributionEvent, parseFundsDepositedLog, resolvePoolId } from './contributionIndexer'
 import { fetchPoolActive, fetchPoolDescription, indexPoolEvent, parsePoolCreatedLog, updatePoolActive } from './eventIndexer'
 import { indexLoanFromLog, LOAN_TOPICS } from './loanIndexer'
+import { indexMembershipFromLog, MEMBERSHIP_TOPICS } from './membershipIndexer'
 import { indexWithdrawalEvent, parseFundsWithdrawnLog } from './withdrawalIndexer'
 
 const poolFactoryInterface = new Interface([...PoolFactoryABI])
@@ -26,6 +27,8 @@ export interface SweepCounts {
   withdrawals: number
   /** Loans written — created or settled. A loan already current is not counted. */
   loans: number
+  /** Memberships written. One already matching the chain is not counted. */
+  memberships: number
   /** Pools whose stored `isActive` disagreed with the chain and was corrected. */
   statusUpdates: number
 }
@@ -270,10 +273,47 @@ async function sweepLoans(options: SweepBlockRangeOptions): Promise<number> {
 }
 
 /**
+ * Index every membership touched in the range.
+ *
+ * All six membership events take one topic-OR query and the same path, for the
+ * reason loans do: `indexMembershipFromLog` re-reads `membership(address)`
+ * rather than inferring standing from which log arrived, so an approval swept
+ * before its request still lands on the right answer.
+ *
+ * `MemberJoined` is in the set, which means a deposit into an open pool is
+ * swept twice — once here and once as a contribution. That is deliberate: they
+ * are different records answering different questions, and both are idempotent.
+ */
+async function sweepMemberships(options: SweepBlockRangeOptions): Promise<number> {
+  const { provider, firestore, chainId, factoryAddress, fromBlock, toBlock } = options
+
+  const logs = await queryLogs(provider, [...MEMBERSHIP_TOPICS], fromBlock, toBlock)
+
+  let stored = 0
+
+  for (const log of logs) {
+    try {
+      const indexed = await indexMembershipFromLog(log, chainId, factoryAddress, provider, firestore)
+
+      if (indexed?.result.stored) stored++
+    } catch (error) {
+      logger.error('Failed to sweep membership log', {
+        chainId,
+        blockNumber: log.blockNumber,
+        transactionHash: log.transactionHash,
+        error: error instanceof Error ? error.message : String(error),
+      })
+    }
+  }
+
+  return stored
+}
+
+/**
  * Index every SuperPool event in one block range.
  *
  * The feeds are swept in dependency order — pools, then their status, then
- * deposits, withdrawals and loans — so that a pool created and funded within the same
+ * memberships, deposits, withdrawals and loans — so that a pool created and funded within the same
  * range is already in Firestore by the time its deposits land, and a pool
  * created and deactivated in one range gets its flag corrected rather than
  * being listed as active. Nothing enforces that order downstream, but a reader
@@ -289,9 +329,12 @@ export async function sweepBlockRange(options: SweepBlockRangeOptions): Promise<
 
   const pools = await sweepPoolCreated(options, caches)
   const statusUpdates = await sweepPoolStatus(options)
+  // Before deposits, so a pool's members exist by the time its contributions
+  // land — the same dependency ordering pools get ahead of everything.
+  const memberships = await sweepMemberships(options)
   const contributions = await sweepFundsDeposited(options, caches)
   const withdrawals = await sweepFundsWithdrawn(options, caches)
   const loans = await sweepLoans(options)
 
-  return { pools, contributions, withdrawals, loans, statusUpdates }
+  return { pools, contributions, withdrawals, loans, memberships, statusUpdates }
 }

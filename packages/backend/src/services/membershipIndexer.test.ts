@@ -1,0 +1,299 @@
+import { Interface } from 'ethers'
+import { SampleLendingPoolABI } from '../constants'
+
+const mockMembership = jest.fn()
+const mockGetPoolId = jest.fn()
+
+// Mock ethers BEFORE importing the module: it builds a top-level Interface and
+// reads six topic hashes from it at load time.
+jest.mock('ethers', () => {
+  const actual = jest.requireActual('ethers')
+  return {
+    ...actual,
+    Contract: jest.fn().mockImplementation(() => ({ membership: mockMembership, getPoolId: mockGetPoolId })),
+  }
+})
+
+const {
+  fetchMembership,
+  indexMembership,
+  indexMembershipFromLog,
+  indexMembershipsByTxHash,
+  membershipDocId,
+  parseAccountFromLog,
+  MEMBERSHIP_REQUESTED_TOPIC,
+  MEMBERSHIP_APPROVED_TOPIC,
+  MEMBER_JOINED_TOPIC,
+  MEMBERSHIP_TOPICS,
+} = require('./membershipIndexer')
+
+// ---------------------------------------------------------------------------
+// Constants
+// ---------------------------------------------------------------------------
+
+const CHAIN_ID = 31337
+const POOL_ID = 7
+const POOL_ADDRESS = '0x5FbDB2315678afecb367f032d93F642f64180aa3'
+const FACTORY_ADDRESS = '0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512'
+const ACCOUNT = '0x9965507D1a55bcC2695C58ba16FB37d819B0A4dc'
+const TX_HASH = `0x${'a'.repeat(64)}`
+const BLOCK_TIME = 1_700_000_000
+
+/** Real topic hashes, so the fixtures agree with the shipped ABI rather than with the test. */
+const REAL_REQUESTED_TOPIC = new Interface([...SampleLendingPoolABI]).getEvent('MembershipRequested')!.topicHash
+
+// The contract enum, by ordinal.
+const NONE = 0
+const REQUESTED = 1
+const ACTIVE = 2
+const REMOVED = 4
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+function buildLog(overrides: Partial<{ topic: string; account: string; address: string; blockNumber: number }> = {}) {
+  const { topic = MEMBERSHIP_REQUESTED_TOPIC, account = ACCOUNT, address = POOL_ADDRESS, blockNumber = 120 } = overrides
+
+  return {
+    address,
+    blockNumber,
+    transactionHash: TX_HASH,
+    index: 0,
+    // The only parameter is indexed, so `data` is empty and the address is topic 1.
+    data: '0x',
+    topics: [topic, `0x${'0'.repeat(24)}${account.slice(2)}`],
+  }
+}
+
+function buildFirestore(options: { exists?: boolean; storedStatus?: string } = {}) {
+  const { exists = false, storedStatus = 'active' } = options
+  const mockSet = jest.fn().mockResolvedValue(undefined)
+  const mockDocRef = {
+    get: jest.fn().mockResolvedValue({ exists, data: () => (exists ? { status: storedStatus } : null) }),
+    set: mockSet,
+  }
+  const mockDoc = jest.fn().mockReturnValue(mockDocRef)
+  const mockCollection = jest.fn().mockReturnValue({ doc: mockDoc })
+
+  return { mockFs: { collection: mockCollection }, mockDocRef, mockDoc, mockCollection }
+}
+
+function buildProvider(receipt: object | null = null) {
+  return {
+    getTransactionReceipt: jest.fn().mockResolvedValue(receipt),
+    getBlock: jest.fn().mockResolvedValue({ timestamp: BLOCK_TIME }),
+  }
+}
+
+const parsedMembership = {
+  poolId: POOL_ID,
+  poolAddress: POOL_ADDRESS,
+  account: ACCOUNT.toLowerCase(),
+  status: 'active' as const,
+  joinedAt: new Date(BLOCK_TIME * 1000),
+  chainId: CHAIN_ID,
+  transactionHash: TX_HASH,
+  blockNumber: 120,
+}
+
+beforeEach(() => {
+  mockMembership.mockResolvedValue(BigInt(ACTIVE))
+  mockGetPoolId.mockResolvedValue(BigInt(POOL_ID))
+})
+
+// ---------------------------------------------------------------------------
+// Tests
+// ---------------------------------------------------------------------------
+
+describe('topic hashes', () => {
+  it('should come from the shipped ABI', () => {
+    // A hand-written hash would make every routing test agree with itself.
+    expect(MEMBERSHIP_REQUESTED_TOPIC).toBe(REAL_REQUESTED_TOPIC)
+    expect(MEMBERSHIP_APPROVED_TOPIC).not.toBe(MEMBERSHIP_REQUESTED_TOPIC)
+  })
+
+  it('should cover all six membership events', () => {
+    // A missing topic is invisible: the sweep simply never sees that event, and
+    // the register silently stops tracking one kind of change.
+    expect(new Set(MEMBERSHIP_TOPICS).size).toBe(6)
+  })
+})
+
+describe('membershipDocId', () => {
+  it('should key on the pool as well as the address', () => {
+    // The same wallet belongs to several pools independently.
+    expect(membershipDocId(CHAIN_ID, 7, ACCOUNT)).toBe(`31337-7-${ACCOUNT.toLowerCase()}`)
+    expect(membershipDocId(CHAIN_ID, 8, ACCOUNT)).not.toBe(membershipDocId(CHAIN_ID, 7, ACCOUNT))
+  })
+
+  it('should lowercase the address however the caller cased it', () => {
+    expect(membershipDocId(CHAIN_ID, 7, ACCOUNT.toUpperCase().replace('0X', '0x'))).toBe(membershipDocId(CHAIN_ID, 7, ACCOUNT))
+  })
+})
+
+describe('parseAccountFromLog', () => {
+  it('should read the address out of topic 1', () => {
+    expect(parseAccountFromLog(buildLog())).toBe(ACCOUNT.toLowerCase())
+  })
+
+  it('should read it identically from every event', () => {
+    // All six declare one indexed address, which is what lets one path serve them.
+    expect(parseAccountFromLog(buildLog({ topic: MEMBER_JOINED_TOPIC }))).toBe(ACCOUNT.toLowerCase())
+  })
+})
+
+describe('fetchMembership', () => {
+  it('should return the chain state, not the log', async () => {
+    mockMembership.mockResolvedValue(BigInt(REQUESTED))
+
+    expect(await fetchMembership(ACCOUNT, POOL_ADDRESS, {})).toBe('requested')
+    expect(mockMembership).toHaveBeenCalledWith(ACCOUNT)
+  })
+
+  it('should read the enum zero as none', async () => {
+    // Unlike LoanStatus, zero here means what it says.
+    mockMembership.mockResolvedValue(BigInt(NONE))
+
+    expect(await fetchMembership(ACCOUNT, POOL_ADDRESS, {})).toBe('none')
+  })
+
+  it('should throw on an ordinal this build does not know', async () => {
+    // Reading it as `none` would quietly drop somebody out of their pool.
+    mockMembership.mockResolvedValue(99n)
+
+    await expect(fetchMembership(ACCOUNT, POOL_ADDRESS, {})).rejects.toThrow('Unknown Membership ordinal')
+  })
+})
+
+describe('indexMembership', () => {
+  it('should write a membership that has never been indexed', async () => {
+    const { mockFs, mockDocRef, mockDoc } = buildFirestore({ exists: false })
+
+    const result = await indexMembership(parsedMembership, mockFs)
+
+    expect(mockDoc).toHaveBeenCalledWith(`31337-7-${ACCOUNT.toLowerCase()}`)
+    expect(mockDocRef.set).toHaveBeenCalledWith(expect.objectContaining({ account: ACCOUNT.toLowerCase(), status: 'active' }), {
+      merge: true,
+    })
+    expect(result).toMatchObject({ alreadyIndexed: false, stored: true })
+  })
+
+  it('should stamp joinedAt when creating the record', async () => {
+    const { mockFs, mockDocRef } = buildFirestore({ exists: false })
+
+    await indexMembership(parsedMembership, mockFs)
+
+    expect(mockDocRef.set).toHaveBeenCalledWith(expect.objectContaining({ joinedAt: parsedMembership.joinedAt }), { merge: true })
+  })
+
+  it('should not restamp joinedAt when the standing changes', async () => {
+    // A removal must not read as if they joined the day they were thrown out.
+    const { mockFs, mockDocRef } = buildFirestore({ exists: true, storedStatus: 'active' })
+
+    await indexMembership({ ...parsedMembership, status: 'removed' }, mockFs)
+
+    expect(mockDocRef.set).toHaveBeenCalledWith(expect.not.objectContaining({ joinedAt: expect.anything() }), { merge: true })
+  })
+
+  it('should rewrite the record when the standing changed', async () => {
+    const { mockFs, mockDocRef } = buildFirestore({ exists: true, storedStatus: 'requested' })
+
+    const result = await indexMembership(parsedMembership, mockFs)
+
+    expect(mockDocRef.set).toHaveBeenCalled()
+    expect(result).toMatchObject({ alreadyIndexed: false, stored: true })
+  })
+
+  it('should do nothing when the stored record already matches the chain', async () => {
+    // What keeps a re-scan of settled history free.
+    const { mockFs, mockDocRef } = buildFirestore({ exists: true, storedStatus: 'active' })
+
+    const result = await indexMembership(parsedMembership, mockFs)
+
+    expect(mockDocRef.set).not.toHaveBeenCalled()
+    expect(result).toMatchObject({ alreadyIndexed: true, stored: false })
+  })
+})
+
+describe('indexMembershipFromLog', () => {
+  it('should resolve a log all the way to a stored record', async () => {
+    const { mockFs } = buildFirestore({ exists: false })
+
+    const indexed = await indexMembershipFromLog(buildLog(), CHAIN_ID, FACTORY_ADDRESS, buildProvider(), mockFs)
+
+    expect(indexed).not.toBeNull()
+    expect(indexed.membership).toMatchObject({ poolId: POOL_ID, account: ACCOUNT.toLowerCase(), status: 'active' })
+  })
+
+  it('should report the chain state rather than the event that arrived', async () => {
+    // A request swept after its approval must still read as active.
+    const { mockFs } = buildFirestore({ exists: false })
+    mockMembership.mockResolvedValue(BigInt(REMOVED))
+
+    const indexed = await indexMembershipFromLog(
+      buildLog({ topic: MEMBERSHIP_APPROVED_TOPIC }),
+      CHAIN_ID,
+      FACTORY_ADDRESS,
+      buildProvider(),
+      mockFs
+    )
+
+    expect(indexed.membership.status).toBe('removed')
+  })
+
+  it('should skip a contract the factory does not know', async () => {
+    // Anyone can emit an identically-shaped event; indexing one would put a
+    // stranger's pool in a user's list.
+    const { mockFs } = buildFirestore({ exists: false })
+    mockGetPoolId.mockResolvedValue(0n)
+
+    expect(await indexMembershipFromLog(buildLog(), CHAIN_ID, FACTORY_ADDRESS, buildProvider(), mockFs)).toBeNull()
+  })
+})
+
+describe('indexMembershipsByTxHash', () => {
+  it('should index every membership event in the transaction', async () => {
+    const { mockFs } = buildFirestore({ exists: false })
+    const receipt = { status: 1, logs: [buildLog(), buildLog({ topic: MEMBER_JOINED_TOPIC, account: FACTORY_ADDRESS })] }
+
+    const { members, results } = await indexMembershipsByTxHash(TX_HASH, CHAIN_ID, FACTORY_ADDRESS, buildProvider(receipt), mockFs)
+
+    expect(members).toHaveLength(2)
+    expect(results).toHaveLength(2)
+  })
+
+  it('should ignore logs that are not membership events', async () => {
+    const { mockFs } = buildFirestore({ exists: false })
+    const receipt = { status: 1, logs: [{ ...buildLog(), topics: [`0x${'f'.repeat(64)}`] }, buildLog()] }
+
+    const { members } = await indexMembershipsByTxHash(TX_HASH, CHAIN_ID, FACTORY_ADDRESS, buildProvider(receipt), mockFs)
+
+    expect(members).toHaveLength(1)
+  })
+
+  it('should reject a transaction with no membership event', async () => {
+    const { mockFs } = buildFirestore({ exists: false })
+    const receipt = { status: 1, logs: [] }
+
+    await expect(indexMembershipsByTxHash(TX_HASH, CHAIN_ID, FACTORY_ADDRESS, buildProvider(receipt), mockFs)).rejects.toThrow(
+      'No membership event found'
+    )
+  })
+
+  it('should reject a reverted transaction', async () => {
+    const { mockFs } = buildFirestore({ exists: false })
+
+    await expect(
+      indexMembershipsByTxHash(TX_HASH, CHAIN_ID, FACTORY_ADDRESS, buildProvider({ status: 0, logs: [buildLog()] }), mockFs)
+    ).rejects.toThrow('reverted')
+  })
+
+  it('should reject a missing receipt', async () => {
+    const { mockFs } = buildFirestore({ exists: false })
+
+    await expect(indexMembershipsByTxHash(TX_HASH, CHAIN_ID, FACTORY_ADDRESS, buildProvider(null), mockFs)).rejects.toThrow(
+      'receipt not found'
+    )
+  })
+})

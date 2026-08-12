@@ -51,3 +51,14 @@ export const LOANS_COLLECTION = 'loans'
  * event, and a position is deposits minus withdrawals, summed on read.
  */
 export const WITHDRAWALS_COLLECTION = 'withdrawals'
+
+/**
+ * The name of the Firestore collection used to store pool memberships.
+ *
+ * The loan shape rather than the contribution shape: one document per
+ * (pool, address), rewritten by every event that touches it, holding what
+ * `membership(address)` reports now. Keyed that way because an address's
+ * standing changes — requested, admitted, removed — while a contribution never
+ * does.
+ */
+export const MEMBERSHIPS_COLLECTION = 'memberships'

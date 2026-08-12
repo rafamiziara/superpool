@@ -293,6 +293,76 @@ export interface ListLoansResponse {
   limit: number
 }
 
+/**
+ * Where one address stands with one pool.
+ *
+ * Unlike a contribution this is not an event: the same record is rewritten by
+ * every decision that touches it, so its `status` is read back from the chain
+ * rather than inferred from which log arrived. Same shape of record as
+ * `LoanInfo`, and for the same reason.
+ *
+ * Note this answers only *membership*. Balances stay derived from contributions
+ * and withdrawals — the register says who belongs, never how much they hold.
+ */
+export interface MemberInfo {
+  /** `${chainId}-${poolId}-${address}` — the document id, and stable. */
+  id: string
+  poolId: number
+  poolAddress: string
+  /** Lowercased on write; compare case-insensitively. */
+  account: string
+  /**
+   * Where the address stands.
+   *
+   * `none` never reaches a stored record — an address nobody has heard of has
+   * no document — but it is the contract's zero value and so the wire form has
+   * to be able to carry it.
+   */
+  status: 'none' | 'requested' | 'active' | 'rejected' | 'removed' | 'left'
+  /**
+   * ISO 8601 — when the address first appeared in this pool's register, whether
+   * by asking to join or by funding an open pool. Not reset by later decisions,
+   * so a removed member keeps the date they joined.
+   */
+  joinedAt: string
+  chainId: number
+  /** The transaction that last changed this membership. */
+  transactionHash: string
+  blockNumber: number
+}
+
+export interface IndexMembershipRequest {
+  txHash: string
+  chainId?: number
+}
+
+export interface IndexMembershipResponse {
+  /** One entry per membership event in the transaction, in its post-transaction state. */
+  members: MemberInfo[]
+  /** How many records this call wrote or changed; the rest were already current. */
+  storedCount: number
+  alreadyIndexed: boolean
+}
+
+export interface ListMembersRequest {
+  chainId?: number
+  /** Restrict to one pool. Omit for every pool on the chain. */
+  poolId?: number
+  /** Restrict to one wallet. Matched case-insensitively. */
+  account?: string
+  /** Only addresses currently in the pool. */
+  activeOnly?: boolean
+  /** Only applicants still waiting on the pool owner. */
+  pendingOnly?: boolean
+  limit?: number
+}
+
+export interface ListMembersResponse {
+  members: MemberInfo[]
+  totalCount: number
+  limit: number
+}
+
 export interface SyncPoolEventsRequest {
   chainId?: number
   /**
@@ -317,6 +387,8 @@ export interface SyncPoolEventsResponse {
   withdrawals: number
   /** Loans created or settled — the record is re-read from the chain either way. */
   loans: number
+  /** Memberships written — asked, decided, or enrolled by a deposit. */
+  memberships: number
   /** Pools whose stored `isActive` disagreed with the chain and was corrected. */
   statusUpdates: number
 }
