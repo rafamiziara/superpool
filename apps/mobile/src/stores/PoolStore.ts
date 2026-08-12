@@ -4,12 +4,15 @@ import type {
   ListContributionsResponse,
   ListLoansRequest,
   ListLoansResponse,
+  ListMembersRequest,
+  ListMembersResponse,
   ListPoolsRequest,
   ListPoolsResponse,
   ListWithdrawalsRequest,
   ListWithdrawalsResponse,
   Loan,
   LoanInfo,
+  MemberInfo,
   PoolInfo,
   PoolMember,
   SyncPoolEventsRequest,
@@ -62,6 +65,29 @@ function isOutstanding(loan: LoanInfo): boolean {
 }
 
 /**
+ * The register's wire status, in the enum the UI reads.
+ *
+ * `none` is in the wire type because it is the contract's zero value, but no
+ * stored record carries it — an address nobody has heard of has no document.
+ * Should one arrive anyway, `LEFT` is the safe reading: it says "not in this
+ * pool" without claiming the owner did anything.
+ */
+function memberStatusFrom(status: MemberInfo['status']): MemberStatus {
+  switch (status) {
+    case 'requested':
+      return MemberStatus.PENDING
+    case 'active':
+      return MemberStatus.ACTIVE
+    case 'rejected':
+      return MemberStatus.REJECTED
+    case 'removed':
+      return MemberStatus.SUSPENDED
+    default:
+      return MemberStatus.LEFT
+  }
+}
+
+/**
  * Lending pool state.
  *
  * Pools, contributions and withdrawals come from the `listPools`,
@@ -78,6 +104,14 @@ export class PoolStore {
   withdrawals: WithdrawalInfo[] = []
   /** Indexed loans, newest first. Mock fixtures stand in only in mock mode. */
   loanRecords: LoanInfo[] = []
+  /**
+   * The on-chain membership register, indexed.
+   *
+   * Where `memberships` used to invent a status, this supplies it. Balances are
+   * still derived from contributions and withdrawals — the register says who
+   * belongs, never how much they hold.
+   */
+  memberRecords: MemberInfo[] = []
   transactions: Transaction[] = []
 
   /** Initial loads. Pull-to-refresh uses `isRefreshing` so the list is not torn down. */
@@ -178,6 +212,7 @@ export class PoolStore {
       this.contributions = []
       this.withdrawals = []
       this.loanRecords = []
+      this.memberRecords = []
       this.transactions = []
       this.isLoading = false
       this.isRefreshing = false
@@ -197,13 +232,20 @@ export class PoolStore {
       // Fetched together so pools and the positions in them are one snapshot:
       // a balance shown against a pool that is not in the list, or vice versa,
       // reads as a bug even though each half was individually correct.
-      const [pools, contributions, withdrawals, loans]: [PoolInfo[], ContributionInfo[], WithdrawalInfo[], LoanInfo[]] = usingMockPools()
-        ? [MOCK_POOLS, [], [], []]
+      const [pools, contributions, withdrawals, loans, members]: [
+        PoolInfo[],
+        ContributionInfo[],
+        WithdrawalInfo[],
+        LoanInfo[],
+        MemberInfo[],
+      ] = usingMockPools()
+        ? [MOCK_POOLS, [], [], [], []]
         : await Promise.all([
             this.requestPools(params),
             this.requestContributions(params),
             this.requestWithdrawals(params),
             this.requestLoans(params),
+            this.requestMembers(params),
           ])
 
       runInAction(() => {
@@ -211,6 +253,7 @@ export class PoolStore {
         this.contributions = contributions
         this.withdrawals = withdrawals
         this.loanRecords = loans
+        this.memberRecords = members
         this.lastFetchedAt = new Date()
         // Activity is derived from contributions when they are real — see
         // `contributionActivity`. The fixtures only stand in for mock mode.
@@ -296,6 +339,25 @@ export class PoolStore {
     return response.data.loans ?? []
   }
 
+  /**
+   * The whole register, not just the user's own standing.
+   *
+   * Not narrowed to `activeOnly`: the app has to tell "never asked" from "asked
+   * and turned down" — a rejected applicant sees a different screen from a
+   * stranger — and a pool owner's queue is exactly the rows that are not
+   * active.
+   */
+  private requestMembers = async (params: ListPoolsRequest): Promise<MemberInfo[]> => {
+    const listMembers = httpsCallable<ListMembersRequest, ListMembersResponse>(FIREBASE_FUNCTIONS, 'listMembers')
+
+    const response = await listMembers({
+      chainId: params.chainId ?? authStore.chainId ?? DEFAULT_CHAIN_ID,
+      limit: DEFAULT_PAGE_SIZE,
+    })
+
+    return response.data.members ?? []
+  }
+
   poolById = (poolId: number): PoolInfo | undefined => {
     return this.pools.find((pool) => pool.poolId === poolId)
   }
@@ -330,11 +392,20 @@ export class PoolStore {
   }
 
   /**
-   * Memberships, derived from contributions and withdrawals.
+   * Memberships: standing from the register, money from the events.
    *
-   * `SampleLendingPool` has no membership register — there is nothing on chain
-   * to join — so putting money into a pool is what makes someone a member of it.
-   * Deriving rather than storing means the two can never disagree.
+   * The split is the point. `SampleLendingPool` now has a register, so who
+   * belongs is a fact read from `membership(address)` rather than inferred from
+   * having deposited — which is what lets a private pool have members who have
+   * not funded it, and a removed member who still has a balance to withdraw.
+   * Balances stay summed from contributions and withdrawals, because those are
+   * events and nothing about them is stored twice.
+   *
+   * An address appears here if it is in *either* source. The register alone
+   * covers someone the owner admitted who has not deposited; the events alone
+   * cover a pool indexed before this shipped, or one whose membership log the
+   * sweep has not reached yet — and those default to `ACTIVE`, which is what
+   * depositing has always meant.
    *
    * `totalContributed` is lifetime deposits and only ever grows; `currentBalance`
    * is what is left after withdrawals. Keeping them apart is what lets a member
@@ -349,6 +420,21 @@ export class PoolStore {
 
     const byMember = new Map<string, PoolMember>()
 
+    // The register first, so every standing the chain knows about exists before
+    // the events add money to it. Balances start at zero: an admitted member
+    // who has not deposited holds nothing, which is exactly what the chain says.
+    for (const member of this.memberRecords) {
+      byMember.set(`${member.poolId}-${member.account.toLowerCase()}`, {
+        walletAddress: member.account,
+        poolId: String(member.poolId),
+        joinedAt: new Date(member.joinedAt),
+        totalContributed: 0n,
+        currentBalance: 0n,
+        isAdmin: sameAddress(this.poolById(member.poolId)?.poolOwner, member.account),
+        status: memberStatusFrom(member.status),
+      })
+    }
+
     for (const contribution of this.contributions) {
       const key = `${contribution.poolId}-${contribution.contributor.toLowerCase()}`
       const amount = BigInt(contribution.amount)
@@ -358,7 +444,9 @@ export class PoolStore {
       if (existing) {
         existing.totalContributed += amount
         existing.currentBalance += amount
-        // Membership dates from the first deposit, not the most recent one.
+        // Membership dates from the first deposit, not the most recent one —
+        // and from the register's own date when there is one, since being
+        // admitted precedes funding.
         if (contributedAt < existing.joinedAt) existing.joinedAt = contributedAt
         continue
       }
@@ -443,8 +531,24 @@ export class PoolStore {
     }, 0n)
   }
 
+  /**
+   * The connected wallet's live positions.
+   *
+   * A member who still holds a balance counts whatever the register says about
+   * them. Removal and leaving take away what you may do next, never what you
+   * already put in — `withdraw` is deliberately ungated on membership — so
+   * filtering on `ACTIVE` alone would hide money the user can still take out,
+   * which is the worst thing this getter could do.
+   *
+   * Conversely an `ACTIVE` member with nothing in counts too: they were admitted
+   * to a private pool and have yet to fund it, and a pool they belong to should
+   * not be missing from their own list.
+   */
   get activeMemberships(): PoolMember[] {
-    return this.memberships.filter((member) => member.status === MemberStatus.ACTIVE && sameAddress(member.walletAddress, this.userAddress))
+    return this.memberships.filter(
+      (member) =>
+        (member.status === MemberStatus.ACTIVE || member.currentBalance > 0n) && sameAddress(member.walletAddress, this.userAddress)
+    )
   }
 
   /**

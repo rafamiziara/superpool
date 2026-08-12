@@ -37,9 +37,17 @@ export interface PoolMember {
   status: MemberStatus
 }
 
+/**
+ * Where an address stands with a pool.
+ *
+ * Mirrors `SampleLendingPool.Membership`, whose `None` has no counterpart here:
+ * an address the register has never heard of has no record to carry a status.
+ * `SUSPENDED` is the wire name for the contract's `Removed`.
+ */
 export enum MemberStatus {
   PENDING = 'pending',
   ACTIVE = 'active',
+  REJECTED = 'rejected',
   SUSPENDED = 'suspended',
   LEFT = 'left',
 }

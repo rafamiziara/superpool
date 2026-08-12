@@ -104,6 +104,20 @@ const LIVE_CONTRIBUTION = {
   contributedAt: '2026-08-10T08:00:00.000Z',
 }
 
+/** One membership in `LIVE_POOL`, as `listMembers` returns it. */
+const LIVE_MEMBER = {
+  id: '31337-12-0x90f79bf6eb2c4f870365e785982e1f101e93b906',
+  poolId: 12,
+  poolAddress: LIVE_POOL.poolAddress,
+  // Lowercased, as the indexer stores it.
+  account: '0x90f79bf6eb2c4f870365e785982e1f101e93b906',
+  status: 'active' as const,
+  joinedAt: '2026-08-10T07:30:00.000Z',
+  chainId: 31337,
+  transactionHash: '0xcccc',
+  blockNumber: 100,
+}
+
 /** One withdrawal out of `LIVE_POOL`, as `listWithdrawals` returns it. */
 const LIVE_WITHDRAWAL = {
   id: '31337-0xcccc-0',
@@ -292,6 +306,7 @@ describe('PoolStore contributions', () => {
   let store: PoolStore
   let listContributionsCallable: jest.Mock
   let listWithdrawalsCallable: jest.Mock
+  let listMembersCallable: jest.Mock
 
   /** Seeds the backend with `contributions` (and optionally withdrawals) and loads. */
   async function loadWith(contributions: (typeof LIVE_CONTRIBUTION)[], withdrawals: (typeof LIVE_WITHDRAWAL)[] = []) {
@@ -317,9 +332,11 @@ describe('PoolStore contributions', () => {
     })
     listContributionsCallable = jest.fn().mockResolvedValue({ data: { contributions: [], totalCount: 0, limit: 50 } })
     listWithdrawalsCallable = jest.fn().mockResolvedValue({ data: { withdrawals: [], totalCount: 0, limit: 50 } })
+    listMembersCallable = jest.fn().mockResolvedValue({ data: { members: [], totalCount: 0, limit: 50 } })
     mockFirebaseCallable.mockImplementation((_functions?: unknown, name?: string) => {
       if (name === 'listContributions') return listContributionsCallable
       if (name === 'listWithdrawals') return listWithdrawalsCallable
+      if (name === 'listMembers') return listMembersCallable
       return listPoolsCallable
     })
   })
@@ -568,6 +585,91 @@ describe('PoolStore contributions', () => {
     expect(store.totalEarned).toBe(0n)
   })
 
+  // -------------------------------------------------------------------------
+  // The register supplies standing; the events supply money. Both halves have
+  // to survive the other being absent.
+  // -------------------------------------------------------------------------
+
+  it('takes a member’s standing from the register, not from having deposited', async () => {
+    listMembersCallable.mockResolvedValue({
+      data: { members: [{ ...LIVE_MEMBER, status: 'removed' }], totalCount: 1, limit: 50 },
+    })
+    await loadWith([LIVE_CONTRIBUTION])
+
+    expect(store.memberships).toHaveLength(1)
+    expect(store.memberships[0].status).toBe(MemberStatus.SUSPENDED)
+    // Removal takes away what you may do next, never what you already put in.
+    expect(store.memberships[0].currentBalance).toBe(parseEther('2'))
+  })
+
+  it('keeps a removed member’s balance on their own dashboard', async () => {
+    // Filtering positions on ACTIVE alone would hide money they can still
+    // withdraw, which is the worst thing that getter could do.
+    authStore.walletAddress = CONTRIBUTOR
+    listMembersCallable.mockResolvedValue({
+      data: { members: [{ ...LIVE_MEMBER, status: 'removed' }], totalCount: 1, limit: 50 },
+    })
+    await loadWith([LIVE_CONTRIBUTION])
+
+    expect(store.totalBalance).toBe(parseEther('2'))
+  })
+
+  it('lists a member the owner admitted who has not funded anything', async () => {
+    // Only reachable through the register: there is no contribution to derive
+    // this person from.
+    authStore.walletAddress = OTHER_WALLET
+    listMembersCallable.mockResolvedValue({
+      data: { members: [{ ...LIVE_MEMBER, account: OTHER_WALLET, status: 'active' }], totalCount: 1, limit: 50 },
+    })
+    await loadWith([])
+
+    expect(store.membershipFor(12)?.currentBalance).toBe(0n)
+    expect(store.membershipFor(12)?.status).toBe(MemberStatus.ACTIVE)
+  })
+
+  it('maps each register status to the app’s enum', async () => {
+    for (const [chain, expected] of [
+      ['requested', MemberStatus.PENDING],
+      ['active', MemberStatus.ACTIVE],
+      ['rejected', MemberStatus.REJECTED],
+      ['removed', MemberStatus.SUSPENDED],
+      ['left', MemberStatus.LEFT],
+    ] as const) {
+      listMembersCallable.mockResolvedValue({ data: { members: [{ ...LIVE_MEMBER, status: chain }], totalCount: 1, limit: 50 } })
+      await loadWith([])
+
+      expect(store.memberships[0].status).toBe(expected)
+    }
+  })
+
+  it('falls back to ACTIVE for a contributor the register has not reached', async () => {
+    // A pool indexed before the register shipped, or one whose membership log
+    // the sweep has not swept yet. Depositing has always meant membership.
+    await loadWith([LIVE_CONTRIBUTION])
+
+    expect(store.memberships[0].status).toBe(MemberStatus.ACTIVE)
+  })
+
+  it('matches the register to its contributions case-insensitively', async () => {
+    listMembersCallable.mockResolvedValue({
+      data: { members: [{ ...LIVE_MEMBER, account: LIVE_MEMBER.account.toUpperCase().replace('0X', '0x') }], totalCount: 1, limit: 50 },
+    })
+    await loadWith([LIVE_CONTRIBUTION])
+
+    // One member, not two: a case mismatch would double them.
+    expect(store.memberships).toHaveLength(1)
+    expect(store.memberships[0].currentBalance).toBe(parseEther('2'))
+  })
+
+  it('survives a response with no members field', async () => {
+    listMembersCallable.mockResolvedValue({ data: { totalCount: 0, limit: 50 } })
+
+    await store.fetchPools()
+
+    expect(store.memberRecords).toEqual([])
+    expect(store.hasError).toBe(false)
+  })
+
   it('survives a response with no contributions field', async () => {
     // `memberships` derives from this and runs during render, so a malformed
     // response must not take the screen down.
@@ -628,6 +730,7 @@ describe('PoolStore chain sync', () => {
       if (name === 'listContributions') return jest.fn().mockResolvedValue({ data: { contributions: [], totalCount: 0, limit: 50 } })
       if (name === 'listWithdrawals') return jest.fn().mockResolvedValue({ data: { withdrawals: [], totalCount: 0, limit: 50 } })
       if (name === 'listLoans') return jest.fn().mockResolvedValue({ data: { loans: [], totalCount: 0, limit: 50 } })
+      if (name === 'listMembers') return jest.fn().mockResolvedValue({ data: { members: [], totalCount: 0, limit: 50 } })
       return listPoolsCallable
     })
   })
