@@ -35,7 +35,13 @@ export type LoanTransactionType = 'BORROW' | 'REPAY' | 'REQUEST_LOAN' | 'APPROVE
  */
 export type MembershipTransactionType = 'REQUEST_MEMBERSHIP' | 'APPROVE_MEMBER' | 'REJECT_MEMBER' | 'REMOVE_MEMBER' | 'LEAVE_POOL'
 
-export type PendingTransactionType = 'CREATE_POOL' | 'CONTRIBUTE' | 'WITHDRAW' | LoanTransactionType | MembershipTransactionType
+export type PendingTransactionType =
+  | 'CREATE_POOL'
+  | 'CONTRIBUTE'
+  | 'WITHDRAW'
+  | 'CLAIM_INTEREST'
+  | LoanTransactionType
+  | MembershipTransactionType
 
 const LOAN_TRANSACTION_TYPES: readonly LoanTransactionType[] = [
   'BORROW',
@@ -100,6 +106,26 @@ export interface ContributeResult {
 /** Populated once the transaction is confirmed and its `FundsWithdrawn` log is decoded. */
 export interface WithdrawResult {
   /** Wei, as the chain recorded it — authoritative over the submitted params. */
+  amount: string
+}
+
+/**
+ * Claiming the interest a pool has credited you.
+ *
+ * No amount going in, unlike a contribution or a withdrawal: `claimInterest`
+ * takes no argument and pays out everything owed, so the figure is only known
+ * once the receipt is decoded.
+ */
+export interface ClaimInterestParams {
+  poolId: number
+  poolAddress: `0x${string}`
+  /** Denormalised so a pending card can name the pool before any pool is fetched. */
+  poolName: string
+}
+
+/** Populated once the transaction is confirmed and its `InterestClaimed` log is decoded. */
+export interface ClaimInterestResult {
+  /** Wei, as the chain recorded it — the only place the claimed amount exists. */
   amount: string
 }
 
@@ -190,6 +216,12 @@ export interface WithdrawTransaction extends PendingTransactionBase {
   result?: WithdrawResult
 }
 
+export interface ClaimInterestTransaction extends PendingTransactionBase {
+  type: 'CLAIM_INTEREST'
+  params: ClaimInterestParams
+  result?: ClaimInterestResult
+}
+
 /**
  * One loan action, kept generic in its `type` so the union still discriminates.
  *
@@ -245,6 +277,9 @@ export type LeavePoolTransaction = MembershipTransaction<'LEAVE_POOL'>
  * other way — but keeps its own `type`, since the extractor, the copy and
  * eventually the indexer all differ.
  *
+ * A claim carries no amount going in — `claimInterest` takes no argument and
+ * pays out everything owed — which is why it does not reuse `ContributeParams`.
+ *
  * The loan actions share `LoanParams` for the same reason and stay separate
  * types: they move money in different directions, are sent by different people
  * and read as different things to the user, even though all six resolve to one
@@ -257,6 +292,7 @@ export type PendingTransaction =
   | CreatePoolTransaction
   | ContributeTransaction
   | WithdrawTransaction
+  | ClaimInterestTransaction
   | LoanTransaction<LoanTransactionType>
   | MembershipTransaction<MembershipTransactionType>
 
@@ -359,6 +395,17 @@ function toContributeResult(value: JsonValue | undefined): ContributeResult | nu
   if (typeof amount !== 'string') return null
 
   return { amount }
+}
+
+function toClaimInterestParams(value: JsonValue | undefined): ClaimInterestParams | null {
+  if (!isJsonObject(value)) return null
+
+  const { poolId, poolAddress, poolName } = value
+
+  if (typeof poolId !== 'number' || typeof poolName !== 'string') return null
+  if (typeof poolAddress !== 'string' || !isHexString(poolAddress)) return null
+
+  return { poolId, poolAddress, poolName }
 }
 
 function toLoanParams(value: JsonValue | undefined): LoanParams | null {
@@ -472,6 +519,19 @@ function toPendingTransaction(value: JsonValue): PendingTransaction | null {
     return transaction
   }
 
+  if (type === 'CLAIM_INTEREST') {
+    const parsedParams = toClaimInterestParams(params)
+    if (!parsedParams) return null
+
+    const transaction: ClaimInterestTransaction = { ...base, type, params: parsedParams }
+
+    // Same shape as a contribution's: one amount, as the chain recorded it.
+    const parsedResult = toContributeResult(result)
+    if (parsedResult) transaction.result = parsedResult
+
+    return transaction
+  }
+
   // Every loan action revives the same way. Until this existed a borrow or a
   // repayment was dropped on restore, so an app killed after signing lost the
   // only record of it and startup recovery had nothing to resolve.
@@ -562,6 +622,23 @@ export function extractFundsWithdrawnResult(receipt: TransactionReceipt): Withdr
 }
 
 /**
+ * Reads the claimed amount out of a confirmed receipt's `InterestClaimed` log.
+ *
+ * The only place that figure exists: `claimInterest` takes no argument, so
+ * unlike a withdrawal there is no submitted amount to fall back on.
+ */
+export function extractInterestClaimedResult(receipt: TransactionReceipt): ClaimInterestResult | undefined {
+  try {
+    const [event] = parseEventLogs({ abi: SampleLendingPoolABI, eventName: 'InterestClaimed', logs: receipt.logs })
+    if (!event) return undefined
+
+    return { amount: event.args.amount.toString() }
+  } catch {
+    return undefined
+  }
+}
+
+/**
  * Reads the loan id and amount out of a confirmed receipt.
  *
  * One extractor for every loan action: all five events carry the same three
@@ -635,9 +712,10 @@ export function extractMembershipResult(receipt: TransactionReceipt): Membership
 export function extractResult(
   type: PendingTransactionType,
   receipt: TransactionReceipt
-): CreatePoolResult | ContributeResult | WithdrawResult | LoanResult | MembershipResult | undefined {
+): CreatePoolResult | ContributeResult | WithdrawResult | ClaimInterestResult | LoanResult | MembershipResult | undefined {
   if (type === 'CREATE_POOL') return extractPoolCreatedResult(receipt)
   if (type === 'WITHDRAW') return extractFundsWithdrawnResult(receipt)
+  if (type === 'CLAIM_INTEREST') return extractInterestClaimedResult(receipt)
   if (isLoanTransactionType(type)) return extractLoanResult(receipt)
   if (isMembershipTransactionType(type)) return extractMembershipResult(receipt)
 

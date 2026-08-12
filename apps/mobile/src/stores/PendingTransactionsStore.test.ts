@@ -12,6 +12,7 @@ import {
 import { PoolFactoryABI, SampleLendingPoolABI } from '../constants/abis'
 import {
   extractFundsDepositedResult,
+  extractInterestClaimedResult,
   extractLoanResult,
   extractMembershipResult,
   extractPoolCreatedResult,
@@ -56,6 +57,9 @@ const STORAGE_KEY = '@superpool/pending_transactions'
 const FACTORY_ADDRESS = '0x5FbDB2315678afecb367f032d93F642f64180aa3'
 const POOL_ADDRESS = '0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0'
 const POOL_OWNER = '0x70997970C51812dc3A010C7d01b50e0d17dc79C8'
+
+/** A claim's params: a pool and nothing else, since the amount is not known yet. */
+const CLAIM_PARAMS = { poolId: 1, poolAddress: POOL_ADDRESS, poolName: 'Neighbourhood Fund' }
 
 // ---------------------------------------------------------------------------
 // Fixtures
@@ -367,6 +371,46 @@ describe('PendingTransactionsStore', () => {
       await store.loadFromStorage()
 
       expect(store.transactions[0].result).toEqual({ amount: '5000000000000000000' })
+    })
+
+    it('restores a claim record, which carries no amount', async () => {
+      // `claimInterest` takes no argument, so unlike every other money movement
+      // there is nothing to record until the receipt is decoded.
+      const claim = { ...makeContributeTransaction(), type: 'CLAIM_INTEREST', params: CLAIM_PARAMS }
+      await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify([claim]))
+
+      await store.loadFromStorage()
+
+      expect(store.transactions).toHaveLength(1)
+      expect(store.transactions[0].type).toBe('CLAIM_INTEREST')
+      expect(store.transactions[0].params).toEqual(CLAIM_PARAMS)
+    })
+
+    it('restores a claim result', async () => {
+      const claim = {
+        ...makeContributeTransaction({ status: 'confirmed' }),
+        type: 'CLAIM_INTEREST',
+        params: CLAIM_PARAMS,
+        result: { amount: '50000000000000000' },
+      }
+      await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify([claim]))
+
+      await store.loadFromStorage()
+
+      expect(store.transactions[0].result).toEqual({ amount: '50000000000000000' })
+    })
+
+    it.each([
+      ['a string poolId', { ...CLAIM_PARAMS, poolId: '1' }],
+      ['a non-hex poolAddress', { ...CLAIM_PARAMS, poolAddress: 'nope' }],
+      ['a missing poolName', { ...CLAIM_PARAMS, poolName: undefined }],
+    ])('drops a malformed claim entry: %s', async (_label, params) => {
+      const claim = { ...makeContributeTransaction(), type: 'CLAIM_INTEREST', params }
+      await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify([claim, makeContributeTransaction({ txHash: OTHER_TX_HASH })]))
+
+      await store.loadFromStorage()
+
+      expect(store.transactions.map((transaction) => transaction.txHash)).toEqual([OTHER_TX_HASH])
     })
 
     it.each([
@@ -738,7 +782,63 @@ describe('extractLoanResult', () => {
   })
 })
 
+function makeInterestClaimedLog(account: `0x${string}`, amount: bigint): ReceiptLog {
+  const topics = encodeEventTopics({ abi: SampleLendingPoolABI, eventName: 'InterestClaimed', args: { account, amount } })
+
+  return {
+    address: POOL_ADDRESS,
+    topics,
+    // Both parameters are `indexed`, as with `FundsDeposited`.
+    data: '0x',
+    blockHash: '0xdead000000000000000000000000000000000000000000000000000000000001',
+    blockNumber: 42n,
+    logIndex: 0,
+    transactionHash: TX_HASH,
+    transactionIndex: 0,
+    removed: false,
+  } as ReceiptLog
+}
+
+describe('extractInterestClaimedResult', () => {
+  it('decodes the amount from an InterestClaimed log', () => {
+    const receipt = makeReceipt({ logs: [makeInterestClaimedLog(POOL_OWNER, 50_000_000_000_000_000n)] })
+
+    expect(extractInterestClaimedResult(receipt)).toEqual({ amount: '50000000000000000' })
+  })
+
+  it('reads an indexed amount out of the topics, where the event actually puts it', () => {
+    const receipt = makeReceipt({ logs: [makeInterestClaimedLog(POOL_OWNER, 1n)] })
+
+    expect(extractInterestClaimedResult(receipt)).toEqual({ amount: '1' })
+  })
+
+  it('ignores a withdrawal, which is the same shape but a different event', () => {
+    const receipt = makeReceipt({ logs: [makeFundsDepositedLog(POOL_OWNER, 1n)] })
+
+    expect(extractInterestClaimedResult(receipt)).toBeUndefined()
+  })
+
+  it('returns undefined when there are no logs', () => {
+    expect(extractInterestClaimedResult(makeReceipt({ logs: [] }))).toBeUndefined()
+  })
+})
+
 describe('extractResult dispatch', () => {
+  it('routes CLAIM_INTEREST to the claim extractor', () => {
+    const receipt = makeReceipt({ logs: [makeInterestClaimedLog(POOL_OWNER, 7n)] })
+
+    expect(extractResult('CLAIM_INTEREST', receipt)).toEqual({ amount: '7' })
+  })
+
+  it('does not fall through to the deposit extractor for a claim', () => {
+    // Both events carry one address and one amount, so a claim receipt would
+    // decode to nothing rather than to a wrong number — and "no log" is what
+    // the monitor reads as a confirmed transaction that produced nothing.
+    const receipt = makeReceipt({ logs: [makeInterestClaimedLog(POOL_OWNER, 7n)] })
+
+    expect(extractFundsDepositedResult(receipt)).toBeUndefined()
+  })
+
   it.each(['BORROW', 'REPAY', 'REQUEST_LOAN', 'APPROVE_LOAN', 'REJECT_LOAN', 'CANCEL_LOAN_REQUEST'] as const)(
     'routes %s to the loan extractor',
     (type) => {

@@ -1,6 +1,8 @@
 import type {
   IndexContributionRequest,
   IndexContributionResponse,
+  IndexInterestClaimRequest,
+  IndexInterestClaimResponse,
   IndexLoanRequest,
   IndexLoanResponse,
   IndexPoolRequest,
@@ -30,6 +32,7 @@ const CALLABLE_NAME: Record<PendingTransactionType, string> = {
   CREATE_POOL: 'indexPool',
   CONTRIBUTE: 'indexContribution',
   WITHDRAW: 'indexWithdrawal',
+  CLAIM_INTEREST: 'indexInterestClaim',
   // Every loan action goes to one callable: it re-reads the loan through
   // `getLoan` and stores the state afterwards, so nothing there needs to know
   // which of the six happened — only which loan to look at.
@@ -70,8 +73,8 @@ export const usePoolIndexing = (): UsePoolIndexingReturn => {
 
       try {
         const index = httpsCallable<
-          IndexPoolRequest | IndexContributionRequest | IndexWithdrawalRequest | IndexLoanRequest,
-          IndexPoolResponse | IndexContributionResponse | IndexWithdrawalResponse | IndexLoanResponse
+          IndexPoolRequest | IndexContributionRequest | IndexWithdrawalRequest | IndexInterestClaimRequest | IndexLoanRequest,
+          IndexPoolResponse | IndexContributionResponse | IndexWithdrawalResponse | IndexInterestClaimResponse | IndexLoanResponse
         >(FIREBASE_FUNCTIONS, CALLABLE_NAME[type])
         const response = await index({ txHash, chainId: requestedChainId ?? chainId ?? DEFAULT_CHAIN_ID })
 

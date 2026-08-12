@@ -232,6 +232,18 @@ const COPY: Record<
       failed: 'Nothing left the pool and no funds moved beyond the network fee. You can safely try again.',
     },
   },
+  CLAIM_INTEREST: {
+    headline: {
+      submitted: 'Claiming your interest',
+      confirmed: 'Almost there',
+      failed: 'That claim failed',
+    },
+    summary: {
+      submitted: 'The network is confirming your claim. You can leave this screen — it carries on without you.',
+      confirmed: 'Your interest is on its way back to your wallet.',
+      failed: 'Nothing left the pool and your interest is still there to claim. You can safely try again.',
+    },
+  },
 }
 
 function StepRow({ step }: { step: Step }) {
@@ -303,6 +315,17 @@ function detailsFor(transaction: PendingTransaction): DetailRow[] {
       // agree in practice; preferring the receipt keeps the display honest if
       // they ever do not.
       { label: 'Amount', value: `${formatToken(result?.amount ?? params.amount)} POL`, mono: true },
+    ]
+  }
+
+  if (transaction.type === 'CLAIM_INTEREST') {
+    const { params, result } = transaction
+
+    return [
+      { label: 'Pool', value: params.poolName },
+      // Only known from the receipt: `claimInterest` takes no amount and pays
+      // out everything owed, so before it confirms there is no figure to show.
+      ...(result ? [{ label: 'Amount', value: `${formatToken(result.amount)} POL`, mono: true }] : []),
     ]
   }
 

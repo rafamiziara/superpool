@@ -2,6 +2,7 @@ import { useCallback, useState } from 'react'
 import { WaitForTransactionReceiptTimeoutError } from 'viem'
 import { usePublicClient } from 'wagmi'
 import {
+  type ClaimInterestResult,
   type ContributeResult,
   type CreatePoolResult,
   extractResult,
@@ -23,11 +24,13 @@ export type ResultFor<T extends PendingTransactionType> = T extends 'CREATE_POOL
   ? CreatePoolResult
   : T extends 'WITHDRAW'
     ? WithdrawResult
-    : T extends LoanTransactionType
-      ? LoanResult
-      : T extends MembershipTransactionType
-        ? MembershipResult
-        : ContributeResult
+    : T extends 'CLAIM_INTEREST'
+      ? ClaimInterestResult
+      : T extends LoanTransactionType
+        ? LoanResult
+        : T extends MembershipTransactionType
+          ? MembershipResult
+          : ContributeResult
 
 export type TransactionOutcome<T extends PendingTransactionType> = ResultFor<T> & { txHash: `0x${string}` }
 
@@ -40,6 +43,7 @@ const MISSING_LOG_MESSAGE: Record<PendingTransactionType, string> = {
   CREATE_POOL: 'The transaction confirmed but did not create a pool',
   CONTRIBUTE: 'The transaction confirmed but did not record a deposit',
   WITHDRAW: 'The transaction confirmed but did not record a withdrawal',
+  CLAIM_INTEREST: 'The transaction confirmed but did not record a claim',
   BORROW: 'The transaction confirmed but did not record a loan',
   REPAY: 'The transaction confirmed but did not record a repayment',
   REQUEST_LOAN: 'The transaction confirmed but did not record a request',
