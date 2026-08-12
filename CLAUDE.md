@@ -583,7 +583,7 @@ POSTs to `exp.host`. `messagingSenderId` in the mobile Firebase config is inert.
 Only two notifications exist, both **owner-facing**: somebody asked to join, and
 somebody asked to borrow. They are the ones that cost the asker nothing to make
 and the owner everything to miss. Plan and the reasoning for what is left out:
-[`.dev/NOTIFICATIONS_PLAN.md`](.dev/NOTIFICATIONS_PLAN.md).
+[`.dev/features/NOTIFICATIONS_PLAN.md`](.dev/features/NOTIFICATIONS_PLAN.md).
 
 Four rules that are easy to break:
 

@@ -521,7 +521,7 @@ The app already shipped the surface for a number that could not exist:
 `PoolStore.totalEarned` was a dashboard tile whose own docstring said it was zero
 against real data and always would be.
 
-Plan: [`.dev/INTEREST_DISTRIBUTION_PLAN.md`](../.dev/INTEREST_DISTRIBUTION_PLAN.md).
+Plan: [`.dev/old/INTEREST_DISTRIBUTION_PLAN.md`](../.dev/old/INTEREST_DISTRIBUTION_PLAN.md).
 How it works: [`INTEREST.md`](INTEREST.md).
 
 ### Features:
@@ -576,7 +576,7 @@ Added 2026-08-12. Not previously its own sprint, but Sprints 4, 7 and 10 each
 list notifications as a feature and none of them had any — so it kept being
 "part of" work that shipped without it.
 
-Plan: [`.dev/NOTIFICATIONS_PLAN.md`](../.dev/NOTIFICATIONS_PLAN.md). How it
+Plan: [`.dev/features/NOTIFICATIONS_PLAN.md`](../.dev/features/NOTIFICATIONS_PLAN.md). How it
 works: the Notifications section in [`CLAUDE.md`](../CLAUDE.md).
 
 ### Why it needed a sprint of its own
@@ -635,7 +635,7 @@ SDK 53.
   owns fixing it. The backend half is done — it serves every configured chain
   now — so what is left is a funded deployer and backend wallet, an Amoy entry
   in `hardhat.config.ts`, and the per-network checklist in
-  [`.dev/contracts-v2/MULTI_CHAIN_IMPLEMENTATION_PLAN.md`](../.dev/contracts-v2/MULTI_CHAIN_IMPLEMENTATION_PLAN.md)
+  [`.dev/deployment/GOING_PUBLIC.md`](../.dev/deployment/GOING_PUBLIC.md)
   §2.2. Until this moves, nothing in the project is publicly inspectable.
 - **Nothing in the app says which chain a pool is on.** Now that the backend can
   serve several, this is the gap it exposes: pool cards carry no network badge,
