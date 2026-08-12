@@ -110,6 +110,32 @@ describe('ApprovalsScreen', () => {
     expect(getByTestId('approvals-pool-not-found')).toBeTruthy()
   })
 
+  // A notification tap can open this screen on a cold start, where the auth
+  // group has only just kicked off `fetchPools`. Answering "that pool is not
+  // available" — or worse, "only the owner can decide" — to the owner who just
+  // tapped a notification about their own pool is a definitive answer to a
+  // question nothing has resolved yet.
+  it('reads as loading, not as missing, while the pools are still arriving', () => {
+    mockLocalSearchParams.mockReturnValue({ poolId: '9999' })
+    poolStore.isLoading = true
+
+    const { getByTestId, queryByTestId } = render(<ApprovalsScreen />)
+
+    expect(getByTestId('approvals-loading')).toBeTruthy()
+    expect(queryByTestId('approvals-pool-not-found')).toBeNull()
+
+    poolStore.isLoading = false
+  })
+
+  it('says the pool is missing once the load has finished', () => {
+    mockLocalSearchParams.mockReturnValue({ poolId: '9999' })
+    poolStore.isLoading = false
+
+    const { getByTestId } = render(<ApprovalsScreen />)
+
+    expect(getByTestId('approvals-pool-not-found')).toBeTruthy()
+  })
+
   it('turns away anyone who is not the pool owner', () => {
     // `approveLoan` and `rejectLoan` are `onlyOwner`, so showing the queue would
     // invite a transaction that reverts.

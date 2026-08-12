@@ -545,6 +545,47 @@ than chosen between: claiming moves an amount from one to the other. Claims are
 indexed; accrual is not an event at all and has to be read from the chain per
 pool per wallet.
 
+## Notifications
+
+Push goes through **Expo's push service**, not FCM: `firebase/messaging` in the
+JS SDK is web-only, so the alternative was a second, native Firebase SDK beside
+the one the app already uses. The backend gains no messaging dependency — it
+POSTs to `exp.host`. `messagingSenderId` in the mobile Firebase config is inert.
+
+Only two notifications exist, both **owner-facing**: somebody asked to join, and
+somebody asked to borrow. They are the ones that cost the asker nothing to make
+and the owner everything to miss. Plan and the reasoning for what is left out:
+[`.dev/NOTIFICATIONS_PLAN.md`](.dev/NOTIFICATIONS_PLAN.md).
+
+Four rules that are easy to break:
+
+- **`stored` is not news.** The loan indexer rewrites a document when only its
+  transaction reference moved to an earlier block, so triggering on `stored`
+  would announce a request every time a sweep tidied up a hash. Notify on the
+  `transition` the indexers now report, which is `null` for exactly that write.
+- **Send at most once per (record, transition).** `syncPoolEvents` re-scans
+  ranges deliberately and re-scanning genesis is supported, so `notifyOnce`
+  claims a marker in `notifications_sent` with `create()` **before** sending.
+  A thrown send releases the claim; a per-device rejection keeps it.
+- **A token belongs to a device, a recipient is a wallet.** Send to every token
+  for the wallet, and give the token back on disconnect _and_ on a wallet
+  switch — otherwise the next wallet on that phone receives the previous one's
+  requests. `push_tokens` is its own collection because
+  `DeviceVerificationService.approveDevice` writes `approved_devices` with
+  `set()` and no merge, which happens on every cold start.
+- **The permission prompt is spent once.** Asked only after a pool is created,
+  where the user has just built an expectation of being told something. Not
+  when joining or borrowing: those askers have no notifications yet, so the
+  prompt would buy a channel that delivers them nothing.
+
+Dispatch is wired into `indexLoanFromLog` / `indexMembershipFromLog` rather than
+the callables, so the sweep notifies too — a request made while the app was
+closed is exactly the one the owner needs. Failures there are swallowed:
+indexing is the job, push is an enhancement.
+
+**Not verified end to end.** The emulator does not deliver push; the last mile
+needs a dev build, an APNs key and an FCM v1 service account uploaded to EAS.
+
 ## Activity feeds
 
 `ActivityRow` takes a `perspective`, and picking the wrong one marks money the

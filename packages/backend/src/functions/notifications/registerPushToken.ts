@@ -6,9 +6,7 @@ import { isExpoPushToken, savePushToken } from '../../services/pushTokens'
 
 const PLATFORMS = ['android', 'ios', 'web'] as const
 
-export const registerPushTokenHandler = async (
-  request: CallableRequest<RegisterPushTokenRequest>
-): Promise<RegisterPushTokenResponse> => {
+export const registerPushTokenHandler = async (request: CallableRequest<RegisterPushTokenRequest>): Promise<RegisterPushTokenResponse> => {
   if (!request.auth) {
     throw new HttpsError('unauthenticated', 'User must be authenticated to register a push token')
   }

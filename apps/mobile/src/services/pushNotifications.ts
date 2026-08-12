@@ -1,4 +1,9 @@
-import type { RegisterPushTokenRequest, RegisterPushTokenResponse, UnregisterPushTokenRequest, UnregisterPushTokenResponse } from '@superpool/types'
+import type {
+  RegisterPushTokenRequest,
+  RegisterPushTokenResponse,
+  UnregisterPushTokenRequest,
+  UnregisterPushTokenResponse,
+} from '@superpool/types'
 import Constants from 'expo-constants'
 import * as Device from 'expo-device'
 import * as Notifications from 'expo-notifications'

@@ -16,6 +16,7 @@ packages/backend/
 │   │   ├── app-check/     # Device verification functions
 │   │   ├── pools/         # Pool management functions
 │   │   ├── events/        # Scheduled chain-event sync
+│   │   ├── notifications/ # Push token registration
 │   │   └── dev/           # Development/testing functions
 │   ├── services/          # Business logic services
 │   │   └── eventIndexer.ts # Shared pool indexing, used by both indexing paths
@@ -191,6 +192,31 @@ Required for local development and Firebase Admin SDK:
 
 See [`docs/POOL_CREATION.md`](../../docs/POOL_CREATION.md) for how these fit
 together with the mobile app.
+
+### Notifications
+
+**`registerPushToken`** / **`unregisterPushToken`**
+
+- Store and forget this device's Expo push token, in the `push_tokens`
+  collection keyed by the token itself
+- The wallet comes from `request.auth.uid` — the auth function mints a token
+  whose UID **is** the address — so a caller cannot register against somebody
+  else's wallet and receive their notifications
+- **Not** kept on `approved_devices`: `DeviceVerificationService.approveDevice`
+  writes that document with `set()` and no merge, which happens on every cold
+  start and would wipe the token
+- Unregistering is called on wallet **disconnect and switch**, not only
+  sign-out; a token left behind sends the next wallet the previous one's
+  requests
+
+Sending is not a function but a service pair: `services/notifications.ts` POSTs
+to Expo (`exp.host`) and prunes a token on a `DeviceNotRegistered` receipt, and
+`services/poolNotifications.ts` decides which indexer transition is worth a push
+and to whom. Both are driven from `indexLoanFromLog` / `indexMembershipFromLog`,
+so the scheduled sweep notifies as well as the on-demand callables.
+
+See the Notifications section in [`CLAUDE.md`](../../CLAUDE.md) for why Expo
+rather than FCM, and why `stored` is not a safe trigger.
 
 ### Development Functions
 

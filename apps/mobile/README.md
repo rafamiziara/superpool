@@ -12,6 +12,7 @@ Cross-platform mobile app supporting 500+ wallets via WalletConnect with MobX st
 - 🌐 Multi-chain support (Ethereum, Polygon, Arbitrum, Base, BSC, Polygon Amoy)
 - 🏊 Lending pool creation and management
 - 💰 Liquidity contributions, withdrawals, borrowing and repayment
+- 🔔 Push notifications telling a pool owner somebody asked to join or borrow
 - 📱 Onboarding flow with feature showcase
 - 🔄 Real-time blockchain synchronization
 
@@ -102,6 +103,26 @@ log arrived, and `isRepaid` means nothing until `status` is `disbursed`. That
 document also covers borrowing history — counts rather than a score, derived on
 read by `PoolStore.borrowerHistory` and shown by `BorrowerHistoryPanel`, where a
 wallet with no loans reads as **new** and never as bad.
+
+## Notifications
+
+`src/services/pushNotifications.ts` obtains an Expo push token and registers it
+with the backend; `src/components/NotificationListener.tsx` turns an arriving
+notification into a toast and a tap into a deep link (`pool/approvals`,
+`pool/members`).
+
+Three things not to change without reading the Notifications section in
+[`CLAUDE.md`](../../CLAUDE.md):
+
+- **Permission is asked in exactly one place** — after a pool is created. It is
+  a one-shot on iOS, and only owner-facing notifications exist, so prompting an
+  asker would spend it on a channel that delivers them nothing.
+- **The token is given back on disconnect _and_ on a wallet switch**
+  (`WalletListener`), or the next wallet on the device receives the previous
+  one's requests.
+- **None of it works in Expo Go on Android**, which has been unable to receive
+  remote push since SDK 53. A development build is required, and the delivery
+  path is unverified until one exists.
 
 ## UI
 

@@ -39,6 +39,14 @@ jest.mock('../../../src/hooks/pools/usePoolIndexing', () => ({
   usePoolIndexing: () => ({ triggerIndexing: mockTriggerIndexing, indexConfirmed: jest.fn(), isIndexing: false }),
 }))
 
+const mockRequestPermission = jest.fn(async () => true)
+const mockRegisterForPush = jest.fn(async () => 'ExponentPushToken[x]')
+
+jest.mock('../../../src/services/pushNotifications', () => ({
+  requestNotificationPermission: () => mockRequestPermission(),
+  registerForPushNotifications: () => mockRegisterForPush(),
+}))
+
 const { getPoolFactoryAddress } = jest.requireMock<{ getPoolFactoryAddress: jest.Mock }>('../../../src/config/contracts')
 
 function fillValidForm() {
@@ -267,6 +275,63 @@ describe('CreatePoolScreen', () => {
       await submitForm()
 
       await waitFor(() => expect(screen.getByTestId('create-pool-success')).toBeTruthy())
+    })
+  })
+
+  // -------------------------------------------------------------------------
+  // Notification permission.
+  //
+  // The one place the app asks. The prompt is a one-shot — on iOS a denial
+  // cannot be re-asked in-app — so it is spent where the user has just created
+  // an expectation of being told something: they have opened a pool for other
+  // people to join, and from here on everything they are meant to do arrives
+  // unannounced.
+  // -------------------------------------------------------------------------
+
+  describe('notification permission', () => {
+    beforeEach(() => {
+      mockRequestPermission.mockResolvedValue(true)
+      mockRegisterForPush.mockResolvedValue('ExponentPushToken[x]')
+    })
+
+    it('asks once the pool is live, and registers when granted', async () => {
+      render(<CreatePoolScreen />)
+
+      await submitForm()
+
+      await waitFor(() => expect(mockRequestPermission).toHaveBeenCalled())
+      await waitFor(() => expect(mockRegisterForPush).toHaveBeenCalled())
+    })
+
+    it('registers nothing when the prompt is refused', async () => {
+      mockRequestPermission.mockResolvedValue(false)
+
+      render(<CreatePoolScreen />)
+
+      await submitForm()
+
+      await waitFor(() => expect(mockRequestPermission).toHaveBeenCalled())
+      expect(mockRegisterForPush).not.toHaveBeenCalled()
+    })
+
+    // Asking before the pool exists would be asking for nothing.
+    it('asks only after the pool is indexed', async () => {
+      render(<CreatePoolScreen />)
+
+      await submitForm()
+
+      await waitFor(() => expect(mockRequestPermission).toHaveBeenCalled())
+      expect(mockTriggerIndexing.mock.invocationCallOrder[0]).toBeLessThan(mockRequestPermission.mock.invocationCallOrder[0])
+    })
+
+    it('does not ask when the transaction never confirmed', async () => {
+      mockWaitForTransaction.mockRejectedValue(new Error('timed out'))
+
+      render(<CreatePoolScreen />)
+
+      await submitForm()
+
+      expect(mockRequestPermission).not.toHaveBeenCalled()
     })
   })
 })

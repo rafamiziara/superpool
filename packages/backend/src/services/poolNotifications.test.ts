@@ -99,13 +99,16 @@ describe('notifyLoanRequested', () => {
     expect(mockNotifyOnce).not.toHaveBeenCalled()
   })
 
-  it.each<LoanTransition>(['disbursed', 'rejected', 'repaid'])('says nothing about a %s loan, which is not owner-facing', async (transition) => {
-    const { firestore } = buildFirestore()
+  it.each<LoanTransition>(['disbursed', 'rejected', 'repaid'])(
+    'says nothing about a %s loan, which is not owner-facing',
+    async (transition) => {
+      const { firestore } = buildFirestore()
 
-    await notifyLoanRequested(loanResult(transition), parsedLoan(), firestore)
+      await notifyLoanRequested(loanResult(transition), parsedLoan(), firestore)
 
-    expect(mockNotifyOnce).not.toHaveBeenCalled()
-  })
+      expect(mockNotifyOnce).not.toHaveBeenCalled()
+    }
+  )
 
   // Nobody needs telling about their own action.
   it('does not tell an owner they borrowed from their own pool', async () => {

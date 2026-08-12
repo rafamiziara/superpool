@@ -207,4 +207,30 @@ describe('MembersScreen', () => {
     expect(getByTestId('members-roster')).toBeTruthy()
     expect(getByText('No members yet')).toBeTruthy()
   })
+
+  // A notification tap can open this screen on a cold start, where the auth
+  // group has only just kicked off `fetchPools`. Answering "that pool is not
+  // available" — or worse, "only the owner can decide" — to the owner who just
+  // tapped a notification about their own pool is a definitive answer to a
+  // question nothing has resolved yet.
+  it('reads as loading, not as missing, while the pools are still arriving', () => {
+    mockLocalSearchParams.mockReturnValue({ poolId: '9999' })
+    poolStore.isLoading = true
+
+    const { getByTestId, queryByTestId } = render(<MembersScreen />)
+
+    expect(getByTestId('members-loading')).toBeTruthy()
+    expect(queryByTestId('members-pool-not-found')).toBeNull()
+
+    poolStore.isLoading = false
+  })
+
+  it('says the pool is missing once the load has finished', () => {
+    mockLocalSearchParams.mockReturnValue({ poolId: '9999' })
+    poolStore.isLoading = false
+
+    const { getByTestId } = render(<MembersScreen />)
+
+    expect(getByTestId('members-pool-not-found')).toBeTruthy()
+  })
 })
