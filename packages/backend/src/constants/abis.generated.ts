@@ -1293,6 +1293,11 @@ export const SampleLendingPoolABI = [
     "type": "error"
   },
   {
+    "inputs": [],
+    "name": "NothingToClaim",
+    "type": "error"
+  },
+  {
     "inputs": [
       {
         "internalType": "address",
@@ -1401,6 +1406,25 @@ export const SampleLendingPoolABI = [
       }
     ],
     "name": "Initialized",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "account",
+        "type": "address"
+      },
+      {
+        "indexed": true,
+        "internalType": "uint256",
+        "name": "amount",
+        "type": "uint256"
+      }
+    ],
+    "name": "InterestClaimed",
     "type": "event"
   },
   {
@@ -1794,6 +1818,13 @@ export const SampleLendingPoolABI = [
       }
     ],
     "name": "cancelLoanRequest",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "claimInterest",
     "outputs": [],
     "stateMutability": "nonpayable",
     "type": "function"

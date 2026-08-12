@@ -1231,5 +1231,143 @@ describe('SampleLendingPool', function () {
         expect(await lendingPool.claimable(lender.address)).to.equal(earned)
       })
     })
+
+    describe('claimInterest', function () {
+      beforeEach(async function () {
+        await lendingPool.connect(lender).depositFunds({ value: ethers.parseEther('20') })
+        await lendingPool.connect(borrower).depositFunds({ value: ethers.parseEther('1') })
+      })
+
+      it('pays out what claimable reported', async function () {
+        await borrowAndRepay(borrower, ethers.parseEther('10'))
+        const earned = await lendingPool.claimable(lender.address)
+        expect(earned).to.be.gt(0)
+
+        const balanceBefore = await ethers.provider.getBalance(lender.address)
+        const tx = await lendingPool.connect(lender).claimInterest()
+        const receipt = await tx.wait()
+        const gasUsed = receipt!.gasUsed * receipt!.gasPrice
+
+        expect(await ethers.provider.getBalance(lender.address)).to.equal(balanceBefore + earned - gasUsed)
+      })
+
+      it('emits InterestClaimed', async function () {
+        await borrowAndRepay(borrower, ethers.parseEther('10'))
+        const earned = await lendingPool.claimable(lender.address)
+
+        await expect(lendingPool.connect(lender).claimInterest()).to.emit(lendingPool, 'InterestClaimed').withArgs(lender.address, earned)
+      })
+
+      it('takes the payout out of pool liquidity', async function () {
+        await borrowAndRepay(borrower, ethers.parseEther('10'))
+        const earned = await lendingPool.claimable(lender.address)
+        const fundsBefore = await lendingPool.totalFunds()
+
+        await lendingPool.connect(lender).claimInterest()
+
+        expect(await lendingPool.totalFunds()).to.equal(fundsBefore - earned)
+      })
+
+      it('leaves the contribution untouched', async function () {
+        await borrowAndRepay(borrower, ethers.parseEther('10'))
+
+        await lendingPool.connect(lender).claimInterest()
+
+        expect(await lendingPool.contributions(lender.address)).to.equal(ethers.parseEther('20'))
+        expect(await lendingPool.totalContributions()).to.equal(ethers.parseEther('21'))
+      })
+
+      it('pays once, not twice', async function () {
+        await borrowAndRepay(borrower, ethers.parseEther('10'))
+        await lendingPool.connect(lender).claimInterest()
+
+        expect(await lendingPool.claimable(lender.address)).to.equal(0)
+        await expect(lendingPool.connect(lender).claimInterest()).to.be.revertedWithCustomError(lendingPool, 'NothingToClaim')
+      })
+
+      it('refuses an account that has earned nothing', async function () {
+        await expect(lendingPool.connect(otherAccount).claimInterest()).to.be.revertedWithCustomError(lendingPool, 'NothingToClaim')
+      })
+
+      it('keeps earning after a claim', async function () {
+        await borrowAndRepay(borrower, ethers.parseEther('10'))
+        await lendingPool.connect(lender).claimInterest()
+
+        const interest = await borrowAndRepay(borrower, ethers.parseEther('10'))
+
+        expect(await lendingPool.claimable(lender.address)).to.be.closeTo((interest * 20n) / 21n, 100n)
+      })
+
+      it('refuses a claim the pool cannot cover, rather than paying part of it', async function () {
+        await borrowAndRepay(borrower, ethers.parseEther('10'))
+        const earned = await lendingPool.claimable(lender.address)
+
+        // Drain the free liquidity into a loan.
+        await lendingPool.connect(borrower).createLoan(ethers.parseEther('10'))
+        await lendingPool.connect(lender).withdraw(await lendingPool.totalFunds())
+        expect(await lendingPool.totalFunds()).to.equal(0)
+
+        await expect(lendingPool.connect(lender).claimInterest()).to.be.revertedWithCustomError(lendingPool, 'InsufficientLiquidity')
+
+        // Delayed, not lost: repaying the loan makes the claim work.
+        const due = await lendingPool.calculateRepaymentAmount(2)
+        await lendingPool.connect(borrower).repayLoan(2, { value: due })
+
+        await expect(lendingPool.connect(lender).claimInterest()).to.emit(lendingPool, 'InterestClaimed')
+        expect(await lendingPool.claimable(lender.address)).to.be.gte(0)
+        expect(earned).to.be.gt(0)
+      })
+
+      it('lets a removed member claim', async function () {
+        // Same rule as `withdraw`: removal takes away what you may do next, not
+        // what you already earned.
+        await borrowAndRepay(borrower, ethers.parseEther('10'))
+        await lendingPool.connect(owner).removeMember(lender.address)
+
+        await expect(lendingPool.connect(lender).claimInterest()).to.emit(lendingPool, 'InterestClaimed')
+      })
+
+      it('lets a member who has left claim', async function () {
+        await borrowAndRepay(borrower, ethers.parseEther('10'))
+        await lendingPool.connect(lender).leavePool()
+
+        await expect(lendingPool.connect(lender).claimInterest()).to.emit(lendingPool, 'InterestClaimed')
+      })
+
+      it('lets someone who withdrew their whole contribution claim', async function () {
+        await borrowAndRepay(borrower, ethers.parseEther('10'))
+        await lendingPool.connect(lender).withdraw(ethers.parseEther('20'))
+
+        await expect(lendingPool.connect(lender).claimInterest()).to.emit(lendingPool, 'InterestClaimed')
+      })
+
+      it('lets a borrower with an outstanding loan claim', async function () {
+        // Unlike `withdraw`, which locks the stake: interest was never part of
+        // what borrowing puts up.
+        await borrowAndRepay(borrower, ethers.parseEther('10'))
+        await lendingPool.connect(borrower).createLoan(ethers.parseEther('5'))
+
+        expect(await lendingPool.activeLoanId(borrower.address)).to.not.equal(0)
+        await expect(lendingPool.connect(borrower).claimInterest()).to.emit(lendingPool, 'InterestClaimed')
+      })
+
+      it('refuses claims while paused', async function () {
+        await borrowAndRepay(borrower, ethers.parseEther('10'))
+        await lendingPool.connect(owner).pause()
+
+        await expect(lendingPool.connect(lender).claimInterest()).to.be.revertedWithCustomError(lendingPool, 'EnforcedPause')
+      })
+
+      it('never pays out more than the pool earned', async function () {
+        await borrowAndRepay(borrower, ethers.parseEther('10'))
+
+        await lendingPool.connect(lender).claimInterest()
+        await lendingPool.connect(borrower).claimInterest()
+
+        // Everything is back to principal, give or take the rounding dust.
+        expect(await lendingPool.totalFunds()).to.be.gte(ethers.parseEther('21'))
+        expect(await lendingPool.totalFunds()).to.be.closeTo(ethers.parseEther('21'), 100n)
+      })
+    })
   })
 })

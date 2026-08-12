@@ -336,6 +336,14 @@ contract SampleLendingPool is
      * no contributions to share against — see `repayLoan`.
      */
     event InterestDistributed(uint256 indexed loanId, uint256 indexed amount);
+    /**
+     * @notice Emitted when an account takes its earned interest out
+     * @param account Address that claimed
+     * @param amount Amount paid out, in wei
+     * @dev Shaped like `FundsWithdrawn` on purpose: both parameters indexed,
+     * so the two decode the same way off chain.
+     */
+    event InterestClaimed(address indexed account, uint256 indexed amount);
 
     /// @notice Errors
     error InsufficientFunds();
@@ -361,6 +369,8 @@ contract SampleLendingPool is
     error AlreadyMember();
     /// @dev Deciding on an address that has not asked to join.
     error NoPendingRequest();
+    /// @dev Claiming interest when none has accrued.
+    error NothingToClaim();
 
     /**
      * @notice Initialize the contract (replaces constructor for upgradeable contracts)
@@ -516,6 +526,38 @@ contract SampleLendingPool is
         return
             unclaimedInterest[_account] +
             (_accruedInterest(_account) - interestDebt[_account]);
+    }
+
+    /**
+     * @notice Take out the interest you have earned
+     * @dev Paid out of `totalFunds`, the same pot and the same
+     * first-come-first-served rule `withdraw` uses. An outstanding loan
+     * therefore delays a claim rather than failing it permanently, and a claim
+     * the pool cannot cover in full is refused outright rather than paid
+     * partially — a silent partial payment reads as a successful claim in every
+     * UI.
+     *
+     * Gated on neither membership nor an outstanding loan, unlike `withdraw`.
+     * Interest is earned money rather than the stake that borrowing locks, and
+     * it is owed for the same reason a removed member's contribution is: it was
+     * earned while the money was in the pool.
+     */
+    function claimInterest() external whenNotPaused nonReentrant {
+        _settle(msg.sender);
+
+        uint256 amount = unclaimedInterest[msg.sender];
+        if (amount == 0) revert NothingToClaim();
+        if (amount > totalFunds) revert InsufficientLiquidity();
+
+        // Complete all state changes before external call (CEI pattern)
+        unclaimedInterest[msg.sender] = 0;
+        totalFunds -= amount;
+
+        // Emit event before external call
+        emit InterestClaimed(msg.sender, amount);
+
+        (bool success, ) = payable(msg.sender).call{value: amount}("");
+        if (!success) revert TransferFailed();
     }
 
     /**
