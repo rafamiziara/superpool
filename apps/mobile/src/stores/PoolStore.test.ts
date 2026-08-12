@@ -1020,6 +1020,18 @@ const REQUESTED_LOAN: LoanInfo = { ...LIVE_LOAN, id: '31337-12-2', loanId: 2, st
 const REJECTED_LOAN: LoanInfo = { ...LIVE_LOAN, id: '31337-12-3', loanId: 3, status: 'rejected' }
 const REPAID_LOAN: LoanInfo = { ...LIVE_LOAN, id: '31337-12-4', loanId: 4, isRepaid: true }
 
+/** Thirty days after `LIVE_LOAN` started, which is exactly its term. */
+const DUE_AT = new Date(new Date(LIVE_LOAN.startedAt).getTime() + LIVE_LOAN.duration * 1000)
+
+function settled(overrides: { id: string; loanId: number; repaidAt?: Date; borrower?: string }): LoanInfo {
+  return {
+    ...LIVE_LOAN,
+    ...overrides,
+    isRepaid: true,
+    repaidAt: overrides.repaidAt?.toISOString(),
+  }
+}
+
 describe('PoolStore loan states', () => {
   let store: PoolStore
   let listLoansCallable: jest.Mock
@@ -1154,6 +1166,95 @@ describe('PoolStore loan states', () => {
 
     expect(store.pendingLoan?.id).toBe(REQUESTED_LOAN.id)
     expect(store.activeLoan).toBeUndefined()
+  })
+
+  it('carries the chain’s repayment stamp into the app’s loan', async () => {
+    const repaidAt = new Date('2026-08-15T09:00:00.000Z')
+    await loadWithLoans([settled({ id: '31337-12-9', loanId: 9, repaidAt })])
+
+    expect(store.loans[0].repaidAt).toEqual(repaidAt)
+  })
+
+  // -------------------------------------------------------------------------
+  // Borrower history.
+  //
+  // What a pool owner is actually deciding on. Counts, not a score: "borrowed
+  // three, repaid three, none late" is what an owner asks for, and it is made
+  // of one fact the chain did not record until now — when a repayment landed.
+  // -------------------------------------------------------------------------
+
+  describe('borrowerHistory', () => {
+    it('reads a wallet nobody has lent to as new, not as bad', async () => {
+      // The one that quietly makes a lending product unusable for the people it
+      // exists for: zero of zero is a first-time borrower, not the worst kind.
+      await loadWithLoans([])
+
+      const history = store.borrowerHistory(USER_WALLET)
+
+      expect(history.isNew).toBe(true)
+      expect(history).toMatchObject({ total: 0, repaid: 0, late: 0, overdue: 0 })
+    })
+
+    it('counts a repayment inside the term as on time', async () => {
+      const repaidAt = new Date(DUE_AT.getTime() - 24 * 60 * 60 * 1000)
+      await loadWithLoans([settled({ id: '31337-12-9', loanId: 9, repaidAt })])
+
+      expect(store.borrowerHistory(USER_WALLET)).toMatchObject({ total: 1, repaid: 1, onTime: 1, late: 0, isNew: false })
+    })
+
+    it('counts a repayment after the term as late', async () => {
+      // The distinction the whole milestone turns on, and the one that was not
+      // derivable at all before the contract stamped a repayment.
+      const repaidAt = new Date(DUE_AT.getTime() + 24 * 60 * 60 * 1000)
+      await loadWithLoans([settled({ id: '31337-12-9', loanId: 9, repaidAt })])
+
+      expect(store.borrowerHistory(USER_WALLET)).toMatchObject({ total: 1, repaid: 1, onTime: 0, late: 1 })
+    })
+
+    it('refuses to call an undated repayment on time', async () => {
+      // A loan settled before the contract recorded a stamp. Counting it as on
+      // time would invent a fact; counting it late would slander a borrower.
+      await loadWithLoans([settled({ id: '31337-12-9', loanId: 9 })])
+
+      expect(store.borrowerHistory(USER_WALLET)).toMatchObject({ repaid: 1, undated: 1, onTime: 0, late: 0 })
+    })
+
+    it('separates what is still owed from what is overdue', async () => {
+      const longSinceDue: LoanInfo = { ...LIVE_LOAN, id: '31337-12-8', loanId: 8, startedAt: '2020-01-01T00:00:00.000Z' }
+      const freshlyBorrowed: LoanInfo = { ...LIVE_LOAN, id: '31337-12-7', loanId: 7, startedAt: new Date().toISOString() }
+      await loadWithLoans([longSinceDue, freshlyBorrowed])
+
+      expect(store.borrowerHistory(USER_WALLET)).toMatchObject({ total: 2, outstanding: 2, overdue: 1 })
+    })
+
+    it('ignores requests and rejections entirely', async () => {
+      // Neither is borrowing. A request that was turned down says something
+      // about the owner who turned it down, not about the borrower.
+      await loadWithLoans([REQUESTED_LOAN, REJECTED_LOAN])
+
+      expect(store.borrowerHistory(USER_WALLET)).toMatchObject({ total: 0, isNew: true })
+    })
+
+    it('does not mix two borrowers together', async () => {
+      await loadWithLoans([LIVE_LOAN, settled({ id: '31337-12-6', loanId: 6, borrower: STRANGER_WALLET, repaidAt: DUE_AT })])
+
+      expect(store.borrowerHistory(USER_WALLET)).toMatchObject({ total: 1, outstanding: 1, repaid: 0 })
+      expect(store.borrowerHistory(STRANGER_WALLET)).toMatchObject({ total: 1, repaid: 1, onTime: 1 })
+    })
+
+    it('matches the borrower case-insensitively', async () => {
+      // The owner's queue hands over a checksummed address from the wallet,
+      // while the indexer stores it lowercased.
+      await loadWithLoans([REPAID_LOAN])
+
+      expect(store.borrowerHistory('0x15D34AAf54267DB7D7c367839AAf71A00a2C6A65')).toMatchObject({ total: 1, repaid: 1 })
+    })
+
+    it('reports the connected wallet’s own record', async () => {
+      await loadWithLoans([REPAID_LOAN])
+
+      expect(store.myBorrowingHistory).toMatchObject({ total: 1, repaid: 1, isNew: false })
+    })
   })
 
   // -------------------------------------------------------------------------

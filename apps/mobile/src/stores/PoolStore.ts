@@ -1,4 +1,5 @@
 import type {
+  BorrowerHistory,
   ContributionInfo,
   InterestClaimInfo,
   ListContributionsRequest,
@@ -666,10 +667,10 @@ export class PoolStore {
         approvedAt: isDisbursed ? startedAt : undefined,
         disbursedAt: isDisbursed ? startedAt : undefined,
         dueDate: isDisbursed ? new Date(startedAt.getTime() + loan.duration * 1000) : undefined,
-        // Never known: `LoanRepaid` is not stored as its own record, and the
-        // loan document keeps the *creating* transaction's block so the
-        // activity feed dates it consistently.
-        repaidAt: undefined,
+        // The chain's own stamp, not the indexer's sighting. Still absent on a
+        // loan settled before the contract recorded one, which is why nothing
+        // reads this to decide *whether* a loan was repaid.
+        repaidAt: loan.repaidAt ? new Date(loan.repaidAt) : undefined,
       }
     })
   }
@@ -722,6 +723,78 @@ export class PoolStore {
   /** Every request in one pool awaiting the owner's decision, for the approvals screen. */
   pendingLoansFor = (poolId: number): LoanInfo[] => {
     return this.loanRecords.filter((loan) => loan.poolId === poolId && loan.status === 'requested')
+  }
+
+  /**
+   * What one wallet has done with money it borrowed before.
+   *
+   * Counted from the indexed loans rather than stored anywhere, for the same
+   * reason liquidity and memberships are: a figure written down is a figure
+   * that can disagree with the chain. It is deliberately a set of counts and
+   * not a score — an owner deciding on a request wants to know that someone
+   * borrowed three times and repaid three times, and a number out of 100 is a
+   * thing that then has to be explained and defended.
+   *
+   * Three things it is careful about:
+   *
+   * - **Only funded loans count.** A request is not borrowing, and a rejected
+   *   one is a decision the owner already made; neither says anything about
+   *   whether this wallet gives money back.
+   * - **A repayment with no date is not an on-time repayment.** Loans settled
+   *   before the contract recorded `repaidAt` are counted as repaid and left
+   *   out of both the on-time and the late tally, because the honest answer to
+   *   when they were settled is that nobody knows.
+   * - **Nothing to show reads as new, never as bad.** `isNew` is what the UI
+   *   needs to say "first time" instead of implying a wallet with no history
+   *   is the worst kind — which would make the product unusable for exactly
+   *   the people micro-lending is for.
+   *
+   * Scoped to the chain that is loaded, since `loanRecords` is, and capped by
+   * the page size the feeds are fetched with: a wallet with more loans than
+   * that on one chain would be summarised from part of its history.
+   */
+  borrowerHistory = (address: string): BorrowerHistory => {
+    const now = Date.now()
+    const history: BorrowerHistory = {
+      total: 0,
+      repaid: 0,
+      onTime: 0,
+      late: 0,
+      undated: 0,
+      outstanding: 0,
+      overdue: 0,
+      isNew: true,
+    }
+
+    for (const loan of this.loanRecords) {
+      if (loan.status !== 'disbursed' || !sameAddress(loan.borrower, address)) continue
+
+      history.total += 1
+
+      const dueAt = new Date(loan.startedAt).getTime() + loan.duration * 1000
+
+      if (!loan.isRepaid) {
+        history.outstanding += 1
+        if (now > dueAt) history.overdue += 1
+
+        continue
+      }
+
+      history.repaid += 1
+
+      if (!loan.repaidAt) history.undated += 1
+      else if (new Date(loan.repaidAt).getTime() > dueAt) history.late += 1
+      else history.onTime += 1
+    }
+
+    history.isNew = history.total === 0
+
+    return history
+  }
+
+  /** The connected wallet's own record, for showing someone their standing. */
+  get myBorrowingHistory(): BorrowerHistory {
+    return this.borrowerHistory(this.userAddress)
   }
 
   /**

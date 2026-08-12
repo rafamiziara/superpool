@@ -73,6 +73,48 @@ export interface Loan {
   repaidAt?: Date
 }
 
+/**
+ * What one wallet has done with money it borrowed before.
+ *
+ * Counts rather than a score, and deliberately: the formula for a score would
+ * be wrong the first time and want retuning, and there is nothing yet to check
+ * one against. These are the facts a pool owner deciding on a request actually
+ * asks for, and every one of them is derived from the loans on read — nothing
+ * about a borrower is stored, so nothing about a borrower can go stale.
+ *
+ * Only funded loans are counted. A request is not borrowing and a rejected one
+ * is a decision that was already made, so neither says anything about whether
+ * this wallet gives money back.
+ */
+export interface BorrowerHistory {
+  /** Loans that were actually disbursed. */
+  total: number
+  /** Of those, the ones settled — whenever that happened. */
+  repaid: number
+  /** Settled on or before `startedAt + duration`. */
+  onTime: number
+  /** Settled after it. Nothing on chain prevents this; the term is unenforced. */
+  late: number
+  /**
+   * Settled, but with no date recorded — loans repaid before the contract
+   * stamped one. Counted in `repaid` and in neither `onTime` nor `late`,
+   * because the honest answer to when they were settled is that nobody knows.
+   */
+  undated: number
+  /** Still owed. */
+  outstanding: number
+  /** Still owed and past the due date, which is a subset of `outstanding`. */
+  overdue: number
+  /**
+   * True when this wallet has never borrowed.
+   *
+   * The distinction the whole shape exists for: zero repayments out of zero
+   * loans is a new borrower, not the worst kind of one, and a lending product
+   * that confuses the two is unusable for the people it is meant for.
+   */
+  isNew: boolean
+}
+
 export enum LoanStatus {
   REQUESTED = 'requested',
   APPROVED = 'approved',
