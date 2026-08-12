@@ -1,9 +1,14 @@
-import type { LoanInfo } from '@superpool/types'
+import type { BorrowerHistory, LoanInfo } from '@superpool/types'
 import React from 'react'
 import { fireEvent, render } from '../../__tests__/test-utils'
 import { LoanRequestCard } from './LoanRequestCard'
 
 const BORROWER = '0x15d34aaf54267db7d7c367839aaf71a00a2c6a65'
+
+/** A wallet nobody has lent to, which is what most fixtures want. */
+function makeHistory(overrides: Partial<BorrowerHistory> = {}): BorrowerHistory {
+  return { total: 0, repaid: 0, onTime: 0, late: 0, undated: 0, outstanding: 0, overdue: 0, isNew: true, ...overrides }
+}
 
 function makeRequest(overrides: Partial<LoanInfo> = {}): LoanInfo {
   return {
@@ -26,7 +31,7 @@ function makeRequest(overrides: Partial<LoanInfo> = {}): LoanInfo {
 }
 
 function renderCard(props: Partial<React.ComponentProps<typeof LoanRequestCard>> = {}) {
-  return render(<LoanRequestCard request={makeRequest()} onApprove={jest.fn()} onReject={jest.fn()} {...props} />)
+  return render(<LoanRequestCard request={makeRequest()} history={makeHistory()} onApprove={jest.fn()} onReject={jest.fn()} {...props} />)
 }
 
 describe('LoanRequestCard', () => {
@@ -97,5 +102,19 @@ describe('LoanRequestCard', () => {
 
     expect(onApprove).not.toHaveBeenCalled()
     expect(onReject).not.toHaveBeenCalled()
+  })
+
+  it('carries the borrower’s record next to the decision', () => {
+    const { getByTestId } = renderCard({ history: makeHistory({ total: 3, repaid: 3, onTime: 3, isNew: false }) })
+
+    expect(getByTestId('loan-request-history-5')).toBeTruthy()
+    expect(getByTestId('loan-request-history-5-on-time')).toBeTruthy()
+  })
+
+  it('says a first-time borrower is new rather than showing them as zeroes', () => {
+    const { getByTestId, queryByTestId } = renderCard()
+
+    expect(getByTestId('loan-request-history-5-new')).toBeTruthy()
+    expect(queryByTestId('loan-request-history-5-stats')).toBeNull()
   })
 })

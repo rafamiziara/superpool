@@ -72,6 +72,30 @@ describe('DashboardScreen', () => {
     expect(getByTestId('repay-button')).toBeTruthy()
   })
 
+  it('shows the user what their own borrowing record looks like', () => {
+    // The same panel a pool owner sees when this wallet asks them for money.
+    // The fixtures hold one loan repaid two days inside its term and one still
+    // running, which is what the counts here are made of.
+    const { getByTestId } = render(<DashboardScreen />)
+
+    expect(getByTestId('dashboard-borrowing-record')).toBeTruthy()
+    expect(getByTestId('dashboard-history-total')).toHaveTextContent('2')
+    expect(getByTestId('dashboard-history-on-time')).toHaveTextContent('1')
+  })
+
+  it('leaves the record out for someone who has never borrowed', () => {
+    // On an owner's queue "nothing to go on" is worth reading. On your own
+    // dashboard it is a panel that exists to say it has nothing to say.
+    poolStore.loanRecords = []
+    const restore = MOCK_LOANS.splice(0, MOCK_LOANS.length)
+
+    const { queryByTestId } = render(<DashboardScreen />)
+
+    expect(queryByTestId('dashboard-borrowing-record')).toBeNull()
+
+    MOCK_LOANS.push(...restore)
+  })
+
   it('renders thumb-zone quick actions', () => {
     const { getByTestId } = render(<DashboardScreen />)
 

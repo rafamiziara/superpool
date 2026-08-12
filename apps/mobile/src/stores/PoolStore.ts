@@ -749,9 +749,9 @@ export class PoolStore {
    *   is the worst kind — which would make the product unusable for exactly
    *   the people micro-lending is for.
    *
-   * Scoped to the chain that is loaded, since `loanRecords` is, and capped by
-   * the page size the feeds are fetched with: a wallet with more loans than
-   * that on one chain would be summarised from part of its history.
+   * Scoped to the chain that is loaded, since the loans are, and capped by the
+   * page size the feeds are fetched with: a wallet with more loans than that on
+   * one chain would be summarised from part of its history.
    */
   borrowerHistory = (address: string): BorrowerHistory => {
     const now = Date.now()
@@ -766,24 +766,29 @@ export class PoolStore {
       isNew: true,
     }
 
-    for (const loan of this.loanRecords) {
-      if (loan.status !== 'disbursed' || !sameAddress(loan.borrower, address)) continue
+    // Over `loans` rather than `loanRecords`, so this agrees with every other
+    // surface about what a loan is — including under mock pools, where the
+    // records are empty and the fixtures are the only loans there are.
+    for (const loan of this.loans) {
+      const wasFunded = loan.status === LoanStatus.DISBURSED || loan.status === LoanStatus.REPAID
+
+      if (!wasFunded || !sameAddress(loan.borrower, address)) continue
 
       history.total += 1
 
-      const dueAt = new Date(loan.startedAt).getTime() + loan.duration * 1000
+      const dueAt = loan.dueDate?.getTime()
 
-      if (!loan.isRepaid) {
+      if (loan.status === LoanStatus.DISBURSED) {
         history.outstanding += 1
-        if (now > dueAt) history.overdue += 1
+        if (dueAt !== undefined && now > dueAt) history.overdue += 1
 
         continue
       }
 
       history.repaid += 1
 
-      if (!loan.repaidAt) history.undated += 1
-      else if (new Date(loan.repaidAt).getTime() > dueAt) history.late += 1
+      if (!loan.repaidAt || dueAt === undefined) history.undated += 1
+      else if (loan.repaidAt.getTime() > dueAt) history.late += 1
       else history.onTime += 1
     }
 

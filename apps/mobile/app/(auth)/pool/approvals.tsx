@@ -220,6 +220,10 @@ function ApprovalsScreen() {
             <LoanRequestCard
               key={request.id}
               request={request}
+              // Read here rather than inside the card so the card stays a
+              // presentational component; the store is the only thing that
+              // knows this borrower's loans in other pools.
+              history={poolStore.borrowerHistory(request.borrower)}
               available={typeof available === 'bigint' ? available : undefined}
               onApprove={() => decide(request, 'approve')}
               onReject={() => decide(request, 'reject')}

@@ -66,6 +66,21 @@ function makeRequest(overrides: Partial<LoanInfo> = {}): LoanInfo {
   }
 }
 
+/**
+ * Load loans the way the live app does.
+ *
+ * The suite runs on mock pools, where `PoolStore.loans` is a fixture list and
+ * ignores `loanRecords` entirely — fine for the queue, which reads the records
+ * directly, and wrong for a borrower's history, which is derived from `loans`
+ * like every other analysis of them. Dropping out of mock mode needs a wallet
+ * too, since the mock user is only the connected one while mocks are on.
+ */
+function withIndexedLoans(records: LoanInfo[]) {
+  delete process.env.EXPO_PUBLIC_USE_MOCK_POOLS
+  authStore.walletAddress = MOCK_USER_ADDRESS
+  poolStore.loanRecords = records
+}
+
 beforeEach(async () => {
   jest.clearAllMocks()
   mockLoanError = null
@@ -81,6 +96,7 @@ beforeEach(async () => {
 })
 
 afterEach(() => {
+  process.env.EXPO_PUBLIC_USE_MOCK_POOLS = 'true'
   poolStore.loanRecords = []
   authStore.walletAddress = null
 })
@@ -120,6 +136,34 @@ describe('ApprovalsScreen', () => {
     const { getByTestId } = render(<ApprovalsScreen />)
 
     expect(getByTestId('approvals-empty')).toBeTruthy()
+  })
+
+  it('shows what the borrower has done with money before', () => {
+    // The decision the screen exists for is a judgement about a person, and
+    // until this landed the only thing on the card about them was an address.
+    withIndexedLoans([
+      makeRequest(),
+      // Their history, in a different pool: settled well inside its term.
+      {
+        ...makeRequest({ id: '31337-3-1', loanId: 1, poolId: 3, status: 'disbursed' }),
+        isRepaid: true,
+        startedAt: '2026-07-20T09:00:00.000Z',
+        repaidAt: '2026-08-10T09:00:00.000Z',
+      },
+    ])
+
+    const { getByTestId } = render(<ApprovalsScreen />)
+
+    expect(getByTestId('loan-request-history-5-total')).toHaveTextContent('1')
+    expect(getByTestId('loan-request-history-5-on-time')).toHaveTextContent('1')
+  })
+
+  it('does not hold a borrower’s first request against them', () => {
+    withIndexedLoans([makeRequest()])
+
+    const { getByTestId } = render(<ApprovalsScreen />)
+
+    expect(getByTestId('loan-request-history-5-new')).toBeTruthy()
   })
 
   it('lists every member’s request, not just the owner’s own', () => {

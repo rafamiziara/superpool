@@ -6,6 +6,7 @@ import React, { useState } from 'react'
 import { Pressable, ScrollView, Text, View } from 'react-native'
 import { ActivityRow } from '../../../../src/components/lending/ActivityRow'
 import { ApprovalsLink } from '../../../../src/components/lending/ApprovalsLink'
+import { BorrowerHistoryPanel } from '../../../../src/components/lending/BorrowerHistoryPanel'
 import { ClaimableInterestSync } from '../../../../src/components/lending/ClaimableInterestSync'
 import { PendingTransactionBanner } from '../../../../src/components/lending/PendingTransactionBanner'
 import { PoolCard } from '../../../../src/components/lending/PoolCard'
@@ -167,6 +168,20 @@ function DashboardScreen() {
                 </Pressable>
               </View>
             </View>
+          </View>
+        )}
+
+        {/*
+          Your own record, shown here because it is the same thing a pool owner
+          sees when you ask them for money — there is no other screen in the app
+          that tells you what your borrowing looks like from the outside. Hidden
+          until you have borrowed at all: on a wallet with no loans the panel
+          says only that there is nothing to say, which is worth reading in an
+          owner's queue and is clutter on your own dashboard.
+        */}
+        {!poolStore.myBorrowingHistory.isNew && (
+          <View className="mt-6 px-6" testID="dashboard-borrowing-record">
+            <BorrowerHistoryPanel history={poolStore.myBorrowingHistory} voice="self" testID="dashboard-history" />
           </View>
         )}
 

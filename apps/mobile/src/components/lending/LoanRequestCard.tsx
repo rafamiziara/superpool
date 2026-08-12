@@ -1,11 +1,19 @@
-import type { LoanInfo } from '@superpool/types'
+import type { BorrowerHistory, LoanInfo } from '@superpool/types'
 import React from 'react'
 import { ActivityIndicator, Pressable, Text, View } from 'react-native'
 import { calculateRepayment } from '../../hooks/pools/useLoan'
 import { formatToken, shortAddress, timeAgo } from '../../utils/format'
+import { BorrowerHistoryPanel } from './BorrowerHistoryPanel'
 
 export interface LoanRequestCardProps {
   request: LoanInfo
+  /**
+   * What this wallet has done with money it borrowed before, across every pool
+   * on the chain — not just this one. Someone who is late everywhere else is
+   * the same risk here, and a pool owner deciding without that is deciding on
+   * the amount alone.
+   */
+  history: BorrowerHistory
   /**
    * Liquidity the pool holds right now, in wei, when known.
    *
@@ -31,7 +39,7 @@ export interface LoanRequestCardProps {
  * pool's money and is the decision worth pausing over; rejection moves nothing
  * and can be undone by the borrower simply asking again.
  */
-export function LoanRequestCard({ request, available, onApprove, onReject, isBusy = false }: LoanRequestCardProps) {
+export function LoanRequestCard({ request, history, available, onApprove, onReject, isBusy = false }: LoanRequestCardProps) {
   const amount = BigInt(request.amount)
   const repayment = calculateRepayment(amount, request.interestRate)
 
@@ -62,6 +70,10 @@ export function LoanRequestCard({ request, available, onApprove, onReject, isBus
         </Text>
         <Text className="mt-1 text-xs text-mist">Interest is fixed the moment you approve, at the pool&apos;s rate on that day.</Text>
       </View>
+
+      {/* Above the buttons rather than below them: it is what the decision is
+          made on, and a record read after deciding is a record read too late. */}
+      <BorrowerHistoryPanel history={history} voice="owner" testID={`loan-request-history-${request.loanId}`} />
 
       {shortOfFunds && (
         <View
