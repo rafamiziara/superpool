@@ -459,10 +459,33 @@ mocked tests do not catch.
 
 ## Contributions
 
-For anything touching deposits, pool liquidity or membership, read
-[`docs/CONTRIBUTIONS.md`](docs/CONTRIBUTIONS.md). Note especially that there is
-**no membership register on chain** — memberships are derived from
-contributions, and liquidity is summed from events rather than stored.
+For anything touching deposits or pool liquidity, read
+[`docs/CONTRIBUTIONS.md`](docs/CONTRIBUTIONS.md). Note especially that liquidity
+and balances are summed from events rather than stored, so nothing can fall out
+of step with the chain.
+
+## Membership
+
+For anything touching who belongs to a pool, read
+[`docs/MEMBERSHIP.md`](docs/MEMBERSHIP.md). The register is on chain now and is
+**written on every deposit in both modes** — an open pool enrols whoever funds
+it, a permissioned one requires `Active` first. That is what keeps one answer to
+"is this address a member", and why an owner can close an open pool without
+stranding anyone.
+
+Two rules that are easy to break and hard to notice:
+
+- **Never gate `withdraw` or `repayLoan` on membership.** Removal takes away
+  what you may do next, not what you already put in. `PoolStore.activeMemberships`
+  follows the same rule and keeps a removed member's position.
+- **`memberships` and `memberRecords` are not interchangeable.** The first
+  merges the register with the events and defaults an unswept contributor to
+  active — right for showing someone their own position. The second is the
+  register alone — right for anything the owner acts on, and the only one that
+  can tell a rejected applicant from a stranger.
+
+`requiresMembership` is `poolConfig[5]`. Read it from the chain, never from an
+indexed pool record — the owner can change it at any moment and nothing indexes it.
 
 ## Loans
 
@@ -479,6 +502,10 @@ reverts and the flow is `requestLoan` → `approveLoan` / `rejectLoan`, plus
 `cancelLoanRequest` for the borrower. Read that flag from the chain, never from
 an indexed pool record — the owner can change it at any moment and nothing
 indexes it.
+
+Borrowing is gated on **membership**, not on having contributed: a member the
+owner admitted can borrow without having lent first. See
+[`docs/MEMBERSHIP.md`](docs/MEMBERSHIP.md).
 
 `isRepaid` is meaningless unless `status` is `disbursed`: it is `false` on a
 pending request too, so anything that reads it without checking `status` first

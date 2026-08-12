@@ -21,19 +21,26 @@ contributionIndexer           → one Firestore document per log
 listContributions             → the app sums them
 ```
 
-## Why there is no membership flow
+## Membership is a register now, not an inference
 
-`SampleLendingPool` has no membership register. There is nothing on chain to
-join, no `addMember`, no approval. So the app treats **contributing to a pool as
-what makes you a member of it**, and `PoolStore.memberships` is derived from
-`contributions` rather than stored.
+**This section used to say the opposite.** Until the membership milestone
+`SampleLendingPool` had nothing to join, so the app treated contributing as what
+made you a member and `PoolStore.memberships` derived that from
+`contributions`. It now reads a real register — see
+[`MEMBERSHIP.md`](MEMBERSHIP.md).
 
-That is not a shortcut around a missing feature — it is the only model the
-contracts can actually support today. When a real register arrives, this getter
-is the one place that changes.
+What matters here is that **depositing still enrols you in an open pool**. The
+contract writes the register on every deposit in both modes, so the old
+semantics are preserved exactly; they are just an on-chain fact instead of an
+off-chain inference. In a permissioned pool the order reverses — `depositFunds`
+reverts for anyone who is not `Active`, so joining comes first.
 
-The same reasoning applies to a pool's liquidity and a member's balance: both
-are summed from the events on read. There is no denormalised total, so there is
+`PoolStore.memberships` therefore merges two sources: standing from the
+register, money from the events. Keep the split. A contributor the sweep has not
+reached yet still reads as active, which is what depositing has always meant.
+
+The liquidity half is unchanged: a pool's liquidity and a member's balance are
+summed from the events on read. There is no denormalised total, so there is
 nothing that can fall out of step with the chain.
 
 ## Why there is no preparation step

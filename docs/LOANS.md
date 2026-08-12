@@ -177,7 +177,7 @@ asking for a signature, because a reverted transaction still costs gas:
 | Amount above zero               | ✅                  | ✅                     | ✅                |
 | ≤ the pool's `maxLoanAmount`    | ✅                  | ✅                     | ✅                |
 | ≤ the pool's `totalFunds`       | ✅                  | ✅                     | ❌ — at approval  |
-| Borrower has contributed        | ❌                  | ✅                     | ✅                |
+| Borrower is an `Active` member  | ❌                  | ✅                     | ✅                |
 | No other open loan in that pool | ❌                  | ✅                     | ✅                |
 | Pool is active and not paused   | ❌                  | ✅                     | ✅                |
 
@@ -294,9 +294,12 @@ The default is `pool`, the only safe answer for a feed nobody has narrowed.
   and "no result" is what the monitor reads as a confirmed transaction that
   produced nothing.
 - **`UnauthorizedBorrower` means three different things.** On `createLoan` and
-  `requestLoan` it fires when the caller has never contributed; on `repayLoan`
-  and `cancelLoanRequest` it means the loan belongs to someone else. `useLoan`
-  keeps a message map per path for that reason.
+  `requestLoan` it fires when the caller is not an `Active` member — see
+  [`MEMBERSHIP.md`](MEMBERSHIP.md); on `repayLoan` and `cancelLoanRequest` it
+  means the loan belongs to someone else. `useLoan` keeps a message map per path
+  for that reason. Note the wording is "join this pool", not "contribute to it":
+  in a permissioned pool no amount of depositing helps until the owner admits
+  you.
 - **`LoanNotPending` is a race, not a fault.** It is what a borrower cancelling
   while the owner's decision is in flight looks like, and it is the error the
   approvals screen will actually hit.
@@ -313,8 +316,10 @@ The default is `pool`, the only safe answer for a feed nobody has narrowed.
 ## Known limitations
 
 - **Approval is per pool and off by default**, so a pool that never turns it on
-  still lets anyone who has contributed borrow up to the cap without anyone
-  agreeing. The step exists now; adopting it is the owner's choice.
+  still lets any member borrow up to the cap without anyone agreeing. The step
+  exists now; adopting it is the owner's choice. In an _open_ pool that also
+  means anyone at all, since funding one enrols you — the membership register is
+  the other half of this gate, not a separate concern.
 - **Approval is the pool owner, not the multi-sig.** `approveLoan` and
   `rejectLoan` are `onlyOwner` on the pool, so the Safe story in `CLAUDE.md`
   still does not reach loans.

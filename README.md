@@ -37,6 +37,7 @@ These are implemented end to end and verified against a live chain:
 - **🏗️ Pool Creation:** A user creates their own lending pool from the mobile app — form → `PoolFactory.createPool` → receipt parsing → an indexed Firestore document, with three independent indexing paths and idempotent writes ([how it works](docs/POOL_CREATION.md)).
 - **💰 Liquidity Contribution:** A member deposits native currency into a pool — form → `depositFunds` → `FundsDeposited` indexed into Firestore → the pool's liquidity and the member's position, both summed from the events rather than stored as totals ([how it works](docs/CONTRIBUTIONS.md)).
 - **⏳ Pending Transaction Tracking:** Submitted transactions of every kind survive an app restart; startup recovery resolves them and drains them into the pool list. A settled record can be cleared by hand — the chain has it either way, so the sweep re-derives it.
+- **👥 Permissioned Membership:** Each pool chooses at creation whether its owner admits members (`requiresMembership`, changeable later). With it on, joining is `requestMembership` → `approveMember` / `rejectMember`, and nobody can fund the pool or borrow from it until they are let in; with it off, funding a pool is what makes you a member of it. The register is written either way, so an owner can close an open pool without stranding anyone ([how it works](docs/MEMBERSHIP.md)).
 - **📋 Loan Request & Approval:** Each pool chooses whether to review requests before lending (`setRequiresApproval`, owner-only, off by default). With it on, borrowing is `requestLoan` → `approveLoan` / `rejectLoan`, plus `cancelLoanRequest` for the borrower; with it off, `createLoan` disburses in one call to any member who has contributed. Owners get a queue, members get a status ([how it works](docs/LOANS.md)).
 - **💸 Loan Repayment:** Principal plus flat interest in one transaction — interest is fixed at disbursement and does not accrue, so repaying early costs the same.
 - **📱 Cross-Platform Mobile App:** React Native/Expo application with onboarding, wallet connection and a live pool list.
@@ -47,7 +48,6 @@ These are implemented end to end and verified against a live chain:
 
 Designed and partly scaffolded, but **not** functional yet — the mobile screens for these are placeholders:
 
-- **👥 Permissioned Membership:** Pool administrators approving members before they can contribute or borrow. There is no membership register on chain today — contributing to a pool is what makes you a member of it.
 - **🪙 ERC-20 Liquidity:** Contributions are native currency only; token deposits need contract work.
 - **💸 Default Handling & Pool Health:** A loan's term is recorded and shown, but nothing on chain enforces it — there is no liquidation, no penalty and no default state.
 - **💰 Interest Distribution:** Repaid interest reaches the pool's balance but cannot be credited to the members who funded the loan, so lifetime earnings are zero for everyone.
