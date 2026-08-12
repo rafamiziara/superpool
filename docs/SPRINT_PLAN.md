@@ -21,7 +21,7 @@ To build a functional micro-lending decentralized application on Polygon where u
 | 9 · Reputations                | 🚧 History shipped; no score, deliberately          |
 | 10 · Loan Management           | 🚧 Decisions and borrower history; AI support not   |
 | 11 · Interest Distribution     | ✅ Complete                                         |
-| 12 · Notifications             | ❌ Not started                                      |
+| 12 · Notifications             | 🚧 Owner-facing pushes shipped; delivery unverified |
 
 Sprints 4–10 were shipped in a different order than planned. Membership (4)
 landed after liquidity (5) and loans (6, 7, 10), and loan management (10)
@@ -171,9 +171,13 @@ membership from having contributed, which is the model Sprint 4 replaced.
 
 - **Pool Discovery & Joining** ✅
   - Smart contract `requestMembership` (the plan called it `requestToJoinPool`)
-  - UI for users to browse and find available pools
+  - UI for users to browse and find available pools ✅ — **this was ticked here
+    before it was true.** `pool/join` was reachable only from `pool/[id]`, and
+    that only from a list narrowed to `myPools`, so the join flow had no entry
+    point for the people it was for. The Discover tab closed it (`6a9d793`);
+    see the Discovery section in [`CLAUDE.md`](../CLAUDE.md).
   - Pool details display and join request submission (`pool/join.tsx`)
-  - Request status tracking — ✅; notifications — ❌ see Sprint 12
+  - Request status tracking — ✅; notifications — ✅ Sprint 12
 
 - **Admin Membership Management** ✅
   - Smart contract `approveMember` / `rejectMember` / `removeMember`, owner-only
@@ -186,7 +190,9 @@ membership from having contributed, which is the model Sprint 4 replaced.
   - Backend APIs for join request processing (`indexMembership`, `listMembers`)
   - Firestore storage for membership requests and statuses
   - Event listeners for membership changes (all six events in `syncPoolEvents`)
-  - **Email/push notifications — ❌** see Sprint 12
+  - Push notifications — ✅ Sprint 12 (owner side: somebody asked to join).
+    **Email — ❌ and out of scope**: no email address exists anywhere in this
+    project and collecting one is a different product decision.
 
 ### Expected Deliverables:
 
@@ -296,7 +302,10 @@ See [`LOANS.md`](LOANS.md) for how the shipped system works.
 
 - **Repayment System** 🚧
   - Smart contract `repayLoan` ✅
-  - **Payment scheduling and reminder system — ❌** see Sprint 12
+  - **Payment scheduling and reminder system — ❌** still outstanding after
+    Sprint 12, which shipped only the owner-facing half. Due and overdue are
+    **not events** — nothing on chain fires when a term lapses — so this is a
+    scheduled scan, not an indexer hook.
   - Full repayment ✅; **partial repayment — ❌**, it is all-or-nothing and
     `isRepaid` is a bool rather than a running balance
   - Interest calculation ✅ — **flat, fixed at disbursement, not accrued**, so
@@ -312,7 +321,7 @@ See [`LOANS.md`](LOANS.md) for how the shipped system works.
   - Event listeners for loan repayment transactions ✅
   - Loan status updates in Firestore ✅
   - Payment history ✅; **analytics — ❌**
-  - **Automated notifications for due dates — ❌** see Sprint 12
+  - **Automated notifications for due dates — ❌** see Sprint 12's remainder
 
 ### Expected Deliverables:
 
@@ -474,7 +483,8 @@ reputation is still waiting on those sprints.
 - **Administrative Tools** 🚧
   - Loan queue management ✅; prioritisation ❌
   - Decision audit trail — on chain by construction; **no tooling over it** ❌
-  - **Admin notification and alert system — ❌** see Sprint 12
+  - Admin notification and alert system — ✅ Sprint 12. A loan request now
+    reaches the owner's phone and deep-links to the queue.
   - **Loan portfolio overview and statistics — ❌**
 
 ### Expected Deliverables:
@@ -558,23 +568,59 @@ fungible. A claim has no activity-feed row yet.
 **Sprint Goal:** Tell people when something is waiting on them.
 
 Added 2026-08-12. Not previously its own sprint, but Sprints 4, 7 and 10 each
-list notifications as a feature and none of them has any — so it kept being
+list notifications as a feature and none of them had any — so it kept being
 "part of" work that shipped without it.
 
-### Why it needs a sprint of its own
+Plan: [`.dev/NOTIFICATIONS_PLAN.md`](../.dev/NOTIFICATIONS_PLAN.md). How it
+works: the Notifications section in [`CLAUDE.md`](../CLAUDE.md).
 
-Every owner-side flow now depends on someone noticing: a loan or membership
-request costs the asker nothing to make and the owner everything to miss.
-Today the only way to find out is to open the pool.
+### Why it needed a sprint of its own
 
-### Features:
+Every owner-side flow depended on someone noticing: a loan or membership request
+costs the asker nothing to make and the owner everything to miss. The only way
+to find out was to open the pool.
 
-- Firebase Cloud Messaging wiring (nothing exists — the only current reference
-  is `messagingSenderId` in the Firebase config object)
-- Cloud Functions triggered by the existing indexers, not by new listeners
-- Membership request received / decided (Sprint 4)
-- Loan request received / approved / rejected (Sprints 6, 10)
-- Repayment due and overdue (Sprint 7)
+### What shipped (plan §8) ✅
+
+- **Expo push, not Firebase Cloud Messaging.** The sprint text said "FCM
+  wiring", and that was wrong in a load-bearing way: `firebase/messaging` in the
+  JS SDK is web-only, so `messagingSenderId` was inert rather than a head start.
+  The alternative was a second, native Firebase SDK beside the one the app
+  already uses. The backend POSTs to `exp.host` and gains no messaging
+  dependency at all.
+- **Token registration** — `registerPushToken` / `unregisterPushToken`, their
+  own `push_tokens` collection, given back on wallet disconnect _and_ switch.
+- **Transition detection in the existing indexers**, not new listeners, as the
+  sprint asked. All six transitions from the plan's table are detected and
+  tested; the two owner-facing ones dispatch.
+- **Membership request received** (Sprint 4) and **loan request received**
+  (Sprints 6, 10), both to the pool owner, both deep-linking to the queue.
+- Idempotency per (record, transition), so re-scanning genesis cannot produce a
+  push per request ever made.
+
+### What is left ❌
+
+- **Borrower-facing pushes**: loan approved, loan rejected, membership decided.
+  Courtesies rather than the reason the sprint exists — and note
+  `cancelLoanRequest` emits `LoanRejected`, so a borrower who cancels their own
+  request must not be told it was declined.
+- **`sendDueReminders`** (Sprint 7's half). A scheduled scan, not an event hook,
+  plus its own clock discipline: the record's `startedAt` is chain time and the
+  job's "now" is server time, and a loan has to remember it was reminded.
+- **Receipt polling.** Only send-response `DeviceNotRegistered` pruning is
+  implemented. Expo's `getReceipts` needs a deferred second pass.
+- **Preferences beyond on/off**, digests, quiet hours, an in-app notification
+  centre — all deliberately out of scope, see the plan §7.
+
+### Current Status: **Owner-facing pushes shipped; delivery unverified** 🚧
+
+The code is written and tested — 116 tests over transitions, idempotency,
+recipient resolution, token pruning and the deep links. **Nothing has reached a
+phone.** This is the first milestone in the project whose acceptance test the
+sandbox cannot run: the emulator does not deliver push. Closing it needs
+`eas build --profile development`, an APNs key and an FCM v1 service account
+uploaded to EAS. Expo Go on Android cannot receive remote push at all since
+SDK 53.
 
 ---
 
@@ -591,3 +637,9 @@ Today the only way to find out is to open the pool.
 - **Pending transaction tracking.** Shipped without a sprint: persistence across
   restarts, startup recovery, per-type result extraction and the status modal.
   Every write flow depends on it; the plan has never mentioned it.
+- **Pool discovery.** Also shipped without a sprint, and Sprint 4 had ticked it
+  years-of-code before it existed. `PoolStore.discoverablePools` is the
+  complement of `myPools`, so the Pools and Discover tabs partition the chain.
+  Its known limit is written down rather than fixed: search is client-side over
+  one page of 50 pools, because `listPools` has no text filter and Firestore
+  cannot match a substring. The fix is search tokens on the pool document.
