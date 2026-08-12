@@ -1,7 +1,10 @@
 import type {
   ContributionInfo,
+  InterestClaimInfo,
   ListContributionsRequest,
   ListContributionsResponse,
+  ListInterestClaimsRequest,
+  ListInterestClaimsResponse,
   ListLoansRequest,
   ListLoansResponse,
   ListMembersRequest,
@@ -102,6 +105,23 @@ export class PoolStore {
   pools: PoolInfo[] = []
   contributions: ContributionInfo[] = []
   withdrawals: WithdrawalInfo[] = []
+  /**
+   * Interest members have taken out of pools, indexed.
+   *
+   * Half of what a member has earned; the other half is still on the pool and
+   * has to be read from the chain — see `claimableByPool`.
+   */
+  interestClaims: InterestClaimInfo[] = []
+  /**
+   * Interest a pool has credited the connected wallet and not yet paid out, by
+   * pool id, in wei as a decimal string.
+   *
+   * Written from outside, by whatever reads `claimable(address)` from the chain,
+   * because this store speaks to Firestore and nothing else. It cannot be
+   * derived from the indexed feeds at all: accrual is a consequence of other
+   * people's repayments and emits nothing per member.
+   */
+  claimableByPool: Record<number, string> = {}
   /** Indexed loans, newest first. Mock fixtures stand in only in mock mode. */
   loanRecords: LoanInfo[] = []
   /**
@@ -211,6 +231,8 @@ export class PoolStore {
       this.pools = []
       this.contributions = []
       this.withdrawals = []
+      this.interestClaims = []
+      this.claimableByPool = {}
       this.loanRecords = []
       this.memberRecords = []
       this.transactions = []
@@ -232,18 +254,20 @@ export class PoolStore {
       // Fetched together so pools and the positions in them are one snapshot:
       // a balance shown against a pool that is not in the list, or vice versa,
       // reads as a bug even though each half was individually correct.
-      const [pools, contributions, withdrawals, loans, members]: [
+      const [pools, contributions, withdrawals, claims, loans, members]: [
         PoolInfo[],
         ContributionInfo[],
         WithdrawalInfo[],
+        InterestClaimInfo[],
         LoanInfo[],
         MemberInfo[],
       ] = usingMockPools()
-        ? [MOCK_POOLS, [], [], [], []]
+        ? [MOCK_POOLS, [], [], [], [], []]
         : await Promise.all([
             this.requestPools(params),
             this.requestContributions(params),
             this.requestWithdrawals(params),
+            this.requestInterestClaims(params),
             this.requestLoans(params),
             this.requestMembers(params),
           ])
@@ -252,6 +276,7 @@ export class PoolStore {
         this.pools = pools
         this.contributions = contributions
         this.withdrawals = withdrawals
+        this.interestClaims = claims
         this.loanRecords = loans
         this.memberRecords = members
         this.lastFetchedAt = new Date()
@@ -320,6 +345,26 @@ export class PoolStore {
     })
 
     return response.data.withdrawals ?? []
+  }
+
+  /**
+   * Every interest claim on the chain, not just the user's.
+   *
+   * Unfiltered for the same reason contributions are: a pool's page shows what
+   * it has paid out in interest, which is everyone's claims.
+   */
+  private requestInterestClaims = async (params: ListPoolsRequest): Promise<InterestClaimInfo[]> => {
+    const listInterestClaims = httpsCallable<ListInterestClaimsRequest, ListInterestClaimsResponse>(
+      FIREBASE_FUNCTIONS,
+      'listInterestClaims'
+    )
+
+    const response = await listInterestClaims({
+      chainId: params.chainId ?? authStore.chainId ?? DEFAULT_CHAIN_ID,
+      limit: DEFAULT_PAGE_SIZE,
+    })
+
+    return response.data.claims ?? []
   }
 
   /**
@@ -410,7 +455,8 @@ export class PoolStore {
    * `totalContributed` is lifetime deposits and only ever grows; `currentBalance`
    * is what is left after withdrawals. Keeping them apart is what lets a member
    * who has taken everything out still read as a past member rather than
-   * vanishing, and it is why `totalEarned` subtracts one from the other.
+   * vanishing. Neither is earnings: interest is credited separately by the
+   * contract and never lands in a contribution — see `totalEarned`.
    *
    * In mock mode the fixtures stand in, so the UI can be worked on without the
    * emulators running.
@@ -513,22 +559,51 @@ export class PoolStore {
     return this.activeMemberships.reduce((sum, member) => sum + member.currentBalance, 0n)
   }
 
+  /** Interest the connected wallet has already taken out, across pools (wei). */
+  get claimedInterest(): bigint {
+    return this.interestClaims
+      .filter((claim) => sameAddress(claim.account, this.userAddress))
+      .reduce((sum, claim) => sum + BigInt(claim.amount), 0n)
+  }
+
+  /** Interest credited to the connected wallet and not yet taken out (wei). */
+  get claimableInterest(): bigint {
+    return Object.values(this.claimableByPool).reduce((sum, amount) => sum + BigInt(amount), 0n)
+  }
+
   /**
-   * Lifetime earnings: current balances minus what was contributed (wei).
+   * Lifetime earnings: what has been claimed plus what is still claimable (wei).
    *
-   * Zero against real data today, and honestly so. Interest reaches the pool
-   * through `repayLoan` but the contract has no way to distribute it — a member
-   * can only ever withdraw what they put in — so there is nothing to credit
-   * anyone. Clamped per member because a withdrawal makes `currentBalance` fall
-   * below `totalContributed`, and reporting that difference as negative earnings
-   * would be wrong rather than merely empty.
+   * It used to be `currentBalance - totalContributed`, clamped at zero, which
+   * was a stand-in for an accounting that did not exist — interest reached the
+   * pool through `repayLoan` and was credited to nobody, so the figure was
+   * structurally zero. The contract distributes it now, and both halves of the
+   * answer are read rather than inferred: claims from the indexed events,
+   * accrual from the chain.
+   *
+   * The two must be added, not chosen between. Claiming moves an amount from one
+   * to the other, so reporting either alone makes lifetime earnings drop the
+   * moment someone takes their money.
+   *
+   * `claimableByPool` is empty until something reads the chain into it, so this
+   * reports claims alone on a screen that has not — which understates rather
+   * than invents.
    */
   get totalEarned(): bigint {
-    return this.activeMemberships.reduce((sum, member) => {
-      const earned = member.currentBalance - member.totalContributed
+    return this.claimedInterest + this.claimableInterest
+  }
 
-      return sum + (earned > 0n ? earned : 0n)
-    }, 0n)
+  /**
+   * Records what the chain says one pool currently owes the connected wallet.
+   *
+   * The way `claimable` gets into the store: an action rather than a fetch,
+   * because reading it needs a wallet-aware contract call and this store has no
+   * chain access of its own.
+   */
+  setClaimable = (poolId: number, amount: bigint): void => {
+    runInAction(() => {
+      this.claimableByPool = { ...this.claimableByPool, [poolId]: amount.toString() }
+    })
   }
 
   /**

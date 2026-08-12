@@ -35,7 +35,26 @@ describe('DashboardScreen', () => {
     const { getByText } = render(<DashboardScreen />)
 
     expect(getByText('601.6')).toBeTruthy()
-    expect(getByText('+26.6 POL earned all-time')).toBeTruthy()
+  })
+
+  it('says nothing about earnings when there are none', () => {
+    // Earnings are no longer inferred from a balance exceeding what was
+    // contributed — that was a stand-in for accounting the contract did not
+    // have. With no claims and nothing read from the chain, the honest answer
+    // is silence rather than a zero.
+    const { queryByText } = render(<DashboardScreen />)
+
+    expect(queryByText(/earned all-time/)).toBeNull()
+  })
+
+  it('shows lifetime earnings once a pool has credited some', () => {
+    poolStore.setClaimable(1, 2_500_000_000_000_000_000n)
+
+    const { getByText } = render(<DashboardScreen />)
+
+    expect(getByText('+2.5 POL earned all-time')).toBeTruthy()
+
+    poolStore.claimableByPool = {}
   })
 
   it('renders a macro-card per joined pool', () => {

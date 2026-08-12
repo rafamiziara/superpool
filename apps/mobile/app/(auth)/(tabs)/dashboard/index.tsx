@@ -6,6 +6,7 @@ import React, { useState } from 'react'
 import { Pressable, ScrollView, Text, View } from 'react-native'
 import { ActivityRow } from '../../../../src/components/lending/ActivityRow'
 import { ApprovalsLink } from '../../../../src/components/lending/ApprovalsLink'
+import { ClaimableInterestSync } from '../../../../src/components/lending/ClaimableInterestSync'
 import { PendingTransactionBanner } from '../../../../src/components/lending/PendingTransactionBanner'
 import { PoolCard } from '../../../../src/components/lending/PoolCard'
 import { TransactionStatusModal } from '../../../../src/components/lending/TransactionStatusModal'
@@ -28,6 +29,14 @@ function DashboardScreen() {
   return (
     <View className="flex-1 bg-abyss" testID="dashboard-screen">
       <StatusBar style="light" />
+
+      {/*
+        Renders nothing. Lifetime earnings are claims plus what is still on the
+        pools, and only the first half is in Firestore — this asks the chain for
+        the second, per pool, so the figure below is the whole answer rather
+        than the part that happens to have been taken out.
+      */}
+      <ClaimableInterestSync />
 
       <ScrollView
         showsVerticalScrollIndicator={false}

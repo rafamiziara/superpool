@@ -7,6 +7,7 @@ import { Pressable, ScrollView, Text, View } from 'react-native'
 import { useReadContract } from 'wagmi'
 import { ActivityRow } from '../../../src/components/lending/ActivityRow'
 import { ApprovalsLink } from '../../../src/components/lending/ApprovalsLink'
+import { ClaimInterestCard } from '../../../src/components/lending/ClaimInterestCard'
 import { PendingContributionCard } from '../../../src/components/lending/PendingContributionCard'
 import { TransactionStatusModal } from '../../../src/components/lending/TransactionStatusModal'
 import { SampleLendingPoolABI } from '../../../src/constants/abis'
@@ -147,6 +148,22 @@ function PoolDetailScreen() {
                 </View>
               </View>
             </View>
+          </View>
+        )}
+
+        {/*
+          Interest, kept out of the position card above rather than added to it.
+          The balance there is a contribution — withdrawable, and the pool's to
+          lend; this is earnings, taken out separately and by a different call.
+          Showing them as one number would suggest withdrawing takes both.
+
+          Shown to anyone with a position, and not gated on membership, because
+          the contract is not: interest earned while your money was in the pool
+          stays yours after you leave or are removed.
+        */}
+        {membership && (
+          <View className="mt-4 px-6">
+            <ClaimInterestCard poolId={pool.poolId} poolAddress={pool.poolAddress as `0x${string}`} poolName={pool.name} />
           </View>
         )}
 

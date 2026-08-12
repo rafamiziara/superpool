@@ -35,9 +35,56 @@ describe('PoolStore', () => {
     expect(store.totalBalance).toBe(parseEther('601.6'))
   })
 
-  it('computes lifetime earnings', () => {
-    // (195.4 - 180) + (331.2 - 320) + (75 - 75)
-    expect(store.totalEarned).toBe(parseEther('26.6'))
+  it('reports no earnings until something says otherwise', () => {
+    // Interest is no longer inferred from a balance exceeding what was
+    // contributed — that was a stand-in for accounting the contract did not
+    // have. It is claims plus what the chain says is still claimable, and the
+    // mock fixtures carry neither.
+    expect(store.totalEarned).toBe(0n)
+  })
+
+  it('adds what is still claimable to what has already been claimed', () => {
+    // The two must be added, not chosen between: claiming moves an amount from
+    // one to the other, so reporting either alone would make lifetime earnings
+    // drop the moment someone takes their money.
+    store.interestClaims = [
+      {
+        id: '31337-0xaaa-0',
+        poolId: 1,
+        poolAddress: '0xPool',
+        account: MOCK_USER_ADDRESS.toLowerCase(),
+        amount: parseEther('2').toString(),
+        chainId: 31337,
+        transactionHash: '0xaaa',
+        logIndex: 0,
+        blockNumber: 1,
+        claimedAt: '2026-08-12T00:00:00.000Z',
+      },
+    ]
+    store.setClaimable(1, parseEther('3'))
+
+    expect(store.claimedInterest).toBe(parseEther('2'))
+    expect(store.claimableInterest).toBe(parseEther('3'))
+    expect(store.totalEarned).toBe(parseEther('5'))
+  })
+
+  it("ignores another wallet's claims", () => {
+    store.interestClaims = [
+      {
+        id: '31337-0xbbb-0',
+        poolId: 1,
+        poolAddress: '0xPool',
+        account: '0x000000000000000000000000000000000000dead',
+        amount: parseEther('9').toString(),
+        chainId: 31337,
+        transactionHash: '0xbbb',
+        logIndex: 0,
+        blockNumber: 1,
+        claimedAt: '2026-08-12T00:00:00.000Z',
+      },
+    ]
+
+    expect(store.totalEarned).toBe(0n)
   })
 
   it('finds the active (disbursed) loan for the user', () => {
@@ -729,6 +776,7 @@ describe('PoolStore chain sync', () => {
       if (name === 'syncPoolEventsNow') return syncCallable
       if (name === 'listContributions') return jest.fn().mockResolvedValue({ data: { contributions: [], totalCount: 0, limit: 50 } })
       if (name === 'listWithdrawals') return jest.fn().mockResolvedValue({ data: { withdrawals: [], totalCount: 0, limit: 50 } })
+      if (name === 'listInterestClaims') return jest.fn().mockResolvedValue({ data: { claims: [], totalCount: 0, limit: 50 } })
       if (name === 'listLoans') return jest.fn().mockResolvedValue({ data: { loans: [], totalCount: 0, limit: 50 } })
       if (name === 'listMembers') return jest.fn().mockResolvedValue({ data: { members: [], totalCount: 0, limit: 50 } })
       return listPoolsCallable
@@ -996,6 +1044,7 @@ describe('PoolStore loan states', () => {
       if (name === 'listLoans') return listLoansCallable
       if (name === 'listContributions') return listContributionsCallable
       if (name === 'listWithdrawals') return jest.fn().mockResolvedValue({ data: { withdrawals: [], totalCount: 0, limit: 50 } })
+      if (name === 'listInterestClaims') return jest.fn().mockResolvedValue({ data: { claims: [], totalCount: 0, limit: 50 } })
       return jest.fn().mockResolvedValue({
         data: { pools: [LIVE_POOL], totalCount: 1, page: 1, limit: 50, hasNextPage: false, hasPreviousPage: false },
       })
