@@ -155,6 +155,7 @@ async function main() {
         loanDuration: 7 * 24 * 60 * 60, // 7 days
         name: 'Quick Loans Pool',
         description: 'Short-term loans with fast approval',
+        requiresMembership: false,
       },
       {
         creator: accounts[2],
@@ -163,6 +164,7 @@ async function main() {
         loanDuration: 30 * 24 * 60 * 60, // 30 days
         name: 'Medium Term Pool',
         description: 'Medium-term loans for moderate amounts',
+        requiresMembership: false,
       },
       {
         creator: deployer,
@@ -171,6 +173,7 @@ async function main() {
         loanDuration: 90 * 24 * 60 * 60, // 90 days
         name: 'Large Loan Pool',
         description: 'High-value loans with extended terms',
+        requiresMembership: false,
       },
     ]
 

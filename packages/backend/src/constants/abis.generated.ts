@@ -480,6 +480,11 @@ export const PoolFactoryABI = [
             "internalType": "string",
             "name": "description",
             "type": "string"
+          },
+          {
+            "internalType": "bool",
+            "name": "requiresMembership",
+            "type": "bool"
           }
         ],
         "internalType": "struct PoolFactory.PoolParams",
@@ -1883,6 +1888,11 @@ export const SampleLendingPoolABI = [
         "internalType": "uint256",
         "name": "_loanDuration",
         "type": "uint256"
+      },
+      {
+        "internalType": "bool",
+        "name": "_requiresMembership",
+        "type": "bool"
       }
     ],
     "name": "initialize",

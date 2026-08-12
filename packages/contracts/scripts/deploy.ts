@@ -148,6 +148,7 @@ async function main() {
       loanDuration: 30 * 24 * 60 * 60, // 30 days in seconds
       name: 'SuperPool Sample Lending Pool',
       description: 'A sample lending pool for testing and demonstration purposes',
+      requiresMembership: false,
     }
 
     console.log('Sample pool parameters:')

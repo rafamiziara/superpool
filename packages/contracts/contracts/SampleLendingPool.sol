@@ -310,12 +310,15 @@ contract SampleLendingPool is
      * @param _maxLoanAmount Maximum loan amount allowed
      * @param _interestRate Interest rate (in basis points, e.g., 500 = 5%)
      * @param _loanDuration Loan duration in seconds
+     * @param _requiresMembership Whether the owner admits members, or the pool
+     * is open to anyone who funds it
      */
     function initialize(
         address _owner,
         uint256 _maxLoanAmount,
         uint256 _interestRate,
-        uint256 _loanDuration
+        uint256 _loanDuration,
+        bool _requiresMembership
     ) public initializer {
         __Ownable_init(_owner);
         __Pausable_init();
@@ -329,12 +332,11 @@ contract SampleLendingPool is
             // to review requests, which keeps the factory's `createPool`
             // signature — and every caller of it — unchanged.
             requiresApproval: false,
-            // Also off here, for now: the factory does not pass a choice yet, so
-            // defaulting this on would make every pool private the moment this
-            // lands and break the open flow that works today. The creator's
-            // choice arrives with the `PoolParams` field, and the register is
-            // populated either way.
-            requiresMembership: false
+            // The creator's choice, unlike `requiresApproval` above: a pool is
+            // private or open from birth, and the owner can still change its
+            // mind later through `setRequiresMembership`. The register is
+            // written either way.
+            requiresMembership: _requiresMembership
         });
 
         nextLoanId = 1;

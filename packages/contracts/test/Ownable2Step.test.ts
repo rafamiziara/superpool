@@ -153,6 +153,7 @@ describe('PoolFactory Ownable2Step', function () {
         loanDuration: 30 * 24 * 60 * 60,
         name: 'Test Pool',
         description: 'A test lending pool',
+        requiresMembership: false,
       }
 
       await expect(poolFactory.connect(owner).createPool(params)).to.not.be.reverted
@@ -234,6 +235,7 @@ describe('PoolFactory Ownable2Step', function () {
         loanDuration: 30 * 24 * 60 * 60,
         name: 'Test Pool',
         description: 'A test lending pool',
+        requiresMembership: false,
       }
       await poolFactory.connect(owner).createPool(params)
       expect(await poolFactory.getPoolCount()).to.equal(1)
@@ -257,6 +259,7 @@ describe('PoolFactory Ownable2Step', function () {
           loanDuration: 60 * 24 * 60 * 60,
           name: 'Pool 2',
           description: 'Second pool',
+          requiresMembership: false,
         })
       ).to.not.be.reverted
 

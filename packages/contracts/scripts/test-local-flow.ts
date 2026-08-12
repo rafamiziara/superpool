@@ -60,6 +60,7 @@ async function testLocalFlow() {
       loanDuration: 30 * 24 * 60 * 60, // 30 days
       name: 'Test Pool',
       description: 'A test lending pool for ownership transfer testing',
+      requiresMembership: false,
     }
 
     const createTx = await poolFactory.connect(deployer).createPool(poolParams)
@@ -114,6 +115,7 @@ async function testLocalFlow() {
       ...poolParams,
       name: 'Test Pool 2',
       description: 'Second test pool',
+      requiresMembership: false,
     })
     const poolCount2 = await poolFactory.getPoolCount()
     console.log(`✅ Original owner can still create pools. Total pools: ${poolCount2}`)
@@ -164,6 +166,7 @@ async function testLocalFlow() {
       ...poolParams,
       name: 'New Owner Pool',
       description: 'Pool created by new owner',
+      requiresMembership: false,
     })
     const finalPoolCount = await poolFactory.getPoolCount()
     console.log(`✅ New owner can create pools. Total pools: ${finalPoolCount}`)

@@ -17,6 +17,7 @@ describe('PoolFactory', function () {
     loanDuration: 30 * 24 * 60 * 60, // 30 days
     name: 'Test Pool',
     description: 'A test lending pool',
+    requiresMembership: false,
   }
 
   beforeEach(async function () {
@@ -122,6 +123,31 @@ describe('PoolFactory', function () {
       expect(poolInfo.isActive).to.be.true
     })
 
+    it('Should create a private pool when the creator asks for one', async function () {
+      // The choice has to survive the trip through `PoolParams` into
+      // `initialize` — nothing else carries it, and `PoolCreated` does not
+      // report it, so this is the only place the wiring is checked.
+      const tx = await poolFactory.connect(owner).createPool({ ...defaultPoolParams, requiresMembership: true })
+      await tx.wait()
+
+      const pool = await ethers.getContractAt('SampleLendingPool', (await poolFactory.getPoolInfo(1)).poolAddress)
+
+      expect((await pool.poolConfig()).requiresMembership).to.be.true
+      await expect(pool.connect(otherAccount).depositFunds({ value: ethers.parseEther('1') })).to.be.revertedWithCustomError(
+        pool,
+        'NotAMember'
+      )
+    })
+
+    it('Should create an open pool by default', async function () {
+      await (await poolFactory.connect(owner).createPool({ ...defaultPoolParams })).wait()
+
+      const pool = await ethers.getContractAt('SampleLendingPool', (await poolFactory.getPoolInfo(1)).poolAddress)
+
+      expect((await pool.poolConfig()).requiresMembership).to.be.false
+      await expect(pool.connect(otherAccount).depositFunds({ value: ethers.parseEther('1') })).to.not.be.reverted
+    })
+
     it('Should create multiple pools', async function () {
       const params1 = {
         ...defaultPoolParams,
@@ -133,6 +159,7 @@ describe('PoolFactory', function () {
         loanDuration: 60 * 24 * 60 * 60, // 60 days
         name: 'Test Pool 2',
         description: 'Second test pool',
+        requiresMembership: false,
       }
 
       // Enable whitelist and authorize users (simulating lazy whitelisting)
@@ -202,6 +229,7 @@ describe('PoolFactory', function () {
           loanDuration: defaultPoolParams.loanDuration,
           name: defaultPoolParams.name,
           description: defaultPoolParams.description,
+          requiresMembership: false,
         })
       ).to.be.revertedWithCustomError(poolFactory, 'InvalidMaxLoanAmount')
 
@@ -213,6 +241,7 @@ describe('PoolFactory', function () {
           loanDuration: defaultPoolParams.loanDuration,
           name: defaultPoolParams.name,
           description: defaultPoolParams.description,
+          requiresMembership: false,
         })
       ).to.be.revertedWithCustomError(poolFactory, 'InvalidInterestRate')
 
@@ -224,6 +253,7 @@ describe('PoolFactory', function () {
           loanDuration: 0,
           name: defaultPoolParams.name,
           description: defaultPoolParams.description,
+          requiresMembership: false,
         })
       ).to.be.revertedWithCustomError(poolFactory, 'InvalidLoanDuration')
 
@@ -235,6 +265,7 @@ describe('PoolFactory', function () {
           loanDuration: defaultPoolParams.loanDuration,
           name: '',
           description: defaultPoolParams.description,
+          requiresMembership: false,
         })
       ).to.be.revertedWithCustomError(poolFactory, 'EmptyName')
     })
@@ -268,6 +299,7 @@ describe('PoolFactory', function () {
         loanDuration: 60 * 24 * 60 * 60,
         name: 'Pool 2',
         description: 'Second pool',
+        requiresMembership: false,
       })
     })
 
@@ -472,6 +504,7 @@ describe('PoolFactory', function () {
         loanDuration: 30 * 24 * 60 * 60,
         name: 'Pool 1',
         description: 'First pool',
+        requiresMembership: false,
       })
 
       await poolFactory.connect(poolOwner2).createPool({
@@ -480,6 +513,7 @@ describe('PoolFactory', function () {
         loanDuration: 60 * 24 * 60 * 60,
         name: 'Pool 2',
         description: 'Second pool',
+        requiresMembership: false,
       })
 
       // Get both pools

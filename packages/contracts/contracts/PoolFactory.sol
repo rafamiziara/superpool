@@ -55,6 +55,13 @@ contract PoolFactory is
         uint256 loanDuration;
         string name;
         string description;
+        /**
+         * @dev Whether the new pool is a private trust circle, whose owner
+         * admits members, or open to anyone who funds it. Appended last so the
+         * existing field order — which the mobile ABI and every caller encode
+         * positionally — is untouched.
+         */
+        bool requiresMembership;
     }
 
     /// @dev Pool registry information - optimized for gas efficiency  
@@ -285,7 +292,8 @@ contract PoolFactory is
             msg.sender,
             _params.maxLoanAmount,
             _params.interestRate,
-            _params.loanDuration
+            _params.loanDuration,
+            _params.requiresMembership
         );
 
         // Increment pool count and assign ID (using pre-increment for gas efficiency)

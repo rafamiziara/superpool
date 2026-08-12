@@ -126,6 +126,7 @@ describe('Whitelist System', function () {
       loanDuration: 30 * 24 * 60 * 60, // 30 days
       name: 'Test Pool',
       description: 'Test pool description',
+      requiresMembership: false,
     }
 
     it('Should allow owner to create pools (owner always authorized)', async function () {
@@ -192,6 +193,7 @@ describe('Whitelist System', function () {
       loanDuration: 30 * 24 * 60 * 60, // 30 days
       name: 'Test Pool',
       description: 'Test pool description',
+      requiresMembership: false,
     }
 
     it('Should allow multiple authorized creators when whitelisted', async function () {

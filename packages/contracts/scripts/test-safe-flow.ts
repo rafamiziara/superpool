@@ -69,6 +69,7 @@ async function testSafeFlow() {
       loanDuration: 30 * 24 * 60 * 60, // 30 days
       name: 'Test Pool',
       description: 'A test lending pool for Safe ownership testing',
+      requiresMembership: false,
     }
 
     const createTx = await poolFactory.connect(deployer).createPool(poolParams)
@@ -122,6 +123,7 @@ async function testSafeFlow() {
       ...poolParams,
       name: 'Pending Phase Pool',
       description: 'Pool created during pending transfer phase',
+      requiresMembership: false,
     })
     const poolCount2 = await poolFactory.getPoolCount()
     console.log(`✅ Original owner can still create pools. Total pools: ${poolCount2}`)

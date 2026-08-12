@@ -35,7 +35,7 @@ describe('Security Tests', function () {
   beforeEach(async function () {
     ;[owner, borrower, lender] = await ethers.getSigners()
 
-    lendingPool = await deployPoolBehindBeacon([owner.address, maxLoanAmount, interestRate, loanDuration])
+    lendingPool = await deployPoolBehindBeacon([owner.address, maxLoanAmount, interestRate, loanDuration, false])
 
     await lendingPool.waitForDeployment()
 
@@ -123,7 +123,7 @@ describe('Security Tests', function () {
       const largeLoanAmount = ethers.parseEther('1000') // 1000 tokens
       const highInterestRate = 9999 // 99.99%
 
-      const largeLendingPool = await deployPoolBehindBeacon([owner.address, largeLoanAmount, highInterestRate, loanDuration])
+      const largeLendingPool = await deployPoolBehindBeacon([owner.address, largeLoanAmount, highInterestRate, loanDuration, false])
 
       await largeLendingPool.waitForDeployment()
 
@@ -154,7 +154,7 @@ describe('Security Tests', function () {
       const maxSafeAmount = ethers.parseEther('100') // 100 tokens
       const maxInterestRate = 10000 // 100%
 
-      const testPool = await deployPoolBehindBeacon([owner.address, maxSafeAmount, maxInterestRate, loanDuration])
+      const testPool = await deployPoolBehindBeacon([owner.address, maxSafeAmount, maxInterestRate, loanDuration, false])
 
       await testPool.waitForDeployment()
       await testPool.connect(lender).depositFunds({ value: ethers.parseEther('200') })
@@ -178,7 +178,7 @@ describe('Security Tests', function () {
       ]
 
       for (const testCase of testCases) {
-        const testPool = await deployPoolBehindBeacon([owner.address, ethers.parseEther('10'), testCase.rate, loanDuration])
+        const testPool = await deployPoolBehindBeacon([owner.address, ethers.parseEther('10'), testCase.rate, loanDuration, false])
 
         await testPool.waitForDeployment()
         await testPool.connect(lender).depositFunds({ value: ethers.parseEther('20') })
@@ -244,6 +244,7 @@ describe('Security Tests', function () {
         ethers.parseEther('10'),
         0, // 0% interest
         loanDuration,
+        false,
       ])
 
       await zeroPool.waitForDeployment()

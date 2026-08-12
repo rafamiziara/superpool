@@ -38,7 +38,7 @@ describe('SampleLendingPool', function () {
     ;[owner, borrower, lender, otherAccount] = await ethers.getSigners()
 
     // Deploy the contract
-    lendingPool = await deployPoolBehindBeacon([owner.address, maxLoanAmount, interestRate, loanDuration])
+    lendingPool = await deployPoolBehindBeacon([owner.address, maxLoanAmount, interestRate, loanDuration, false])
 
     await lendingPool.waitForDeployment()
   })
@@ -524,12 +524,14 @@ describe('SampleLendingPool', function () {
         maxLoanAmount,
         interestRate,
         loanDuration,
+        false,
       ])) as unknown as SampleLendingPool
       const second = (await upgrades.deployBeaconProxy(beacon, SampleLendingPool, [
         owner.address,
         maxLoanAmount,
         interestRate,
         loanDuration,
+        false,
       ])) as unknown as SampleLendingPool
 
       const before = await upgrades.beacon.getImplementationAddress(await beacon.getAddress())

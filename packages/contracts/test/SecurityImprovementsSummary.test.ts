@@ -37,6 +37,7 @@ describe('Security Improvements Summary', function () {
         loanDuration: 30 * 24 * 60 * 60, // 30 days
         name: 'Test Pool',
         description: 'Test pool description',
+        requiresMembership: false,
       }
 
       await poolFactory.connect(owner).createPool(poolParams)
@@ -72,6 +73,7 @@ describe('Security Improvements Summary', function () {
         loanDuration: 30 * 24 * 60 * 60,
         name: 'High Interest Pool',
         description: 'Test pool with high interest',
+        requiresMembership: false,
       }
 
       await poolFactory.connect(owner).createPool(poolParams)
@@ -112,6 +114,7 @@ describe('Security Improvements Summary', function () {
         loanDuration: 30 * 24 * 60 * 60,
         name: 'Zero Interest Pool',
         description: 'Test pool with zero interest',
+        requiresMembership: false,
       }
 
       await poolFactory.connect(owner).createPool(poolParams)
@@ -143,6 +146,7 @@ describe('Security Improvements Summary', function () {
           loanDuration: 30 * 24 * 60 * 60,
           name: `Pool ${i}`,
           description: `Test pool ${i}`,
+          requiresMembership: false,
         }
         await poolFactory.connect(owner).createPool(poolParams)
       }
@@ -166,6 +170,7 @@ describe('Security Improvements Summary', function () {
         loanDuration: 30 * 24 * 60 * 60,
         name: 'Valid Pool',
         description: 'Pool with valid owner (caller becomes owner)',
+        requiresMembership: false,
       }
 
       // Normal accounts can create pools (they become the owner)
@@ -185,6 +190,7 @@ describe('Security Improvements Summary', function () {
         loanDuration: 30 * 24 * 60 * 60,
         name: 'Test Pool',
         description: 'Test pool',
+        requiresMembership: false,
       }
 
       // Non-owner cannot create pools (not authorized)
@@ -251,6 +257,7 @@ describe('Security Improvements Summary', function () {
         loanDuration: 30 * 24 * 60 * 60, // 30 days
         name: 'Integration Test Pool',
         description: 'Pool for integration testing',
+        requiresMembership: false,
       }
 
       // Lazy whitelisting: the backend authorizes the creator before they submit.
