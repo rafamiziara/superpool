@@ -117,11 +117,13 @@ prompt rather than after it.
 ## Known limitations
 
 - **Native currency only.** ERC-20 deposits need contract work.
-- **No interest accrues yet**, so `totalEarned` is 0 for everyone. Members can
-  withdraw (`SampleLendingPool.withdraw` → `FundsWithdrawn` → the `withdrawals`
+- **A contribution is not earnings.** Members can withdraw
+  (`SampleLendingPool.withdraw` → `FundsWithdrawn` → the `withdrawals`
   collection), and `currentBalance` is deposits minus withdrawals, while
   `totalContributed` stays lifetime deposits — so someone who withdrew
-  everything still reads as a past member.
+  everything still reads as a past member. Interest is credited separately and
+  never lands in either figure; `totalEarned` is claims plus what the chain says
+  is still claimable. See [`INTEREST.md`](INTEREST.md).
 - **The scheduled sweep has never run on its schedule.** `syncPoolEvents` does
   now cover `FundsDeposited` and `FundsWithdrawn` alongside `PoolCreated`, so a
   contribution whose immediate indexing fails is caught by the net rather than

@@ -173,7 +173,7 @@ membership from having contributed, which is the model Sprint 4 replaced.
   - Smart contract `requestMembership` (the plan called it `requestToJoinPool`)
   - UI for users to browse and find available pools
   - Pool details display and join request submission (`pool/join.tsx`)
-  - Request status tracking — ✅; notifications — ❌ see Sprint 11
+  - Request status tracking — ✅; notifications — ❌ see Sprint 12
 
 - **Admin Membership Management** ✅
   - Smart contract `approveMember` / `rejectMember` / `removeMember`, owner-only
@@ -186,7 +186,7 @@ membership from having contributed, which is the model Sprint 4 replaced.
   - Backend APIs for join request processing (`indexMembership`, `listMembers`)
   - Firestore storage for membership requests and statuses
   - Event listeners for membership changes (all six events in `syncPoolEvents`)
-  - **Email/push notifications — ❌** see Sprint 11
+  - **Email/push notifications — ❌** see Sprint 12
 
 ### Expected Deliverables:
 
@@ -296,7 +296,7 @@ See [`LOANS.md`](LOANS.md) for how the shipped system works.
 
 - **Repayment System** 🚧
   - Smart contract `repayLoan` ✅
-  - **Payment scheduling and reminder system — ❌** see Sprint 11
+  - **Payment scheduling and reminder system — ❌** see Sprint 12
   - Full repayment ✅; **partial repayment — ❌**, it is all-or-nothing and
     `isRepaid` is a bool rather than a running balance
   - Interest calculation ✅ — **flat, fixed at disbursement, not accrued**, so
@@ -312,7 +312,7 @@ See [`LOANS.md`](LOANS.md) for how the shipped system works.
   - Event listeners for loan repayment transactions ✅
   - Loan status updates in Firestore ✅
   - Payment history ✅; **analytics — ❌**
-  - **Automated notifications for due dates — ❌** see Sprint 11
+  - **Automated notifications for due dates — ❌** see Sprint 12
 
 ### Expected Deliverables:
 
@@ -323,8 +323,8 @@ See [`LOANS.md`](LOANS.md) for how the shipped system works.
 
 ### Current Status: **Complete for lump-sum repayment** ✅
 
-The gap that matters is not in this sprint: **repaid interest reaches the pool
-and cannot be distributed to the lenders who funded the loan.** See Sprint 11.
+The gap that mattered was not in this sprint — repaid interest reached the pool
+and could not be distributed — and it is closed in Sprint 11.
 
 ---
 
@@ -435,7 +435,7 @@ reputation is still waiting on those sprints.
 - **Administrative Tools** 🚧
   - Loan queue management ✅; prioritisation ❌
   - Decision audit trail — on chain by construction; **no tooling over it** ❌
-  - **Admin notification and alert system — ❌** see Sprint 11
+  - **Admin notification and alert system — ❌** see Sprint 12
   - **Loan portfolio overview and statistics — ❌**
 
 ### Expected Deliverables:
@@ -456,37 +456,53 @@ reputation is still waiting on those sprints.
 Added 2026-08-12. This was missing from the plan entirely, which is how it went
 unnoticed: the money loop has a hole at the end of it.
 
-### Why this is next
+### Why this was next
 
-`repayLoan` adds principal plus interest to `totalFunds`, but `withdraw` is
-bounded by `contributions[msg.sender]` — what the caller put in. Nothing credits
-the interest to anybody, so it accumulates in the contract **permanently
-unclaimable**, and every lender's lifetime earnings are structurally zero.
+`repayLoan` added principal plus interest to `totalFunds`, but `withdraw` was
+bounded by `contributions[msg.sender]` — what the caller put in. Nothing credited
+the interest to anybody, so it accumulated in the contract **permanently
+unclaimable**, and every lender's lifetime earnings were structurally zero.
 
-The app already ships the surface for a number that cannot exist:
-`PoolStore.totalEarned` is a dashboard tile whose own docstring says it is zero
-against real data and always will be.
+The app already shipped the surface for a number that could not exist:
+`PoolStore.totalEarned` was a dashboard tile whose own docstring said it was zero
+against real data and always would be.
 
 Plan: [`.dev/INTEREST_DISTRIBUTION_PLAN.md`](../.dev/INTEREST_DISTRIBUTION_PLAN.md).
+How it works: [`INTEREST.md`](INTEREST.md).
 
 ### Features:
 
-- **Per-share accounting in the contract**
+- **Per-share accounting in the contract** ✅
   - An accumulator (`accInterestPerShare`) credited on repayment
-  - Per-member checkpoints so a deposit made after a repayment does not earn
+  - `interestDebt` per member, so a deposit made after a repayment does not earn
     from it retroactively
   - `claimable(address)` and `claimInterest()`
-  - `totalContributions` tracked separately from `totalFunds`
+  - `totalContributions` tracked separately from `totalFunds` — the distinction
+    the whole design turns on, since `totalFunds` is missing exactly the money
+    that was lent out
 
-- **Indexing and the app**
-  - Index the distribution and claim events
-  - `PoolStore.totalEarned` stops being a subtraction and reads a real figure
-  - A claim action on the pool and dashboard surfaces
+- **Indexing and the app** ✅
+  - `interest_claims`, an append-only log; `indexInterestClaim` and
+    `listInterestClaims`, both served from `src/index.ts`
+  - `InterestClaimed` swept by `syncPoolEvents`. `InterestDistributed` gets no
+    collection — it moves a pool-level figure read from the chain
+  - `PoolStore.totalEarned` stops being a subtraction: claims plus what
+    `claimable` reports, added rather than chosen between
+  - `ClaimInterestCard` on the pool page; `ClaimableInterestSync` behind the
+    dashboard tile
 
 ### Expected Deliverables:
 
-- A lender's earnings are non-zero and withdrawable
-- The dashboard tile means something
+- A lender's earnings are non-zero and withdrawable — ✅
+- The dashboard tile means something — ✅
+
+### Current Status: **COMPLETE** ✅
+
+Deliberately not built: **no compounding** — unclaimed interest does not itself
+earn, since that would mean adding it to `contributions` and changing what
+`withdraw` means. **No platform fee** (`ROADMAP.md` Phase 3): the same
+arithmetic, but a product decision. **No per-loan attribution**: the pool is
+fungible. A claim has no activity-feed row yet.
 
 ---
 

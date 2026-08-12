@@ -511,6 +511,33 @@ owner admitted can borrow without having lent first. See
 pending request too, so anything that reads it without checking `status` first
 treats a request as an outstanding debt.
 
+## Interest
+
+For anything touching what a member has earned, read
+[`docs/INTEREST.md`](docs/INTEREST.md). Interest is distributed by an
+accumulator rather than a loop — the pool keeps no member list to walk.
+
+Three things that are easy to break:
+
+- **The denominator is `totalContributions`, never `totalFunds`.** `totalFunds`
+  falls when money is lent out, which is exactly when interest is earned, so
+  using it pays roughly double on any pool with a loan outstanding — and no test
+  where nothing is borrowed will notice.
+- **Settle before any change to a stake, restamp after it.** That is what stops a
+  deposit made after a repayment from earning a share of it.
+- **Never gate `claimInterest` on membership or on an outstanding loan.**
+  Interest is earned money, not the stake that borrowing locks. Removal and
+  withdrawal both leave the accrual claimable.
+
+`claimable(address)` is deliberately **not** capped by free liquidity, unlike
+`withdrawableAmount` — an outstanding loan must not make an earnings figure
+appear to shrink. The bound is applied by `claimInterest` at payout.
+
+`PoolStore.totalEarned` is claims **plus** what `claimable` reports, added rather
+than chosen between: claiming moves an amount from one to the other. Claims are
+indexed; accrual is not an event at all and has to be read from the chain per
+pool per wallet.
+
 ## Activity feeds
 
 `ActivityRow` takes a `perspective`, and picking the wrong one marks money the

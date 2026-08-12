@@ -40,6 +40,7 @@ These are implemented end to end and verified against a live chain:
 - **👥 Permissioned Membership:** Each pool chooses at creation whether its owner admits members (`requiresMembership`, changeable later). With it on, joining is `requestMembership` → `approveMember` / `rejectMember`, and nobody can fund the pool or borrow from it until they are let in; with it off, funding a pool is what makes you a member of it. The register is written either way, so an owner can close an open pool without stranding anyone ([how it works](docs/MEMBERSHIP.md)).
 - **📋 Loan Request & Approval:** Each pool chooses whether to review requests before lending (`setRequiresApproval`, owner-only, off by default). With it on, borrowing is `requestLoan` → `approveLoan` / `rejectLoan`, plus `cancelLoanRequest` for the borrower; with it off, `createLoan` disburses in one call to any member who has contributed. Owners get a queue, members get a status ([how it works](docs/LOANS.md)).
 - **💸 Loan Repayment:** Principal plus flat interest in one transaction — interest is fixed at disbursement and does not accrue, so repaying early costs the same.
+- **📈 Interest Distribution:** A repayment's interest is shared out to the members who funded the pool, in proportion to what each put in, through a per-share accumulator rather than a loop over a member list. `claimable(address)` says what you have earned and `claimInterest()` pays it; withdrawing your contribution leaves the accrual claimable, and so does being removed from the pool ([how it works](docs/INTEREST.md)).
 - **📱 Cross-Platform Mobile App:** React Native/Expo application with onboarding, wallet connection and a live pool list.
 - **🔐 Multi-Sig Administration:** `PoolFactory` ownership transfers to a Safe; admin actions are executed through it.
 - **📦 Monorepo Structure:** pnpm workspaces with shared types, CI running lint, type-check and the test matrix.
@@ -50,7 +51,6 @@ Designed and partly scaffolded, but **not** functional yet — the mobile screen
 
 - **🪙 ERC-20 Liquidity:** Contributions are native currency only; token deposits need contract work.
 - **💸 Default Handling & Pool Health:** A loan's term is recorded and shown, but nothing on chain enforces it — there is no liquidation, no penalty and no default state.
-- **💰 Interest Distribution:** Repaid interest reaches the pool's balance but cannot be credited to the members who funded the loan, so lifetime earnings are zero for everyone.
 - **🌐 Multi-Chain Support:** The contracts are chain-agnostic and the wallet offers Ethereum, Polygon, Arbitrum, Base and BSC, but the backend currently resolves exactly one configured chain at a time. Only a local Hardhat node is deployed today; Polygon Amoy is next.
 
 ## ⚙️ Tech Stack
