@@ -4,6 +4,7 @@ import { logger } from 'firebase-functions/v2'
 import { PoolFactoryABI, SampleLendingPoolABI } from '../constants'
 import { indexContributionEvent, parseFundsDepositedLog, resolvePoolId } from './contributionIndexer'
 import { fetchPoolActive, fetchPoolDescription, indexPoolEvent, parsePoolCreatedLog, updatePoolActive } from './eventIndexer'
+import { indexInterestClaimEvent, parseInterestClaimedLog } from './interestClaimIndexer'
 import { indexLoanFromLog, LOAN_TOPICS } from './loanIndexer'
 import { indexMembershipFromLog, MEMBERSHIP_TOPICS } from './membershipIndexer'
 import { indexWithdrawalEvent, parseFundsWithdrawnLog } from './withdrawalIndexer'
@@ -16,6 +17,7 @@ const POOL_DEACTIVATED_TOPIC = poolFactoryInterface.getEvent('PoolDeactivated')!
 const POOL_REACTIVATED_TOPIC = poolFactoryInterface.getEvent('PoolReactivated')!.topicHash
 const FUNDS_DEPOSITED_TOPIC = lendingPoolInterface.getEvent('FundsDeposited')!.topicHash
 const FUNDS_WITHDRAWN_TOPIC = lendingPoolInterface.getEvent('FundsWithdrawn')!.topicHash
+const INTEREST_CLAIMED_TOPIC = lendingPoolInterface.getEvent('InterestClaimed')!.topicHash
 
 /** `getPoolId` returns 0 for an unknown address — pool ids start at 1. */
 const UNKNOWN_POOL_ID = 0
@@ -29,6 +31,8 @@ export interface SweepCounts {
   loans: number
   /** Memberships written. One already matching the chain is not counted. */
   memberships: number
+  /** Interest claims written. A log already indexed is not counted. */
+  interestClaims: number
   /** Pools whose stored `isActive` disagreed with the chain and was corrected. */
   statusUpdates: number
 }
@@ -235,6 +239,45 @@ async function sweepFundsWithdrawn(options: SweepBlockRangeOptions, caches: Swee
 }
 
 /**
+ * Index every interest claim in the range.
+ *
+ * `InterestDistributed` is deliberately not swept: it moves a pool-level figure
+ * that is read straight from the chain, so a document for it would only be a
+ * copy that can go stale. A claim, by contrast, is money leaving a wallet's
+ * history and has to be recorded.
+ */
+async function sweepInterestClaims(options: SweepBlockRangeOptions, caches: SweepCaches): Promise<number> {
+  const { provider, firestore, chainId, factoryAddress, fromBlock, toBlock } = options
+
+  const logs = await queryLogs(provider, INTEREST_CLAIMED_TOPIC, fromBlock, toBlock)
+
+  let stored = 0
+
+  for (const log of logs) {
+    try {
+      const timestamp = await getBlockTimestamp(log.blockNumber, provider, caches)
+      const parsed = parseInterestClaimedLog(log, chainId, timestamp)
+      const poolId = await getPoolId(parsed.poolAddress, factoryAddress, provider, caches)
+
+      if (poolId === UNKNOWN_POOL_ID) continue
+
+      const result = await indexInterestClaimEvent({ ...parsed, poolId }, firestore)
+
+      if (result.stored) stored++
+    } catch (error) {
+      logger.error('Failed to sweep InterestClaimed log', {
+        chainId,
+        blockNumber: log.blockNumber,
+        transactionHash: log.transactionHash,
+        error: error instanceof Error ? error.message : String(error),
+      })
+    }
+  }
+
+  return stored
+}
+
+/**
  * Index every loan touched in the range, borrowed or repaid alike.
  *
  * All five loan events are fetched in one topic-OR query and take the same
@@ -334,7 +377,8 @@ export async function sweepBlockRange(options: SweepBlockRangeOptions): Promise<
   const memberships = await sweepMemberships(options)
   const contributions = await sweepFundsDeposited(options, caches)
   const withdrawals = await sweepFundsWithdrawn(options, caches)
+  const interestClaims = await sweepInterestClaims(options, caches)
   const loans = await sweepLoans(options)
 
-  return { pools, contributions, withdrawals, loans, memberships, statusUpdates }
+  return { pools, contributions, withdrawals, interestClaims, loans, memberships, statusUpdates }
 }

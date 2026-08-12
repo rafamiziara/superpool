@@ -62,3 +62,14 @@ export const WITHDRAWALS_COLLECTION = 'withdrawals'
  * does.
  */
 export const MEMBERSHIPS_COLLECTION = 'memberships'
+
+/**
+ * The name of the Firestore collection used to store indexed interest claims
+ * (`InterestClaimed` events).
+ *
+ * The contribution shape, not the membership shape: a claim is an event and
+ * never changes, so a member's lifetime earnings are summed from these on read.
+ * `InterestDistributed` has no collection of its own — it moves a pool-level
+ * figure that is read from the chain.
+ */
+export const INTEREST_CLAIMS_COLLECTION = 'interest_claims'

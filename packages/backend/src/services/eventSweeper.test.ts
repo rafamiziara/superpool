@@ -7,6 +7,7 @@ import { PoolFactoryABI, SampleLendingPoolABI } from '../constants'
 jest.mock('./eventIndexer')
 jest.mock('./contributionIndexer')
 jest.mock('./withdrawalIndexer')
+jest.mock('./interestClaimIndexer')
 jest.mock('./loanIndexer', () => {
   // The topics are real: the sweep routes on them, and stubbing them would let
   // the test agree with itself rather than with the shipped ABI.
@@ -21,6 +22,7 @@ const { sweepBlockRange } = require('./eventSweeper')
 const { fetchPoolActive, fetchPoolDescription, indexPoolEvent, parsePoolCreatedLog, updatePoolActive } = require('./eventIndexer')
 const { indexContributionEvent, parseFundsDepositedLog, resolvePoolId } = require('./contributionIndexer')
 const { indexWithdrawalEvent, parseFundsWithdrawnLog } = require('./withdrawalIndexer')
+const { indexInterestClaimEvent, parseInterestClaimedLog } = require('./interestClaimIndexer')
 const { indexLoanFromLog, LOAN_CREATED_TOPIC, LOAN_REPAID_TOPIC, LOAN_TOPICS } = require('./loanIndexer')
 
 // ---------------------------------------------------------------------------
@@ -38,6 +40,7 @@ const BLOCK_TIMESTAMP = 1700000000
 const POOL_CREATED_TOPIC = new Interface([...PoolFactoryABI]).getEvent('PoolCreated')!.topicHash
 const FUNDS_DEPOSITED_TOPIC = new Interface([...SampleLendingPoolABI]).getEvent('FundsDeposited')!.topicHash
 const FUNDS_WITHDRAWN_TOPIC = new Interface([...SampleLendingPoolABI]).getEvent('FundsWithdrawn')!.topicHash
+const INTEREST_CLAIMED_TOPIC = new Interface([...SampleLendingPoolABI]).getEvent('InterestClaimed')!.topicHash
 const POOL_DEACTIVATED_TOPIC = new Interface([...PoolFactoryABI]).getEvent('PoolDeactivated')!.topicHash
 const POOL_REACTIVATED_TOPIC = new Interface([...PoolFactoryABI]).getEvent('PoolReactivated')!.topicHash
 
@@ -71,6 +74,7 @@ interface ProviderLogs {
   pools?: object[]
   deposits?: object[]
   withdrawals?: object[]
+  interestClaims?: object[]
   status?: object[]
   loans?: object[]
 }
@@ -85,6 +89,7 @@ function buildMockProvider(logs: ProviderLogs = {}, options: { blockTimestamp?: 
     [POOL_CREATED_TOPIC]: logs.pools ?? [],
     [FUNDS_DEPOSITED_TOPIC]: logs.deposits ?? [],
     [FUNDS_WITHDRAWN_TOPIC]: logs.withdrawals ?? [],
+    [INTEREST_CLAIMED_TOPIC]: logs.interestClaims ?? [],
   }
 
   return {
@@ -138,6 +143,9 @@ beforeEach(() => {
   parseFundsWithdrawnLog.mockImplementation(() => ({ poolAddress: POOL_ADDRESS, member: '0xabc', amount: '1' }))
   indexWithdrawalEvent.mockResolvedValue({ id: 'w1', poolId: 1, alreadyIndexed: false, stored: true })
 
+  parseInterestClaimedLog.mockImplementation(() => ({ poolAddress: POOL_ADDRESS, account: '0xabc', amount: '1' }))
+  indexInterestClaimEvent.mockResolvedValue({ id: 'i1', poolId: 1, alreadyIndexed: false, stored: true })
+
   fetchPoolActive.mockResolvedValue(false)
   updatePoolActive.mockResolvedValue(true)
 
@@ -152,19 +160,20 @@ beforeEach(() => {
 
 describe('sweepBlockRange', () => {
   describe('counting', () => {
-    it('should index all three feeds and report how many documents were written', async () => {
+    it('should index every feed and report how many documents were written', async () => {
       // Arrange
       const provider = buildMockProvider({
         pools: [buildLog(), buildLog({ index: 1 })],
         deposits: [buildLog({ index: 2 })],
         withdrawals: [buildLog({ index: 3 }), buildLog({ index: 4 }), buildLog({ index: 5 })],
+        interestClaims: [buildLog({ index: 6 }), buildLog({ index: 7 })],
       })
 
       // Act
       const counts = await sweep(provider)
 
       // Assert
-      expect(counts).toEqual({ pools: 2, contributions: 1, withdrawals: 3, loans: 0, memberships: 0, statusUpdates: 0 })
+      expect(counts).toEqual({ pools: 2, contributions: 1, withdrawals: 3, interestClaims: 2, loans: 0, memberships: 0, statusUpdates: 0 })
     })
 
     it('should return zeroes when the range holds no events', async () => {
@@ -175,7 +184,7 @@ describe('sweepBlockRange', () => {
       const counts = await sweep(provider)
 
       // Assert
-      expect(counts).toEqual({ pools: 0, contributions: 0, withdrawals: 0, loans: 0, memberships: 0, statusUpdates: 0 })
+      expect(counts).toEqual({ pools: 0, contributions: 0, withdrawals: 0, interestClaims: 0, loans: 0, memberships: 0, statusUpdates: 0 })
       expect(indexPoolEvent).not.toHaveBeenCalled()
     })
 
@@ -192,7 +201,7 @@ describe('sweepBlockRange', () => {
       const counts = await sweep(provider)
 
       // Assert
-      expect(counts).toEqual({ pools: 0, contributions: 0, withdrawals: 0, loans: 0, memberships: 0, statusUpdates: 0 })
+      expect(counts).toEqual({ pools: 0, contributions: 0, withdrawals: 0, interestClaims: 0, loans: 0, memberships: 0, statusUpdates: 0 })
       expect(indexPoolEvent).toHaveBeenCalledTimes(1)
     })
   })
@@ -273,6 +282,7 @@ describe('sweepBlockRange', () => {
     it.each([
       ['deposits', 'deposits' as const, () => indexContributionEvent],
       ['withdrawals', 'withdrawals' as const, () => indexWithdrawalEvent],
+      ['interest claims', 'interestClaims' as const, () => indexInterestClaimEvent],
     ])('should skip %s emitted by a contract the factory does not know', async (_name, feed, getIndexer) => {
       // Arrange
       // Anyone can emit an identically-shaped event. Indexing one would attach
@@ -285,7 +295,7 @@ describe('sweepBlockRange', () => {
 
       // Assert
       expect(getIndexer()).not.toHaveBeenCalled()
-      expect(counts).toEqual({ pools: 0, contributions: 0, withdrawals: 0, loans: 0, memberships: 0, statusUpdates: 0 })
+      expect(counts).toEqual({ pools: 0, contributions: 0, withdrawals: 0, interestClaims: 0, loans: 0, memberships: 0, statusUpdates: 0 })
     })
 
     it('should skip foreign logs silently rather than as errors', async () => {
@@ -548,6 +558,79 @@ describe('sweepBlockRange', () => {
       expect(order).toEqual(['create', 'status'])
     })
   })
+  describe('interest claims', () => {
+    it('should index every InterestClaimed log in the range', async () => {
+      // Arrange
+      const provider = buildMockProvider({ interestClaims: [buildLog(), buildLog({ index: 1 })] })
+
+      // Act
+      const counts = await sweep(provider)
+
+      // Assert
+      expect(counts.interestClaims).toBe(2)
+      expect(indexInterestClaimEvent).toHaveBeenCalledTimes(2)
+    })
+
+    it('should query by topic with no address filter', async () => {
+      // Arrange
+      // Emitted by each pool contract, like deposits and withdrawals, so there
+      // is no single address to filter on.
+      const provider = buildMockProvider()
+
+      // Act
+      await sweep(provider)
+
+      // Assert
+      expect(filterFor(provider, INTEREST_CLAIMED_TOPIC)).toEqual({
+        fromBlock: FROM_BLOCK,
+        toBlock: TO_BLOCK,
+        topics: [INTEREST_CLAIMED_TOPIC],
+      })
+    })
+
+    it('should not sweep InterestDistributed at all', async () => {
+      // Arrange
+      // It moves a pool-level figure that is read from the chain, so a document
+      // for it could only ever be a copy that goes stale.
+      const distributedTopic = new Interface([...SampleLendingPoolABI]).getEvent('InterestDistributed')!.topicHash
+      const provider = buildMockProvider()
+
+      // Act
+      await sweep(provider)
+
+      // Assert
+      expect(filterFor(provider, distributedTopic)).toBeUndefined()
+    })
+
+    it('should not count a claim that was already indexed', async () => {
+      // Arrange
+      indexInterestClaimEvent.mockResolvedValue({ id: 'i1', poolId: 1, alreadyIndexed: true, stored: false })
+      const provider = buildMockProvider({ interestClaims: [buildLog()] })
+
+      // Act
+      const counts = await sweep(provider)
+
+      // Assert
+      expect(counts.interestClaims).toBe(0)
+    })
+
+    it('should keep sweeping after one claim fails to index', async () => {
+      // Arrange
+      indexInterestClaimEvent.mockRejectedValueOnce(new Error('Firestore unavailable'))
+      const provider = buildMockProvider({ interestClaims: [buildLog(), buildLog({ index: 1 })] })
+
+      // Act
+      const counts = await sweep(provider)
+
+      // Assert
+      expect(counts.interestClaims).toBe(1)
+      expect(mockLogger.error).toHaveBeenCalledWith(
+        'Failed to sweep InterestClaimed log',
+        expect.objectContaining({ error: 'Firestore unavailable' })
+      )
+    })
+  })
+
   describe('loans', () => {
     it('should index every loan log in the range', async () => {
       // Arrange

@@ -83,6 +83,17 @@ service cloud.firestore {
       allow write: if false; // backend-only (withdrawal indexer)
     }
 
+    // --- interest_claims ---------------------------------------------------
+    // Interest taken out of a pool, indexed from on-chain InterestClaimed
+    // events. Append-only like contributions and withdrawals — a claim is an
+    // event and never changes — and governed identically.
+
+    match /interest_claims/{claimId} {
+      allow get: if isSignedIn();
+      allow list: if isSignedIn() && request.query.limit <= 100; // mirrors listInterestClaims' own cap
+      allow write: if false; // backend-only (interest claim indexer)
+    }
+
     // --- loans -------------------------------------------------------------
     // Loans indexed from on-chain LoanCreated / LoanRepaid events. Unlike the
     // other feeds a document here is mutable — it is rewritten when the loan is

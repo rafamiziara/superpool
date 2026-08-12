@@ -213,6 +213,45 @@ export interface IndexWithdrawalResponse {
 }
 
 /**
+ * One `InterestClaimed` event: a member taking earned interest out of a pool.
+ *
+ * The contribution shape, not the loan shape. A claim is an event and never
+ * changes afterwards, so lifetime earnings are summed from these on read rather
+ * than stored anywhere. The pool-level `InterestDistributed` gets no collection
+ * of its own — what it changes is read from the chain.
+ */
+export interface InterestClaimInfo {
+  /** `${chainId}-${transactionHash}-${logIndex}` — the document id, and stable. */
+  id: string
+  poolId: number
+  poolAddress: string
+  /** Lowercased on write; compare case-insensitively. */
+  account: string
+  /** Wei, as a decimal string — JSON has no bigint. */
+  amount: string
+  chainId: number
+  transactionHash: string
+  /** Position of the `InterestClaimed` log within its transaction. */
+  logIndex: number
+  blockNumber: number
+  /** ISO 8601, not a Date — see the note on `ContributionInfo.contributedAt`. */
+  claimedAt: string
+}
+
+export interface IndexInterestClaimRequest {
+  txHash: string
+  chainId?: number
+}
+
+export interface IndexInterestClaimResponse {
+  /** One entry per `InterestClaimed` log in the transaction. */
+  claims: InterestClaimInfo[]
+  /** How many were written by this call; the rest were already stored. */
+  storedCount: number
+  alreadyIndexed: boolean
+}
+
+/**
  * One loan, as the chain currently describes it.
  *
  * Unlike a contribution or a withdrawal — each of which *is* one event — a loan
@@ -389,6 +428,8 @@ export interface SyncPoolEventsResponse {
   loans: number
   /** Memberships written — asked, decided, or enrolled by a deposit. */
   memberships: number
+  /** Interest claims written. */
+  interestClaims: number
   /** Pools whose stored `isActive` disagreed with the chain and was corrected. */
   statusUpdates: number
 }
@@ -404,6 +445,21 @@ export interface ListWithdrawalsRequest {
 
 export interface ListWithdrawalsResponse {
   withdrawals: WithdrawalInfo[]
+  totalCount: number
+  limit: number
+}
+
+export interface ListInterestClaimsRequest {
+  chainId?: number
+  /** Restrict to one pool. Omit for every pool on the chain. */
+  poolId?: number
+  /** Restrict to one wallet. Matched case-insensitively. */
+  account?: string
+  limit?: number
+}
+
+export interface ListInterestClaimsResponse {
+  claims: InterestClaimInfo[]
   totalCount: number
   limit: number
 }
