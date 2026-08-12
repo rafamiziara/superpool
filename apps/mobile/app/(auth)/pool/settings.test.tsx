@@ -14,6 +14,7 @@ const POOL_ID = '2'
 const POOL_I_DO_NOT_OWN = '1'
 
 const mockSetRequiresApproval = jest.fn()
+const mockSetRequiresMembership = jest.fn()
 const mockReset = jest.fn()
 let mockSettingsError: string | null = null
 let mockIsSubmitting = false
@@ -25,6 +26,7 @@ jest.mock('expo-status-bar', () => ({
 jest.mock('../../../src/hooks/pools/usePoolSettings', () => ({
   usePoolSettings: () => ({
     setRequiresApproval: mockSetRequiresApproval,
+    setRequiresMembership: mockSetRequiresMembership,
     isSubmitting: mockIsSubmitting,
     error: mockSettingsError,
     reset: mockReset,
@@ -32,14 +34,14 @@ jest.mock('../../../src/hooks/pools/usePoolSettings', () => ({
 }))
 
 /**
- * `poolConfig` decodes to a five-member tuple; the screen reads
- * `requiresApproval` positionally from index 4. `data: undefined` stands for a
+ * `poolConfig` decodes to a six-member tuple; the screen reads
+ * `requiresApproval` from index 4 and `requiresMembership` from index 5. `data: undefined` stands for a
  * pool that predates the field, where the decode yields nothing.
  */
-function mockConfig({ requiresApproval = false, readable = true, isLoading = false } = {}) {
+function mockConfig({ requiresApproval = false, requiresMembership = false, readable = true, isLoading = false } = {}) {
   const refetch = jest.fn().mockResolvedValue({ data: undefined })
   mockWagmiUseReadContract.mockReturnValue({
-    data: readable ? [10_000_000_000_000_000_000n, 500n, 2_592_000n, true, requiresApproval] : undefined,
+    data: readable ? [10_000_000_000_000_000_000n, 500n, 2_592_000n, true, requiresApproval, requiresMembership] : undefined,
     isLoading,
     refetch,
   })
@@ -72,6 +74,7 @@ beforeEach(async () => {
   mockSettingsError = null
   mockIsSubmitting = false
   mockSetRequiresApproval.mockResolvedValue('0xabc')
+  mockSetRequiresMembership.mockResolvedValue('0xabc')
   mockLocalSearchParams.mockReturnValue({ poolId: POOL_ID })
   mockConfig()
   authStore.walletAddress = null
@@ -209,14 +212,68 @@ describe('PoolSettingsScreen', () => {
 
     it('locks the control while a change is in flight', async () => {
       mockIsSubmitting = true
-      const { getByTestId, getByText } = render(<PoolSettingsScreen />)
+      const { getByTestId } = render(<PoolSettingsScreen />)
 
       await act(async () => {
         fireEvent.press(getByTestId('settings-approval-toggle'))
       })
 
       expect(mockSetRequiresApproval).not.toHaveBeenCalled()
-      expect(getByText('Confirming…')).toBeTruthy()
+      // Both toggles say "Confirming…" — one wallet, one transaction at a time —
+      // so this has to name the control rather than search the whole screen.
+      expect(getByTestId('settings-approval-toggle')).toHaveTextContent('Confirming…')
+    })
+  })
+
+  describe('deciding who joins', () => {
+    it('shows the pool as open by default', () => {
+      const { getByTestId } = render(<PoolSettingsScreen />)
+
+      expect(getByTestId('settings-membership-off')).toBeTruthy()
+    })
+
+    it('closes an open pool', async () => {
+      const { getByTestId } = render(<PoolSettingsScreen />)
+
+      await act(async () => {
+        fireEvent.press(getByTestId('settings-membership-toggle'))
+      })
+
+      expect(mockSetRequiresMembership).toHaveBeenCalledWith(
+        expect.objectContaining({ poolAddress: poolStore.poolById(2)!.poolAddress, requiresMembership: true })
+      )
+    })
+
+    it('opens a closed pool', async () => {
+      mockConfig({ requiresMembership: true })
+      const { getByTestId } = render(<PoolSettingsScreen />)
+
+      expect(getByTestId('settings-membership-on')).toBeTruthy()
+
+      await act(async () => {
+        fireEvent.press(getByTestId('settings-membership-toggle'))
+      })
+
+      expect(mockSetRequiresMembership).toHaveBeenCalledWith(expect.objectContaining({ requiresMembership: false }))
+    })
+
+    it('reassures the owner that closing strands nobody', () => {
+      // The register is written on every deposit, so everyone who has funded the
+      // pool is already a member — the fact an owner needs before flipping this.
+      const { getByText } = render(<PoolSettingsScreen />)
+
+      expect(getByText(/stays a member/)).toBeTruthy()
+    })
+
+    it('re-reads the chain once the change confirms', async () => {
+      const refetch = mockConfig()
+      const { getByTestId } = render(<PoolSettingsScreen />)
+
+      await act(async () => {
+        fireEvent.press(getByTestId('settings-membership-toggle'))
+      })
+
+      await waitFor(() => expect(refetch).toHaveBeenCalled())
     })
   })
 

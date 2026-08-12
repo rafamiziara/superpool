@@ -25,7 +25,7 @@ import { sameAddress } from '../../../src/utils/format'
 function PoolSettingsScreen() {
   const { poolId } = useLocalSearchParams<{ poolId: string }>()
 
-  const { setRequiresApproval, isSubmitting, error: settingsError, reset } = usePoolSettings()
+  const { setRequiresApproval, setRequiresMembership, isSubmitting, error: settingsError, reset } = usePoolSettings()
   const [failure, setFailure] = useState<string | null>(null)
 
   const pool = poolStore.poolById(Number(poolId))
@@ -45,19 +45,24 @@ function PoolSettingsScreen() {
   // predates the field decodes to nothing, and false is the right answer — those
   // pools are stranded clones with no approval step to turn on.
   const requiresApproval = Array.isArray(config) ? config[4] === true : false
+  // `requiresMembership` is the sixth member, appended after `requiresApproval`.
+  const requiresMembership = Array.isArray(config) ? config[5] === true : false
   const isReadable = Array.isArray(config)
 
   /** Requests still waiting, which decides how a change has to be worded. */
   const pendingCount = pool ? poolStore.pendingLoansFor(pool.poolId).length : 0
 
-  const handleToggle = async () => {
+  /** Applicants waiting, for the same reason. */
+  const pendingMemberCount = pool ? poolStore.pendingMembersFor(pool.poolId).length : 0
+
+  const runChange = async (change: () => Promise<unknown>) => {
     if (!pool || isSubmitting) return
 
     setFailure(null)
     reset()
 
     try {
-      await setRequiresApproval({ poolAddress: pool.poolAddress as `0x${string}`, requiresApproval: !requiresApproval })
+      await change()
     } catch {
       // `usePoolSettings` already put the message in `settingsError`; it rethrows
       // so a caller can branch, and this one only needs to not proceed.
@@ -67,6 +72,12 @@ function PoolSettingsScreen() {
     // The hook waits for the receipt, so the chain already agrees by here.
     await refetchConfig()
   }
+
+  const handleToggle = () =>
+    runChange(() => setRequiresApproval({ poolAddress: pool!.poolAddress as `0x${string}`, requiresApproval: !requiresApproval }))
+
+  const handleMembershipToggle = () =>
+    runChange(() => setRequiresMembership({ poolAddress: pool!.poolAddress as `0x${string}`, requiresMembership: !requiresMembership }))
 
   if (!pool) {
     return (
@@ -203,6 +214,61 @@ function PoolSettingsScreen() {
               {isSubmitting && <ActivityIndicator size="small" colorClassName={requiresApproval ? 'accent-snow' : 'accent-abyss'} />}
               <Text className={requiresApproval ? 'text-base font-bold text-snow' : 'text-base font-bold text-abyss disabled:text-mist'}>
                 {isSubmitting ? 'Confirming…' : requiresApproval ? 'Stop reviewing requests' : 'Review requests before lending'}
+              </Text>
+            </Pressable>
+
+            <View className="rounded-3xl border-continuous border-hairline border-veil bg-surface p-5" testID="settings-membership-card">
+              <View className="flex-row items-start justify-between gap-4">
+                <View className="flex-1">
+                  <Text className="text-base font-bold text-snow">Decide who joins</Text>
+                  <Text className="mt-2 text-sm leading-6 text-fog">
+                    {requiresMembership
+                      ? 'People ask to join, and nobody can fund the pool or borrow from it until you let them in.'
+                      : 'Anyone can fund this pool, and funding it makes them a member.'}
+                  </Text>
+                </View>
+                <View
+                  className={`rounded-full px-3 py-1 ${requiresMembership ? 'bg-mint-deep' : 'bg-veil'}`}
+                  testID={requiresMembership ? 'settings-membership-on' : 'settings-membership-off'}
+                >
+                  <Text className={`text-xs font-semibold ${requiresMembership ? 'text-mint' : 'text-mist'}`}>
+                    {requiresMembership ? 'On' : 'Off'}
+                  </Text>
+                </View>
+              </View>
+            </View>
+
+            {/*
+              Closing a pool strands nobody — the register is written on every
+              deposit either way, so everyone who has funded it is already a
+              member. That is the fact an owner needs before flipping this, and
+              it is not obvious from the switch.
+            */}
+            <View className="rounded-2xl border-continuous border-hairline border-veil bg-raised px-4 py-3">
+              <Text className="text-xs leading-5 text-mist">
+                {requiresMembership
+                  ? pendingMemberCount > 0
+                    ? `Opening the pool lets anyone fund it. The ${pendingMemberCount === 1 ? 'person' : `${pendingMemberCount} people`} already waiting stay waiting until you decide.`
+                    : 'Opening the pool lets anyone fund it. Members you have removed stay out.'
+                  : 'Everyone who has already funded this pool stays a member, so closing it locks nobody out of what they put in.'}
+              </Text>
+            </View>
+
+            <Pressable
+              onPress={handleMembershipToggle}
+              disabled={isSubmitting}
+              testID="settings-membership-toggle"
+              accessibilityRole="button"
+              accessibilityState={{ disabled: isSubmitting, checked: requiresMembership }}
+              className={
+                requiresMembership
+                  ? 'flex-row items-center justify-center gap-2 rounded-2xl border-continuous border-hairline border-veil bg-raised px-6 py-4 active:opacity-80 disabled:opacity-50'
+                  : 'flex-row items-center justify-center gap-2 rounded-2xl border-continuous border-hairline border-veil bg-raised px-6 py-4 active:opacity-80 disabled:opacity-50'
+              }
+            >
+              {isSubmitting && <ActivityIndicator size="small" colorClassName="accent-snow" />}
+              <Text className="text-base font-bold text-snow">
+                {isSubmitting ? 'Confirming…' : requiresMembership ? 'Open this pool to anyone' : 'Decide who joins'}
               </Text>
             </Pressable>
           </View>

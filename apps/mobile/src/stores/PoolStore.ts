@@ -650,6 +650,30 @@ export class PoolStore {
   }
 
   /**
+   * Everyone waiting to be let into one pool.
+   *
+   * Read from `memberRecords` rather than `memberships`, because the derived
+   * getter merges in contributors the register has not reached and defaults
+   * them to active — which is right for showing a position and wrong for a
+   * queue, where only the register's own word counts.
+   */
+  pendingMembersFor = (poolId: number): MemberInfo[] => {
+    return this.memberRecords.filter((member) => member.poolId === poolId && member.status === 'requested')
+  }
+
+  /**
+   * The connected wallet's standing in one pool, straight from the register.
+   *
+   * `membershipFor` answers "what is my position", merging money in and
+   * defaulting a contributor to active. This answers "what does the register
+   * say", which is what the join button needs: a rejected applicant and a
+   * stranger must not see the same screen, and only this can tell them apart.
+   */
+  registerStandingFor = (poolId: number): MemberInfo | undefined => {
+    return this.memberRecords.find((member) => member.poolId === poolId && sameAddress(member.account, this.userAddress))
+  }
+
+  /**
    * The user's own pools that have somebody waiting on them.
    *
    * Owner-side work is otherwise invisible until you open the pool, which is the

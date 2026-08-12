@@ -20,9 +20,17 @@ export interface SetRequiresApprovalParams {
   requiresApproval: boolean
 }
 
+export interface SetRequiresMembershipParams {
+  poolAddress: `0x${string}`
+  /** The value to write. The caller passes the target state, not a toggle. */
+  requiresMembership: boolean
+}
+
 export interface UsePoolSettingsReturn {
   /** Resolves once the change is confirmed on chain. */
   setRequiresApproval: (params: SetRequiresApprovalParams) => Promise<`0x${string}`>
+  /** Opens or closes membership. Resolves once the change is confirmed on chain. */
+  setRequiresMembership: (params: SetRequiresMembershipParams) => Promise<`0x${string}`>
   /** True from the signature prompt until the receipt lands. */
   isSubmitting: boolean
   error: string | null
@@ -73,8 +81,17 @@ export const usePoolSettings = (): UsePoolSettingsReturn => {
     setError(null)
   }, [])
 
-  const setRequiresApproval = useCallback(
-    async (params: SetRequiresApprovalParams): Promise<`0x${string}`> => {
+  /**
+   * Both settings are one owner-only boolean write, so they share everything
+   * below the function name — estimate, send, wait, and the reasoning about why
+   * the receipt is waited on.
+   */
+  const setFlag = useCallback(
+    async (
+      poolAddress: `0x${string}`,
+      functionName: 'setRequiresApproval' | 'setRequiresMembership',
+      value: boolean
+    ): Promise<`0x${string}`> => {
       const activeChainId = chainId ?? DEFAULT_CHAIN_ID
 
       const fail = (message: string): never => {
@@ -96,20 +113,20 @@ export const usePoolSettings = (): UsePoolSettingsReturn => {
         let gas: bigint | undefined
         if (publicClient) {
           const estimate = await publicClient.estimateContractGas({
-            address: params.poolAddress,
+            address: poolAddress,
             abi: SampleLendingPoolABI,
-            functionName: 'setRequiresApproval',
-            args: [params.requiresApproval],
+            functionName,
+            args: [value],
             account: address,
           })
           gas = estimate + (estimate * GAS_BUFFER_PERCENT) / 100n
         }
 
         txHash = await writeContractAsync({
-          address: params.poolAddress,
+          address: poolAddress,
           abi: SampleLendingPoolABI,
-          functionName: 'setRequiresApproval',
-          args: [params.requiresApproval],
+          functionName,
+          args: [value],
           chainId: activeChainId,
           ...(gas === undefined ? {} : { gas }),
         })
@@ -137,5 +154,17 @@ export const usePoolSettings = (): UsePoolSettingsReturn => {
     [address, chainId, publicClient, writeContractAsync]
   )
 
-  return { setRequiresApproval, isSubmitting, error, reset }
+  const setRequiresApproval = useCallback(
+    (params: SetRequiresApprovalParams): Promise<`0x${string}`> =>
+      setFlag(params.poolAddress, 'setRequiresApproval', params.requiresApproval),
+    [setFlag]
+  )
+
+  const setRequiresMembership = useCallback(
+    (params: SetRequiresMembershipParams): Promise<`0x${string}`> =>
+      setFlag(params.poolAddress, 'setRequiresMembership', params.requiresMembership),
+    [setFlag]
+  )
+
+  return { setRequiresApproval, setRequiresMembership, isSubmitting, error, reset }
 }
