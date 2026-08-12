@@ -26,7 +26,16 @@ export type PendingTransactionStatus = 'submitted' | 'confirmed' | 'failed'
  */
 export type LoanTransactionType = 'BORROW' | 'REPAY' | 'REQUEST_LOAN' | 'APPROVE_LOAN' | 'REJECT_LOAN' | 'CANCEL_LOAN_REQUEST'
 
-export type PendingTransactionType = 'CREATE_POOL' | 'CONTRIBUTE' | 'WITHDRAW' | LoanTransactionType
+/**
+ * Everything that resolves to one membership record.
+ *
+ * Same arrangement as the loan actions, and for the same reason: five wordings,
+ * two senders — the applicant asks and leaves, the owner decides — but one
+ * payload, one extractor and one indexer.
+ */
+export type MembershipTransactionType = 'REQUEST_MEMBERSHIP' | 'APPROVE_MEMBER' | 'REJECT_MEMBER' | 'REMOVE_MEMBER' | 'LEAVE_POOL'
+
+export type PendingTransactionType = 'CREATE_POOL' | 'CONTRIBUTE' | 'WITHDRAW' | LoanTransactionType | MembershipTransactionType
 
 const LOAN_TRANSACTION_TYPES: readonly LoanTransactionType[] = [
   'BORROW',
@@ -37,8 +46,20 @@ const LOAN_TRANSACTION_TYPES: readonly LoanTransactionType[] = [
   'CANCEL_LOAN_REQUEST',
 ]
 
+const MEMBERSHIP_TRANSACTION_TYPES: readonly MembershipTransactionType[] = [
+  'REQUEST_MEMBERSHIP',
+  'APPROVE_MEMBER',
+  'REJECT_MEMBER',
+  'REMOVE_MEMBER',
+  'LEAVE_POOL',
+]
+
 export function isLoanTransactionType(type: PendingTransactionType): type is LoanTransactionType {
   return LOAN_TRANSACTION_TYPES.includes(type as LoanTransactionType)
+}
+
+export function isMembershipTransactionType(type: PendingTransactionType): type is MembershipTransactionType {
+  return MEMBERSHIP_TRANSACTION_TYPES.includes(type as MembershipTransactionType)
 }
 
 export interface CreatePoolParams {
@@ -116,6 +137,33 @@ export interface LoanResult {
   amount: string
 }
 
+/**
+ * Anything that acts on one membership.
+ *
+ * No amount: nothing here moves money. That is the whole difference from a loan
+ * action, and it is why these do not reuse `LoanParams`.
+ */
+export interface MembershipParams {
+  poolId: number
+  poolAddress: `0x${string}`
+  /** Denormalised so a pending card can name the pool before any pool is fetched. */
+  poolName: string
+  /**
+   * Whose membership this is, when that is not the sender.
+   *
+   * Set on the owner's decisions: the card has to say whose application is
+   * being decided, and the sender's own address would name the wrong person.
+   * Absent when the applicant asks or leaves.
+   */
+  account?: string
+}
+
+/** Populated once a membership transaction is confirmed and its log is decoded. */
+export interface MembershipResult {
+  /** The address the chain recorded — authoritative over the submitted params. */
+  account: string
+}
+
 interface PendingTransactionBase {
   txHash: `0x${string}`
   chainId: number
@@ -167,6 +215,27 @@ export type RejectLoanTransaction = LoanTransaction<'REJECT_LOAN'>
 export type CancelLoanRequestTransaction = LoanTransaction<'CANCEL_LOAN_REQUEST'>
 
 /**
+ * One membership action, kept generic in its `type` so the union still
+ * discriminates — the same arrangement the loan actions use.
+ */
+export interface MembershipTransaction<T extends MembershipTransactionType> extends PendingTransactionBase {
+  type: T
+  params: MembershipParams
+  result?: MembershipResult
+}
+
+/** Someone asking to join a pool that admits members. */
+export type RequestMembershipTransaction = MembershipTransaction<'REQUEST_MEMBERSHIP'>
+/** The owner admitting an applicant. */
+export type ApproveMemberTransaction = MembershipTransaction<'APPROVE_MEMBER'>
+/** The owner turning an applicant down. They are free to ask again. */
+export type RejectMemberTransaction = MembershipTransaction<'REJECT_MEMBER'>
+/** The owner removing a member. Their balance stays withdrawable. */
+export type RemoveMemberTransaction = MembershipTransaction<'REMOVE_MEMBER'>
+/** A member leaving of their own accord. */
+export type LeavePoolTransaction = MembershipTransaction<'LEAVE_POOL'>
+
+/**
  * Discriminated on `type`, because the flows carry genuinely different
  * payloads: a pool creation has terms and produces an id, a contribution has an
  * amount and a pool it went into. Widening them into one optional-everything
@@ -180,8 +249,16 @@ export type CancelLoanRequestTransaction = LoanTransaction<'CANCEL_LOAN_REQUEST'
  * types: they move money in different directions, are sent by different people
  * and read as different things to the user, even though all six resolve to one
  * loan record and one indexer.
+ *
+ * The membership actions are arranged the same way, on their own params: none
+ * of them moves money, which is the one structural difference from a loan.
  */
-export type PendingTransaction = CreatePoolTransaction | ContributeTransaction | WithdrawTransaction | LoanTransaction<LoanTransactionType>
+export type PendingTransaction =
+  | CreatePoolTransaction
+  | ContributeTransaction
+  | WithdrawTransaction
+  | LoanTransaction<LoanTransactionType>
+  | MembershipTransaction<MembershipTransactionType>
 
 /**
  * Whether the user may clear this record by hand.
@@ -212,6 +289,11 @@ export function isDismissable(transaction: PendingTransaction): boolean {
  */
 export function isLoanTransaction(transaction: PendingTransaction): transaction is LoanTransaction<LoanTransactionType> {
   return isLoanTransactionType(transaction.type)
+}
+
+/** The membership counterpart of `isLoanTransaction`, narrowing the record too. */
+export function isMembershipTransaction(transaction: PendingTransaction): transaction is MembershipTransaction<MembershipTransactionType> {
+  return isMembershipTransactionType(transaction.type)
 }
 
 /**
@@ -309,6 +391,34 @@ function toLoanResult(value: JsonValue | undefined): LoanResult | null {
   return { loanId, amount }
 }
 
+function toMembershipParams(value: JsonValue | undefined): MembershipParams | null {
+  if (!isJsonObject(value)) return null
+
+  const { poolId, poolAddress, poolName, account } = value
+
+  if (typeof poolId !== 'number' || typeof poolName !== 'string') return null
+  if (typeof poolAddress !== 'string' || !isHexString(poolAddress)) return null
+  // Genuinely optional — only the owner's decisions name someone else — so
+  // absent is valid and a wrong type is not.
+  if (account !== undefined && typeof account !== 'string') return null
+
+  const params: MembershipParams = { poolId, poolAddress, poolName }
+
+  if (account !== undefined) params.account = account
+
+  return params
+}
+
+function toMembershipResult(value: JsonValue | undefined): MembershipResult | null {
+  if (!isJsonObject(value)) return null
+
+  const { account } = value
+
+  if (typeof account !== 'string') return null
+
+  return { account }
+}
+
 /**
  * Rebuilds a transaction from persisted JSON, returning `null` for anything that
  * does not match the current shape. Storage outlives the code that wrote it: a
@@ -372,6 +482,25 @@ function toPendingTransaction(value: JsonValue): PendingTransaction | null {
     const transaction: LoanTransaction<LoanTransactionType> = { ...base, type: type as LoanTransactionType, params: parsedParams }
 
     const parsedResult = toLoanResult(result)
+    if (parsedResult) transaction.result = parsedResult
+
+    return transaction
+  }
+
+  // Every membership action revives the same way, for the same reason the loan
+  // actions do: an app killed after signing must still have the record startup
+  // recovery resolves.
+  if (typeof type === 'string' && isMembershipTransactionType(type as PendingTransactionType)) {
+    const parsedParams = toMembershipParams(params)
+    if (!parsedParams) return null
+
+    const transaction: MembershipTransaction<MembershipTransactionType> = {
+      ...base,
+      type: type as MembershipTransactionType,
+      params: parsedParams,
+    }
+
+    const parsedResult = toMembershipResult(result)
     if (parsedResult) transaction.result = parsedResult
 
     return transaction
@@ -462,6 +591,40 @@ export function extractLoanResult(receipt: TransactionReceipt): LoanResult | und
 }
 
 /**
+ * Reads the account out of a confirmed receipt's membership log.
+ *
+ * One extractor for every membership action: all six events carry a single
+ * indexed address, and a transaction contains exactly one of them, so trying
+ * each in turn is unambiguous.
+ *
+ * `MemberJoined` is in the list even though no membership action sends it — an
+ * open pool emits it from `depositFunds`. It costs nothing here and means a
+ * receipt is never silently unreadable.
+ */
+export function extractMembershipResult(receipt: TransactionReceipt): MembershipResult | undefined {
+  for (const eventName of [
+    'MembershipRequested',
+    'MembershipApproved',
+    'MembershipRejected',
+    'MembershipRevoked',
+    'MembershipLeft',
+    'MemberJoined',
+  ] as const) {
+    try {
+      const [event] = parseEventLogs({ abi: SampleLendingPoolABI, eventName, logs: receipt.logs })
+      if (!event) continue
+
+      return { account: event.args.account }
+    } catch {
+      // Try the others; an undecodable log is not a reason to give up on a
+      // receipt that may still hold a sibling event.
+    }
+  }
+
+  return undefined
+}
+
+/**
  * The result extractor for a transaction's type.
  *
  * Startup recovery resolves records of every kind against the chain and has only
@@ -472,10 +635,11 @@ export function extractLoanResult(receipt: TransactionReceipt): LoanResult | und
 export function extractResult(
   type: PendingTransactionType,
   receipt: TransactionReceipt
-): CreatePoolResult | ContributeResult | WithdrawResult | LoanResult | undefined {
+): CreatePoolResult | ContributeResult | WithdrawResult | LoanResult | MembershipResult | undefined {
   if (type === 'CREATE_POOL') return extractPoolCreatedResult(receipt)
   if (type === 'WITHDRAW') return extractFundsWithdrawnResult(receipt)
   if (isLoanTransactionType(type)) return extractLoanResult(receipt)
+  if (isMembershipTransactionType(type)) return extractMembershipResult(receipt)
 
   return extractFundsDepositedResult(receipt)
 }
@@ -542,7 +706,7 @@ export class PendingTransactionsStore {
   updateTransactionStatus = async (
     txHash: `0x${string}`,
     status: PendingTransactionStatus,
-    result?: CreatePoolResult | ContributeResult | WithdrawResult | LoanResult
+    result?: CreatePoolResult | ContributeResult | WithdrawResult | LoanResult | MembershipResult
   ): Promise<void> => {
     const transaction = this.transactions.find((existing) => existing.txHash === txHash)
     if (!transaction) return

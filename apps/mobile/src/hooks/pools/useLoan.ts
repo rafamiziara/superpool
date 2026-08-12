@@ -89,13 +89,16 @@ export function calculateRepayment(amount: bigint, interestRate: number): bigint
  * `SampleLendingPool`'s custom errors, in the wording a borrower should see.
  *
  * `UnauthorizedBorrower` means two different things depending on the call, and
- * the wording has to pick one: on `createLoan` it is fired when the caller has
- * never contributed, which is the case a borrower will actually hit. On
- * `repayLoan` it means the loan is someone else's, which the UI does not let
- * you reach.
+ * the wording has to pick one: on `createLoan` it is fired when the caller is
+ * not a member, which is the case a borrower will actually hit. On `repayLoan`
+ * it means the loan is someone else's, which the UI does not let you reach.
+ *
+ * "Not a member" is the honest wording since the gate became the register: in
+ * an open pool the way in is still to contribute, but in a private one the
+ * owner has to admit you and no amount of depositing would help.
  */
 const BORROW_ERROR_MESSAGES: Record<string, string> = {
-  UnauthorizedBorrower: 'Contribute to this pool before borrowing from it',
+  UnauthorizedBorrower: 'Join this pool before borrowing from it',
   LoanOutstanding: 'Repay your current loan from this pool first',
   ExceedsMaxLoanAmount: 'That is more than this pool lends at once',
   InsufficientFunds: 'The pool does not have that much available right now',
@@ -123,7 +126,7 @@ const REPAY_ERROR_MESSAGES: Record<string, string> = {
  * by the time the owner decides.
  */
 const REQUEST_ERROR_MESSAGES: Record<string, string> = {
-  UnauthorizedBorrower: 'Contribute to this pool before asking to borrow from it',
+  UnauthorizedBorrower: 'Join this pool before asking to borrow from it',
   LoanOutstanding: 'You already have a loan or a request in this pool',
   ExceedsMaxLoanAmount: 'That is more than this pool lends at once',
   InvalidAmount: 'Enter an amount greater than zero',

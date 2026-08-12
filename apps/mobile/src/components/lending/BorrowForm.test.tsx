@@ -119,7 +119,7 @@ describe('BorrowForm', () => {
   })
 
   it('shows the flow error above the button', () => {
-    const { getByTestId } = renderForm({ error: 'Contribute to this pool before borrowing from it' })
+    const { getByTestId } = renderForm({ error: 'Join this pool before borrowing from it' })
 
     expect(getByTestId('borrow-error')).toBeTruthy()
   })

@@ -136,6 +136,16 @@ function Field({ label, value, onChangeText, onBlur, error, placeholder, hint, k
 export function CreatePoolForm({ onSubmit, isSubmitting = false, error, gasEstimate, submitLabel = 'Create pool' }: CreatePoolFormProps) {
   const [values, setValues] = useState<Record<FormField, string>>(EMPTY_FORM)
   const [touched, setTouched] = useState<Partial<Record<FormField, boolean>>>({})
+  /**
+   * Outside the Zod schema on purpose: every field there is a string the user
+   * types and the schema's job is parsing them into contract units. A boolean
+   * needs neither, and forcing it through would mean a `'true'`/`'false'` field
+   * that can be neither empty nor invalid.
+   *
+   * Defaults on: a private circle is what the product is for, and a pool opened
+   * by accident cannot be un-opened for whoever funded it in the meantime.
+   */
+  const [requiresMembership, setRequiresMembership] = useState(true)
 
   const parsed = useMemo(() => createPoolFormSchema.safeParse(values), [values])
 
@@ -161,7 +171,7 @@ export function CreatePoolForm({ onSubmit, isSubmitting = false, error, gasEstim
   const handleSubmit = () => {
     if (!parsed.success || isSubmitting) return
 
-    void onSubmit(parsed.data)
+    void onSubmit({ ...parsed.data, requiresMembership })
   }
 
   return (
@@ -234,6 +244,30 @@ export function CreatePoolForm({ onSubmit, isSubmitting = false, error, gasEstim
           </Text>
         </View>
       ) : null}
+
+      <View className="gap-2 rounded-2xl border-continuous border-hairline border-veil bg-surface px-4 py-3">
+        <View className="flex-row items-center justify-between">
+          <Text className="text-sm text-snow">Private pool</Text>
+          <Pressable
+            onPress={() => setRequiresMembership((current) => !current)}
+            disabled={isSubmitting}
+            accessibilityRole="switch"
+            accessibilityState={{ checked: requiresMembership, disabled: isSubmitting }}
+            accessibilityLabel="Private pool"
+            testID="create-pool-private"
+            className={`rounded-full px-3 py-1 ${requiresMembership ? 'bg-mint-deep' : 'bg-veil'}`}
+          >
+            <Text className={`text-xs font-semibold ${requiresMembership ? 'text-mint' : 'text-mist'}`}>
+              {requiresMembership ? 'On' : 'Off'}
+            </Text>
+          </Pressable>
+        </View>
+        <Text className="text-xs text-fog">
+          {requiresMembership
+            ? 'You decide who joins. People ask, and you approve or turn them down before they can fund the pool or borrow from it.'
+            : 'Anyone can fund this pool, and funding it makes them a member. You can close it later.'}
+        </Text>
+      </View>
 
       {error ? (
         <View className="rounded-2xl border-continuous border-hairline border-coral bg-coral-deep px-4 py-3">

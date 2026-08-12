@@ -25,6 +25,14 @@ export interface PoolCreationParams {
   interestRate: number
   /** Seconds. */
   loanDuration: number
+  /**
+   * Whether the owner admits members, or anyone may fund the pool.
+   *
+   * A private pool is what the product is about, so the form defaults it on —
+   * but the contract takes it as an explicit choice rather than defaulting,
+   * since nothing about a pool should depend on a field being forgotten.
+   */
+  requiresMembership: boolean
 }
 
 export interface UsePoolCreationReturn {
@@ -138,6 +146,7 @@ export const usePoolCreation = (): UsePoolCreationReturn => {
           loanDuration: BigInt(params.loanDuration),
           name: params.name,
           description: params.description,
+          requiresMembership: params.requiresMembership,
         },
       ] as const
 

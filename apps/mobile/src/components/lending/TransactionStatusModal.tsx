@@ -4,6 +4,7 @@ import { ActivityIndicator, Linking, Modal, Pressable, Text, View } from 'react-
 import { palette } from '../../constants/palette'
 import {
   isLoanTransaction,
+  isMembershipTransaction,
   type PendingTransaction,
   type PendingTransactionStatus,
   type PendingTransactionType,
@@ -134,6 +135,67 @@ const COPY: Record<
       failed: 'Your request still stands and no funds moved beyond the network fee.',
     },
   },
+  REQUEST_MEMBERSHIP: {
+    headline: {
+      submitted: 'Asking to join',
+      confirmed: 'Almost there',
+      failed: 'That transaction failed',
+    },
+    summary: {
+      submitted: 'The network is confirming your request. The pool owner decides from there.',
+      confirmed: 'Your request is on chain. The pool owner will see it in their queue.',
+      failed: 'You have not asked to join and nothing moved beyond the network fee.',
+    },
+  },
+  APPROVE_MEMBER: {
+    headline: {
+      submitted: 'Adding the member',
+      confirmed: 'Almost there',
+      failed: 'That transaction failed',
+    },
+    summary: {
+      submitted: 'The network is confirming this. They can fund the pool and borrow once it lands.',
+      confirmed: 'They are in. Their membership will appear in the pool in a moment.',
+      failed: 'They are still waiting and nothing moved beyond the network fee.',
+    },
+  },
+  REJECT_MEMBER: {
+    headline: {
+      submitted: 'Turning down the request',
+      confirmed: 'Almost there',
+      failed: 'That transaction failed',
+    },
+    summary: {
+      submitted: 'The network is confirming this. Nothing was held, so there is nothing to return.',
+      confirmed: 'The request is turned down. They can ask again if they want to.',
+      failed: 'The request still stands and nothing moved beyond the network fee.',
+    },
+  },
+  REMOVE_MEMBER: {
+    headline: {
+      submitted: 'Removing the member',
+      confirmed: 'Almost there',
+      failed: 'That transaction failed',
+    },
+    summary: {
+      // The reassurance that matters here: removal is not confiscation.
+      submitted: 'The network is confirming this. Their balance stays theirs and remains withdrawable.',
+      confirmed: 'They are out of the pool. Anything they put in is still theirs to withdraw.',
+      failed: 'They are still a member and nothing moved beyond the network fee.',
+    },
+  },
+  LEAVE_POOL: {
+    headline: {
+      submitted: 'Leaving the pool',
+      confirmed: 'Almost there',
+      failed: 'That transaction failed',
+    },
+    summary: {
+      submitted: 'The network is confirming this. Your balance stays yours and remains withdrawable.',
+      confirmed: 'You have left the pool. Anything you put in is still yours to withdraw.',
+      failed: 'You are still a member and nothing moved beyond the network fee.',
+    },
+  },
   CREATE_POOL: {
     headline: {
       submitted: 'Creating your pool',
@@ -215,6 +277,20 @@ function detailsFor(transaction: PendingTransaction): DetailRow[] {
       // Absent while borrowing or requesting: the contract assigns the id, so it
       // only exists once the receipt is in hand.
       ...(result || params.loanId !== undefined ? [{ label: 'Loan ID', value: `#${result?.loanId ?? params.loanId}`, mono: true }] : []),
+    ]
+  }
+
+  if (isMembershipTransaction(transaction)) {
+    const { params, result } = transaction
+
+    return [
+      { label: 'Pool', value: params.poolName },
+      // Only on the owner's decisions, where the membership being acted on is
+      // someone else's — see `MembershipParams.account`. No amount row at all:
+      // nothing here moves money.
+      ...(result?.account || params.account
+        ? [{ label: 'Member', value: shortAddress(result?.account ?? params.account ?? ''), mono: true }]
+        : []),
     ]
   }
 

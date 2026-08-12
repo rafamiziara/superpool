@@ -161,7 +161,7 @@ describe('validateBorrowParams', () => {
 
 describe('describeBorrowError', () => {
   it.each([
-    ['UnauthorizedBorrower', /Contribute to this pool/],
+    ['UnauthorizedBorrower', /Join this pool/],
     ['LoanOutstanding', /Repay your current loan/],
     ['ExceedsMaxLoanAmount', /more than this pool lends/],
     ['InsufficientFunds', /does not have that much/],
@@ -387,7 +387,7 @@ describe('useLoan repay', () => {
 
 describe('describeRequestError', () => {
   it.each([
-    ['UnauthorizedBorrower', /Contribute to this pool/],
+    ['UnauthorizedBorrower', /Join this pool/],
     ['LoanOutstanding', /already have a loan or a request/],
     ['ExceedsMaxLoanAmount', /more than this pool lends/],
     ['InvalidAmount', /greater than zero/],

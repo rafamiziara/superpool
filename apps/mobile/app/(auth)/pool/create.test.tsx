@@ -126,6 +126,7 @@ describe('CreatePoolScreen', () => {
         maxLoanAmount: 100_000_000_000_000_000_000n,
         interestRate: 500,
         loanDuration: 2_592_000,
+        requiresMembership: true,
       })
       expect(mockWaitForTransaction).toHaveBeenCalledWith(TX_HASH, 'CREATE_POOL')
       expect(mockTriggerIndexing).toHaveBeenCalledWith(TX_HASH, 'CREATE_POOL')

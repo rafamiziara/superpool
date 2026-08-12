@@ -13,10 +13,12 @@ import { PoolFactoryABI, SampleLendingPoolABI } from '../constants/abis'
 import {
   extractFundsDepositedResult,
   extractLoanResult,
+  extractMembershipResult,
   extractPoolCreatedResult,
   extractResult,
   isDismissable,
   isLoanTransactionType,
+  isMembershipTransactionType,
   type PendingTransaction,
   PendingTransactionsStore,
   type TransactionReceiptReader,
@@ -657,6 +659,26 @@ function makeLoanLog(
   } as ReceiptLog
 }
 
+function makeMembershipLog(
+  eventName: 'MembershipRequested' | 'MembershipApproved' | 'MembershipRejected' | 'MembershipRevoked' | 'MembershipLeft' | 'MemberJoined',
+  account: `0x${string}`
+): ReceiptLog {
+  const topics = encodeEventTopics({ abi: SampleLendingPoolABI, eventName, args: { account } })
+
+  return {
+    address: POOL_ADDRESS,
+    topics,
+    // The only parameter is `indexed`, so `data` is empty.
+    data: '0x',
+    blockHash: '0xdead000000000000000000000000000000000000000000000000000000000001',
+    blockNumber: 42n,
+    logIndex: 0,
+    transactionHash: TX_HASH,
+    transactionIndex: 0,
+    removed: false,
+  } as ReceiptLog
+}
+
 // ---------------------------------------------------------------------------
 // What the user may clear by hand.
 //
@@ -733,6 +755,23 @@ describe('extractResult dispatch', () => {
 
     expect(extractResult('CONTRIBUTE', receipt)).toEqual({ amount: '5' })
   })
+
+  it.each(['REQUEST_MEMBERSHIP', 'APPROVE_MEMBER', 'REJECT_MEMBER', 'REMOVE_MEMBER', 'LEAVE_POOL'] as const)(
+    'routes %s to the membership extractor',
+    (type) => {
+      const receipt = makeReceipt({ logs: [makeMembershipLog('MembershipApproved', POOL_OWNER)] })
+
+      expect(extractResult(type, receipt)).toEqual({ account: POOL_OWNER })
+    }
+  )
+
+  it('reads a deposit into an open pool as a contribution, not a membership', () => {
+    // That transaction carries both logs. The type is what decides which record
+    // this call is resolving.
+    const receipt = makeReceipt({ logs: [makeFundsDepositedLog(POOL_OWNER, 5n), makeMembershipLog('MemberJoined', POOL_OWNER)] })
+
+    expect(extractResult('CONTRIBUTE', receipt)).toEqual({ amount: '5' })
+  })
 })
 
 describe('isLoanTransactionType', () => {
@@ -740,7 +779,42 @@ describe('isLoanTransactionType', () => {
     expect(isLoanTransactionType(type)).toBe(true)
   })
 
-  it.each(['CREATE_POOL', 'CONTRIBUTE', 'WITHDRAW'] as const)('does not claim %s', (type) => {
+  it.each(['CREATE_POOL', 'CONTRIBUTE', 'WITHDRAW', 'REQUEST_MEMBERSHIP', 'APPROVE_MEMBER'] as const)('does not claim %s', (type) => {
     expect(isLoanTransactionType(type)).toBe(false)
+  })
+})
+
+describe('isMembershipTransactionType', () => {
+  it.each(['REQUEST_MEMBERSHIP', 'APPROVE_MEMBER', 'REJECT_MEMBER', 'REMOVE_MEMBER', 'LEAVE_POOL'] as const)('claims %s', (type) => {
+    expect(isMembershipTransactionType(type)).toBe(true)
+  })
+
+  it.each(['CREATE_POOL', 'CONTRIBUTE', 'WITHDRAW', 'BORROW', 'APPROVE_LOAN'] as const)('does not claim %s', (type) => {
+    expect(isMembershipTransactionType(type)).toBe(false)
+  })
+})
+
+describe('extractMembershipResult', () => {
+  it.each([
+    'MembershipRequested',
+    'MembershipApproved',
+    'MembershipRejected',
+    'MembershipRevoked',
+    'MembershipLeft',
+    'MemberJoined',
+  ] as const)('decodes the account from a %s log', (eventName) => {
+    const receipt = makeReceipt({ logs: [makeMembershipLog(eventName, POOL_OWNER)] })
+
+    expect(extractMembershipResult(receipt)).toEqual({ account: POOL_OWNER })
+  })
+
+  it('ignores a loan event', () => {
+    const receipt = makeReceipt({ logs: [makeLoanLog('LoanCreated', 1n, 1n)] })
+
+    expect(extractMembershipResult(receipt)).toBeUndefined()
+  })
+
+  it('returns undefined when there are no logs', () => {
+    expect(extractMembershipResult(makeReceipt({ logs: [] }))).toBeUndefined()
   })
 })

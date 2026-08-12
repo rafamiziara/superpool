@@ -119,7 +119,20 @@ describe('CreatePoolForm', () => {
       maxLoanAmount: parseEther('100'),
       interestRate: 500,
       loanDuration: 2_592_000,
+      // Defaulted on: a private circle is what the product is for, and a pool
+      // opened by accident cannot be un-opened for whoever funded it meanwhile.
+      requiresMembership: true,
     })
+  })
+
+  it('submits an open pool when the switch is turned off', () => {
+    render(<CreatePoolForm onSubmit={onSubmit} />)
+
+    fillValidForm()
+    fireEvent.press(screen.getByTestId('create-pool-private'))
+    fireEvent.press(screen.getByTestId('create-pool-submit'))
+
+    expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ requiresMembership: false }))
   })
 
   it('enables submission without a description', () => {

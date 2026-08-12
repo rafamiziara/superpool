@@ -35,6 +35,7 @@ function makeParams(overrides: Partial<PoolCreationParams> = {}): PoolCreationPa
     maxLoanAmount: 1_000_000_000_000_000_000n,
     interestRate: 500,
     loanDuration: 2_592_000,
+    requiresMembership: false,
     ...overrides,
   }
 }
@@ -195,6 +196,7 @@ describe('usePoolCreation', () => {
               loanDuration: 2_592_000n,
               name: 'Neighbourhood Fund',
               description: 'Micro-loans for the block',
+              requiresMembership: false,
             },
           ],
         })
