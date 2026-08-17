@@ -9,11 +9,25 @@ import { poolStore } from '../../src/stores/PoolStore'
 export default observer(function AuthLayout() {
   const isAuthenticated = authStore.isWalletConnected && !!authStore.user
 
+  /**
+   * Reloads on a network switch as well as on sign-in.
+   *
+   * Every list in the app is one chain's: `PoolStore.requestPools` passes
+   * `authStore.chainId`, and the backend keys every document by it. So the
+   * chain the wallet is on is not a detail of the fetch — it decides which
+   * pools exist at all.
+   *
+   * Without `chainId` here the store kept the *previous* chain's pools after a
+   * switch, and went on showing them until some unrelated refresh replaced the
+   * list wholesale. `fetchPools` rather than `refreshPools`: the pools on
+   * screen belong to the chain being left, so keeping them visible while the
+   * new ones load would show a list that is wrong rather than merely stale.
+   */
   useEffect(() => {
     if (isAuthenticated) {
       poolStore.fetchPools()
     }
-  }, [isAuthenticated])
+  }, [isAuthenticated, authStore.chainId])
 
   // Redirect protection - this should not happen due to NavigationStore
   // but provides a fallback if someone tries to access auth routes directly

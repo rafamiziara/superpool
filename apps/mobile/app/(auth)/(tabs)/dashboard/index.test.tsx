@@ -269,4 +269,27 @@ describe('DashboardScreen', () => {
       expect(getByText('Creating your pool')).toBeTruthy()
     })
   })
+
+  // -------------------------------------------------------------------------
+  // Which chain the balance is.
+  //
+  // The hero figure is one chain's, and reads as everything the user owns
+  // without a network against it.
+  // -------------------------------------------------------------------------
+
+  describe('the network', () => {
+    it('names the connected chain beside the balance', () => {
+      const { getByTestId } = render(<DashboardScreen />)
+
+      expect(getByTestId('dashboard-network')).toBeTruthy()
+    })
+
+    it('follows the wallet rather than the default', () => {
+      mockWagmiUseAccount.mockReturnValue({ isConnected: true, isConnecting: false, address: undefined, chainId: 80002 })
+
+      const { getByText } = render(<DashboardScreen />)
+
+      expect(getByText('Polygon Amoy')).toBeTruthy()
+    })
+  })
 })

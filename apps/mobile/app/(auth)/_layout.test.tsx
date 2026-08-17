@@ -1,6 +1,8 @@
-import { render } from '../../src/__tests__/test-utils'
+import { act, render } from '../../src/__tests__/test-utils'
+import { runInAction } from 'mobx'
 import React from 'react'
 import { authStore } from '../../src/stores/AuthStore'
+import { poolStore } from '../../src/stores/PoolStore'
 import AuthLayout from './_layout'
 
 // The header constants pull in AppKit, whose ES modules do not survive Jest.
@@ -8,11 +10,27 @@ jest.mock('@reown/appkit-wagmi-react-native', () => ({
   AppKitButton: () => null,
 }))
 
-// Mock authStore
-jest.mock('../../src/stores/AuthStore', () => ({
-  authStore: {
-    isWalletConnected: false,
-    user: null,
+/**
+ * Observable rather than a plain object, because `observer` wraps the layout in
+ * `React.memo`: with no props to change, a re-render only happens when MobX
+ * says something it read has changed. A plain mock cannot say that, and the
+ * network-switch test below would pass against either version of the effect.
+ */
+jest.mock('../../src/stores/AuthStore', () => {
+  const { observable } = jest.requireActual('mobx')
+
+  return {
+    authStore: observable({
+      isWalletConnected: false,
+      user: null,
+      chainId: null,
+    }),
+  }
+})
+
+jest.mock('../../src/stores/PoolStore', () => ({
+  poolStore: {
+    fetchPools: jest.fn(),
   },
 }))
 
@@ -29,14 +47,31 @@ jest.mock('expo-router', () => {
 })
 
 const mockAuthStore = authStore as jest.Mocked<typeof authStore>
+const mockFetchPools = poolStore.fetchPools as jest.Mock
+
+/** Signed in, on one chain. */
+function authenticateOn(chainId: number) {
+  runInAction(() => {
+    mockAuthStore.isWalletConnected = true
+    mockAuthStore.chainId = chainId
+    mockAuthStore.user = {
+      walletAddress: '0x123456789',
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+    }
+  })
+}
 
 describe('AuthLayout', () => {
   beforeEach(() => {
     jest.clearAllMocks()
 
     // Reset to default state
-    mockAuthStore.isWalletConnected = false
-    mockAuthStore.user = null
+    runInAction(() => {
+      mockAuthStore.isWalletConnected = false
+      mockAuthStore.user = null
+      mockAuthStore.chainId = null
+    })
   })
 
   it('should render Stack when fully authenticated', () => {
@@ -77,5 +112,56 @@ describe('AuthLayout', () => {
 
     const { getByText } = render(<AuthLayout />)
     expect(getByText('Redirecting to authentication...')).toBeTruthy()
+  })
+
+  // -------------------------------------------------------------------------
+  // Which chain's pools are loaded.
+  //
+  // Every list in the app is one chain's, so the connected chain decides which
+  // pools exist — not merely how they are fetched.
+  // -------------------------------------------------------------------------
+
+  describe('loading pools', () => {
+    it('loads pools once signed in', () => {
+      authenticateOn(31337)
+
+      render(<AuthLayout />)
+
+      expect(mockFetchPools).toHaveBeenCalledTimes(1)
+    })
+
+    it('loads nothing while signed out', () => {
+      render(<AuthLayout />)
+
+      expect(mockFetchPools).not.toHaveBeenCalled()
+    })
+
+    it('reloads when the wallet switches network', () => {
+      // The regression: the effect depended on authentication alone, so after
+      // a switch the store kept serving the previous chain's pools.
+      authenticateOn(31337)
+      render(<AuthLayout />)
+
+      act(() => {
+        runInAction(() => {
+          mockAuthStore.chainId = 80002
+        })
+      })
+
+      expect(mockFetchPools).toHaveBeenCalledTimes(2)
+    })
+
+    it('does not reload when the wallet reports the same network again', () => {
+      authenticateOn(31337)
+      render(<AuthLayout />)
+
+      act(() => {
+        runInAction(() => {
+          mockAuthStore.chainId = 31337
+        })
+      })
+
+      expect(mockFetchPools).toHaveBeenCalledTimes(1)
+    })
   })
 })

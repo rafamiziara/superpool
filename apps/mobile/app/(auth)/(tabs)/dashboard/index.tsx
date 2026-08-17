@@ -4,13 +4,16 @@ import { StatusBar } from 'expo-status-bar'
 import { observer } from 'mobx-react-lite'
 import React, { useState } from 'react'
 import { Pressable, ScrollView, Text, View } from 'react-native'
+import { useAccount } from 'wagmi'
 import { ActivityRow } from '../../../../src/components/lending/ActivityRow'
 import { ApprovalsLink } from '../../../../src/components/lending/ApprovalsLink'
 import { BorrowerHistoryPanel } from '../../../../src/components/lending/BorrowerHistoryPanel'
 import { ClaimableInterestSync } from '../../../../src/components/lending/ClaimableInterestSync'
+import { NetworkBadge } from '../../../../src/components/lending/NetworkBadge'
 import { PendingTransactionBanner } from '../../../../src/components/lending/PendingTransactionBanner'
 import { PoolCard } from '../../../../src/components/lending/PoolCard'
 import { TransactionStatusModal } from '../../../../src/components/lending/TransactionStatusModal'
+import { DEFAULT_CHAIN_ID } from '../../../../src/config/contracts'
 import { palette } from '../../../../src/constants/palette'
 import { isDismissable, type PendingTransaction, pendingTransactionsStore } from '../../../../src/stores/PendingTransactionsStore'
 import { poolStore } from '../../../../src/stores/PoolStore'
@@ -20,6 +23,8 @@ const CARD_WIDTH = 288 // w-72
 const CARD_GAP = 16
 
 function DashboardScreen() {
+  const { chainId } = useAccount()
+  const activeChainId = chainId ?? DEFAULT_CHAIN_ID
   const loan = poolStore.activeLoan
   const loanPool = loan ? poolStore.poolById(Number(loan.poolId)) : undefined
   const loanTotal = loan ? loan.amount + loan.interestAccrued : 0n
@@ -47,7 +52,15 @@ function DashboardScreen() {
       >
         {/* Hero: total balance */}
         <View className="px-6" testID="dashboard-hero">
-          <Text className="text-xs font-semibold uppercase tracking-widest text-mist">Total pool balance</Text>
+          {/*
+            Beside the label rather than down with the chips: the balance below
+            is one chain's, and a five-figure number with no network against it
+            reads as everything the user owns.
+          */}
+          <View className="flex-row items-center justify-between gap-3">
+            <Text className="text-xs font-semibold uppercase tracking-widest text-mist">Total pool balance</Text>
+            <NetworkBadge chainId={activeChainId} testID="dashboard-network" />
+          </View>
           <View className="mt-2 flex-row items-baseline gap-2">
             <Text className="text-5xl font-bold tracking-tight text-snow">{formatToken(poolStore.totalBalance)}</Text>
             <Text className="text-xl font-bold text-mint">POL</Text>

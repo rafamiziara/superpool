@@ -182,6 +182,45 @@ describe('DiscoverScreen', () => {
 
       expect(mockRouterPush).toHaveBeenCalledWith('/(auth)/pool/create')
     })
+
+    it('names the chain it found nothing on', () => {
+      poolStore.pools = poolStore.myPools
+
+      const { getByText } = render(<DiscoverScreen />)
+
+      expect(getByText('No other circles on Localhost')).toBeTruthy()
+    })
+  })
+
+  // -------------------------------------------------------------------------
+  // Which chain the screen is showing.
+  // -------------------------------------------------------------------------
+
+  describe('the network', () => {
+    it('names the connected chain', () => {
+      const { getByTestId } = render(<DiscoverScreen />)
+
+      expect(getByTestId('discover-network')).toBeTruthy()
+    })
+
+    it('follows the wallet rather than the default', () => {
+      mockWagmiUseAccount.mockReturnValue({ isConnected: true, isConnecting: false, address: undefined, chainId: 80002 })
+
+      const { getByText } = render(<DiscoverScreen />)
+
+      expect(getByText('Polygon Amoy')).toBeTruthy()
+    })
+
+    it('stays on screen when a search found nothing', () => {
+      // The user is looking at an empty result on a specific chain; which one
+      // is part of why it is empty.
+      const { getByTestId } = render(<DiscoverScreen />)
+
+      fireEvent.changeText(getByTestId('discover-search'), 'nothing matches this')
+
+      expect(getByTestId('discover-no-results')).toBeTruthy()
+      expect(getByTestId('discover-network')).toBeTruthy()
+    })
   })
 
   // -------------------------------------------------------------------------

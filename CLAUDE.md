@@ -566,6 +566,20 @@ Two consequences worth holding on to:
   cursor per chain in `event_sync_state`. So a wallet on Amoy sees Amoy's pools
   and nothing else — including in Discover. A cross-chain view would be a
   deliberate feature, not a filter that was forgotten.
+- **`NetworkBadge` goes one per screen, never one per card.** It follows from
+  the line above: every list is already narrowed to the connected chain, so a
+  badge on each card would repeat one fact as many times as there are pools.
+  It sits on the Pools and Discover headers and beside the dashboard balance —
+  which is a per-chain figure that reads as everything the user owns without
+  it. The empty states name the chain for the same reason: with several
+  networks configured, "no circles" is as likely to mean the wrong network as
+  it is to mean nothing is there.
+- **Anything that loads per chain must re-run when the chain changes.**
+  `AuthLayout` depends on `authStore.chainId` as well as authentication;
+  without that the store kept serving the chain the user had just left. Note
+  `observer` wraps a component in `React.memo`, so a test that mocks a store as
+  a plain object cannot exercise this — the mock has to be observable or the
+  test passes either way.
 - **The sweep walks the chains in turn and one failure does not stop the rest.**
   An unreachable public RPC is ordinary and must not silently stop localhost
   indexing too.

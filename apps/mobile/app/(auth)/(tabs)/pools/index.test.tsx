@@ -262,6 +262,46 @@ describe('PoolsScreen', () => {
       // The count line would only say "0 circles" — the empty state says it better.
       expect(queryByText("0 circles you're part of")).toBeNull()
     })
+
+    it('names the chain that has nothing on it', () => {
+      // With several networks configured, an empty list is as likely to mean
+      // the wallet is on the wrong one as it is to mean there is nothing.
+      poolStore.reset()
+
+      const { getByText } = render(<PoolsScreen />)
+
+      expect(getByText('No circles on Localhost')).toBeTruthy()
+    })
+  })
+
+  // -------------------------------------------------------------------------
+  // Which chain the screen is showing.
+  // -------------------------------------------------------------------------
+
+  describe('the network', () => {
+    it('names the connected chain', () => {
+      const { getByTestId } = render(<PoolsScreen />)
+
+      expect(getByTestId('pools-network')).toBeTruthy()
+    })
+
+    it('follows the wallet rather than the default', () => {
+      mockWagmiUseAccount.mockReturnValue({ isConnected: true, isConnecting: false, address: undefined, chainId: 80002 })
+
+      const { getByText } = render(<PoolsScreen />)
+
+      expect(getByText('Polygon Amoy')).toBeTruthy()
+    })
+
+    it('stays on screen when the list is empty', () => {
+      // The case it exists for: "no circles" says nothing until you know which
+      // chain has none of them.
+      poolStore.reset()
+
+      const { getByTestId } = render(<PoolsScreen />)
+
+      expect(getByTestId('pools-network')).toBeTruthy()
+    })
   })
 
   describe('errors', () => {

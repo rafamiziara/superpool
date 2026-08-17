@@ -4,9 +4,13 @@ import { StatusBar } from 'expo-status-bar'
 import { observer } from 'mobx-react-lite'
 import React, { useCallback, useMemo, useState } from 'react'
 import { ActivityIndicator, Pressable, RefreshControl, ScrollView, Text, TextInput, View } from 'react-native'
+import { useAccount } from 'wagmi'
 import { DiscoverPoolCard } from '../../../../src/components/lending/DiscoverPoolCard'
+import { NetworkBadge } from '../../../../src/components/lending/NetworkBadge'
+import { DEFAULT_CHAIN_ID } from '../../../../src/config/contracts'
 import { palette } from '../../../../src/constants/palette'
 import { poolStore } from '../../../../src/stores/PoolStore'
+import { chainName } from '../../../../src/utils/explorer'
 import { filterPools, POOL_SORT_LABELS, POOL_SORT_MODES, type PoolSortMode, sortPools } from '../../../../src/utils/poolSearch'
 
 /**
@@ -24,9 +28,11 @@ import { filterPools, POOL_SORT_LABELS, POOL_SORT_MODES, type PoolSortMode, sort
  * without the indexer writing search tokens onto the pool document.
  */
 function DiscoverScreen() {
+  const { chainId } = useAccount()
   const [query, setQuery] = useState('')
   const [sort, setSort] = useState<PoolSortMode>('newest')
 
+  const activeChainId = chainId ?? DEFAULT_CHAIN_ID
   const pools = poolStore.discoverablePools
 
   /**
@@ -153,12 +159,18 @@ function DiscoverScreen() {
             </View>
           )}
 
-          {results.length > 0 && (
-            <Text className="text-sm text-fog" testID="discover-count">
-              {results.length === 1 ? '1 circle' : `${results.length} circles`}
-              {isSearching ? ' found' : ' you have not joined'}
-            </Text>
-          )}
+          {/* Kept when the list is empty, for the same reason as the Pools tab. */}
+          <View className="flex-row items-center gap-3">
+            {results.length > 0 && (
+              <Text className="text-sm text-fog" testID="discover-count">
+                {results.length === 1 ? '1 circle' : `${results.length} circles`}
+                {isSearching ? ' found' : ' you have not joined'}
+              </Text>
+            )}
+            <View className="ml-auto">
+              <NetworkBadge chainId={activeChainId} testID="discover-network" />
+            </View>
+          </View>
 
           {results.map((pool) => (
             <DiscoverPoolCard key={pool.poolId} pool={pool} onPress={() => router.push(`/(auth)/pool/${pool.poolId}`)} />
@@ -180,9 +192,9 @@ function DiscoverScreen() {
               </View>
             ) : (
               <View className="items-center gap-2 py-10" testID="discover-empty">
-                <Text className="text-base font-semibold text-snow">No other circles yet</Text>
+                <Text className="text-base font-semibold text-snow">No other circles on {chainName(activeChainId)}</Text>
                 <Text className="text-center text-sm text-fog">
-                  You are in every pool on this network. Pull down to check for new ones, or start your own.
+                  You are in every pool on this network. Pull down to check for new ones, start your own, or switch networks in your wallet.
                 </Text>
                 <Pressable onPress={() => router.push('/(auth)/pool/create')} className="mt-2 active:opacity-70" testID="discover-create">
                   <Text className="font-semibold text-mint">Start a new pool</Text>

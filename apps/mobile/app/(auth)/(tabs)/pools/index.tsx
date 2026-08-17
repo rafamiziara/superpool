@@ -5,6 +5,7 @@ import { observer } from 'mobx-react-lite'
 import React, { useCallback, useEffect, useState } from 'react'
 import { ActivityIndicator, Pressable, RefreshControl, ScrollView, Text, View } from 'react-native'
 import { useAccount } from 'wagmi'
+import { NetworkBadge } from '../../../../src/components/lending/NetworkBadge'
 import { PendingPoolCard } from '../../../../src/components/lending/PendingPoolCard'
 import { PoolCard } from '../../../../src/components/lending/PoolCard'
 import { TransactionStatusModal } from '../../../../src/components/lending/TransactionStatusModal'
@@ -18,6 +19,7 @@ import {
   pendingTransactionsStore,
 } from '../../../../src/stores/PendingTransactionsStore'
 import { poolStore } from '../../../../src/stores/PoolStore'
+import { chainName } from '../../../../src/utils/explorer'
 
 /**
  * Pool creations to show above the list: this chain's, newest first, minus any
@@ -132,13 +134,21 @@ function PoolsScreen() {
         contentContainerClassName="pb-8 pt-4"
         refreshControl={<RefreshControl refreshing={poolStore.isRefreshing} onRefresh={handleRefresh} tintColor={palette.fog} />}
       >
-        {!isEmpty && (
-          <View className="px-6">
+        {/*
+          The badge stays when the list is empty — that is the case it exists
+          for. "No circles" means nothing until you know which chain has none
+          of them.
+        */}
+        <View className="flex-row items-center gap-3 px-6">
+          {!isEmpty && (
             <Text className="text-sm text-fog">
               {pools.length} {pools.length === 1 ? 'circle' : 'circles'} you&apos;re part of
             </Text>
+          )}
+          <View className="ml-auto">
+            <NetworkBadge chainId={activeChainId} testID="pools-network" />
           </View>
-        )}
+        </View>
 
         <View className="mt-4 gap-4 px-6">
           {poolStore.hasError && (
@@ -170,8 +180,15 @@ function PoolsScreen() {
 
           {isEmpty && (
             <View className="items-center gap-2 py-6" testID="pools-empty">
-              <Text className="text-base font-semibold text-snow">No circles yet</Text>
-              <Text className="text-center text-sm text-fog">Browse the circles other people have started, or start one of your own.</Text>
+              {/*
+                Naming the chain rather than saying "yet": with several
+                networks configured, an empty list is as likely to mean the
+                wallet is on the wrong one as it is to mean there is nothing.
+              */}
+              <Text className="text-base font-semibold text-snow">No circles on {chainName(activeChainId)}</Text>
+              <Text className="text-center text-sm text-fog">
+                Browse the circles other people have started here, start one of your own, or switch networks in your wallet.
+              </Text>
               <Pressable
                 onPress={() => router.push('/(auth)/(tabs)/discover')}
                 className="mt-2 active:opacity-70"
