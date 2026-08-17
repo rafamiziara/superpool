@@ -26,12 +26,21 @@ export interface RepayFormProps {
   poolName: string
   /** Per-pool loan id, shown so a borrower can match it to the pool's records. */
   loanId: number
-  /** What was borrowed, in wei. */
+  /** What was borrowed, in wei — for context, not for arithmetic. */
+  borrowed: bigint
+  /** Principal not yet returned, in wei. From the chain. */
   principal: bigint
-  /** Principal plus the whole fixed interest, in wei — the loan's lifetime cost. */
-  totalOwed: bigint
-  /** What has already been handed back, in wei. Zero on a loan nobody has paid towards. */
+  /** Interest accrued and not yet paid, in wei. From the chain. */
+  interest: bigint
+  /** Everything handed back so far, in wei. */
   amountRepaid: bigint
+  /**
+   * What to send to close the loan: the debt plus a little accrual head-room.
+   *
+   * Kept separate from `principal + interest` because they are different
+   * numbers on purpose — see the note on the submit handler.
+   */
+  settlementQuote: bigint
   onSubmit: (amount: bigint) => void | Promise<void>
   isSubmitting?: boolean
   /** Shown above the button — the flow's error, not a field's. */
@@ -41,18 +50,38 @@ export interface RepayFormProps {
 /**
  * Collects a payment towards a loan.
  *
- * **Pre-filled with the whole outstanding balance**, unlike the withdraw form,
- * which starts empty. Settling is what a borrower opening this screen usually
- * means to do, and it was the only thing they could do until the contract
- * started accepting instalments — so paying in full stays one tap, and paying
- * part of it is an edit rather than a separate flow.
+ * **Pre-filled with the whole outstanding balance.** Settling is what a
+ * borrower opening this screen usually means to do, so paying in full stays one
+ * tap and paying part of it is an edit rather than a separate flow.
  *
- * Overpaying is blocked here even though the contract refunds it. A form that
- * quietly hands most of a number back is worse than one that says the number
- * is wrong.
+ * Two things the accruing rate forces on this form:
+ *
+ * - **Paying it off sends slightly more than the field shows.** Interest grows
+ *   while the wallet is being signed, so an exact payment would land a few
+ *   seconds short and quietly leave the loan open. The excess is refunded in
+ *   the same transaction, so the borrower is never out of pocket — but the
+ *   figure they are told is the debt, not the head-room.
+ * - **The balance shown is a moment, not a price.** It came from the chain when
+ *   the screen loaded and is already a little out of date, which is exactly why
+ *   nothing here treats it as the amount that must arrive.
+ *
+ * Overpaying by hand is still blocked even though the contract refunds it: a
+ * form that quietly hands most of a number back is worse than one that says the
+ * number is wrong.
  */
-export function RepayForm({ poolName, loanId, principal, totalOwed, amountRepaid, onSubmit, isSubmitting = false, error }: RepayFormProps) {
-  const outstanding = totalOwed - amountRepaid
+export function RepayForm({
+  poolName,
+  loanId,
+  borrowed,
+  principal,
+  interest,
+  amountRepaid,
+  settlementQuote,
+  onSubmit,
+  isSubmitting = false,
+  error,
+}: RepayFormProps) {
+  const outstanding = principal + interest
   const hasPaidSome = amountRepaid > 0n
 
   // `formatEther`, not the display formatter: this fills the input, so it has
@@ -72,18 +101,21 @@ export function RepayForm({ poolName, loanId, principal, totalOwed, amountRepaid
 
   const canSubmit = parsed.success && !isSubmitting && !exceedsOutstanding
 
-  const handleSubmit = () => {
-    if (!canSubmit) return
+  /** True when the borrower is asking to close the loan rather than pay part of it. */
+  const isSettling = parsed.success && parsed.data.amount >= outstanding
 
-    void onSubmit(parsed.data.amount)
+  const handleSubmit = () => {
+    if (!canSubmit || !parsed.success) return
+
+    // Settling sends the quote rather than the figure on screen. Anything else
+    // is a race against accrual that the borrower loses silently.
+    void onSubmit(isSettling ? settlementQuote : parsed.data.amount)
   }
 
   const fillFull = () => {
     setAmount(formatEther(outstanding))
     setTouched(true)
   }
-
-  const isSettling = parsed.success && parsed.data.amount === outstanding
 
   return (
     <View className="gap-5" testID="repay-form">
@@ -93,30 +125,32 @@ export function RepayForm({ poolName, loanId, principal, totalOwed, amountRepaid
           {poolName}
         </Text>
         <Text className="mt-1 text-xs text-fog">
-          Borrowed {formatToken(principal)} POL · loan #{loanId}
+          Borrowed {formatToken(borrowed)} POL · loan #{loanId}
         </Text>
       </View>
 
       <View className="rounded-2xl border-continuous border-hairline border-veil bg-raised px-4 py-3">
         <Text className="text-sm text-fog">
-          Still owed <Text className="font-mono font-bold text-snow">{formatToken(outstanding)}</Text> POL
+          Owed now <Text className="font-mono font-bold text-snow">{formatToken(outstanding)}</Text> POL
+        </Text>
+        {/* The split is the point of an accruing rate: one half stops growing
+            when it is paid, the other keeps growing until it is. */}
+        <Text className="mt-1 text-xs text-mist" testID="repay-breakdown">
+          {formatToken(principal)} POL borrowed back · {formatToken(interest)} POL interest so far
         </Text>
         {hasPaidSome ? (
           <Text className="mt-1 text-xs text-mist" testID="repay-progress">
-            You have paid {formatToken(amountRepaid)} of {formatToken(totalOwed)} POL. The loan closes when the rest is in.
+            You have paid {formatToken(amountRepaid)} POL towards it.
           </Text>
-        ) : (
-          <Text className="mt-1 text-xs text-mist">
-            Principal plus fixed interest. You can pay it in one go or in parts — the loan stays open until it is all back.
-          </Text>
-        )}
+        ) : null}
+        <Text className="mt-2 text-xs text-mist">Interest builds each day on what is still out, so paying sooner costs less.</Text>
       </View>
 
       <View className="gap-2">
         <View className="flex-row items-center justify-between">
           <Text className="text-sm font-semibold text-fog">Amount</Text>
           <Pressable onPress={fillFull} testID="repay-full" accessibilityRole="button" className="active:opacity-70">
-            <Text className="text-xs font-semibold text-mint">Pay in full</Text>
+            <Text className="text-xs font-semibold text-mint">Pay it off</Text>
           </Pressable>
         </View>
 
@@ -154,14 +188,25 @@ export function RepayForm({ poolName, loanId, principal, totalOwed, amountRepaid
       )}
 
       {/* Only when the payment leaves something behind: the borrower is choosing
-          to stay in debt, and the two things that follow from it — the loan
-          stays open, and their one slot in this pool stays taken — are worth
-          saying before they sign rather than after. */}
+          to stay in debt, and the three things that follow from it — the loan
+          stays open, their one slot stays taken, and the rest keeps accruing —
+          are worth saying before they sign rather than after. */}
       {parsed.success && !exceedsOutstanding && !isSettling && (
         <View className="rounded-2xl border-continuous border-hairline border-amber/20 bg-amber-deep px-4 py-3" testID="repay-partial-note">
           <Text className="text-sm text-amber">
-            {formatToken(outstanding - parsed.data.amount)} POL will still be owed. The loan stays open and you cannot borrow again from
-            this pool until it is settled.
+            {formatToken(outstanding - parsed.data.amount)} POL will still be owed, and will keep building interest. The loan stays open and
+            you cannot borrow again from this pool until it is settled.
+          </Text>
+        </View>
+      )}
+
+      {/* Said only when it applies, and said plainly: the wallet will ask to
+          approve slightly more than the number above. */}
+      {isSettling && !exceedsOutstanding && (
+        <View className="rounded-2xl border-continuous border-hairline border-veil bg-raised px-4 py-3" testID="repay-settle-note">
+          <Text className="text-xs text-mist">
+            Your wallet will ask for a little extra to cover the interest that builds while the transaction confirms. Whatever is not needed
+            comes straight back.
           </Text>
         </View>
       )}

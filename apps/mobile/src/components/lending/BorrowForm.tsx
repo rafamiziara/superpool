@@ -54,11 +54,15 @@ export interface BorrowFormProps {
 /**
  * Collects the amount to borrow, and shows what it will cost to repay.
  *
- * The total is worth showing before signing because it is fixed the instant the
- * loan is created: interest is a flat `amount × rate`, not something that
- * accrues, so repaying tomorrow costs exactly what repaying on the last day
- * does. A borrower who expects to save by repaying early should find that out
- * here rather than afterwards.
+ * The total shown is the price of the **full term** — `interestRate` buys
+ * `loanDuration`, so this is what the loan costs held exactly that long. It is
+ * a quote and not a bill: interest accrues per second on the principal still
+ * out, so repaying sooner costs less and running past the due date costs more,
+ * without a cap.
+ *
+ * Worth stating here rather than afterwards, and worth stating as a maximum
+ * that is easy to beat rather than a fixed price. The figure a borrower
+ * actually owes at any moment comes from the chain, on the repay screen.
  */
 export function BorrowForm({
   poolName,
@@ -149,12 +153,12 @@ export function BorrowForm({
       {repayment !== null && !exceedsMax && !exceedsAvailable && (
         <View className="rounded-2xl border-continuous border-hairline border-veil bg-raised px-4 py-3" testID="borrow-repayment">
           <Text className="text-sm text-fog">
-            You will repay <Text className="font-mono font-bold text-snow">{formatToken(repayment)}</Text> POL in total.
+            You will repay <Text className="font-mono font-bold text-snow">{formatToken(repayment)}</Text> POL if you take the full term.
           </Text>
           <Text className="mt-1 text-xs text-mist">
             {requiresApproval
-              ? 'At this pool’s current rate. Interest is fixed when the owner approves, so it can change before then.'
-              : 'Interest is fixed when the loan is created — repaying early costs the same.'}
+              ? 'At this pool’s current rate, which is set when the owner approves. Interest then builds each day on what you still owe — repaying sooner costs less.'
+              : 'Interest builds each day on what you still owe, so repaying sooner costs less and running late costs more.'}
           </Text>
         </View>
       )}

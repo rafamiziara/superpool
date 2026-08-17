@@ -59,6 +59,8 @@ function makeRequest(overrides: Partial<LoanInfo> = {}): LoanInfo {
     startedAt: '2026-08-11T09:00:00.000Z',
     isRepaid: false,
     amountRepaid: '0',
+    principalOutstanding: '4000000000000000000',
+    interestOutstanding: '0',
     status: 'requested',
     chainId: 31337,
     transactionHash: '0xaaa',
@@ -176,6 +178,8 @@ describe('ApprovalsScreen', () => {
         isRepaid: true,
         // 4 POL at 500bp, settled in full.
         amountRepaid: '4200000000000000000',
+        principalOutstanding: '0',
+        interestOutstanding: '0',
         startedAt: '2026-07-20T09:00:00.000Z',
         repaidAt: '2026-08-10T09:00:00.000Z',
       },

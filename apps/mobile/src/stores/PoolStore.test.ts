@@ -1201,6 +1201,9 @@ const LIVE_LOAN: LoanInfo = {
   startedAt: '2026-08-11T09:00:00.000Z',
   isRepaid: false,
   amountRepaid: '0',
+  // Untouched: the whole principal is still out and nothing has accrued yet.
+  principalOutstanding: parseEther('3').toString(),
+  interestOutstanding: '0',
   status: 'disbursed',
   chainId: 31337,
   transactionHash: '0xeeee',
@@ -1211,7 +1214,15 @@ const LIVE_LOAN: LoanInfo = {
 const REQUESTED_LOAN: LoanInfo = { ...LIVE_LOAN, id: '31337-12-2', loanId: 2, status: 'requested' }
 const REJECTED_LOAN: LoanInfo = { ...LIVE_LOAN, id: '31337-12-3', loanId: 3, status: 'rejected' }
 /** 3 POL at 500bp, settled: the whole 3.15 came back. */
-const REPAID_LOAN: LoanInfo = { ...LIVE_LOAN, id: '31337-12-4', loanId: 4, isRepaid: true, amountRepaid: parseEther('3.15').toString() }
+const REPAID_LOAN: LoanInfo = {
+  ...LIVE_LOAN,
+  id: '31337-12-4',
+  loanId: 4,
+  isRepaid: true,
+  amountRepaid: parseEther('3.15').toString(),
+  principalOutstanding: '0',
+  interestOutstanding: '0',
+}
 
 /** Thirty days after `LIVE_LOAN` started, which is exactly its term. */
 const DUE_AT = new Date(new Date(LIVE_LOAN.startedAt).getTime() + LIVE_LOAN.duration * 1000)
@@ -1222,6 +1233,8 @@ function settled(overrides: { id: string; loanId: number; repaidAt?: Date; borro
     ...overrides,
     isRepaid: true,
     amountRepaid: parseEther('3.15').toString(),
+    principalOutstanding: '0',
+    interestOutstanding: '0',
     repaidAt: overrides.repaidAt?.toISOString(),
   }
 }
@@ -1323,21 +1336,75 @@ describe('PoolStore loan states', () => {
     // A request has moved nothing. Counting it would report liquidity as lent
     // while it is still in the pool.
     //
-    // 3 POL at 500bp, so 3.15 is owed: principal plus interest rather than
-    // principal alone, because that is the sum that actually has to come back
-    // and splitting it would mean restating the contract's pro-rata rule here.
+    // The principal still out plus whatever has accrued on it — this fixture
+    // has accrued nothing, so it is the 3 POL borrowed.
     await loadWithLoans([LIVE_LOAN, REQUESTED_LOAN, REJECTED_LOAN, REPAID_LOAN])
 
-    expect(store.outstandingDebt(12)).toBe(parseEther('3.15'))
+    expect(store.outstandingDebt(12)).toBe(parseEther('3'))
   })
 
   it('nets off what a borrower has already paid back', async () => {
     // The figure sits beside the pool's liquidity, which `totalFunds` has
     // already grown by. Summing the whole debt after two POL came back would
     // have the two describe different worlds.
-    await loadWithLoans([{ ...LIVE_LOAN, amountRepaid: parseEther('2').toString() }])
+    //
+    // Interest first, then principal: 2 POL against 0.15 accrued leaves 1.15
+    // of principal, which is what the chain reports and what this reads.
+    await loadWithLoans([
+      {
+        ...LIVE_LOAN,
+        amountRepaid: parseEther('2').toString(),
+        principalOutstanding: parseEther('1.15').toString(),
+        interestOutstanding: '0',
+      },
+    ])
 
     expect(store.outstandingDebt(12)).toBe(parseEther('1.15'))
+  })
+
+  /**
+   * The figure the flat model could not produce: a debt that grows.
+   *
+   * The record carries a snapshot and the moment it was taken; the store
+   * projects it forward the way the contract does — on the principal still
+   * out, at the loan's rate over its term, uncapped once the term has passed.
+   */
+  it('grows the debt as interest accrues against the principal still out', async () => {
+    const accruedAt = new Date('2026-08-11T09:00:00.000Z')
+    // Half of a thirty-day term at 500bp on 3 POL: 0.075 POL.
+    const halfway = new Date(accruedAt.getTime() + 15 * 24 * 60 * 60 * 1000)
+    jest.spyOn(Date, 'now').mockReturnValue(halfway.getTime())
+
+    await loadWithLoans([{ ...LIVE_LOAN, accruedAt: accruedAt.toISOString() }])
+
+    expect(store.outstandingDebt(12)).toBe(parseEther('3.075'))
+
+    jest.spyOn(Date, 'now').mockRestore()
+  })
+
+  it('keeps a loan that predates accrual at the price it was made', async () => {
+    // No `accruedAt` means the figures are static, not that they are unknown:
+    // such a loan does not accrue until its first payment converts it, so
+    // projecting it forward would show interest the contract will not charge.
+    const later = new Date('2027-01-01T00:00:00.000Z')
+    jest.spyOn(Date, 'now').mockReturnValue(later.getTime())
+
+    await loadWithLoans([{ ...LIVE_LOAN, interestOutstanding: parseEther('0.15').toString() }])
+
+    expect(store.outstandingDebt(12)).toBe(parseEther('3.15'))
+
+    jest.spyOn(Date, 'now').mockRestore()
+  })
+
+  it('never accrues backwards when the device clock lags the chain', async () => {
+    const accruedAt = new Date('2026-08-11T09:00:00.000Z')
+    jest.spyOn(Date, 'now').mockReturnValue(accruedAt.getTime() - 60_000)
+
+    await loadWithLoans([{ ...LIVE_LOAN, accruedAt: accruedAt.toISOString() }])
+
+    expect(store.outstandingDebt(12)).toBe(parseEther('3'))
+
+    jest.spyOn(Date, 'now').mockRestore()
   })
 
   it('lists every borrower’s pending request for the pool owner', async () => {

@@ -23,6 +23,8 @@ function makeRequest(overrides: Partial<LoanInfo> = {}): LoanInfo {
     startedAt: '2026-08-11T09:00:00.000Z',
     isRepaid: false,
     amountRepaid: '0',
+    principalOutstanding: '4000000000000000000',
+    interestOutstanding: '0',
     status: 'requested',
     chainId: 31337,
     transactionHash: '0xaaa',

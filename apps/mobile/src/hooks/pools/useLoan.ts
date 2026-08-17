@@ -81,19 +81,52 @@ export interface UseLoanReturn {
 }
 
 /**
- * What a loan costs to settle over its whole life: principal plus flat interest.
+ * What a loan costs if it runs exactly its term and is repaid once.
  *
- * Not accrued over time — the contract computes `amount * rate / 10000` once
- * and the figure never changes, so repaying early costs exactly the same as
- * repaying on the due date.
+ * The **quoted price, not the bill**: `interestRate` basis points buys the
+ * pool's `loanDuration`, so this is what borrowing costs held exactly that
+ * long. Repaying sooner costs less and later costs more.
  *
- * This is the lifetime total, matching the contract's `calculateRepaymentAmount`.
- * What is still owed is that minus `amountRepaid`, which is what the screen
- * offers and `PoolStore` exposes — a loan can be paid down in instalments, so
- * the two figures part company the moment one is made.
+ * Matches the contract's `calculateRepaymentAmount`, and is what the borrow
+ * form states before anyone signs. What is owed at a given moment is a
+ * different question, and only the chain can answer it — see
+ * `settlementQuote`.
  */
 export function calculateRepayment(amount: bigint, interestRate: number): bigint {
   return amount + (amount * BigInt(interestRate)) / BASIS_POINTS
+}
+
+/**
+ * How far ahead a settlement is quoted.
+ *
+ * Interest accrues per second, so a payment of exactly what is owed *now*
+ * arrives a block or two late and leaves the loan a few seconds short of
+ * settled — which looks like success and is not. An hour covers any realistic
+ * gap between reading the balance, signing in a wallet and the block being
+ * mined.
+ */
+export const SETTLEMENT_BUFFER_SECONDS = 3600n
+
+/**
+ * What to send to close a loan in one transaction.
+ *
+ * The debt plus an hour of accrual on the principal still out. **Overshooting
+ * is free** — `repayLoan` credits only what is owed and refunds the rest — so
+ * this errs upwards on purpose, and being approximate here is harmless in a
+ * way it would never be for the debt itself.
+ *
+ * That is why the buffer is computed locally rather than read from the
+ * contract's `outstandingBalanceAt`: quoting a moving timestamp would change
+ * the call's arguments on every render, and nothing here needs to be exact.
+ * The `principal` and `interest` it starts from must still come from the
+ * chain.
+ */
+export function settlementQuote(principal: bigint, interest: bigint, interestRate: number, loanDuration: number): bigint {
+  if (loanDuration <= 0) return principal + interest
+
+  const buffer = (principal * BigInt(interestRate) * SETTLEMENT_BUFFER_SECONDS) / (BASIS_POINTS * BigInt(loanDuration))
+
+  return principal + interest + buffer
 }
 
 /**

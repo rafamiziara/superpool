@@ -10,7 +10,7 @@ import { BorrowForm } from '../../../src/components/lending/BorrowForm'
 import { RepayForm } from '../../../src/components/lending/RepayForm'
 import { LendingPoolABI } from '../../../src/constants/abis'
 import { palette } from '../../../src/constants/palette'
-import { calculateRepayment, useLoan } from '../../../src/hooks/pools/useLoan'
+import { calculateRepayment, settlementQuote, useLoan } from '../../../src/hooks/pools/useLoan'
 import { usePoolIndexing } from '../../../src/hooks/pools/usePoolIndexing'
 import { useTransactionMonitoring } from '../../../src/hooks/pools/useTransactionMonitoring'
 import type { LoanTransactionType } from '../../../src/stores/PendingTransactionsStore'
@@ -57,17 +57,6 @@ function successSummary(outcome: Outcome, amount: bigint, poolName: string, sett
 }
 
 /**
- * What is still owed on an indexed loan, in wei.
- *
- * The lifetime cost minus what has already come back. Used only to decide
- * whether a payment closes the debt — the amount to send is the borrower's
- * choice, and `RepayForm` collects it.
- */
-function repaymentOutstanding(loan: LoanInfo): bigint {
-  return calculateRepayment(BigInt(loan.amount), loan.interestRate) - BigInt(loan.amountRepaid)
-}
-
-/**
  * Borrowing from a pool, asking a pool that reviews first, and repaying.
  *
  * One screen for all of it because the contract holds a single `activeLoanId`
@@ -104,6 +93,21 @@ function BorrowScreen() {
     functionName: 'totalFunds',
     query: { enabled: Boolean(pool?.poolAddress) },
   })
+
+  // What the loan owes right now, split into principal and the interest
+  // accrued against it. **Read from the chain, never from the indexed record.**
+  // Interest grows per second, and the app's own projection of it runs against
+  // the device clock — right for showing a figure in a list, wrong for one the
+  // borrower is about to sign for.
+  const { data: balance } = useReadContract({
+    address: pool?.poolAddress as `0x${string}` | undefined,
+    abi: LendingPoolABI,
+    functionName: 'loanBalance',
+    args: outstanding ? [BigInt(outstanding.loanId)] : undefined,
+    query: { enabled: Boolean(pool?.poolAddress) && Boolean(outstanding) },
+  })
+
+  const [principalOwed, interestOwed] = Array.isArray(balance) ? (balance as [bigint, bigint]) : [undefined, undefined]
 
   // Also from the chain, and for a stronger reason: the owner can flip this at
   // any moment with `setRequiresApproval`, and nothing indexes it. Inferring it
@@ -186,12 +190,12 @@ function BorrowScreen() {
    * whole debt is back, so "how much" is a question the borrower answers.
    */
   const handleRepay = async (amount: bigint) => {
-    if (!pool || !outstanding) return
+    if (!pool || !outstanding || principalOwed === undefined || interestOwed === undefined) return
 
     setFailure(null)
     reset()
 
-    const owed = repaymentOutstanding(outstanding)
+    const owed = principalOwed + interestOwed
 
     let txHash: `0x${string}`
     try {
@@ -299,7 +303,7 @@ function BorrowScreen() {
   const title = outstanding ? 'Repay' : pendingRequest ? 'Your request' : 'Borrow'
 
   const intro = outstanding
-    ? 'Repaying returns the funds to the pool. Pay it all at once to close the loan and free yourself to borrow again, or pay part of it now.'
+    ? 'Interest builds each day on what you still owe. Pay it all at once to close the loan and free yourself to borrow again, or pay part of it now — either way the rest keeps building.'
     : pendingRequest
       ? 'This pool reviews requests before it lends. Nothing has moved yet — the owner decides when the funds go out.'
       : requiresApproval
@@ -331,16 +335,31 @@ function BorrowScreen() {
 
         {outstanding ? (
           <View className="gap-5" testID="repay-panel">
-            <RepayForm
-              poolName={pool.name}
-              loanId={outstanding.loanId}
-              principal={BigInt(outstanding.amount)}
-              totalOwed={calculateRepayment(BigInt(outstanding.amount), outstanding.interestRate)}
-              amountRepaid={BigInt(outstanding.amountRepaid)}
-              onSubmit={handleRepay}
-              isSubmitting={isBusy}
-              error={failure ?? loanError}
-            />
+            {/* Held back until the chain answers. A form pre-filled from the
+                indexed record would show a figure a few seconds stale and then
+                change under the borrower's hands. */}
+            {principalOwed === undefined || interestOwed === undefined ? (
+              <View
+                className="flex-row items-center gap-3 rounded-2xl border-continuous border-hairline border-veil bg-surface px-4 py-4"
+                testID="repay-loading"
+              >
+                <ActivityIndicator colorClassName="accent-mint" />
+                <Text className="flex-1 text-sm text-snow">Checking what you owe</Text>
+              </View>
+            ) : (
+              <RepayForm
+                poolName={pool.name}
+                loanId={outstanding.loanId}
+                borrowed={BigInt(outstanding.amount)}
+                principal={principalOwed}
+                interest={interestOwed}
+                amountRepaid={BigInt(outstanding.amountRepaid)}
+                settlementQuote={settlementQuote(principalOwed, interestOwed, outstanding.interestRate, outstanding.duration)}
+                onSubmit={handleRepay}
+                isSubmitting={isBusy}
+                error={failure ?? loanError}
+              />
+            )}
           </View>
         ) : pendingRequest ? (
           <View className="gap-5" testID="pending-request-panel">

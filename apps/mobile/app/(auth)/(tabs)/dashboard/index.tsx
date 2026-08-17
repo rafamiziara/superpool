@@ -27,7 +27,12 @@ function DashboardScreen() {
   const activeChainId = chainId ?? DEFAULT_CHAIN_ID
   const loan = poolStore.activeLoan
   const loanPool = loan ? poolStore.poolById(Number(loan.poolId)) : undefined
-  const loanTotal = loan ? loan.amount + loan.interestAccrued : 0n
+  // Paid against paid-plus-owed, rather than against a fixed total: interest
+  // accrues, so there is no final figure to measure progress towards. The bar
+  // can therefore slip backwards while nothing is repaid, which is not a
+  // display bug — it is the debt growing.
+  const loanOwed = loan ? loan.amount + loan.interestAccrued - loan.amountRepaid : 0n
+  const loanTotal = loan ? loan.amountRepaid + loanOwed : 0n
   const repaidPct = loan && loanTotal > 0n ? Number((loan.amountRepaid * 100n) / loanTotal) : 0
 
   const [detail, setDetail] = useState<PendingTransaction | null>(null)
@@ -169,8 +174,13 @@ function DashboardScreen() {
               </View>
               <View className="mt-2 flex-row items-center justify-between">
                 <Text className="text-xs text-fog">
-                  <Text className="font-mono font-bold text-snow">{formatToken(loan.amountRepaid)}</Text> of{' '}
-                  <Text className="font-mono">{formatToken(loanTotal)}</Text> POL repaid
+                  <Text className="font-mono font-bold text-snow">{formatToken(loanOwed)}</Text> POL still owed
+                  {loan.amountRepaid > 0n ? (
+                    <Text className="text-mist">
+                      {' · '}
+                      <Text className="font-mono">{formatToken(loan.amountRepaid)}</Text> paid
+                    </Text>
+                  ) : null}
                 </Text>
                 <Pressable
                   onPress={() => router.push(`/(auth)/pool/borrow?poolId=${loan.poolId}`)}

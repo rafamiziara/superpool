@@ -3,9 +3,13 @@ import React from 'react'
 import { parseEther } from 'viem'
 import { RepayForm } from './RepayForm'
 
-/** 4 POL at 500bp: 4.2 to settle. */
+/** 4 POL borrowed, 0.2 POL of interest accrued against it so far. */
+const BORROWED = parseEther('4')
 const PRINCIPAL = parseEther('4')
-const TOTAL_OWED = parseEther('4.2')
+const INTEREST = parseEther('0.2')
+const OUTSTANDING = PRINCIPAL + INTEREST
+/** What the screen would send to settle: the debt plus an hour of head-room. */
+const QUOTE = OUTSTANDING + parseEther('0.001')
 
 function renderForm(props: Partial<React.ComponentProps<typeof RepayForm>> = {}) {
   const onSubmit = jest.fn()
@@ -14,9 +18,11 @@ function renderForm(props: Partial<React.ComponentProps<typeof RepayForm>> = {})
     <RepayForm
       poolName="Neighbourhood Fund"
       loanId={3}
+      borrowed={BORROWED}
       principal={PRINCIPAL}
-      totalOwed={TOTAL_OWED}
+      interest={INTEREST}
       amountRepaid={0n}
+      settlementQuote={QUOTE}
       onSubmit={onSubmit}
       {...props}
     />
@@ -40,39 +46,66 @@ describe('RepayForm', () => {
   })
 
   /**
-   * Settling is what a borrower opening this screen usually means to do, and
-   * it was the only thing they could do before instalments existed. Paying in
-   * full stays one tap; paying part of it is an edit.
+   * The split is the point of an accruing rate: one half stops growing when it
+   * is paid, the other keeps growing until it is.
    */
+  it('shows what the debt is made of', () => {
+    renderForm()
+
+    expect(screen.getByTestId('repay-breakdown')).toHaveTextContent(/4 POL borrowed back/)
+    expect(screen.getByTestId('repay-breakdown')).toHaveTextContent(/0\.2 POL interest so far/)
+  })
+
   it('starts filled with the whole outstanding balance', () => {
+    renderForm()
+
+    expect(screen.getByTestId('repay-submit')).toHaveTextContent(/Repay 4\.2 POL/)
+  })
+
+  /**
+   * The one thing this form does that its numbers do not show.
+   *
+   * Interest grows while the wallet is being signed, so sending exactly the
+   * balance lands a few seconds short and quietly leaves the loan open. The
+   * excess is refunded, so the borrower is never out of pocket.
+   */
+  it('sends the buffered quote when settling, not the figure on screen', () => {
     const { onSubmit } = renderForm()
 
     fireEvent.press(screen.getByTestId('repay-submit'))
 
-    expect(onSubmit).toHaveBeenCalledWith(TOTAL_OWED)
+    expect(onSubmit).toHaveBeenCalledWith(QUOTE)
   })
 
-  it('starts filled with what is left when part is already paid', () => {
-    const { onSubmit } = renderForm({ amountRepaid: parseEther('1.2') })
+  it('says so, rather than surprising the wallet', () => {
+    renderForm()
 
-    fireEvent.press(screen.getByTestId('repay-submit'))
-
-    expect(onSubmit).toHaveBeenCalledWith(parseEther('3'))
+    expect(screen.getByTestId('repay-settle-note')).toHaveTextContent(/comes straight back/)
   })
 
-  it('converts POL to wei on submit', () => {
+  it('sends exactly what was typed for a part payment', () => {
     const { onSubmit } = renderForm()
 
     enter('1.5')
     fireEvent.press(screen.getByTestId('repay-submit'))
 
     expect(onSubmit).toHaveBeenCalledWith(parseEther('1.5'))
+    expect(screen.queryByTestId('repay-settle-note')).toBeNull()
   })
 
-  it('reports progress once something has been paid', () => {
+  it('converts POL to wei on submit', () => {
+    const { onSubmit } = renderForm()
+
+    enter('0.75')
+    fireEvent.press(screen.getByTestId('repay-submit'))
+
+    expect(onSubmit).toHaveBeenCalledWith(parseEther('0.75'))
+  })
+
+  it('reports what has been paid once something has', () => {
     renderForm({ amountRepaid: parseEther('1.2') })
 
-    expect(screen.getByTestId('repay-progress')).toHaveTextContent(/1\.2 of 4\.2/)
+    expect(screen.getByTestId('repay-progress')).toHaveTextContent(/1\.2 POL/)
   })
 
   it('says nothing about progress on an untouched loan', () => {
@@ -82,16 +115,17 @@ describe('RepayForm', () => {
   })
 
   /**
-   * The borrower is choosing to stay in debt, and the two things that follow —
-   * the loan stays open, and their one slot in this pool stays taken — are
-   * worth saying before they sign rather than after.
+   * The borrower is choosing to stay in debt, and the three things that follow
+   * — the loan stays open, their one slot stays taken, and the rest keeps
+   * accruing — are worth saying before they sign rather than after.
    */
-  it('warns that a part payment leaves the loan open', () => {
+  it('warns that a part payment leaves the loan open and still building', () => {
     renderForm()
 
     enter('1.5')
 
     expect(screen.getByTestId('repay-partial-note')).toHaveTextContent(/2\.7 POL will still be owed/)
+    expect(screen.getByTestId('repay-partial-note')).toHaveTextContent(/keep building interest/)
   })
 
   it('says nothing of the sort when the payment settles it', () => {
@@ -132,14 +166,14 @@ describe('RepayForm', () => {
     expect(onSubmit).not.toHaveBeenCalled()
   })
 
-  it('restores the full balance from “Pay in full”', () => {
+  it('restores the full balance from “Pay it off”', () => {
     const { onSubmit } = renderForm()
 
     enter('1')
     fireEvent.press(screen.getByTestId('repay-full'))
     fireEvent.press(screen.getByTestId('repay-submit'))
 
-    expect(onSubmit).toHaveBeenCalledWith(TOTAL_OWED)
+    expect(onSubmit).toHaveBeenCalledWith(QUOTE)
   })
 
   it('names the amount on the button', () => {

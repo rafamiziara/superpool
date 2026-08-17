@@ -132,14 +132,28 @@ describe('BorrowForm', () => {
       expect(getByText('Requesting from')).toBeTruthy()
     })
 
-    it('does not promise the rate is fixed yet', () => {
-      // Interest is set when the owner approves, which may be days later at a
-      // rate they have since changed.
+    it('does not promise the rate is settled yet', () => {
+      // The rate is taken when the owner approves, which may be days later and
+      // at a rate they have since changed.
       const { getByTestId, getByText } = renderForm({ requiresApproval: true })
 
       fireEvent.changeText(getByTestId('borrow-amount'), '4')
 
-      expect(getByText(/fixed when the owner approves/)).toBeTruthy()
+      expect(getByText(/set when the owner approves/)).toBeTruthy()
+    })
+
+    /**
+     * The quote is the price of the whole term, and the copy has to say so —
+     * interest accrues per second now, so calling it "the total" would promise
+     * a fixed price the contract does not offer.
+     */
+    it('states the total as the cost of the full term', () => {
+      const { getByTestId, getByText } = renderForm({ requiresApproval: true })
+
+      fireEvent.changeText(getByTestId('borrow-amount'), '4')
+
+      expect(getByText(/if you take the full term/)).toBeTruthy()
+      expect(getByText(/repaying sooner costs less/)).toBeTruthy()
     })
 
     it('still collects the same amount and total', () => {

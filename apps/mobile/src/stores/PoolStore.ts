@@ -72,13 +72,15 @@ function isOutstanding(loan: LoanInfo): boolean {
 }
 
 /**
- * What this loan costs to settle over its whole life: principal plus the whole
- * fixed interest.
+ * What this loan costs if it runs exactly its term and is repaid once.
  *
- * `interestRate` is basis points and does not accrue — it is fixed at
- * disbursement — so this figure never depends on when it is asked. It is the
- * lifetime total and not a bill: what is still owed is `remainingBalance`,
- * since a loan can be paid down in instalments.
+ * The **quoted price, not the bill**: `interestRate` basis points buys
+ * `duration` seconds, so this is what the loan costs held exactly that long.
+ * Repaying sooner costs less and later costs more, and what is actually owed
+ * at this moment is `remainingBalance`. The two agree only on a loan settled
+ * in one payment at the exact end of its term.
+ *
+ * Matches the contract's `calculateRepaymentAmount`.
  */
 function repaymentTotal(loan: LoanInfo): bigint {
   const principal = BigInt(loan.amount)
@@ -87,9 +89,46 @@ function repaymentTotal(loan: LoanInfo): bigint {
 }
 
 /**
- * What is still owed on a loan.
+ * Interest accrued on a loan and not yet paid, right now.
  *
- * The figure to offer as a repayment and the one to call a debt. Zero once the
+ * The indexed record carries a **snapshot** — `interestOutstanding` as of
+ * `accruedAt` — because interest grows per second and nothing writes to the
+ * chain in between. This projects it forward the same way the contract does:
+ * on the principal still out, at `interestRate` over `duration`, with no cap
+ * once the term has passed.
+ *
+ * Two things it is careful about, both mirroring `LendingPool._balanceAt`:
+ *
+ * - **No `accruedAt` means the figures are static.** A loan made before
+ *   interest accrued is priced on the flat terms it was made under and stays
+ *   there until its first payment converts it, so projecting one forward would
+ *   show interest the contract will not ask for.
+ * - **Time never runs backwards.** A device clock behind the chain's would
+ *   otherwise produce a rebate.
+ *
+ * **For display only.** It runs against the device clock and the contract runs
+ * against block time, so the two disagree by seconds — and on a local node
+ * whose clock has been pushed forward, by hours. Anything about to send money
+ * reads `outstandingBalanceAt` from the chain instead.
+ */
+function accruedInterestNow(loan: LoanInfo, now: number = Date.now()): bigint {
+  const snapshot = BigInt(loan.interestOutstanding)
+  const principal = BigInt(loan.principalOutstanding)
+
+  if (!loan.accruedAt || principal === 0n || loan.duration === 0) return snapshot
+
+  const elapsed = Math.floor((now - new Date(loan.accruedAt).getTime()) / 1000)
+
+  if (elapsed <= 0) return snapshot
+
+  return snapshot + (principal * BigInt(loan.interestRate) * BigInt(elapsed)) / (10_000n * BigInt(loan.duration))
+}
+
+/**
+ * What is still owed on a loan, right now.
+ *
+ * Principal plus the interest accrued against it — which grows between reads,
+ * unlike the fixed sum this returned while the rate was flat. Zero once the
  * loan is settled, and — deliberately — also zero on anything that is not an
  * open debt, mirroring the contract's `outstandingBalance`: a request nobody
  * approved owes nothing, however much it asked for.
@@ -97,7 +136,7 @@ function repaymentTotal(loan: LoanInfo): bigint {
 function remainingBalance(loan: LoanInfo): bigint {
   if (!isOutstanding(loan)) return 0n
 
-  return repaymentTotal(loan) - BigInt(loan.amountRepaid)
+  return BigInt(loan.principalOutstanding) + accruedInterestNow(loan)
 }
 
 /**
@@ -736,20 +775,18 @@ export class PoolStore {
    * - `status` never reaches `APPROVED` or `DEFAULTED`. Approval disburses in
    *   the same transaction, so an approved loan is already `DISBURSED`, and
    *   nothing on chain marks a loan defaulted.
-   * - `interestAccrued` is the whole fixed interest from the moment the loan
-   *   exists, because that is genuinely what is owed — it does not grow.
    * - `dueDate` is `startedAt + duration`, which nothing on chain enforces.
    *
    * `amountRepaid` is no longer one of them: it is the chain's own running
-   * total now, and a loan can genuinely be somewhere between nothing and
-   * everything.
+   * total. Neither is `interestAccrued`, which genuinely grows now — it is the
+   * snapshot on the record projected to this moment, and therefore a figure
+   * that changes between renders.
    */
   get loans(): Loan[] {
     if (usingMockPools()) return MOCK_LOANS
 
     return this.loanRecords.map((loan) => {
       const amount = BigInt(loan.amount)
-      const interest = repaymentTotal(loan) - amount
       const startedAt = new Date(loan.startedAt)
       const isDisbursed = loan.status === 'disbursed'
 
@@ -766,7 +803,9 @@ export class PoolStore {
         // repayment was all-or-nothing — would report a part-paid loan as
         // untouched.
         amountRepaid: isDisbursed ? BigInt(loan.amountRepaid) : 0n,
-        interestAccrued: interest,
+        // What has actually accrued and is still owed, not the full term's
+        // worth. Nothing is owed on a request that was never funded.
+        interestAccrued: isDisbursed ? accruedInterestNow(loan) : 0n,
         requestedAt: startedAt,
         // Approval and disbursement are one moment on chain, and neither has
         // happened while the request is still waiting or after it was refused.

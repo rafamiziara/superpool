@@ -37,16 +37,31 @@ jest.mock('../../../src/hooks/pools/useLoan', () => ({
 }))
 
 /**
- * Answers the screen's two chain reads.
+ * Answers the screen's three chain reads.
  *
  * `poolConfig` is a five-member tuple and `requiresApproval` is the last of
  * them; the screen reads it positionally, so the fixture has to be the same
  * shape the ABI decodes to rather than an object.
+ *
+ * `loanBalance` returns the debt split in two, and the screen waits for it
+ * rather than pricing the loan from the indexed record — interest accrues per
+ * second, and only the chain knows what has accrued.
  */
-function mockChainReads({ requiresApproval = false, available = 100_000_000_000_000_000_000n } = {}) {
+function mockChainReads({
+  requiresApproval = false,
+  available = 100_000_000_000_000_000_000n,
+  principal = 4_000_000_000_000_000_000n,
+  interest = 200_000_000_000_000_000n,
+  /** Leaves `loanBalance` unanswered, as it is on the first render. */
+  balancePending = false,
+}: { requiresApproval?: boolean; available?: bigint; principal?: bigint; interest?: bigint; balancePending?: boolean } = {}) {
   mockWagmiUseReadContract.mockImplementation((config?: { functionName?: string }) => {
     if (config?.functionName === 'poolConfig') {
       return { data: [10_000_000_000_000_000_000n, 500n, 2_592_000n, true, requiresApproval], refetch: jest.fn() }
+    }
+
+    if (config?.functionName === 'loanBalance') {
+      return { data: balancePending ? undefined : [principal, interest], refetch: jest.fn() }
     }
 
     return { data: available, refetch: jest.fn() }
@@ -75,6 +90,8 @@ function outstandingLoan(overrides: Record<string, unknown> = {}) {
     startedAt: '2026-08-01T00:00:00.000Z',
     isRepaid: false,
     amountRepaid: '0',
+    principalOutstanding: '4000000000000000000',
+    interestOutstanding: '0',
     status: 'disbursed' as const,
     chainId: 31337,
     transactionHash: '0xaaa',
@@ -190,28 +207,51 @@ describe('BorrowScreen', () => {
       expect(queryByTestId('borrow-form')).toBeNull()
     })
 
-    it('offers the whole outstanding balance by default', async () => {
-      // 4 POL at 500 bps = 4.2 POL. Settling is what a borrower opening this
-      // screen usually means to do, so it stays one tap even though the
-      // contract now accepts any amount.
+    /**
+     * Settling sends a shade more than the debt on purpose.
+     *
+     * Interest accrues per second, so a payment of exactly the balance lands a
+     * block late and leaves the loan open — which looks like success. The
+     * head-room is an hour of accrual and the excess is refunded.
+     */
+    it('offers the whole balance plus accrual head-room by default', async () => {
+      // 4 POL principal + 0.2 accrued, plus an hour at 500bp over 30 days.
       const { getByTestId } = render(<BorrowScreen />)
 
       await act(async () => {
         fireEvent.press(getByTestId('repay-submit'))
       })
 
-      expect(mockRepay).toHaveBeenCalledWith(expect.objectContaining({ loanId: 3, amount: 4_200_000_000_000_000_000n }))
+      expect(mockRepay).toHaveBeenCalledWith(expect.objectContaining({ loanId: 3, amount: 4_200_277_777_777_777_777n }))
     })
 
-    it('offers only what is left when part of it is already paid', async () => {
-      poolStore.loanRecords = [outstandingLoan({ amountRepaid: '1200000000000000000' })]
+    /**
+     * The balance comes from `loanBalance`, not from the indexed record.
+     *
+     * The record carries a snapshot the app projects with the *device* clock;
+     * right for a figure in a list, wrong for one about to be signed for.
+     */
+    it('prices the loan from the chain rather than the indexed record', async () => {
+      // The record still says nothing has been paid; the chain says otherwise,
+      // and the chain wins.
+      mockChainReads({ principal: 1_000_000_000_000_000_000n, interest: 50_000_000_000_000_000n })
       const { getByTestId } = render(<BorrowScreen />)
 
       await act(async () => {
         fireEvent.press(getByTestId('repay-submit'))
       })
 
-      expect(mockRepay).toHaveBeenCalledWith(expect.objectContaining({ amount: 3_000_000_000_000_000_000n }))
+      expect(mockRepay).toHaveBeenCalledWith(expect.objectContaining({ amount: 1_050_069_444_444_444_444n }))
+    })
+
+    it('waits for the chain before offering a figure', async () => {
+      // A form pre-filled from the record would show a stale number and then
+      // change under the borrower's hands.
+      mockChainReads({ balancePending: true })
+      const { getByTestId, queryByTestId } = render(<BorrowScreen />)
+
+      expect(getByTestId('repay-loading')).toBeTruthy()
+      expect(queryByTestId('repay-form')).toBeNull()
     })
 
     it('sends whatever the borrower asks for', async () => {
@@ -279,7 +319,9 @@ describe('BorrowScreen', () => {
     })
 
     it('ignores a loan that has already been settled', async () => {
-      poolStore.loanRecords = [outstandingLoan({ isRepaid: true, amountRepaid: '4200000000000000000' })]
+      poolStore.loanRecords = [
+        outstandingLoan({ isRepaid: true, amountRepaid: '4200000000000000000', principalOutstanding: '0', interestOutstanding: '0' }),
+      ]
 
       const { getByTestId, queryByTestId } = render(<BorrowScreen />)
 
@@ -365,13 +407,7 @@ describe('BorrowScreen', () => {
       // `requestLoan` ignores the balance — what matters is whether the pool can
       // cover it when the owner decides — so refusing on today's figure would
       // turn away a request the contract would have taken.
-      mockWagmiUseReadContract.mockImplementation((config?: { functionName?: string }) => {
-        if (config?.functionName === 'poolConfig') {
-          return { data: [10_000_000_000_000_000_000n, 500n, 2_592_000n, true, true], refetch: jest.fn() }
-        }
-
-        return { data: 1n, refetch: jest.fn() }
-      })
+      mockChainReads({ requiresApproval: true, available: 1n })
       const { getByTestId, queryByTestId } = render(<BorrowScreen />)
 
       fireEvent.changeText(getByTestId('borrow-amount'), '5')
