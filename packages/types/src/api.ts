@@ -45,34 +45,6 @@ export interface VerifySignatureResponse {
 }
 
 // Pool API types
-export interface CreatePoolRequest {
-  name: string
-  description: string
-  maxMembers: number
-  minimumContribution: string // bigint as string
-  interestRate: number
-  loanDuration: number
-}
-
-export interface CreatePoolResponse {
-  poolId: string
-  contractAddress: string
-  transactionHash: string
-}
-
-export interface GetPoolsRequest {
-  userAddress?: string
-  status?: 'active' | 'inactive' | 'all'
-  limit?: number
-  offset?: number
-}
-
-export interface GetPoolsResponse {
-  pools: LendingPool[]
-  total: number
-  hasMore: boolean
-}
-
 export interface ListPoolsRequest {
   page?: number
   limit?: number
@@ -555,4 +527,4 @@ export interface GetTransactionsResponse {
 }
 
 // Import shared types
-import type { LendingPool, Loan, Transaction } from './lending'
+import type { Loan, Transaction } from './lending'

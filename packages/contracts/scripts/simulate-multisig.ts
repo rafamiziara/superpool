@@ -1,7 +1,7 @@
 import Safe from '@safe-global/protocol-kit'
 import { MetaTransactionData } from '@safe-global/types-kit'
 import * as dotenv from 'dotenv'
-import { ethers, network } from 'hardhat'
+import { artifacts, ethers, network } from 'hardhat'
 
 dotenv.config()
 
@@ -32,7 +32,17 @@ const HARDHAT_ACCOUNTS = {
 interface MultiSigSimulationConfig {
   safeAddress: string
   targetContract: string
-  functionSignature: string
+  /**
+   * Name of the function on `PoolFactory`, encoded from the compiled artifact.
+   *
+   * Not a hand-written signature. This script carried one for `createPool` that
+   * described a contract that never shipped — `maxMembers`, `contributionAmount`,
+   * `collateralRatio`, `requiresKYC` — so every run failed at encoding. A
+   * signature written by hand is a second copy of the ABI with nothing keeping
+   * it honest, which is the same drift `test/AbiSync.test.ts` exists to catch
+   * for the consumers' copies.
+   */
+  functionName: string
   functionArgs: unknown[]
   value?: string
 }
@@ -45,7 +55,7 @@ async function simulateMultiSigApproval(config: MultiSigSimulationConfig): Promi
   console.log('=====================================')
   console.log('Safe Address:', config.safeAddress)
   console.log('Target Contract:', config.targetContract)
-  console.log('Function:', config.functionSignature)
+  console.log('Function:', config.functionName)
   console.log('Arguments:', config.functionArgs)
 
   if (network.name !== 'localhost' && network.name !== 'hardhat' && !network.name.includes('Fork')) {
@@ -81,10 +91,11 @@ async function simulateMultiSigApproval(config: MultiSigSimulationConfig): Promi
   // Step 2: Prepare transaction data
   console.log('\n📝 Step 2: Prepare transaction data')
 
-  // Encode function call
-  const contractInterface = new ethers.Interface([config.functionSignature])
-  const functionName = config.functionSignature.split('(')[0]
-  const transactionData = contractInterface.encodeFunctionData(functionName, config.functionArgs)
+  // Encode from the compiled artifact, so the call cannot describe a contract
+  // that is not the one deployed. Read rather than attached: encoding needs the
+  // ABI, not a provider, and an unknown name throws here with the real list.
+  const { abi } = await artifacts.readArtifact('PoolFactory')
+  const transactionData = new ethers.Interface(abi).encodeFunctionData(config.functionName, config.functionArgs)
 
   const safeTransaction: MetaTransactionData = {
     to: config.targetContract,
@@ -185,7 +196,7 @@ async function simulateAcceptOwnership(safeAddress: string, poolFactoryAddress: 
   await simulateMultiSigApproval({
     safeAddress,
     targetContract: poolFactoryAddress,
-    functionSignature: 'acceptOwnership()',
+    functionName: 'acceptOwnership',
     functionArgs: [],
     value: '0',
   })
@@ -200,8 +211,7 @@ async function simulatePoolCreation(safeAddress: string, poolFactoryAddress: str
   await simulateMultiSigApproval({
     safeAddress,
     targetContract: poolFactoryAddress,
-    functionSignature:
-      'function createPool((string name, string description, uint256 maxMembers, uint256 contributionAmount, uint256 maxLoanAmount, uint256 interestRate, uint256 loanTerm, uint256 collateralRatio, bool requiresKYC) params)',
+    functionName: 'createPool',
     functionArgs: [poolParams],
     value: '0',
   })
@@ -216,7 +226,7 @@ async function simulateEmergencyPause(safeAddress: string, poolFactoryAddress: s
   await simulateMultiSigApproval({
     safeAddress,
     targetContract: poolFactoryAddress,
-    functionSignature: 'pause()',
+    functionName: 'pause',
     functionArgs: [],
     value: '0',
   })
@@ -264,17 +274,15 @@ async function runDemo(): Promise<void> {
           throw new Error('poolFactoryAddress required for createPool')
         }
 
-        // Example pool parameters
+        // `PoolFactory.PoolParams`, in its declared order — ethers encodes a
+        // tuple positionally, so the order is load-bearing, not cosmetic.
         const poolParams: Record<string, unknown> = {
-          name: 'Demo Pool',
-          description: 'Multi-sig simulation demo pool',
-          maxMembers: 10,
-          contributionAmount: ethers.parseEther('100'),
           maxLoanAmount: ethers.parseEther('1000'),
           interestRate: 500, // 5%
-          loanTerm: 30 * 24 * 60 * 60, // 30 days
-          collateralRatio: 15000, // 150%
-          requiresKYC: false,
+          loanDuration: 30 * 24 * 60 * 60, // 30 days
+          name: 'Demo Pool',
+          description: 'Multi-sig simulation demo pool',
+          requiresMembership: false,
         }
 
         await simulatePoolCreation(safeAddress, targetAddress, poolParams)

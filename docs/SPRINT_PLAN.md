@@ -215,8 +215,9 @@ be closed without stranding anyone; and `withdraw` and `repayLoan` are never
 gated on membership, because removal takes away what you may do next and not
 what you already put in.
 
-Deliberately not built: `maxMembers` is tracked (`memberCount`) but not
-enforced, and a request never expires.
+Deliberately not built: a member cap — `memberCount` is tracked but nothing
+bounds it, and the `maxMembers` field that implied otherwise was deleted — and
+a request never expires.
 
 ---
 
@@ -230,8 +231,9 @@ See [`CONTRIBUTIONS.md`](CONTRIBUTIONS.md) for how the shipped system works.
 
 - **Liquidity Contribution System** 🚧
   - `depositFunds` for POL — ✅; **ERC-20 — ❌**, needs contract work
-  - Contribution amount validation — ✅; **limits — ❌** (`minimumContribution`
-    exists in `packages/types` and nothing enforces it)
+  - Contribution amount validation — ✅; **a minimum deposit — ❌**, and no
+    longer implied: the `minimumContribution` field that promised one was
+    deleted rather than implemented
   - Real-time pool liquidity tracking ✅
   - Member contribution history and balances ✅
 

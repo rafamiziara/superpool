@@ -97,7 +97,9 @@ exists to prevent:
   `cancelMembershipRequest` counterpart to `cancelLoanRequest`.
 - **Membership is the owner, not the Safe.** The multi-sig story still does not
   reach it.
-- **`maxMembers` is not enforced.** `memberCount` is tracked on chain and the
-  field exists in `packages/types`, but nothing bounds it.
+- **A pool has no member cap.** `memberCount` is tracked on chain but nothing
+  bounds it. There was a `maxMembers` field in `packages/types` promising
+  otherwise; it was deleted rather than implemented, because no screen ever
+  collected a cap and no pool has ever had one.
 - **Rejection carries no reason.** Deliberate: free text on chain costs gas and
   is metadata. If it is wanted, it belongs in Firestore beside the record.

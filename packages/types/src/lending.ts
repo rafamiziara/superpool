@@ -1,31 +1,13 @@
 // Lending pool and transaction types
-
-export interface LendingPool {
-  id: string
-  name: string
-  description: string
-  contractAddress: string
-  creator: string
-  members: string[]
-  admins: string[]
-
-  // Pool parameters
-  maxMembers: number
-  minimumContribution: bigint
-  interestRate: number // basis points (e.g., 500 = 5%)
-  loanDuration: number // seconds
-
-  // Pool state
-  totalLiquidity: bigint
-  availableLiquidity: bigint
-  totalBorrowed: bigint
-  isActive: boolean
-  isPaused: boolean
-
-  // Timestamps
-  createdAt: Date
-  updatedAt: Date
-}
+//
+// A pool as the app sees it is `PoolInfo` in `api.ts` — the shape `listPools`
+// returns. There was a second, richer `LendingPool` interface here that no
+// code ever built or read: it predated the indexed record and described a
+// backend that was never written, with `createPool` and `getPools` callables
+// that do not exist. It was deleted on 2026-08-17 along with its request and
+// response types, because two of its fields — `maxMembers` and
+// `minimumContribution` — were promises of enforcement nothing anywhere made
+// good. See `.dev/contracts/CONTRACTS_BACKLOG.md` §2.
 
 export interface PoolMember {
   walletAddress: string
