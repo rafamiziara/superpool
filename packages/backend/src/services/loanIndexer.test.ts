@@ -4,6 +4,8 @@ import { LendingPoolABI } from '../constants'
 
 const mockGetLoan = jest.fn()
 const mockGetPoolId = jest.fn()
+/** Only reached for a loan that predates accrual; see `accrualOf`. */
+const mockLoanBalance = jest.fn()
 
 // Mock ethers BEFORE importing the module: it builds a top-level Interface and
 // reads two topic hashes from it at load time.
@@ -11,7 +13,7 @@ jest.mock('ethers', () => {
   const actual = jest.requireActual('ethers')
   return {
     ...actual,
-    Contract: jest.fn().mockImplementation(() => ({ getLoan: mockGetLoan, getPoolId: mockGetPoolId })),
+    Contract: jest.fn().mockImplementation(() => ({ getLoan: mockGetLoan, getPoolId: mockGetPoolId, loanBalance: mockLoanBalance })),
   }
 })
 
@@ -77,7 +79,17 @@ function buildLog(overrides: Partial<{ topic: string; loanId: number; address: s
 }
 
 function buildChainLoan(
-  overrides: Partial<{ isRepaid: boolean; amount: bigint; status: number; repaidAt: number; amountRepaid: bigint }> = {}
+  overrides: Partial<{
+    isRepaid: boolean
+    amount: bigint
+    status: number
+    repaidAt: number
+    amountRepaid: bigint
+    principalOutstanding: bigint
+    interestOutstanding: bigint
+    /** Seconds. 0 marks a loan made before interest accrued. */
+    accruedAt: number
+  }> = {}
 ) {
   return {
     borrower: BORROWER,
@@ -86,6 +98,9 @@ function buildChainLoan(
     repaidAt: BigInt(overrides.repaidAt ?? 0),
     // The running total, in wei. 0 on a loan nobody has paid towards.
     amountRepaid: overrides.amountRepaid ?? 0n,
+    principalOutstanding: overrides.principalOutstanding ?? 5_000_000_000_000_000_000n,
+    interestOutstanding: overrides.interestOutstanding ?? 0n,
+    accruedAt: BigInt(overrides.accruedAt ?? START_TIME),
     amount: overrides.amount ?? 5_000_000_000_000_000_000n,
     interestRate: 500n,
     startTime: BigInt(START_TIME),
@@ -110,6 +125,9 @@ function buildFirestore(
     storedBlockNumber?: number
     /** `null` writes no `amountRepaid` at all — a record from before the field existed. */
     storedAmountRepaid?: string | null
+    storedPrincipalOutstanding?: string
+    storedInterestOutstanding?: string
+    storedAccruedAt?: Date | null
   } = {}
 ) {
   const {
@@ -120,12 +138,18 @@ function buildFirestore(
     storedStartedAt = new Date(START_TIME * 1000),
     storedBlockNumber = 120,
     storedAmountRepaid = '0',
+    storedPrincipalOutstanding = '5000000000000000000',
+    storedInterestOutstanding = '0',
+    storedAccruedAt = new Date(START_TIME * 1000),
   } = options
   const mockSet = jest.fn().mockResolvedValue(undefined)
   const storedData = {
     isRepaid: storedIsRepaid,
     status: storedStatus,
     ...(storedAmountRepaid === null ? {} : { amountRepaid: storedAmountRepaid }),
+    principalOutstanding: storedPrincipalOutstanding,
+    interestOutstanding: storedInterestOutstanding,
+    ...(storedAccruedAt === null ? {} : { accruedAt: timestampOf(storedAccruedAt) }),
     startedAt: timestampOf(storedStartedAt),
     blockNumber: storedBlockNumber,
     ...(storedRepaidAt ? { repaidAt: timestampOf(storedRepaidAt) } : {}),
@@ -157,6 +181,9 @@ const parsedLoan = {
   startedAt: new Date(START_TIME * 1000),
   isRepaid: false,
   amountRepaid: '0',
+  principalOutstanding: '5000000000000000000',
+  interestOutstanding: '0',
+  accruedAt: new Date(START_TIME * 1000),
   status: 'disbursed' as const,
   chainId: CHAIN_ID,
   transactionHash: TX_HASH,
@@ -236,6 +263,9 @@ describe('fetchLoan', () => {
       startedAt: new Date(START_TIME * 1000),
       isRepaid: false,
       amountRepaid: '0',
+      principalOutstanding: '5000000000000000000',
+      interestOutstanding: '0',
+      accruedAt: new Date(START_TIME * 1000),
       repaidAt: undefined,
       status: 'disbursed',
     })
@@ -582,6 +612,101 @@ describe('indexLoansByTxHash', () => {
 // so a notification on `stored` would tell a borrower their loan was approved
 // because a sweep tidied up a hash.
 // ---------------------------------------------------------------------------
+
+describe('the accrual snapshot', () => {
+  it('should read the snapshot straight off a loan that accrues', async () => {
+    mockGetLoan.mockResolvedValue(
+      buildChainLoan({
+        principalOutstanding: 4_000_000_000_000_000_000n,
+        interestOutstanding: 120_000_000_000_000_000n,
+        accruedAt: START_TIME + 600,
+      })
+    )
+
+    const loan = await fetchLoan(LOAN_ID, POOL_ADDRESS, {})
+
+    expect(loan.principalOutstanding).toBe('4000000000000000000')
+    expect(loan.interestOutstanding).toBe('120000000000000000')
+    expect(loan.accruedAt).toEqual(new Date((START_TIME + 600) * 1000))
+    // No second call: the struct already said everything.
+    expect(mockLoanBalance).not.toHaveBeenCalled()
+  })
+
+  /**
+   * A loan made before interest accrued reads all three fields as zero,
+   * because none of them existed when it was written. Storing that literally
+   * would tell the app the principal is already back.
+   */
+  it('should price a loan that predates accrual from the chain, not from zeroes', async () => {
+    mockGetLoan.mockResolvedValue(buildChainLoan({ accruedAt: 0, principalOutstanding: 0n, interestOutstanding: 0n }))
+    mockLoanBalance.mockResolvedValue([5_000_000_000_000_000_000n, 250_000_000_000_000_000n])
+
+    const loan = await fetchLoan(LOAN_ID, POOL_ADDRESS, {})
+
+    expect(mockLoanBalance).toHaveBeenCalledWith(LOAN_ID)
+    expect(loan.principalOutstanding).toBe('5000000000000000000')
+    expect(loan.interestOutstanding).toBe('250000000000000000')
+  })
+
+  /**
+   * Absent, not zero, and the difference is load-bearing: an unconverted loan
+   * does not accrue until its first payment, so a reader that projected one
+   * forward would show interest the contract will not charge.
+   */
+  it('should leave a pre-accrual loan without a snapshot date', async () => {
+    mockGetLoan.mockResolvedValue(buildChainLoan({ accruedAt: 0, principalOutstanding: 0n, interestOutstanding: 0n }))
+    mockLoanBalance.mockResolvedValue([5_000_000_000_000_000_000n, 250_000_000_000_000_000n])
+
+    const loan = await fetchLoan(LOAN_ID, POOL_ADDRESS, {})
+
+    expect(loan.accruedAt).toBeUndefined()
+  })
+
+  it('should omit the date from the write rather than storing undefined', async () => {
+    // Firestore rejects an undefined value, and under `merge` an absent key
+    // leaves whatever is there — which is the same shape `repaidAt` uses.
+    const { mockFs, mockDocRef } = buildFirestore({ exists: false })
+
+    await indexLoan({ ...parsedLoan, accruedAt: undefined }, mockFs)
+
+    expect(mockDocRef.set).toHaveBeenCalledWith(expect.not.objectContaining({ accruedAt: expect.anything() }), { merge: true })
+  })
+
+  /**
+   * The snapshot moves on every payment and only on a payment — nothing else
+   * calls `_accrue`. So a record whose snapshot has moved is a record with
+   * news in it, and the currency check has to notice.
+   */
+  it('should rewrite a loan whose snapshot has moved', async () => {
+    const { mockFs, mockDocRef } = buildFirestore({ exists: true })
+
+    const result = await indexLoan(
+      { ...parsedLoan, interestOutstanding: '90000000000000000', accruedAt: new Date((START_TIME + 3600) * 1000) },
+      mockFs
+    )
+
+    expect(mockDocRef.set).toHaveBeenCalledWith(expect.objectContaining({ interestOutstanding: '90000000000000000' }), { merge: true })
+    expect(result.stored).toBe(true)
+  })
+
+  it('should write nothing when the snapshot is unchanged', async () => {
+    const { mockFs, mockDocRef } = buildFirestore({ exists: true })
+
+    const result = await indexLoan(parsedLoan, mockFs)
+
+    expect(mockDocRef.set).not.toHaveBeenCalled()
+    expect(result.alreadyIndexed).toBe(true)
+  })
+
+  it('should rewrite a loan whose principal has come down', async () => {
+    const { mockFs, mockDocRef } = buildFirestore({ exists: true })
+
+    const result = await indexLoan({ ...parsedLoan, principalOutstanding: '3000000000000000000' }, mockFs)
+
+    expect(mockDocRef.set).toHaveBeenCalledWith(expect.objectContaining({ principalOutstanding: '3000000000000000000' }), { merge: true })
+    expect(result.stored).toBe(true)
+  })
+})
 
 describe('indexLoan transitions', () => {
   it('reports a request from a loan with no record', async () => {

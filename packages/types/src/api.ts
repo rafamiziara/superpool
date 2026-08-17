@@ -231,9 +231,10 @@ export interface IndexInterestClaimResponse {
  * So the record is not a log; it is the answer `getLoan` gives now, re-read
  * whenever any of those events is seen.
  *
- * Still thinner than the app's `Loan` interface: interest is fixed at
- * disbursement rather than accruing, and nothing on chain enforces the term.
- * Partial repayment is no longer one of the gaps — see `amountRepaid`.
+ * Still thinner than the app's `Loan` interface in one respect: nothing on
+ * chain enforces the term, so no loan ever reaches `DEFAULTED`. Partial
+ * repayment and accrued interest are no longer among the gaps — see
+ * `amountRepaid` and `interestOutstanding`.
  */
 export interface LoanInfo {
   /** `${chainId}-${poolId}-${loanId}` — the document id, and stable. */
@@ -276,6 +277,38 @@ export interface LoanInfo {
    * `LoanRepaymentInfo`.
    */
   amountRepaid: string
+  /**
+   * Principal not yet returned, in wei as a decimal string.
+   *
+   * Moves only when a payment is made, so unlike the interest beside it this
+   * figure does not go stale between blocks.
+   */
+  principalOutstanding: string
+  /**
+   * Interest accrued and not yet paid, in wei as a decimal string, **as of
+   * `accruedAt`**.
+   *
+   * A snapshot rather than a live figure. Interest accrues per second on the
+   * principal still out, so what is owed *now* is this projected forward from
+   * `accruedAt` at `interestRate` over `duration` — which is why those two are
+   * on this record, and why the snapshot is worth carrying at all: a list of
+   * loans can price itself without an RPC call each.
+   *
+   * **Project for display, never to decide what to send.** The projection runs
+   * against the device clock and the contract runs against block time, so the
+   * figure to pay is always read from the chain.
+   */
+  interestOutstanding: string
+  /**
+   * ISO 8601 — when `interestOutstanding` was taken. Absent on a loan that does
+   * not accrue.
+   *
+   * **Absent means the figures are static**, not that they are unknown: a loan
+   * made before interest accrued keeps the flat price it was made at until its
+   * first payment converts it. Projecting one forward would show interest the
+   * contract will not charge.
+   */
+  accruedAt?: string
   /**
    * ISO 8601 — when the loan was **settled**, from the chain's own stamp.
    *

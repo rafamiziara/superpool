@@ -68,6 +68,14 @@ export const listLoansHandler = async (request: CallableRequest<ListLoansRequest
         // were all-or-nothing: `isRepaid` already says which end they are at,
         // so '0' loses nothing that was ever recorded.
         amountRepaid: data.amountRepaid ?? '0',
+        // Absent on records indexed before interest accrued. Falling back to
+        // the whole principal is the safe direction — it says the debt is
+        // outstanding rather than settled — and the next sweep fills it in.
+        principalOutstanding: data.principalOutstanding ?? data.amount,
+        interestOutstanding: data.interestOutstanding ?? '0',
+        // Left off entirely rather than sent as null, like `repaidAt`: absent
+        // is the statement that these figures do not accrue.
+        ...(data.accruedAt ? { accruedAt: data.accruedAt.toDate().toISOString() } : {}),
         // Left off entirely rather than sent as null when the loan is
         // outstanding: the field means "settled at this moment", and there is
         // no moment. Also absent on a loan repaid before the contract recorded

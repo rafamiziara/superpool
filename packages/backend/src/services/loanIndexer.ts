@@ -41,6 +41,33 @@ export interface ParsedLoan {
    */
   amountRepaid: string
   /**
+   * Principal not yet returned, in wei as a decimal string.
+   *
+   * Changes only when a payment is made, so unlike the interest beside it this
+   * one does not go stale between blocks.
+   */
+  principalOutstanding: string
+  /**
+   * Interest accrued and not yet paid, in wei as a decimal string, **as of
+   * `accruedAt`**.
+   *
+   * A snapshot, not a live figure. Anything reporting what is owed now has to
+   * project it forward from `accruedAt` at the loan's own rate — which is why
+   * `interestRate` and `duration` are stored beside it, and why this is worth
+   * indexing at all: a list of loans can price itself without an RPC each.
+   */
+  interestOutstanding: string
+  /**
+   * When `interestOutstanding` was taken, or `undefined` on a loan that does
+   * not accrue.
+   *
+   * **Undefined means the figures are static**, not that they are unknown. A
+   * loan made before interest accrued is priced on the flat terms it was made
+   * under and stays there until its first payment converts it — so projecting
+   * one forward would charge interest the contract will not ask for.
+   */
+  accruedAt?: Date
+  /**
    * When the loan was **settled**. Undefined while any of it is still owed.
    *
    * Not "when a payment last arrived": earlier instalments are dated by their
@@ -154,6 +181,52 @@ export function parseLoanIdFromLog(log: Log): number {
   return Number(BigInt(log.topics[1]))
 }
 
+/** The three fields that describe where a loan's interest has got to. */
+interface LoanAccrual {
+  principalOutstanding: string
+  interestOutstanding: string
+  accruedAt?: Date
+}
+
+/**
+ * What a loan's accrual state is, as the contract would price it.
+ *
+ * The raw struct is enough for a loan made since interest started accruing:
+ * `principalOutstanding` and `interestOutstanding` are a snapshot and
+ * `accruedAt` says when it was taken.
+ *
+ * **A loan made before that reads all three as zero**, because none of the
+ * fields existed when it was written — and storing that literally would tell
+ * the app the principal is already back. Such a loan is priced by
+ * `loanBalance`, which applies the same conversion the contract does when the
+ * loan is next paid, so the arithmetic lives in one place rather than being
+ * restated here. `accruedAt` stays undefined, which is what says the figures
+ * are static: an unconverted loan does not accrue until its first payment.
+ *
+ * Costs an extra call only for those legacy loans; a modern one is read
+ * entirely from the struct already in hand.
+ */
+async function accrualOf(
+  loan: { accruedAt: bigint; principalOutstanding: bigint; interestOutstanding: bigint },
+  loanId: number,
+  pool: Contract
+): Promise<LoanAccrual> {
+  if (loan.accruedAt !== 0n) {
+    return {
+      principalOutstanding: loan.principalOutstanding.toString(),
+      interestOutstanding: loan.interestOutstanding.toString(),
+      accruedAt: new Date(Number(loan.accruedAt) * 1000),
+    }
+  }
+
+  const [principal, interest] = await pool.loanBalance(loanId)
+
+  return {
+    principalOutstanding: (principal as bigint).toString(),
+    interestOutstanding: (interest as bigint).toString(),
+  }
+}
+
 /**
  * Read a loan's current state from its pool.
  *
@@ -167,8 +240,10 @@ export async function fetchLoan(
 ): Promise<Omit<ParsedLoan, 'poolId' | 'chainId' | 'transactionHash' | 'blockNumber'>> {
   const pool = new Contract(poolAddress, [...LendingPoolABI], provider)
   const loan = await pool.getLoan(loanId)
+  const accrual = await accrualOf(loan, loanId, pool)
 
   return {
+    ...accrual,
     loanId,
     poolAddress,
     // Lowercased on write so `listLoans` can filter by wallet without caring
@@ -200,6 +275,9 @@ interface StoredLoan {
   startedAt?: Timestamp
   repaidAt?: Timestamp
   amountRepaid?: string
+  principalOutstanding?: string
+  interestOutstanding?: string
+  accruedAt?: Timestamp
   blockNumber?: number
 }
 
@@ -341,6 +419,13 @@ export async function indexLoan(loan: ParsedLoan, firestore: Firestore): Promise
     stored.isRepaid === loan.isRepaid &&
     stored.status === loan.status &&
     (stored.amountRepaid ?? '0') === loan.amountRepaid &&
+    // The accrual snapshot moves on every payment, and only on a payment —
+    // nothing else calls `_accrue`. Comparing `accruedAt` alone would be
+    // enough on a live chain, but the two amounts are what a reader actually
+    // uses, so all three are checked rather than a proxy for them.
+    stored.principalOutstanding === loan.principalOutstanding &&
+    stored.interestOutstanding === loan.interestOutstanding &&
+    millisOf(stored.accruedAt) === loan.accruedAt?.getTime() &&
     millisOf(stored.repaidAt) === loan.repaidAt?.getTime() &&
     millisOf(stored.startedAt) === loan.startedAt.getTime() &&
     // A record whose state is right but whose reference points at a later
@@ -368,6 +453,12 @@ export async function indexLoan(loan: ParsedLoan, firestore: Firestore): Promise
       startedAt: loan.startedAt,
       isRepaid: loan.isRepaid,
       amountRepaid: loan.amountRepaid,
+      principalOutstanding: loan.principalOutstanding,
+      interestOutstanding: loan.interestOutstanding,
+      // Omitted rather than null when the loan does not accrue, which is the
+      // same shape `repaidAt` uses and means the same thing here: absent is a
+      // statement, not a gap. A reader takes it as "these figures are static".
+      ...(loan.accruedAt ? { accruedAt: loan.accruedAt } : {}),
       // Omitted rather than written as undefined while the loan is
       // outstanding: Firestore rejects an undefined value, and under `merge`
       // an absent key leaves whatever is already there — which is what a
