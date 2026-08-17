@@ -140,6 +140,36 @@ async function main() {
     await whitelistTx.wait()
     console.log('   ✅ Whitelist mode enabled')
 
+    // Step 3b: Deploy a six-decimal token and let pools be denominated in it
+    //
+    // Six, not eighteen: USDC has six, and a test token that quietly had the
+    // same decimals as the native coin would let an off-by-10^12 through every
+    // screen in the app without anything looking wrong.
+    //
+    // The factory keeps an allowlist, so deploying the token is not enough —
+    // `createPool` rejects a denomination that is not on it. `address(0)` is
+    // never on the list and never needs to be.
+    console.log('\n3️⃣.5 Deploying a test stablecoin and authorizing it...')
+
+    const TestERC20 = await ethers.getContractFactory('TestERC20')
+    const testToken = await TestERC20.deploy('USD Coin', 'USDC', 6)
+    await testToken.waitForDeployment()
+    const testTokenAddress = await testToken.getAddress()
+    console.log(`   ✅ TestERC20 (USDC, 6 decimals) deployed to: ${testTokenAddress}`)
+
+    const authorizeTokenTx = await poolFactory.setLoanTokenAuthorization(testTokenAddress, true)
+    await authorizeTokenTx.wait()
+    console.log('   ✅ Authorized as a loan token')
+
+    // Every account that might fund or borrow gets a balance, so the app can be
+    // driven from any of the Hardhat accounts without minting by hand.
+    const TOKEN_GRANT = 100_000n * 10n ** 6n
+    for (const account of accounts.slice(0, 6)) {
+      const mintTx = await testToken.mint(account.address, TOKEN_GRANT)
+      await mintTx.wait()
+    }
+    console.log(`   ✅ Minted 100,000 USDC to each of the first six accounts`)
+
     // Step 4: Create sample pools, each from its own creator account
     //
     // `PoolParams` no longer carries `poolOwner` — the factory sets
@@ -178,6 +208,19 @@ async function main() {
         requiresMembership: false,
         loanToken: ethers.ZeroAddress,
       },
+      {
+        // The one pool that is not native, and the reason the token above
+        // exists: without it nothing on the local chain ever exercises six
+        // decimals, an approval, or `depositTokens`.
+        creator: accounts[1],
+        maxLoanAmount: 500n * 10n ** 6n, // 500 USDC
+        interestRate: 600, // 6%
+        loanDuration: 30 * 24 * 60 * 60, // 30 days
+        name: 'Stablecoin Circle',
+        description: 'Lending in USDC, so the amounts mean something',
+        requiresMembership: false,
+        loanToken: testTokenAddress,
+      },
     ]
 
     // Authorize every non-owner creator up front (the factory owner is always
@@ -195,7 +238,10 @@ async function main() {
       const { creator, ...poolParams } = samplePools[i]
       console.log(`\n   Creating pool ${i + 1}: ${poolParams.name}`)
       console.log(`   - Owner (tx sender): ${creator.address}`)
-      console.log(`   - Max Loan: ${ethers.formatEther(poolParams.maxLoanAmount)} ETH`)
+      const isTokenPool = poolParams.loanToken !== ethers.ZeroAddress
+      console.log(
+        `   - Max Loan: ${isTokenPool ? `${ethers.formatUnits(poolParams.maxLoanAmount, 6)} USDC` : `${ethers.formatEther(poolParams.maxLoanAmount)} POL`}`
+      )
       console.log(`   - Interest: ${poolParams.interestRate / 100}%`)
       console.log(`   - Duration: ${poolParams.loanDuration / (24 * 60 * 60)} days`)
 
@@ -213,6 +259,7 @@ async function main() {
           address: poolAddress,
           name: poolParams.name,
           owner: creator.address,
+          loanToken: poolParams.loanToken,
         })
         console.log(`   ✅ Pool created at: ${poolAddress}`)
       }
@@ -229,14 +276,27 @@ async function main() {
       const ownerAccount = accounts.find((acc) => acc.address === pool.owner) || deployer
       const poolWithOwner = poolContract.connect(ownerAccount)
 
-      // Fund each pool with some test ETH
-      const fundAmount = ethers.parseEther('50') // 50 ETH per pool
+      // A token pool takes an approval and its own entry point. `depositTokens`
+      // is not an overload of `depositFunds` on purpose — two entries under one
+      // name leave ethers unable to resolve either. See ERC20_PLAN §3.1.
+      const isTokenPool = pool.loanToken !== ethers.ZeroAddress
+      const fundAmount = isTokenPool ? 5_000n * 10n ** 6n : ethers.parseEther('50')
 
-      console.log(`   Funding ${pool.name} with ${ethers.formatEther(fundAmount)} ETH...`)
+      console.log(
+        `   Funding ${pool.name} with ${isTokenPool ? `${ethers.formatUnits(fundAmount, 6)} USDC` : `${ethers.formatEther(fundAmount)} POL`}...`
+      )
 
       try {
-        const fundTx = await poolWithOwner.depositFunds({ value: fundAmount })
-        await fundTx.wait()
+        if (isTokenPool) {
+          const approveTx = await testToken.connect(ownerAccount).approve(pool.address, fundAmount)
+          await approveTx.wait()
+
+          const fundTx = await poolWithOwner.depositTokens(fundAmount)
+          await fundTx.wait()
+        } else {
+          const fundTx = await poolWithOwner.depositFunds({ value: fundAmount })
+          await fundTx.wait()
+        }
         console.log(`   ✅ ${pool.name} funded successfully`)
       } catch (error: unknown) {
         const errorMessage = error instanceof Error ? error.message : 'Unknown error'
@@ -307,6 +367,8 @@ async function main() {
       whitelistMode: await poolFactory.isWhitelistEnabled(),
       contracts: {
         lendingPoolImplementation: implementationAddress,
+        /** The six-decimal test stablecoin, authorized on the factory above. */
+        testToken: testTokenAddress,
         // Every pool proxies through this; upgrading it upgrades them all.
         poolBeacon: await poolFactory.poolBeacon(),
         poolFactory: {
@@ -334,6 +396,13 @@ async function main() {
     console.log(`   RPC_URL=${deploymentInfo.network.rpcUrl}`)
     console.log(`   POOL_FACTORY_ADDRESS=${factoryAddress}`)
     console.log(`   BACKEND_WALLET_PRIVATE_KEY=${HARDHAT_ACCOUNT_0_PRIVATE_KEY}`)
+    console.log('')
+    console.log('🔑 Mobile configuration (apps/mobile/.env):')
+    console.log(`   EXPO_PUBLIC_POOL_FACTORY_ADDRESS_LOCALHOST=${factoryAddress}`)
+    console.log(`   EXPO_PUBLIC_USDC_ADDRESS_LOCALHOST=${testTokenAddress}`)
+    console.log('')
+    console.log('   The token address changes on every redeploy, like the factory:')
+    console.log('   without it the app offers native pools only on localhost.')
     console.log('')
     console.log(`   The backend wallet must be the factory owner (${deployer.address},`)
     console.log('   Hardhat account #0): lazy whitelisting calls setCreatorAuthorization,')
