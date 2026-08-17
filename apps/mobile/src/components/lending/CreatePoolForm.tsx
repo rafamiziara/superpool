@@ -66,14 +66,18 @@ const EMPTY_FORM: Record<FormField, string> = {
 
 export interface CreatePoolFormProps {
   /**
-   * What the new pool will lend.
+   * What the new pool may lend, **native first**.
    *
-   * Supplied by the screen rather than chosen here — for now the chain's own
-   * coin, which is what every pool this app creates is denominated in. It is a
-   * prop and not an assumption so that offering a choice is a change to one
-   * screen rather than to the whole form.
+   * Supplied by the screen, which reads the chain's allowlist: a chain with no
+   * token configured offers one choice and the picker does not appear at all.
+   * The first entry is the default, and native is first because every pool that
+   * already exists is one and because a group lending the chain's own coin is
+   * not wrong to.
+   *
+   * Immutable once the pool exists — `loanToken` has no setter — which is why
+   * this is a choice made here and never afterwards.
    */
-  denomination: Denomination
+  denominations: Denomination[]
   onSubmit: (params: PoolCreationParams) => void | Promise<void>
   /** Disables the form while the wallet or backend is busy. */
   isSubmitting?: boolean
@@ -146,7 +150,7 @@ function Field({ label, value, onChangeText, onBlur, error, placeholder, hint, k
  * disabled until every field parses.
  */
 export function CreatePoolForm({
-  denomination,
+  denominations,
   onSubmit,
   isSubmitting = false,
   error,
@@ -165,6 +169,12 @@ export function CreatePoolForm({
    * by accident cannot be un-opened for whoever funded it in the meantime.
    */
   const [requiresMembership, setRequiresMembership] = useState(true)
+  /**
+   * Held by symbol rather than by object so the choice survives a re-render
+   * that rebuilds the list — the options are derived from config each time.
+   */
+  const [chosenSymbol, setChosenSymbol] = useState(denominations[0].symbol)
+  const denomination = denominations.find((option) => option.symbol === chosenSymbol) ?? denominations[0]
 
   const schema = useMemo(() => createPoolFormSchema(denomination), [denomination])
   const parsed = useMemo(() => schema.safeParse(values), [schema, values])
@@ -219,6 +229,36 @@ export function CreatePoolForm({
         multiline
         testID="create-pool-description"
       />
+
+      {denominations.length > 1 && (
+        <View className="gap-2" testID="create-pool-denomination">
+          <Text className="text-sm font-semibold text-fog">What the pool lends</Text>
+          <View className="flex-row gap-2">
+            {denominations.map((option) => {
+              const isChosen = option.symbol === denomination.symbol
+
+              return (
+                <Pressable
+                  key={option.symbol}
+                  onPress={() => setChosenSymbol(option.symbol)}
+                  disabled={isSubmitting}
+                  accessibilityRole="radio"
+                  accessibilityState={{ checked: isChosen, disabled: isSubmitting }}
+                  testID={`create-pool-denomination-${option.symbol}`}
+                  className={`rounded-2xl border-continuous border-hairline px-4 py-2 ${
+                    isChosen ? 'border-mint bg-mint-deep' : 'border-veil bg-surface'
+                  }`}
+                >
+                  <Text className={`text-sm font-semibold ${isChosen ? 'text-mint' : 'text-fog'}`}>{option.symbol}</Text>
+                </Pressable>
+              )
+            })}
+          </View>
+          {/* Said once, and here, because this is the only field on the form
+              that cannot be changed after the pool exists. */}
+          <Text className="text-xs text-mist">Chosen once. A pool lends one thing for its whole life.</Text>
+        </View>
+      )}
 
       <Field
         label="Maximum loan amount"

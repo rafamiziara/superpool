@@ -2,7 +2,7 @@ import { fireEvent, render, screen } from '@testing-library/react-native'
 import React from 'react'
 import { parseEther } from 'viem'
 import { CreatePoolForm, createPoolFormSchema } from './CreatePoolForm'
-import { NATIVE } from '../../__tests__/fixtures/denomination'
+import { NATIVE, USDC } from '../../__tests__/fixtures/denomination'
 
 /** Fills every field with values that parse, so tests can vary one at a time. */
 function fillValidForm(overrides: Partial<Record<string, string>> = {}) {
@@ -93,7 +93,7 @@ describe('CreatePoolForm', () => {
   })
 
   it('renders every field', () => {
-    render(<CreatePoolForm denomination={NATIVE} onSubmit={onSubmit} />)
+    render(<CreatePoolForm denominations={[NATIVE]} onSubmit={onSubmit} />)
 
     expect(screen.getByTestId('create-pool-name')).toBeTruthy()
     expect(screen.getByTestId('create-pool-description')).toBeTruthy()
@@ -103,13 +103,13 @@ describe('CreatePoolForm', () => {
   })
 
   it('starts with submission disabled', () => {
-    render(<CreatePoolForm denomination={NATIVE} onSubmit={onSubmit} />)
+    render(<CreatePoolForm denominations={[NATIVE]} onSubmit={onSubmit} />)
 
     expect(screen.getByTestId('create-pool-submit').props.accessibilityState.disabled).toBe(true)
   })
 
   it('submits the converted parameters once every field parses', () => {
-    render(<CreatePoolForm denomination={NATIVE} onSubmit={onSubmit} />)
+    render(<CreatePoolForm denominations={[NATIVE]} onSubmit={onSubmit} />)
 
     fillValidForm()
     fireEvent.press(screen.getByTestId('create-pool-submit'))
@@ -128,7 +128,7 @@ describe('CreatePoolForm', () => {
   })
 
   it('submits an open pool when the switch is turned off', () => {
-    render(<CreatePoolForm denomination={NATIVE} onSubmit={onSubmit} />)
+    render(<CreatePoolForm denominations={[NATIVE]} onSubmit={onSubmit} />)
 
     fillValidForm()
     fireEvent.press(screen.getByTestId('create-pool-private'))
@@ -138,7 +138,7 @@ describe('CreatePoolForm', () => {
   })
 
   it('enables submission without a description', () => {
-    render(<CreatePoolForm denomination={NATIVE} onSubmit={onSubmit} />)
+    render(<CreatePoolForm denominations={[NATIVE]} onSubmit={onSubmit} />)
 
     fillValidForm({ 'create-pool-description': '' })
 
@@ -146,7 +146,7 @@ describe('CreatePoolForm', () => {
   })
 
   it('does not submit while a field is invalid', () => {
-    render(<CreatePoolForm denomination={NATIVE} onSubmit={onSubmit} />)
+    render(<CreatePoolForm denominations={[NATIVE]} onSubmit={onSubmit} />)
 
     fillValidForm({ 'create-pool-interest-rate': '150' })
     fireEvent.press(screen.getByTestId('create-pool-submit'))
@@ -157,7 +157,7 @@ describe('CreatePoolForm', () => {
 
   describe('inline errors', () => {
     it('stays quiet while a field is still being typed in', () => {
-      render(<CreatePoolForm denomination={NATIVE} onSubmit={onSubmit} />)
+      render(<CreatePoolForm denominations={[NATIVE]} onSubmit={onSubmit} />)
 
       fireEvent.changeText(screen.getByTestId('create-pool-max-loan'), 'ten')
 
@@ -165,7 +165,7 @@ describe('CreatePoolForm', () => {
     })
 
     it('shows the message once the field is left', () => {
-      render(<CreatePoolForm denomination={NATIVE} onSubmit={onSubmit} />)
+      render(<CreatePoolForm denominations={[NATIVE]} onSubmit={onSubmit} />)
 
       fireEvent.changeText(screen.getByTestId('create-pool-max-loan'), 'ten')
       fireEvent(screen.getByTestId('create-pool-max-loan'), 'blur')
@@ -174,7 +174,7 @@ describe('CreatePoolForm', () => {
     })
 
     it('clears the message once the field is corrected', () => {
-      render(<CreatePoolForm denomination={NATIVE} onSubmit={onSubmit} />)
+      render(<CreatePoolForm denominations={[NATIVE]} onSubmit={onSubmit} />)
 
       fireEvent.changeText(screen.getByTestId('create-pool-interest-rate'), '500')
       fireEvent(screen.getByTestId('create-pool-interest-rate'), 'blur')
@@ -186,7 +186,7 @@ describe('CreatePoolForm', () => {
     })
 
     it('reports each invalid field independently', () => {
-      render(<CreatePoolForm denomination={NATIVE} onSubmit={onSubmit} />)
+      render(<CreatePoolForm denominations={[NATIVE]} onSubmit={onSubmit} />)
 
       fireEvent(screen.getByTestId('create-pool-name'), 'blur')
       fireEvent(screen.getByTestId('create-pool-loan-duration'), 'blur')
@@ -199,7 +199,7 @@ describe('CreatePoolForm', () => {
 
   describe('flow state', () => {
     it('blocks submission and relabels the button while submitting', () => {
-      render(<CreatePoolForm denomination={NATIVE} onSubmit={onSubmit} isSubmitting />)
+      render(<CreatePoolForm denominations={[NATIVE]} onSubmit={onSubmit} isSubmitting />)
 
       fillValidForm()
       fireEvent.press(screen.getByTestId('create-pool-submit'))
@@ -209,27 +209,83 @@ describe('CreatePoolForm', () => {
     })
 
     it('shows the flow error', () => {
-      render(<CreatePoolForm denomination={NATIVE} onSubmit={onSubmit} error="Transaction cancelled" />)
+      render(<CreatePoolForm denominations={[NATIVE]} onSubmit={onSubmit} error="Transaction cancelled" />)
 
       expect(screen.getByTestId('create-pool-error')).toHaveTextContent('Transaction cancelled')
     })
 
     it('shows a gas estimate when the screen supplies one', () => {
-      render(<CreatePoolForm denomination={NATIVE} onSubmit={onSubmit} gasEstimate="0.0021 POL" />)
+      render(<CreatePoolForm denominations={[NATIVE]} onSubmit={onSubmit} gasEstimate="0.0021 POL" />)
 
       expect(screen.getByTestId('create-pool-gas-estimate')).toHaveTextContent('0.0021 POL')
     })
 
     it('omits the fee row when there is no estimate', () => {
-      render(<CreatePoolForm denomination={NATIVE} onSubmit={onSubmit} />)
+      render(<CreatePoolForm denominations={[NATIVE]} onSubmit={onSubmit} />)
 
       expect(screen.queryByTestId('create-pool-gas-estimate')).toBeNull()
     })
 
     it('honours a custom submit label', () => {
-      render(<CreatePoolForm denomination={NATIVE} onSubmit={onSubmit} submitLabel="Launch pool" />)
+      render(<CreatePoolForm denominations={[NATIVE]} onSubmit={onSubmit} submitLabel="Launch pool" />)
 
       expect(screen.getByText('Launch pool')).toBeTruthy()
+    })
+  })
+
+  describe('the denomination', () => {
+    it('shows no picker where the chain offers one choice', () => {
+      // Which is every chain with no token configured — the common case, and
+      // one where a picker of one would be furniture.
+      render(<CreatePoolForm denominations={[NATIVE]} onSubmit={onSubmit} />)
+
+      expect(screen.queryByTestId('create-pool-denomination')).toBeNull()
+    })
+
+    it('defaults to the first choice, which is native', () => {
+      render(<CreatePoolForm denominations={[NATIVE, USDC]} onSubmit={onSubmit} />)
+
+      fillValidForm()
+      fireEvent.press(screen.getByTestId('create-pool-submit'))
+
+      expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ denomination: NATIVE }))
+    })
+
+    it('parses the amount at the chosen token’s exponent, not at 18', () => {
+      // The whole reason the picker changes the schema: 100 USDC is 100000000,
+      // and parsing it as 18 decimals would ask the pool to lend a trillion
+      // times what the owner typed.
+      render(<CreatePoolForm denominations={[NATIVE, USDC]} onSubmit={onSubmit} />)
+
+      fireEvent.press(screen.getByTestId('create-pool-denomination-USDC'))
+      fillValidForm()
+      fireEvent.press(screen.getByTestId('create-pool-submit'))
+
+      expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ denomination: USDC, maxLoanAmount: 100_000_000n }))
+    })
+
+    it('refuses a fraction the chosen token cannot hold', () => {
+      // parseUnits would round the seventh decimal off a USDC amount silently.
+      render(<CreatePoolForm denominations={[NATIVE, USDC]} onSubmit={onSubmit} />)
+
+      fireEvent.press(screen.getByTestId('create-pool-denomination-USDC'))
+      fillValidForm({ 'create-pool-max-loan': '1.1234567' })
+      fireEvent(screen.getByTestId('create-pool-max-loan'), 'blur')
+
+      expect(screen.getByTestId('create-pool-max-loan-error')).toHaveTextContent('Enter an amount in USDC, with at most 6 decimals')
+    })
+
+    it('re-reads an amount already typed when the choice changes', () => {
+      render(<CreatePoolForm denominations={[NATIVE, USDC]} onSubmit={onSubmit} />)
+
+      fillValidForm({ 'create-pool-max-loan': '1.1234567' })
+      fireEvent(screen.getByTestId('create-pool-max-loan'), 'blur')
+      // Valid as 18 decimals, which is what it was parsed as a moment ago.
+      expect(screen.queryByTestId('create-pool-max-loan-error')).toBeNull()
+
+      fireEvent.press(screen.getByTestId('create-pool-denomination-USDC'))
+
+      expect(screen.getByTestId('create-pool-max-loan-error')).toBeTruthy()
     })
   })
 })
