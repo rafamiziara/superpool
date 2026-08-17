@@ -28,9 +28,16 @@ export interface RepayParams {
   poolId: number
   poolAddress: `0x${string}`
   poolName: string
-  /** Per-pool loan id — `repayLoan` takes the id, not an amount. */
+  /** Per-pool loan id — `repayLoan` takes the id; the payment is the `value`. */
   loanId: number
-  /** Total due in wei: principal plus interest. Sent as `value`. */
+  /**
+   * What to pay, in wei. Sent as `value`.
+   *
+   * Any amount above zero is accepted: the contract credits it against the
+   * debt and closes the loan only when the whole of it has been paid. Anything
+   * beyond what is still owed is refunded in the same transaction, so
+   * overpaying costs only gas.
+   */
   amount: bigint
 }
 
@@ -74,12 +81,16 @@ export interface UseLoanReturn {
 }
 
 /**
- * What a loan costs to settle: principal plus flat interest.
+ * What a loan costs to settle over its whole life: principal plus flat interest.
  *
  * Not accrued over time — the contract computes `amount * rate / 10000` once
  * and the figure never changes, so repaying early costs exactly the same as
- * repaying on the due date. The app must send at least this much as `value`;
- * `repayLoan` reverts on anything less.
+ * repaying on the due date.
+ *
+ * This is the lifetime total, matching the contract's `calculateRepaymentAmount`.
+ * What is still owed is that minus `amountRepaid`, which is what the screen
+ * offers and `PoolStore` exposes — a loan can be paid down in instalments, so
+ * the two figures part company the moment one is made.
  */
 export function calculateRepayment(amount: bigint, interestRate: number): bigint {
   return amount + (amount * BigInt(interestRate)) / BASIS_POINTS
@@ -111,10 +122,16 @@ const BORROW_ERROR_MESSAGES: Record<string, string> = {
   ApprovalRequired: 'This pool now reviews requests before lending',
 }
 
+/**
+ * `InsufficientRepaymentAmount` is deliberately absent: the contract no longer
+ * has that error, because there is no longer a minimum. Any amount above zero
+ * is a payment, and zero is `InvalidAmount`.
+ */
 const REPAY_ERROR_MESSAGES: Record<string, string> = {
   UnauthorizedBorrower: 'This loan belongs to another wallet',
   LoanAlreadyRepaid: 'This loan has already been repaid',
-  InsufficientRepaymentAmount: 'That is less than the full amount due',
+  LoanNotDisbursed: 'Nothing has been lent on this request yet',
+  InvalidAmount: 'Enter an amount greater than zero',
   EnforcedPause: 'This pool is not processing repayments at the moment',
 }
 
@@ -326,9 +343,10 @@ export const useLoan = (): UseLoanReturn => {
       setIsSubmitting(true)
 
       try {
-        // `repayLoan` is payable and reverts on anything less than the total, so
-        // the value is part of the estimate — an underfunded repayment is caught
-        // here rather than at the signature prompt.
+        // `repayLoan` is payable, so the value is part of the estimate. It no
+        // longer catches an underfunded repayment — there is no such thing now
+        // — but it still catches a loan that belongs to someone else, one
+        // already settled, and a paused pool.
         let gas: bigint | undefined
         if (publicClient) {
           const estimate = await publicClient.estimateContractGas({

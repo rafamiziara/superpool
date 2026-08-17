@@ -20,6 +20,7 @@ export {
   indexWithdrawal,
   listContributions,
   listInterestClaims,
+  listLoanRepayments,
   listLoans,
   listMembers,
   listPools,

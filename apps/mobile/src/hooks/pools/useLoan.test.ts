@@ -184,7 +184,10 @@ describe('describeRepayError', () => {
 
   it.each([
     ['LoanAlreadyRepaid', /already been repaid/],
-    ['InsufficientRepaymentAmount', /less than the full amount/],
+    // Not `InsufficientRepaymentAmount`: the contract no longer has that error,
+    // because there is no longer a minimum. Any amount above zero is a payment.
+    ['InvalidAmount', /greater than zero/],
+    ['LoanNotDisbursed', /Nothing has been lent/],
   ])('should explain %s', (name, expected) => {
     expect(describeRepayError(wrapped(revertedWith(name, 'repayLoan')))).toMatch(expected)
   })

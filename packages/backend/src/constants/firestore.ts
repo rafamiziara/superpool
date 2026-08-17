@@ -44,6 +44,22 @@ export const CONTRIBUTIONS_COLLECTION = 'contributions'
 export const LOANS_COLLECTION = 'loans'
 
 /**
+ * The name of the Firestore collection used to store payments made towards
+ * loans (`LoanRepaymentMade` events).
+ *
+ * The contribution shape, not the loan shape, and the split is the point: the
+ * loan document holds `amountRepaid` as the chain reports it *now*, and these
+ * hold when each instalment arrived and in which transaction. Once a loan can
+ * be paid down in parts, the running total cannot answer either question —
+ * `repaidAt` dates only the payment that closed the debt, and the loan carries
+ * a single transaction hash which belongs to its disbursement.
+ *
+ * So a feed that shows repayments reads these, and anything asking "how much is
+ * still owed" reads the loan. Neither is derivable from the other.
+ */
+export const LOAN_REPAYMENTS_COLLECTION = 'loan_repayments'
+
+/**
  * The name of the Firestore collection used to store indexed liquidity
  * withdrawals (`FundsWithdrawn` events).
  *

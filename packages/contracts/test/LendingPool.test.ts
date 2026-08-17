@@ -2,6 +2,7 @@ import { time } from '@nomicfoundation/hardhat-network-helpers'
 import { expect } from 'chai'
 import { ethers, upgrades } from 'hardhat'
 import { SignerWithAddress } from '@nomicfoundation/hardhat-ethers/signers'
+import { ContractTransactionResponse } from 'ethers'
 import { LendingPool } from '../typechain-types'
 
 /**
@@ -22,6 +23,20 @@ async function findLoanSlot(poolAddress: string, loanId: number, borrower: strin
   }
 
   throw new Error(`No storage slot holds loan ${loanId} for ${borrower}`)
+}
+
+/**
+ * The interest one transaction shared out, summed from its logs.
+ *
+ * Read from `InterestDistributed` rather than from the accumulator, because
+ * the accumulator is per share and divides — which is exactly the rounding the
+ * caller is usually trying to see past.
+ */
+async function interestDistributedBy(tx: ContractTransactionResponse): Promise<bigint> {
+  const receipt = await tx.wait()
+  const topic = ethers.id('InterestDistributed(uint256,uint256)')
+
+  return receipt!.logs.filter((log) => log.topics[0] === topic).reduce((sum, log) => sum + BigInt(log.topics[2]), 0n)
 }
 
 /**
@@ -455,13 +470,30 @@ describe('LendingPool', function () {
       )
     })
 
-    it('Should reject insufficient repayment', async function () {
-      const repaymentAmount = await lendingPool.calculateRepaymentAmount(loanId)
-      const insufficientAmount = repaymentAmount - ethers.parseEther('0.1')
-
-      await expect(lendingPool.connect(borrower).repayLoan(loanId, { value: insufficientAmount })).to.be.revertedWithCustomError(
+    it('Should reject a payment of nothing', async function () {
+      await expect(lendingPool.connect(borrower).repayLoan(loanId, { value: 0 })).to.be.revertedWithCustomError(
         lendingPool,
-        'InsufficientRepaymentAmount'
+        'InvalidAmount'
+      )
+    })
+
+    /**
+     * A request is not a debt.
+     *
+     * Both of the checks this call used to make — the borrower matches, and
+     * `isRepaid` is false — pass on a request nobody has approved and on one
+     * that was turned down, so either could be "repaid": money taken, the
+     * record marked settled, and nothing ever lent. Nothing in the app routes
+     * there, which is precisely why the contract has to be the one to refuse.
+     */
+    it('Should refuse payment towards a request that was never disbursed', async function () {
+      await lendingPool.connect(owner).setRequiresApproval(true)
+      await lendingPool.connect(lender).requestLoan(ethers.parseEther('2'))
+      const requestId = 2
+
+      await expect(lendingPool.connect(lender).repayLoan(requestId, { value: ethers.parseEther('2.1') })).to.be.revertedWithCustomError(
+        lendingPool,
+        'LoanNotDisbursed'
       )
     })
 
@@ -537,6 +569,202 @@ describe('LendingPool', function () {
 
         // The very next word is still `amount`, which is the stride assertion.
         expect(BigInt(await ethers.provider.getStorage(address, slot + 1n))).to.equal(loanAmount)
+      })
+    })
+
+    /**
+     * Paying a loan down in instalments.
+     *
+     * Before this the call demanded the exact total, so a borrower who could
+     * pay half could pay nothing — `isRepaid` was a bool and there was nowhere
+     * to record half. `amountRepaid` is the running total, and `isRepaid` still
+     * says whether the debt is closed.
+     */
+    describe('paying in instalments', function () {
+      /** Principal plus the whole fixed interest — 5 POL at 500bp. */
+      let totalOwed: bigint
+
+      beforeEach(async function () {
+        totalOwed = await lendingPool.calculateRepaymentAmount(loanId)
+      })
+
+      it('Should credit a part payment and leave the loan open', async function () {
+        const part = totalOwed / 4n
+
+        await lendingPool.connect(borrower).repayLoan(loanId, { value: part })
+
+        const loan = await lendingPool.getLoan(loanId)
+
+        expect(loan.amountRepaid).to.equal(part)
+        expect(loan.isRepaid).to.be.false
+        // Nothing was settled, so there is nothing to date. The instalment is
+        // dated by its own log instead.
+        expect(loan.repaidAt).to.equal(0)
+      })
+
+      it('Should report what is left, while the lifetime total holds still', async function () {
+        const part = ethers.parseEther('2')
+
+        await lendingPool.connect(borrower).repayLoan(loanId, { value: part })
+
+        expect(await lendingPool.outstandingBalance(loanId)).to.equal(totalOwed - part)
+        expect(await lendingPool.calculateRepaymentAmount(loanId)).to.equal(totalOwed)
+      })
+
+      it('Should announce the payment without announcing a settlement', async function () {
+        const part = ethers.parseEther('1')
+
+        await expect(lendingPool.connect(borrower).repayLoan(loanId, { value: part }))
+          .to.emit(lendingPool, 'LoanRepaymentMade')
+          .withArgs(loanId, borrower.address, part)
+
+        await expect(lendingPool.connect(borrower).repayLoan(loanId, { value: part })).to.not.emit(lendingPool, 'LoanRepaid')
+      })
+
+      it('Should emit both on the payment that closes the debt', async function () {
+        const part = ethers.parseEther('1')
+        await lendingPool.connect(borrower).repayLoan(loanId, { value: part })
+
+        const final = totalOwed - part
+
+        const tx = lendingPool.connect(borrower).repayLoan(loanId, { value: final })
+
+        // The instalment carries what this payment moved; the settlement
+        // carries the whole debt, however many transactions it arrived in.
+        await expect(tx).to.emit(lendingPool, 'LoanRepaymentMade').withArgs(loanId, borrower.address, final)
+        await expect(tx).to.emit(lendingPool, 'LoanRepaid').withArgs(loanId, borrower.address, totalOwed)
+
+        const loan = await lendingPool.getLoan(loanId)
+        expect(loan.isRepaid).to.be.true
+        expect(loan.amountRepaid).to.equal(totalOwed)
+        expect(await lendingPool.outstandingBalance(loanId)).to.equal(0)
+      })
+
+      it('Should hold the borrower’s slot until the debt is closed', async function () {
+        await lendingPool.connect(borrower).repayLoan(loanId, { value: totalOwed / 2n })
+
+        // The lock is what caps a borrower at one open loan. A part-paid loan
+        // is still a loan, so releasing it early would let them open a second.
+        expect(await lendingPool.activeLoanId(borrower.address)).to.equal(loanId)
+        await expect(lendingPool.connect(borrower).createLoan(ethers.parseEther('1'))).to.be.revertedWithCustomError(
+          lendingPool,
+          'LoanOutstanding'
+        )
+
+        await lendingPool.connect(borrower).repayLoan(loanId, { value: totalOwed / 2n })
+
+        expect(await lendingPool.activeLoanId(borrower.address)).to.equal(0)
+      })
+
+      it('Should credit only what was owed, and refund the rest', async function () {
+        await lendingPool.connect(borrower).repayLoan(loanId, { value: totalOwed - ethers.parseEther('1') })
+
+        const fundsBefore = await lendingPool.totalFunds()
+        const balanceBefore = await ethers.provider.getBalance(borrower.address)
+
+        // Twice what is left. Only the outstanding POL may be credited.
+        const tx = await lendingPool.connect(borrower).repayLoan(loanId, { value: ethers.parseEther('2') })
+        const receipt = await tx.wait()
+        const gas = receipt!.gasUsed * receipt!.gasPrice
+
+        expect(await lendingPool.totalFunds()).to.equal(fundsBefore + ethers.parseEther('1'))
+        expect(await ethers.provider.getBalance(borrower.address)).to.equal(balanceBefore - ethers.parseEther('1') - gas)
+        expect((await lendingPool.getLoan(loanId)).amountRepaid).to.equal(totalOwed)
+      })
+
+      it('Should refuse another payment once the debt is closed', async function () {
+        await lendingPool.connect(borrower).repayLoan(loanId, { value: totalOwed })
+
+        await expect(lendingPool.connect(borrower).repayLoan(loanId, { value: 1n })).to.be.revertedWithCustomError(
+          lendingPool,
+          'LoanAlreadyRepaid'
+        )
+      })
+
+      /**
+       * The check the whole interest split turns on.
+       *
+       * Distributing `payment * rate` per instalment would let a borrower
+       * change what lenders earn by choosing how to split their payments. Each
+       * payment distributes a difference of cumulative shares instead, so the
+       * distributed amounts sum to exactly the interest — which is what
+       * `InterestDistributed` reports and what the pool actually holds.
+       *
+       * The per-share accumulator is the one place a split is not free: it
+       * divides by `totalContributions` once per payment, so five payments
+       * truncate five times where one truncates once. The loss is bounded by
+       * one wei-per-share per instalment and it is always downwards, which is
+       * the same dust the pool already leaves on a single repayment. What must
+       * never happen is the other direction.
+       */
+      it('Should pay lenders the same interest however the payments are split', async function () {
+        expect(await lendingPool.accInterestPerShare()).to.equal(0)
+
+        // Five uneven instalments, deliberately not a clean division.
+        const parts = [ethers.parseEther('0.3'), ethers.parseEther('1.7'), ethers.parseEther('2'), ethers.parseEther('0.9')]
+        let paid = 0n
+        let distributed = 0n
+
+        for (const part of parts) {
+          const tx = await lendingPool.connect(borrower).repayLoan(loanId, { value: part })
+          distributed += await interestDistributedBy(tx)
+          paid += part
+        }
+
+        const tx = await lendingPool.connect(borrower).repayLoan(loanId, { value: totalOwed - paid })
+        distributed += await interestDistributedBy(tx)
+
+        // Exactly the interest, in five pieces. No wei is created or lost here.
+        const interest = totalOwed - loanAmount
+        expect(distributed).to.equal(interest)
+
+        // What one payment on the same loan would have produced.
+        const contributions = await lendingPool.totalContributions()
+        const lump = (interest * 10n ** 18n) / contributions
+        const split = await lendingPool.accInterestPerShare()
+
+        expect(split).to.be.lte(lump)
+        expect(split).to.be.gte(lump - BigInt(parts.length + 1))
+      })
+
+      it('Should share out each instalment’s interest as it arrives', async function () {
+        const half = totalOwed / 2n
+        const interest = totalOwed - loanAmount
+
+        await expect(lendingPool.connect(borrower).repayLoan(loanId, { value: half }))
+          .to.emit(lendingPool, 'InterestDistributed')
+          .withArgs(loanId, interest / 2n)
+
+        // Lenders can claim from a loan that is still running: the money is in
+        // the pool, and waiting for settlement would be holding earnings back
+        // from people who have already been repaid part of what they lent.
+        expect(await lendingPool.claimable(lender.address)).to.be.gt(0)
+      })
+
+      /**
+       * The field appends, so nothing that already exists moves.
+       *
+       * Unlike `repaidAt`, which had to be packed into a slot the struct was
+       * already using: `loans` is a mapping, each entry hashes to its own base
+       * slot, and widening the struct extends into a word that was unallocated.
+       */
+      it('Should append without shifting any field already in the struct', async function () {
+        const part = ethers.parseEther('2')
+        await lendingPool.connect(borrower).repayLoan(loanId, { value: part })
+
+        const address = await lendingPool.getAddress()
+        const slot = await findLoanSlot(address, loanId, borrower.address)
+        const loan = await lendingPool.getLoan(loanId)
+
+        // The four words that were there before this field, unchanged and in
+        // the same order.
+        expect(BigInt(await ethers.provider.getStorage(address, slot + 1n))).to.equal(loan.amount)
+        expect(BigInt(await ethers.provider.getStorage(address, slot + 2n))).to.equal(loan.interestRate)
+        expect(BigInt(await ethers.provider.getStorage(address, slot + 3n))).to.equal(loan.startTime)
+        expect(BigInt(await ethers.provider.getStorage(address, slot + 4n))).to.equal(loan.duration)
+
+        // And the new one in the word after them.
+        expect(BigInt(await ethers.provider.getStorage(address, slot + 5n))).to.equal(part)
       })
     })
   })

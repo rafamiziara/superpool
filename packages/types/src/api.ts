@@ -231,9 +231,9 @@ export interface IndexInterestClaimResponse {
  * So the record is not a log; it is the answer `getLoan` gives now, re-read
  * whenever any of those events is seen.
  *
- * Still thinner than the app's `Loan` interface. The contract has an approval
- * step, but `repayLoan` demands the full amount in one transaction and interest
- * is fixed at disbursement, so there is no partial repayment and no accrual.
+ * Still thinner than the app's `Loan` interface: interest is fixed at
+ * disbursement rather than accruing, and nothing on chain enforces the term.
+ * Partial repayment is no longer one of the gaps — see `amountRepaid`.
  */
 export interface LoanInfo {
   /** `${chainId}-${poolId}-${loanId}` — the document id, and stable. */
@@ -253,12 +253,31 @@ export interface LoanInfo {
   /** ISO 8601 — the block timestamp the contract recorded as `startTime`. */
   startedAt: string
   /**
-   * Whether a disbursed loan has been settled. Repayment is all-or-nothing, so
-   * there is no partial state. Meaningless unless `status` is `disbursed`.
+   * Whether a disbursed loan has been settled in full. Meaningless unless
+   * `status` is `disbursed`.
+   *
+   * Still a bool with `amountRepaid` beside it, because the two answer
+   * different questions: this one closes the debt, releases the borrower's
+   * slot and stamps `repaidAt`, while `amountRepaid` only says how far along
+   * they are. A part-paid loan reads `false` here, which is what every caller
+   * asking "does this wallet owe money" wants.
    */
   isRepaid: boolean
   /**
-   * ISO 8601 — when the repayment landed, from the chain's own stamp.
+   * How much of principal-plus-interest has been paid back, in wei as a
+   * decimal string.
+   *
+   * A running total read from the chain, not a sum of anything stored. `'0'`
+   * on a loan nobody has paid towards, and on a record indexed before the
+   * contract could count instalments.
+   *
+   * It cannot tell you *when* any of it arrived — `repaidAt` dates only the
+   * payment that closed the debt. Each instalment is its own record; see
+   * `LoanRepaymentInfo`.
+   */
+  amountRepaid: string
+  /**
+   * ISO 8601 — when the loan was **settled**, from the chain's own stamp.
    *
    * Absent while the loan is outstanding, and absent on a loan repaid before
    * the contract recorded this at all: `isRepaid` stays the authority on
@@ -292,6 +311,71 @@ export interface IndexLoanResponse {
   /** How many records this call wrote or changed; the rest were already current. */
   storedCount: number
   alreadyIndexed: boolean
+  /**
+   * The payments this transaction made towards a loan, if it made any.
+   *
+   * Indexed by the same callable rather than a second one, because a repayment
+   * produces both records at once and the app should not have to know that: it
+   * confirms one transaction and asks for it to be indexed. Empty for every
+   * other loan event.
+   */
+  repayments: LoanRepaymentInfo[]
+}
+
+/**
+ * One payment towards a loan.
+ *
+ * A `LoanRepaymentMade` log, and therefore the contribution shape rather than
+ * the `LoanInfo` shape: it is one event, immutable, dated by its own block.
+ * That distinction is what makes instalments legible at all — the loan record
+ * carries a running `amountRepaid` and a single `repaidAt` that only dates the
+ * payment which closed the debt, so the earlier ones would have no date and no
+ * transaction of their own to point at.
+ *
+ * The settling payment produces one of these *and* moves the loan to
+ * `isRepaid`. They are different facts: money moved, and the debt ended.
+ */
+export interface LoanRepaymentInfo {
+  /** `${chainId}-${transactionHash}-${logIndex}` — the document id, and stable. */
+  id: string
+  /** Per-pool loan id. Join to `LoanInfo.loanId` within the same pool and chain. */
+  loanId: number
+  poolId: number
+  poolAddress: string
+  /** Lowercased on write; compare case-insensitively. */
+  borrower: string
+  /**
+   * What this payment credited, in wei as a decimal string.
+   *
+   * This instalment alone, never the running total, and never the amount sent:
+   * a payment larger than the outstanding balance is refunded down to it, and
+   * this is what the pool kept.
+   */
+  amount: string
+  chainId: number
+  transactionHash: string
+  /** Position of the `LoanRepaymentMade` log within its transaction. */
+  logIndex: number
+  blockNumber: number
+  /** ISO 8601, not a Date — see the note on `ContributionInfo.contributedAt`. */
+  repaidAt: string
+}
+
+export interface ListLoanRepaymentsRequest {
+  chainId?: number
+  /** Restrict to one pool. Omit for every pool on the chain. */
+  poolId?: number
+  /** Restrict to one loan. Only meaningful together with `poolId`, which scopes the id. */
+  loanId?: number
+  /** Restrict to one wallet. Matched case-insensitively. */
+  borrower?: string
+  limit?: number
+}
+
+export interface ListLoanRepaymentsResponse {
+  repayments: LoanRepaymentInfo[]
+  totalCount: number
+  limit: number
 }
 
 export interface ListLoansRequest {

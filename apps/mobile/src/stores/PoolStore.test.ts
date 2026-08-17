@@ -1,4 +1,4 @@
-import type { LoanInfo, MemberInfo, PoolInfo } from '@superpool/types'
+import type { LoanInfo, LoanRepaymentInfo, MemberInfo, PoolInfo } from '@superpool/types'
 import { LoanStatus, MemberStatus, TransactionStatus, TransactionType } from '@superpool/types'
 import { parseEther } from 'viem'
 import { mockFirebaseCallable } from '../__tests__/mocks'
@@ -777,6 +777,7 @@ describe('PoolStore chain sync', () => {
       if (name === 'listContributions') return jest.fn().mockResolvedValue({ data: { contributions: [], totalCount: 0, limit: 50 } })
       if (name === 'listWithdrawals') return jest.fn().mockResolvedValue({ data: { withdrawals: [], totalCount: 0, limit: 50 } })
       if (name === 'listInterestClaims') return jest.fn().mockResolvedValue({ data: { claims: [], totalCount: 0, limit: 50 } })
+      if (name === 'listLoanRepayments') return jest.fn().mockResolvedValue({ data: { repayments: [], totalCount: 0, limit: 50 } })
       if (name === 'listLoans') return jest.fn().mockResolvedValue({ data: { loans: [], totalCount: 0, limit: 50 } })
       if (name === 'listMembers') return jest.fn().mockResolvedValue({ data: { members: [], totalCount: 0, limit: 50 } })
       return listPoolsCallable
@@ -1199,6 +1200,7 @@ const LIVE_LOAN: LoanInfo = {
   duration: 2_592_000,
   startedAt: '2026-08-11T09:00:00.000Z',
   isRepaid: false,
+  amountRepaid: '0',
   status: 'disbursed',
   chainId: 31337,
   transactionHash: '0xeeee',
@@ -1208,7 +1210,8 @@ const LIVE_LOAN: LoanInfo = {
 /** The same borrower's request in a pool whose owner reviews before funding. */
 const REQUESTED_LOAN: LoanInfo = { ...LIVE_LOAN, id: '31337-12-2', loanId: 2, status: 'requested' }
 const REJECTED_LOAN: LoanInfo = { ...LIVE_LOAN, id: '31337-12-3', loanId: 3, status: 'rejected' }
-const REPAID_LOAN: LoanInfo = { ...LIVE_LOAN, id: '31337-12-4', loanId: 4, isRepaid: true }
+/** 3 POL at 500bp, settled: the whole 3.15 came back. */
+const REPAID_LOAN: LoanInfo = { ...LIVE_LOAN, id: '31337-12-4', loanId: 4, isRepaid: true, amountRepaid: parseEther('3.15').toString() }
 
 /** Thirty days after `LIVE_LOAN` started, which is exactly its term. */
 const DUE_AT = new Date(new Date(LIVE_LOAN.startedAt).getTime() + LIVE_LOAN.duration * 1000)
@@ -1218,6 +1221,7 @@ function settled(overrides: { id: string; loanId: number; repaidAt?: Date; borro
     ...LIVE_LOAN,
     ...overrides,
     isRepaid: true,
+    amountRepaid: parseEther('3.15').toString(),
     repaidAt: overrides.repaidAt?.toISOString(),
   }
 }
@@ -1226,9 +1230,16 @@ describe('PoolStore loan states', () => {
   let store: PoolStore
   let listLoansCallable: jest.Mock
   let listContributionsCallable: jest.Mock
+  let listLoanRepaymentsCallable: jest.Mock
 
   async function loadWithLoans(loans: LoanInfo[]) {
     listLoansCallable.mockResolvedValue({ data: { loans, totalCount: loans.length, limit: 50 } })
+    await store.fetchPools()
+  }
+
+  async function loadWithRepayments(loans: LoanInfo[], repayments: LoanRepaymentInfo[]) {
+    listLoansCallable.mockResolvedValue({ data: { loans, totalCount: loans.length, limit: 50 } })
+    listLoanRepaymentsCallable.mockResolvedValue({ data: { repayments, totalCount: repayments.length, limit: 50 } })
     await store.fetchPools()
   }
 
@@ -1242,11 +1253,13 @@ describe('PoolStore loan states', () => {
     store = new PoolStore()
     listLoansCallable = jest.fn().mockResolvedValue({ data: { loans: [], totalCount: 0, limit: 50 } })
     listContributionsCallable = jest.fn().mockResolvedValue({ data: { contributions: [], totalCount: 0, limit: 50 } })
+    listLoanRepaymentsCallable = jest.fn().mockResolvedValue({ data: { repayments: [], totalCount: 0, limit: 50 } })
     mockFirebaseCallable.mockImplementation((_functions?: unknown, name?: string) => {
       if (name === 'listLoans') return listLoansCallable
       if (name === 'listContributions') return listContributionsCallable
       if (name === 'listWithdrawals') return jest.fn().mockResolvedValue({ data: { withdrawals: [], totalCount: 0, limit: 50 } })
       if (name === 'listInterestClaims') return jest.fn().mockResolvedValue({ data: { claims: [], totalCount: 0, limit: 50 } })
+      if (name === 'listLoanRepayments') return listLoanRepaymentsCallable
       return jest.fn().mockResolvedValue({
         data: { pools: [LIVE_POOL], totalCount: 1, page: 1, limit: 50, hasNextPage: false, hasPreviousPage: false },
       })
@@ -1306,12 +1319,25 @@ describe('PoolStore loan states', () => {
     expect(store.activeLoanFor(12)).toBeUndefined()
   })
 
-  it('counts only disbursed principal as lent out', async () => {
+  it('counts only disbursed loans as owed', async () => {
     // A request has moved nothing. Counting it would report liquidity as lent
     // while it is still in the pool.
+    //
+    // 3 POL at 500bp, so 3.15 is owed: principal plus interest rather than
+    // principal alone, because that is the sum that actually has to come back
+    // and splitting it would mean restating the contract's pro-rata rule here.
     await loadWithLoans([LIVE_LOAN, REQUESTED_LOAN, REJECTED_LOAN, REPAID_LOAN])
 
-    expect(store.outstandingDebt(12)).toBe(parseEther('3'))
+    expect(store.outstandingDebt(12)).toBe(parseEther('3.15'))
+  })
+
+  it('nets off what a borrower has already paid back', async () => {
+    // The figure sits beside the pool's liquidity, which `totalFunds` has
+    // already grown by. Summing the whole debt after two POL came back would
+    // have the two describe different worlds.
+    await loadWithLoans([{ ...LIVE_LOAN, amountRepaid: parseEther('2').toString() }])
+
+    expect(store.outstandingDebt(12)).toBe(parseEther('1.15'))
   })
 
   it('lists every borrower’s pending request for the pool owner', async () => {
@@ -1451,9 +1477,10 @@ describe('PoolStore loan states', () => {
   // Loans in the activity feed.
   //
   // A loan is an entity, not a log, so it is expanded into the events that can
-  // be dated: the disbursement, and — once `repaidAt` exists — the repayment.
-  // A repayment with no date still produces no row; it cannot be placed in a
-  // feed ordered by time.
+  // be dated. Since instalments became possible that is the disbursement and
+  // nothing else: money coming back is its own indexed feed, because a loan
+  // record carries one date and one running total and a debt settled in four
+  // transactions has four of each.
   // -------------------------------------------------------------------------
 
   describe('loanActivity', () => {
@@ -1493,69 +1520,14 @@ describe('PoolStore loan states', () => {
       expect(store.loanActivity).toEqual([])
     })
 
-    it('shows a repayment as money returning to the pool', async () => {
+    it('leaves money coming back to the loan repayment feed', async () => {
+      // It used to be derived here, one row per settled loan. That was exactly
+      // right while `repayLoan` demanded the whole sum in one transaction and
+      // wrong the moment it stopped: instalments before the last would have no
+      // row at all, and the last would claim the whole debt.
       await loadWithLoans([settled({ id: '31337-12-5', loanId: 5, repaidAt: DUE_AT })])
 
-      const repayment = store.loanActivity.find((tx) => tx.type === TransactionType.LOAN_REPAYMENT)
-      expect(repayment).toBeDefined()
-      expect(repayment?.from).toBe(LIVE_LOAN.borrower)
-      expect(repayment?.to).toBe(LIVE_LOAN.poolAddress)
-      expect(repayment?.status).toBe(TransactionStatus.CONFIRMED)
-    })
-
-    it('repays principal plus the whole fixed interest', async () => {
-      // 3 POL at 500bp. The rate does not accrue, so this is the sum
-      // `repayLoan` demands however long the loan ran.
-      await loadWithLoans([settled({ id: '31337-12-5', loanId: 5, repaidAt: DUE_AT })])
-
-      const repayment = store.loanActivity.find((tx) => tx.type === TransactionType.LOAN_REPAYMENT)
-      expect(repayment?.amount).toBe(parseEther('3.15'))
-    })
-
-    it('dates the repayment when it landed, not when the loan started', async () => {
-      // Reusing `startedAt` would file the money coming back at the moment it
-      // went out — the reason repayments were left out of the feed entirely.
-      await loadWithLoans([settled({ id: '31337-12-5', loanId: 5, repaidAt: DUE_AT })])
-
-      const repayment = store.loanActivity.find((tx) => tx.type === TransactionType.LOAN_REPAYMENT)
-      expect(repayment?.createdAt).toEqual(DUE_AT)
-    })
-
-    it('gives the repayment no transaction hash', async () => {
-      // The record's hash created the loan. Linking a repayment to the borrow
-      // is worse than offering no link at all.
-      await loadWithLoans([settled({ id: '31337-12-5', loanId: 5, repaidAt: DUE_AT })])
-
-      const repayment = store.loanActivity.find((tx) => tx.type === TransactionType.LOAN_REPAYMENT)
-      expect(repayment?.txHash).toBeUndefined()
-      expect(repayment?.blockNumber).toBeUndefined()
-    })
-
-    it('keeps the disbursement alongside the repayment', async () => {
-      // Both happened, at different times. Replacing one with the other would
-      // hide that the pool ever paid out.
-      await loadWithLoans([settled({ id: '31337-12-5', loanId: 5, repaidAt: DUE_AT })])
-
-      expect(store.loanActivity.map((tx) => tx.type)).toEqual([TransactionType.LOAN_DISBURSEMENT, TransactionType.LOAN_REPAYMENT])
-    })
-
-    it('gives the two rows distinct ids', async () => {
-      // They share a loan; a shared key would collide in the list.
-      await loadWithLoans([settled({ id: '31337-12-5', loanId: 5, repaidAt: DUE_AT })])
-
-      const [disbursement, repayment] = store.loanActivity
-      expect(repayment.id).not.toBe(disbursement.id)
-    })
-
-    it('leaves an undated repayment out', async () => {
-      // `isRepaid` says it was settled and nothing says when — a loan repaid
-      // before the contract stamped a date. There is no honest place for it in
-      // a feed ordered by time, so only the disbursement is shown.
-      await loadWithLoans([REPAID_LOAN])
-
-      expect(REPAID_LOAN.repaidAt).toBeUndefined()
-      expect(store.loanActivity).toHaveLength(1)
-      expect(store.loanActivity[0].type).toBe(TransactionType.LOAN_DISBURSEMENT)
+      expect(store.loanActivity.map((tx) => tx.type)).toEqual([TransactionType.LOAN_DISBURSEMENT])
     })
 
     it('never gives a request a repayment row', async () => {
@@ -1566,7 +1538,7 @@ describe('PoolStore loan states', () => {
       expect(store.loanActivity.map((tx) => tx.type)).toEqual([TransactionType.LOAN_REQUEST])
     })
 
-    it('expands only the loans that have a dated repayment', async () => {
+    it('produces one row per loan that moved', async () => {
       await loadWithLoans([
         LIVE_LOAN,
         REQUESTED_LOAN,
@@ -1575,10 +1547,105 @@ describe('PoolStore loan states', () => {
         settled({ id: '31337-12-5', loanId: 5, repaidAt: DUE_AT }),
       ])
 
-      // Live 1, request 1, rejected 0, undated repaid 1, dated repaid 2.
-      expect(store.loanActivity).toHaveLength(5)
+      // Live 1, request 1, rejected 0, repaid 1 each — the disbursement.
+      expect(store.loanActivity).toHaveLength(4)
+    })
+  })
+
+  // -------------------------------------------------------------------------
+  // Payments towards loans.
+  //
+  // Their own indexed feed, because instalments are logs and a loan is not.
+  // `LoanRepaymentMade` carries a block, a hash and the amount that payment
+  // credited; the loan record carries a running total and one date belonging
+  // to whichever payment closed the debt.
+  // -------------------------------------------------------------------------
+
+  describe('loanRepaymentActivity', () => {
+    /** 2 POL towards `LIVE_LOAN`, three days after it went out. */
+    const FIRST_INSTALMENT: LoanRepaymentInfo = {
+      id: '31337-0xf1-0',
+      loanId: 1,
+      poolId: 12,
+      poolAddress: LIVE_LOAN.poolAddress,
+      borrower: USER_WALLET,
+      amount: parseEther('2').toString(),
+      chainId: 31337,
+      transactionHash: '0xf1',
+      logIndex: 0,
+      blockNumber: 300,
+      repaidAt: '2026-08-14T09:00:00.000Z',
+    }
+
+    /** The 1.15 POL that closes it, a week later. */
+    const FINAL_INSTALMENT: LoanRepaymentInfo = {
+      ...FIRST_INSTALMENT,
+      id: '31337-0xf2-0',
+      amount: parseEther('1.15').toString(),
+      transactionHash: '0xf2',
+      blockNumber: 420,
+      repaidAt: '2026-08-21T09:00:00.000Z',
+    }
+
+    it('shows a payment as money returning to the pool', async () => {
+      await loadWithRepayments([LIVE_LOAN], [FIRST_INSTALMENT])
+
+      const [repayment] = store.loanRepaymentActivity
+      expect(repayment.type).toBe(TransactionType.LOAN_REPAYMENT)
+      expect(repayment.from).toBe(USER_WALLET)
+      expect(repayment.to).toBe(LIVE_LOAN.poolAddress)
+      expect(repayment.status).toBe(TransactionStatus.CONFIRMED)
     })
 
+    it('gives one row per instalment, each carrying what it paid', async () => {
+      // The whole point of the feed. Derived from the loan record these would
+      // be a single row for 3.15 POL, dated when the last one landed.
+      await loadWithRepayments([settled({ id: '31337-12-1', loanId: 1 })], [FIRST_INSTALMENT, FINAL_INSTALMENT])
+
+      expect(store.loanRepaymentActivity.map((tx) => tx.amount)).toEqual([parseEther('2'), parseEther('1.15')])
+    })
+
+    it('dates each payment by its own block', async () => {
+      await loadWithRepayments([settled({ id: '31337-12-1', loanId: 1 })], [FIRST_INSTALMENT, FINAL_INSTALMENT])
+
+      expect(store.loanRepaymentActivity.map((tx) => tx.createdAt)).toEqual([
+        new Date('2026-08-14T09:00:00.000Z'),
+        new Date('2026-08-21T09:00:00.000Z'),
+      ])
+    })
+
+    it('links each payment to its own transaction', async () => {
+      // Unlike every other loan row: the loan record's hash created the loan,
+      // so a repayment derived from it had to carry no link at all.
+      await loadWithRepayments([LIVE_LOAN], [FIRST_INSTALMENT])
+
+      const [repayment] = store.loanRepaymentActivity
+      expect(repayment.txHash).toBe('0xf1')
+      expect(repayment.blockNumber).toBe(300)
+    })
+
+    it('reaches the pool’s activity feed alongside the disbursement', async () => {
+      await loadWithRepayments([LIVE_LOAN], [FIRST_INSTALMENT])
+
+      expect(store.transactionsFor(12).map((tx) => tx.type)).toEqual([TransactionType.LOAN_REPAYMENT, TransactionType.LOAN_DISBURSEMENT])
+    })
+
+    it('counts as the borrower’s own activity', async () => {
+      // A repayment leaves their wallet, so the `wallet` perspective marks it
+      // negative — which needs the row to be matched on `from`.
+      await loadWithRepayments([LIVE_LOAN], [FIRST_INSTALMENT])
+
+      expect(store.myActivity.map((tx) => tx.type)).toContain(TransactionType.LOAN_REPAYMENT)
+    })
+
+    it('is empty when nothing has been paid back', async () => {
+      await loadWithRepayments([LIVE_LOAN], [])
+
+      expect(store.loanRepaymentActivity).toEqual([])
+    })
+  })
+
+  describe('loanActivity, continued', () => {
     it('reaches the pool’s activity feed', async () => {
       // The regression: loans were indexed and shown everywhere except here.
       await loadWithLoans([LIVE_LOAN])

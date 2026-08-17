@@ -190,6 +190,7 @@ describe('DashboardScreen', () => {
         duration: 2_592_000,
         startedAt: '2026-08-11T09:00:00.000Z',
         isRepaid: false,
+        amountRepaid: '0',
         status: 'requested' as const,
         chainId: 31337,
         transactionHash: '0xaaa',

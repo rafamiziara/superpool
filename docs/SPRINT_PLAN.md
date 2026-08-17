@@ -16,7 +16,7 @@ To build a functional micro-lending decentralized application on Polygon where u
 | 4 · Pool Membership            | ✅ Complete                                         |
 | 5 · Pool Liquidity             | 🚧 Native currency only; ERC-20 outstanding         |
 | 6 · Loan Requests              | 🚧 Request flow complete; AI assessment not started |
-| 7 · Loan Repayments            | ✅ Complete for lump-sum repayment                  |
+| 7 · Loan Repayments            | ✅ Full and partial; no schedule or reminders       |
 | 8 · Withdrawals                | ✅ Complete                                         |
 | 9 · Reputations                | 🚧 History shipped; no score, deliberately          |
 | 10 · Loan Management           | 🚧 Decisions and borrower history; AI support not   |
@@ -313,8 +313,11 @@ See [`LOANS.md`](LOANS.md) for how the shipped system works.
     Sprint 12, which shipped only the owner-facing half. Due and overdue are
     **not events** — nothing on chain fires when a term lapses — so this is a
     scheduled scan, not an indexer hook.
-  - Full repayment ✅; **partial repayment — ❌**, it is all-or-nothing and
-    `isRepaid` is a bool rather than a running balance
+  - Full repayment ✅; **partial repayment ✅** — `repayLoan` takes any amount
+    above zero, `amountRepaid` is the running total on the `Loan` struct, and
+    the loan closes only on the payment that finishes it. Each payment is its
+    own indexed record in `loan_repayments`, because a loan holds one
+    `repaidAt` and a debt returned in four transactions has four dates
   - Interest calculation ✅ — **flat, fixed at disbursement, not accrued**, so
     repaying early costs exactly the same
 
@@ -327,7 +330,7 @@ See [`LOANS.md`](LOANS.md) for how the shipped system works.
 - **Backend Integration** 🚧
   - Event listeners for loan repayment transactions ✅
   - Loan status updates in Firestore ✅
-  - Payment history ✅; **analytics — ❌**
+  - Payment history ✅ — per payment now, not per loan; **analytics — ❌**
   - **Automated notifications for due dates — ❌** see Sprint 12's remainder
 
 ### Expected Deliverables:
@@ -337,10 +340,23 @@ See [`LOANS.md`](LOANS.md) for how the shipped system works.
 - Payment tracking and history system — ✅
 - Automated loan status updates — ✅
 
-### Current Status: **Complete for lump-sum repayment** ✅
+### Current Status: **Full and partial repayment both work** ✅
 
-The gap that mattered was not in this sprint — repaid interest reached the pool
-and could not be distributed — and it is closed in Sprint 11.
+Two gaps that mattered were not in this sprint and are both closed now. Repaid
+interest reached the pool and could not be distributed — Sprint 11. And a
+borrower who could pay half could pay nothing, which is the one that made the
+product unusable for the people it is for; closed 2026-08-17, live-verified
+with 47 checks (`pnpm --filter backend testPartial`).
+
+What is left here is **scheduling**: no minimum payment, no instalment plan, no
+reminder when a term lapses. Due and overdue are not events — nothing on chain
+fires when a term passes — so that is a scheduled scan, not an indexer hook, and
+it is Sprint 12's remainder.
+
+The live run also found what mocks could not: an instalment moves `amountRepaid`
+and nothing else, so an indexer currency check that does not compare it reports
+the payment as already indexed and leaves the record claiming the whole debt is
+outstanding.
 
 ---
 

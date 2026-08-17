@@ -6,6 +6,7 @@ import { indexContributionEvent, parseFundsDepositedLog, resolvePoolId } from '.
 import { fetchPoolActive, fetchPoolDescription, indexPoolEvent, parsePoolCreatedLog, updatePoolActive } from './eventIndexer'
 import { indexInterestClaimEvent, parseInterestClaimedLog } from './interestClaimIndexer'
 import { indexLoanFromLog, LOAN_TOPICS } from './loanIndexer'
+import { indexLoanRepaymentEvent, LOAN_REPAYMENT_MADE_TOPIC, parseLoanRepaymentLog } from './loanRepaymentIndexer'
 import { indexMembershipFromLog, MEMBERSHIP_TOPICS } from './membershipIndexer'
 import { indexWithdrawalEvent, parseFundsWithdrawnLog } from './withdrawalIndexer'
 
@@ -31,6 +32,8 @@ export interface SweepCounts {
   loans: number
   /** Memberships written. One already matching the chain is not counted. */
   memberships: number
+  /** Payments towards loans written. A log already indexed is not counted. */
+  loanRepayments: number
   /** Interest claims written. A log already indexed is not counted. */
   interestClaims: number
   /** Pools whose stored `isActive` disagreed with the chain and was corrected. */
@@ -316,6 +319,48 @@ async function sweepLoans(options: SweepBlockRangeOptions): Promise<number> {
 }
 
 /**
+ * Index every payment towards a loan in the range.
+ *
+ * These logs are swept **twice** — once here for the payment record and once by
+ * `sweepLoans`, which needs them to keep the loan's `amountRepaid` current. The
+ * same deliberate duplication `MemberJoined` has: two records answering
+ * different questions, both idempotent. A payment cannot be derived from the
+ * loan (which holds only a running total, dated once at settlement) and the
+ * loan cannot be derived from the payments (which never see a rejection or an
+ * approval), so neither sweep can be dropped in favour of the other.
+ */
+async function sweepLoanRepayments(options: SweepBlockRangeOptions, caches: SweepCaches): Promise<number> {
+  const { provider, firestore, chainId, factoryAddress, fromBlock, toBlock } = options
+
+  const logs = await queryLogs(provider, LOAN_REPAYMENT_MADE_TOPIC, fromBlock, toBlock)
+
+  let stored = 0
+
+  for (const log of logs) {
+    try {
+      const timestamp = await getBlockTimestamp(log.blockNumber, provider, caches)
+      const parsed = parseLoanRepaymentLog(log, chainId, timestamp)
+      const poolId = await getPoolId(parsed.poolAddress, factoryAddress, provider, caches)
+
+      if (poolId === UNKNOWN_POOL_ID) continue
+
+      const result = await indexLoanRepaymentEvent({ ...parsed, poolId }, firestore)
+
+      if (result.stored) stored++
+    } catch (error) {
+      logger.error('Failed to sweep LoanRepaymentMade log', {
+        chainId,
+        blockNumber: log.blockNumber,
+        transactionHash: log.transactionHash,
+        error: error instanceof Error ? error.message : String(error),
+      })
+    }
+  }
+
+  return stored
+}
+
+/**
  * Index every membership touched in the range.
  *
  * All six membership events take one topic-OR query and the same path, for the
@@ -379,6 +424,9 @@ export async function sweepBlockRange(options: SweepBlockRangeOptions): Promise<
   const withdrawals = await sweepFundsWithdrawn(options, caches)
   const interestClaims = await sweepInterestClaims(options, caches)
   const loans = await sweepLoans(options)
+  // After the loans, so a payment record never points at a loan the index has
+  // not heard of yet. Same dependency ordering pools get ahead of everything.
+  const loanRepayments = await sweepLoanRepayments(options, caches)
 
-  return { pools, contributions, withdrawals, interestClaims, loans, memberships, statusUpdates }
+  return { pools, contributions, withdrawals, interestClaims, loans, loanRepayments, memberships, statusUpdates }
 }

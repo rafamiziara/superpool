@@ -39,6 +39,7 @@ function parsedLoan(borrower = ASKER): ParsedLoan {
     duration: 2_592_000,
     startedAt: new Date('2026-08-11T09:00:00.000Z'),
     isRepaid: false,
+    amountRepaid: '0',
     status: 'requested',
     chainId: CHAIN_ID,
     transactionHash: `0x${'a'.repeat(64)}`,

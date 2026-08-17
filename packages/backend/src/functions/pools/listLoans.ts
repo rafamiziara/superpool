@@ -64,6 +64,10 @@ export const listLoansHandler = async (request: CallableRequest<ListLoansRequest
         // ISO string, not a Date: the callable encoder turns a Date into `{}`.
         startedAt: (data.startedAt?.toDate() || new Date()).toISOString(),
         isRepaid: data.isRepaid,
+        // Absent on loans indexed before instalments were possible, and those
+        // were all-or-nothing: `isRepaid` already says which end they are at,
+        // so '0' loses nothing that was ever recorded.
+        amountRepaid: data.amountRepaid ?? '0',
         // Left off entirely rather than sent as null when the loan is
         // outstanding: the field means "settled at this moment", and there is
         // no moment. Also absent on a loan repaid before the contract recorded

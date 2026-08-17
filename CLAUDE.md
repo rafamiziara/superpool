@@ -517,6 +517,26 @@ owner admitted can borrow without having lent first. See
 pending request too, so anything that reads it without checking `status` first
 treats a request as an outstanding debt.
 
+**A loan can be paid down in instalments.** `repayLoan` takes any amount above
+zero, credits it against `amount + interest` and refunds the rest; `amountRepaid`
+is the running total and `isRepaid` still means the debt is closed. Three things
+follow and are easy to break:
+
+- **The loan closes on the payment that finishes it, and not before** — that one
+  write sets `isRepaid`, stamps `repaidAt` and releases `activeLoanId`. Freeing
+  the slot earlier would let a borrower who paid a wei open a second loan.
+- **Each payment is its own record**, in `loan_repayments`, keyed on the log like
+  a contribution. The loan holds a running total and one `repaidAt` dating only
+  the payment that settled it, so a debt returned in four transactions has three
+  dates that live nowhere else. The activity feed reads the payments, not the
+  loan.
+- **Interest is distributed pro rata to what has been paid**, as a difference of
+  cumulative shares. Taking `payment × rate` instead would let a borrower change
+  what lenders earn by choosing how to split.
+
+`calculateRepaymentAmount` is the loan's lifetime cost and never moves;
+`outstandingBalance` is what is owed now, and is the figure to send as `value`.
+
 Borrowing history — what this project has instead of a reputation score — is in
 the same document. `repaidAt` is the fact it is made of, and **zero means "no
 date", never 1970**: on a loan that is still running, and on one settled before
@@ -647,6 +667,11 @@ user received as negative. It follows from **who the feed is about**:
 
 A feed that has not been narrowed must use `pool`. `PoolStore.recentTransactions`
 is pool-wide by construction, because every source it merges covers all members.
+
+Repayment rows come from `PoolStore.loanRepaymentActivity` — the indexed
+`LoanRepaymentMade` logs — and **not** from the loan record. Deriving them there
+gave one row per settled loan carrying the whole debt, which stopped being true
+the moment a loan could be paid in parts.
 
 ## Discovery
 

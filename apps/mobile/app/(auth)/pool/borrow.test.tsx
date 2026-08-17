@@ -74,6 +74,7 @@ function outstandingLoan(overrides: Record<string, unknown> = {}) {
     duration: 2_592_000,
     startedAt: '2026-08-01T00:00:00.000Z',
     isRepaid: false,
+    amountRepaid: '0',
     status: 'disbursed' as const,
     chainId: 31337,
     transactionHash: '0xaaa',
@@ -189,8 +190,10 @@ describe('BorrowScreen', () => {
       expect(queryByTestId('borrow-form')).toBeNull()
     })
 
-    it('sends the principal plus fixed interest', async () => {
-      // 4 POL at 500 bps = 4.2 POL, and `repayLoan` reverts on anything less.
+    it('offers the whole outstanding balance by default', async () => {
+      // 4 POL at 500 bps = 4.2 POL. Settling is what a borrower opening this
+      // screen usually means to do, so it stays one tap even though the
+      // contract now accepts any amount.
       const { getByTestId } = render(<BorrowScreen />)
 
       await act(async () => {
@@ -198,6 +201,49 @@ describe('BorrowScreen', () => {
       })
 
       expect(mockRepay).toHaveBeenCalledWith(expect.objectContaining({ loanId: 3, amount: 4_200_000_000_000_000_000n }))
+    })
+
+    it('offers only what is left when part of it is already paid', async () => {
+      poolStore.loanRecords = [outstandingLoan({ amountRepaid: '1200000000000000000' })]
+      const { getByTestId } = render(<BorrowScreen />)
+
+      await act(async () => {
+        fireEvent.press(getByTestId('repay-submit'))
+      })
+
+      expect(mockRepay).toHaveBeenCalledWith(expect.objectContaining({ amount: 3_000_000_000_000_000_000n }))
+    })
+
+    it('sends whatever the borrower asks for', async () => {
+      const { getByTestId } = render(<BorrowScreen />)
+
+      fireEvent.changeText(getByTestId('repay-amount'), '1.5')
+      await act(async () => {
+        fireEvent.press(getByTestId('repay-submit'))
+      })
+
+      expect(mockRepay).toHaveBeenCalledWith(expect.objectContaining({ amount: 1_500_000_000_000_000_000n }))
+    })
+
+    /**
+     * The one thing this screen must not do.
+     *
+     * A part payment leaves the debt open and the borrower's single slot in
+     * this pool taken, so "Loan repaid" and "you can borrow from it again"
+     * would both be false — and the second is a promise `createLoan` would
+     * refuse a moment later with `LoanOutstanding`.
+     */
+    it('does not call a part payment a repaid loan', async () => {
+      const { getByTestId, getByText, queryByText } = render(<BorrowScreen />)
+
+      fireEvent.changeText(getByTestId('repay-amount'), '1.5')
+      await act(async () => {
+        fireEvent.press(getByTestId('repay-submit'))
+      })
+
+      await waitFor(() => expect(getByTestId('borrow-success')).toBeTruthy())
+      expect(getByText('Payment received')).toBeTruthy()
+      expect(queryByText(/borrow from it again/)).toBeNull()
     })
 
     it('indexes the repayment through the same callable as a borrow', async () => {
@@ -222,7 +268,7 @@ describe('BorrowScreen', () => {
     })
 
     it('surfaces a failed repayment without leaving the panel', async () => {
-      mockRepay.mockRejectedValue(new Error('That is less than the full amount due'))
+      mockRepay.mockRejectedValue(new Error('This loan belongs to another wallet'))
       const { getByTestId } = render(<BorrowScreen />)
 
       await act(async () => {
@@ -233,7 +279,7 @@ describe('BorrowScreen', () => {
     })
 
     it('ignores a loan that has already been settled', async () => {
-      poolStore.loanRecords = [outstandingLoan({ isRepaid: true })]
+      poolStore.loanRecords = [outstandingLoan({ isRepaid: true, amountRepaid: '4200000000000000000' })]
 
       const { getByTestId, queryByTestId } = render(<BorrowScreen />)
 

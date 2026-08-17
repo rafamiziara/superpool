@@ -1244,11 +1244,6 @@ export const LendingPoolABI = [
   },
   {
     "inputs": [],
-    "name": "InsufficientRepaymentAmount",
-    "type": "error"
-  },
-  {
-    "inputs": [],
     "name": "InvalidAmount",
     "type": "error"
   },
@@ -1265,6 +1260,11 @@ export const LendingPoolABI = [
   {
     "inputs": [],
     "name": "LoanAlreadyRepaid",
+    "type": "error"
+  },
+  {
+    "inputs": [],
+    "name": "LoanNotDisbursed",
     "type": "error"
   },
   {
@@ -1549,6 +1549,31 @@ export const LendingPoolABI = [
       }
     ],
     "name": "LoanRepaid",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "uint256",
+        "name": "loanId",
+        "type": "uint256"
+      },
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "borrower",
+        "type": "address"
+      },
+      {
+        "indexed": true,
+        "internalType": "uint256",
+        "name": "amount",
+        "type": "uint256"
+      }
+    ],
+    "name": "LoanRepaymentMade",
     "type": "event"
   },
   {
@@ -1949,6 +1974,11 @@ export const LendingPoolABI = [
             "internalType": "uint256",
             "name": "duration",
             "type": "uint256"
+          },
+          {
+            "internalType": "uint256",
+            "name": "amountRepaid",
+            "type": "uint256"
           }
         ],
         "internalType": "struct LendingPool.Loan",
@@ -2067,6 +2097,11 @@ export const LendingPoolABI = [
         "internalType": "uint256",
         "name": "duration",
         "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "amountRepaid",
+        "type": "uint256"
       }
     ],
     "stateMutability": "view",
@@ -2107,6 +2142,25 @@ export const LendingPoolABI = [
   {
     "inputs": [],
     "name": "nextLoanId",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "_loanId",
+        "type": "uint256"
+      }
+    ],
+    "name": "outstandingBalance",
     "outputs": [
       {
         "internalType": "uint256",

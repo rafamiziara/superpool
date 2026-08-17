@@ -180,17 +180,26 @@ Required for local development and Firebase Admin SDK:
   borrow, request, approve, reject, cancel or repay. One callable for all of
   them, since the record written is the loan's state afterwards whichever
   happened
-- Matches all five loan events (`LoanCreated`, `LoanRequested`, `LoanApproved`,
-  `LoanRejected`, `LoanRepaid`). A cancellation has no event of its own — it
-  emits `LoanRejected`, because the record tracks the state and not who ended
-  the request
+- Matches all six loan events (`LoanCreated`, `LoanRequested`, `LoanApproved`,
+  `LoanRejected`, `LoanRepaymentMade`, `LoanRepaid`). A cancellation has no event
+  of its own — it emits `LoanRejected`, because the record tracks the state and
+  not who ended the request. `LoanRepaymentMade` has to be in the set even
+  though it has a collection of its own: a payment that does not settle the loan
+  emits nothing else, so leaving it out would let `amountRepaid` sit at zero
 - Reads `getLoan` rather than decoding the log, so the stored record cannot
   disagree with the chain whichever event triggered it. This also means indexing
   an **old** transaction stores the loan's state _now_, not then
 - `status` comes from the Solidity enum by ordinal, and `LOAN_STATUS` must track
   it by index — `Disbursed` is 0 so that loans written before the field existed
   read as disbursed, which is what they were
-- Idempotent: reports `alreadyIndexed` when the stored record already matches
+- Also indexes the payment itself when the transaction carries one, into
+  `loan_repayments`, and returns it as `repayments`. Both records at once,
+  because the app confirms one transaction and should not have to know it
+  produced two
+- Idempotent: reports `alreadyIndexed` when the stored record already matches.
+  The comparison includes `amountRepaid`, which is the sharpest case it has:
+  an instalment moves that field and nothing else, so without it a part payment
+  would be reported as already indexed
 - Requires authentication
 - **Cannot read pools created before the beacon migration.** Those clones return
   the pre-approval `Loan` struct and `getLoan` fails to decode, so a sweep skips
@@ -210,8 +219,24 @@ Required for local development and Firebase Admin SDK:
   while pending and "disbursed at" afterwards
 - `repaidAt` is an ISO string too, and **absent** rather than null while the
   loan is outstanding — and also on a loan settled before the contract recorded
-  a date. It is what borrowing history is derived from; see
+  a date. It dates the **settlement**, not the last payment. It is what borrowing
+  history is derived from; see
   [`docs/LOANS.md`](../../docs/LOANS.md#borrowing-history)
+- `amountRepaid` is a decimal wei string, the chain's running total, `'0'` on
+  records indexed before instalments were possible
+- Requires authentication
+
+**`listLoanRepayments`**
+
+- Lists payments made towards loans, newest first, filterable by pool, loan and
+  borrower
+- Separate from `listLoans` because neither derives from the other: a loan says
+  how much is still owed, and these say when each instalment arrived and in
+  which transaction. `loanId` is per-pool, so filtering on it alone would match
+  one loan per pool on the chain
+- Append-only, keyed `${chainId}-${txHash}-${logIndex}` like contributions — a
+  payment is one immutable log, so keying on the loan would collapse a
+  borrower's instalments onto one document
 - Requires authentication
 
 **`listPools`**

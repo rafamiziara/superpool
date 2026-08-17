@@ -116,6 +116,21 @@ contract LendingPool is
         uint256 interestRate;    // 32 bytes - new slot
         uint256 startTime;       // 32 bytes - new slot
         uint256 duration;        // 32 bytes - new slot
+        /**
+         * @dev How much of `amount + interest` has been handed back so far.
+         *
+         * **Appended**, unlike `repaidAt`, and safely so: `loans` is a mapping,
+         * so each entry sits at its own `keccak256(loanId . slot)` and widening
+         * the struct from five words to six extends every entry into a word
+         * that was previously unallocated rather than shifting any field that
+         * already exists. A loan written before this field reads 0 here, which
+         * is the correct answer for one that was never partly paid and — read
+         * beside `isRepaid` — for one that was settled in full.
+         *
+         * `isRepaid` stays the authority on whether the debt is closed. This
+         * says how far along it is, and the two are only redundant at the ends.
+         */
+        uint256 amountRepaid;    // 32 bytes - new slot
     }
 
     /// @notice Pool configuration
@@ -261,12 +276,39 @@ contract LendingPool is
         uint256 indexed amount
     );
     /**
-     * @notice Emitted when a loan is repaid
+     * @notice Emitted when a loan is repaid in full and the debt is closed
      * @param loanId Unique identifier of the repaid loan
      * @param borrower Address of the borrower who repaid the loan
      * @param amount Total amount repaid (principal + interest)
+     * @dev Still means exactly what it always did — the loan is settled — which
+     * is why partial payments got an event of their own rather than being
+     * folded into this one. Everything downstream that reads this as "the debt
+     * is over" stays correct, and `amount` is the whole of it however many
+     * transactions it arrived in.
      */
     event LoanRepaid(
+        uint256 indexed loanId,
+        address indexed borrower,
+        uint256 indexed amount
+    );
+    /**
+     * @notice Emitted on every payment towards a loan, part or whole
+     * @param loanId Unique identifier of the loan being paid down
+     * @param borrower Address of the borrower making the payment
+     * @param amount What this payment credited, in wei, after any refund
+     * @dev The settling payment emits this *and* `LoanRepaid`: the first says
+     * money moved, the second says the debt is closed, and they are different
+     * facts the moment a loan can be paid in instalments.
+     *
+     * This is the only record that a particular payment happened at a
+     * particular moment. `Loan.amountRepaid` is a running total and
+     * `Loan.repaidAt` only dates the last one, so a feed that wants to show
+     * instalments has to index these logs — as it already does for deposits and
+     * withdrawals, which are events for the same reason.
+     *
+     * Three indexed parameters, `data` empty, like every other event here.
+     */
+    event LoanRepaymentMade(
         uint256 indexed loanId,
         address indexed borrower,
         uint256 indexed amount
@@ -382,7 +424,6 @@ contract LendingPool is
     error ExceedsMaxLoanAmount();
     error InvalidAmount();
     error PoolNotActive();
-    error InsufficientRepaymentAmount();
     error TransferFailed();
     error RefundFailed();
     error InvalidImplementation();
@@ -390,6 +431,17 @@ contract LendingPool is
     error ApprovalRequired();
     /// @dev The loan is not awaiting a decision — already approved, or rejected.
     error LoanNotPending();
+    /**
+     * @dev Paying towards a loan that never paid out.
+     *
+     * A request and a refused request both have a borrower and read
+     * `isRepaid == false`, so the two checks `repayLoan` used to make let
+     * either through: the money was taken, the request was marked settled, and
+     * nothing had ever been lent. Nothing in the app routes there — the repay
+     * panel is fed by `activeLoanFor`, which is disbursed-only — but the
+     * contract is what has to refuse it.
+     */
+    error LoanNotDisbursed();
     /// @dev The caller is not an `Active` member of a pool that requires one.
     error NotAMember();
     /// @dev Asking to join when already `Active` or already `Requested`.
@@ -681,6 +733,7 @@ contract LendingPool is
             duration: poolConfig.loanDuration,
             isRepaid: false,
             repaidAt: 0,
+            amountRepaid: 0,
             status: LoanStatus.Disbursed
         });
 
@@ -910,6 +963,7 @@ contract LendingPool is
             duration: poolConfig.loanDuration,
             isRepaid: false,
             repaidAt: 0,
+            amountRepaid: 0,
             status: LoanStatus.Requested
         });
 
@@ -989,12 +1043,35 @@ contract LendingPool is
     }
 
     /**
-     * @notice Repay a loan with interest
-     * @param _loanId The ID of the loan to repay
-     * @dev The interest is shared out to contributors here, at the moment it
-     * arrives, rather than being credited to whoever happens to be a member
-     * later. A pool with no contributions left at all — every member having
-     * withdrawn while the loan was out — has no one to share it with, and the
+     * @notice Pay towards a loan, in part or in full
+     * @param _loanId The ID of the loan to pay down
+     * @dev Any amount above zero is accepted and credited against
+     * `amount + interest`; anything beyond what is still owed is refunded, so
+     * overpaying is as safe as it was when the call demanded the exact sum. The
+     * loan closes — `isRepaid`, `repaidAt`, the borrower's lock released — on
+     * the payment that finishes it, whether that is the first or the fifth.
+     *
+     * **Interest is shared out in proportion to what has been paid**, not
+     * interest-first and not principal-first. Each payment distributes the
+     * difference between two cumulative figures, which has three consequences
+     * worth stating because none of them survives a rewrite that distributes
+     * `payment * rate` directly:
+     *
+     * - the parts sum to exactly `interest` at settlement, since the last
+     *   difference is taken against the whole debt and integer truncation
+     *   cancels rather than accumulating;
+     * - a borrower therefore cannot change what the pool distributes by
+     *   choosing how to split their payments. The per-share accumulator below
+     *   is the one place a split is not quite free: it divides by
+     *   `totalContributions` once per payment, so instalments leave up to one
+     *   wei-per-share of dust each. Always downwards, and the same dust a
+     *   single repayment already leaves once;
+     * - a lender who deposits between two instalments earns from the later one
+     *   and not the earlier, which is the same rule the accumulator already
+     *   enforces for whole repayments.
+     *
+     * A pool with no contributions left at all — every member having withdrawn
+     * while the loan was out — has no one to share with, and that payment's
      * interest stays in the contract as it did before distribution existed.
      */
     function repayLoan(
@@ -1006,54 +1083,99 @@ contract LendingPool is
             revert UnauthorizedBorrower();
         }
 
+        // Before `isRepaid`, because a request that was never funded is not a
+        // debt that happens to be unpaid — see `LoanNotDisbursed`. Loans made
+        // before `status` existed read `Disbursed`, which is what they all were.
+        if (loan.status != LoanStatus.Disbursed) {
+            revert LoanNotDisbursed();
+        }
+
         if (loan.isRepaid) {
             revert LoanAlreadyRepaid();
         }
 
-        uint256 interest = Math.mulDiv(loan.amount, loan.interestRate, 10000);
-        uint256 totalRepayment = loan.amount + interest;
+        if (msg.value == 0) revert InvalidAmount();
 
-        if (msg.value < totalRepayment) revert InsufficientRepaymentAmount();
+        uint256 interest = Math.mulDiv(loan.amount, loan.interestRate, 10000);
+        uint256 totalOwed = loan.amount + interest;
+        uint256 paidBefore = loan.amountRepaid;
+        uint256 outstanding = totalOwed - paidBefore;
+
+        uint256 payment = msg.value < outstanding ? msg.value : outstanding;
+        uint256 paidAfter = paidBefore + payment;
+
+        // The interest carried by this payment, as a difference of cumulative
+        // shares. Taking `payment * interest / totalOwed` on its own instead
+        // would drop a wei per instalment and leave the last lender short.
+        uint256 interestShare = Math.mulDiv(paidAfter, interest, totalOwed) -
+            Math.mulDiv(paidBefore, interest, totalOwed);
 
         // Complete all state changes before external call (CEI pattern)
-        loan.isRepaid = true;
-        // Free, in the sense that matters: same slot as `isRepaid`, so this is
-        // the same write. It is also the only record that a repayment happened
-        // at a particular moment — `LoanRepaid` carries no timestamp, and a log
-        // is not something a later reader can ask the chain for by loan id.
-        loan.repaidAt = uint64(block.timestamp);
-        totalFunds += totalRepayment;
+        loan.amountRepaid = paidAfter;
+        totalFunds += payment;
+
+        bool settled = paidAfter == totalOwed;
+
+        if (settled) _closeLoan(loan, _loanId);
 
         // Share the interest out across the contributions standing behind the
         // loan. The denominator is `totalContributions`, never `totalFunds` —
         // the latter is missing exactly the money that was lent out.
-        if (interest > 0 && totalContributions > 0) {
+        if (interestShare > 0 && totalContributions > 0) {
             accInterestPerShare += Math.mulDiv(
-                interest,
+                interestShare,
                 PRECISION,
                 totalContributions
             );
 
-            emit InterestDistributed(_loanId, interest);
+            emit InterestDistributed(_loanId, interestShare);
         }
+
+        // Emit events before external call
+        emit LoanRepaymentMade(_loanId, msg.sender, payment);
+
+        if (settled) {
+            emit LoanRepaid(_loanId, msg.sender, paidAfter);
+        }
+
+        // Store refund amount for external call
+        uint256 refundAmount = msg.value - payment;
+
+        // Refund any excess payment (external call moved to end)
+        if (refundAmount > 0) {
+            (bool success, ) = payable(msg.sender).call{value: refundAmount}("");
+            if (!success) revert RefundFailed();
+        }
+    }
+
+    /**
+     * @notice Close a fully-paid loan: mark it, date it, free the borrower's slot
+     * @dev
+     *
+     * Reached only when the whole of `amount + interest` is back, which is why
+     * it is a step of its own rather than three lines inside `repayLoan` — a
+     * part-paid loan must go through none of it. Freeing the slot early would
+     * be the costly half: `activeLoanId` is what caps a borrower at one open
+     * loan, so a borrower who paid a wei could open a second.
+     *
+     * @param loan The loan being settled
+     * @param _loanId Its id, needed to check the borrower's lock points here
+     */
+    function _closeLoan(Loan storage loan, uint256 _loanId) private {
+        loan.isRepaid = true;
+        // Free, in the sense that matters: same slot as `isRepaid`, so this is
+        // the same write. It is also the only record that a repayment happened
+        // at a particular moment — `LoanRepaid` carries no timestamp, and a log
+        // is not something a later reader can ask the chain for by loan id. It
+        // dates the *settlement*; the instalments before it are dated by their
+        // `LoanRepaymentMade` logs.
+        loan.repaidAt = uint64(block.timestamp);
 
         // Only clears the lock if this is the tracked loan. A pool upgraded to
         // v2 can hold loans created before `activeLoanId` existed; repaying one
         // of those must not release a lock taken by a newer loan.
         if (activeLoanId[msg.sender] == _loanId) {
             delete activeLoanId[msg.sender];
-        }
-
-        // Emit event before external call
-        emit LoanRepaid(_loanId, msg.sender, totalRepayment);
-
-        // Store refund amount for external call
-        uint256 refundAmount = msg.value > totalRepayment ? msg.value - totalRepayment : 0;
-
-        // Refund any excess payment (external call moved to end)
-        if (refundAmount > 0) {
-            (bool success, ) = payable(msg.sender).call{value: refundAmount}("");
-            if (!success) revert RefundFailed();
         }
     }
 
@@ -1106,9 +1228,12 @@ contract LendingPool is
     }
 
     /**
-     * @notice Calculate loan repayment amount
+     * @notice What a loan costs to settle over its whole life
      * @param _loanId The loan ID to calculate for
-     * @return Total repayment amount including interest
+     * @return Principal plus the whole fixed interest, whatever has been paid
+     * @dev Deliberately unchanged by instalments, so it keeps meaning what it
+     * always meant and every reader of it stays correct. What is still owed
+     * *now* is `outstandingBalance`, and that is the figure to send as `value`.
      */
     function calculateRepaymentAmount(
         uint256 _loanId
@@ -1118,6 +1243,28 @@ contract LendingPool is
 
         uint256 interest = Math.mulDiv(loan.amount, loan.interestRate, 10000);
         return loan.amount + interest;
+    }
+
+    /**
+     * @notice What is left to pay on a loan right now
+     * @param _loanId The loan ID to calculate for
+     * @return The amount `repayLoan` would still credit, in wei
+     * @dev Zero on anything that is not an open debt — a settled loan, a
+     * request nobody has approved, a refused one — rather than the sum such a
+     * loan would owe if it existed. That mirrors the gate in `repayLoan`, so a
+     * caller can send this figure without first working out whether the call
+     * would revert.
+     */
+    function outstandingBalance(
+        uint256 _loanId
+    ) external view returns (uint256) {
+        Loan storage loan = loans[_loanId];
+
+        if (loan.status != LoanStatus.Disbursed || loan.isRepaid) return 0;
+
+        uint256 interest = Math.mulDiv(loan.amount, loan.interestRate, 10000);
+
+        return loan.amount + interest - loan.amountRepaid;
     }
 
     /**

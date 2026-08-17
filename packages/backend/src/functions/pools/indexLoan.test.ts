@@ -7,6 +7,10 @@ jest.mock('../../services/loanIndexer', () => ({
   ...jest.requireActual('../../services/loanIndexer'),
   indexLoansByTxHash: jest.fn(),
 }))
+jest.mock('../../services/loanRepaymentIndexer', () => ({
+  ...jest.requireActual('../../services/loanRepaymentIndexer'),
+  indexLoanRepaymentsByTxHash: jest.fn(),
+}))
 
 // `ACTIVE_CHAIN_CONFIG` reads the environment once, at module load. Set this
 // before the requires below or every case fails on an unconfigured factory.
@@ -16,6 +20,7 @@ process.env.POOL_FACTORY_ADDRESS = FACTORY_ADDRESS
 const { indexLoanHandler } = require('./indexLoan')
 const { getProvider } = require('../../utils/blockchain')
 const { indexLoansByTxHash } = require('../../services/loanIndexer')
+const { indexLoanRepaymentsByTxHash } = require('../../services/loanRepaymentIndexer')
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -43,6 +48,7 @@ function buildLoan(overrides: Partial<ParsedLoan> = {}): ParsedLoan {
     duration: 2_592_000,
     startedAt: STARTED_AT,
     isRepaid: false,
+    amountRepaid: '0',
     status: 'disbursed',
     chainId: SUPPORTED_CHAIN_ID,
     transactionHash: VALID_TX_HASH,
@@ -67,6 +73,10 @@ function resolveWith(loans: ParsedLoan[], stored: boolean[] = loans.map(() => tr
 beforeEach(() => {
   getProvider.mockReturnValue({})
   resolveWith([buildLoan()])
+  // The common case: every loan transaction that is not a repayment. The
+  // helper returns an empty result rather than throwing, so the callable's
+  // counts must be unaffected by it.
+  indexLoanRepaymentsByTxHash.mockResolvedValue({ repayments: [], results: [] })
 })
 
 // ---------------------------------------------------------------------------
@@ -131,6 +141,51 @@ describe('indexLoanHandler', () => {
       const result = await indexLoanHandler(buildRequest() as never)
 
       expect(result.loans[0].isRepaid).toBe(true)
+      expect(result.storedCount).toBe(1)
+    })
+
+    /**
+     * A repayment is the one transaction that produces two kinds of record.
+     *
+     * The app confirms one transaction and asks for it to be indexed; it
+     * should not have to know that an instalment is also its own document in
+     * another collection. So this callable does both.
+     */
+    it('should index the payment alongside the loan it paid down', async () => {
+      resolveWith([buildLoan({ amountRepaid: '2000000000000000000' })])
+      indexLoanRepaymentsByTxHash.mockResolvedValue({
+        repayments: [
+          {
+            loanId: 3,
+            poolId: 7,
+            poolAddress: '0x5FbDB2315678afecb367f032d93F642f64180aa3',
+            borrower: '0x9965507d1a55bcc2695c58ba16fb37d819b0a4dc',
+            amount: '2000000000000000000',
+            chainId: SUPPORTED_CHAIN_ID,
+            transactionHash: VALID_TX_HASH,
+            logIndex: 1,
+            blockNumber: 120,
+            repaidAt: STARTED_AT,
+          },
+        ],
+        results: [{ id: 'r1', loanId: 3, poolId: 7, alreadyIndexed: false, stored: true }],
+      })
+
+      const result = await indexLoanHandler(buildRequest() as never)
+
+      expect(result.loans[0].amountRepaid).toBe('2000000000000000000')
+      expect(result.repayments).toHaveLength(1)
+      expect(result.repayments[0].amount).toBe('2000000000000000000')
+      // Both records count: two documents were written.
+      expect(result.storedCount).toBe(2)
+    })
+
+    it('should return no payments for a transaction that made none', async () => {
+      // Every borrow, approval and rejection. The helper returns an empty
+      // result rather than throwing, so this must not affect the verdict.
+      const result = await indexLoanHandler(buildRequest() as never)
+
+      expect(result.repayments).toEqual([])
       expect(result.storedCount).toBe(1)
     })
 

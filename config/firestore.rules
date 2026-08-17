@@ -106,6 +106,18 @@ service cloud.firestore {
       allow write: if false; // backend-only (loan indexer)
     }
 
+    // --- loan_repayments ---------------------------------------------------
+    // Payments towards loans, indexed from on-chain LoanRepaymentMade events.
+    // Append-only like contributions rather than mutable like the loan itself:
+    // a loan can be paid in instalments, and each payment is one immutable log
+    // with a date and a transaction of its own. Governed identically.
+
+    match /loan_repayments/{repaymentId} {
+      allow get: if isSignedIn();
+      allow list: if isSignedIn() && request.query.limit <= 100; // mirrors listLoanRepayments' own cap
+      allow write: if false; // backend-only (loan repayment indexer)
+    }
+
     // --- memberships -------------------------------------------------------
     // Pool memberships indexed from the on-chain register. Mutable like loans —
     // one document per pool and address, rewritten by every decision — and

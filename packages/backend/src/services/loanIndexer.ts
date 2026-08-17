@@ -29,7 +29,24 @@ export interface ParsedLoan {
   duration: number
   startedAt: Date
   isRepaid: boolean
-  /** When the repayment landed. Undefined while the loan is outstanding. */
+  /**
+   * How much of `amount + interest` has been paid back, in wei as a decimal
+   * string.
+   *
+   * The running total the chain holds now, not this event's payment — a loan
+   * can be settled in instalments, and each of those is its own record in
+   * `loan_repayments`. Reads `'0'` on a loan written before the field existed,
+   * which is right for an outstanding one and wrong-but-harmless for a settled
+   * one, since `isRepaid` is what anything asking "is this closed" reads.
+   */
+  amountRepaid: string
+  /**
+   * When the loan was **settled**. Undefined while any of it is still owed.
+   *
+   * Not "when a payment last arrived": earlier instalments are dated by their
+   * own `LoanRepaymentMade` logs, and this is stamped only by the payment that
+   * closes the debt.
+   */
   repaidAt?: Date
   status: LoanStatus
   chainId: number
@@ -67,7 +84,7 @@ export interface IndexLoanResult {
  * Named for the state arrived at, not the event observed, because the event is
  * deliberately not consulted anywhere in this indexer — `getLoan` is.
  */
-export type LoanTransition = 'requested' | 'disbursed' | 'rejected' | 'repaid' | null
+export type LoanTransition = 'requested' | 'disbursed' | 'rejected' | 'repayment' | 'repaid' | null
 
 /** The wire form of `LendingPool.LoanStatus`. */
 export type LoanStatus = 'disbursed' | 'requested' | 'rejected'
@@ -88,15 +105,28 @@ export const LOAN_REPAID_TOPIC = lendingPoolInterface.getEvent('LoanRepaid')!.to
 export const LOAN_REQUESTED_TOPIC = lendingPoolInterface.getEvent('LoanRequested')!.topicHash
 export const LOAN_APPROVED_TOPIC = lendingPoolInterface.getEvent('LoanApproved')!.topicHash
 export const LOAN_REJECTED_TOPIC = lendingPoolInterface.getEvent('LoanRejected')!.topicHash
+export const LOAN_REPAYMENT_MADE_TOPIC = lendingPoolInterface.getEvent('LoanRepaymentMade')!.topicHash
 
 /**
  * Every event that touches a loan.
  *
- * All five are treated identically: the log says *which* loan changed and
+ * All six are treated identically: the log says *which* loan changed and
  * `getLoan` says what it now is, so nothing downstream branches on which one
  * arrived.
+ *
+ * `LoanRepaymentMade` has to be in here even though it has its own collection:
+ * a payment that does not settle the loan emits **only** that event, so leaving
+ * it out would let `amountRepaid` sit at zero on the loan record until some
+ * later event happened to touch it.
  */
-export const LOAN_TOPICS = [LOAN_CREATED_TOPIC, LOAN_REPAID_TOPIC, LOAN_REQUESTED_TOPIC, LOAN_APPROVED_TOPIC, LOAN_REJECTED_TOPIC] as const
+export const LOAN_TOPICS = [
+  LOAN_CREATED_TOPIC,
+  LOAN_REPAID_TOPIC,
+  LOAN_REQUESTED_TOPIC,
+  LOAN_APPROVED_TOPIC,
+  LOAN_REJECTED_TOPIC,
+  LOAN_REPAYMENT_MADE_TOPIC,
+] as const
 
 /** `getPoolId` returns 0 for an unknown address — pool ids start at 1. */
 const UNKNOWN_POOL_ID = 0
@@ -149,6 +179,7 @@ export async function fetchLoan(
     duration: Number(loan.duration),
     startedAt: new Date(Number(loan.startTime) * 1000),
     isRepaid: loan.isRepaid as boolean,
+    amountRepaid: (loan.amountRepaid as bigint).toString(),
     // Read from state like everything else here, rather than taken from the
     // `LoanRepaid` log's block. That is what makes it survive a re-scan: the
     // sweep sees `LoanCreated` on every pass, and a timestamp derived from
@@ -168,6 +199,7 @@ interface StoredLoan {
   status?: LoanStatus
   startedAt?: Timestamp
   repaidAt?: Timestamp
+  amountRepaid?: string
   blockNumber?: number
 }
 
@@ -219,16 +251,34 @@ function transitionOf(stored: StoredLoan | undefined, loan: ParsedLoan): LoanTra
   // transaction and there was never a request to observe.
   //
   // A stored record with no `status` counts as absent: it was written before
-  // the field existed, and it has no previous state to have moved from.
+  // the field existed, and it has no previous state to have moved from. The
+  // news is the loan, not any instalment already paid against it.
   if (!stored?.status) return loan.status
 
-  if (stored.status === loan.status) return null
+  if (stored.status === loan.status) {
+    // Money arrived without closing the debt — a state the loan record could
+    // not be in until instalments existed, and one that has to be told apart
+    // from the reference-tidying write this function exists to silence.
+    //
+    // Gated on the loan still being open, because a record written before
+    // `amountRepaid` existed reads it as absent: without the gate, the first
+    // sweep after the upgrade would announce a payment on every settled loan
+    // in the index.
+    if (!loan.isRepaid && paidMoreThan(stored, loan)) return 'repayment'
+
+    return null
+  }
 
   // `requested` is the only state anything moves out of: a disbursed loan is
   // settled by repayment, which is handled above, and a rejected one is final.
   if (stored.status !== 'requested') return null
 
   return loan.status
+}
+
+/** Whether the chain has been paid more towards this loan than the record knows. */
+function paidMoreThan(stored: StoredLoan, loan: ParsedLoan): boolean {
+  return BigInt(loan.amountRepaid) > BigInt(stored.amountRepaid ?? '0')
 }
 
 /**
@@ -281,10 +331,16 @@ export async function indexLoan(loan: ParsedLoan, firestore: Firestore): Promise
   // so comparing that alone would leave the record stuck at `requested`
   // forever; and a record written before `repaidAt` existed has to be allowed
   // to pick it up rather than being reported as already current.
+  //
+  // `amountRepaid` is here for the sharpest version of that: an instalment
+  // moves *only* this field — same status, same `isRepaid`, same dates — so
+  // without it a part payment would be reported as already indexed and the
+  // record would keep claiming the whole debt is outstanding.
   if (
     stored &&
     stored.isRepaid === loan.isRepaid &&
     stored.status === loan.status &&
+    (stored.amountRepaid ?? '0') === loan.amountRepaid &&
     millisOf(stored.repaidAt) === loan.repaidAt?.getTime() &&
     millisOf(stored.startedAt) === loan.startedAt.getTime() &&
     // A record whose state is right but whose reference points at a later
@@ -311,6 +367,7 @@ export async function indexLoan(loan: ParsedLoan, firestore: Firestore): Promise
       duration: loan.duration,
       startedAt: loan.startedAt,
       isRepaid: loan.isRepaid,
+      amountRepaid: loan.amountRepaid,
       // Omitted rather than written as undefined while the loan is
       // outstanding: Firestore rejects an undefined value, and under `merge`
       // an absent key leaves whatever is already there — which is what a

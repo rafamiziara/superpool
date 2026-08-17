@@ -76,12 +76,16 @@ function buildLog(overrides: Partial<{ topic: string; loanId: number; address: s
   }
 }
 
-function buildChainLoan(overrides: Partial<{ isRepaid: boolean; amount: bigint; status: number; repaidAt: number }> = {}) {
+function buildChainLoan(
+  overrides: Partial<{ isRepaid: boolean; amount: bigint; status: number; repaidAt: number; amountRepaid: bigint }> = {}
+) {
   return {
     borrower: BORROWER,
     isRepaid: overrides.isRepaid ?? false,
     // Seconds, and 0 for a loan nobody has repaid — the contract's own zero.
     repaidAt: BigInt(overrides.repaidAt ?? 0),
+    // The running total, in wei. 0 on a loan nobody has paid towards.
+    amountRepaid: overrides.amountRepaid ?? 0n,
     amount: overrides.amount ?? 5_000_000_000_000_000_000n,
     interestRate: 500n,
     startTime: BigInt(START_TIME),
@@ -104,6 +108,8 @@ function buildFirestore(
     storedRepaidAt?: Date
     storedStartedAt?: Date
     storedBlockNumber?: number
+    /** `null` writes no `amountRepaid` at all — a record from before the field existed. */
+    storedAmountRepaid?: string | null
   } = {}
 ) {
   const {
@@ -113,11 +119,13 @@ function buildFirestore(
     storedRepaidAt,
     storedStartedAt = new Date(START_TIME * 1000),
     storedBlockNumber = 120,
+    storedAmountRepaid = '0',
   } = options
   const mockSet = jest.fn().mockResolvedValue(undefined)
   const storedData = {
     isRepaid: storedIsRepaid,
     status: storedStatus,
+    ...(storedAmountRepaid === null ? {} : { amountRepaid: storedAmountRepaid }),
     startedAt: timestampOf(storedStartedAt),
     blockNumber: storedBlockNumber,
     ...(storedRepaidAt ? { repaidAt: timestampOf(storedRepaidAt) } : {}),
@@ -148,6 +156,7 @@ const parsedLoan = {
   duration: 2_592_000,
   startedAt: new Date(START_TIME * 1000),
   isRepaid: false,
+  amountRepaid: '0',
   status: 'disbursed' as const,
   chainId: CHAIN_ID,
   transactionHash: TX_HASH,
@@ -226,6 +235,8 @@ describe('fetchLoan', () => {
       duration: 2_592_000,
       startedAt: new Date(START_TIME * 1000),
       isRepaid: false,
+      amountRepaid: '0',
+      repaidAt: undefined,
       status: 'disbursed',
     })
   })
@@ -299,12 +310,58 @@ describe('indexLoan', () => {
   })
 
   it('should write nothing on a repeated repayment either', async () => {
-    const { mockFs, mockDocRef } = buildFirestore({ exists: true, storedIsRepaid: true, storedRepaidAt: REPAID_AT })
+    const { mockFs, mockDocRef } = buildFirestore({
+      exists: true,
+      storedIsRepaid: true,
+      storedRepaidAt: REPAID_AT,
+      storedAmountRepaid: '5250000000000000000',
+    })
 
-    const result = await indexLoan({ ...parsedLoan, isRepaid: true, repaidAt: REPAID_AT }, mockFs)
+    const result = await indexLoan({ ...parsedLoan, isRepaid: true, repaidAt: REPAID_AT, amountRepaid: '5250000000000000000' }, mockFs)
 
     expect(mockDocRef.set).not.toHaveBeenCalled()
     expect(result.stored).toBe(false)
+  })
+
+  /**
+   * The sharpest case the currency check has to catch.
+   *
+   * An instalment moves `amountRepaid` and nothing else: same status, same
+   * `isRepaid`, same `startedAt`, same block ordering. Every other field the
+   * comparison looks at already matches, so without this one the record would
+   * be reported as current and keep claiming the whole debt is outstanding.
+   */
+  it('should rewrite a loan that has been paid down without being settled', async () => {
+    const { mockFs, mockDocRef } = buildFirestore({ exists: true, storedIsRepaid: false, storedAmountRepaid: '0' })
+
+    const result = await indexLoan({ ...parsedLoan, amountRepaid: '2000000000000000000' }, mockFs)
+
+    expect(mockDocRef.set).toHaveBeenCalledWith(expect.objectContaining({ amountRepaid: '2000000000000000000', isRepaid: false }), {
+      merge: true,
+    })
+    expect(result).toMatchObject({ alreadyIndexed: false, stored: true })
+  })
+
+  it('should let a record written before instalments existed pick the total up', async () => {
+    const { mockFs, mockDocRef } = buildFirestore({ exists: true, storedIsRepaid: false, storedAmountRepaid: null })
+
+    const result = await indexLoan({ ...parsedLoan, amountRepaid: '2000000000000000000' }, mockFs)
+
+    expect(mockDocRef.set).toHaveBeenCalledWith(expect.objectContaining({ amountRepaid: '2000000000000000000' }), { merge: true })
+    expect(result.stored).toBe(true)
+  })
+
+  it('should not take the reference from a payment, which does not move the loan’s date', async () => {
+    // Same rule `LoanRepaid` follows: the record points at the transaction that
+    // put the loan into the dating it carries, and an instalment is a later
+    // block that leaves `startTime` alone.
+    const { mockFs, mockDocRef } = buildFirestore({ exists: true, storedIsRepaid: false, storedBlockNumber: 120 })
+
+    await indexLoan({ ...parsedLoan, amountRepaid: '2000000000000000000', transactionHash: OTHER_TX_HASH, blockNumber: 400 }, mockFs)
+
+    const written = mockDocRef.set.mock.calls[0][0]
+    expect(written).not.toHaveProperty('transactionHash')
+    expect(written).not.toHaveProperty('blockNumber')
   })
 
   describe('repaidAt', () => {
@@ -607,10 +664,77 @@ describe('indexLoan transitions', () => {
       storedStatus: 'disbursed',
       storedIsRepaid: true,
       storedRepaidAt: REPAID_AT,
+      storedAmountRepaid: '5250000000000000000',
     })
 
-    const result = await indexLoan({ ...parsedLoan, isRepaid: true, repaidAt: REPAID_AT }, mockFs)
+    const result = await indexLoan({ ...parsedLoan, isRepaid: true, repaidAt: REPAID_AT, amountRepaid: '5250000000000000000' }, mockFs)
 
+    expect(result.transition).toBeNull()
+  })
+
+  /**
+   * An instalment moves the loan without settling it — a state the record
+   * could not be in until `repayLoan` accepted part payments.
+   */
+  it('reports a payment that does not close the debt', async () => {
+    const { mockFs } = buildFirestore({ exists: true, storedStatus: 'disbursed', storedIsRepaid: false, storedAmountRepaid: '0' })
+
+    const result = await indexLoan({ ...parsedLoan, amountRepaid: '2000000000000000000' }, mockFs)
+
+    expect(result.transition).toBe('repayment')
+  })
+
+  it('reports the settlement, not a payment, on the instalment that finishes it', async () => {
+    // Both are true of the last payment. The debt ending is the larger fact
+    // and the one anything downstream is waiting on.
+    const { mockFs } = buildFirestore({
+      exists: true,
+      storedStatus: 'disbursed',
+      storedIsRepaid: false,
+      storedAmountRepaid: '2000000000000000000',
+    })
+
+    const result = await indexLoan({ ...parsedLoan, isRepaid: true, repaidAt: REPAID_AT, amountRepaid: '5250000000000000000' }, mockFs)
+
+    expect(result.transition).toBe('repaid')
+  })
+
+  it('reports nothing when the same instalment is swept twice', async () => {
+    const { mockFs } = buildFirestore({
+      exists: true,
+      storedStatus: 'disbursed',
+      storedIsRepaid: false,
+      storedAmountRepaid: '2000000000000000000',
+    })
+
+    const result = await indexLoan({ ...parsedLoan, amountRepaid: '2000000000000000000' }, mockFs)
+
+    expect(result).toMatchObject({ alreadyIndexed: true, stored: false, transition: null })
+  })
+
+  /**
+   * The backfill trap.
+   *
+   * A record written before the contract counted instalments has no
+   * `amountRepaid` at all, so the first sweep afterwards sees the chain
+   * reporting the full sum against an absent field. On a settled loan that is
+   * not news — it was already known to be repaid — and announcing a payment
+   * for every settled loan in the index is what the gate on `isRepaid`
+   * prevents.
+   */
+  it('reports nothing when a settled loan picks up a total it never stored', async () => {
+    const { mockFs, mockDocRef } = buildFirestore({
+      exists: true,
+      storedStatus: 'disbursed',
+      storedIsRepaid: true,
+      storedRepaidAt: REPAID_AT,
+      storedAmountRepaid: null,
+    })
+
+    const result = await indexLoan({ ...parsedLoan, isRepaid: true, repaidAt: REPAID_AT, amountRepaid: '5250000000000000000' }, mockFs)
+
+    // The write happens — the record genuinely gains the field.
+    expect(mockDocRef.set).toHaveBeenCalledWith(expect.objectContaining({ amountRepaid: '5250000000000000000' }), { merge: true })
     expect(result.transition).toBeNull()
   })
 

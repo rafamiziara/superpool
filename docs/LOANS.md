@@ -17,9 +17,10 @@ loanIndexer               → reads getLoan, writes one document per loan
 listLoans                 → the app derives its Loan shape from it
 ```
 
-Repaying takes the same path with `repayLoan` and `LoanRepaid`, and lands on the
-**same document**. So do the four approval calls below — one document per loan,
-whatever moved it.
+Repaying takes the same path with `repayLoan`, and lands on the **same
+document**. So do the four approval calls below — one document per loan,
+whatever moved it. A repayment also writes a second, separate record; see
+[Paying in instalments](#paying-in-instalments).
 
 ## Two ways a pool lends
 
@@ -138,23 +139,24 @@ the request ended up, not who ended it.
 
 ## The contract still implements less than the UI describes
 
-`Loan` in `@superpool/types` is closer than it was — the approval step is real
-now — but three gaps remain:
+`Loan` in `@superpool/types` is closer than it was — the approval step is real,
+and so is partial repayment — but two gaps remain:
 
 | The app's model        | The contract                                                       |
 | ---------------------- | ------------------------------------------------------------------ |
-| `amountRepaid` grows   | `repayLoan` demands the **full** sum; it is 0 or everything        |
 | `interestAccrued`      | flat `amount × rate / 10000`, fixed at disbursement, never accrues |
 | `dueDate`, `DEFAULTED` | `startTime + duration` is stored; **nothing on chain enforces it** |
 
-`repaidAt` is no longer one of them — see [Borrowing history](#borrowing-history).
+`repaidAt` is no longer one of them — see [Borrowing history](#borrowing-history)
+— and neither is `amountRepaid`, which is a real running total on chain now.
+See [Paying in instalments](#paying-in-instalments).
 
 `LoanStatus.APPROVED` never occurs either: approval disburses in the same
 transaction, so an approved loan is already `DISBURSED`.
 
 **`isRepaid` only means anything once the loan was funded.** It is `false` on a
-request that is still waiting and on one that was turned down, neither of which
-is a debt. Anything that reads it without checking `status` first treats a
+request that is still waiting, on one that was turned down, and on a loan that
+has been paid down but not settled — none of which is a closed debt. Anything that reads it without checking `status` first treats a
 request as an outstanding loan — which is exactly the bug `activeLoanFor` had.
 `PoolStore` reads `status` first everywhere now:
 
@@ -178,6 +180,103 @@ disbursed rather than pretending to know them.
 **Interest does not accrue**, which is worth repeating because it is
 counter-intuitive: repaying on day 1 costs exactly what repaying on day 30 does.
 `BorrowForm` states the total before the user signs for that reason.
+
+## Paying in instalments
+
+`repayLoan` takes any amount above zero and credits it against
+`amount + interest`. Before this it demanded the exact total, so a borrower who
+could pay half could pay nothing — `isRepaid` was a bool and there was nowhere
+to record half.
+
+```solidity
+uint256 public amountRepaid;   // appended to Loan
+function outstandingBalance(uint256 _loanId) external view returns (uint256);
+event LoanRepaymentMade(uint256 indexed loanId, address indexed borrower, uint256 indexed amount);
+```
+
+**`isRepaid` still says whether the debt is closed**; `amountRepaid` says only
+how far along it is. The two are redundant only at the ends, and every caller
+asking "does this wallet owe money" wants the first.
+
+Four rules the whole design rests on:
+
+- **The loan closes on the payment that finishes it, and not before.** That one
+  write sets `isRepaid`, stamps `repaidAt` and releases `activeLoanId`.
+  Releasing the lock earlier is the expensive mistake available here: it is what
+  caps a borrower at one open loan, so a borrower who paid a wei could open a
+  second.
+- **Interest is shared out in proportion to what has been paid**, as a
+  difference of two cumulative figures rather than `payment × rate`. The parts
+  therefore sum to exactly the interest a single payment produces, so a borrower
+  cannot change what the pool distributes by choosing how to split. The
+  per-share accumulator is the one place a split is not quite free — it divides
+  by `totalContributions` once per payment — and the loss is bounded by one wei
+  per payment, always downwards. Live-verified: four instalments credited a 40
+  POL lender 120 wei less than one payment would, on a full POL of interest.
+- **Overpaying is refunded** down to what is owed, so "pay in full" is safe
+  against a balance that moved between the read and the send.
+- **A request is not a debt.** `repayLoan` refuses anything whose status is not
+  `Disbursed` with `LoanNotDisbursed`. Both checks it used to make — the
+  borrower matches, `isRepaid` is false — pass on a request nobody approved and
+  on one that was turned down, so either could be "repaid": money taken, the
+  record marked settled, and nothing ever lent. Nothing in the app routes there,
+  which is exactly why the contract has to be the one to refuse.
+
+`calculateRepaymentAmount` and `outstandingBalance` are **not** the same figure
+and both are worth having. The first is the loan's lifetime cost and never
+moves, so everything that read it stayed correct; the second is what is owed now
+and is what to send as `value`. `outstandingBalance` returns 0 for anything that
+is not an open debt — a settled loan, a request, a refusal — mirroring the gate
+in `repayLoan`, so a caller can send it without first working out whether the
+call would revert.
+
+### An instalment is a log; a loan is not
+
+This is why repayments got a collection of their own, `loan_repayments`, keyed
+`${chainId}-${txHash}-${logIndex}` like contributions and withdrawals.
+
+The loan record cannot answer when a payment arrived or which transaction
+carried it: it holds a running total, a single `transactionHash` belonging to
+the disbursement, and one `repaidAt` that dates only the payment which closed
+the debt. A loan settled in four transactions has four dates and four hashes,
+and three of them have nowhere else to live.
+
+So the two records are both needed and neither derives from the other:
+
+| Question                      | Read                                    |
+| ----------------------------- | --------------------------------------- |
+| How much is still owed?       | the loan's `amountRepaid`               |
+| When did each payment arrive? | `loan_repayments`                       |
+| Was this request rejected?    | the loan — payments never see a refusal |
+
+`LoanRepaymentMade` is in `LOAN_TOPICS` **as well as** having its own sweep, so
+those logs are read twice on purpose. A payment that does not settle the loan
+emits nothing else, so leaving it out of `LOAN_TOPICS` would let `amountRepaid`
+sit at zero until some later event happened to touch the record. Same deliberate
+duplication `MemberJoined` has.
+
+`LoanRepaid` still fires only on settlement and still carries the whole debt, so
+everything reading it as "this loan is over" stayed correct. The settling
+payment emits both: money moved, and the debt ended, which are different facts
+the moment a loan can be paid in parts.
+
+Two more that are easy to get wrong:
+
+- **An instalment moves `amountRepaid` and nothing else** — same status, same
+  `isRepaid`, same dates, same block ordering. The indexer's currency check has
+  to compare it, or a part payment is reported as already indexed and the record
+  keeps claiming the whole debt is outstanding. Found live.
+- **A payment must not take the transaction reference.** It moves the loan
+  without moving its date, exactly as `LoanRepaid` does, so `datesTheLoan`
+  already holds it back — a settled loan must not show its disbursement date
+  beside a link to a repayment.
+
+The indexers report a `repayment` transition for a payment that leaves the debt
+open, distinct from `repaid`. Nothing notifies on it; it exists so that "the
+record was written" and "nothing happened worth telling anybody" stay separable.
+It is gated on the loan still being open, because a record written before
+`amountRepaid` existed reads it as absent — without the gate, the first sweep
+after the upgrade would announce a payment on every settled loan in the index.
 
 ## Borrowing rules, and where each is enforced
 
@@ -328,33 +427,32 @@ pushed forward — which is exactly what producing a late repayment requires.
 
 `PoolStore.loanActivity` puts loans in the same feed as contributions and
 withdrawals. A contribution is a log and dates itself; a loan is an entity with a
-single transaction hash, so it is **expanded into the events that can be dated**
-— one row, or two.
+single transaction hash, so it is **expanded into the events that can be dated**.
 
 - A `requested` loan is a row awaiting a decision. `TransactionStatus.PENDING`
   there means "waiting on the owner", not "not yet mined" as it does everywhere
   else: a request is on chain the moment it is made.
 - A `disbursed` loan is money leaving the pool, dated when it did.
-- A **repaid** loan adds a second row, dated `repaidAt`, for the money coming
-  back. The disbursement row stays: both things happened, at different times.
 - `rejected` and cancelled requests are left out. Nothing moved, the request is
   over, and `TransactionType` has no member that says so.
 
-Two things about the repayment row:
+**Money coming back is not derived here any more.** It used to be: one row per
+settled loan, dated `repaidAt`, carrying the whole debt — exactly right while
+`repayLoan` demanded the full sum in one transaction, and wrong in three ways
+the moment it stopped. Instalments before the last would produce no row, the
+last would claim the whole amount, and all of them would be filed at the
+settlement date.
 
-- **It carries no `txHash` or `blockNumber`.** `LoanRepaid` is not stored as its
-  own record, so the only hash on hand is the one that _created_ the loan.
-  Linking a repayment to the borrow is worse than offering no link, and
-  `Transaction` makes both fields optional for exactly this.
-- **An undated repayment produces no row at all.** `isRepaid` is the authority on
-  _whether_ and `repaidAt` only on _when_, so a loan settled before the contract
-  stamped a date has no honest position in a feed ordered by time — reusing
-  `startedAt` would file it at the moment the money went the other way.
-  `borrowerHistory` draws the same line, counting those as `undated` rather than
-  guessing.
+`PoolStore.loanRepaymentActivity` reads the indexed `LoanRepaymentMade` records
+instead, one row per payment. Unlike every other loan row these carry a real
+`txHash` and `blockNumber` — the payment's own — where the derived row had to
+carry none, because the only hash on hand belonged to the borrow.
 
-Its amount is principal plus the whole fixed interest — the sum `repayLoan`
-demands in one transaction, since the rate does not accrue.
+An undated repayment no longer disappears either. It used to have no honest
+position in a feed ordered by time; now every payment is dated by its own block.
+`borrowerHistory` still counts a loan settled before the contract stamped
+`repaidAt` as `undated`, because that is a question about the loan and not about
+a payment.
 
 ### The sign depends on whose feed it is
 
@@ -381,7 +479,7 @@ The default is `pool`, the only safe answer for a feed nobody has narrowed.
 
 ## Traps
 
-- **All five loan events carry the same three `indexed` parameters**, so
+- **All six loan events carry the same three `indexed` parameters**, so
   `log.data` is empty and `loanId` is `topics[1]`. The indexer reads it from
   there rather than decoding, and one extractor serves every action — but only
   if every event name is in the list it tries. A missing name yields no result,
@@ -405,7 +503,12 @@ The default is `pool`, the only safe answer for a feed nobody has narrowed.
   ABI, so a sweep silently skips them. Verified live.
 - **`calculateRepayment` in `useLoan` must agree with the contract's
   `calculateRepaymentAmount`.** Verified live: both give 4.3 POL for 4 POL at
-  750 bps, and 4.2 for 4 POL at 500 bps.
+  750 bps, and 4.2 for 4 POL at 500 bps. Note that is the _lifetime_ cost;
+  what to send is that minus `amountRepaid`, and `outstandingBalance` is the
+  chain's own answer.
+- **`UnauthorizedBorrower` is checked before `LoanNotDisbursed`**, so paying
+  towards someone else's request reports the wrong loan rather than the wrong
+  state. Both revert; only the wording differs.
 
 ## Known limitations
 
@@ -421,9 +524,10 @@ The default is `pool`, the only safe answer for a feed nobody has narrowed.
   happens when it passes — there is no liquidation, no penalty, no default.
 - **A request never expires.** If the owner simply never decides, only the
   borrower's own `cancelLoanRequest` frees their slot.
-- **Interest reaches the pool but never the members.** `repayLoan` adds
-  principal plus interest to `totalFunds`, but a member can only ever withdraw
-  what they put in, so `totalEarned` is 0 for everyone. See `CONTRIBUTIONS.md`.
+- **No minimum payment, and no schedule.** Any amount above zero is accepted,
+  and nothing requires a borrower to make progress — a loan can sit part-paid
+  indefinitely, holding its borrower's one slot in the pool. That is the same
+  gap as the unenforced term above, not a separate one.
 - **The `loans` composite indexes are declared in
   `config/firestore.indexes.json`.** The emulator does not enforce them, so a
   query that works locally can still need an index in production.
@@ -434,6 +538,11 @@ Same environment as pool creation — see
 [`POOL_CREATION.md`](POOL_CREATION.md#running-it-locally). Borrowing needs a
 pool behind the beacon that you have contributed to; `pnpm --filter backend
 testSweep` reports loans alongside the other feeds.
+
+`pnpm --filter backend testPartial` drives three loans through the node — one
+settled in four uneven instalments, one in a single payment, one left part-paid
+— and checks the running total, one `loan_repayments` document per payment, and
+that a split credits lenders what a lump sum would. 47 checks.
 
 `pnpm --filter backend testHistory` drives four loans through the node — one
 repaid inside its term, one after it, one left running past its due date, one

@@ -6,6 +6,8 @@ import type {
   ListContributionsResponse,
   ListInterestClaimsRequest,
   ListInterestClaimsResponse,
+  ListLoanRepaymentsRequest,
+  ListLoanRepaymentsResponse,
   ListLoansRequest,
   ListLoansResponse,
   ListMembersRequest,
@@ -16,6 +18,7 @@ import type {
   ListWithdrawalsResponse,
   Loan,
   LoanInfo,
+  LoanRepaymentInfo,
   MemberInfo,
   PoolInfo,
   PoolMember,
@@ -69,16 +72,32 @@ function isOutstanding(loan: LoanInfo): boolean {
 }
 
 /**
- * What settling this loan costs: principal plus the whole fixed interest.
+ * What this loan costs to settle over its whole life: principal plus the whole
+ * fixed interest.
  *
  * `interestRate` is basis points and does not accrue — it is fixed at
- * disbursement — so this is the exact sum `repayLoan` demands, in one
- * transaction, rather than a figure that depends on when it is asked.
+ * disbursement — so this figure never depends on when it is asked. It is the
+ * lifetime total and not a bill: what is still owed is `remainingBalance`,
+ * since a loan can be paid down in instalments.
  */
 function repaymentTotal(loan: LoanInfo): bigint {
   const principal = BigInt(loan.amount)
 
   return principal + (principal * BigInt(loan.interestRate)) / 10_000n
+}
+
+/**
+ * What is still owed on a loan.
+ *
+ * The figure to offer as a repayment and the one to call a debt. Zero once the
+ * loan is settled, and — deliberately — also zero on anything that is not an
+ * open debt, mirroring the contract's `outstandingBalance`: a request nobody
+ * approved owes nothing, however much it asked for.
+ */
+function remainingBalance(loan: LoanInfo): bigint {
+  if (!isOutstanding(loan)) return 0n
+
+  return repaymentTotal(loan) - BigInt(loan.amountRepaid)
 }
 
 /**
@@ -136,6 +155,16 @@ export class PoolStore {
    * people's repayments and emits nothing per member.
    */
   claimableByPool: Record<number, string> = {}
+  /**
+   * Payments made towards loans, newest first.
+   *
+   * Its own feed rather than a field on the loan, because a loan can be paid
+   * down in instalments and only the payment that settles it is dated on the
+   * loan record. Without these the activity feed could show one row for a debt
+   * that came back in four transactions, at the wrong time and for the wrong
+   * amount.
+   */
+  loanRepayments: LoanRepaymentInfo[] = []
   /** Indexed loans, newest first. Mock fixtures stand in only in mock mode. */
   loanRecords: LoanInfo[] = []
   /**
@@ -248,6 +277,7 @@ export class PoolStore {
       this.interestClaims = []
       this.claimableByPool = {}
       this.loanRecords = []
+      this.loanRepayments = []
       this.memberRecords = []
       this.transactions = []
       this.isLoading = false
@@ -268,21 +298,23 @@ export class PoolStore {
       // Fetched together so pools and the positions in them are one snapshot:
       // a balance shown against a pool that is not in the list, or vice versa,
       // reads as a bug even though each half was individually correct.
-      const [pools, contributions, withdrawals, claims, loans, members]: [
+      const [pools, contributions, withdrawals, claims, loans, repayments, members]: [
         PoolInfo[],
         ContributionInfo[],
         WithdrawalInfo[],
         InterestClaimInfo[],
         LoanInfo[],
+        LoanRepaymentInfo[],
         MemberInfo[],
       ] = usingMockPools()
-        ? [MOCK_POOLS, [], [], [], [], []]
+        ? [MOCK_POOLS, [], [], [], [], [], []]
         : await Promise.all([
             this.requestPools(params),
             this.requestContributions(params),
             this.requestWithdrawals(params),
             this.requestInterestClaims(params),
             this.requestLoans(params),
+            this.requestLoanRepayments(params),
             this.requestMembers(params),
           ])
 
@@ -292,6 +324,7 @@ export class PoolStore {
         this.withdrawals = withdrawals
         this.interestClaims = claims
         this.loanRecords = loans
+        this.loanRepayments = repayments
         this.memberRecords = members
         this.lastFetchedAt = new Date()
         // Activity is derived from contributions when they are real — see
@@ -396,6 +429,26 @@ export class PoolStore {
     })
 
     return response.data.loans ?? []
+  }
+
+  /**
+   * Every payment towards a loan on the chain, not just the user's.
+   *
+   * Unfiltered for the same reason loans are: a pool's page shows money coming
+   * back into it, which is everyone's repayments.
+   */
+  private requestLoanRepayments = async (params: ListPoolsRequest): Promise<LoanRepaymentInfo[]> => {
+    const listLoanRepayments = httpsCallable<ListLoanRepaymentsRequest, ListLoanRepaymentsResponse>(
+      FIREBASE_FUNCTIONS,
+      'listLoanRepayments'
+    )
+
+    const response = await listLoanRepayments({
+      chainId: params.chainId ?? authStore.chainId ?? DEFAULT_CHAIN_ID,
+      limit: DEFAULT_PAGE_SIZE,
+    })
+
+    return response.data.repayments ?? []
   }
 
   /**
@@ -676,17 +729,20 @@ export class PoolStore {
   /**
    * Indexed loans in the app's `Loan` shape.
    *
-   * The contract implements less than this interface describes — no partial
-   * repayment and no accrual — so the mapping is partly about being honest where
-   * it cannot fill a field:
+   * The contract implements less than this interface describes — no accrual, no
+   * default — so the mapping is partly about being honest where it cannot fill
+   * a field:
    *
    * - `status` never reaches `APPROVED` or `DEFAULTED`. Approval disburses in
    *   the same transaction, so an approved loan is already `DISBURSED`, and
    *   nothing on chain marks a loan defaulted.
    * - `interestAccrued` is the whole fixed interest from the moment the loan
    *   exists, because that is genuinely what is owed — it does not grow.
-   * - `amountRepaid` is all or nothing, since `repayLoan` takes the full sum.
    * - `dueDate` is `startedAt + duration`, which nothing on chain enforces.
+   *
+   * `amountRepaid` is no longer one of them: it is the chain's own running
+   * total now, and a loan can genuinely be somewhere between nothing and
+   * everything.
    */
   get loans(): Loan[] {
     if (usingMockPools()) return MOCK_LOANS
@@ -705,7 +761,11 @@ export class PoolStore {
         interestRate: loan.interestRate,
         duration: loan.duration,
         status: loanStatusOf(loan),
-        amountRepaid: isDisbursed && loan.isRepaid ? amount + interest : 0n,
+        // The chain's figure, not a re-derivation of it. Reading `isRepaid` to
+        // decide between 0 and the whole sum — which is what this did while
+        // repayment was all-or-nothing — would report a part-paid loan as
+        // untouched.
+        amountRepaid: isDisbursed ? BigInt(loan.amountRepaid) : 0n,
         interestAccrued: interest,
         requestedAt: startedAt,
         // Approval and disbursement are one moment on chain, and neither has
@@ -896,15 +956,24 @@ export class PoolStore {
   }
 
   /**
-   * Principal currently lent out of one pool, in wei.
+   * What one pool's borrowers still owe it, in wei.
    *
    * Requests are excluded: nothing has moved until an owner approves, so
    * counting them would report liquidity as lent while it is still in the pool.
+   *
+   * Net of instalments already paid, which is the difference from the figure
+   * this reported when repayment was all-or-nothing. Summing principal alone
+   * would keep calling a loan five POL of debt after four of them came back,
+   * while the pool's own liquidity — read from `totalFunds` — had already gone
+   * up by four. The two are shown side by side, so they cannot be allowed to
+   * describe different worlds.
+   *
+   * Principal plus interest, then, rather than principal: what comes back is
+   * one sum, and splitting it to keep this "principal only" would need the
+   * contract's pro-rata rule restated here to no benefit.
    */
   outstandingDebt = (poolId: number): bigint => {
-    return this.loanRecords
-      .filter((loan) => loan.poolId === poolId && isOutstanding(loan))
-      .reduce((sum, loan) => sum + BigInt(loan.amount), 0n)
+    return this.loanRecords.filter((loan) => loan.poolId === poolId).reduce((sum, loan) => sum + remainingBalance(loan), 0n)
   }
 
   /**
@@ -976,23 +1045,14 @@ export class PoolStore {
    *   the badge for a loan, and the alternative is a row that looks settled
    *   while somebody is still waiting on it.
    * - `disbursed` → the funds left the pool, dated when they did.
-   * - **repaid** → a second row, dated `repaidAt`, for the money coming back.
-   *   The disbursement row stays: both things happened, at different times.
    *
-   * The repayment row carries **no `txHash` or `blockNumber`**. The record's
-   * hash is the one that *created* the loan, so reusing it would link a
-   * repayment to the borrow — a wrong explorer link is worse than none, and
-   * `Transaction` makes both optional for exactly this.
-   *
-   * Its amount is principal plus the fixed interest, which is what `repayLoan`
-   * demands in one transaction — the same sum `loans` reports as `amountRepaid`.
-   *
-   * **A repayment with no `repaidAt` produces no row.** `isRepaid` is the
-   * authority on *whether* and this only answers *when*, so a loan settled
-   * before the contract stamped a date cannot be placed in a feed ordered by
-   * time. Inventing one by reusing `startedAt` would file the repayment at the
-   * moment the loan went *out*. `borrowerHistory` draws the same line, counting
-   * those as `undated` rather than guessing.
+   * **Money coming back is not one of them any more.** It used to be derived
+   * here, one row per settled loan dated `repaidAt` and carrying the whole
+   * debt — which was exactly right while `repayLoan` demanded the full sum in
+   * one transaction, and is wrong in three ways once it does not: instalments
+   * before the last would have no row, the last would claim the whole amount,
+   * and every one of them would be filed at the settlement date. Repayments
+   * are their own indexed feed now; see `loanRepaymentActivity`.
    *
    * A rejected or cancelled request is left out. Nothing moved, the request is
    * over, and `TransactionType` has no member that says so — a `LOAN_REQUEST`
@@ -1023,25 +1083,42 @@ export class PoolStore {
         },
       ]
 
-      // `isRepaid` is meaningless on a request, which reads false while nothing
-      // is owed at all.
-      if (!isRequest && loan.isRepaid && loan.repaidAt) {
-        const repaidAt = new Date(loan.repaidAt)
-
-        rows.push({
-          id: `${loan.id}-repayment`,
-          poolId: String(loan.poolId),
-          from: loan.borrower,
-          to: loan.poolAddress,
-          type: TransactionType.LOAN_REPAYMENT,
-          amount: repaymentTotal(loan),
-          status: TransactionStatus.CONFIRMED,
-          createdAt: repaidAt,
-          confirmedAt: repaidAt,
-        })
-      }
-
       return rows
+    })
+  }
+
+  /**
+   * Payments towards loans as activity rows.
+   *
+   * One row per payment, from the indexed `LoanRepaymentMade` logs — so unlike
+   * every other loan row these carry a real `txHash` and `blockNumber`, and
+   * unlike the derived row they replaced they are dated when the money actually
+   * moved rather than when the debt happened to close.
+   *
+   * That is the whole reason the feed exists. A repayment derived from the loan
+   * record could only ever have one date and one amount, and a loan settled in
+   * four transactions has four of each.
+   *
+   * The id is already `${chainId}-${txHash}-${logIndex}`, so it carries over as
+   * the row key unchanged and stays stable across refetches.
+   */
+  get loanRepaymentActivity(): Transaction[] {
+    return this.loanRepayments.map((repayment) => {
+      const repaidAt = new Date(repayment.repaidAt)
+
+      return {
+        id: repayment.id,
+        poolId: String(repayment.poolId),
+        from: repayment.borrower,
+        to: repayment.poolAddress,
+        type: TransactionType.LOAN_REPAYMENT,
+        amount: BigInt(repayment.amount),
+        status: TransactionStatus.CONFIRMED,
+        txHash: repayment.transactionHash,
+        blockNumber: repayment.blockNumber,
+        createdAt: repaidAt,
+        confirmedAt: repaidAt,
+      }
     })
   }
 
@@ -1053,7 +1130,13 @@ export class PoolStore {
    * page; wrong for anything headed "your activity", which wants `myActivity`.
    */
   get recentTransactions(): Transaction[] {
-    return [...this.transactions, ...this.contributionActivity, ...this.withdrawalActivity, ...this.loanActivity]
+    return [
+      ...this.transactions,
+      ...this.contributionActivity,
+      ...this.withdrawalActivity,
+      ...this.loanActivity,
+      ...this.loanRepaymentActivity,
+    ]
       .filter((tx) => tx.status !== TransactionStatus.CANCELLED)
       .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
   }

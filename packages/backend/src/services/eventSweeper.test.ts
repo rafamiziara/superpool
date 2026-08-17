@@ -8,6 +8,12 @@ jest.mock('./eventIndexer')
 jest.mock('./contributionIndexer')
 jest.mock('./withdrawalIndexer')
 jest.mock('./interestClaimIndexer')
+jest.mock('./loanRepaymentIndexer', () => {
+  // Same reasoning as `loanIndexer` below: the topic is real, because the
+  // sweep routes on it.
+  const actual = jest.requireActual('./loanRepaymentIndexer')
+  return { ...actual, indexLoanRepaymentEvent: jest.fn(), parseLoanRepaymentLog: jest.fn() }
+})
 jest.mock('./loanIndexer', () => {
   // The topics are real: the sweep routes on them, and stubbing them would let
   // the test agree with itself rather than with the shipped ABI.
@@ -24,6 +30,7 @@ const { indexContributionEvent, parseFundsDepositedLog, resolvePoolId } = requir
 const { indexWithdrawalEvent, parseFundsWithdrawnLog } = require('./withdrawalIndexer')
 const { indexInterestClaimEvent, parseInterestClaimedLog } = require('./interestClaimIndexer')
 const { indexLoanFromLog, LOAN_CREATED_TOPIC, LOAN_REPAID_TOPIC, LOAN_TOPICS } = require('./loanIndexer')
+const { indexLoanRepaymentEvent, parseLoanRepaymentLog, LOAN_REPAYMENT_MADE_TOPIC } = require('./loanRepaymentIndexer')
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -77,6 +84,7 @@ interface ProviderLogs {
   interestClaims?: object[]
   status?: object[]
   loans?: object[]
+  loanRepayments?: object[]
 }
 
 /**
@@ -90,6 +98,7 @@ function buildMockProvider(logs: ProviderLogs = {}, options: { blockTimestamp?: 
     [FUNDS_DEPOSITED_TOPIC]: logs.deposits ?? [],
     [FUNDS_WITHDRAWN_TOPIC]: logs.withdrawals ?? [],
     [INTEREST_CLAIMED_TOPIC]: logs.interestClaims ?? [],
+    [LOAN_REPAYMENT_MADE_TOPIC]: logs.loanRepayments ?? [],
   }
 
   return {
@@ -146,6 +155,9 @@ beforeEach(() => {
   parseInterestClaimedLog.mockImplementation(() => ({ poolAddress: POOL_ADDRESS, account: '0xabc', amount: '1' }))
   indexInterestClaimEvent.mockResolvedValue({ id: 'i1', poolId: 1, alreadyIndexed: false, stored: true })
 
+  parseLoanRepaymentLog.mockImplementation(() => ({ poolAddress: POOL_ADDRESS, loanId: 1, borrower: '0xabc', amount: '1' }))
+  indexLoanRepaymentEvent.mockResolvedValue({ id: 'r1', loanId: 1, poolId: 1, alreadyIndexed: false, stored: true })
+
   fetchPoolActive.mockResolvedValue(false)
   updatePoolActive.mockResolvedValue(true)
 
@@ -173,7 +185,16 @@ describe('sweepBlockRange', () => {
       const counts = await sweep(provider)
 
       // Assert
-      expect(counts).toEqual({ pools: 2, contributions: 1, withdrawals: 3, interestClaims: 2, loans: 0, memberships: 0, statusUpdates: 0 })
+      expect(counts).toEqual({
+        pools: 2,
+        contributions: 1,
+        withdrawals: 3,
+        interestClaims: 2,
+        loans: 0,
+        loanRepayments: 0,
+        memberships: 0,
+        statusUpdates: 0,
+      })
     })
 
     it('should return zeroes when the range holds no events', async () => {
@@ -184,7 +205,16 @@ describe('sweepBlockRange', () => {
       const counts = await sweep(provider)
 
       // Assert
-      expect(counts).toEqual({ pools: 0, contributions: 0, withdrawals: 0, interestClaims: 0, loans: 0, memberships: 0, statusUpdates: 0 })
+      expect(counts).toEqual({
+        pools: 0,
+        contributions: 0,
+        withdrawals: 0,
+        interestClaims: 0,
+        loans: 0,
+        loanRepayments: 0,
+        memberships: 0,
+        statusUpdates: 0,
+      })
       expect(indexPoolEvent).not.toHaveBeenCalled()
     })
 
@@ -201,7 +231,16 @@ describe('sweepBlockRange', () => {
       const counts = await sweep(provider)
 
       // Assert
-      expect(counts).toEqual({ pools: 0, contributions: 0, withdrawals: 0, interestClaims: 0, loans: 0, memberships: 0, statusUpdates: 0 })
+      expect(counts).toEqual({
+        pools: 0,
+        contributions: 0,
+        withdrawals: 0,
+        interestClaims: 0,
+        loans: 0,
+        loanRepayments: 0,
+        memberships: 0,
+        statusUpdates: 0,
+      })
       expect(indexPoolEvent).toHaveBeenCalledTimes(1)
     })
   })
@@ -283,6 +322,7 @@ describe('sweepBlockRange', () => {
       ['deposits', 'deposits' as const, () => indexContributionEvent],
       ['withdrawals', 'withdrawals' as const, () => indexWithdrawalEvent],
       ['interest claims', 'interestClaims' as const, () => indexInterestClaimEvent],
+      ['loan repayments', 'loanRepayments' as const, () => indexLoanRepaymentEvent],
     ])('should skip %s emitted by a contract the factory does not know', async (_name, feed, getIndexer) => {
       // Arrange
       // Anyone can emit an identically-shaped event. Indexing one would attach
@@ -295,7 +335,62 @@ describe('sweepBlockRange', () => {
 
       // Assert
       expect(getIndexer()).not.toHaveBeenCalled()
-      expect(counts).toEqual({ pools: 0, contributions: 0, withdrawals: 0, interestClaims: 0, loans: 0, memberships: 0, statusUpdates: 0 })
+      expect(counts).toEqual({
+        pools: 0,
+        contributions: 0,
+        withdrawals: 0,
+        interestClaims: 0,
+        loans: 0,
+        loanRepayments: 0,
+        memberships: 0,
+        statusUpdates: 0,
+      })
+    })
+
+    it('should record a payment towards a loan as its own document', async () => {
+      // Arrange
+      const provider = buildMockProvider({ loanRepayments: [buildLog(), buildLog({ index: 1 })] })
+
+      // Act
+      const counts = await sweep(provider)
+
+      // Assert
+      expect(indexLoanRepaymentEvent).toHaveBeenCalledTimes(2)
+      expect(counts.loanRepayments).toBe(2)
+    })
+
+    /**
+     * These logs are swept twice, deliberately.
+     *
+     * `sweepLoans` needs them to keep the loan's `amountRepaid` current — a
+     * payment that does not settle the debt emits nothing else — and
+     * `sweepLoanRepayments` needs them for the payment record. Neither is
+     * derivable from the other, so dropping either query loses something.
+     */
+    it('should drive both the loan record and the payment record from one log', async () => {
+      // Arrange
+      const provider = buildMockProvider({ loanRepayments: [buildLog()], loans: [buildLog()] })
+
+      // Act
+      const counts = await sweep(provider)
+
+      // Assert
+      expect(indexLoanFromLog).toHaveBeenCalled()
+      expect(indexLoanRepaymentEvent).toHaveBeenCalled()
+      expect(counts).toMatchObject({ loans: 1, loanRepayments: 1 })
+    })
+
+    it('should keep sweeping payments after one of them fails', async () => {
+      // Arrange — one unreadable log must not cost the rest of the range.
+      const provider = buildMockProvider({ loanRepayments: [buildLog(), buildLog({ index: 1 })] })
+      indexLoanRepaymentEvent.mockRejectedValueOnce(new Error('firestore unavailable'))
+
+      // Act
+      const counts = await sweep(provider)
+
+      // Assert
+      expect(counts.loanRepayments).toBe(1)
+      expect(mockLogger.error).toHaveBeenCalledWith('Failed to sweep LoanRepaymentMade log', expect.objectContaining({ chainId: CHAIN_ID }))
     })
 
     it('should skip foreign logs silently rather than as errors', async () => {

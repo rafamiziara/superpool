@@ -1,3 +1,4 @@
+import type { LoanInfo } from '@superpool/types'
 import { FontAwesome } from '@expo/vector-icons'
 import { router, Stack, useLocalSearchParams } from 'expo-router'
 import { StatusBar } from 'expo-status-bar'
@@ -6,6 +7,7 @@ import React, { useState } from 'react'
 import { ActivityIndicator, Pressable, ScrollView, Text, View } from 'react-native'
 import { useReadContract } from 'wagmi'
 import { BorrowForm } from '../../../src/components/lending/BorrowForm'
+import { RepayForm } from '../../../src/components/lending/RepayForm'
 import { LendingPoolABI } from '../../../src/constants/abis'
 import { palette } from '../../../src/constants/palette'
 import { calculateRepayment, useLoan } from '../../../src/hooks/pools/useLoan'
@@ -39,13 +41,30 @@ const SUCCESS_HEADLINE: Record<Outcome, string> = {
   cancelled: 'Request withdrawn',
 }
 
-function successSummary(outcome: Outcome, amount: bigint, poolName: string): string {
-  if (outcome === 'repaid') return `${formatToken(amount)} POL went back into ${poolName}. You can borrow from it again.`
+function successSummary(outcome: Outcome, amount: bigint, poolName: string, settled = true): string {
+  if (outcome === 'repaid') {
+    // A part payment must not promise the slot back: the loan is still open,
+    // and `createLoan` would revert with `LoanOutstanding`.
+    return settled
+      ? `${formatToken(amount)} POL went back into ${poolName}. You can borrow from it again.`
+      : `${formatToken(amount)} POL went back into ${poolName}. The rest of the loan is still outstanding.`
+  }
   if (outcome === 'requested')
     return `${poolName}'s owner has your request for ${formatToken(amount)} POL. You will see the funds if they approve it.`
   if (outcome === 'cancelled') return `Your request to ${poolName} is withdrawn. You can borrow from it again whenever you like.`
 
   return `${formatToken(amount)} POL is on its way to your wallet.`
+}
+
+/**
+ * What is still owed on an indexed loan, in wei.
+ *
+ * The lifetime cost minus what has already come back. Used only to decide
+ * whether a payment closes the debt — the amount to send is the borrower's
+ * choice, and `RepayForm` collects it.
+ */
+function repaymentOutstanding(loan: LoanInfo): bigint {
+  return calculateRepayment(BigInt(loan.amount), loan.interestRate) - BigInt(loan.amountRepaid)
 }
 
 /**
@@ -69,7 +88,7 @@ function BorrowScreen() {
 
   const [stage, setStage] = useState<Stage>('form')
   const [failure, setFailure] = useState<string | null>(null)
-  const [settled, setSettled] = useState<{ amount: bigint; outcome: Outcome } | null>(null)
+  const [settled, setSettled] = useState<{ amount: bigint; outcome: Outcome; closedTheLoan: boolean } | null>(null)
 
   const pool = poolStore.poolById(Number(poolId))
   const outstanding = pool ? poolStore.activeLoanFor(pool.poolId) : undefined
@@ -104,11 +123,11 @@ function BorrowScreen() {
   const requiresApproval = Array.isArray(config) ? config[4] === true : false
 
   /** Shared tail: confirm, index, finish. Every action here does exactly this. */
-  const settle = async (txHash: `0x${string}`, type: LoanTransactionType, amount: bigint, outcome: Outcome) => {
+  const settle = async (txHash: `0x${string}`, type: LoanTransactionType, amount: bigint, outcome: Outcome, closedTheLoan = true) => {
     try {
       setStage('confirming')
       await waitForTransaction(txHash, type)
-      setSettled({ amount, outcome })
+      setSettled({ amount, outcome, closedTheLoan })
     } catch (error) {
       // The transaction is on chain; only its outcome is unresolved. The record
       // in PendingTransactionsStore survives, so recovery can finish the job.
@@ -159,13 +178,20 @@ function BorrowScreen() {
     await settle(txHash, requiresApproval ? 'REQUEST_LOAN' : 'BORROW', amount, requiresApproval ? 'requested' : 'borrowed')
   }
 
-  const handleRepay = async () => {
+  /**
+   * Paying towards the outstanding loan, in part or in full.
+   *
+   * The amount comes from the form rather than being computed here: the
+   * contract credits any amount above zero and closes the loan only when the
+   * whole debt is back, so "how much" is a question the borrower answers.
+   */
+  const handleRepay = async (amount: bigint) => {
     if (!pool || !outstanding) return
 
     setFailure(null)
     reset()
 
-    const due = calculateRepayment(BigInt(outstanding.amount), outstanding.interestRate)
+    const owed = repaymentOutstanding(outstanding)
 
     let txHash: `0x${string}`
     try {
@@ -175,7 +201,7 @@ function BorrowScreen() {
         poolAddress: pool.poolAddress as `0x${string}`,
         poolName: pool.name,
         loanId: outstanding.loanId,
-        amount: due,
+        amount,
       })
     } catch (error) {
       setStage('form')
@@ -184,7 +210,7 @@ function BorrowScreen() {
       return
     }
 
-    await settle(txHash, 'REPAY', due, 'repaid')
+    await settle(txHash, 'REPAY', amount, 'repaid', amount >= owed)
   }
 
   /**
@@ -244,9 +270,16 @@ function BorrowScreen() {
         <View className="h-16 w-16 items-center justify-center rounded-full bg-mint-deep">
           <FontAwesome name="check" size={24} color={palette.mint} />
         </View>
-        <Text className="text-center text-lg font-bold text-snow">{SUCCESS_HEADLINE[settled?.outcome ?? 'borrowed']}</Text>
+        <Text className="text-center text-lg font-bold text-snow">
+          {/* A part payment is not a repaid loan, and saying so is the one thing
+              this screen must not do — the debt and the borrower's slot both
+              survive it. */}
+          {settled?.outcome === 'repaid' && !settled.closedTheLoan ? 'Payment received' : SUCCESS_HEADLINE[settled?.outcome ?? 'borrowed']}
+        </Text>
         <Text className="text-center text-sm text-fog">
-          {settled === null ? `Your loan from ${pool.name} is settled.` : successSummary(settled.outcome, settled.amount, pool.name)}
+          {settled === null
+            ? `Your loan from ${pool.name} is settled.`
+            : successSummary(settled.outcome, settled.amount, pool.name, settled.closedTheLoan)}
         </Text>
         <Pressable
           // `dismissTo`, not `replace` — see the note on the contribute screen:
@@ -262,12 +295,11 @@ function BorrowScreen() {
   }
 
   const isBusy = stage !== 'form'
-  const due = outstanding ? calculateRepayment(BigInt(outstanding.amount), outstanding.interestRate) : null
 
   const title = outstanding ? 'Repay' : pendingRequest ? 'Your request' : 'Borrow'
 
   const intro = outstanding
-    ? 'Repaying returns the funds to the pool and frees you to borrow again. It takes one transaction from your wallet.'
+    ? 'Repaying returns the funds to the pool. Pay it all at once to close the loan and free yourself to borrow again, or pay part of it now.'
     : pendingRequest
       ? 'This pool reviews requests before it lends. Nothing has moved yet — the owner decides when the funds go out.'
       : requiresApproval
@@ -297,45 +329,18 @@ function BorrowScreen() {
           </View>
         ) : null}
 
-        {outstanding && due !== null ? (
+        {outstanding ? (
           <View className="gap-5" testID="repay-panel">
-            <View className="rounded-3xl border-continuous border-hairline border-veil bg-surface p-5">
-              <Text className="text-[10px] font-semibold uppercase tracking-widest text-mist">Outstanding loan</Text>
-              <Text className="mt-2 text-lg font-bold text-snow" numberOfLines={1}>
-                {pool.name}
-              </Text>
-              <Text className="mt-1 text-xs text-fog">
-                Borrowed {formatToken(BigInt(outstanding.amount))} POL · loan #{outstanding.loanId}
-              </Text>
-            </View>
-
-            <View className="rounded-2xl border-continuous border-hairline border-veil bg-raised px-4 py-3">
-              <Text className="text-sm text-fog">
-                Total due <Text className="font-mono font-bold text-snow">{formatToken(due)}</Text> POL
-              </Text>
-              <Text className="mt-1 text-xs text-mist">Principal plus fixed interest. The pool takes the full amount in one payment.</Text>
-            </View>
-
-            {(failure ?? loanError) ? (
-              <View className="rounded-2xl border-continuous border-hairline border-coral bg-coral-deep px-4 py-3">
-                <Text className="text-sm text-coral" testID="repay-error">
-                  {failure ?? loanError}
-                </Text>
-              </View>
-            ) : null}
-
-            <Pressable
-              onPress={handleRepay}
-              disabled={isBusy}
-              testID="repay-submit"
-              accessibilityRole="button"
-              accessibilityState={{ disabled: isBusy }}
-              className="items-center justify-center rounded-2xl border-continuous bg-mint px-6 py-4 shadow-glow-mint active:opacity-90 disabled:bg-veil disabled:shadow-none"
-            >
-              <Text className="text-base font-bold text-abyss disabled:text-mist">
-                {isBusy ? 'Submitting…' : `Repay ${formatToken(due)} POL`}
-              </Text>
-            </Pressable>
+            <RepayForm
+              poolName={pool.name}
+              loanId={outstanding.loanId}
+              principal={BigInt(outstanding.amount)}
+              totalOwed={calculateRepayment(BigInt(outstanding.amount), outstanding.interestRate)}
+              amountRepaid={BigInt(outstanding.amountRepaid)}
+              onSubmit={handleRepay}
+              isSubmitting={isBusy}
+              error={failure ?? loanError}
+            />
           </View>
         ) : pendingRequest ? (
           <View className="gap-5" testID="pending-request-panel">
