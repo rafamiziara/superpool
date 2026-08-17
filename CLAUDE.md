@@ -594,6 +594,60 @@ than chosen between: claiming moves an amount from one to the other. Claims are
 indexed; accrual is not an event at all and has to be read from the chain per
 pool per wallet.
 
+## Denominations
+
+A pool lends **one asset**, chosen at creation and never changed —
+`PoolConfig.loanToken`, where **`address(0)` means native POL**. That is the
+zero value, so every pool made before the field existed is native with no
+migration: the same retrofit as `LoanStatus.Disbursed = 0` and
+`requiresApproval = false`. There is no setter, deliberately; re-denominating a
+pool would reinterpret every `contributions` entry and every outstanding debt as
+a quantity of something else.
+
+Plan and the reasoning behind each decision:
+[`.dev/contracts/ERC20_PLAN.md`](.dev/contracts/ERC20_PLAN.md). Phases 1–2 are
+built; the app still creates native pools only.
+
+**Formatting is three-way, and collapsing it to two is a factor-of-10¹² bug.**
+`PoolInfo` carries `loanToken`, `tokenSymbol` and `tokenDecimals`:
+
+- `loanToken` is the zero address → **native**. 18 decimals, and the symbol
+  comes from the app's own chain config — POL on Polygon, ETH on Base, BNB on
+  BSC. A native pool deliberately carries **no `tokenSymbol`**, because the
+  native symbol belongs to the chain and writing one would put POL on a Base
+  pool.
+- `loanToken` is set and `tokenDecimals` is a number → **a token pool.**
+- `loanToken` is set and `tokenDecimals` is **absent** → the backend could not
+  read the token. Show the pool as **unsupported**. Never fall back to 18, which
+  renders 5 USDC as 5,000,000,000,000.
+
+Four more rules that are easy to break:
+
+- **The token entry points are `depositTokens` and `repayLoanWithTokens`, not
+  overloads of `depositFunds` / `repayLoan`.** Solidity accepts the overloads,
+  but ethers then refuses to resolve either bare name — *ambiguous function
+  description* — breaking every existing native call site in the backend, the
+  scripts and the tests. Do not "tidy" them back into overloads.
+- **Credit the balance delta, never the requested amount.** A fee-on-transfer
+  token delivers less than it was asked for, and crediting the request inflates
+  `totalContributions` — the denominator every interest distribution divides by
+  — diluting every other lender for the life of the pool, invisibly.
+- **A token repayment needs no refund and no settlement buffer**, unlike the
+  native one. The pool pulls `min(_amount, outstanding)` priced at execution
+  time, so `_amount` only has to be *big enough*; the head-room moved to the
+  allowance, where it costs the borrower nothing. Keep `_amount` explicit —
+  inferring it from the allowance would let a leftover approval decide how much
+  a later repayment took.
+- **`tokenDecimals` is safe to store; almost nothing else read from a contract
+  is.** Decimals and symbol are immutable for a token's lifetime. Contrast
+  `requiresMembership`, which the owner can change at any moment and which must
+  therefore always be read from the chain.
+
+`PoolFactory` gates creation on an owner-curated allowlist
+(`setLoanTokenAuthorization`); `address(0)` is never on it and never needs to
+be. Disallowing a token does **not** reach back to pools already holding
+balances in it — that would strand both sides of a live loan.
+
 ## Chains
 
 The backend serves **every chain configured**, not one at a time. Configuration
