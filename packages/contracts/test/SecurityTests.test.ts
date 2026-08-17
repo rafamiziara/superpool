@@ -1,3 +1,4 @@
+import { time } from '@nomicfoundation/hardhat-network-helpers'
 import { SignerWithAddress } from '@nomicfoundation/hardhat-ethers/signers'
 import { expect } from 'chai'
 import { ethers, upgrades } from 'hardhat'
@@ -82,8 +83,10 @@ describe('Security Tests', function () {
       const loanAmount = ethers.parseEther('1')
       await lendingPool.connect(borrower).createLoan(loanAmount)
 
-      // Calculate repayment amount
-      const repaymentAmount = await lendingPool.calculateRepaymentAmount(1)
+      // Quoted an hour ahead: interest accrues per second now, so a figure
+      // read for *this* block would leave the loan a few seconds short of
+      // settled. The excess comes back either way.
+      const quoted = await lendingPool.outstandingBalanceAt(1, (await time.latest()) + 3600)
 
       // Test that the borrower can repay normally (our CEI pattern works)
       const initialPoolFunds = await lendingPool.totalFunds()
@@ -91,15 +94,17 @@ describe('Security Tests', function () {
       // Borrower repays with excess to test refund mechanism
       const excessPayment = ethers.parseEther('0.5')
       await lendingPool.connect(borrower).repayLoan(1, {
-        value: repaymentAmount + excessPayment,
+        value: quoted + excessPayment,
       })
 
       // Verify loan is properly repaid and funds are correct
       const loan = await lendingPool.getLoan(1)
       expect(loan.isRepaid).to.be.true
 
+      // The pool kept the debt and not a wei of the excess.
       const finalPoolFunds = await lendingPool.totalFunds()
-      expect(finalPoolFunds).to.equal(initialPoolFunds + repaymentAmount)
+      expect(finalPoolFunds - initialPoolFunds).to.equal(loan.amountRepaid)
+      expect(finalPoolFunds - initialPoolFunds).to.be.lt(quoted + excessPayment)
     })
 
     it('Should properly handle legitimate high-frequency transactions', async function () {
@@ -279,22 +284,24 @@ describe('Security Tests', function () {
       const loanAmount = ethers.parseEther('1')
       await lendingPool.connect(borrower).createLoan(loanAmount)
 
-      const repaymentAmount = await lendingPool.calculateRepaymentAmount(1)
+      const quoted = await lendingPool.outstandingBalanceAt(1, (await time.latest()) + 3600)
       const excessPayment = ethers.parseEther('5') // Much more than needed
 
       const initialBalance = await ethers.provider.getBalance(borrower.address)
 
       const tx = await lendingPool.connect(borrower).repayLoan(1, {
-        value: repaymentAmount + excessPayment,
+        value: quoted + excessPayment,
       })
       const receipt = await tx.wait()
       const gasUsed = receipt!.gasUsed * tx.gasPrice!
 
       const finalBalance = await ethers.provider.getBalance(borrower.address)
 
-      // Borrower should get excess back (minus gas)
-      const expectedBalance = initialBalance - repaymentAmount - gasUsed
-      expect(finalBalance).to.equal(expectedBalance)
+      // The wallet is down by the debt and the gas, and by nothing else —
+      // measured against what the loan actually took rather than what was
+      // sent, since the debt grew by a block on the way in.
+      const credited = (await lendingPool.getLoan(1)).amountRepaid
+      expect(finalBalance).to.equal(initialBalance - credited - gasUsed)
     })
   })
 })

@@ -10,6 +10,7 @@ import {
 import {ReentrancyGuardTransient} from "@openzeppelin/contracts/utils/ReentrancyGuardTransient.sol";
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
+import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
 
 /**
  * @title LendingPool
@@ -129,8 +130,45 @@ contract LendingPool is
          *
          * `isRepaid` stays the authority on whether the debt is closed. This
          * says how far along it is, and the two are only redundant at the ends.
+         *
+         * A running total of everything handed back, principal and interest
+         * together. It is what the app displays; the split that decides what is
+         * still owed is `principalOutstanding` and `interestOutstanding`.
          */
         uint256 amountRepaid;    // 32 bytes - new slot
+        /**
+         * @dev Principal not yet returned. Starts at `amount`.
+         *
+         * The base interest accrues on, which is why it is tracked rather than
+         * derived from `amountRepaid`: a payment is split between interest and
+         * principal, so the two cannot be recovered from their sum.
+         *
+         * Paying this down is what makes future interest cheaper — the whole
+         * point of accrual, and the thing a flat rate could not express.
+         */
+        uint256 principalOutstanding;  // 32 bytes - new slot
+        /**
+         * @dev Interest accrued and not yet paid, **as of `accruedAt`**.
+         *
+         * A snapshot, not a live figure: it is brought up to date by `_accrue`
+         * before anything reads or changes it. Anything asking what is owed
+         * *now* must project it forward — `loanBalance` and
+         * `outstandingBalanceAt` do, and are the only honest answers.
+         *
+         * `uint192` because it shares this slot with `accruedAt`, and written
+         * through `SafeCast` so an impossible figure reverts rather than
+         * silently wrapping. 2^192 wei is more interest than any pool can hold.
+         */
+        uint192 interestOutstanding;   // 24 bytes - new slot
+        /**
+         * @dev When `interestOutstanding` was last brought up to date.
+         *
+         * **Zero means the loan predates accrual**, and is the flag `_accrue`
+         * converts on. It is never zero on a loan created since: `createLoan`,
+         * `requestLoan` and `approveLoan` all stamp it, so a real loan always
+         * carries a real timestamp.
+         */
+        uint64 accruedAt;        // 8 bytes - packs into the same slot (32 bytes)
     }
 
     /// @notice Pool configuration
@@ -450,6 +488,10 @@ contract LendingPool is
     error NoPendingRequest();
     /// @dev Claiming interest when none has accrued.
     error NothingToClaim();
+    /// @dev A rate above 100%, which `PoolFactory` refuses at creation too.
+    error InvalidInterestRate();
+    /// @dev A zero term. It is the denominator interest accrues over.
+    error InvalidLoanDuration();
     /**
      * @dev Removing the owner from their own pool, or the owner leaving it.
      *
@@ -734,6 +776,11 @@ contract LendingPool is
             isRepaid: false,
             repaidAt: 0,
             amountRepaid: 0,
+            principalOutstanding: _amount,
+            interestOutstanding: 0,
+            // Non-zero from birth, which is what tells a loan made under
+            // accrual from one that predates it. Interest runs from here.
+            accruedAt: SafeCast.toUint64(block.timestamp),
             status: LoanStatus.Disbursed
         });
 
@@ -964,6 +1011,11 @@ contract LendingPool is
             isRepaid: false,
             repaidAt: 0,
             amountRepaid: 0,
+            principalOutstanding: _amount,
+            interestOutstanding: 0,
+            // Stamped again on approval, like `startTime`: nothing is owed
+            // while a request waits, so the clock starts when the money moves.
+            accruedAt: SafeCast.toUint64(block.timestamp),
             status: LoanStatus.Requested
         });
 
@@ -996,6 +1048,9 @@ contract LendingPool is
         // Complete all state changes before the external call (CEI pattern)
         loan.status = LoanStatus.Disbursed;
         loan.startTime = block.timestamp;
+        // Beside `startTime`, and for the same reason: a request that waited a
+        // week on the owner must not arrive already owing a week of interest.
+        loan.accruedAt = SafeCast.toUint64(block.timestamp);
         totalFunds -= amount;
 
         emit LoanApproved(_loanId, borrower, amount);
@@ -1096,46 +1151,42 @@ contract LendingPool is
 
         if (msg.value == 0) revert InvalidAmount();
 
-        uint256 interest = Math.mulDiv(loan.amount, loan.interestRate, 10000);
-        uint256 totalOwed = loan.amount + interest;
-        uint256 paidBefore = loan.amountRepaid;
-        uint256 outstanding = totalOwed - paidBefore;
+        // Stop the clock before pricing the payment. Everything below is
+        // arithmetic on figures that are now current.
+        _accrue(loan);
+
+        uint256 interestDue = loan.interestOutstanding;
+        uint256 principalDue = loan.principalOutstanding;
+        uint256 outstanding = interestDue + principalDue;
 
         uint256 payment = msg.value < outstanding ? msg.value : outstanding;
-        uint256 paidAfter = paidBefore + payment;
-
-        // The interest carried by this payment, as a difference of cumulative
-        // shares. Taking `payment * interest / totalOwed` on its own instead
-        // would drop a wei per instalment and leave the last lender short.
-        uint256 interestShare = Math.mulDiv(paidAfter, interest, totalOwed) -
-            Math.mulDiv(paidBefore, interest, totalOwed);
 
         // Complete all state changes before external call (CEI pattern)
-        loan.amountRepaid = paidAfter;
+        uint256 interestPaid = _creditPayment(loan, payment);
         totalFunds += payment;
 
-        bool settled = paidAfter == totalOwed;
+        bool settled = payment == outstanding;
 
         if (settled) _closeLoan(loan, _loanId);
 
         // Share the interest out across the contributions standing behind the
         // loan. The denominator is `totalContributions`, never `totalFunds` —
         // the latter is missing exactly the money that was lent out.
-        if (interestShare > 0 && totalContributions > 0) {
+        if (interestPaid > 0 && totalContributions > 0) {
             accInterestPerShare += Math.mulDiv(
-                interestShare,
+                interestPaid,
                 PRECISION,
                 totalContributions
             );
 
-            emit InterestDistributed(_loanId, interestShare);
+            emit InterestDistributed(_loanId, interestPaid);
         }
 
         // Emit events before external call
         emit LoanRepaymentMade(_loanId, msg.sender, payment);
 
         if (settled) {
-            emit LoanRepaid(_loanId, msg.sender, paidAfter);
+            emit LoanRepaid(_loanId, msg.sender, loan.amountRepaid);
         }
 
         // Store refund amount for external call
@@ -1146,6 +1197,154 @@ contract LendingPool is
             (bool success, ) = payable(msg.sender).call{value: refundAmount}("");
             if (!success) revert RefundFailed();
         }
+    }
+
+    /**
+     * @notice What a loan owes, projected to a moment in time
+     * @param loan The loan to price
+     * @param _at The moment to price it at. Earlier than `accruedAt` accrues nothing.
+     * @return principal Principal not yet returned
+     * @return interest Interest accrued and not yet paid, at `_at`
+     * @dev The single definition of what is owed, shared by `_accrue` — which
+     * writes it down — and by every view that reports it. Two copies of this
+     * arithmetic is how a screen ends up quoting a figure the contract will not
+     * accept.
+     *
+     * **The rate is the price of the full term, and the clock never stops.**
+     * `interestRate` basis points buys `duration` seconds, so a loan held twice
+     * its term costs twice its stated rate. There is no cap, deliberately: a cap
+     * would make time free after the due date, which is a rule that has to be
+     * invented rather than one that falls out of pricing time.
+     *
+     * Linear and simple, not compounding: unpaid interest does not itself
+     * accrue. Same reasoning as unclaimed interest not earning — see
+     * `docs/INTEREST.md`.
+     *
+     * A loan whose `accruedAt` is zero predates this and is priced on the terms
+     * it was made under; see `_accrue`.
+     */
+    function _balanceAt(
+        Loan storage loan,
+        uint256 _at
+    ) private view returns (uint256 principal, uint256 interest) {
+        if (loan.accruedAt == 0) {
+            return _legacyBalance(loan);
+        }
+
+        principal = loan.principalOutstanding;
+        interest = loan.interestOutstanding;
+
+        // `<=` rather than `<` is the intent: at the instant of the last
+        // accrual no time has passed, and a moment before it is not a rebate.
+        // solhint-disable-next-line gas-strict-inequalities
+        if (_at <= loan.accruedAt || principal == 0 || loan.duration == 0) {
+            return (principal, interest);
+        }
+
+        // `mulDiv` rather than a bare product: the numerator is a wei amount
+        // times a rate times an elapsed second count, and the 512-bit
+        // intermediate is what keeps a long-running loan on a large pool from
+        // overflowing on the way to a small answer.
+        interest += Math.mulDiv(
+            principal,
+            loan.interestRate * (_at - loan.accruedAt),
+            10000 * loan.duration
+        );
+    }
+
+    /**
+     * @notice Price a loan made before interest accrued, on the terms it was made under
+     * @param loan The loan to price
+     * @return principal Principal not yet returned
+     * @return interest What is still owed of its flat interest
+     * @dev Such a loan carries `principalOutstanding == 0` and `accruedAt == 0`,
+     * because neither field existed when it was written — and reading the first
+     * literally would say the principal is already back.
+     *
+     * It was priced flat, and `amountRepaid` was applied across principal and
+     * that flat interest **pro rata**, so it is converted on exactly those
+     * terms. No new money is invented and none is forgiven: what it owed a
+     * moment before the upgrade is what it owes a moment after.
+     *
+     * Accrual then starts from the conversion, not from `startTime` — dating it
+     * back would charge the loan twice for time it already paid flat interest
+     * on.
+     */
+    function _legacyBalance(
+        Loan storage loan
+    ) private view returns (uint256 principal, uint256 interest) {
+        uint256 flatInterest = Math.mulDiv(
+            loan.amount,
+            loan.interestRate,
+            10000
+        );
+        uint256 owedInFull = loan.amount + flatInterest;
+
+        if (owedInFull == 0) return (0, 0);
+
+        uint256 principalPaid = Math.mulDiv(
+            loan.amountRepaid,
+            loan.amount,
+            owedInFull
+        );
+
+        return (
+            loan.amount - principalPaid,
+            flatInterest - (loan.amountRepaid - principalPaid)
+        );
+    }
+
+    /**
+     * @notice Bring a loan's interest up to now, so it can be read or paid
+     * @param loan The loan to accrue
+     * @dev Called before anything that changes the debt. Writing the snapshot
+     * down and moving `accruedAt` is what makes accrual path-independent: the
+     * interest already earned is fixed, and only the principal still out earns
+     * from here.
+     *
+     * Also where a pre-accrual loan is converted, once, on its first touch —
+     * a migration nobody has to run, in the same spirit as `LoanStatus.Disbursed`
+     * being ordinal zero.
+     */
+    function _accrue(Loan storage loan) private {
+        (uint256 principal, uint256 interest) = _balanceAt(
+            loan,
+            block.timestamp
+        );
+
+        loan.principalOutstanding = principal;
+        loan.interestOutstanding = SafeCast.toUint192(interest);
+        loan.accruedAt = SafeCast.toUint64(block.timestamp);
+    }
+
+    /**
+     * @notice Split a payment across a loan's interest and principal
+     * @param loan The loan being paid, already accrued to now
+     * @param payment What to credit. Never more than the loan owes.
+     * @return interestPaid The part that covered interest, and so the part the
+     * lenders earn
+     * @dev **Interest first, then principal.** Not a convention borrowed for
+     * its own sake: interest is the price of time already used, and letting a
+     * payment cut principal while interest stands would let a borrower reduce
+     * what they owe for time they have not paid for yet.
+     *
+     * It also makes the lenders' share *exact* rather than apportioned. The
+     * flat model had to split each payment pro rata across a fixed total; here
+     * the interest in a payment is simply the interest it covered.
+     */
+    function _creditPayment(
+        Loan storage loan,
+        uint256 payment
+    ) private returns (uint256 interestPaid) {
+        uint256 interestDue = loan.interestOutstanding;
+
+        interestPaid = payment < interestDue ? payment : interestDue;
+
+        loan.interestOutstanding = SafeCast.toUint192(
+            interestDue - interestPaid
+        );
+        loan.principalOutstanding -= payment - interestPaid;
+        loan.amountRepaid += payment;
     }
 
     /**
@@ -1190,6 +1389,14 @@ contract LendingPool is
         uint256 _interestRate,
         uint256 _loanDuration
     ) external onlyOwner {
+        // The same three rules `PoolFactory.createPool` enforces, which this
+        // could always sidestep. It matters more now: `duration` is the
+        // denominator interest accrues over, so a zero here would have made
+        // every later loan from this pool interest-free.
+        if (_maxLoanAmount == 0) revert InvalidAmount();
+        if (_interestRate > 10000) revert InvalidInterestRate();
+        if (_loanDuration == 0) revert InvalidLoanDuration();
+
         poolConfig.maxLoanAmount = _maxLoanAmount;
         poolConfig.interestRate = _interestRate;
         poolConfig.loanDuration = _loanDuration;
@@ -1228,12 +1435,18 @@ contract LendingPool is
     }
 
     /**
-     * @notice What a loan costs to settle over its whole life
+     * @notice What a loan costs if it runs exactly its term and is repaid once
      * @param _loanId The loan ID to calculate for
-     * @return Principal plus the whole fixed interest, whatever has been paid
-     * @dev Deliberately unchanged by instalments, so it keeps meaning what it
-     * always meant and every reader of it stays correct. What is still owed
-     * *now* is `outstandingBalance`, and that is the figure to send as `value`.
+     * @return Principal plus the rate applied over the full term
+     * @dev **The quoted price, not the bill.** `interestRate` buys `duration`
+     * seconds, so this is what the loan costs held exactly that long — which is
+     * what the borrow form states before anyone signs, and what it has always
+     * returned. The arithmetic is unchanged; what changed underneath is that
+     * repaying earlier now costs less and repaying later costs more.
+     *
+     * What is owed *now* is `outstandingBalance`, and that is the figure to
+     * send as `value`. The two agree only on a loan repaid in one payment at
+     * the exact end of its term.
      */
     function calculateRepaymentAmount(
         uint256 _loanId
@@ -1254,17 +1467,71 @@ contract LendingPool is
      * loan would owe if it existed. That mirrors the gate in `repayLoan`, so a
      * caller can send this figure without first working out whether the call
      * would revert.
+     *
+     * **This figure grows between blocks.** Sending exactly it settles nothing
+     * if a block passes on the way — the loan is left owing a few seconds of
+     * interest, which is a worse surprise than a revert because it looks like
+     * success. Anything meaning to close a loan should send
+     * `outstandingBalanceAt` a little in the future and let the refund return
+     * the difference.
      */
     function outstandingBalance(
         uint256 _loanId
     ) external view returns (uint256) {
+        return _outstandingAt(_loanId, block.timestamp);
+    }
+
+    /**
+     * @notice What a loan will owe at a given moment, if nothing is paid before then
+     * @param _loanId The loan ID to calculate for
+     * @param _at Unix seconds. Anything at or before the last accrual accrues nothing.
+     * @return The amount owed at `_at`, in wei
+     * @dev Exists so that "pay it off" can be a single transaction. The debt
+     * grows while the wallet is being signed and the block is being mined, so a
+     * caller quotes slightly ahead and relies on `repayLoan` refunding whatever
+     * it did not need. The horizon is the caller's to choose — the app uses an
+     * hour, which is worth a few wei of principal and covers any realistic
+     * delay.
+     */
+    function outstandingBalanceAt(
+        uint256 _loanId,
+        uint256 _at
+    ) external view returns (uint256) {
+        return _outstandingAt(_loanId, _at);
+    }
+
+    /**
+     * @notice The two halves of what a loan owes right now
+     * @param _loanId The loan ID to calculate for
+     * @return principal Principal not yet returned
+     * @return interest Interest accrued and not yet paid
+     * @dev Both from one call, because a screen showing a debt wants to show
+     * what it is made of — and because deriving one from the other off chain
+     * means restating the accrual rule somewhere it can drift.
+     *
+     * Zero for anything that is not an open debt, like `outstandingBalance`.
+     */
+    function loanBalance(
+        uint256 _loanId
+    ) external view returns (uint256 principal, uint256 interest) {
+        Loan storage loan = loans[_loanId];
+
+        if (loan.status != LoanStatus.Disbursed || loan.isRepaid) return (0, 0);
+
+        return _balanceAt(loan, block.timestamp);
+    }
+
+    function _outstandingAt(
+        uint256 _loanId,
+        uint256 _at
+    ) private view returns (uint256) {
         Loan storage loan = loans[_loanId];
 
         if (loan.status != LoanStatus.Disbursed || loan.isRepaid) return 0;
 
-        uint256 interest = Math.mulDiv(loan.amount, loan.interestRate, 10000);
+        (uint256 principal, uint256 interest) = _balanceAt(loan, _at);
 
-        return loan.amount + interest - loan.amountRepaid;
+        return principal + interest;
     }
 
     /**

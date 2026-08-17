@@ -1259,6 +1259,16 @@ export const LendingPoolABI = [
   },
   {
     "inputs": [],
+    "name": "InvalidInterestRate",
+    "type": "error"
+  },
+  {
+    "inputs": [],
+    "name": "InvalidLoanDuration",
+    "type": "error"
+  },
+  {
+    "inputs": [],
     "name": "LoanAlreadyRepaid",
     "type": "error"
   },
@@ -1337,6 +1347,22 @@ export const LendingPoolABI = [
   {
     "inputs": [],
     "name": "RefundFailed",
+    "type": "error"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint8",
+        "name": "bits",
+        "type": "uint8"
+      },
+      {
+        "internalType": "uint256",
+        "name": "value",
+        "type": "uint256"
+      }
+    ],
+    "name": "SafeCastOverflowedUintDowncast",
     "type": "error"
   },
   {
@@ -1979,6 +2005,21 @@ export const LendingPoolABI = [
             "internalType": "uint256",
             "name": "amountRepaid",
             "type": "uint256"
+          },
+          {
+            "internalType": "uint256",
+            "name": "principalOutstanding",
+            "type": "uint256"
+          },
+          {
+            "internalType": "uint192",
+            "name": "interestOutstanding",
+            "type": "uint192"
+          },
+          {
+            "internalType": "uint64",
+            "name": "accruedAt",
+            "type": "uint64"
           }
         ],
         "internalType": "struct LendingPool.Loan",
@@ -2052,6 +2093,30 @@ export const LendingPoolABI = [
     "inputs": [
       {
         "internalType": "uint256",
+        "name": "_loanId",
+        "type": "uint256"
+      }
+    ],
+    "name": "loanBalance",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "principal",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "interest",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
         "name": "",
         "type": "uint256"
       }
@@ -2102,6 +2167,21 @@ export const LendingPoolABI = [
         "internalType": "uint256",
         "name": "amountRepaid",
         "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "principalOutstanding",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint192",
+        "name": "interestOutstanding",
+        "type": "uint192"
+      },
+      {
+        "internalType": "uint64",
+        "name": "accruedAt",
+        "type": "uint64"
       }
     ],
     "stateMutability": "view",
@@ -2161,6 +2241,30 @@ export const LendingPoolABI = [
       }
     ],
     "name": "outstandingBalance",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "_loanId",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "_at",
+        "type": "uint256"
+      }
+    ],
+    "name": "outstandingBalanceAt",
     "outputs": [
       {
         "internalType": "uint256",

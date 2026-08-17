@@ -2,7 +2,6 @@ import { time } from '@nomicfoundation/hardhat-network-helpers'
 import { expect } from 'chai'
 import { ethers, upgrades } from 'hardhat'
 import { SignerWithAddress } from '@nomicfoundation/hardhat-ethers/signers'
-import { ContractTransactionResponse } from 'ethers'
 import { LendingPool } from '../typechain-types'
 
 /**
@@ -26,17 +25,30 @@ async function findLoanSlot(poolAddress: string, loanId: number, borrower: strin
 }
 
 /**
- * The interest one transaction shared out, summed from its logs.
+ * Makes the next transaction mine exactly at the end of a loan's term.
  *
- * Read from `InterestDistributed` rather than from the accumulator, because
- * the accumulator is per share and divides — which is exactly the rounding the
- * caller is usually trying to see past.
+ * Interest accrues per second now, so "repay at the due date" has to be an
+ * exact moment or the assertions drift by a block. `setNextBlockTimestamp`
+ * pins it; `increaseTo` would leave the repayment a second late.
  */
-async function interestDistributedBy(tx: ContractTransactionResponse): Promise<bigint> {
-  const receipt = await tx.wait()
-  const topic = ethers.id('InterestDistributed(uint256,uint256)')
+async function atEndOfTerm(pool: LendingPool, loanId: number): Promise<void> {
+  const { startTime, duration } = await pool.getLoan(loanId)
 
-  return receipt!.logs.filter((log) => log.topics[0] === topic).reduce((sum, log) => sum + BigInt(log.topics[2]), 0n)
+  await time.setNextBlockTimestamp(startTime + duration)
+}
+
+/**
+ * Settles a loan in one payment.
+ *
+ * Quotes an hour ahead and lets the contract refund the difference, which is
+ * what the app does and what anything closing a loan has to do: the debt grows
+ * while the block is being mined, so sending today's `outstandingBalance`
+ * exactly would leave a few seconds of interest behind and quietly not settle.
+ */
+async function repayInFull(pool: LendingPool, borrower: SignerWithAddress, loanId: number) {
+  const quote = await pool.outstandingBalanceAt(loanId, (await time.latest()) + 3600)
+
+  return pool.connect(borrower).repayLoan(loanId, { value: quote })
 }
 
 /**
@@ -243,7 +255,11 @@ describe('LendingPool', function () {
     it('Should not let interest earned by the pool be withdrawn as contribution', async function () {
       await lendingPool.connect(borrower).depositFunds({ value: ethers.parseEther('1') })
       await lendingPool.connect(borrower).createLoan(ethers.parseEther('5'))
+
+      // Held to term, so the interest earned is the pool's stated rate rather
+      // than the few seconds a test would otherwise accrue.
       const repayment = await lendingPool.calculateRepaymentAmount(1)
+      await atEndOfTerm(lendingPool, 1)
       await lendingPool.connect(borrower).repayLoan(1, { value: repayment })
 
       // The pool now holds more than the sum of contributions: the interest.
@@ -429,6 +445,10 @@ describe('LendingPool', function () {
 
       const poolBalanceBefore = await lendingPool.totalFunds()
 
+      // The quote is the price of the whole term, so it is what the loan costs
+      // at exactly the due date and nowhere else — earlier is less, later more.
+      await atEndOfTerm(lendingPool, loanId)
+
       await expect(lendingPool.connect(borrower).repayLoan(loanId, { value: repaymentAmount }))
         .to.emit(lendingPool, 'LoanRepaid')
         .withArgs(loanId, borrower.address, repaymentAmount)
@@ -446,6 +466,8 @@ describe('LendingPool', function () {
       const excessPayment = repaymentAmount + ethers.parseEther('1')
 
       const borrowerBalanceBefore = await ethers.provider.getBalance(borrower.address)
+
+      await atEndOfTerm(lendingPool, loanId)
 
       const tx = await lendingPool.connect(borrower).repayLoan(loanId, {
         value: excessPayment,
@@ -501,7 +523,7 @@ describe('LendingPool', function () {
       const repaymentAmount = await lendingPool.calculateRepaymentAmount(loanId)
 
       // First repayment
-      await lendingPool.connect(borrower).repayLoan(loanId, { value: repaymentAmount })
+      await repayInFull(lendingPool, borrower, loanId)
 
       // Second repayment attempt
       await expect(lendingPool.connect(borrower).repayLoan(loanId, { value: repaymentAmount })).to.be.revertedWithCustomError(
@@ -524,9 +546,7 @@ describe('LendingPool', function () {
       })
 
       it('Should be stamped with the repaying block', async function () {
-        const repaymentAmount = await lendingPool.calculateRepaymentAmount(loanId)
-
-        const tx = await lendingPool.connect(borrower).repayLoan(loanId, { value: repaymentAmount })
+        const tx = await repayInFull(lendingPool, borrower, loanId)
         const receipt = await tx.wait()
         const block = await ethers.provider.getBlock(receipt!.blockNumber)
 
@@ -534,13 +554,13 @@ describe('LendingPool', function () {
       })
 
       it('Should let a repayment after the term be told from one inside it', async function () {
-        const repaymentAmount = await lendingPool.calculateRepaymentAmount(loanId)
         const { startTime, duration } = await lendingPool.getLoan(loanId)
 
         // A day past the due date. Nothing on chain stops this — the term is
-        // recorded and unenforced — so the only trace it leaves is the stamp.
+        // recorded and unenforced — so the trace it leaves is the stamp, and
+        // now also a day of extra interest.
         await time.increaseTo(startTime + duration + BigInt(24 * 60 * 60))
-        await lendingPool.connect(borrower).repayLoan(loanId, { value: repaymentAmount })
+        await repayInFull(lendingPool, borrower, loanId)
 
         const loan = await lendingPool.getLoan(loanId)
 
@@ -549,8 +569,7 @@ describe('LendingPool', function () {
       })
 
       it('Should pack into the slot the borrower already sits in', async function () {
-        const repaymentAmount = await lendingPool.calculateRepaymentAmount(loanId)
-        await lendingPool.connect(borrower).repayLoan(loanId, { value: repaymentAmount })
+        await repayInFull(lendingPool, borrower, loanId)
 
         const address = await lendingPool.getAddress()
         const slot = await findLoanSlot(address, loanId, borrower.address)
@@ -581,34 +600,90 @@ describe('LendingPool', function () {
      * says whether the debt is closed.
      */
     describe('paying in instalments', function () {
-      /** Principal plus the whole fixed interest — 5 POL at 500bp. */
-      let totalOwed: bigint
+      /** 5 POL at 500bp over 30 days: 0.25 POL of interest if held to term. */
+      const fullTermInterest = (loanAmount * BigInt(interestRate)) / 10000n
 
-      beforeEach(async function () {
-        totalOwed = await lendingPool.calculateRepaymentAmount(loanId)
-      })
+      /** A wei figure close enough, given a block or two of accrual either way. */
+      const dust = ethers.parseEther('0.0001')
+
+      /** Mines the next transaction a given number of seconds into the term. */
+      async function atSecondsIn(seconds: number): Promise<void> {
+        const { startTime } = await lendingPool.getLoan(loanId)
+
+        await time.setNextBlockTimestamp(startTime + BigInt(seconds))
+      }
+
+      /**
+       * Settles the loan exactly `seconds` into its term.
+       *
+       * The quote has to be taken *for that moment*, not for now — which is
+       * the same trap `repayInFull` exists to cover on a live chain, seen here
+       * from the other side: quote the wrong instant and the payment lands
+       * short, the debt survives, and nothing says so.
+       */
+      async function settleAtSecondsIn(seconds: number) {
+        const { startTime } = await lendingPool.getLoan(loanId)
+        const at = startTime + BigInt(seconds)
+        const owed = await lendingPool.outstandingBalanceAt(loanId, at)
+
+        await time.setNextBlockTimestamp(at)
+
+        return lendingPool.connect(borrower).repayLoan(loanId, { value: owed })
+      }
+
+      const halfTerm = loanDuration / 2
 
       it('Should credit a part payment and leave the loan open', async function () {
-        const part = totalOwed / 4n
-
-        await lendingPool.connect(borrower).repayLoan(loanId, { value: part })
+        await atSecondsIn(halfTerm)
+        await lendingPool.connect(borrower).repayLoan(loanId, { value: ethers.parseEther('1') })
 
         const loan = await lendingPool.getLoan(loanId)
 
-        expect(loan.amountRepaid).to.equal(part)
+        expect(loan.amountRepaid).to.equal(ethers.parseEther('1'))
         expect(loan.isRepaid).to.be.false
         // Nothing was settled, so there is nothing to date. The instalment is
         // dated by its own log instead.
         expect(loan.repaidAt).to.equal(0)
       })
 
-      it('Should report what is left, while the lifetime total holds still', async function () {
-        const part = ethers.parseEther('2')
+      /**
+       * The rule that makes accrual mean anything.
+       *
+       * A payment settles the time already used before it touches the money
+       * still out. Principal-first would let a borrower cut what they owe for
+       * time they have not paid for yet.
+       */
+      it('Should take interest before principal', async function () {
+        // Half a term in, half the stated interest has accrued.
+        await atSecondsIn(halfTerm)
+        await lendingPool.connect(borrower).repayLoan(loanId, { value: fullTermInterest / 4n })
 
-        await lendingPool.connect(borrower).repayLoan(loanId, { value: part })
+        const [principal, interest] = await lendingPool.loanBalance(loanId)
 
-        expect(await lendingPool.outstandingBalance(loanId)).to.equal(totalOwed - part)
-        expect(await lendingPool.calculateRepaymentAmount(loanId)).to.equal(totalOwed)
+        expect(principal).to.equal(loanAmount)
+        expect(interest).to.be.closeTo(fullTermInterest / 4n, dust)
+      })
+
+      it('Should reduce principal only once the interest is covered', async function () {
+        await atSecondsIn(halfTerm)
+        await lendingPool.connect(borrower).repayLoan(loanId, { value: fullTermInterest / 2n + ethers.parseEther('1') })
+
+        const [principal, interest] = await lendingPool.loanBalance(loanId)
+
+        expect(interest).to.be.closeTo(0n, dust)
+        expect(principal).to.be.closeTo(loanAmount - ethers.parseEther('1'), dust)
+      })
+
+      it('Should report what is left as principal plus interest so far', async function () {
+        await atSecondsIn(halfTerm)
+        await lendingPool.connect(borrower).repayLoan(loanId, { value: ethers.parseEther('1') })
+
+        const [principal, interest] = await lendingPool.loanBalance(loanId)
+
+        expect(await lendingPool.outstandingBalance(loanId)).to.equal(principal + interest)
+        // The lifetime quote does not move — it is the price of the term, not
+        // the bill.
+        expect(await lendingPool.calculateRepaymentAmount(loanId)).to.equal(loanAmount + fullTermInterest)
       })
 
       it('Should announce the payment without announcing a settlement', async function () {
@@ -622,26 +697,32 @@ describe('LendingPool', function () {
       })
 
       it('Should emit both on the payment that closes the debt', async function () {
-        const part = ethers.parseEther('1')
-        await lendingPool.connect(borrower).repayLoan(loanId, { value: part })
+        await lendingPool.connect(borrower).repayLoan(loanId, { value: ethers.parseEther('1') })
 
-        const final = totalOwed - part
+        const tx = repayInFull(lendingPool, borrower, loanId)
 
-        const tx = lendingPool.connect(borrower).repayLoan(loanId, { value: final })
-
-        // The instalment carries what this payment moved; the settlement
-        // carries the whole debt, however many transactions it arrived in.
-        await expect(tx).to.emit(lendingPool, 'LoanRepaymentMade').withArgs(loanId, borrower.address, final)
-        await expect(tx).to.emit(lendingPool, 'LoanRepaid').withArgs(loanId, borrower.address, totalOwed)
+        // The instalment says money moved; the settlement says the debt ended.
+        await expect(tx).to.emit(lendingPool, 'LoanRepaymentMade')
+        await expect(tx).to.emit(lendingPool, 'LoanRepaid')
 
         const loan = await lendingPool.getLoan(loanId)
         expect(loan.isRepaid).to.be.true
-        expect(loan.amountRepaid).to.equal(totalOwed)
         expect(await lendingPool.outstandingBalance(loanId)).to.equal(0)
       })
 
-      it('Should hold the borrower’s slot until the debt is closed', async function () {
-        await lendingPool.connect(borrower).repayLoan(loanId, { value: totalOwed / 2n })
+      it('Should report the running total on settlement, not any single quote', async function () {
+        await lendingPool.connect(borrower).repayLoan(loanId, { value: ethers.parseEther('1') })
+        await repayInFull(lendingPool, borrower, loanId)
+
+        const loan = await lendingPool.getLoan(loanId)
+        const settlement = await lendingPool.queryFilter(lendingPool.filters.LoanRepaid())
+
+        expect(settlement).to.have.length(1)
+        expect(settlement[0].args.amount).to.equal(loan.amountRepaid)
+      })
+
+      it('Should hold the borrower slot until the debt is closed', async function () {
+        await lendingPool.connect(borrower).repayLoan(loanId, { value: loanAmount / 2n })
 
         // The lock is what caps a borrower at one open loan. A part-paid loan
         // is still a loan, so releasing it early would let them open a second.
@@ -651,29 +732,31 @@ describe('LendingPool', function () {
           'LoanOutstanding'
         )
 
-        await lendingPool.connect(borrower).repayLoan(loanId, { value: totalOwed / 2n })
+        await repayInFull(lendingPool, borrower, loanId)
 
         expect(await lendingPool.activeLoanId(borrower.address)).to.equal(0)
       })
 
       it('Should credit only what was owed, and refund the rest', async function () {
-        await lendingPool.connect(borrower).repayLoan(loanId, { value: totalOwed - ethers.parseEther('1') })
-
         const fundsBefore = await lendingPool.totalFunds()
         const balanceBefore = await ethers.provider.getBalance(borrower.address)
 
-        // Twice what is left. Only the outstanding POL may be credited.
-        const tx = await lendingPool.connect(borrower).repayLoan(loanId, { value: ethers.parseEther('2') })
+        // Far more than the debt. Only what is owed may be credited.
+        const owed = await lendingPool.outstandingBalance(loanId)
+        const tx = await lendingPool.connect(borrower).repayLoan(loanId, { value: owed + ethers.parseEther('5') })
         const receipt = await tx.wait()
         const gas = receipt!.gasUsed * receipt!.gasPrice
+        const credited = (await lendingPool.totalFunds()) - fundsBefore
 
-        expect(await lendingPool.totalFunds()).to.equal(fundsBefore + ethers.parseEther('1'))
-        expect(await ethers.provider.getBalance(borrower.address)).to.equal(balanceBefore - ethers.parseEther('1') - gas)
-        expect((await lendingPool.getLoan(loanId)).amountRepaid).to.equal(totalOwed)
+        // A block passed, so a shade more accrued than `owed` reported — but
+        // the pool still took only the debt and gave the rest back.
+        expect(credited).to.be.closeTo(owed, dust)
+        expect(await ethers.provider.getBalance(borrower.address)).to.equal(balanceBefore - credited - gas)
+        expect((await lendingPool.getLoan(loanId)).isRepaid).to.be.true
       })
 
       it('Should refuse another payment once the debt is closed', async function () {
-        await lendingPool.connect(borrower).repayLoan(loanId, { value: totalOwed })
+        await repayInFull(lendingPool, borrower, loanId)
 
         await expect(lendingPool.connect(borrower).repayLoan(loanId, { value: 1n })).to.be.revertedWithCustomError(
           lendingPool,
@@ -682,72 +765,66 @@ describe('LendingPool', function () {
       })
 
       /**
-       * The check the whole interest split turns on.
+       * The whole point of accruing on outstanding principal rather than on the
+       * original: handing some back makes the rest cheaper. A flat rate could
+       * not express this at all.
        *
-       * Distributing `payment * rate` per instalment would let a borrower
-       * change what lenders earn by choosing how to split their payments. Each
-       * payment distributes a difference of cumulative shares instead, so the
-       * distributed amounts sum to exactly the interest — which is what
-       * `InterestDistributed` reports and what the pool actually holds.
-       *
-       * The per-share accumulator is the one place a split is not free: it
-       * divides by `totalContributions` once per payment, so five payments
-       * truncate five times where one truncates once. The loss is bounded by
-       * one wei-per-share per instalment and it is always downwards, which is
-       * the same dust the pool already leaves on a single repayment. What must
-       * never happen is the other direction.
+       * Note this replaces an assertion that was true under the flat model and
+       * is now deliberately false — that splitting a repayment was neutral. It
+       * is not neutral any more, and that is the feature.
        */
-      it('Should pay lenders the same interest however the payments are split', async function () {
-        expect(await lendingPool.accInterestPerShare()).to.equal(0)
+      it('Should cost less when principal comes back sooner', async function () {
+        // Clear the interest and half the principal at the halfway mark, then
+        // run the rest of the term.
+        await atSecondsIn(halfTerm)
+        await lendingPool.connect(borrower).repayLoan(loanId, { value: fullTermInterest / 2n + loanAmount / 2n })
+        await settleAtSecondsIn(loanDuration)
 
-        // Five uneven instalments, deliberately not a clean division.
-        const parts = [ethers.parseEther('0.3'), ethers.parseEther('1.7'), ethers.parseEther('2'), ethers.parseEther('0.9')]
-        let paid = 0n
-        let distributed = 0n
+        const loan = await lendingPool.getLoan(loanId)
+        const paidEarly = loan.amountRepaid
 
-        for (const part of parts) {
-          const tx = await lendingPool.connect(borrower).repayLoan(loanId, { value: part })
-          distributed += await interestDistributedBy(tx)
-          paid += part
-        }
+        expect(loan.isRepaid).to.be.true
 
-        const tx = await lendingPool.connect(borrower).repayLoan(loanId, { value: totalOwed - paid })
-        distributed += await interestDistributedBy(tx)
-
-        // Exactly the interest, in five pieces. No wei is created or lost here.
-        const interest = totalOwed - loanAmount
-        expect(distributed).to.equal(interest)
-
-        // What one payment on the same loan would have produced.
-        const contributions = await lendingPool.totalContributions()
-        const lump = (interest * 10n ** 18n) / contributions
-        const split = await lendingPool.accInterestPerShare()
-
-        expect(split).to.be.lte(lump)
-        expect(split).to.be.gte(lump - BigInt(parts.length + 1))
+        // Half the principal for half the term saves a quarter of the term's
+        // interest — which only happens if accrual follows what came back.
+        expect(paidEarly).to.be.lt(loanAmount + fullTermInterest)
+        expect(paidEarly).to.be.closeTo(loanAmount + (fullTermInterest * 3n) / 4n, dust)
       })
 
-      it('Should share out each instalment’s interest as it arrives', async function () {
-        const half = totalOwed / 2n
-        const interest = totalOwed - loanAmount
+      it('Should share out each instalment interest as it arrives', async function () {
+        await atSecondsIn(halfTerm)
 
-        await expect(lendingPool.connect(borrower).repayLoan(loanId, { value: half }))
+        // Half the term's interest is accrued and this payment covers exactly
+        // that, so the pool distributes precisely it — no apportioning.
+        await expect(lendingPool.connect(borrower).repayLoan(loanId, { value: fullTermInterest / 2n }))
           .to.emit(lendingPool, 'InterestDistributed')
-          .withArgs(loanId, interest / 2n)
+          .withArgs(loanId, fullTermInterest / 2n)
 
         // Lenders can claim from a loan that is still running: the money is in
-        // the pool, and waiting for settlement would be holding earnings back
-        // from people who have already been repaid part of what they lent.
+        // the pool, and waiting for settlement would hold earnings back from
+        // people who have already been repaid part of what they lent.
         expect(await lendingPool.claimable(lender.address)).to.be.gt(0)
       })
 
       /**
-       * The field appends, so nothing that already exists moves.
+       * Interest-first must not quietly eat a principal payment.
        *
-       * Unlike `repaidAt`, which had to be packed into a slot the struct was
-       * already using: `loans` is a mapping, each entry hashes to its own base
-       * slot, and widening the struct extends into a word that was unallocated.
+       * There is no such thing as a payment with no interest in it at all —
+       * a block always advances the clock by at least a second — so the
+       * assertion is that once the accrued interest is cleared, what follows
+       * goes to principal essentially in full.
        */
+      it('Should put a payment into principal once the interest is cleared', async function () {
+        await atSecondsIn(halfTerm)
+        await lendingPool.connect(borrower).repayLoan(loanId, { value: fullTermInterest / 2n })
+
+        const [principalBefore] = await lendingPool.loanBalance(loanId)
+        await lendingPool.connect(borrower).repayLoan(loanId, { value: ethers.parseEther('1') })
+        const [principalAfter] = await lendingPool.loanBalance(loanId)
+
+        expect(principalBefore - principalAfter).to.be.closeTo(ethers.parseEther('1'), dust)
+      })
+
       it('Should append without shifting any field already in the struct', async function () {
         const part = ethers.parseEther('2')
         await lendingPool.connect(borrower).repayLoan(loanId, { value: part })
@@ -767,6 +844,184 @@ describe('LendingPool', function () {
         expect(BigInt(await ethers.provider.getStorage(address, slot + 5n))).to.equal(part)
       })
     })
+    /**
+     * Interest grows with time held, on the principal still out.
+     *
+     * `interestRate` is the price of `duration` seconds — the meaning it always
+     * had, so every existing pool and every screen showing a rate kept theirs.
+     * What changed is that the price is now charged per second rather than in
+     * one lump the moment the loan exists.
+     */
+    describe('accrual', function () {
+      const fullTermInterest = (loanAmount * BigInt(interestRate)) / 10000n
+
+      /** What the loan owes, priced a given number of seconds into its term. */
+      async function owedAtSecondsIn(seconds: number): Promise<bigint> {
+        const { startTime } = await lendingPool.getLoan(loanId)
+
+        return lendingPool.outstandingBalanceAt(loanId, startTime + BigInt(seconds))
+      }
+
+      it('Should owe essentially only principal at the start', async function () {
+        expect(await owedAtSecondsIn(0)).to.equal(loanAmount)
+      })
+
+      it('Should owe half the stated rate at half the term', async function () {
+        expect(await owedAtSecondsIn(loanDuration / 2)).to.equal(loanAmount + fullTermInterest / 2n)
+      })
+
+      it('Should owe exactly the stated rate at the due date', async function () {
+        // The one moment where the quote and the bill agree.
+        expect(await owedAtSecondsIn(loanDuration)).to.equal(loanAmount + fullTermInterest)
+        expect(await owedAtSecondsIn(loanDuration)).to.equal(await lendingPool.calculateRepaymentAmount(loanId))
+      })
+
+      /**
+       * The decision this model turns on: the clock does not stop at the due
+       * date. Capping there would make time free afterwards, which is a rule
+       * that has to be invented — and one that leaves a borrower with no reason
+       * ever to settle.
+       */
+      it('Should keep charging past the due date, at the same rate', async function () {
+        expect(await owedAtSecondsIn(loanDuration * 2)).to.equal(loanAmount + fullTermInterest * 2n)
+        expect(await owedAtSecondsIn(loanDuration * 3)).to.equal(loanAmount + fullTermInterest * 3n)
+      })
+
+      it('Should not accrue backwards', async function () {
+        // A timestamp before the last accrual is not a rebate.
+        const { startTime } = await lendingPool.getLoan(loanId)
+
+        expect(await lendingPool.outstandingBalanceAt(loanId, startTime - 1000n)).to.equal(loanAmount)
+      })
+
+      it('Should report the two halves of the debt separately', async function () {
+        await time.increaseTo((await lendingPool.getLoan(loanId)).startTime + BigInt(loanDuration))
+
+        const [principal, interest] = await lendingPool.loanBalance(loanId)
+
+        expect(principal).to.equal(loanAmount)
+        expect(interest).to.be.closeTo(fullTermInterest, ethers.parseEther('0.0001'))
+      })
+
+      it('Should report nothing owed on a settled loan, however long ago', async function () {
+        await repayInFull(lendingPool, borrower, loanId)
+        await time.increase(loanDuration * 4)
+
+        expect(await lendingPool.outstandingBalance(loanId)).to.equal(0)
+        expect(await lendingPool.outstandingBalanceAt(loanId, (await time.latest()) + loanDuration)).to.equal(0)
+      })
+
+      it('Should report nothing owed on a request nobody has funded', async function () {
+        await lendingPool.connect(owner).setRequiresApproval(true)
+        await lendingPool.connect(lender).requestLoan(ethers.parseEther('2'))
+        const requestId = 2
+
+        await time.increase(loanDuration)
+
+        // It asked for money it never received; there is nothing to charge for.
+        expect(await lendingPool.outstandingBalance(requestId)).to.equal(0)
+        const [principal, interest] = await lendingPool.loanBalance(requestId)
+        expect(principal).to.equal(0)
+        expect(interest).to.equal(0)
+      })
+
+      it('Should start the clock at approval, not at the request', async function () {
+        await lendingPool.connect(owner).setRequiresApproval(true)
+        await lendingPool.connect(lender).requestLoan(ethers.parseEther('2'))
+        const requestId = 2
+
+        // The owner sits on it for a full term before agreeing.
+        await time.increase(loanDuration)
+        await lendingPool.connect(owner).approveLoan(requestId)
+
+        // Nothing is owed but the principal: waiting on a decision is not
+        // borrowing, and a request that waited a week must not arrive already
+        // owing a week of interest.
+        expect(await lendingPool.outstandingBalance(requestId)).to.equal(ethers.parseEther('2'))
+      })
+    })
+
+    /**
+     * Loans made before interest accrued.
+     *
+     * Their `principalOutstanding` and `accruedAt` read zero, because neither
+     * field existed when they were written — and reading the first literally
+     * would say the principal is already back. Simulated here by zeroing those
+     * two words directly, which is the only way to hold a pre-upgrade loan in a
+     * suite that deploys the current implementation.
+     */
+    describe('a loan made before accrual', function () {
+      const fullTermInterest = (loanAmount * BigInt(interestRate)) / 10000n
+
+      /** Blanks the two words accrual added, leaving the loan as v3 wrote it. */
+      async function stripAccrualFields(): Promise<void> {
+        const address = await lendingPool.getAddress()
+        const slot = await findLoanSlot(address, loanId, borrower.address)
+        const zero = `0x${'0'.repeat(64)}`
+
+        // Slot 6 is `principalOutstanding`, slot 7 packs `interestOutstanding`
+        // with `accruedAt`. The four before them predate this change.
+        await ethers.provider.send('hardhat_setStorageAt', [address, `0x${(slot + 6n).toString(16)}`, zero])
+        await ethers.provider.send('hardhat_setStorageAt', [address, `0x${(slot + 7n).toString(16)}`, zero])
+      }
+
+      it('Should owe what it owed under the flat rate, not nothing', async function () {
+        await stripAccrualFields()
+
+        // Reading `principalOutstanding` literally would say zero is owed.
+        expect(await lendingPool.outstandingBalance(loanId)).to.equal(loanAmount + fullTermInterest)
+      })
+
+      it('Should keep an untouched loan whole', async function () {
+        await stripAccrualFields()
+
+        const [principal, interest] = await lendingPool.loanBalance(loanId)
+
+        expect(principal).to.equal(loanAmount)
+        expect(interest).to.equal(fullTermInterest)
+      })
+
+      /**
+       * A part-paid legacy loan was split pro rata across principal and its
+       * flat interest, so it is converted on exactly those terms — no money
+       * invented, none forgiven.
+       */
+      it('Should convert a part-paid one on the terms it was paid under', async function () {
+        // Pay a fifth of the old total, then blank the new fields as though the
+        // payment had happened under the previous implementation.
+        const oldTotal = loanAmount + fullTermInterest
+        await lendingPool.connect(borrower).repayLoan(loanId, { value: oldTotal / 5n })
+        await stripAccrualFields()
+
+        const [principal, interest] = await lendingPool.loanBalance(loanId)
+
+        // Four fifths of each half still standing.
+        expect(principal).to.equal((loanAmount * 4n) / 5n)
+        expect(interest).to.equal((fullTermInterest * 4n) / 5n)
+        expect(principal + interest).to.equal((oldTotal * 4n) / 5n)
+      })
+
+      it('Should start accruing from the conversion, not from the loan', async function () {
+        await stripAccrualFields()
+
+        // A full term has already passed, and under the flat rate it was all
+        // paid for. Dating accrual back to `startTime` would charge for it
+        // twice.
+        await time.increaseTo((await lendingPool.getLoan(loanId)).startTime + BigInt(loanDuration))
+
+        expect(await lendingPool.outstandingBalance(loanId)).to.equal(loanAmount + fullTermInterest)
+      })
+
+      it('Should be repayable, and settle at the flat figure', async function () {
+        await stripAccrualFields()
+
+        await repayInFull(lendingPool, borrower, loanId)
+
+        const loan = await lendingPool.getLoan(loanId)
+        expect(loan.isRepaid).to.be.true
+        expect(loan.amountRepaid).to.be.closeTo(loanAmount + fullTermInterest, ethers.parseEther('0.0001'))
+      })
+    })
   })
 
   describe('Pool Configuration', function () {
@@ -783,6 +1038,32 @@ describe('LendingPool', function () {
       expect(poolConfig.maxLoanAmount).to.equal(newMaxLoan)
       expect(poolConfig.interestRate).to.equal(newInterestRate)
       expect(poolConfig.loanDuration).to.equal(newDuration)
+    })
+
+    /**
+     * The same three rules `PoolFactory.createPool` enforces, which this could
+     * always sidestep. The term matters most: it is the denominator interest
+     * accrues over, so a zero would have made every later loan from this pool
+     * free to hold for ever.
+     */
+    it('Should refuse a zero term, which interest accrues over', async function () {
+      await expect(lendingPool.connect(owner).updatePoolConfig(ethers.parseEther('20'), 750, 0)).to.be.revertedWithCustomError(
+        lendingPool,
+        'InvalidLoanDuration'
+      )
+    })
+
+    it('Should refuse a rate above 100%', async function () {
+      await expect(
+        lendingPool.connect(owner).updatePoolConfig(ethers.parseEther('20'), 10001, 60 * 24 * 60 * 60)
+      ).to.be.revertedWithCustomError(lendingPool, 'InvalidInterestRate')
+    })
+
+    it('Should refuse a zero cap', async function () {
+      await expect(lendingPool.connect(owner).updatePoolConfig(0, 750, 60 * 24 * 60 * 60)).to.be.revertedWithCustomError(
+        lendingPool,
+        'InvalidAmount'
+      )
     })
 
     it('Should reject config updates from non-owner', async function () {
@@ -1409,11 +1690,22 @@ describe('LendingPool', function () {
   })
 
   describe('Interest accrual', function () {
-    /** Borrows `amount` and repays it, returning the interest that produced. */
+    /**
+     * Borrows `amount`, holds it to the due date and repays it, returning the
+     * interest that produced.
+     *
+     * **Held to term deliberately.** Interest accrues per second, so a loan
+     * borrowed and repaid in the same test would earn a second or two of it and
+     * every distribution assertion below would be measuring dust. Running the
+     * full term is what makes the interest exactly the pool's stated rate,
+     * which is the figure these tests are written against.
+     */
     async function borrowAndRepay(who: SignerWithAddress, amount: bigint): Promise<bigint> {
       await lendingPool.connect(who).createLoan(amount)
       const loanId = (await lendingPool.nextLoanId()) - 1n
       const due = await lendingPool.calculateRepaymentAmount(loanId)
+
+      await atEndOfTerm(lendingPool, Number(loanId))
       await lendingPool.connect(who).repayLoan(loanId, { value: due })
 
       return due - amount
@@ -1480,6 +1772,8 @@ describe('LendingPool', function () {
         await lendingPool.connect(borrower).createLoan(ethers.parseEther('10'))
         const due = await lendingPool.calculateRepaymentAmount(1)
         const interest = due - ethers.parseEther('10')
+
+        await atEndOfTerm(lendingPool, 1)
 
         await expect(lendingPool.connect(borrower).repayLoan(1, { value: due }))
           .to.emit(lendingPool, 'InterestDistributed')
