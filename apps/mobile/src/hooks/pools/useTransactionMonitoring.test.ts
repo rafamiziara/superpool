@@ -14,7 +14,7 @@ import {
   mockWaitForTransactionReceipt,
 } from '../../__tests__/mocks'
 import { makeContributeTransaction, makePendingTransaction, TX_HASH } from '../../__tests__/fixtures/pendingTransaction'
-import { PoolFactoryABI, SampleLendingPoolABI } from '../../constants/abis'
+import { LendingPoolABI, PoolFactoryABI } from '../../constants/abis'
 import { pendingTransactionsStore } from '../../stores/PendingTransactionsStore'
 import { useTransactionMonitoring } from './useTransactionMonitoring'
 
@@ -50,7 +50,7 @@ function makeFundsDepositedLog(amount: bigint): ReceiptLog {
   return {
     address: POOL_ADDRESS,
     topics: encodeEventTopics({
-      abi: SampleLendingPoolABI,
+      abi: LendingPoolABI,
       eventName: 'FundsDeposited',
       args: { depositor: POOL_OWNER, amount },
     }),

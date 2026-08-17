@@ -5,7 +5,7 @@ import { observer } from 'mobx-react-lite'
 import React, { useState } from 'react'
 import { ActivityIndicator, Pressable, ScrollView, Text, View } from 'react-native'
 import { useReadContract } from 'wagmi'
-import { SampleLendingPoolABI } from '../../../src/constants/abis'
+import { LendingPoolABI } from '../../../src/constants/abis'
 import { palette } from '../../../src/constants/palette'
 import { usePoolSettings } from '../../../src/hooks/pools/usePoolSettings'
 import { poolStore } from '../../../src/stores/PoolStore'
@@ -36,7 +36,7 @@ function PoolSettingsScreen() {
     refetch: refetchConfig,
   } = useReadContract({
     address: pool?.poolAddress as `0x${string}` | undefined,
-    abi: SampleLendingPoolABI,
+    abi: LendingPoolABI,
     functionName: 'poolConfig',
     query: { enabled: Boolean(pool?.poolAddress) },
   })

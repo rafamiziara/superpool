@@ -3,7 +3,7 @@ import { observer } from 'mobx-react-lite'
 import React, { useEffect, useState } from 'react'
 import { ActivityIndicator, Pressable, Text, View } from 'react-native'
 import { useAccount, useReadContract } from 'wagmi'
-import { SampleLendingPoolABI } from '../../constants/abis'
+import { LendingPoolABI } from '../../constants/abis'
 import { palette } from '../../constants/palette'
 import { useInterest } from '../../hooks/pools/useInterest'
 import { usePoolIndexing } from '../../hooks/pools/usePoolIndexing'
@@ -57,7 +57,7 @@ function ClaimInterestCardComponent({ poolId, poolAddress, poolName, testID = 'c
 
   const { data: claimable, refetch } = useReadContract({
     address: poolAddress,
-    abi: SampleLendingPoolABI,
+    abi: LendingPoolABI,
     functionName: 'claimable',
     args: address ? [address] : undefined,
     query: { enabled: Boolean(address) },

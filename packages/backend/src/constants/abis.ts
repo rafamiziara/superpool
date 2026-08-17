@@ -12,4 +12,4 @@
  * ABIs are produced.
  */
 
-export { PoolFactoryABI, SampleLendingPoolABI } from './abis.generated'
+export { PoolFactoryABI, LendingPoolABI } from './abis.generated'

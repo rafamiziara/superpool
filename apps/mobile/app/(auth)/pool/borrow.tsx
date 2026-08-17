@@ -6,7 +6,7 @@ import React, { useState } from 'react'
 import { ActivityIndicator, Pressable, ScrollView, Text, View } from 'react-native'
 import { useReadContract } from 'wagmi'
 import { BorrowForm } from '../../../src/components/lending/BorrowForm'
-import { SampleLendingPoolABI } from '../../../src/constants/abis'
+import { LendingPoolABI } from '../../../src/constants/abis'
 import { palette } from '../../../src/constants/palette'
 import { calculateRepayment, useLoan } from '../../../src/hooks/pools/useLoan'
 import { usePoolIndexing } from '../../../src/hooks/pools/usePoolIndexing'
@@ -81,7 +81,7 @@ function BorrowScreen() {
   // both lag and ignore outstanding loans, offering money that is not there.
   const { data: available } = useReadContract({
     address: pool?.poolAddress as `0x${string}` | undefined,
-    abi: SampleLendingPoolABI,
+    abi: LendingPoolABI,
     functionName: 'totalFunds',
     query: { enabled: Boolean(pool?.poolAddress) },
   })
@@ -92,7 +92,7 @@ function BorrowScreen() {
   // reverts with `ApprovalRequired`.
   const { data: config } = useReadContract({
     address: pool?.poolAddress as `0x${string}` | undefined,
-    abi: SampleLendingPoolABI,
+    abi: LendingPoolABI,
     functionName: 'poolConfig',
     query: { enabled: Boolean(pool?.poolAddress) },
   })

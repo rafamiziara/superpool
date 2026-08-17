@@ -28,9 +28,9 @@ async function testSafeFlow() {
 
   try {
     // Step 1: Deploy implementation
-    console.log('\n1️⃣ Deploying SampleLendingPool implementation...')
-    const SampleLendingPool = await ethers.getContractFactory('SampleLendingPool')
-    const lendingPoolImplementation = await SampleLendingPool.deploy()
+    console.log('\n1️⃣ Deploying LendingPool implementation...')
+    const LendingPool = await ethers.getContractFactory('LendingPool')
+    const lendingPoolImplementation = await LendingPool.deploy()
     await lendingPoolImplementation.waitForDeployment()
     const implementationAddress = await lendingPoolImplementation.getAddress()
     console.log(`✅ Implementation deployed: ${implementationAddress}`)

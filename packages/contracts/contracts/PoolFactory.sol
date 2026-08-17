@@ -14,7 +14,7 @@ import {BeaconProxy} from "@openzeppelin/contracts/proxy/beacon/BeaconProxy.sol"
 import {
     UpgradeableBeacon
 } from "@openzeppelin/contracts/proxy/beacon/UpgradeableBeacon.sol";
-import {SampleLendingPool} from "./SampleLendingPool.sol";
+import {LendingPool} from "./LendingPool.sol";
 
 /**
  * @title PoolFactory
@@ -26,7 +26,7 @@ import {SampleLendingPool} from "./SampleLendingPool.sol";
  * This replaced ERC-1167 minimal clones, which hardcode their implementation in
  * bytecode and can never be upgraded: pools created before an implementation
  * change were stranded on the old code forever, and each change forked the pool
- * population again. `SampleLendingPool` also inherited `UUPSUpgradeable` under
+ * population again. `LendingPool` also inherited `UUPSUpgradeable` under
  * that scheme, which advertised an upgrade path it did not have — calling
  * `upgradeToAndCall` on a clone wrote the ERC-1967 slot that a minimal proxy
  * never reads, so it reported success and changed nothing.
@@ -288,7 +288,7 @@ contract PoolFactory is
         if (poolAddress == address(0)) revert PoolCreationFailed();
 
         // Initialize the new pool (msg.sender becomes pool owner)
-        SampleLendingPool(poolAddress).initialize(
+        LendingPool(poolAddress).initialize(
             msg.sender,
             _params.maxLoanAmount,
             _params.interestRate,

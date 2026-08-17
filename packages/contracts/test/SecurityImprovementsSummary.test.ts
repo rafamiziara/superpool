@@ -1,11 +1,11 @@
 import { SignerWithAddress } from '@nomicfoundation/hardhat-ethers/signers'
 import { expect } from 'chai'
 import { ethers } from 'hardhat'
-import { PoolFactory, SampleLendingPool } from '../typechain-types'
+import { LendingPool, PoolFactory } from '../typechain-types'
 
 describe('Security Improvements Summary', function () {
   let poolFactory: PoolFactory
-  let lendingPoolImplementation: SampleLendingPool
+  let lendingPoolImplementation: LendingPool
   let owner: SignerWithAddress
   let addr1: SignerWithAddress
   let addr2: SignerWithAddress
@@ -15,8 +15,8 @@ describe('Security Improvements Summary', function () {
     ;[owner, addr1, addr2, addr3] = await ethers.getSigners()
 
     // Deploy lending pool implementation
-    const SampleLendingPool = await ethers.getContractFactory('SampleLendingPool')
-    lendingPoolImplementation = await SampleLendingPool.deploy()
+    const LendingPool = await ethers.getContractFactory('LendingPool')
+    lendingPoolImplementation = await LendingPool.deploy()
     await lendingPoolImplementation.waitForDeployment()
 
     // Deploy pool factory
@@ -42,7 +42,7 @@ describe('Security Improvements Summary', function () {
 
       await poolFactory.connect(owner).createPool(poolParams)
       const poolAddress = await poolFactory.getPoolAddress(1)
-      const pool = await ethers.getContractAt('SampleLendingPool', poolAddress)
+      const pool = await ethers.getContractAt('LendingPool', poolAddress)
 
       // Fund the pool
       await pool.depositFunds({ value: ethers.parseEther('2') })
@@ -78,7 +78,7 @@ describe('Security Improvements Summary', function () {
 
       await poolFactory.connect(owner).createPool(poolParams)
       const poolAddress = await poolFactory.getPoolAddress(1)
-      const pool = await ethers.getContractAt('SampleLendingPool', poolAddress)
+      const pool = await ethers.getContractAt('LendingPool', poolAddress)
 
       // Fund the pool
       await pool.depositFunds({ value: ethers.parseEther('2') })
@@ -119,7 +119,7 @@ describe('Security Improvements Summary', function () {
 
       await poolFactory.connect(owner).createPool(poolParams)
       const poolAddress = await poolFactory.getPoolAddress(1)
-      const pool = await ethers.getContractAt('SampleLendingPool', poolAddress)
+      const pool = await ethers.getContractAt('LendingPool', poolAddress)
 
       // Should handle zero interest correctly
       await pool.depositFunds({ value: ethers.parseEther('2') })
@@ -275,7 +275,7 @@ describe('Security Improvements Summary', function () {
       expect(poolInfo.name).to.equal('Integration Test Pool')
 
       // 3. Interact with the pool (tests reentrancy protection and safe arithmetic)
-      const pool = await ethers.getContractAt('SampleLendingPool', poolAddress)
+      const pool = await ethers.getContractAt('LendingPool', poolAddress)
 
       // Fund the pool
       await pool.connect(addr2).depositFunds({ value: ethers.parseEther('2') })

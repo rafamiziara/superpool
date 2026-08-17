@@ -9,7 +9,7 @@ import {
   OTHER_TX_HASH,
   TX_HASH,
 } from '../__tests__/fixtures/pendingTransaction'
-import { PoolFactoryABI, SampleLendingPoolABI } from '../constants/abis'
+import { LendingPoolABI, PoolFactoryABI } from '../constants/abis'
 import {
   extractFundsDepositedResult,
   extractInterestClaimedResult,
@@ -104,7 +104,7 @@ function makePoolCreatedLog(poolId: bigint, poolAddress: `0x${string}`): Receipt
  */
 function makeFundsDepositedLog(depositor: `0x${string}`, amount: bigint): ReceiptLog {
   const topics = encodeEventTopics({
-    abi: SampleLendingPoolABI,
+    abi: LendingPoolABI,
     eventName: 'FundsDeposited',
     args: { depositor, amount },
   })
@@ -684,7 +684,7 @@ function makeLoanLog(
   amount: bigint
 ): ReceiptLog {
   const topics = encodeEventTopics({
-    abi: SampleLendingPoolABI,
+    abi: LendingPoolABI,
     eventName,
     args: { loanId, borrower: POOL_OWNER, amount },
   })
@@ -707,7 +707,7 @@ function makeMembershipLog(
   eventName: 'MembershipRequested' | 'MembershipApproved' | 'MembershipRejected' | 'MembershipRevoked' | 'MembershipLeft' | 'MemberJoined',
   account: `0x${string}`
 ): ReceiptLog {
-  const topics = encodeEventTopics({ abi: SampleLendingPoolABI, eventName, args: { account } })
+  const topics = encodeEventTopics({ abi: LendingPoolABI, eventName, args: { account } })
 
   return {
     address: POOL_ADDRESS,
@@ -783,7 +783,7 @@ describe('extractLoanResult', () => {
 })
 
 function makeInterestClaimedLog(account: `0x${string}`, amount: bigint): ReceiptLog {
-  const topics = encodeEventTopics({ abi: SampleLendingPoolABI, eventName: 'InterestClaimed', args: { account, amount } })
+  const topics = encodeEventTopics({ abi: LendingPoolABI, eventName: 'InterestClaimed', args: { account, amount } })
 
   return {
     address: POOL_ADDRESS,

@@ -2,7 +2,7 @@ import { Interface, JsonRpcProvider, Log } from 'ethers'
 import { Firestore } from 'firebase-admin/firestore'
 import { logger } from 'firebase-functions/v2'
 import { HttpsError } from 'firebase-functions/v2/https'
-import { SampleLendingPoolABI, WITHDRAWALS_COLLECTION } from '../constants'
+import { LendingPoolABI, WITHDRAWALS_COLLECTION } from '../constants'
 import { resolvePoolId } from './contributionIndexer'
 
 /**
@@ -32,7 +32,7 @@ export interface IndexWithdrawalResult {
   stored: boolean
 }
 
-const lendingPoolInterface = new Interface([...SampleLendingPoolABI])
+const lendingPoolInterface = new Interface([...LendingPoolABI])
 
 /** `getPoolId` returns 0 for an unknown address — pool ids start at 1. */
 const UNKNOWN_POOL_ID = 0

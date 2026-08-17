@@ -32,7 +32,7 @@ If automatic verification fails or you need to verify specific contracts:
 
 ```bash
 # Verify a specific contract
-pnpm verify:contracts SampleLendingPool 0x123... [constructorArgs...]
+pnpm verify:contracts LendingPool 0x123... [constructorArgs...]
 
 # Verify a proxy contract
 pnpm verify:proxy 0x123...
@@ -75,10 +75,10 @@ Deploy Contract → Wait for Confirmations → Verify Implementation → Verify 
 pnpm verify:contracts <contractName> <address>
 
 # Contract with constructor arguments
-pnpm verify:contracts SampleLendingPool 0x123... 0xOwnerAddress 1000000000000000000 500 604800
+pnpm verify:contracts LendingPool 0x123... 0xOwnerAddress 1000000000000000000 500 604800
 
 # Examples:
-pnpm verify:contracts SampleLendingPool 0x742d35Cc6634C0532925a3b8D45b9F73F9d9432A
+pnpm verify:contracts LendingPool 0x742d35Cc6634C0532925a3b8D45b9F73F9d9432A
 pnpm verify:contracts PoolFactory 0x5F4eC3Df9cbd43714FE2740f5E3616155c5b8419 0xOwnerAddress 0xImplementationAddress
 ```
 
@@ -107,11 +107,11 @@ pnpm hardhat verify --network polygonAmoy 0x123... "arg1" "arg2" "arg3"
 
 ### Constructor Arguments
 
-#### SampleLendingPool Implementation
+#### LendingPool Implementation
 
 ```bash
 # No constructor arguments (uses initialize instead)
-pnpm verify:contracts SampleLendingPool 0x123...
+pnpm verify:contracts LendingPool 0x123...
 ```
 
 #### PoolFactory Implementation

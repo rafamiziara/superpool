@@ -1,6 +1,6 @@
 import { Interface } from 'ethers'
 import { mockLogger } from '../__tests__/setup'
-import { SampleLendingPoolABI } from '../constants'
+import { LendingPoolABI } from '../constants'
 
 const mockGetLoan = jest.fn()
 const mockGetPoolId = jest.fn()
@@ -56,7 +56,7 @@ const START_TIME = 1_700_000_000
 const REPAID_AT = new Date((START_TIME + 10 * 24 * 60 * 60) * 1000)
 
 /** Real topic hashes, so the fixtures agree with the shipped ABI rather than with the test. */
-const REAL_CREATED_TOPIC = new Interface([...SampleLendingPoolABI]).getEvent('LoanCreated')!.topicHash
+const REAL_CREATED_TOPIC = new Interface([...LendingPoolABI]).getEvent('LoanCreated')!.topicHash
 
 // ---------------------------------------------------------------------------
 // Helpers

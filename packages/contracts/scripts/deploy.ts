@@ -89,20 +89,20 @@ async function main() {
   console.log('Account balance:', ethers.formatEther(balance), 'ETH')
 
   try {
-    // Step 1: Deploy SampleLendingPool Implementation
-    console.log('\n1️⃣ Deploying SampleLendingPool implementation...')
-    const SampleLendingPool = await ethers.getContractFactory('SampleLendingPool')
-    const lendingPoolImplementation = await SampleLendingPool.deploy()
+    // Step 1: Deploy LendingPool Implementation
+    console.log('\n1️⃣ Deploying LendingPool implementation...')
+    const LendingPool = await ethers.getContractFactory('LendingPool')
+    const lendingPoolImplementation = await LendingPool.deploy()
     await lendingPoolImplementation.waitForDeployment()
     const implementationAddress = await lendingPoolImplementation.getAddress()
 
-    console.log('✅ SampleLendingPool implementation deployed to:', implementationAddress)
+    console.log('✅ LendingPool implementation deployed to:', implementationAddress)
 
     // Wait for confirmations before verification
     await waitForConfirmations(lendingPoolImplementation.deploymentTransaction()?.hash || '')
 
-    // Verify SampleLendingPool implementation
-    await verifyContract('SampleLendingPool', implementationAddress, [])
+    // Verify LendingPool implementation
+    await verifyContract('LendingPool', implementationAddress, [])
 
     // Step 2: Deploy PoolFactory
     console.log('\n2️⃣ Deploying PoolFactory...')
@@ -183,7 +183,7 @@ async function main() {
 
     // Verify sample pool if created
     if (samplePoolAddress) {
-      const samplePool = await ethers.getContractAt('SampleLendingPool', samplePoolAddress)
+      const samplePool = await ethers.getContractAt('LendingPool', samplePoolAddress)
       const poolConfig = await samplePool.poolConfig()
       console.log('\nSample pool verification:')
       console.log('- Pool owner:', await samplePool.owner())
@@ -201,7 +201,7 @@ async function main() {
       console.log('\n📋 Contract Verification Summary:')
       console.log(`   🔗 View contracts on Polygonscan:`)
       console.log(
-        `   - SampleLendingPool: https://${network.name === 'polygonAmoy' ? 'amoy.' : ''}polygonscan.com/address/${implementationAddress}`
+        `   - LendingPool: https://${network.name === 'polygonAmoy' ? 'amoy.' : ''}polygonscan.com/address/${implementationAddress}`
       )
       console.log(`   - PoolFactory: https://${network.name === 'polygonAmoy' ? 'amoy.' : ''}polygonscan.com/address/${factoryAddress}`)
       console.log(

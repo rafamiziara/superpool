@@ -2,7 +2,7 @@ import { Contract, Interface, JsonRpcProvider, Log, Provider } from 'ethers'
 import { Firestore } from 'firebase-admin/firestore'
 import { logger } from 'firebase-functions/v2'
 import { HttpsError } from 'firebase-functions/v2/https'
-import { CONTRIBUTIONS_COLLECTION, PoolFactoryABI, SampleLendingPoolABI } from '../constants'
+import { CONTRIBUTIONS_COLLECTION, LendingPoolABI, PoolFactoryABI } from '../constants'
 
 /**
  * One `FundsDeposited` event, resolved to the pool it belongs to.
@@ -30,7 +30,7 @@ export interface IndexContributionResult {
   stored: boolean
 }
 
-const lendingPoolInterface = new Interface([...SampleLendingPoolABI])
+const lendingPoolInterface = new Interface([...LendingPoolABI])
 
 /** `getPoolId` returns 0 for an unknown address — pool ids start at 1 (`++poolCount`). */
 const UNKNOWN_POOL_ID = 0

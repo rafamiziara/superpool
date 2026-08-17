@@ -154,7 +154,7 @@ async function getContractsToVerify(): Promise<ContractInfo[]> {
     console.log(`   2. Use verify:all script to verify from deployment artifacts`)
     console.log(`   3. Use individual verification scripts like verify:implementation or verify:proxy`)
     console.log(`\nExample:`)
-    console.log(`   pnpm verify:contracts SampleLendingPool 0x123... 0xOwnerAddress 1000000000000000000 500 604800`)
+    console.log(`   pnpm verify:contracts LendingPool 0x123... 0xOwnerAddress 1000000000000000000 500 604800`)
 
     process.exit(0)
   }

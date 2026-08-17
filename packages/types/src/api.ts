@@ -300,7 +300,7 @@ export interface LoanInfo {
    * Only pools whose owner turned on review ever produce `requested` or
    * `rejected`; a pool that lends on demand goes straight to `disbursed`. Loans
    * written before the field existed also read `disbursed`, which is what they
-   * were — see the enum note in `SampleLendingPool`.
+   * were — see the enum note in `LendingPool`.
    */
   status: 'disbursed' | 'requested' | 'rejected'
   chainId: number

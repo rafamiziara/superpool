@@ -1201,7 +1201,7 @@ export const PoolFactoryABI = [
   }
 ] as const
 
-export const SampleLendingPoolABI = [
+export const LendingPoolABI = [
   {
     "inputs": [],
     "name": "AlreadyMember",
@@ -1916,7 +1916,7 @@ export const SampleLendingPoolABI = [
             "type": "bool"
           },
           {
-            "internalType": "enum SampleLendingPool.LoanStatus",
+            "internalType": "enum LendingPool.LoanStatus",
             "name": "status",
             "type": "uint8"
           },
@@ -1946,7 +1946,7 @@ export const SampleLendingPoolABI = [
             "type": "uint256"
           }
         ],
-        "internalType": "struct SampleLendingPool.Loan",
+        "internalType": "struct LendingPool.Loan",
         "name": "",
         "type": "tuple"
       }
@@ -2034,7 +2034,7 @@ export const SampleLendingPoolABI = [
         "type": "bool"
       },
       {
-        "internalType": "enum SampleLendingPool.LoanStatus",
+        "internalType": "enum LendingPool.LoanStatus",
         "name": "status",
         "type": "uint8"
       },
@@ -2091,7 +2091,7 @@ export const SampleLendingPoolABI = [
     "name": "membership",
     "outputs": [
       {
-        "internalType": "enum SampleLendingPool.Membership",
+        "internalType": "enum LendingPool.Membership",
         "name": "",
         "type": "uint8"
       }

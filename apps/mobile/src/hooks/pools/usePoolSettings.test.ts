@@ -8,7 +8,7 @@ import {
   mockWaitForTransactionReceipt,
   mockWriteContractAsync,
 } from '../../__tests__/mocks'
-import { SampleLendingPoolABI } from '../../constants/abis'
+import { LendingPoolABI } from '../../constants/abis'
 import { pendingTransactionsStore } from '../../stores/PendingTransactionsStore'
 import { describePoolSettingsError, usePoolSettings } from './usePoolSettings'
 
@@ -31,8 +31,8 @@ type RevertAbiItem = NonNullable<ContractFunctionRevertedError['data']>['abiItem
 
 /** Looks the error up in the shipped ABI, so a rename there fails this test too. */
 function revertedWith(name: string): ContractFunctionRevertedError {
-  const item = SampleLendingPoolABI.find((entry) => entry.type === 'error' && entry.name === name)
-  if (!item || item.type !== 'error') throw new Error(`SampleLendingPoolABI has no error named ${name}`)
+  const item = LendingPoolABI.find((entry) => entry.type === 'error' && entry.name === name)
+  if (!item || item.type !== 'error') throw new Error(`LendingPoolABI has no error named ${name}`)
 
   const reverted = new ContractFunctionRevertedError({ abi: [], functionName: 'setRequiresApproval' })
   reverted.data = { abiItem: item as RevertAbiItem, errorName: name, args: [] }

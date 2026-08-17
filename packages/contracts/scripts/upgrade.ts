@@ -18,7 +18,7 @@ dotenv.config()
  * - **Pools are EIP-1167 minimal proxies** — `PoolFactory.createPool` calls
  *   `lendingPoolImplementation.clone()`. A clone hardcodes its implementation
  *   address in its own bytecode and never reads the ERC-1967 slot, so
- *   **an existing pool can never be upgraded**. `SampleLendingPool` inherits
+ *   **an existing pool can never be upgraded**. `LendingPool` inherits
  *   `UUPSUpgradeable`, but for a cloned pool that machinery is inert: calling
  *   `upgradeToAndCall` on one writes a slot nothing will ever read.
  *
@@ -69,7 +69,7 @@ function writeDeployment(record: DeploymentRecord): void {
 }
 
 /**
- * Deploy a new SampleLendingPool implementation and point the factory at it.
+ * Deploy a new LendingPool implementation and point the factory at it.
  *
  * Only affects pools created from here on. See the note at the top of the file.
  */
@@ -79,15 +79,15 @@ async function upgradePoolImplementation(record: DeploymentRecord): Promise<void
   const currentImplementation = record.contracts.lendingPoolImplementation
 
   console.log('\n1️⃣ Validating the new implementation...')
-  const SampleLendingPool = await ethers.getContractFactory('SampleLendingPool')
+  const LendingPool = await ethers.getContractFactory('LendingPool')
 
   // Catches constructors, immutables, delegatecall and selfdestruct — anything
   // that makes a contract unusable behind a proxy — before it is deployed.
-  await upgrades.validateImplementation(SampleLendingPool, { kind: 'uups' })
+  await upgrades.validateImplementation(LendingPool, { kind: 'uups' })
   console.log('   ✅ Safe to use behind a proxy')
 
   console.log('\n2️⃣ Deploying the new implementation...')
-  const implementation = await SampleLendingPool.deploy()
+  const implementation = await LendingPool.deploy()
   await implementation.waitForDeployment()
   const newImplementation = await implementation.getAddress()
   console.log(`   ✅ Deployed to ${newImplementation}`)

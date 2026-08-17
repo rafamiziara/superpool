@@ -1,11 +1,11 @@
 import { SignerWithAddress } from '@nomicfoundation/hardhat-ethers/signers'
 import { expect } from 'chai'
 import { ethers, upgrades } from 'hardhat'
-import { PoolFactory, SampleLendingPool } from '../typechain-types'
+import { LendingPool, PoolFactory } from '../typechain-types'
 
 describe('PoolFactory', function () {
   let poolFactory: PoolFactory
-  let lendingPoolImplementation: SampleLendingPool
+  let lendingPoolImplementation: LendingPool
   let owner: SignerWithAddress
   let poolOwner1: SignerWithAddress
   let poolOwner2: SignerWithAddress
@@ -25,8 +25,8 @@ describe('PoolFactory', function () {
     ;[owner, poolOwner1, poolOwner2, otherAccount] = await ethers.getSigners()
 
     // Deploy lending pool implementation
-    const SampleLendingPool = await ethers.getContractFactory('SampleLendingPool')
-    lendingPoolImplementation = await SampleLendingPool.deploy()
+    const LendingPool = await ethers.getContractFactory('LendingPool')
+    lendingPoolImplementation = await LendingPool.deploy()
     await lendingPoolImplementation.waitForDeployment()
 
     // Deploy PoolFactory
@@ -130,7 +130,7 @@ describe('PoolFactory', function () {
       const tx = await poolFactory.connect(owner).createPool({ ...defaultPoolParams, requiresMembership: true })
       await tx.wait()
 
-      const pool = await ethers.getContractAt('SampleLendingPool', (await poolFactory.getPoolInfo(1)).poolAddress)
+      const pool = await ethers.getContractAt('LendingPool', (await poolFactory.getPoolInfo(1)).poolAddress)
 
       expect((await pool.poolConfig()).requiresMembership).to.be.true
       await expect(pool.connect(otherAccount).depositFunds({ value: ethers.parseEther('1') })).to.be.revertedWithCustomError(
@@ -142,7 +142,7 @@ describe('PoolFactory', function () {
     it('Should create an open pool by default', async function () {
       await (await poolFactory.connect(owner).createPool({ ...defaultPoolParams })).wait()
 
-      const pool = await ethers.getContractAt('SampleLendingPool', (await poolFactory.getPoolInfo(1)).poolAddress)
+      const pool = await ethers.getContractAt('LendingPool', (await poolFactory.getPoolInfo(1)).poolAddress)
 
       expect((await pool.poolConfig()).requiresMembership).to.be.false
       await expect(pool.connect(otherAccount).depositFunds({ value: ethers.parseEther('1') })).to.not.be.reverted
@@ -308,7 +308,7 @@ describe('PoolFactory', function () {
       expect(poolAddress).to.not.equal(ethers.ZeroAddress)
 
       // Verify it's a valid pool by checking it has the expected owner
-      const pool = await ethers.getContractAt('SampleLendingPool', poolAddress)
+      const pool = await ethers.getContractAt('LendingPool', poolAddress)
       expect(await pool.owner()).to.equal(poolOwner1.address)
     })
 
@@ -404,8 +404,8 @@ describe('PoolFactory', function () {
   describe('Implementation Management', function () {
     it('Should update implementation address', async function () {
       // Deploy new implementation
-      const SampleLendingPool = await ethers.getContractFactory('SampleLendingPool')
-      const newImplementation = await SampleLendingPool.deploy()
+      const LendingPool = await ethers.getContractFactory('LendingPool')
+      const newImplementation = await LendingPool.deploy()
       await newImplementation.waitForDeployment()
 
       const oldImplementation = await poolFactory.lendingPoolImplementation()
@@ -425,8 +425,8 @@ describe('PoolFactory', function () {
     })
 
     it('Should reject implementation update from non-owner', async function () {
-      const SampleLendingPool = await ethers.getContractFactory('SampleLendingPool')
-      const newImplementation = await SampleLendingPool.deploy()
+      const LendingPool = await ethers.getContractFactory('LendingPool')
+      const newImplementation = await LendingPool.deploy()
       await newImplementation.waitForDeployment()
 
       await expect(
@@ -474,7 +474,7 @@ describe('PoolFactory', function () {
 
       // Get pool address and interact with it
       const poolAddress = await poolFactory.getPoolAddress(1)
-      const pool = await ethers.getContractAt('SampleLendingPool', poolAddress)
+      const pool = await ethers.getContractAt('LendingPool', poolAddress)
 
       // Verify pool is properly initialized
       expect(await pool.owner()).to.equal(poolOwner1.address)
@@ -520,8 +520,8 @@ describe('PoolFactory', function () {
       const pool1Address = await poolFactory.getPoolAddress(1)
       const pool2Address = await poolFactory.getPoolAddress(2)
 
-      const pool1 = await ethers.getContractAt('SampleLendingPool', pool1Address)
-      const pool2 = await ethers.getContractAt('SampleLendingPool', pool2Address)
+      const pool1 = await ethers.getContractAt('LendingPool', pool1Address)
+      const pool2 = await ethers.getContractAt('LendingPool', pool2Address)
 
       // Verify different configurations
       const config1 = await pool1.poolConfig()

@@ -10,7 +10,7 @@ const mockGetEvent = jest.fn()
 const mockGetPoolId = jest.fn()
 
 // Mock ethers BEFORE importing the module under test. The module creates a
-// top-level `new Interface([...SampleLendingPoolABI])`, so the mock must be in
+// top-level `new Interface([...LendingPoolABI])`, so the mock must be in
 // place before the first `require`.
 jest.mock('ethers', () => {
   const actual = jest.requireActual('ethers')

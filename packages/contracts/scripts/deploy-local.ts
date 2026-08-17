@@ -84,17 +84,17 @@ async function main() {
   console.log(`💰 Deployer balance: ${ethers.formatEther(deployerBalance)} ETH`)
 
   try {
-    // Step 1: Deploy SampleLendingPool Implementation
-    console.log('\n1️⃣ Deploying SampleLendingPool implementation...')
-    const SampleLendingPool = await ethers.getContractFactory('SampleLendingPool')
-    const lendingPoolImplementation = await SampleLendingPool.deploy()
+    // Step 1: Deploy LendingPool Implementation
+    console.log('\n1️⃣ Deploying LendingPool implementation...')
+    const LendingPool = await ethers.getContractFactory('LendingPool')
+    const lendingPoolImplementation = await LendingPool.deploy()
     await lendingPoolImplementation.waitForDeployment()
     const implementationAddress = await lendingPoolImplementation.getAddress()
 
-    console.log('✅ SampleLendingPool implementation deployed to:', implementationAddress)
+    console.log('✅ LendingPool implementation deployed to:', implementationAddress)
 
-    // Verify SampleLendingPool implementation
-    await verifyContract('SampleLendingPool', implementationAddress, [])
+    // Verify LendingPool implementation
+    await verifyContract('LendingPool', implementationAddress, [])
 
     // Step 2: Deploy PoolFactory
     console.log('\n2️⃣ Deploying PoolFactory...')
@@ -220,7 +220,7 @@ async function main() {
 
     for (let i = 0; i < createdPools.length; i++) {
       const pool = createdPools[i]
-      const poolContract = await ethers.getContractAt('SampleLendingPool', pool.address)
+      const poolContract = await ethers.getContractAt('LendingPool', pool.address)
 
       // Get the pool owner account
       const ownerAccount = accounts.find((acc) => acc.address === pool.owner) || deployer
@@ -277,7 +277,7 @@ async function main() {
     console.log(`   const factory = await ethers.getContractAt("PoolFactory", "${factoryAddress}");`)
     console.log(``)
     console.log(`   # Get pool instance`)
-    console.log(`   const pool = await ethers.getContractAt("SampleLendingPool", "${createdPools[0]?.address}");`)
+    console.log(`   const pool = await ethers.getContractAt("LendingPool", "${createdPools[0]?.address}");`)
 
     console.log('\n🎉 LOCAL deployment completed successfully!')
     console.log('\n📱 Mobile App Configuration:')

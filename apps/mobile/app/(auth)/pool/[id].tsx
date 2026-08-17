@@ -10,7 +10,7 @@ import { ApprovalsLink } from '../../../src/components/lending/ApprovalsLink'
 import { ClaimInterestCard } from '../../../src/components/lending/ClaimInterestCard'
 import { PendingContributionCard } from '../../../src/components/lending/PendingContributionCard'
 import { TransactionStatusModal } from '../../../src/components/lending/TransactionStatusModal'
-import { SampleLendingPoolABI } from '../../../src/constants/abis'
+import { LendingPoolABI } from '../../../src/constants/abis'
 import { palette } from '../../../src/constants/palette'
 import {
   type ContributeTransaction,
@@ -60,7 +60,7 @@ function PoolDetailScreen() {
   // this at any moment and nothing indexes it.
   const { data: config } = useReadContract({
     address: pool?.poolAddress as `0x${string}` | undefined,
-    abi: SampleLendingPoolABI,
+    abi: LendingPoolABI,
     functionName: 'poolConfig',
     query: { enabled: Boolean(pool?.poolAddress) },
   })

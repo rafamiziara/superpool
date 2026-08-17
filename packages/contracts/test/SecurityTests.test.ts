@@ -1,7 +1,7 @@
 import { SignerWithAddress } from '@nomicfoundation/hardhat-ethers/signers'
 import { expect } from 'chai'
 import { ethers, upgrades } from 'hardhat'
-import { SampleLendingPool } from '../typechain-types'
+import { LendingPool } from '../typechain-types'
 
 /**
  * Deploys a pool the way the factory does: behind a beacon proxy.
@@ -11,19 +11,19 @@ import { SampleLendingPool } from '../typechain-types'
  * deployment is rejected outright. Testing through a beacon is also the only
  * way these tests exercise the delegation path production actually uses.
  */
-async function deployPoolBehindBeacon(args: unknown[]): Promise<SampleLendingPool> {
-  const SampleLendingPool = await ethers.getContractFactory('SampleLendingPool')
-  const beacon = await upgrades.deployBeacon(SampleLendingPool)
+async function deployPoolBehindBeacon(args: unknown[]): Promise<LendingPool> {
+  const LendingPool = await ethers.getContractFactory('LendingPool')
+  const beacon = await upgrades.deployBeacon(LendingPool)
   await beacon.waitForDeployment()
 
-  const pool = (await upgrades.deployBeaconProxy(beacon, SampleLendingPool, args)) as unknown as SampleLendingPool
+  const pool = (await upgrades.deployBeaconProxy(beacon, LendingPool, args)) as unknown as LendingPool
   await pool.waitForDeployment()
 
   return pool
 }
 
 describe('Security Tests', function () {
-  let lendingPool: SampleLendingPool
+  let lendingPool: LendingPool
   let owner: SignerWithAddress
   let borrower: SignerWithAddress
   let lender: SignerWithAddress

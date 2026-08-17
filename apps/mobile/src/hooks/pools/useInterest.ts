@@ -1,7 +1,7 @@
 import { useCallback, useState } from 'react'
 import { useAccount, usePublicClient, useWriteContract } from 'wagmi'
 import { DEFAULT_CHAIN_ID } from '../../config/contracts'
-import { SampleLendingPoolABI } from '../../constants/abis'
+import { LendingPoolABI } from '../../constants/abis'
 import { pendingTransactionsStore } from '../../stores/PendingTransactionsStore'
 import { describeTransactionError } from './transactionErrors'
 
@@ -29,7 +29,7 @@ export interface UseInterestReturn {
 }
 
 /**
- * `SampleLendingPool`'s custom errors, in the wording someone claiming should
+ * `LendingPool`'s custom errors, in the wording someone claiming should
  * see. `InsufficientLiquidity` is the one worth phrasing carefully: the interest
  * is not gone, the pool has simply lent out too much to pay it right now, and it
  * becomes claimable again as loans are repaid.
@@ -98,7 +98,7 @@ export const useInterest = (): UseInterestReturn => {
         if (publicClient) {
           const estimate = await publicClient.estimateContractGas({
             address: params.poolAddress,
-            abi: SampleLendingPoolABI,
+            abi: LendingPoolABI,
             functionName: 'claimInterest',
             args: [],
             account: address,
@@ -108,7 +108,7 @@ export const useInterest = (): UseInterestReturn => {
 
         const txHash = await writeContractAsync({
           address: params.poolAddress,
-          abi: SampleLendingPoolABI,
+          abi: LendingPoolABI,
           functionName: 'claimInterest',
           args: [],
           chainId: activeChainId,

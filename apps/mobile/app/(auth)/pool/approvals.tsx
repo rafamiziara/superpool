@@ -7,7 +7,7 @@ import React, { useState } from 'react'
 import { ActivityIndicator, Pressable, RefreshControl, ScrollView, Text, View } from 'react-native'
 import { useReadContract } from 'wagmi'
 import { LoanRequestCard } from '../../../src/components/lending/LoanRequestCard'
-import { SampleLendingPoolABI } from '../../../src/constants/abis'
+import { LendingPoolABI } from '../../../src/constants/abis'
 import { palette } from '../../../src/constants/palette'
 import { useLoan } from '../../../src/hooks/pools/useLoan'
 import { usePoolIndexing } from '../../../src/hooks/pools/usePoolIndexing'
@@ -53,7 +53,7 @@ function ApprovalsScreen() {
   // whether a request can go through — not the one when it was made.
   const { data: available, refetch: refetchAvailable } = useReadContract({
     address: pool?.poolAddress as `0x${string}` | undefined,
-    abi: SampleLendingPoolABI,
+    abi: LendingPoolABI,
     functionName: 'totalFunds',
     query: { enabled: Boolean(pool?.poolAddress) },
   })

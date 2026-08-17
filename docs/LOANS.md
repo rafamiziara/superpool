@@ -435,7 +435,7 @@ script or an older pool, the same thing from the console:
 
 ```bash
 npx hardhat console --network localhost
-const pool = await ethers.getContractAt('SampleLendingPool', '<pool address>')
+const pool = await ethers.getContractAt('LendingPool', '<pool address>')
 const owner = (await ethers.getSigners())[1]   // whoever created the pool
 await pool.connect(owner).setRequiresApproval(true)
 ```

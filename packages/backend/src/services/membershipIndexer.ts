@@ -2,7 +2,7 @@ import { Contract, Interface, JsonRpcProvider, Log, Provider } from 'ethers'
 import { Firestore } from 'firebase-admin/firestore'
 import { logger } from 'firebase-functions/v2'
 import { HttpsError } from 'firebase-functions/v2/https'
-import { MEMBERSHIPS_COLLECTION, SampleLendingPoolABI } from '../constants'
+import { LendingPoolABI, MEMBERSHIPS_COLLECTION } from '../constants'
 import { resolvePoolId } from './contributionIndexer'
 import { notifyMembershipRequested } from './poolNotifications'
 
@@ -60,7 +60,7 @@ export interface IndexMembershipResult {
  */
 export type MembershipTransition = 'requested' | 'active' | 'rejected' | 'removed' | 'left' | null
 
-/** The wire form of `SampleLendingPool.Membership`. */
+/** The wire form of `LendingPool.Membership`. */
 export type MembershipStatus = 'none' | 'requested' | 'active' | 'rejected' | 'removed' | 'left'
 
 /**
@@ -72,7 +72,7 @@ export type MembershipStatus = 'none' | 'requested' | 'active' | 'rejected' | 'r
  */
 const MEMBERSHIP_STATUS: readonly MembershipStatus[] = ['none', 'requested', 'active', 'rejected', 'removed', 'left']
 
-const lendingPoolInterface = new Interface([...SampleLendingPoolABI])
+const lendingPoolInterface = new Interface([...LendingPoolABI])
 
 export const MEMBERSHIP_REQUESTED_TOPIC = lendingPoolInterface.getEvent('MembershipRequested')!.topicHash
 export const MEMBERSHIP_APPROVED_TOPIC = lendingPoolInterface.getEvent('MembershipApproved')!.topicHash
@@ -131,7 +131,7 @@ export function parseAccountFromLog(log: Log): string {
  * itself — so nothing needs configuring to know where to ask.
  */
 export async function fetchMembership(account: string, poolAddress: string, provider: Provider): Promise<MembershipStatus> {
-  const pool = new Contract(poolAddress, [...SampleLendingPoolABI], provider)
+  const pool = new Contract(poolAddress, [...LendingPoolABI], provider)
 
   return statusFromOrdinal(Number(await pool.membership(account)))
 }

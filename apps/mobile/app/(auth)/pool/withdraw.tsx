@@ -6,7 +6,7 @@ import React, { useState } from 'react'
 import { ActivityIndicator, Pressable, ScrollView, Text, View } from 'react-native'
 import { useAccount, useReadContract } from 'wagmi'
 import { WithdrawForm } from '../../../src/components/lending/WithdrawForm'
-import { SampleLendingPoolABI } from '../../../src/constants/abis'
+import { LendingPoolABI } from '../../../src/constants/abis'
 import { palette } from '../../../src/constants/palette'
 import { usePoolIndexing } from '../../../src/hooks/pools/usePoolIndexing'
 import { useTransactionMonitoring } from '../../../src/hooks/pools/useTransactionMonitoring'
@@ -48,7 +48,7 @@ function WithdrawScreen() {
   // indexed `FundsDeposited` events, which say what was put in and know nothing
   // about what has been taken out — after one withdrawal they overstate the
   // position. The contract is the only thing that can answer this correctly.
-  const contractArgs = { address: pool?.poolAddress as `0x${string}` | undefined, abi: SampleLendingPoolABI } as const
+  const contractArgs = { address: pool?.poolAddress as `0x${string}` | undefined, abi: LendingPoolABI } as const
   const enabled = Boolean(pool && address)
 
   const { data: position, refetch: refetchPosition } = useReadContract({

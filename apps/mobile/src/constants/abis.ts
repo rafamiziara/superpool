@@ -12,4 +12,4 @@
  * return-type inference, so import from here rather than widening to `Abi`.
  */
 
-export { PoolFactoryABI, SampleLendingPoolABI } from './abis.generated'
+export { PoolFactoryABI, LendingPoolABI } from './abis.generated'

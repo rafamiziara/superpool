@@ -24,7 +24,7 @@ listContributions             → the app sums them
 ## Membership is a register now, not an inference
 
 **This section used to say the opposite.** Until the membership milestone
-`SampleLendingPool` had nothing to join, so the app treated contributing as what
+`LendingPool` had nothing to join, so the app treated contributing as what
 made you a member and `PoolStore.memberships` derived that from
 `contributions`. It now reads a real register — see
 [`MEMBERSHIP.md`](MEMBERSHIP.md).
@@ -118,7 +118,7 @@ prompt rather than after it.
 
 - **Native currency only.** ERC-20 deposits need contract work.
 - **A contribution is not earnings.** Members can withdraw
-  (`SampleLendingPool.withdraw` → `FundsWithdrawn` → the `withdrawals`
+  (`LendingPool.withdraw` → `FundsWithdrawn` → the `withdrawals`
   collection), and `currentBalance` is deposits minus withdrawals, while
   `totalContributed` stays lifetime deposits — so someone who withdrew
   everything still reads as a past member. Interest is credited separately and

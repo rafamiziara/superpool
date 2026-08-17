@@ -12,17 +12,17 @@ import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Ini
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
 /**
- * @title SampleLendingPool
- * @notice A sample upgradeable lending pool contract for SuperPool platform
+ * @title LendingPool
+ * @notice One SuperPool lending pool: members contribute, borrow against the
+ * pool's liquidity, repay with interest, and claim their share of it.
  * @author SuperPool Team
- * @dev A sample upgradeable lending pool contract for SuperPool platform
- * This contract demonstrates the basic structure for a lending pool with:
+ * @dev The implementation every pool proxy delegates to:
  * - Upgraded as a set through the factory's beacon, not per instance
  * - Access control with ownership
  * - Pausable functionality for emergency stops
  * - Reentrancy protection
  */
-contract SampleLendingPool is
+contract LendingPool is
     Initializable,
     OwnableUpgradeable,
     PausableUpgradeable,

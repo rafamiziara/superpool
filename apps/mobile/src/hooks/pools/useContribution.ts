@@ -1,7 +1,7 @@
 import { useCallback, useState } from 'react'
 import { useAccount, usePublicClient, useWriteContract } from 'wagmi'
 import { DEFAULT_CHAIN_ID } from '../../config/contracts'
-import { SampleLendingPoolABI } from '../../constants/abis'
+import { LendingPoolABI } from '../../constants/abis'
 import { pendingTransactionsStore } from '../../stores/PendingTransactionsStore'
 import { describeTransactionError } from './transactionErrors'
 
@@ -30,7 +30,7 @@ export interface UseContributionReturn {
   reset: () => void
 }
 
-/** `SampleLendingPool`'s custom errors, in the wording a contributor should see. */
+/** `LendingPool`'s custom errors, in the wording a contributor should see. */
 const CONTRACT_ERROR_MESSAGES: Record<string, string> = {
   InvalidAmount: 'Enter an amount greater than zero',
   EnforcedPause: 'This pool is not accepting contributions at the moment',
@@ -106,7 +106,7 @@ export const useContribution = (): UseContributionReturn => {
         if (publicClient) {
           const estimate = await publicClient.estimateContractGas({
             address: params.poolAddress,
-            abi: SampleLendingPoolABI,
+            abi: LendingPoolABI,
             functionName: 'depositFunds',
             value: params.amount,
             account: address,
@@ -116,7 +116,7 @@ export const useContribution = (): UseContributionReturn => {
 
         const txHash = await writeContractAsync({
           address: params.poolAddress,
-          abi: SampleLendingPoolABI,
+          abi: LendingPoolABI,
           functionName: 'depositFunds',
           value: params.amount,
           chainId: activeChainId,

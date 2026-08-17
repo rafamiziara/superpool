@@ -1,7 +1,7 @@
 import { useCallback, useState } from 'react'
 import { useAccount, usePublicClient, useWriteContract } from 'wagmi'
 import { DEFAULT_CHAIN_ID } from '../../config/contracts'
-import { SampleLendingPoolABI } from '../../constants/abis'
+import { LendingPoolABI } from '../../constants/abis'
 import { type MembershipTransactionType, pendingTransactionsStore } from '../../stores/PendingTransactionsStore'
 import { describeTransactionError } from './transactionErrors'
 
@@ -169,7 +169,7 @@ export const useMembership = (): UseMembershipReturn => {
         if (publicClient) {
           const estimate = await publicClient.estimateContractGas({
             address: params.poolAddress,
-            abi: SampleLendingPoolABI,
+            abi: LendingPoolABI,
             functionName,
             args,
             account: address,
@@ -179,7 +179,7 @@ export const useMembership = (): UseMembershipReturn => {
 
         const txHash = await writeContractAsync({
           address: params.poolAddress,
-          abi: SampleLendingPoolABI,
+          abi: LendingPoolABI,
           functionName,
           args,
           chainId: activeChainId,

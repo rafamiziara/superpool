@@ -1,11 +1,11 @@
 import { SignerWithAddress } from '@nomicfoundation/hardhat-ethers/signers'
 import { expect } from 'chai'
 import { ethers } from 'hardhat'
-import { PoolFactory, SampleLendingPool } from '../typechain-types'
+import { LendingPool, PoolFactory } from '../typechain-types'
 
 describe('PoolFactory Ownable2Step', function () {
   let poolFactory: PoolFactory
-  let lendingPoolImplementation: SampleLendingPool
+  let lendingPoolImplementation: LendingPool
   let owner: SignerWithAddress
   let newOwner: SignerWithAddress
   let otherAccount: SignerWithAddress
@@ -15,8 +15,8 @@ describe('PoolFactory Ownable2Step', function () {
     ;[owner, newOwner, otherAccount] = await ethers.getSigners()
 
     // Deploy lending pool implementation
-    const SampleLendingPool = await ethers.getContractFactory('SampleLendingPool')
-    lendingPoolImplementation = await SampleLendingPool.deploy()
+    const LendingPool = await ethers.getContractFactory('LendingPool')
+    lendingPoolImplementation = await LendingPool.deploy()
     await lendingPoolImplementation.waitForDeployment()
 
     // Deploy PoolFactory using direct deployment instead of proxy for testing

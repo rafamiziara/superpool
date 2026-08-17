@@ -1,7 +1,7 @@
 import { useCallback, useState } from 'react'
 import { useAccount, usePublicClient, useWriteContract } from 'wagmi'
 import { DEFAULT_CHAIN_ID } from '../../config/contracts'
-import { SampleLendingPoolABI } from '../../constants/abis'
+import { LendingPoolABI } from '../../constants/abis'
 import { pendingTransactionsStore } from '../../stores/PendingTransactionsStore'
 import { describeTransactionError } from './transactionErrors'
 
@@ -86,7 +86,7 @@ export function calculateRepayment(amount: bigint, interestRate: number): bigint
 }
 
 /**
- * `SampleLendingPool`'s custom errors, in the wording a borrower should see.
+ * `LendingPool`'s custom errors, in the wording a borrower should see.
  *
  * `UnauthorizedBorrower` means two different things depending on the call, and
  * the wording has to pick one: on `createLoan` it is fired when the caller is
@@ -266,7 +266,7 @@ export const useLoan = (): UseLoanReturn => {
         if (publicClient) {
           const estimate = await publicClient.estimateContractGas({
             address: params.poolAddress,
-            abi: SampleLendingPoolABI,
+            abi: LendingPoolABI,
             functionName: 'createLoan',
             args: [params.amount],
             account: address,
@@ -276,7 +276,7 @@ export const useLoan = (): UseLoanReturn => {
 
         const txHash = await writeContractAsync({
           address: params.poolAddress,
-          abi: SampleLendingPoolABI,
+          abi: LendingPoolABI,
           functionName: 'createLoan',
           args: [params.amount],
           chainId: activeChainId,
@@ -333,7 +333,7 @@ export const useLoan = (): UseLoanReturn => {
         if (publicClient) {
           const estimate = await publicClient.estimateContractGas({
             address: params.poolAddress,
-            abi: SampleLendingPoolABI,
+            abi: LendingPoolABI,
             functionName: 'repayLoan',
             args: [BigInt(params.loanId)],
             account: address,
@@ -344,7 +344,7 @@ export const useLoan = (): UseLoanReturn => {
 
         const txHash = await writeContractAsync({
           address: params.poolAddress,
-          abi: SampleLendingPoolABI,
+          abi: LendingPoolABI,
           functionName: 'repayLoan',
           args: [BigInt(params.loanId)],
           value: params.amount,
@@ -415,7 +415,7 @@ export const useLoan = (): UseLoanReturn => {
         if (publicClient) {
           const estimate = await publicClient.estimateContractGas({
             address: params.poolAddress,
-            abi: SampleLendingPoolABI,
+            abi: LendingPoolABI,
             functionName,
             args: [BigInt(params.loanId)],
             account: address,
@@ -425,7 +425,7 @@ export const useLoan = (): UseLoanReturn => {
 
         const txHash = await writeContractAsync({
           address: params.poolAddress,
-          abi: SampleLendingPoolABI,
+          abi: LendingPoolABI,
           functionName,
           args: [BigInt(params.loanId)],
           chainId: activeChainId,
@@ -492,7 +492,7 @@ export const useLoan = (): UseLoanReturn => {
         if (publicClient) {
           const estimate = await publicClient.estimateContractGas({
             address: params.poolAddress,
-            abi: SampleLendingPoolABI,
+            abi: LendingPoolABI,
             functionName: 'requestLoan',
             args: [params.amount],
             account: address,
@@ -502,7 +502,7 @@ export const useLoan = (): UseLoanReturn => {
 
         const txHash = await writeContractAsync({
           address: params.poolAddress,
-          abi: SampleLendingPoolABI,
+          abi: LendingPoolABI,
           functionName: 'requestLoan',
           args: [params.amount],
           chainId: activeChainId,

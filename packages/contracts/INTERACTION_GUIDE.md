@@ -56,7 +56,7 @@ const factory = await ethers.getContractAt('PoolFactory', factoryAddress)
 
 // Get first pool address
 const poolAddress = await factory.getPoolAddress(1)
-const pool = await ethers.getContractAt('SampleLendingPool', poolAddress)
+const pool = await ethers.getContractAt('LendingPool', poolAddress)
 ```
 
 ### 🏭 PoolFactory Interactions
@@ -266,7 +266,7 @@ async function main() {
   }
 
   const [funder] = await ethers.getSigners()
-  const pool = await ethers.getContractAt('SampleLendingPool', poolAddress)
+  const pool = await ethers.getContractAt('LendingPool', poolAddress)
 
   const fundAmount = ethers.parseEther(amount)
   console.log(`Funding pool ${poolAddress} with ${amount} ETH...`)
@@ -303,7 +303,7 @@ async function main() {
 
   for (let i = 1; i <= poolCount; i++) {
     const info = await factory.getPoolInfo(i)
-    const pool = await ethers.getContractAt('SampleLendingPool', info.poolAddress)
+    const pool = await ethers.getContractAt('LendingPool', info.poolAddress)
     const totalFunds = await pool.totalFunds()
     const nextLoanId = await pool.nextLoanId()
 
@@ -565,7 +565,7 @@ const poolParams = {
 const createTx = await factory.createPool(poolParams);
 const createReceipt = await createTx.wait();
 const poolAddress = /* extract from event */;
-const pool = await ethers.getContractAt("SampleLendingPool", poolAddress);
+const pool = await ethers.getContractAt("LendingPool", poolAddress);
 
 // === 2. POOL FUNDING ===
 // Multiple lenders fund the pool
@@ -619,7 +619,7 @@ async function manageMutiplePools() {
 
   for (let i = 1; i <= poolCount; i++) {
     const poolInfo = await factory.getPoolInfo(i)
-    const pool = await ethers.getContractAt('SampleLendingPool', poolInfo.poolAddress)
+    const pool = await ethers.getContractAt('LendingPool', poolInfo.poolAddress)
 
     // Get pool statistics
     const totalFunds = await pool.totalFunds()
@@ -642,7 +642,7 @@ async function manageMutiplePools() {
 // === LOAN MONITORING ===
 async function monitorLoans() {
   const poolAddress = '0x...'
-  const pool = await ethers.getContractAt('SampleLendingPool', poolAddress)
+  const pool = await ethers.getContractAt('LendingPool', poolAddress)
 
   // Listen for new loans
   pool.on('LoanCreated', async (loanId, borrower, amount, event) => {
@@ -761,7 +761,7 @@ async function generatePoolAnalytics() {
 
   for (let i = 1; i <= poolCount; i++) {
     const info = await factory.getPoolInfo(i)
-    const pool = await ethers.getContractAt('SampleLendingPool', info.poolAddress)
+    const pool = await ethers.getContractAt('LendingPool', info.poolAddress)
 
     const totalFunds = await pool.totalFunds()
     const nextLoanId = await pool.nextLoanId()
@@ -832,7 +832,7 @@ function deactivatePool(uint256 _poolId) external
 function reactivatePool(uint256 _poolId) external
 ```
 
-**SampleLendingPool Key Functions:**
+**LendingPool Key Functions:**
 
 ```solidity
 function depositFunds() external payable
@@ -858,7 +858,7 @@ event PoolReactivated(uint256 indexed poolId, address indexed poolAddress)
 event ImplementationUpdated(address indexed oldImplementation, address indexed newImplementation)
 ```
 
-**SampleLendingPool Events:**
+**LendingPool Events:**
 
 ```solidity
 event PoolConfigured(uint256 maxLoanAmount, uint256 interestRate, uint256 loanDuration)
@@ -879,7 +879,7 @@ event LoanRepaid(uint256 indexed loanId, address indexed borrower, uint256 amoun
 - `EmptyName()` - Pool name is empty
 - `ImplementationNotSet()` - Implementation address is zero
 
-**SampleLendingPool Errors:**
+**LendingPool Errors:**
 
 - `InsufficientFunds()` - Pool doesn't have enough liquidity
 - `LoanAlreadyRepaid()` - Attempting to repay already repaid loan
@@ -896,7 +896,7 @@ pnpm console:local                 # Interactive console
 
 # Common console commands
 const factory = await ethers.getContractAt("PoolFactory", "FACTORY_ADDRESS")
-const pool = await ethers.getContractAt("SampleLendingPool", "POOL_ADDRESS")
+const pool = await ethers.getContractAt("LendingPool", "POOL_ADDRESS")
 const [deployer, owner, borrower, lender] = await ethers.getSigners()
 
 # Quick operations

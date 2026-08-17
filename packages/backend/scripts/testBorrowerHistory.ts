@@ -36,7 +36,7 @@ dotenv.config()
 import { BaseContract, Contract, JsonRpcProvider, parseEther, Wallet } from 'ethers'
 import { initializeApp } from 'firebase-admin/app'
 import { getFirestore, Timestamp } from 'firebase-admin/firestore'
-import { PoolFactoryABI, SampleLendingPoolABI } from '../src/constants/abis'
+import { PoolFactoryABI, LendingPoolABI } from '../src/constants/abis'
 import { LOANS_COLLECTION } from '../src/constants/firestore'
 import { sweepBlockRange } from '../src/services/eventSweeper'
 import { indexLoansByTxHash, loanDocId } from '../src/services/loanIndexer'
@@ -169,7 +169,7 @@ async function createPool(provider: JsonRpcProvider, owner: Wallet, name: string
   return {
     poolId: Number(created.args.poolId),
     address: created.args.poolAddress as string,
-    contract: new Contract(created.args.poolAddress as string, SampleLendingPoolABI, owner),
+    contract: new Contract(created.args.poolAddress as string, LendingPoolABI, owner),
   }
 }
 

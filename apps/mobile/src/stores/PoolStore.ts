@@ -440,7 +440,7 @@ export class PoolStore {
   /**
    * Memberships: standing from the register, money from the events.
    *
-   * The split is the point. `SampleLendingPool` now has a register, so who
+   * The split is the point. `LendingPool` now has a register, so who
    * belongs is a fact read from `membership(address)` rather than inferred from
    * having deposited — which is what lets a private pool have members who have
    * not funded it, and a removed member who still has a balance to withdraw.

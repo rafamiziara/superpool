@@ -2,7 +2,7 @@ import { Contract, Interface, JsonRpcProvider, Log, Provider } from 'ethers'
 import { Firestore, Timestamp } from 'firebase-admin/firestore'
 import { logger } from 'firebase-functions/v2'
 import { HttpsError } from 'firebase-functions/v2/https'
-import { LOANS_COLLECTION, SampleLendingPoolABI } from '../constants'
+import { LendingPoolABI, LOANS_COLLECTION } from '../constants'
 import { resolvePoolId } from './contributionIndexer'
 import { notifyLoanRequested } from './poolNotifications'
 
@@ -69,7 +69,7 @@ export interface IndexLoanResult {
  */
 export type LoanTransition = 'requested' | 'disbursed' | 'rejected' | 'repaid' | null
 
-/** The wire form of `SampleLendingPool.LoanStatus`. */
+/** The wire form of `LendingPool.LoanStatus`. */
 export type LoanStatus = 'disbursed' | 'requested' | 'rejected'
 
 /**
@@ -81,7 +81,7 @@ export type LoanStatus = 'disbursed' | 'requested' | 'rejected'
  */
 const LOAN_STATUS: readonly LoanStatus[] = ['disbursed', 'requested', 'rejected']
 
-const lendingPoolInterface = new Interface([...SampleLendingPoolABI])
+const lendingPoolInterface = new Interface([...LendingPoolABI])
 
 export const LOAN_CREATED_TOPIC = lendingPoolInterface.getEvent('LoanCreated')!.topicHash
 export const LOAN_REPAID_TOPIC = lendingPoolInterface.getEvent('LoanRepaid')!.topicHash
@@ -135,7 +135,7 @@ export async function fetchLoan(
   poolAddress: string,
   provider: Provider
 ): Promise<Omit<ParsedLoan, 'poolId' | 'chainId' | 'transactionHash' | 'blockNumber'>> {
-  const pool = new Contract(poolAddress, [...SampleLendingPoolABI], provider)
+  const pool = new Contract(poolAddress, [...LendingPoolABI], provider)
   const loan = await pool.getLoan(loanId)
 
   return {

@@ -1,7 +1,7 @@
 import { useCallback, useState } from 'react'
 import { useAccount, usePublicClient, useWriteContract } from 'wagmi'
 import { DEFAULT_CHAIN_ID } from '../../config/contracts'
-import { SampleLendingPoolABI } from '../../constants/abis'
+import { LendingPoolABI } from '../../constants/abis'
 import { pendingTransactionsStore } from '../../stores/PendingTransactionsStore'
 import { describeTransactionError } from './transactionErrors'
 
@@ -31,7 +31,7 @@ export interface UseWithdrawalReturn {
 }
 
 /**
- * `SampleLendingPool`'s custom errors, in the wording someone withdrawing
+ * `LendingPool`'s custom errors, in the wording someone withdrawing
  * should see. The two "not enough" cases are genuinely different and must not
  * be collapsed: `InsufficientBalance` means you are asking for more than you
  * ever put in, `InsufficientLiquidity` means the pool has lent out too much to
@@ -123,7 +123,7 @@ export const useWithdrawal = (): UseWithdrawalReturn => {
         if (publicClient) {
           const estimate = await publicClient.estimateContractGas({
             address: params.poolAddress,
-            abi: SampleLendingPoolABI,
+            abi: LendingPoolABI,
             functionName: 'withdraw',
             args: [params.amount],
             account: address,
@@ -133,7 +133,7 @@ export const useWithdrawal = (): UseWithdrawalReturn => {
 
         const txHash = await writeContractAsync({
           address: params.poolAddress,
-          abi: SampleLendingPoolABI,
+          abi: LendingPoolABI,
           functionName: 'withdraw',
           args: [params.amount],
           chainId: activeChainId,

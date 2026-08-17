@@ -1,7 +1,7 @@
 import { observer } from 'mobx-react-lite'
 import React, { useEffect } from 'react'
 import { useAccount, useReadContract } from 'wagmi'
-import { SampleLendingPoolABI } from '../../constants/abis'
+import { LendingPoolABI } from '../../constants/abis'
 import { poolStore } from '../../stores/PoolStore'
 
 /**
@@ -16,7 +16,7 @@ function ClaimableProbe({ poolId, poolAddress }: { poolId: number; poolAddress: 
 
   const { data: claimable } = useReadContract({
     address: poolAddress,
-    abi: SampleLendingPoolABI,
+    abi: LendingPoolABI,
     functionName: 'claimable',
     args: address ? [address] : undefined,
     query: { enabled: Boolean(address) },

@@ -1,7 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import { makeAutoObservable, runInAction } from 'mobx'
 import { parseEventLogs, type TransactionReceipt } from 'viem'
-import { PoolFactoryABI, SampleLendingPoolABI } from '../constants/abis'
+import { LendingPoolABI, PoolFactoryABI } from '../constants/abis'
 import { logger } from '../utils/logger'
 
 /** AsyncStorage key holding the serialised transaction list. */
@@ -595,7 +595,7 @@ export function extractPoolCreatedResult(receipt: TransactionReceipt): CreatePoo
  */
 export function extractFundsDepositedResult(receipt: TransactionReceipt): ContributeResult | undefined {
   try {
-    const [event] = parseEventLogs({ abi: SampleLendingPoolABI, eventName: 'FundsDeposited', logs: receipt.logs })
+    const [event] = parseEventLogs({ abi: LendingPoolABI, eventName: 'FundsDeposited', logs: receipt.logs })
     if (!event) return undefined
 
     return { amount: event.args.amount.toString() }
@@ -612,7 +612,7 @@ export function extractFundsDepositedResult(receipt: TransactionReceipt): Contri
  */
 export function extractFundsWithdrawnResult(receipt: TransactionReceipt): WithdrawResult | undefined {
   try {
-    const [event] = parseEventLogs({ abi: SampleLendingPoolABI, eventName: 'FundsWithdrawn', logs: receipt.logs })
+    const [event] = parseEventLogs({ abi: LendingPoolABI, eventName: 'FundsWithdrawn', logs: receipt.logs })
     if (!event) return undefined
 
     return { amount: event.args.amount.toString() }
@@ -629,7 +629,7 @@ export function extractFundsWithdrawnResult(receipt: TransactionReceipt): Withdr
  */
 export function extractInterestClaimedResult(receipt: TransactionReceipt): ClaimInterestResult | undefined {
   try {
-    const [event] = parseEventLogs({ abi: SampleLendingPoolABI, eventName: 'InterestClaimed', logs: receipt.logs })
+    const [event] = parseEventLogs({ abi: LendingPoolABI, eventName: 'InterestClaimed', logs: receipt.logs })
     if (!event) return undefined
 
     return { amount: event.args.amount.toString() }
@@ -654,7 +654,7 @@ export function extractInterestClaimedResult(receipt: TransactionReceipt): Claim
 export function extractLoanResult(receipt: TransactionReceipt): LoanResult | undefined {
   for (const eventName of ['LoanCreated', 'LoanRepaid', 'LoanRequested', 'LoanApproved', 'LoanRejected'] as const) {
     try {
-      const [event] = parseEventLogs({ abi: SampleLendingPoolABI, eventName, logs: receipt.logs })
+      const [event] = parseEventLogs({ abi: LendingPoolABI, eventName, logs: receipt.logs })
       if (!event) continue
 
       return { loanId: Number(event.args.loanId), amount: event.args.amount.toString() }
@@ -688,7 +688,7 @@ export function extractMembershipResult(receipt: TransactionReceipt): Membership
     'MemberJoined',
   ] as const) {
     try {
-      const [event] = parseEventLogs({ abi: SampleLendingPoolABI, eventName, logs: receipt.logs })
+      const [event] = parseEventLogs({ abi: LendingPoolABI, eventName, logs: receipt.logs })
       if (!event) continue
 
       return { account: event.args.account }

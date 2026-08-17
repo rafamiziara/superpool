@@ -1,6 +1,6 @@
 import { Interface } from 'ethers'
 import { mockLogger } from '../__tests__/setup'
-import { PoolFactoryABI, SampleLendingPoolABI } from '../constants'
+import { LendingPoolABI, PoolFactoryABI } from '../constants'
 
 // The three indexers are covered by their own suites; what is under test here
 // is how the sweep drives them — ordering, filtering, caching and containment.
@@ -38,9 +38,9 @@ const TO_BLOCK = 599
 const BLOCK_TIMESTAMP = 1700000000
 
 const POOL_CREATED_TOPIC = new Interface([...PoolFactoryABI]).getEvent('PoolCreated')!.topicHash
-const FUNDS_DEPOSITED_TOPIC = new Interface([...SampleLendingPoolABI]).getEvent('FundsDeposited')!.topicHash
-const FUNDS_WITHDRAWN_TOPIC = new Interface([...SampleLendingPoolABI]).getEvent('FundsWithdrawn')!.topicHash
-const INTEREST_CLAIMED_TOPIC = new Interface([...SampleLendingPoolABI]).getEvent('InterestClaimed')!.topicHash
+const FUNDS_DEPOSITED_TOPIC = new Interface([...LendingPoolABI]).getEvent('FundsDeposited')!.topicHash
+const FUNDS_WITHDRAWN_TOPIC = new Interface([...LendingPoolABI]).getEvent('FundsWithdrawn')!.topicHash
+const INTEREST_CLAIMED_TOPIC = new Interface([...LendingPoolABI]).getEvent('InterestClaimed')!.topicHash
 const POOL_DEACTIVATED_TOPIC = new Interface([...PoolFactoryABI]).getEvent('PoolDeactivated')!.topicHash
 const POOL_REACTIVATED_TOPIC = new Interface([...PoolFactoryABI]).getEvent('PoolReactivated')!.topicHash
 
@@ -592,7 +592,7 @@ describe('sweepBlockRange', () => {
       // Arrange
       // It moves a pool-level figure that is read from the chain, so a document
       // for it could only ever be a copy that goes stale.
-      const distributedTopic = new Interface([...SampleLendingPoolABI]).getEvent('InterestDistributed')!.topicHash
+      const distributedTopic = new Interface([...LendingPoolABI]).getEvent('InterestDistributed')!.topicHash
       const provider = buildMockProvider()
 
       // Act

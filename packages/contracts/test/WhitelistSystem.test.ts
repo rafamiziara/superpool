@@ -1,11 +1,11 @@
 import { SignerWithAddress } from '@nomicfoundation/hardhat-ethers/signers'
 import { expect } from 'chai'
 import { ethers } from 'hardhat'
-import { PoolFactory, SampleLendingPool } from '../typechain-types'
+import { LendingPool, PoolFactory } from '../typechain-types'
 
 describe('Whitelist System', function () {
   let poolFactory: PoolFactory
-  let lendingPoolImplementation: SampleLendingPool
+  let lendingPoolImplementation: LendingPool
   let owner: SignerWithAddress
   let addr1: SignerWithAddress
   let addr2: SignerWithAddress
@@ -15,8 +15,8 @@ describe('Whitelist System', function () {
     ;[owner, addr1, addr2, addr3] = await ethers.getSigners()
 
     // Deploy lending pool implementation
-    const SampleLendingPool = await ethers.getContractFactory('SampleLendingPool')
-    lendingPoolImplementation = await SampleLendingPool.deploy()
+    const LendingPool = await ethers.getContractFactory('LendingPool')
+    lendingPoolImplementation = await LendingPool.deploy()
     await lendingPoolImplementation.waitForDeployment()
 
     // Deploy pool factory

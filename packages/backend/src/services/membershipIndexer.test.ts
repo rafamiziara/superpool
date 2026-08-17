@@ -1,6 +1,6 @@
 import { Interface } from 'ethers'
 import { mockLogger } from '../__tests__/setup'
-import { SampleLendingPoolABI } from '../constants'
+import { LendingPoolABI } from '../constants'
 
 const mockMembership = jest.fn()
 const mockGetPoolId = jest.fn()
@@ -53,7 +53,7 @@ const TX_HASH = `0x${'a'.repeat(64)}`
 const BLOCK_TIME = 1_700_000_000
 
 /** Real topic hashes, so the fixtures agree with the shipped ABI rather than with the test. */
-const REAL_REQUESTED_TOPIC = new Interface([...SampleLendingPoolABI]).getEvent('MembershipRequested')!.topicHash
+const REAL_REQUESTED_TOPIC = new Interface([...LendingPoolABI]).getEvent('MembershipRequested')!.topicHash
 
 // The contract enum, by ordinal.
 const NONE = 0

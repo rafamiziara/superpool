@@ -1,7 +1,7 @@
 import { useCallback, useState } from 'react'
 import { useAccount, usePublicClient, useWriteContract } from 'wagmi'
 import { DEFAULT_CHAIN_ID } from '../../config/contracts'
-import { SampleLendingPoolABI } from '../../constants/abis'
+import { LendingPoolABI } from '../../constants/abis'
 import { describeTransactionError } from './transactionErrors'
 
 /**
@@ -114,7 +114,7 @@ export const usePoolSettings = (): UsePoolSettingsReturn => {
         if (publicClient) {
           const estimate = await publicClient.estimateContractGas({
             address: poolAddress,
-            abi: SampleLendingPoolABI,
+            abi: LendingPoolABI,
             functionName,
             args: [value],
             account: address,
@@ -124,7 +124,7 @@ export const usePoolSettings = (): UsePoolSettingsReturn => {
 
         txHash = await writeContractAsync({
           address: poolAddress,
-          abi: SampleLendingPoolABI,
+          abi: LendingPoolABI,
           functionName,
           args: [value],
           chainId: activeChainId,

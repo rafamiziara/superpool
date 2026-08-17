@@ -27,7 +27,7 @@ export interface AbiContract {
 
 export const ABI_CONTRACTS: readonly AbiContract[] = [
   { contractName: 'PoolFactory', exportName: 'PoolFactoryABI' },
-  { contractName: 'SampleLendingPool', exportName: 'SampleLendingPoolABI' },
+  { contractName: 'LendingPool', exportName: 'LendingPoolABI' },
 ]
 
 /** Repo root, resolved from this file's location in `packages/contracts/scripts`. */

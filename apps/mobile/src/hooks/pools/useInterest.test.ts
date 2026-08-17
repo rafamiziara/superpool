@@ -8,7 +8,7 @@ import {
   mockWaitForTransactionReceipt,
   mockWriteContractAsync,
 } from '../../__tests__/mocks'
-import { SampleLendingPoolABI } from '../../constants/abis'
+import { LendingPoolABI } from '../../constants/abis'
 import { pendingTransactionsStore } from '../../stores/PendingTransactionsStore'
 import { type ClaimInterestParams, describeClaimInterestError, useInterest } from './useInterest'
 
@@ -40,8 +40,8 @@ type RevertAbiItem = NonNullable<ContractFunctionRevertedError['data']>['abiItem
 
 /** Looks the error up in the shipped ABI, so a rename there fails this test too. */
 function findAbiError(name: string): RevertAbiItem {
-  const item = SampleLendingPoolABI.find((entry) => entry.type === 'error' && entry.name === name)
-  if (!item || item.type !== 'error') throw new Error(`SampleLendingPoolABI has no error named ${name}`)
+  const item = LendingPoolABI.find((entry) => entry.type === 'error' && entry.name === name)
+  if (!item || item.type !== 'error') throw new Error(`LendingPoolABI has no error named ${name}`)
 
   return item
 }
@@ -127,7 +127,7 @@ describe('useInterest', () => {
       expect(mockWriteContractAsync).toHaveBeenCalledWith(
         expect.objectContaining({
           address: POOL_ADDRESS,
-          abi: SampleLendingPoolABI,
+          abi: LendingPoolABI,
           functionName: 'claimInterest',
           args: [],
           chainId: LOCALHOST_CHAIN_ID,

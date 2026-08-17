@@ -26,7 +26,7 @@ import * as dotenv from 'dotenv'
 dotenv.config()
 
 import { Contract, Interface, JsonRpcProvider } from 'ethers'
-import { PoolFactoryABI, SampleLendingPoolABI } from '../src/constants/abis'
+import { PoolFactoryABI, LendingPoolABI } from '../src/constants/abis'
 import { CONTRIBUTIONS_COLLECTION, LOANS_COLLECTION, POOLS_COLLECTION, WITHDRAWALS_COLLECTION } from '../src/constants/firestore'
 import { syncPoolEventsHandler } from '../src/functions/events/syncPoolEvents'
 import { firestore } from '../src/services'
@@ -58,7 +58,7 @@ function info(msg: string) {
 }
 
 const poolFactoryInterface = new Interface([...PoolFactoryABI])
-const lendingPoolInterface = new Interface([...SampleLendingPoolABI])
+const lendingPoolInterface = new Interface([...LendingPoolABI])
 
 /**
  * How many logs belong to a pool this factory deployed.

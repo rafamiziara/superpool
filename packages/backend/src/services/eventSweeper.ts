@@ -1,7 +1,7 @@
 import { Interface, Log, Provider } from 'ethers'
 import { Firestore } from 'firebase-admin/firestore'
 import { logger } from 'firebase-functions/v2'
-import { PoolFactoryABI, SampleLendingPoolABI } from '../constants'
+import { LendingPoolABI, PoolFactoryABI } from '../constants'
 import { indexContributionEvent, parseFundsDepositedLog, resolvePoolId } from './contributionIndexer'
 import { fetchPoolActive, fetchPoolDescription, indexPoolEvent, parsePoolCreatedLog, updatePoolActive } from './eventIndexer'
 import { indexInterestClaimEvent, parseInterestClaimedLog } from './interestClaimIndexer'
@@ -10,7 +10,7 @@ import { indexMembershipFromLog, MEMBERSHIP_TOPICS } from './membershipIndexer'
 import { indexWithdrawalEvent, parseFundsWithdrawnLog } from './withdrawalIndexer'
 
 const poolFactoryInterface = new Interface([...PoolFactoryABI])
-const lendingPoolInterface = new Interface([...SampleLendingPoolABI])
+const lendingPoolInterface = new Interface([...LendingPoolABI])
 
 const POOL_CREATED_TOPIC = poolFactoryInterface.getEvent('PoolCreated')!.topicHash
 const POOL_DEACTIVATED_TOPIC = poolFactoryInterface.getEvent('PoolDeactivated')!.topicHash

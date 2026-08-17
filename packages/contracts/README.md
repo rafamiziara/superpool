@@ -139,11 +139,11 @@ decoding to the wrong values.
 ```
 packages/contracts/
 ├── contracts/              # Solidity smart contracts
-│   └── SampleLendingPool.sol
+│   └── LendingPool.sol
 ├── scripts/                # Deployment and utility scripts
 │   └── deploy.ts
 ├── test/                   # Test files
-│   └── SampleLendingPool.test.ts
+│   └── LendingPool.test.ts
 ├── typechain-types/        # Generated TypeScript types
 ├── hardhat.config.ts       # Hardhat configuration
 ├── tsconfig.json          # TypeScript configuration
@@ -153,7 +153,7 @@ packages/contracts/
 
 ## Contract Architecture
 
-### SampleLendingPool
+### LendingPool
 
 A fully upgradeable lending pool contract that demonstrates the core functionality:
 

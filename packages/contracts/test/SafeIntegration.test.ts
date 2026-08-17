@@ -7,7 +7,7 @@ import { ethers, network } from 'hardhat'
 import chai from 'chai'
 import { deploySafe, SafeConfig } from '../scripts/deploy-safe'
 import { completeOwnershipTransfer, initiateOwnershipTransfer, verifyOwnershipStatus } from '../scripts/transfer-ownership'
-import { PoolFactory, SampleLendingPool } from '../typechain-types'
+import { LendingPool, PoolFactory } from '../typechain-types'
 chai.use(chaiAsPromised)
 
 describe('Safe Integration Tests', function () {
@@ -21,7 +21,7 @@ describe('Safe Integration Tests', function () {
   })
 
   let poolFactory: PoolFactory
-  let lendingPoolImplementation: SampleLendingPool
+  let lendingPoolImplementation: LendingPool
   let deployer: SignerWithAddress
   let safeOwner1: SignerWithAddress
   let safeOwner2: SignerWithAddress
@@ -34,8 +34,8 @@ describe('Safe Integration Tests', function () {
     ;[deployer, safeOwner1, safeOwner2, safeOwner3, otherAccount] = await ethers.getSigners()
 
     // Deploy lending pool implementation
-    const SampleLendingPool = await ethers.getContractFactory('SampleLendingPool')
-    lendingPoolImplementation = await SampleLendingPool.deploy()
+    const LendingPool = await ethers.getContractFactory('LendingPool')
+    lendingPoolImplementation = await LendingPool.deploy()
     await lendingPoolImplementation.waitForDeployment()
 
     // Deploy PoolFactory

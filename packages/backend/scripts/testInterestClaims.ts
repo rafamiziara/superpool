@@ -28,7 +28,7 @@ dotenv.config()
 import { initializeApp } from 'firebase-admin/app'
 import { getFirestore } from 'firebase-admin/firestore'
 import { BaseContract, Contract, JsonRpcProvider, parseEther, Wallet } from 'ethers'
-import { PoolFactoryABI, SampleLendingPoolABI } from '../src/constants/abis'
+import { PoolFactoryABI, LendingPoolABI } from '../src/constants/abis'
 import { INTEREST_CLAIMS_COLLECTION } from '../src/constants/firestore'
 import { indexInterestClaimsByTxHash } from '../src/services/interestClaimIndexer'
 import { sweepBlockRange } from '../src/services/eventSweeper'
@@ -155,7 +155,7 @@ async function produceClaim(provider: JsonRpcProvider) {
   const poolAddress: string = created.args.poolAddress
   const poolId = Number(created.args.poolId)
 
-  const pool = new Contract(poolAddress, SampleLendingPoolABI, owner)
+  const pool = new Contract(poolAddress, LendingPoolABI, owner)
 
   for (const account of [lender, borrower]) {
     const request = await as(pool.connect(account)).requestMembership({ nonce: await nextNonce(provider, account.address) })

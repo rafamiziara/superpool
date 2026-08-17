@@ -2,7 +2,7 @@ import { time } from '@nomicfoundation/hardhat-network-helpers'
 import { expect } from 'chai'
 import { ethers, upgrades } from 'hardhat'
 import { SignerWithAddress } from '@nomicfoundation/hardhat-ethers/signers'
-import { SampleLendingPool } from '../typechain-types'
+import { LendingPool } from '../typechain-types'
 
 /**
  * Where `loans[loanId]` starts in storage, found rather than hardcoded.
@@ -32,19 +32,19 @@ async function findLoanSlot(poolAddress: string, loanId: number, borrower: strin
  * deployment is rejected outright. Testing through a beacon is also the only
  * way these tests exercise the delegation path production actually uses.
  */
-async function deployPoolBehindBeacon(args: unknown[]): Promise<SampleLendingPool> {
-  const SampleLendingPool = await ethers.getContractFactory('SampleLendingPool')
-  const beacon = await upgrades.deployBeacon(SampleLendingPool)
+async function deployPoolBehindBeacon(args: unknown[]): Promise<LendingPool> {
+  const LendingPool = await ethers.getContractFactory('LendingPool')
+  const beacon = await upgrades.deployBeacon(LendingPool)
   await beacon.waitForDeployment()
 
-  const pool = (await upgrades.deployBeaconProxy(beacon, SampleLendingPool, args)) as unknown as SampleLendingPool
+  const pool = (await upgrades.deployBeaconProxy(beacon, LendingPool, args)) as unknown as LendingPool
   await pool.waitForDeployment()
 
   return pool
 }
 
-describe('SampleLendingPool', function () {
-  let lendingPool: SampleLendingPool
+describe('LendingPool', function () {
+  let lendingPool: LendingPool
   let owner: SignerWithAddress
   let borrower: SignerWithAddress
   let lender: SignerWithAddress
@@ -598,28 +598,28 @@ describe('SampleLendingPool', function () {
       // The whole reason for the beacon. Under ERC-1167 clones each pool
       // hardcoded its implementation, so an upgrade reached only pools created
       // afterwards and the population forked on every change.
-      const SampleLendingPool = await ethers.getContractFactory('SampleLendingPool')
-      const beacon = await upgrades.deployBeacon(SampleLendingPool)
+      const LendingPool = await ethers.getContractFactory('LendingPool')
+      const beacon = await upgrades.deployBeacon(LendingPool)
       await beacon.waitForDeployment()
 
-      const first = (await upgrades.deployBeaconProxy(beacon, SampleLendingPool, [
+      const first = (await upgrades.deployBeaconProxy(beacon, LendingPool, [
         owner.address,
         maxLoanAmount,
         interestRate,
         loanDuration,
         false,
-      ])) as unknown as SampleLendingPool
-      const second = (await upgrades.deployBeaconProxy(beacon, SampleLendingPool, [
+      ])) as unknown as LendingPool
+      const second = (await upgrades.deployBeaconProxy(beacon, LendingPool, [
         owner.address,
         maxLoanAmount,
         interestRate,
         loanDuration,
         false,
-      ])) as unknown as SampleLendingPool
+      ])) as unknown as LendingPool
 
       const before = await upgrades.beacon.getImplementationAddress(await beacon.getAddress())
 
-      await upgrades.upgradeBeacon(beacon, SampleLendingPool, { redeployImplementation: 'always' })
+      await upgrades.upgradeBeacon(beacon, LendingPool, { redeployImplementation: 'always' })
 
       const after = await upgrades.beacon.getImplementationAddress(await beacon.getAddress())
       expect(after).to.not.equal(before)
