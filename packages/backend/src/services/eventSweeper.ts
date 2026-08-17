@@ -3,7 +3,7 @@ import { Firestore } from 'firebase-admin/firestore'
 import { logger } from 'firebase-functions/v2'
 import { LendingPoolABI, PoolFactoryABI } from '../constants'
 import { indexContributionEvent, parseFundsDepositedLog, resolvePoolId } from './contributionIndexer'
-import { fetchPoolActive, fetchPoolDescription, indexPoolEvent, parsePoolCreatedLog, updatePoolActive } from './eventIndexer'
+import { fetchPoolActive, fetchPoolMetadata, indexPoolEvent, parsePoolCreatedLog, updatePoolActive } from './eventIndexer'
 import { indexInterestClaimEvent, parseInterestClaimedLog } from './interestClaimIndexer'
 import { indexLoanFromLog, LOAN_TOPICS } from './loanIndexer'
 import { indexLoanRepaymentEvent, LOAN_REPAYMENT_MADE_TOPIC, parseLoanRepaymentLog } from './loanRepaymentIndexer'
@@ -121,7 +121,7 @@ async function sweepPoolCreated(options: SweepBlockRangeOptions, caches: SweepCa
     try {
       const timestamp = await getBlockTimestamp(log.blockNumber, provider, caches)
       const parsedPool = parsePoolCreatedLog(log, chainId, timestamp)
-      parsedPool.description = await fetchPoolDescription(parsedPool.poolId, log.address, provider)
+      Object.assign(parsedPool, await fetchPoolMetadata(parsedPool.poolId, log.address, provider))
 
       const result = await indexPoolEvent(parsedPool, firestore)
 

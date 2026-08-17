@@ -25,7 +25,7 @@ jest.mock('./loanIndexer', () => {
 // from the shipped ABIs, and a stubbed Interface would agree with whatever the
 // test invented rather than with the contracts.
 const { sweepBlockRange } = require('./eventSweeper')
-const { fetchPoolActive, fetchPoolDescription, indexPoolEvent, parsePoolCreatedLog, updatePoolActive } = require('./eventIndexer')
+const { fetchPoolActive, fetchPoolMetadata, indexPoolEvent, parsePoolCreatedLog, updatePoolActive } = require('./eventIndexer')
 const { indexContributionEvent, parseFundsDepositedLog, resolvePoolId } = require('./contributionIndexer')
 const { indexWithdrawalEvent, parseFundsWithdrawnLog } = require('./withdrawalIndexer')
 const { indexInterestClaimEvent, parseInterestClaimedLog } = require('./interestClaimIndexer')
@@ -39,6 +39,7 @@ const { indexLoanRepaymentEvent, parseLoanRepaymentLog, LOAN_REPAYMENT_MADE_TOPI
 const CHAIN_ID = 31337
 const FACTORY_ADDRESS = '0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512'
 const POOL_ADDRESS = '0x5FbDB2315678afecb367f032d93F642f64180aa3'
+const NATIVE = '0x0000000000000000000000000000000000000000'
 const OTHER_POOL_ADDRESS = '0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0'
 const FROM_BLOCK = 100
 const TO_BLOCK = 599
@@ -143,7 +144,7 @@ function filterFor(provider: { getLogs: jest.Mock }, topic: string) {
 
 beforeEach(() => {
   parsePoolCreatedLog.mockImplementation(() => ({ poolId: 1, description: '' }))
-  fetchPoolDescription.mockResolvedValue('a description')
+  fetchPoolMetadata.mockResolvedValue({ description: 'a description', loanToken: NATIVE })
   indexPoolEvent.mockResolvedValue({ poolId: 1, alreadyIndexed: false, stored: true })
 
   parseFundsDepositedLog.mockImplementation(() => ({ poolAddress: POOL_ADDRESS, contributor: '0xabc', amount: '1' }))
@@ -508,9 +509,10 @@ describe('sweepBlockRange', () => {
 
     it('should index a pool without its description when the factory read fails', async () => {
       // Arrange
-      // `fetchPoolDescription` already degrades to '' internally; this pins that
-      // the sweep does not treat a cosmetic miss as a reason to drop the pool.
-      fetchPoolDescription.mockResolvedValue('')
+      // `fetchPoolMetadata` already degrades to an empty description and a
+      // native denomination internally; this pins that the sweep does not treat
+      // a cosmetic miss as a reason to drop the pool.
+      fetchPoolMetadata.mockResolvedValue({ description: '', loanToken: NATIVE })
       const provider = buildMockProvider({ pools: [buildLog()] })
 
       // Act
@@ -519,6 +521,26 @@ describe('sweepBlockRange', () => {
       // Assert
       expect(counts.pools).toBe(1)
       expect(indexPoolEvent).toHaveBeenCalledWith(expect.objectContaining({ description: '' }), expect.anything())
+    })
+
+    it('should carry a token pool’s denomination through to the indexer', async () => {
+      // The sweep is the only path that reaches a pool nobody's app was
+      // watching — a pool created by a script, or while the phone was closed —
+      // so it has to enrich exactly as the on-demand callable does.
+      fetchPoolMetadata.mockResolvedValue({
+        description: 'Stable circle',
+        loanToken: '0xstablecoin',
+        tokenSymbol: 'USDC',
+        tokenDecimals: 6,
+      })
+      const provider = buildMockProvider({ pools: [buildLog()] })
+
+      await sweep(provider)
+
+      expect(indexPoolEvent).toHaveBeenCalledWith(
+        expect.objectContaining({ loanToken: '0xstablecoin', tokenSymbol: 'USDC', tokenDecimals: 6 }),
+        expect.anything()
+      )
     })
   })
 

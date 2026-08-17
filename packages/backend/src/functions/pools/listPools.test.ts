@@ -4,8 +4,17 @@ import { mockLogger } from '../../__tests__/setup'
 /**
  * A pool as Firestore stores it, which is not what the callable returns:
  * `createdAt` is a Timestamp there and an ISO string on the wire.
+ *
+ * `loanToken` is optional here and required on the wire, which is the whole
+ * point of the retrofit: a document written before pools had a denomination
+ * simply has no such field, and the handler answers "native" for it.
  */
-type StoredPool = Omit<PoolInfo, 'createdAt'> & { createdAt: Date }
+type StoredPool = Omit<PoolInfo, 'createdAt' | 'loanToken'> & {
+  createdAt: Date
+  loanToken?: string
+}
+
+const NATIVE = '0x0000000000000000000000000000000000000000'
 
 // Import mocked services (already mocked in setup.ts)
 const { firestore } = require('../../services')
@@ -29,6 +38,7 @@ describe('listPoolsHandler', () => {
       createdAt: new Date('2024-01-01'),
       transactionHash: '0xTxHash1',
       isActive: true,
+      loanToken: NATIVE,
     },
     {
       poolId: 2,
@@ -44,6 +54,9 @@ describe('listPoolsHandler', () => {
       createdAt: new Date('2024-01-02'),
       transactionHash: '0xTxHash2',
       isActive: true,
+      loanToken: '0xstablecoin',
+      tokenSymbol: 'USDC',
+      tokenDecimals: 6,
     },
   ]
 
@@ -104,6 +117,58 @@ describe('listPoolsHandler', () => {
       hasPreviousPage: false,
     })
     expect(mockLogger.info).toHaveBeenCalledWith('Listing pools', { params: {} })
+  })
+
+  describe('denomination', () => {
+    it('reports a pool indexed before denominations existed as native', async () => {
+      // The retrofit. Nothing could have created a token pool before the field
+      // existed, so an absent one is not missing information — it is the answer.
+      const { loanToken: _omitted, ...legacyPool } = mockPools[0]
+      firestore.collection.mockReturnValue(createMockQuery([legacyPool], 1))
+
+      const result = await listPoolsHandler({ data: {} })
+
+      expect(result.pools[0].loanToken).toBe(NATIVE)
+      expect(result.pools[0].tokenSymbol).toBeUndefined()
+      expect(result.pools[0].tokenDecimals).toBeUndefined()
+    })
+
+    it('gives a native pool no symbol of its own', async () => {
+      // The native symbol is POL on Polygon and ETH on Base — a fact about the
+      // chain, which the app already knows, not about the pool. Answering 'POL'
+      // here would put it on a Base pool.
+      firestore.collection.mockReturnValue(createMockQuery([mockPools[0]], 1))
+
+      const result = await listPoolsHandler({ data: {} })
+
+      expect(result.pools[0].loanToken).toBe(NATIVE)
+      expect(result.pools[0].tokenSymbol).toBeUndefined()
+    })
+
+    it('carries a token pool’s symbol and decimals through', async () => {
+      firestore.collection.mockReturnValue(createMockQuery([mockPools[1]], 1))
+
+      const result = await listPoolsHandler({ data: {} })
+
+      expect(result.pools[0]).toMatchObject({
+        loanToken: '0xstablecoin',
+        tokenSymbol: 'USDC',
+        tokenDecimals: 6,
+      })
+    })
+
+    it('leaves decimals absent when the token was never read, rather than defaulting to 18', async () => {
+      // The sharpest rule in the feature. A token pool whose metadata could not
+      // be read has to reach the app as unsupported; 18 decimals against a
+      // 6-decimal token renders 5 USDC as 5,000,000,000,000.
+      const { tokenSymbol: _symbol, tokenDecimals: _decimals, ...unreadable } = mockPools[1]
+      firestore.collection.mockReturnValue(createMockQuery([unreadable], 1))
+
+      const result = await listPoolsHandler({ data: {} })
+
+      expect(result.pools[0].loanToken).toBe('0xstablecoin')
+      expect(result.pools[0].tokenDecimals).toBeUndefined()
+    })
   })
 
   // Test Case: Pagination - Page 2

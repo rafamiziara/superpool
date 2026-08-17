@@ -1,4 +1,5 @@
 import type { LoanInfo, PoolInfo } from '@superpool/types'
+import { zeroAddress } from 'viem'
 import React from 'react'
 import { render } from '../../__tests__/test-utils'
 import { MOCK_USER_ADDRESS } from '../../mocks/lending'
@@ -23,6 +24,7 @@ function makePool(overrides: Partial<PoolInfo> = {}): PoolInfo {
     createdAt: '2026-08-11T09:00:00.000Z',
     transactionHash: '0xaaa',
     isActive: true,
+    loanToken: zeroAddress,
     ...overrides,
   }
 }

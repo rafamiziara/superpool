@@ -1,4 +1,5 @@
 import type { PoolInfo } from '@superpool/types'
+import { zeroAddress } from 'viem'
 import { filterPools, POOL_SORT_MODES, sortPools } from './poolSearch'
 
 function makePool(overrides: Partial<PoolInfo> = {}): PoolInfo {
@@ -16,6 +17,7 @@ function makePool(overrides: Partial<PoolInfo> = {}): PoolInfo {
     createdAt: '2026-08-01T09:00:00.000Z',
     transactionHash: '0xaaa',
     isActive: true,
+    loanToken: zeroAddress,
     ...overrides,
   }
 }

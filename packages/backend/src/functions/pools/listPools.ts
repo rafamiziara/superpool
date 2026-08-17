@@ -1,4 +1,5 @@
 import { ListPoolsRequest, ListPoolsResponse } from '@superpool/types'
+import { ZeroAddress } from 'ethers'
 import { logger } from 'firebase-functions/v2'
 import { CallableRequest, HttpsError, onCall } from 'firebase-functions/v2/https'
 import { firestore } from '../../services'
@@ -55,6 +56,18 @@ export const listPoolsHandler = async (request: CallableRequest<ListPoolsRequest
         createdAt: (data.createdAt?.toDate() || new Date()).toISOString(),
         transactionHash: data.transactionHash,
         isActive: data.isActive,
+        // A pool indexed before pools had a denomination has no field here, and
+        // native is exactly what it is — nothing could create a token pool
+        // before the field existed. The zero address is the same answer a new
+        // native pool stores, so the client never has to know which era a
+        // document came from.
+        loanToken: data.loanToken ?? ZeroAddress,
+        // Left off rather than defaulted. Absent beside a non-zero `loanToken`
+        // means the backend could not read the token, and the client must show
+        // the pool as unsupported instead of formatting it with a guess — 18
+        // decimals against a 6-decimal token is out by a factor of a trillion.
+        ...(data.tokenSymbol == null ? {} : { tokenSymbol: data.tokenSymbol }),
+        ...(data.tokenDecimals == null ? {} : { tokenDecimals: data.tokenDecimals }),
       }
     })
 

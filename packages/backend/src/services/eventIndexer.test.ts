@@ -26,7 +26,14 @@ jest.mock('ethers', () => {
 })
 
 // Import AFTER mocks are registered
-const { parsePoolCreatedLog, indexPoolEvent, indexPoolByTxHash, fetchPoolActive, updatePoolActive } = require('./eventIndexer')
+const {
+  parsePoolCreatedLog,
+  indexPoolEvent,
+  indexPoolByTxHash,
+  fetchPoolActive,
+  updatePoolActive,
+  fetchPoolMetadata,
+} = require('./eventIndexer')
 const { Contract } = require('ethers')
 
 // ---------------------------------------------------------------------------
@@ -38,6 +45,8 @@ const TX_HASH = '0xabc123def456'
 const BLOCK_NUMBER = 100
 const BLOCK_TIMESTAMP = 1700000000
 const POOL_CREATED_TOPIC = '0xPOOL_CREATED_TOPIC'
+const NATIVE = '0x0000000000000000000000000000000000000000'
+const TOKEN = '0xStablecoinAddress'
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -83,6 +92,7 @@ function buildParsedPool(overrides: Partial<ParsedPoolEvent> = {}): ParsedPoolEv
     blockNumber: BLOCK_NUMBER,
     createdAt: new Date(BLOCK_TIMESTAMP * 1000),
     isActive: true,
+    loanToken: NATIVE,
     ...overrides,
   }
 }
@@ -390,6 +400,201 @@ describe('indexPoolEvent', () => {
 
     // Assert
     expect(mockLogger.info).toHaveBeenCalledWith('Pool indexed successfully', expect.objectContaining({ poolId: 4, chainId: CHAIN_ID }))
+  })
+
+  describe('denomination', () => {
+    it('stores a native pool with the zero address and no token metadata', async () => {
+      const { mockFs, mockCreate } = buildMockFirestore(false)
+
+      await indexPoolEvent(buildParsedPool(), mockFs)
+
+      const written = mockCreate.mock.calls[0][0]
+      expect(written.loanToken).toBe(NATIVE)
+      // Not `null`, not `'POL'` — absent. The native symbol belongs to the
+      // chain, and writing one here would put POL on a Base pool.
+      expect('tokenSymbol' in written).toBe(false)
+      expect('tokenDecimals' in written).toBe(false)
+    })
+
+    it('stores a token pool with its symbol and decimals', async () => {
+      const { mockFs, mockCreate } = buildMockFirestore(false)
+
+      await indexPoolEvent(buildParsedPool({ loanToken: TOKEN, tokenSymbol: 'USDC', tokenDecimals: 6 }), mockFs)
+
+      expect(mockCreate.mock.calls[0][0]).toMatchObject({
+        loanToken: TOKEN.toLowerCase(),
+        tokenSymbol: 'USDC',
+        tokenDecimals: 6,
+      })
+    })
+
+    it('lowercases the token address, like every other address it stores', async () => {
+      const { mockFs, mockCreate } = buildMockFirestore(false)
+
+      await indexPoolEvent(buildParsedPool({ loanToken: '0xABCDEF', tokenSymbol: 'USDC', tokenDecimals: 6 }), mockFs)
+
+      expect(mockCreate.mock.calls[0][0].loanToken).toBe('0xabcdef')
+    })
+
+    it('writes no decimals at all when the token could not be read', async () => {
+      // Firestore rejects `undefined` outright, and a default would be worse
+      // than a rejection: the app has to be able to tell "unsupported" from
+      // "eighteen".
+      const { mockFs, mockCreate } = buildMockFirestore(false)
+
+      await indexPoolEvent(buildParsedPool({ loanToken: TOKEN }), mockFs)
+
+      const written = mockCreate.mock.calls[0][0]
+      expect(written.loanToken).toBe(TOKEN.toLowerCase())
+      expect('tokenDecimals' in written).toBe(false)
+    })
+  })
+
+  describe('repairing token metadata on a pool already indexed without it', () => {
+    function buildExistingPool(stored: Record<string, unknown>) {
+      const mockUpdate = jest.fn().mockResolvedValue(undefined)
+      const mockGet = jest.fn().mockResolvedValue({ exists: true, data: () => stored })
+      const mockDocRef = {
+        create: jest.fn().mockRejectedValue(alreadyExistsError()),
+        get: mockGet,
+        update: mockUpdate,
+      }
+
+      return {
+        mockFs: { collection: jest.fn().mockReturnValue({ doc: jest.fn().mockReturnValue(mockDocRef) }) },
+        mockUpdate,
+      }
+    }
+
+    it('fills in metadata a failed token read left out', async () => {
+      // One RPC hiccup at creation would otherwise mark a pool unsupported for
+      // ever, because `create()` never runs again for it. The sweep re-scans
+      // ranges deliberately, so this path actually runs.
+      const { mockFs, mockUpdate } = buildExistingPool({ loanToken: TOKEN.toLowerCase() })
+
+      const result = await indexPoolEvent(buildParsedPool({ loanToken: TOKEN, tokenSymbol: 'USDC', tokenDecimals: 6 }), mockFs)
+
+      expect(mockUpdate).toHaveBeenCalledWith({ loanToken: TOKEN.toLowerCase(), tokenSymbol: 'USDC', tokenDecimals: 6 })
+      // Still not a store: nothing was created, and the caller's counters are
+      // about pools discovered, not fields tidied.
+      expect(result).toEqual({ poolId: 1, alreadyIndexed: true, stored: false })
+    })
+
+    it('never overwrites metadata that is already there', async () => {
+      // Repairs in one direction only — absent to known — so a later failed
+      // read cannot undo a good value.
+      const { mockFs, mockUpdate } = buildExistingPool({ loanToken: TOKEN.toLowerCase(), tokenSymbol: 'USDC', tokenDecimals: 6 })
+
+      await indexPoolEvent(buildParsedPool({ loanToken: TOKEN, tokenSymbol: 'WRONG', tokenDecimals: 18 }), mockFs)
+
+      expect(mockUpdate).not.toHaveBeenCalled()
+    })
+
+    it('leaves a pool indexed before denominations existed alone', async () => {
+      // It has no `loanToken` because it is native, which is what it is. There
+      // is nothing to repair, and touching it would be a rewrite for nothing.
+      const { mockFs, mockUpdate } = buildExistingPool({ name: 'An older pool' })
+
+      await indexPoolEvent(buildParsedPool(), mockFs)
+
+      expect(mockUpdate).not.toHaveBeenCalled()
+    })
+
+    it('does not repair when this read failed too', async () => {
+      const { mockFs, mockUpdate } = buildExistingPool({ loanToken: TOKEN.toLowerCase() })
+
+      await indexPoolEvent(buildParsedPool({ loanToken: TOKEN }), mockFs)
+
+      expect(mockUpdate).not.toHaveBeenCalled()
+    })
+  })
+})
+
+// ---------------------------------------------------------------------------
+// fetchPoolMetadata
+// ---------------------------------------------------------------------------
+
+describe('fetchPoolMetadata', () => {
+  const FACTORY = '0xFactoryAddress'
+
+  beforeEach(() => {
+    jest.clearAllMocks()
+  })
+
+  /**
+   * The indexer builds two contracts from one address argument each: the
+   * factory, then the token. Dispatching on the address keeps the two apart
+   * without depending on the order they happen to be constructed in.
+   */
+  function mockChain(options: { poolInfo?: object; poolInfoError?: Error; symbol?: string; decimals?: bigint; tokenError?: Error }) {
+    Contract.mockImplementation((address: string) => {
+      if (address === FACTORY) {
+        return {
+          getPoolInfo: options.poolInfoError
+            ? jest.fn().mockRejectedValue(options.poolInfoError)
+            : jest.fn().mockResolvedValue(options.poolInfo),
+        }
+      }
+
+      return {
+        symbol: options.tokenError ? jest.fn().mockRejectedValue(options.tokenError) : jest.fn().mockResolvedValue(options.symbol),
+        decimals: options.tokenError ? jest.fn().mockRejectedValue(options.tokenError) : jest.fn().mockResolvedValue(options.decimals),
+      }
+    })
+  }
+
+  it('reads the description and the denomination in one call', async () => {
+    mockChain({ poolInfo: { description: 'Micro-loans', loanToken: NATIVE } })
+
+    expect(await fetchPoolMetadata(1, FACTORY, {})).toEqual({ description: 'Micro-loans', loanToken: NATIVE })
+  })
+
+  it('asks a token pool’s token for its symbol and decimals', async () => {
+    mockChain({ poolInfo: { description: 'Stable circle', loanToken: TOKEN }, symbol: 'USDC', decimals: 6n })
+
+    expect(await fetchPoolMetadata(1, FACTORY, {})).toEqual({
+      description: 'Stable circle',
+      loanToken: TOKEN,
+      tokenSymbol: 'USDC',
+      tokenDecimals: 6,
+    })
+  })
+
+  it('does not ask a native pool’s non-existent token anything', async () => {
+    mockChain({ poolInfo: { description: '', loanToken: NATIVE } })
+
+    await fetchPoolMetadata(1, FACTORY, {})
+
+    // One contract, the factory. Constructing an ERC-20 at the zero address
+    // would be a guaranteed-failing call on every native pool ever swept.
+    expect(Contract).toHaveBeenCalledTimes(1)
+  })
+
+  it('indexes the pool as native when the factory cannot be read', async () => {
+    // Degrading to native rather than throwing: losing the pool entirely is
+    // worse, and native is what all but the token pools are.
+    mockChain({ poolInfoError: new Error('call reverted') })
+
+    expect(await fetchPoolMetadata(1, FACTORY, {})).toEqual({ description: '', loanToken: NATIVE })
+    expect(mockLogger.warn).toHaveBeenCalled()
+  })
+
+  it('returns no decimals rather than a guess when the token cannot be read', async () => {
+    // The pool is still stored — losing it would be worse — but it reaches the
+    // app as unsupported instead of being formatted with 18 decimals it may
+    // not have.
+    mockChain({ poolInfo: { description: 'Stable circle', loanToken: TOKEN }, tokenError: new Error('not a contract') })
+
+    expect(await fetchPoolMetadata(1, FACTORY, {})).toEqual({ description: 'Stable circle', loanToken: TOKEN })
+    expect(mockLogger.warn).toHaveBeenCalled()
+  })
+
+  it('treats a factory that has never heard of denominations as native', async () => {
+    // A factory deployed before `PoolInfo.loanToken` existed returns a struct
+    // without it. `undefined` there must not become `undefined` in Firestore.
+    mockChain({ poolInfo: { description: 'An older pool' } })
+
+    expect(await fetchPoolMetadata(1, FACTORY, {})).toEqual({ description: 'An older pool', loanToken: NATIVE })
   })
 })
 

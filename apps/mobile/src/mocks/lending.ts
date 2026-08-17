@@ -1,6 +1,6 @@
 import type { Loan, PoolInfo, PoolMember, Transaction } from '@superpool/types'
 import { LoanStatus, MemberStatus, TransactionStatus, TransactionType } from '@superpool/types'
-import { parseEther } from 'viem'
+import { parseEther, zeroAddress } from 'viem'
 
 /**
  * Mock data for UX/UI validation.
@@ -34,6 +34,7 @@ export const MOCK_POOLS: PoolInfo[] = [
     createdAt: daysAgo(92).toISOString(),
     transactionHash: '0x5f0e8c1a9b2d374650f8ee12ab34cd56ef7890a1b2c3d4e5f60718293a4b5c6d',
     isActive: true,
+    loanToken: zeroAddress,
   },
   {
     poolId: 2,
@@ -49,6 +50,7 @@ export const MOCK_POOLS: PoolInfo[] = [
     createdAt: daysAgo(210).toISOString(),
     transactionHash: '0x1a2b3c4d5e6f708192a3b4c5d6e7f8091a2b3c4d5e6f708192a3b4c5d6e7f809',
     isActive: true,
+    loanToken: zeroAddress,
   },
   {
     poolId: 3,
@@ -64,6 +66,7 @@ export const MOCK_POOLS: PoolInfo[] = [
     createdAt: daysAgo(45).toISOString(),
     transactionHash: '0x9e8d7c6b5a493827160f5e4d3c2b1a09f8e7d6c5b4a3928170f6e5d4c3b2a190',
     isActive: true,
+    loanToken: zeroAddress,
   },
   {
     poolId: 4,
@@ -79,6 +82,7 @@ export const MOCK_POOLS: PoolInfo[] = [
     createdAt: daysAgo(12).toISOString(),
     transactionHash: '0x2f3e4d5c6b7a8091f2e3d4c5b6a798012f3e4d5c6b7a8091f2e3d4c5b6a79801',
     isActive: true,
+    loanToken: zeroAddress,
   },
   // Pools 5 and 6 deliberately have no entry in MOCK_MEMBERSHIPS: they are what
   // Discover has to show. The mock user belongs to every pool above, so without
@@ -98,6 +102,7 @@ export const MOCK_POOLS: PoolInfo[] = [
     createdAt: daysAgo(31).toISOString(),
     transactionHash: '0x7c6b5a49382716f0e5d4c3b2a1908f7e6d5c4b3a2918070f6e5d4c3b2a190817',
     isActive: true,
+    loanToken: zeroAddress,
   },
   {
     poolId: 6,
@@ -113,6 +118,7 @@ export const MOCK_POOLS: PoolInfo[] = [
     createdAt: daysAgo(3).toISOString(),
     transactionHash: '0x4d5c6b7a8091f2e3d4c5b6a798012f3e4d5c6b7a8091f2e3d4c5b6a798012f3e',
     isActive: true,
+    loanToken: zeroAddress,
   },
 ]
 

@@ -71,6 +71,43 @@ export interface PoolInfo {
   createdAt: string
   transactionHash: string
   isActive: boolean
+  /**
+   * The ERC-20 the pool is denominated in, lowercased, or the zero address for
+   * native.
+   *
+   * Always present on the wire even though it is absent from documents indexed
+   * before pools had a denomination — `listPools` fills those in with the zero
+   * address, which is what they are. Nothing could have created a token pool
+   * before the field existed.
+   */
+  loanToken: string
+  /**
+   * The token's symbol, for a pool denominated in one.
+   *
+   * **Absent on a native pool, deliberately.** The native symbol is POL on
+   * Polygon, ETH on Base and Arbitrum, BNB on BSC — a property of the chain, not
+   * of the pool, and the app already knows it per chain. Writing one here would
+   * put "POL" on a Base pool.
+   */
+  tokenSymbol?: string
+  /**
+   * The token's decimals, for a pool denominated in one. USDC has 6.
+   *
+   * Indexed rather than read from the chain because a token's decimals are
+   * immutable for its lifetime, unlike `requiresMembership`, which the owner can
+   * change at any moment and which must therefore never be read from a stored
+   * record.
+   *
+   * **Three states, and conflating the last two is a factor-of-10^12 bug:**
+   *
+   * - `loanToken` is the zero address — native. Format with the chain's own
+   *   native currency, which is 18 decimals on every chain here.
+   * - `loanToken` is set and this is a number — a token pool. Format with it.
+   * - `loanToken` is set and this is absent — the pool is denominated in
+   *   something the backend could not read. **Show it as unsupported. Never
+   *   fall back to 18**, which would render 5 USDC as 5,000,000,000,000.
+   */
+  tokenDecimals?: number
 }
 
 export interface ListPoolsResponse {
