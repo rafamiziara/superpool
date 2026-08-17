@@ -327,31 +327,43 @@ pushed forward — which is exactly what producing a late repayment requires.
 ## Loans in the activity feed
 
 `PoolStore.loanActivity` puts loans in the same feed as contributions and
-withdrawals, but **one row per loan, not one per event**. A contribution is a log
-and dates itself; a loan is an entity with a single timestamp — one that
-`startTime` rewrites on approval — and a single transaction hash.
+withdrawals. A contribution is a log and dates itself; a loan is an entity with a
+single transaction hash, so it is **expanded into the events that can be dated**
+— one row, or two.
 
 - A `requested` loan is a row awaiting a decision. `TransactionStatus.PENDING`
   there means "waiting on the owner", not "not yet mined" as it does everywhere
   else: a request is on chain the moment it is made.
-- A `disbursed` loan is money leaving the pool, dated when it did, and stays that
-  row once repaid.
+- A `disbursed` loan is money leaving the pool, dated when it did.
+- A **repaid** loan adds a second row, dated `repaidAt`, for the money coming
+  back. The disbursement row stays: both things happened, at different times.
 - `rejected` and cancelled requests are left out. Nothing moved, the request is
   over, and `TransactionType` has no member that says so.
 
-**There is still no repayment row, but it is no longer impossible.** `LoanRepaid`
-is not stored as its own record, and until `repaidAt` existed a repayment had no
-date to be placed at — reusing `startedAt` would have filed it at the moment the
-money went the other way. The date is there now; the row is simply not built.
+Two things about the repayment row:
+
+- **It carries no `txHash` or `blockNumber`.** `LoanRepaid` is not stored as its
+  own record, so the only hash on hand is the one that _created_ the loan.
+  Linking a repayment to the borrow is worse than offering no link, and
+  `Transaction` makes both fields optional for exactly this.
+- **An undated repayment produces no row at all.** `isRepaid` is the authority on
+  _whether_ and `repaidAt` only on _when_, so a loan settled before the contract
+  stamped a date has no honest position in a feed ordered by time — reusing
+  `startedAt` would file it at the moment the money went the other way.
+  `borrowerHistory` draws the same line, counting those as `undated` rather than
+  guessing.
+
+Its amount is principal plus the whole fixed interest — the sum `repayLoan`
+demands in one transaction, since the rate does not accrue.
 
 ### The sign depends on whose feed it is
 
 `ActivityRow` takes a `perspective`, and the two tables are exact mirrors:
 
-| Feed                       | Perspective | A contribution | A disbursed loan |
-| -------------------------- | ----------- | -------------- | ---------------- |
-| Pool page, "Pool activity" | `pool`      | `+` arrives    | `−` leaves       |
-| Dashboard, activity tab    | `wallet`    | `−` you sent   | `+` you received |
+| Feed                       | Perspective | A contribution | A disbursed loan | A repayment      |
+| -------------------------- | ----------- | -------------- | ---------------- | ---------------- |
+| Pool page, "Pool activity" | `pool`      | `+` arrives    | `−` leaves       | `+` comes back   |
+| Dashboard, activity tab    | `wallet`    | `−` you sent   | `+` you received | `−` you paid out |
 
 Which one is not cosmetic: it follows from **who the feed is about**. The pool's
 page lists everything that happened to that pool, including other members', so
@@ -361,8 +373,8 @@ dashboard and activity tab are narrowed to the connected wallet by
 money the user received, and the pool's sign would mark it negative.
 
 `myActivity` matches on **either end** of the row, because which end holds the
-member depends on direction: a contribution comes from them, a withdrawal and a
-disbursed loan go to them. With no wallet connected it is empty rather than
+member depends on direction: a contribution and a repayment come from them, a
+withdrawal and a disbursed loan go to them. With no wallet connected it is empty rather than
 everything, since `sameAddress` refuses to match an empty address.
 
 The default is `pool`, the only safe answer for a feed nobody has narrowed.

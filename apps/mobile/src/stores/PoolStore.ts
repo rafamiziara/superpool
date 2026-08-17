@@ -69,6 +69,19 @@ function isOutstanding(loan: LoanInfo): boolean {
 }
 
 /**
+ * What settling this loan costs: principal plus the whole fixed interest.
+ *
+ * `interestRate` is basis points and does not accrue — it is fixed at
+ * disbursement — so this is the exact sum `repayLoan` demands, in one
+ * transaction, rather than a figure that depends on when it is asked.
+ */
+function repaymentTotal(loan: LoanInfo): bigint {
+  const principal = BigInt(loan.amount)
+
+  return principal + (principal * BigInt(loan.interestRate)) / 10_000n
+}
+
+/**
  * The register's wire status, in the enum the UI reads.
  *
  * `none` is in the wire type because it is the contract's zero value, but no
@@ -680,7 +693,7 @@ export class PoolStore {
 
     return this.loanRecords.map((loan) => {
       const amount = BigInt(loan.amount)
-      const interest = (amount * BigInt(loan.interestRate)) / 10_000n
+      const interest = repaymentTotal(loan) - amount
       const startedAt = new Date(loan.startedAt)
       const isDisbursed = loan.status === 'disbursed'
 
@@ -952,24 +965,34 @@ export class PoolStore {
   /**
    * Loans as activity rows.
    *
-   * Unlike the two above, this is **one row per loan, not one per event**. A
-   * contribution is a log and dates itself; a loan is an entity carrying a
-   * single timestamp that `startTime` rewrites on approval, and a single
-   * `transactionHash` from whichever call created it. There is no repayment
-   * timestamp anywhere — `LoanRepaid` is not stored as its own record — so a
-   * repayment cannot be given a date, and inventing one by reusing `startedAt`
-   * would put it in the feed at the moment the loan went *out*.
-   *
-   * So each loan appears once, typed by where it currently stands:
+   * A loan is not a log the way a contribution is: it is an entity, and the
+   * record carries a single `transactionHash` from whichever call created it.
+   * So it is expanded here into the events that can be dated, and a loan
+   * produces one row or two:
    *
    * - `requested` → a request awaiting the owner. `PENDING` here means "awaiting
    *   a decision", not "not yet mined" as it does everywhere else — a request is
    *   confirmed on chain the moment it is made. It is the one honest reading of
    *   the badge for a loan, and the alternative is a row that looks settled
    *   while somebody is still waiting on it.
-   * - `disbursed` → the funds left the pool, dated when they did. A repaid loan
-   *   stays this row: the disbursement is the part that happened at a time we
-   *   know.
+   * - `disbursed` → the funds left the pool, dated when they did.
+   * - **repaid** → a second row, dated `repaidAt`, for the money coming back.
+   *   The disbursement row stays: both things happened, at different times.
+   *
+   * The repayment row carries **no `txHash` or `blockNumber`**. The record's
+   * hash is the one that *created* the loan, so reusing it would link a
+   * repayment to the borrow — a wrong explorer link is worse than none, and
+   * `Transaction` makes both optional for exactly this.
+   *
+   * Its amount is principal plus the fixed interest, which is what `repayLoan`
+   * demands in one transaction — the same sum `loans` reports as `amountRepaid`.
+   *
+   * **A repayment with no `repaidAt` produces no row.** `isRepaid` is the
+   * authority on *whether* and this only answers *when*, so a loan settled
+   * before the contract stamped a date cannot be placed in a feed ordered by
+   * time. Inventing one by reusing `startedAt` would file the repayment at the
+   * moment the loan went *out*. `borrowerHistory` draws the same line, counting
+   * those as `undated` rather than guessing.
    *
    * A rejected or cancelled request is left out. Nothing moved, the request is
    * over, and `TransactionType` has no member that says so — a `LOAN_REQUEST`
@@ -981,8 +1004,9 @@ export class PoolStore {
 
       const startedAt = new Date(loan.startedAt)
       const isRequest = loan.status === 'requested'
+      const principal = BigInt(loan.amount)
 
-      return [
+      const rows: Transaction[] = [
         {
           id: loan.id,
           poolId: String(loan.poolId),
@@ -990,7 +1014,7 @@ export class PoolStore {
           from: isRequest ? loan.borrower : loan.poolAddress,
           to: isRequest ? loan.poolAddress : loan.borrower,
           type: isRequest ? TransactionType.LOAN_REQUEST : TransactionType.LOAN_DISBURSEMENT,
-          amount: BigInt(loan.amount),
+          amount: principal,
           status: isRequest ? TransactionStatus.PENDING : TransactionStatus.CONFIRMED,
           txHash: loan.transactionHash,
           blockNumber: loan.blockNumber,
@@ -998,6 +1022,26 @@ export class PoolStore {
           confirmedAt: startedAt,
         },
       ]
+
+      // `isRepaid` is meaningless on a request, which reads false while nothing
+      // is owed at all.
+      if (!isRequest && loan.isRepaid && loan.repaidAt) {
+        const repaidAt = new Date(loan.repaidAt)
+
+        rows.push({
+          id: `${loan.id}-repayment`,
+          poolId: String(loan.poolId),
+          from: loan.borrower,
+          to: loan.poolAddress,
+          type: TransactionType.LOAN_REPAYMENT,
+          amount: repaymentTotal(loan),
+          status: TransactionStatus.CONFIRMED,
+          createdAt: repaidAt,
+          confirmedAt: repaidAt,
+        })
+      }
+
+      return rows
     })
   }
 

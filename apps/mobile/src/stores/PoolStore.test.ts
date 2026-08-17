@@ -1450,8 +1450,10 @@ describe('PoolStore loan states', () => {
   // -------------------------------------------------------------------------
   // Loans in the activity feed.
   //
-  // One row per loan, not one per event: the record carries a single timestamp
-  // and a single transaction hash, so a repayment has no date to be shown at.
+  // A loan is an entity, not a log, so it is expanded into the events that can
+  // be dated: the disbursement, and — once `repaidAt` exists — the repayment.
+  // A repayment with no date still produces no row; it cannot be placed in a
+  // feed ordered by time.
   // -------------------------------------------------------------------------
 
   describe('loanActivity', () => {
@@ -1491,19 +1493,90 @@ describe('PoolStore loan states', () => {
       expect(store.loanActivity).toEqual([])
     })
 
-    it('keeps a repaid loan as the disbursement it was', async () => {
-      // There is no repayment timestamp anywhere, so a repayment row would have
-      // to borrow the disbursement's date and land in the wrong place.
+    it('shows a repayment as money returning to the pool', async () => {
+      await loadWithLoans([settled({ id: '31337-12-5', loanId: 5, repaidAt: DUE_AT })])
+
+      const repayment = store.loanActivity.find((tx) => tx.type === TransactionType.LOAN_REPAYMENT)
+      expect(repayment).toBeDefined()
+      expect(repayment?.from).toBe(LIVE_LOAN.borrower)
+      expect(repayment?.to).toBe(LIVE_LOAN.poolAddress)
+      expect(repayment?.status).toBe(TransactionStatus.CONFIRMED)
+    })
+
+    it('repays principal plus the whole fixed interest', async () => {
+      // 3 POL at 500bp. The rate does not accrue, so this is the sum
+      // `repayLoan` demands however long the loan ran.
+      await loadWithLoans([settled({ id: '31337-12-5', loanId: 5, repaidAt: DUE_AT })])
+
+      const repayment = store.loanActivity.find((tx) => tx.type === TransactionType.LOAN_REPAYMENT)
+      expect(repayment?.amount).toBe(parseEther('3.15'))
+    })
+
+    it('dates the repayment when it landed, not when the loan started', async () => {
+      // Reusing `startedAt` would file the money coming back at the moment it
+      // went out — the reason repayments were left out of the feed entirely.
+      await loadWithLoans([settled({ id: '31337-12-5', loanId: 5, repaidAt: DUE_AT })])
+
+      const repayment = store.loanActivity.find((tx) => tx.type === TransactionType.LOAN_REPAYMENT)
+      expect(repayment?.createdAt).toEqual(DUE_AT)
+    })
+
+    it('gives the repayment no transaction hash', async () => {
+      // The record's hash created the loan. Linking a repayment to the borrow
+      // is worse than offering no link at all.
+      await loadWithLoans([settled({ id: '31337-12-5', loanId: 5, repaidAt: DUE_AT })])
+
+      const repayment = store.loanActivity.find((tx) => tx.type === TransactionType.LOAN_REPAYMENT)
+      expect(repayment?.txHash).toBeUndefined()
+      expect(repayment?.blockNumber).toBeUndefined()
+    })
+
+    it('keeps the disbursement alongside the repayment', async () => {
+      // Both happened, at different times. Replacing one with the other would
+      // hide that the pool ever paid out.
+      await loadWithLoans([settled({ id: '31337-12-5', loanId: 5, repaidAt: DUE_AT })])
+
+      expect(store.loanActivity.map((tx) => tx.type)).toEqual([TransactionType.LOAN_DISBURSEMENT, TransactionType.LOAN_REPAYMENT])
+    })
+
+    it('gives the two rows distinct ids', async () => {
+      // They share a loan; a shared key would collide in the list.
+      await loadWithLoans([settled({ id: '31337-12-5', loanId: 5, repaidAt: DUE_AT })])
+
+      const [disbursement, repayment] = store.loanActivity
+      expect(repayment.id).not.toBe(disbursement.id)
+    })
+
+    it('leaves an undated repayment out', async () => {
+      // `isRepaid` says it was settled and nothing says when — a loan repaid
+      // before the contract stamped a date. There is no honest place for it in
+      // a feed ordered by time, so only the disbursement is shown.
       await loadWithLoans([REPAID_LOAN])
 
+      expect(REPAID_LOAN.repaidAt).toBeUndefined()
       expect(store.loanActivity).toHaveLength(1)
       expect(store.loanActivity[0].type).toBe(TransactionType.LOAN_DISBURSEMENT)
     })
 
-    it('emits one row per loan, not one per event', async () => {
-      await loadWithLoans([LIVE_LOAN, REQUESTED_LOAN, REJECTED_LOAN, REPAID_LOAN])
+    it('never gives a request a repayment row', async () => {
+      // `isRepaid` reads false on a request, but a request that was never
+      // funded has nothing to give back.
+      await loadWithLoans([{ ...REQUESTED_LOAN, isRepaid: true, repaidAt: DUE_AT.toISOString() }])
 
-      expect(store.loanActivity).toHaveLength(3)
+      expect(store.loanActivity.map((tx) => tx.type)).toEqual([TransactionType.LOAN_REQUEST])
+    })
+
+    it('expands only the loans that have a dated repayment', async () => {
+      await loadWithLoans([
+        LIVE_LOAN,
+        REQUESTED_LOAN,
+        REJECTED_LOAN,
+        REPAID_LOAN,
+        settled({ id: '31337-12-5', loanId: 5, repaidAt: DUE_AT }),
+      ])
+
+      // Live 1, request 1, rejected 0, undated repaid 1, dated repaid 2.
+      expect(store.loanActivity).toHaveLength(5)
     })
 
     it('reaches the pool’s activity feed', async () => {
