@@ -57,6 +57,21 @@ opened, or turning it back on would silently readmit them.
   admitted can borrow without having lent first. This is the micro-lending
   model, not a loosening: before the register the contribution check was only
   ever a weak proxy for membership, and the contract said so in its own comment.
+- **An open pool has members too, and the screen has to say so.** For a long
+  while `pool/[id]` expressed membership only as a balance, which made an open
+  pool look as though the concept did not apply to it — the register is written
+  in both modes, and the deposit _is_ the join. `membershipNoticeFor` states
+  which door the pool has and where the wallet stands with it, in both modes.
+- **The borrow button is gated on `Active`, never on the pool being
+  permissioned.** An open pool grants membership on the first deposit, so a
+  stranger there has a Contribute button that works and a Borrow button that
+  reverts with `UnauthorizedBorrower`. It reads "Contribute to borrow" and is
+  disabled — except when a loan or a live request already exists, because
+  `repayLoan` is ungated and a removed borrower must still be able to settle.
+- **Withdraw follows the balance, not the membership record.** Since the
+  register was merged into `PoolStore.memberships`, an admitted member who has
+  not funded anything holds a record with a zero balance, and `withdraw` reverts
+  on them.
 - **`Membership.None` is enum ordinal 0 and that is the correct zero** — an
   address nobody has heard of has no membership. Note this is the _opposite_ of
   `LoanStatus.Disbursed`, which sits at zero only because it was retrofitted

@@ -1,6 +1,7 @@
 import type { MemberInfo } from '@superpool/types'
 import { act, fireEvent, render, waitFor } from '@testing-library/react-native'
 import React from 'react'
+import { mockWagmiUseReadContract } from '../../../src/__tests__/mocks'
 import { mockLocalSearchParams } from '../../../src/__tests__/setup'
 import { MOCK_USER_ADDRESS } from '../../../src/mocks/lending'
 import { authStore } from '../../../src/stores/AuthStore'
@@ -88,6 +89,37 @@ describe('JoinPoolScreen', () => {
     const { getByText } = render(<JoinPoolScreen />)
 
     expect(getByText(/No money moves/)).toBeTruthy()
+  })
+
+  describe('what the pool lets an outsider do meanwhile', () => {
+    afterEach(() => {
+      mockWagmiUseReadContract.mockImplementation(() => ({
+        data: undefined,
+        isLoading: false,
+        refetch: jest.fn().mockResolvedValue({ data: undefined }),
+      }))
+    })
+
+    it('says a permissioned pool is closed until the owner decides', () => {
+      mockWagmiUseReadContract.mockImplementation((config?: { functionName?: string }) => ({
+        data: config?.functionName === 'poolConfig' ? [0n, 0n, 0n, true, false, true] : undefined,
+        refetch: jest.fn().mockResolvedValue({ data: undefined }),
+      }))
+
+      const { getByText } = render(<JoinPoolScreen />)
+
+      expect(getByText(/Until they do you cannot fund the pool/)).toBeTruthy()
+    })
+
+    it('does not claim an open pool is closed', () => {
+      // `requestMembership` is callable on an open pool too — which is how a
+      // removed member asks to be let back in somewhere anyone may deposit.
+      // Telling them they cannot fund it would be plainly false.
+      const { getByText, queryByText } = render(<JoinPoolScreen />)
+
+      expect(queryByText(/Until they do you cannot fund the pool/)).toBeNull()
+      expect(getByText(/Anyone may put money into this pool/)).toBeTruthy()
+    })
   })
 
   it('sends the request', async () => {

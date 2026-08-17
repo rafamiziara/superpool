@@ -1,4 +1,5 @@
 import { FontAwesome } from '@expo/vector-icons'
+import { MemberStatus } from '@superpool/types'
 import { router, Stack, useLocalSearchParams } from 'expo-router'
 import { StatusBar } from 'expo-status-bar'
 import { observer } from 'mobx-react-lite'
@@ -35,6 +36,100 @@ function pendingContributionsFor(poolId: number): ContributeTransaction[] {
     .sort((a, b) => b.timestamp - a.timestamp)
 }
 
+/** What the membership notice says, and whether it offers a way in. */
+type MembershipNotice = {
+  title: string
+  body: string
+  /**
+   * Whether to offer `requestMembership` from the notice itself.
+   *
+   * Only for the one state the action bar cannot cover: a rejected or removed
+   * address on an **open** pool. Depositing enrols `None` and `Left` and
+   * deliberately skips those two, so contributing — the thing the bar offers —
+   * will never make them a member again, and asking is their only way back to
+   * borrowing.
+   */
+  askToJoin: boolean
+}
+
+/**
+ * What this pool's door is, and where the connected wallet stands with it.
+ *
+ * The screen said neither before: membership was expressed only as a balance,
+ * so an open pool looked like it had no membership at all — when in fact the
+ * register is written in both modes and a deposit is the join.
+ *
+ * `status` is the merged view (`membershipFor`) rather than the register alone.
+ * This is the user's own position, which is what that source is for, and the
+ * two only diverge for a contributor the sweep has not reached — whose deposit
+ * already proves the chain holds them as `Active`.
+ */
+function membershipNoticeFor(requiresMembership: boolean, status: MemberStatus | undefined, isOwner: boolean): MembershipNotice {
+  if (isOwner) {
+    return {
+      title: requiresMembership ? 'You decide who joins' : 'Open to anyone',
+      body: requiresMembership
+        ? 'People ask to join and you let them in. Pool settings changes that.'
+        : 'Anyone who contributes becomes a member, without asking you. Pool settings changes that.',
+      askToJoin: false,
+    }
+  }
+
+  if (status === MemberStatus.ACTIVE) {
+    return {
+      title: 'You are a member',
+      body: requiresMembership
+        ? 'The owner let you in. You can fund this circle and borrow from it.'
+        : 'Contributing to an open circle makes you one. You can borrow from it, and take your money back out whenever you like.',
+      askToJoin: false,
+    }
+  }
+
+  if (status === MemberStatus.PENDING) {
+    return {
+      title: 'Waiting to be let in',
+      body: requiresMembership
+        ? 'The owner decides. Until they do you cannot fund this circle or borrow from it.'
+        : 'The owner decides. You can put money in while you wait, but only being let in lets you borrow.',
+      askToJoin: false,
+    }
+  }
+
+  // `SUSPENDED` is how the register's `removed` arrives — see `PoolStore`.
+  if (status === MemberStatus.REJECTED || status === MemberStatus.SUSPENDED) {
+    const removed = status === MemberStatus.SUSPENDED
+
+    if (requiresMembership) {
+      return {
+        title: removed ? 'No longer a member' : 'Not a member',
+        body: removed
+          ? 'Anything you put in is still yours to withdraw. You would have to be let back in to fund this circle or borrow from it again.'
+          : 'You asked before and were turned down. You are free to ask again.',
+        askToJoin: false,
+      }
+    }
+
+    return {
+      title: removed ? 'No longer a member' : 'Not a member',
+      body: removed
+        ? 'Anything you put in is still yours to withdraw, and you may put more in — but contributing will not make you a member again. Only the owner can do that.'
+        : 'Anyone may contribute here, but the owner turned your request down — so contributing will not make you a member. You would have to be let in to borrow.',
+      askToJoin: true,
+    }
+  }
+
+  // `LEFT` lands here with the strangers, and correctly: depositing enrols it
+  // again on an open pool, and on a permissioned one there is nothing to do but
+  // ask.
+  return {
+    title: requiresMembership ? 'Members only' : 'Open to anyone',
+    body: requiresMembership
+      ? 'The owner decides who joins. Ask to join, and once you are in you can fund this circle and borrow from it.'
+      : 'Contributing makes you a member of this circle — there is nothing to ask for.',
+    askToJoin: false,
+  }
+}
+
 function PoolDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>()
   const pool = poolStore.poolById(Number(id))
@@ -69,6 +164,16 @@ function PoolDetailScreen() {
   // nothing, and open is the right answer for those.
   const requiresMembership = Array.isArray(config) ? config[5] === true : false
 
+  /**
+   * Whether the connected wallet may borrow — which is `Membership.Active` on
+   * chain in **both** modes, and never "has contributed".
+   *
+   * Both halves of that matter. An admitted member who has not funded anything
+   * can borrow, which is the whole micro-lending model; and a stranger looking
+   * at an open pool cannot, even though nothing on the screen used to say so.
+   */
+  const isActiveMember = membership?.status === MemberStatus.ACTIVE
+
   /** Deposits into this pool that the backend has not indexed yet. */
   const pending = pool ? pendingContributionsFor(pool.poolId) : []
 
@@ -88,6 +193,17 @@ function PoolDetailScreen() {
 
   // A strict compare would hide the admin controls from the pool's own owner.
   const isOwner = sameAddress(pool.poolOwner, poolStore.userAddress)
+
+  const notice = membershipNoticeFor(requiresMembership, membership?.status, isOwner)
+
+  /**
+   * Whether the borrow button leads anywhere.
+   *
+   * An outstanding loan or a live request keeps it open whatever the standing:
+   * `repayLoan` is ungated on purpose, so a removed borrower can still settle
+   * what they owe, and a request already made is still theirs to look at.
+   */
+  const canBorrow = isActiveMember || Boolean(outstandingLoan) || Boolean(myRequest)
 
   const stats = [
     { label: 'Liquidity', value: `${formatToken(poolStore.poolLiquidity(pool.poolId))} POL` },
@@ -130,6 +246,36 @@ function PoolDetailScreen() {
               <Text className="mt-2 font-mono text-base font-bold text-snow">{stat.value}</Text>
             </View>
           ))}
+        </View>
+
+        {/*
+          What kind of door this pool has, and where the user stands with it.
+          Above the position card because it is the question that comes first:
+          the balance below says what you hold, this says whether you are in.
+        */}
+        <View className="mt-6 px-6">
+          <View
+            className="flex-row items-center gap-4 rounded-3xl border-continuous border-hairline border-veil bg-surface px-5 py-4"
+            testID="pool-membership-notice"
+          >
+            <View className="h-10 w-10 items-center justify-center rounded-2xl border-continuous bg-raised">
+              <FontAwesome name={requiresMembership ? 'lock' : 'globe'} size={16} color={isActiveMember ? palette.mint : palette.mist} />
+            </View>
+            <View className="flex-1">
+              <Text className="text-sm font-bold text-snow">{notice.title}</Text>
+              <Text className="mt-0.5 text-xs leading-5 text-fog">{notice.body}</Text>
+              {notice.askToJoin && (
+                <Pressable
+                  onPress={() => router.push(`/(auth)/pool/join?poolId=${pool.poolId}`)}
+                  accessibilityRole="button"
+                  testID="pool-membership-ask"
+                  className="mt-2 self-start active:opacity-70"
+                >
+                  <Text className="text-xs font-bold text-mint">Ask to be let in</Text>
+                </Pressable>
+              )}
+            </View>
+          </View>
         </View>
 
         {/* Membership card */}
@@ -271,8 +417,13 @@ function PoolDetailScreen() {
         fails. The owner is exempt — they are `Active` in their own pool from
         the moment they fund it, and locking them out of their own screen on a
         chain read that has not landed yet would be worse than the alternative.
+
+        `isActiveMember` is checked alongside the register's own word so the two
+        halves of the screen cannot contradict each other: a contributor the
+        sweep has not reached reads as a member in the notice above, and must
+        not be invited to ask for what they already have.
       */}
-      {requiresMembership && !isOwner && standing?.status !== 'active' ? (
+      {requiresMembership && !isOwner && standing?.status !== 'active' && !isActiveMember ? (
         <View className="absolute inset-x-0 bottom-safe-offset-4 px-6" testID="pool-join-actions">
           <Pressable
             onPress={() => router.push(`/(auth)/pool/join?poolId=${pool.poolId}`)}
@@ -307,13 +458,14 @@ function PoolDetailScreen() {
             <Text className="text-sm font-bold text-abyss">Contribute</Text>
           </Pressable>
           {/*
-          Only offered to members. Someone who never contributed has nothing to
-          take out, and `withdraw` would revert on them. The membership is
-          derived from indexed deposits, so it answers "has this wallet ever
-          funded this pool" — the withdrawable amount itself is read from the
-          chain on the next screen, where it has to be exact.
+          Offered on a balance, not on membership. Someone who never contributed
+          has nothing to take out and `withdraw` would revert on them — and
+          since the register was merged into `memberships`, an admitted member
+          who has not funded anything yet has a membership record holding zero.
+          The exact withdrawable amount is read from the chain on the next
+          screen, where it has to be.
         */}
-          {membership && (
+          {membership && membership.currentBalance > 0n && (
             <Pressable
               onPress={() => router.push(`/(auth)/pool/withdraw?poolId=${pool.poolId}`)}
               className="flex-1 items-center justify-center rounded-2xl border-continuous border-hairline border-veil bg-raised py-4 active:scale-[0.97] active:opacity-80"
@@ -322,16 +474,33 @@ function PoolDetailScreen() {
               <Text className="text-sm font-bold text-snow">Withdraw</Text>
             </Pressable>
           )}
+          {/*
+            Borrowing is gated on `Active`, which an open pool grants on the
+            first deposit — so a stranger here has a Contribute button that
+            works and a Borrow button that reverts with `UnauthorizedBorrower`.
+            Say which, rather than sell them a failing transaction.
+
+            Still rendered when there is an outstanding loan or a live request,
+            whatever the standing: a removed member has to be able to repay, and
+            `repayLoan` is ungated for exactly that reason.
+          */}
           <Pressable
             onPress={() => router.push(`/(auth)/pool/borrow?poolId=${pool.poolId}`)}
-            className="flex-1 items-center justify-center rounded-2xl border-continuous border-hairline border-veil bg-raised py-4 active:scale-[0.97] active:opacity-80"
+            disabled={!canBorrow}
+            accessibilityRole="button"
+            accessibilityState={{ disabled: !canBorrow }}
+            className={
+              canBorrow
+                ? 'flex-1 items-center justify-center rounded-2xl border-continuous border-hairline border-veil bg-raised py-4 active:scale-[0.97] active:opacity-80'
+                : 'flex-1 items-center justify-center rounded-2xl border-continuous border-hairline border-veil bg-surface py-4'
+            }
             testID="pool-request-loan-button"
           >
             {/* One screen for all three: the contract holds a single activeLoanId
               per member per pool, so whatever is in that slot is the only thing
               there is to act on. */}
-            <Text className="text-sm font-bold text-snow">
-              {outstandingLoan ? 'Repay loan' : myRequest ? 'Your request' : 'Request loan'}
+            <Text className={canBorrow ? 'text-sm font-bold text-snow' : 'text-sm font-bold text-mist'}>
+              {outstandingLoan ? 'Repay loan' : myRequest ? 'Your request' : canBorrow ? 'Request loan' : 'Contribute to borrow'}
             </Text>
           </Pressable>
         </View>

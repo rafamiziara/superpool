@@ -4,6 +4,8 @@ import { StatusBar } from 'expo-status-bar'
 import { observer } from 'mobx-react-lite'
 import React, { useState } from 'react'
 import { ActivityIndicator, Pressable, ScrollView, Text, View } from 'react-native'
+import { useReadContract } from 'wagmi'
+import { LendingPoolABI } from '../../../src/constants/abis'
 import { palette } from '../../../src/constants/palette'
 import { useMembership } from '../../../src/hooks/pools/useMembership'
 import { usePoolIndexing } from '../../../src/hooks/pools/usePoolIndexing'
@@ -40,6 +42,19 @@ function JoinPoolScreen() {
 
   const pool = poolStore.poolById(Number(poolId))
   const standing = pool ? poolStore.registerStandingFor(pool.poolId) : undefined
+
+  // From the chain, never from the indexed record — same rule as the pool
+  // screen. It changes what this screen means rather than whether it works:
+  // `requestMembership` is deliberately callable on an open pool too, which is
+  // how a removed member asks to be let back in somewhere anyone may deposit.
+  const { data: config } = useReadContract({
+    address: pool?.poolAddress as `0x${string}` | undefined,
+    abi: LendingPoolABI,
+    functionName: 'poolConfig',
+    query: { enabled: Boolean(pool?.poolAddress) },
+  })
+
+  const requiresMembership = Array.isArray(config) ? config[5] === true : false
 
   const isBusy = stage !== 'idle' && stage !== 'done'
 
@@ -111,11 +126,22 @@ function JoinPoolScreen() {
         contentContainerClassName="gap-6 px-6 pb-16 pt-4"
       >
         <View className="gap-3 rounded-3xl border-continuous border-hairline border-veil bg-surface p-5">
-          <Text className="text-base font-bold text-snow">{pool.name} decides who joins</Text>
+          <Text className="text-base font-bold text-snow">
+            {requiresMembership ? `${pool.name} decides who joins` : `${pool.name} is open, but you are not in it`}
+          </Text>
+          {/*
+            An open pool lets anyone deposit, so the permissioned copy would be
+            plainly false here — the only thing being asked for is the standing
+            that borrowing needs.
+          */}
           <Text className="text-sm leading-6 text-fog">
-            {alreadyWaiting
-              ? 'Your request is with the pool owner. You will be able to fund the pool and borrow from it as soon as they let you in.'
-              : 'Ask to join, and the pool owner decides. Until they do you cannot fund the pool or borrow from it.'}
+            {requiresMembership
+              ? alreadyWaiting
+                ? 'Your request is with the pool owner. You will be able to fund the pool and borrow from it as soon as they let you in.'
+                : 'Ask to join, and the pool owner decides. Until they do you cannot fund the pool or borrow from it.'
+              : alreadyWaiting
+                ? 'Your request is with the pool owner. You can put money in meanwhile, but only being let in lets you borrow.'
+                : 'Anyone may put money into this pool, but contributing will not make you a member — the owner has to let you in before you can borrow.'}
           </Text>
           <Text className="text-xs leading-5 text-mist">
             Asking costs a network fee and nothing else. No money moves, and you can be turned down without losing anything.
