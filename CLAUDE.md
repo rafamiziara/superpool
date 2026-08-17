@@ -686,22 +686,6 @@ are in rather than introducing a third.
 
 ## EXTREMELY IMPORTANT: Testing & Code Quality Requirements
 
-### **MANDATORY: Test-Writer-Fixer Agent Usage**
-
-**ALWAYS use the test-writer-fixer agent for ALL testing-related work:**
-
-- **Creating tests** - New test files, test suites, or test cases
-- **Updating tests** - Modifying existing tests or test configurations
-- **Fixing tests** - Resolving test failures or debugging test issues
-- **Improving tests** - Enhancing test coverage, performance, or reliability
-- **Refactoring tests** - Restructuring test code or test organization
-- **Cleaning up tests** - Removing deprecated tests or consolidating test files
-- **Any other testing work** - Test utilities, mocks, test setup, etc.
-
-The test-writer-fixer agent has comprehensive knowledge of all project-specific testing standards, mock systems, and documentation. It ensures consistency across all packages and applications.
-
-**Usage**: Use the `Task` tool with `subagent_type: "test-writer-fixer"` for any testing task.
-
 ### **Code Quality Checks**
 
 **ALWAYS execute the following commands IN ORDER before completing any task:**
