@@ -120,14 +120,17 @@ async function testLocalFlow() {
     const poolCount2 = await poolFactory.getPoolCount()
     console.log(`✅ Original owner can still create pools. Total pools: ${poolCount2}`)
 
-    // Test that pending owner cannot perform owner functions yet
+    // Test that pending owner cannot perform owner functions yet.
+    //
+    // `pause` rather than `createPool`: creating a pool is not an owner
+    // function. It is gated on creator authorization, so with whitelist mode on
+    // — which `deploy:local` enables — it reverts with `UnauthorizedCreator`
+    // before ownership is ever consulted, and this step passed for a reason
+    // that had nothing to do with the transfer it is checking.
     console.log('Testing pending owner cannot perform owner functions yet...')
     try {
-      await poolFactory.connect(newOwner).createPool({
-        ...poolParams,
-        name: 'Should Fail',
-      })
-      throw new Error('Pending owner should not be able to create pools')
+      await poolFactory.connect(newOwner).pause()
+      throw new Error('Pending owner should not be able to pause the factory')
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error'
       if (errorMessage.includes('OwnableUnauthorizedAccount')) {
@@ -171,12 +174,11 @@ async function testLocalFlow() {
     const finalPoolCount = await poolFactory.getPoolCount()
     console.log(`✅ New owner can create pools. Total pools: ${finalPoolCount}`)
 
-    // Original owner should no longer have access
+    // Original owner should no longer have access. `pause` for the same reason
+    // as above — `createPool` would revert on creator authorization instead,
+    // which is a different question with a different answer.
     try {
-      await poolFactory.connect(deployer).createPool({
-        ...poolParams,
-        name: 'Should Fail 2',
-      })
+      await poolFactory.connect(deployer).pause()
       throw new Error('Original owner should no longer have access')
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error'
