@@ -57,7 +57,13 @@ function ActivityScreen() {
               <Text className="mb-3 text-xs font-semibold uppercase tracking-widest text-mist">{group.label}</Text>
               <View className="rounded-3xl border-continuous border-hairline border-veil bg-surface py-1">
                 {group.items.map((tx) => (
-                  <ActivityRow key={tx.id} tx={tx} poolName={poolStore.poolById(Number(tx.poolId))?.name} perspective="wallet" />
+                  <ActivityRow
+                    key={tx.id}
+                    tx={tx}
+                    poolName={poolStore.poolById(Number(tx.poolId))?.name}
+                    denomination={poolStore.denominationFor(Number(tx.poolId))}
+                    perspective="wallet"
+                  />
                 ))}
               </View>
             </View>

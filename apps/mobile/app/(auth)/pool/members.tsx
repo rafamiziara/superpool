@@ -10,7 +10,8 @@ import { useMembership } from '../../../src/hooks/pools/useMembership'
 import { usePoolIndexing } from '../../../src/hooks/pools/usePoolIndexing'
 import { useTransactionMonitoring } from '../../../src/hooks/pools/useTransactionMonitoring'
 import { poolStore } from '../../../src/stores/PoolStore'
-import { formatToken, sameAddress, shortAddress } from '../../../src/utils/format'
+import { denominationFor } from '../../../src/utils/denomination'
+import { formatAmount, sameAddress, shortAddress } from '../../../src/utils/format'
 
 /** Where a decision is. One at a time, so the whole list locks while it runs. */
 type Stage = 'idle' | 'submitting' | 'confirming' | 'indexing'
@@ -46,6 +47,7 @@ function MembersScreen() {
   const [failure, setFailure] = useState<string | null>(null)
 
   const pool = poolStore.poolById(Number(poolId))
+  const denomination = pool ? denominationFor(pool) : undefined
   const waiting = pool ? poolStore.pendingMembersFor(pool.poolId) : []
 
   /**
@@ -258,7 +260,7 @@ function MembersScreen() {
               >
                 <View className="flex-1">
                   <Text className="font-mono text-sm text-snow">{shortAddress(member.account)}</Text>
-                  <Text className="mt-1 text-xs text-mist">{formatToken(member.balance ?? 0n)} POL in</Text>
+                  <Text className="mt-1 text-xs text-mist">{formatAmount(member.balance ?? 0n, denomination)} in</Text>
                 </View>
                 {/*
                   The owner is a member of their own pool and cannot be removed

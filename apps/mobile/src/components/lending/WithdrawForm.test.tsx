@@ -2,13 +2,23 @@ import { fireEvent, render, screen } from '@testing-library/react-native'
 import React from 'react'
 import { parseEther } from 'viem'
 import { WithdrawForm } from './WithdrawForm'
+import { NATIVE } from '../../__tests__/fixtures/denomination'
 
 const POSITION = parseEther('10')
 
 function renderForm(props: Partial<React.ComponentProps<typeof WithdrawForm>> = {}) {
   const onSubmit = jest.fn()
 
-  render(<WithdrawForm poolName="Neighbourhood Fund" position={POSITION} withdrawable={POSITION} onSubmit={onSubmit} {...props} />)
+  render(
+    <WithdrawForm
+      poolName="Neighbourhood Fund"
+      denomination={NATIVE}
+      position={POSITION}
+      withdrawable={POSITION}
+      onSubmit={onSubmit}
+      {...props}
+    />
+  )
 
   return { onSubmit }
 }
@@ -113,7 +123,7 @@ describe('WithdrawForm', () => {
   })
 
   it('does not scold before the field is left', () => {
-    render(<WithdrawForm poolName="Neighbourhood Fund" onSubmit={jest.fn()} />)
+    render(<WithdrawForm poolName="Neighbourhood Fund" denomination={NATIVE} onSubmit={jest.fn()} />)
 
     fireEvent.changeText(screen.getByTestId('withdraw-amount'), 'abc')
 

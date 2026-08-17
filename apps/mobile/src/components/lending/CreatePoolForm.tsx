@@ -1,6 +1,5 @@
 import React, { useMemo, useState } from 'react'
 import { Pressable, Text, TextInput, View } from 'react-native'
-import { parseEther } from 'viem'
 import { z } from 'zod'
 import {
   MAX_POOL_DESCRIPTION_LENGTH as MAX_DESCRIPTION_LENGTH,
@@ -9,49 +8,53 @@ import {
   SECONDS_PER_DAY,
 } from '../../constants/pools'
 import type { PoolCreationParams } from '../../hooks/pools/usePoolCreation'
+import type { Denomination } from '../../utils/denomination'
+import { amountPattern, parseToken } from '../../utils/format'
 
 /**
  * Parses what the user typed into the parameters `createPool` takes.
  *
- * The units differ deliberately: people think in POL, percent and days, while
- * the contract takes wei, basis points and seconds. Converting here keeps that
- * translation in one place and out of the hook.
+ * The units differ deliberately: people think in whole coins, percent and days,
+ * while the contract takes the smallest unit, basis points and seconds.
+ * Converting here keeps that translation in one place and out of the hook.
  *
  * This is not the last line of defence — `validatePoolCreationParams` re-checks
  * the converted values against the contract's own rules before anything is sent.
  */
-export const createPoolFormSchema = z.object({
-  name: z.string().trim().min(1, 'Pool name is required').max(MAX_NAME_LENGTH, `Use ${MAX_NAME_LENGTH} characters or fewer`),
+export function createPoolFormSchema({ symbol, decimals }: Denomination) {
+  return z.object({
+    name: z.string().trim().min(1, 'Pool name is required').max(MAX_NAME_LENGTH, `Use ${MAX_NAME_LENGTH} characters or fewer`),
 
-  description: z.string().trim().max(MAX_DESCRIPTION_LENGTH, `Use ${MAX_DESCRIPTION_LENGTH} characters or fewer`),
+    description: z.string().trim().max(MAX_DESCRIPTION_LENGTH, `Use ${MAX_DESCRIPTION_LENGTH} characters or fewer`),
 
-  maxLoanAmount: z
-    .string()
-    .trim()
-    .min(1, 'Enter a maximum loan amount')
-    .refine((value) => /^\d+(\.\d{1,18})?$/.test(value), 'Enter an amount in POL, with at most 18 decimals')
-    .transform((value) => parseEther(value))
-    .refine((value) => value > 0n, 'Maximum loan amount must be greater than zero'),
+    maxLoanAmount: z
+      .string()
+      .trim()
+      .min(1, 'Enter a maximum loan amount')
+      .refine((value) => amountPattern(decimals).test(value), `Enter an amount in ${symbol}, with at most ${decimals} decimals`)
+      .transform((value) => parseToken(value, decimals))
+      .refine((value) => value > 0n, 'Maximum loan amount must be greater than zero'),
 
-  // Basis points are the contract's unit; a percentage is what a lender reads.
-  interestRate: z
-    .string()
-    .trim()
-    .min(1, 'Enter an interest rate')
-    .refine((value) => /^\d+(\.\d{1,2})?$/.test(value), 'Enter a percentage, with at most 2 decimals')
-    .transform((value) => Math.round(Number(value) * 100))
-    .refine((value) => value <= MAX_INTEREST_RATE_BPS, 'Interest rate cannot exceed 100%'),
+    // Basis points are the contract's unit; a percentage is what a lender reads.
+    interestRate: z
+      .string()
+      .trim()
+      .min(1, 'Enter an interest rate')
+      .refine((value) => /^\d+(\.\d{1,2})?$/.test(value), 'Enter a percentage, with at most 2 decimals')
+      .transform((value) => Math.round(Number(value) * 100))
+      .refine((value) => value <= MAX_INTEREST_RATE_BPS, 'Interest rate cannot exceed 100%'),
 
-  loanDuration: z
-    .string()
-    .trim()
-    .min(1, 'Enter a loan duration')
-    .refine((value) => /^\d+$/.test(value), 'Enter a whole number of days')
-    .transform((value) => Number(value) * SECONDS_PER_DAY)
-    .refine((value) => value > 0, 'Loan duration must be at least one day'),
-})
+    loanDuration: z
+      .string()
+      .trim()
+      .min(1, 'Enter a loan duration')
+      .refine((value) => /^\d+$/.test(value), 'Enter a whole number of days')
+      .transform((value) => Number(value) * SECONDS_PER_DAY)
+      .refine((value) => value > 0, 'Loan duration must be at least one day'),
+  })
+}
 
-type FormField = keyof z.input<typeof createPoolFormSchema>
+type FormField = keyof z.input<ReturnType<typeof createPoolFormSchema>>
 
 const EMPTY_FORM: Record<FormField, string> = {
   name: '',
@@ -62,6 +65,15 @@ const EMPTY_FORM: Record<FormField, string> = {
 }
 
 export interface CreatePoolFormProps {
+  /**
+   * What the new pool will lend.
+   *
+   * Supplied by the screen rather than chosen here — for now the chain's own
+   * coin, which is what every pool this app creates is denominated in. It is a
+   * prop and not an assumption so that offering a choice is a change to one
+   * screen rather than to the whole form.
+   */
+  denomination: Denomination
   onSubmit: (params: PoolCreationParams) => void | Promise<void>
   /** Disables the form while the wallet or backend is busy. */
   isSubmitting?: boolean
@@ -133,7 +145,14 @@ function Field({ label, value, onChangeText, onBlur, error, placeholder, hint, k
  * someone for a name they have not finished typing, and the button stays
  * disabled until every field parses.
  */
-export function CreatePoolForm({ onSubmit, isSubmitting = false, error, gasEstimate, submitLabel = 'Create pool' }: CreatePoolFormProps) {
+export function CreatePoolForm({
+  denomination,
+  onSubmit,
+  isSubmitting = false,
+  error,
+  gasEstimate,
+  submitLabel = 'Create pool',
+}: CreatePoolFormProps) {
   const [values, setValues] = useState<Record<FormField, string>>(EMPTY_FORM)
   const [touched, setTouched] = useState<Partial<Record<FormField, boolean>>>({})
   /**
@@ -147,7 +166,8 @@ export function CreatePoolForm({ onSubmit, isSubmitting = false, error, gasEstim
    */
   const [requiresMembership, setRequiresMembership] = useState(true)
 
-  const parsed = useMemo(() => createPoolFormSchema.safeParse(values), [values])
+  const schema = useMemo(() => createPoolFormSchema(denomination), [denomination])
+  const parsed = useMemo(() => schema.safeParse(values), [schema, values])
 
   const fieldErrors = useMemo(() => {
     if (parsed.success) return {} as Partial<Record<FormField, string>>
@@ -171,7 +191,7 @@ export function CreatePoolForm({ onSubmit, isSubmitting = false, error, gasEstim
   const handleSubmit = () => {
     if (!parsed.success || isSubmitting) return
 
-    void onSubmit({ ...parsed.data, requiresMembership })
+    void onSubmit({ ...parsed.data, requiresMembership, denomination })
   }
 
   return (
@@ -207,7 +227,7 @@ export function CreatePoolForm({ onSubmit, isSubmitting = false, error, gasEstim
         onBlur={blurField('maxLoanAmount')}
         error={errorFor('maxLoanAmount')}
         placeholder="100"
-        hint="In POL — the most any single member can borrow"
+        hint={`In ${denomination.symbol} — the most any single member can borrow`}
         keyboardType="decimal-pad"
         testID="create-pool-max-loan"
       />

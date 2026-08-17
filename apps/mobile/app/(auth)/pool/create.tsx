@@ -11,6 +11,7 @@ import { usePoolIndexing } from '../../../src/hooks/pools/usePoolIndexing'
 import { useTransactionMonitoring } from '../../../src/hooks/pools/useTransactionMonitoring'
 import { palette } from '../../../src/constants/palette'
 import { registerForPushNotifications, requestNotificationPermission } from '../../../src/services/pushNotifications'
+import { nativeDenomination } from '../../../src/utils/denomination'
 import { shortAddress } from '../../../src/utils/format'
 
 /**
@@ -177,7 +178,14 @@ function CreatePoolScreen() {
           </View>
         ) : null}
 
-        <CreatePoolForm onSubmit={handleSubmit} isSubmitting={isBusy} error={failure ?? creationError} />
+        {/* The chain's own coin: every pool this app creates is native. The
+            form takes it as a prop so offering a choice is a change here. */}
+        <CreatePoolForm
+          denomination={nativeDenomination(activeChainId)}
+          onSubmit={handleSubmit}
+          isSubmitting={isBusy}
+          error={failure ?? creationError}
+        />
       </ScrollView>
     </View>
   )

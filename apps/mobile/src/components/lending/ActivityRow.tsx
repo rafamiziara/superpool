@@ -4,7 +4,8 @@ import { TransactionStatus, TransactionType } from '@superpool/types'
 import React from 'react'
 import { Text, View } from 'react-native'
 import { palette } from '../../constants/palette'
-import { formatToken, timeAgo } from '../../utils/format'
+import type { Denomination } from '../../utils/denomination'
+import { formatAmount, timeAgo } from '../../utils/format'
 
 /** Which way the money moved, relative to whoever the feed is about. */
 type Direction = 'in' | 'out' | 'neutral'
@@ -69,13 +70,20 @@ interface ActivityRowProps {
   tx: Transaction
   poolName?: string
   /**
+   * What the row's pool lends. Required, and required to be passed per row
+   * rather than per feed: a wallet-wide feed spans pools, so two rows next to
+   * each other can be in different units. `undefined` renders a dash — see
+   * `formatAmount`.
+   */
+  denomination: Denomination | undefined
+  /**
    * Whose ledger this row belongs to. Defaults to the pool's, which is the only
    * safe answer for a feed that has not been narrowed to one wallet.
    */
   perspective?: ActivityPerspective
 }
 
-export function ActivityRow({ tx, poolName, perspective = 'pool' }: ActivityRowProps) {
+export function ActivityRow({ tx, poolName, denomination, perspective = 'pool' }: ActivityRowProps) {
   const config = VIEWS[perspective][tx.type]
   const isPending = tx.status === TransactionStatus.PENDING
 
@@ -97,7 +105,7 @@ export function ActivityRow({ tx, poolName, perspective = 'pool' }: ActivityRowP
         {tx.amount > 0n && (
           <Text className={`font-mono text-sm font-bold ${config.direction === 'in' ? 'text-mint' : 'text-snow'}`}>
             {config.direction === 'in' ? '+' : config.direction === 'out' ? '−' : ''}
-            {formatToken(tx.amount)} POL
+            {formatAmount(tx.amount, denomination)}
           </Text>
         )}
         {isPending && (

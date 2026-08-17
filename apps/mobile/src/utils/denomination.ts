@@ -75,6 +75,18 @@ export function denominationFor(pool: Denominated): Denomination | undefined {
   }
 }
 
+/**
+ * What a persisted record's amounts are quantities of.
+ *
+ * A pending transaction carries its own denomination, because its card renders
+ * at startup before any pool is fetched. A record written before pools had one
+ * falls back to native — not a guess: nothing but a native pool could have
+ * created a record without the field.
+ */
+export function recordedDenomination(record: { chainId: number; denomination?: Denomination }): Denomination {
+  return record.denomination ?? nativeDenomination(record.chainId)
+}
+
 /** Whether a pool lends the chain's own coin, which needs no approval to spend. */
 export function isNative(denomination: Denomination): boolean {
   return denomination.address === undefined

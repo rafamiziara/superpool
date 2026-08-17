@@ -19,9 +19,17 @@ const LOCALHOST_RPC_URL = process.env.EXPO_PUBLIC_LOCALHOST_RPC_URL ?? 'http://1
 export const localhostChain = {
   ...hardhat,
   name: 'Localhost',
+  /**
+   * POL rather than Viem's ETH, because the local node stands in for Polygon
+   * and `pnpm node:fork` literally forks Amoy — where the coin *is* POL.
+   *
+   * This is read, not decorative: it is where the app gets the symbol for every
+   * amount in a native pool, and it reaches the wallet's network picker the same
+   * way the name above does.
+   */
   nativeCurrency: {
-    name: 'Ether',
-    symbol: 'ETH',
+    name: 'POL',
+    symbol: 'POL',
     decimals: 18,
   },
   rpcUrls: {

@@ -2,6 +2,7 @@ import type { BorrowerHistory, LoanInfo } from '@superpool/types'
 import React from 'react'
 import { ActivityIndicator, Pressable, Text, View } from 'react-native'
 import { calculateRepayment } from '../../hooks/pools/useLoan'
+import type { Denomination } from '../../utils/denomination'
 import { formatToken, shortAddress, timeAgo } from '../../utils/format'
 import { BorrowerHistoryPanel } from './BorrowerHistoryPanel'
 
@@ -22,6 +23,12 @@ export interface LoanRequestCardProps {
    * the owner needs the current figure here, not the one from when it was asked.
    */
   available?: bigint
+  /**
+   * What the pool lends. Every figure on this card is a quantity of it, and the
+   * screen does not render at all for a pool whose token the app cannot read —
+   * so this is never absent here.
+   */
+  denomination: Denomination
   onApprove: () => void
   onReject: () => void
   /** True while any decision on this pool is in flight; both buttons lock. */
@@ -39,7 +46,8 @@ export interface LoanRequestCardProps {
  * pool's money and is the decision worth pausing over; rejection moves nothing
  * and can be undone by the borrower simply asking again.
  */
-export function LoanRequestCard({ request, history, available, onApprove, onReject, isBusy = false }: LoanRequestCardProps) {
+export function LoanRequestCard({ request, history, available, denomination, onApprove, onReject, isBusy = false }: LoanRequestCardProps) {
+  const { symbol, decimals } = denomination
   const amount = BigInt(request.amount)
   const repayment = calculateRepayment(amount, request.interestRate)
 
@@ -54,7 +62,9 @@ export function LoanRequestCard({ request, history, available, onApprove, onReje
     >
       <View className="flex-row items-start justify-between gap-3">
         <View className="flex-1">
-          <Text className="font-mono text-lg font-bold text-snow">{formatToken(amount)} POL</Text>
+          <Text className="font-mono text-lg font-bold text-snow">
+            {formatToken(amount, decimals)} {symbol}
+          </Text>
           <Text className="mt-1 text-xs text-fog" testID={`loan-request-borrower-${request.loanId}`}>
             {shortAddress(request.borrower)} · asked {timeAgo(new Date(request.startedAt))}
           </Text>
@@ -66,7 +76,7 @@ export function LoanRequestCard({ request, history, available, onApprove, onReje
 
       <View className="rounded-2xl border-continuous border-hairline border-veil bg-raised px-4 py-3">
         <Text className="text-sm text-fog">
-          They repay <Text className="font-mono font-bold text-snow">{formatToken(repayment)}</Text> POL in total.
+          They repay <Text className="font-mono font-bold text-snow">{formatToken(repayment, decimals)}</Text> {symbol} in total.
         </Text>
         <Text className="mt-1 text-xs text-mist">Interest is fixed the moment you approve, at the pool&apos;s rate on that day.</Text>
       </View>
@@ -81,7 +91,8 @@ export function LoanRequestCard({ request, history, available, onApprove, onReje
           testID={`loan-request-shortfall-${request.loanId}`}
         >
           <Text className="text-sm text-coral">
-            The pool holds {formatToken(available ?? 0n)} POL — not enough to cover this. It grows as members contribute or repay.
+            The pool holds {formatToken(available ?? 0n, decimals)} {symbol} — not enough to cover this. It grows as members contribute or
+            repay.
           </Text>
         </View>
       )}

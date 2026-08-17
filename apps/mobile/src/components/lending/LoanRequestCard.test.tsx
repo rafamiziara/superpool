@@ -1,6 +1,7 @@
 import type { BorrowerHistory, LoanInfo } from '@superpool/types'
 import React from 'react'
 import { fireEvent, render } from '../../__tests__/test-utils'
+import { NATIVE } from '../../__tests__/fixtures/denomination'
 import { LoanRequestCard } from './LoanRequestCard'
 
 const BORROWER = '0x15d34aaf54267db7d7c367839aaf71a00a2c6a65'
@@ -34,7 +35,16 @@ function makeRequest(overrides: Partial<LoanInfo> = {}): LoanInfo {
 }
 
 function renderCard(props: Partial<React.ComponentProps<typeof LoanRequestCard>> = {}) {
-  return render(<LoanRequestCard request={makeRequest()} history={makeHistory()} onApprove={jest.fn()} onReject={jest.fn()} {...props} />)
+  return render(
+    <LoanRequestCard
+      request={makeRequest()}
+      history={makeHistory()}
+      denomination={NATIVE}
+      onApprove={jest.fn()}
+      onReject={jest.fn()}
+      {...props}
+    />
+  )
 }
 
 describe('LoanRequestCard', () => {

@@ -101,6 +101,9 @@ describe('ContributeScreen', () => {
       await submitAmount('5')
 
       expect(mockContribute).toHaveBeenCalledWith({
+        // The pool's own unit, read from the pool record rather than assumed:
+        // it travels with the transaction so the pending card can use it.
+        denomination: { symbol: 'POL', decimals: 18 },
         poolId: 1,
         poolAddress: poolStore.poolById(1)!.poolAddress,
         poolName: poolStore.poolById(1)!.name,

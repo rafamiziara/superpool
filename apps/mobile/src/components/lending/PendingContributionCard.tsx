@@ -3,7 +3,8 @@ import React from 'react'
 import { ActivityIndicator, Pressable, Text, View } from 'react-native'
 import { palette } from '../../constants/palette'
 import type { ContributeTransaction, PendingTransactionStatus } from '../../stores/PendingTransactionsStore'
-import { formatToken } from '../../utils/format'
+import { recordedDenomination } from '../../utils/denomination'
+import { formatAmount } from '../../utils/format'
 
 /**
  * A deposit that has been sent but is not yet counted in a pool's liquidity.
@@ -52,7 +53,7 @@ export function PendingContributionCard({ transaction, onPress, onDismiss }: Pen
       <View className="flex-1">
         <Text className="font-mono text-base font-bold text-snow">
           {/* The chain's figure once confirmed, the submitted one before that. */}
-          {formatToken(result?.amount ?? params.amount)} POL
+          {formatAmount(result?.amount ?? params.amount, recordedDenomination(transaction))}
         </Text>
         <Text
           className={`mt-0.5 text-xs ${hasFailed ? 'text-coral' : 'text-fog'}`}

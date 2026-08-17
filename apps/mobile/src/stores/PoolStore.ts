@@ -33,6 +33,7 @@ import { makeAutoObservable, runInAction } from 'mobx'
 import { DEFAULT_CHAIN_ID } from '../config/contracts'
 import { FIREBASE_FUNCTIONS } from '../config/firebase'
 import { MOCK_LOANS, MOCK_MEMBERSHIPS, MOCK_POOLS, MOCK_TRANSACTIONS, MOCK_USER_ADDRESS } from '../mocks/lending'
+import { type Denomination, denominationFor } from '../utils/denomination'
 import { sameAddress } from '../utils/format'
 import { logger } from '../utils/logger'
 import { authStore } from './AuthStore'
@@ -69,23 +70,6 @@ function loanStatusOf(loan: LoanInfo): LoanStatus {
 /** Funded and not yet settled — the only state that owes the pool money. */
 function isOutstanding(loan: LoanInfo): boolean {
   return loan.status === 'disbursed' && !loan.isRepaid
-}
-
-/**
- * What this loan costs if it runs exactly its term and is repaid once.
- *
- * The **quoted price, not the bill**: `interestRate` basis points buys
- * `duration` seconds, so this is what the loan costs held exactly that long.
- * Repaying sooner costs less and later costs more, and what is actually owed
- * at this moment is `remainingBalance`. The two agree only on a loan settled
- * in one payment at the exact end of its term.
- *
- * Matches the contract's `calculateRepaymentAmount`.
- */
-function repaymentTotal(loan: LoanInfo): bigint {
-  const principal = BigInt(loan.amount)
-
-  return principal + (principal * BigInt(loan.interestRate)) / 10_000n
 }
 
 /**
@@ -511,6 +495,21 @@ export class PoolStore {
 
   poolById = (poolId: number): PoolInfo | undefined => {
     return this.pools.find((pool) => pool.poolId === poolId)
+  }
+
+  /**
+   * What a pool lends, or `undefined` where the app cannot say — either because
+   * the pool is not loaded or because it is denominated in a token the backend
+   * could not read.
+   *
+   * Here rather than at each screen because a wallet-wide feed mixes pools, and
+   * therefore mixes units: a row's denomination is a property of its pool, not
+   * of the list it is in.
+   */
+  denominationFor = (poolId: number): Denomination | undefined => {
+    const pool = this.poolById(poolId)
+
+    return pool ? denominationFor(pool) : undefined
   }
 
   /** Every contribution into one pool, newest first. */

@@ -9,12 +9,15 @@ import { useInterest } from '../../hooks/pools/useInterest'
 import { usePoolIndexing } from '../../hooks/pools/usePoolIndexing'
 import { useTransactionMonitoring } from '../../hooks/pools/useTransactionMonitoring'
 import { poolStore } from '../../stores/PoolStore'
-import { formatToken } from '../../utils/format'
+import type { Denomination } from '../../utils/denomination'
+import { formatAmount } from '../../utils/format'
 
 export interface ClaimInterestCardProps {
   poolId: number
   poolAddress: `0x${string}`
   poolName: string
+  /** What the pool lends: earnings are paid in the same asset it lends. */
+  denomination: Denomination
   testID?: string
 }
 
@@ -44,7 +47,13 @@ const STAGE_MESSAGES: Record<Exclude<Stage, 'idle' | 'done'>, string> = {
  * nothing yet" is a real answer to the question a lender is asking, and hiding
  * the card would read as the feature not existing.
  */
-function ClaimInterestCardComponent({ poolId, poolAddress, poolName, testID = 'claim-interest-card' }: ClaimInterestCardProps) {
+function ClaimInterestCardComponent({
+  poolId,
+  poolAddress,
+  poolName,
+  denomination,
+  testID = 'claim-interest-card',
+}: ClaimInterestCardProps) {
   const { address } = useAccount()
 
   const { claimInterest, error: claimError, reset } = useInterest()
@@ -81,7 +90,7 @@ function ClaimInterestCardComponent({ poolId, poolAddress, poolName, testID = 'c
     let txHash: `0x${string}`
     try {
       setStage('submitting')
-      txHash = await claimInterest({ poolId, poolAddress, poolName })
+      txHash = await claimInterest({ poolId, poolAddress, poolName, denomination })
     } catch (error) {
       setStage('idle')
       setFailure(error instanceof Error ? error.message : 'Could not send the claim')
@@ -123,7 +132,7 @@ function ClaimInterestCardComponent({ poolId, poolAddress, poolName, testID = 'c
         <View className="flex-1">
           <Text className="text-xs font-semibold uppercase tracking-widest text-iris">Interest earned</Text>
           <Text className="mt-1 font-mono text-lg font-bold text-snow" testID="claim-interest-amount">
-            {formatToken(amount)} POL
+            {formatAmount(amount, denomination)}
           </Text>
         </View>
       </View>
@@ -142,7 +151,7 @@ function ClaimInterestCardComponent({ poolId, poolAddress, poolName, testID = 'c
 
       {stage === 'done' && claimed !== null && (
         <Text className="mt-3 text-xs leading-5 text-mint" testID="claim-interest-success">
-          {formatToken(claimed)} POL is on its way to your wallet.
+          {formatAmount(claimed, denomination)} is on its way to your wallet.
         </Text>
       )}
 
@@ -168,7 +177,7 @@ function ClaimInterestCardComponent({ poolId, poolAddress, poolName, testID = 'c
           className={`mt-4 items-center rounded-2xl border-continuous px-5 py-3 ${isBusy ? 'bg-veil' : 'bg-iris'} active:opacity-80`}
           testID="claim-interest-button"
         >
-          <Text className={`text-sm font-bold ${isBusy ? 'text-mist' : 'text-abyss'}`}>Claim {formatToken(amount)} POL</Text>
+          <Text className={`text-sm font-bold ${isBusy ? 'text-mist' : 'text-abyss'}`}>Claim {formatAmount(amount, denomination)}</Text>
         </Pressable>
       )}
     </View>

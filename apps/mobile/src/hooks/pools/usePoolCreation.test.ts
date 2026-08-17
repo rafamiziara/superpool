@@ -12,6 +12,7 @@ import {
 import { PoolFactoryABI } from '../../constants/abis'
 import { pendingTransactionsStore } from '../../stores/PendingTransactionsStore'
 import { describePoolCreationError, type PoolCreationParams, usePoolCreation, validatePoolCreationParams } from './usePoolCreation'
+import { NATIVE } from '../../__tests__/fixtures/denomination'
 
 const FACTORY_ADDRESS = '0x5FbDB2315678afecb367f032d93F642f64180aa3'
 const WALLET_ADDRESS = '0x70997970C51812dc3A010C7d01b50e0d17dc79C8'
@@ -36,6 +37,7 @@ function makeParams(overrides: Partial<PoolCreationParams> = {}): PoolCreationPa
     interestRate: 500,
     loanDuration: 2_592_000,
     requiresMembership: false,
+    denomination: NATIVE,
     ...overrides,
   }
 }
@@ -198,8 +200,9 @@ describe('usePoolCreation', () => {
               description: 'Micro-loans for the block',
               requiresMembership: false,
               // Native POL, and the app has no way to ask for anything else
-              // yet. Asserted rather than omitted because the field decides
-              // what the pool is denominated in for its whole life, and a
+              // yet — the denomination the form supplies carries no address.
+              // Asserted rather than omitted because the field decides what
+              // the pool is denominated in for its whole life, and a
               // wrong-but-plausible address here is not something a later
               // screen could correct.
               loanToken: '0x0000000000000000000000000000000000000000',

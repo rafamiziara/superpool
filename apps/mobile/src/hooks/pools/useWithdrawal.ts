@@ -3,6 +3,7 @@ import { useAccount, usePublicClient, useWriteContract } from 'wagmi'
 import { DEFAULT_CHAIN_ID } from '../../config/contracts'
 import { LendingPoolABI } from '../../constants/abis'
 import { pendingTransactionsStore } from '../../stores/PendingTransactionsStore'
+import type { Denomination } from '../../utils/denomination'
 import { describeTransactionError } from './transactionErrors'
 
 /**
@@ -19,6 +20,12 @@ export interface WithdrawalParams {
   poolName: string
   /** Wei. */
   amount: bigint
+  /**
+   * What the pool is denominated in. Recorded on the pending transaction so its
+   * card can show the amount in the right unit at startup, before any pool has
+   * been fetched — the same reason `poolName` is denormalised.
+   */
+  denomination: Denomination
 }
 
 export interface UseWithdrawalReturn {
@@ -148,6 +155,7 @@ export const useWithdrawal = (): UseWithdrawalReturn => {
           type: 'WITHDRAW',
           status: 'submitted',
           timestamp: Date.now(),
+          denomination: params.denomination,
           params: {
             poolId: params.poolId,
             poolAddress: params.poolAddress,

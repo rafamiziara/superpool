@@ -5,7 +5,8 @@ import React from 'react'
 import { Pressable, Text, View } from 'react-native'
 import { palette } from '../../constants/palette'
 import { poolStore } from '../../stores/PoolStore'
-import { bpsToPercent, formatDuration, formatToken, timeAgo } from '../../utils/format'
+import { denominationFor } from '../../utils/denomination'
+import { bpsToPercent, formatAmount, formatDuration, timeAgo } from '../../utils/format'
 
 type Accent = 'mint' | 'iris' | 'amber'
 
@@ -44,6 +45,7 @@ interface DiscoverPoolCardProps {
  */
 function DiscoverPoolCardComponent({ pool, onPress }: DiscoverPoolCardProps) {
   const accent = accentStyles[ACCENT_CYCLE[pool.poolId % ACCENT_CYCLE.length]]
+  const denomination = denominationFor(pool)
   const liquidity = poolStore.poolLiquidity(pool.poolId)
   const members = poolStore.memberCountFor(pool.poolId)
 
@@ -72,7 +74,7 @@ function DiscoverPoolCardComponent({ pool, onPress }: DiscoverPoolCardProps) {
       <View className="mt-4 flex-row justify-between">
         <View>
           <Text className="text-[10px] font-semibold uppercase tracking-widest text-mist">Max loan</Text>
-          <Text className="mt-1 font-mono text-sm text-snow">{formatToken(pool.maxLoanAmount)} POL</Text>
+          <Text className="mt-1 font-mono text-sm text-snow">{formatAmount(pool.maxLoanAmount, denomination)}</Text>
         </View>
         <View>
           <Text className="text-[10px] font-semibold uppercase tracking-widest text-mist">Rate</Text>
@@ -92,7 +94,7 @@ function DiscoverPoolCardComponent({ pool, onPress }: DiscoverPoolCardProps) {
           </Text>
         </View>
         <Text className="font-mono text-sm font-bold text-snow" testID={`discover-pool-liquidity-${pool.poolId}`}>
-          {formatToken(liquidity)} POL
+          {formatAmount(liquidity, denomination)}
         </Text>
       </View>
     </Pressable>

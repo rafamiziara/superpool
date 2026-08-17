@@ -1,30 +1,38 @@
 import React, { useMemo, useState } from 'react'
 import { Pressable, Text, TextInput, View } from 'react-native'
-import { parseEther } from 'viem'
 import { z } from 'zod'
-import { formatToken } from '../../utils/format'
+import type { Denomination } from '../../utils/denomination'
+import { amountPattern, formatAmount, formatToken, parseToken } from '../../utils/format'
 
 /**
- * Parses what the user typed into the amount `depositFunds` takes.
+ * Parses what the user typed into the amount the pool's deposit function takes.
  *
- * People think in POL, the contract takes wei. Converting here keeps that
- * translation in one place and out of the hook, exactly as the create-pool form
- * does — and `validateContributionParams` re-checks the converted value against
- * the contract's own rule before anything is sent.
+ * People think in whole units, the contract takes the smallest one. Converting
+ * here keeps that translation in one place and out of the hook, exactly as the
+ * create-pool form does — and `validateContributionParams` re-checks the
+ * converted value against the contract's own rule before anything is sent.
+ *
+ * A factory rather than a constant because the exponent belongs to the pool: 18
+ * for a native coin, 6 for USDC. The digit limit is part of it — without it,
+ * a seventh decimal of USDC would be silently rounded away instead of refused.
  */
-export const contributeFormSchema = z.object({
-  amount: z
-    .string()
-    .trim()
-    .min(1, 'Enter an amount')
-    .refine((value) => /^\d+(\.\d{1,18})?$/.test(value), 'Enter an amount in POL, with at most 18 decimals')
-    .transform((value) => parseEther(value))
-    .refine((value) => value > 0n, 'Enter an amount greater than zero'),
-})
+export function contributeFormSchema({ symbol, decimals }: Denomination) {
+  return z.object({
+    amount: z
+      .string()
+      .trim()
+      .min(1, 'Enter an amount')
+      .refine((value) => amountPattern(decimals).test(value), `Enter an amount in ${symbol}, with at most ${decimals} decimals`)
+      .transform((value) => parseToken(value, decimals))
+      .refine((value) => value > 0n, 'Enter an amount greater than zero'),
+  })
+}
 
 export interface ContributeFormProps {
   /** Named so the form can confirm where the money is going. */
   poolName: string
+  /** What the pool takes. Decides both the unit shown and the exponent parsed. */
+  denomination: Denomination
   /** Wei the user has already put into this pool, if any. */
   currentPosition?: bigint
   /** The wallet's spendable balance in wei, when known. */
@@ -45,6 +53,7 @@ export interface ContributeFormProps {
  */
 export function ContributeForm({
   poolName,
+  denomination,
   currentPosition,
   walletBalance,
   onSubmit,
@@ -55,7 +64,8 @@ export function ContributeForm({
   const [amount, setAmount] = useState('')
   const [touched, setTouched] = useState(false)
 
-  const parsed = useMemo(() => contributeFormSchema.safeParse({ amount }), [amount])
+  const schema = useMemo(() => contributeFormSchema(denomination), [denomination])
+  const parsed = useMemo(() => schema.safeParse({ amount }), [schema, amount])
 
   const fieldError = useMemo(() => {
     if (parsed.success) return undefined
@@ -87,7 +97,7 @@ export function ContributeForm({
         </Text>
         {currentPosition !== undefined && currentPosition > 0n && (
           <Text className="mt-1 text-xs text-fog" testID="contribute-current-position">
-            You have {formatToken(currentPosition)} POL in this pool
+            You have {formatAmount(currentPosition, denomination)} in this pool
           </Text>
         )}
       </View>
@@ -119,7 +129,9 @@ export function ContributeForm({
           </Text>
         ) : (
           <Text className="text-xs text-mist">
-            In POL{walletBalance === undefined ? '' : ` — your wallet holds ${formatToken(walletBalance)} POL`}
+            {walletBalance === undefined
+              ? `In ${denomination.symbol}`
+              : `In ${denomination.symbol} — your wallet holds ${formatToken(walletBalance, denomination.decimals)} ${denomination.symbol}`}
           </Text>
         )}
       </View>

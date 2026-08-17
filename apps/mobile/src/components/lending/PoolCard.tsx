@@ -6,7 +6,8 @@ import React from 'react'
 import { Pressable, Text, View } from 'react-native'
 import { palette } from '../../constants/palette'
 import { poolStore } from '../../stores/PoolStore'
-import { bpsToPercent, formatDuration, formatToken, sameAddress } from '../../utils/format'
+import { denominationFor } from '../../utils/denomination'
+import { bpsToPercent, formatAmount, formatDuration, sameAddress } from '../../utils/format'
 
 type Accent = 'mint' | 'iris' | 'amber'
 
@@ -35,6 +36,7 @@ interface PoolCardProps {
  */
 function PoolCardComponent({ pool, membership, onPress, carousel = false }: PoolCardProps) {
   const accent = accentStyles[ACCENT_CYCLE[pool.poolId % ACCENT_CYCLE.length]]
+  const denomination = denominationFor(pool)
   const isOwner = sameAddress(pool.poolOwner, poolStore.userAddress)
   const isPending = membership?.status === MemberStatus.PENDING
   // Only the owner can act on these, so only the owner is told about them.
@@ -77,7 +79,7 @@ function PoolCardComponent({ pool, membership, onPress, carousel = false }: Pool
       <View className="mt-4 flex-row justify-between">
         <View>
           <Text className="text-[10px] font-semibold uppercase tracking-widest text-mist">Max loan</Text>
-          <Text className="mt-1 font-mono text-sm text-snow">{formatToken(pool.maxLoanAmount)} POL</Text>
+          <Text className="mt-1 font-mono text-sm text-snow">{formatAmount(pool.maxLoanAmount, denomination)}</Text>
         </View>
         <View>
           <Text className="text-[10px] font-semibold uppercase tracking-widest text-mist">Rate</Text>
@@ -92,7 +94,7 @@ function PoolCardComponent({ pool, membership, onPress, carousel = false }: Pool
       {membership && !isPending && (
         <View className="mt-4 flex-row items-center justify-between rounded-2xl border-continuous bg-raised px-4 py-3">
           <Text className="text-xs text-fog">Your balance</Text>
-          <Text className="font-mono text-sm font-bold text-mint">{formatToken(membership.currentBalance)} POL</Text>
+          <Text className="font-mono text-sm font-bold text-mint">{formatAmount(membership.currentBalance, denomination)}</Text>
         </View>
       )}
       {isPending && (

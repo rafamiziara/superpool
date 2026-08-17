@@ -1,4 +1,3 @@
-import type { LoanInfo } from '@superpool/types'
 import { FontAwesome } from '@expo/vector-icons'
 import { router, Stack, useLocalSearchParams } from 'expo-router'
 import { StatusBar } from 'expo-status-bar'
@@ -7,15 +6,17 @@ import React, { useState } from 'react'
 import { ActivityIndicator, Pressable, ScrollView, Text, View } from 'react-native'
 import { useReadContract } from 'wagmi'
 import { BorrowForm } from '../../../src/components/lending/BorrowForm'
+import { UnsupportedPoolNotice } from '../../../src/components/lending/UnsupportedPoolNotice'
 import { RepayForm } from '../../../src/components/lending/RepayForm'
 import { LendingPoolABI } from '../../../src/constants/abis'
 import { palette } from '../../../src/constants/palette'
-import { calculateRepayment, settlementQuote, useLoan } from '../../../src/hooks/pools/useLoan'
+import { settlementQuote, useLoan } from '../../../src/hooks/pools/useLoan'
 import { usePoolIndexing } from '../../../src/hooks/pools/usePoolIndexing'
 import { useTransactionMonitoring } from '../../../src/hooks/pools/useTransactionMonitoring'
 import type { LoanTransactionType } from '../../../src/stores/PendingTransactionsStore'
 import { poolStore } from '../../../src/stores/PoolStore'
-import { formatToken } from '../../../src/utils/format'
+import { type Denomination, denominationFor } from '../../../src/utils/denomination'
+import { formatAmount } from '../../../src/utils/format'
 
 /**
  * Where the flow is. Distinct from the hooks' own flags because it has to
@@ -41,19 +42,20 @@ const SUCCESS_HEADLINE: Record<Outcome, string> = {
   cancelled: 'Request withdrawn',
 }
 
-function successSummary(outcome: Outcome, amount: bigint, poolName: string, settled = true): string {
+function successSummary(outcome: Outcome, amount: bigint, poolName: string, denomination: Denomination, settled = true): string {
+  const paid = formatAmount(amount, denomination)
+
   if (outcome === 'repaid') {
     // A part payment must not promise the slot back: the loan is still open,
     // and `createLoan` would revert with `LoanOutstanding`.
     return settled
-      ? `${formatToken(amount)} POL went back into ${poolName}. You can borrow from it again.`
-      : `${formatToken(amount)} POL went back into ${poolName}. The rest of the loan is still outstanding.`
+      ? `${paid} went back into ${poolName}. You can borrow from it again.`
+      : `${paid} went back into ${poolName}. The rest of the loan is still outstanding.`
   }
-  if (outcome === 'requested')
-    return `${poolName}'s owner has your request for ${formatToken(amount)} POL. You will see the funds if they approve it.`
+  if (outcome === 'requested') return `${poolName}'s owner has your request for ${paid}. You will see the funds if they approve it.`
   if (outcome === 'cancelled') return `Your request to ${poolName} is withdrawn. You can borrow from it again whenever you like.`
 
-  return `${formatToken(amount)} POL is on its way to your wallet.`
+  return `${paid} is on its way to your wallet.`
 }
 
 /**
@@ -80,6 +82,7 @@ function BorrowScreen() {
   const [settled, setSettled] = useState<{ amount: bigint; outcome: Outcome; closedTheLoan: boolean } | null>(null)
 
   const pool = poolStore.poolById(Number(poolId))
+  const denomination = pool ? denominationFor(pool) : undefined
   const outstanding = pool ? poolStore.activeLoanFor(pool.poolId) : undefined
   const pendingRequest = pool ? poolStore.pendingLoanFor(pool.poolId) : undefined
 
@@ -156,7 +159,7 @@ function BorrowScreen() {
    * is already stated in the copy above it.
    */
   const handleBorrow = async (amount: bigint) => {
-    if (!pool) return
+    if (!pool || !denomination) return
 
     setFailure(null)
     reset()
@@ -170,6 +173,7 @@ function BorrowScreen() {
         poolId: pool.poolId,
         poolAddress: pool.poolAddress as `0x${string}`,
         poolName: pool.name,
+        denomination,
         amount,
       })
     } catch (error) {
@@ -190,7 +194,7 @@ function BorrowScreen() {
    * whole debt is back, so "how much" is a question the borrower answers.
    */
   const handleRepay = async (amount: bigint) => {
-    if (!pool || !outstanding || principalOwed === undefined || interestOwed === undefined) return
+    if (!pool || !denomination || !outstanding || principalOwed === undefined || interestOwed === undefined) return
 
     setFailure(null)
     reset()
@@ -204,6 +208,7 @@ function BorrowScreen() {
         poolId: pool.poolId,
         poolAddress: pool.poolAddress as `0x${string}`,
         poolName: pool.name,
+        denomination,
         loanId: outstanding.loanId,
         amount,
       })
@@ -225,7 +230,7 @@ function BorrowScreen() {
    * borrow nor ask for a different amount.
    */
   const handleCancel = async () => {
-    if (!pool || !pendingRequest) return
+    if (!pool || !denomination || !pendingRequest) return
 
     setFailure(null)
     reset()
@@ -237,6 +242,7 @@ function BorrowScreen() {
       setStage('submitting')
       txHash = await cancelLoanRequest({
         poolId: pool.poolId,
+        denomination,
         poolAddress: pool.poolAddress as `0x${string}`,
         poolName: pool.name,
         loanId: pendingRequest.loanId,
@@ -268,6 +274,16 @@ function BorrowScreen() {
     )
   }
 
+  // Before anything that shows or collects an amount — see pool/contribute.tsx.
+  if (!denomination) {
+    return (
+      <>
+        <Stack.Screen options={{ title: 'Borrow' }} />
+        <UnsupportedPoolNotice />
+      </>
+    )
+  }
+
   if (stage === 'done') {
     return (
       <View className="flex-1 items-center justify-center gap-4 bg-abyss px-10" testID="borrow-success">
@@ -283,7 +299,7 @@ function BorrowScreen() {
         <Text className="text-center text-sm text-fog">
           {settled === null
             ? `Your loan from ${pool.name} is settled.`
-            : successSummary(settled.outcome, settled.amount, pool.name, settled.closedTheLoan)}
+            : successSummary(settled.outcome, settled.amount, pool.name, denomination, settled.closedTheLoan)}
         </Text>
         <Pressable
           // `dismissTo`, not `replace` — see the note on the contribute screen:
@@ -349,6 +365,7 @@ function BorrowScreen() {
             ) : (
               <RepayForm
                 poolName={pool.name}
+                denomination={denomination}
                 loanId={outstanding.loanId}
                 borrowed={BigInt(outstanding.amount)}
                 principal={principalOwed}
@@ -366,7 +383,7 @@ function BorrowScreen() {
             <View className="rounded-3xl border-continuous border-hairline border-amber/20 bg-amber-deep p-5">
               <Text className="text-[10px] font-semibold uppercase tracking-widest text-amber">Waiting on the pool owner</Text>
               <Text className="mt-2 text-lg font-bold text-snow" numberOfLines={1}>
-                {formatToken(BigInt(pendingRequest.amount))} POL
+                {formatAmount(BigInt(pendingRequest.amount), denomination)}
               </Text>
               <Text className="mt-1 text-xs text-fog">
                 Requested from {pool.name} · request #{pendingRequest.loanId}
@@ -403,6 +420,7 @@ function BorrowScreen() {
         ) : (
           <BorrowForm
             poolName={pool.name}
+            denomination={denomination}
             maxLoanAmount={BigInt(pool.maxLoanAmount)}
             interestRate={pool.interestRate}
             loanDuration={pool.loanDuration}

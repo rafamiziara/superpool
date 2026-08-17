@@ -3,7 +3,8 @@ import React from 'react'
 import { ActivityIndicator, Pressable, Text, View } from 'react-native'
 import { palette } from '../../constants/palette'
 import type { CreatePoolTransaction, PendingTransactionStatus } from '../../stores/PendingTransactionsStore'
-import { bpsToPercent, formatDuration, formatToken } from '../../utils/format'
+import { recordedDenomination } from '../../utils/denomination'
+import { bpsToPercent, formatAmount, formatDuration } from '../../utils/format'
 
 /**
  * A pool that has been paid for but is not yet listed.
@@ -74,7 +75,7 @@ export function PendingPoolCard({ transaction, onPress, onDismiss, carousel = fa
       <View className="mt-4 flex-row justify-between">
         <View>
           <Text className="text-[10px] font-semibold uppercase tracking-widest text-mist">Max loan</Text>
-          <Text className="mt-1 font-mono text-sm text-snow">{formatToken(params.maxLoanAmount)} POL</Text>
+          <Text className="mt-1 font-mono text-sm text-snow">{formatAmount(params.maxLoanAmount, recordedDenomination(transaction))}</Text>
         </View>
         <View>
           <Text className="text-[10px] font-semibold uppercase tracking-widest text-mist">Rate</Text>

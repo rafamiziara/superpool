@@ -3,6 +3,7 @@ import { useAccount, usePublicClient, useWriteContract } from 'wagmi'
 import { DEFAULT_CHAIN_ID } from '../../config/contracts'
 import { LendingPoolABI } from '../../constants/abis'
 import { pendingTransactionsStore } from '../../stores/PendingTransactionsStore'
+import type { Denomination } from '../../utils/denomination'
 import { describeTransactionError } from './transactionErrors'
 
 /**
@@ -17,6 +18,12 @@ export interface ClaimInterestParams {
   poolAddress: `0x${string}`
   /** Denormalised onto the pending record so a card can name the pool at startup. */
   poolName: string
+  /**
+   * What the pool is denominated in — interest is paid in what the pool lends.
+   * Recorded on the pending transaction so the card can show the claimed amount
+   * in the right unit, which for a claim is only known from the receipt.
+   */
+  denomination: Denomination
 }
 
 export interface UseInterestReturn {
@@ -123,6 +130,7 @@ export const useInterest = (): UseInterestReturn => {
           type: 'CLAIM_INTEREST',
           status: 'submitted',
           timestamp: Date.now(),
+          denomination: params.denomination,
           params: {
             poolId: params.poolId,
             poolAddress: params.poolAddress,

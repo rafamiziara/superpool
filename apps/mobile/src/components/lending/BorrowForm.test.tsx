@@ -1,5 +1,6 @@
 import React from 'react'
 import { fireEvent, render } from '../../__tests__/test-utils'
+import { NATIVE } from '../../__tests__/fixtures/denomination'
 import { BorrowForm } from './BorrowForm'
 
 const POOL_NAME = 'Neighbourhood Fund'
@@ -12,6 +13,7 @@ function renderForm(props: Partial<React.ComponentProps<typeof BorrowForm>> = {}
   const utils = render(
     <BorrowForm
       poolName={POOL_NAME}
+      denomination={NATIVE}
       maxLoanAmount={MAX_LOAN}
       interestRate={INTEREST_RATE}
       loanDuration={DURATION}

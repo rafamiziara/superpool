@@ -5,6 +5,7 @@ import { observer } from 'mobx-react-lite'
 import React, { useState } from 'react'
 import { ActivityIndicator, Pressable, ScrollView, Text, View } from 'react-native'
 import { useAccount, useReadContract } from 'wagmi'
+import { UnsupportedPoolNotice } from '../../../src/components/lending/UnsupportedPoolNotice'
 import { WithdrawForm } from '../../../src/components/lending/WithdrawForm'
 import { LendingPoolABI } from '../../../src/constants/abis'
 import { palette } from '../../../src/constants/palette'
@@ -12,7 +13,8 @@ import { usePoolIndexing } from '../../../src/hooks/pools/usePoolIndexing'
 import { useTransactionMonitoring } from '../../../src/hooks/pools/useTransactionMonitoring'
 import { useWithdrawal } from '../../../src/hooks/pools/useWithdrawal'
 import { poolStore } from '../../../src/stores/PoolStore'
-import { formatToken } from '../../../src/utils/format'
+import { denominationFor } from '../../../src/utils/denomination'
+import { formatAmount } from '../../../src/utils/format'
 
 /**
  * Where the flow is. Distinct from the hooks' own flags because it has to
@@ -43,6 +45,7 @@ function WithdrawScreen() {
   const [withdrawn, setWithdrawn] = useState<bigint | null>(null)
 
   const pool = poolStore.poolById(Number(poolId))
+  const denomination = pool ? denominationFor(pool) : undefined
 
   // Read from the chain, not from PoolStore. Memberships are derived from
   // indexed `FundsDeposited` events, which say what was put in and know nothing
@@ -74,7 +77,7 @@ function WithdrawScreen() {
   const supportsWithdrawal = version === undefined || !version.startsWith('1.')
 
   const handleSubmit = async (amount: bigint) => {
-    if (!pool) return
+    if (!pool || !denomination) return
 
     setFailure(null)
     reset()
@@ -86,6 +89,7 @@ function WithdrawScreen() {
         poolId: pool.poolId,
         poolAddress: pool.poolAddress as `0x${string}`,
         poolName: pool.name,
+        denomination,
         amount,
       })
     } catch (error) {
@@ -155,6 +159,16 @@ function WithdrawScreen() {
     )
   }
 
+  // Before anything that shows or collects an amount — see pool/contribute.tsx.
+  if (!denomination) {
+    return (
+      <>
+        <Stack.Screen options={{ title: 'Withdraw' }} />
+        <UnsupportedPoolNotice />
+      </>
+    )
+  }
+
   if (stage === 'done') {
     return (
       <View className="flex-1 items-center justify-center gap-4 bg-abyss px-10" testID="withdraw-success">
@@ -165,7 +179,7 @@ function WithdrawScreen() {
         <Text className="text-center text-sm text-fog">
           {withdrawn === null
             ? `Your funds have left ${pool.name}.`
-            : `${formatToken(withdrawn)} POL is back in your wallet from ${pool.name}.`}
+            : `${formatAmount(withdrawn, denomination)} is back in your wallet from ${pool.name}.`}
         </Text>
         <Pressable
           // See the note in pool/contribute.tsx: replacing this screen would put
@@ -209,6 +223,7 @@ function WithdrawScreen() {
 
         <WithdrawForm
           poolName={pool.name}
+          denomination={denomination}
           position={position}
           withdrawable={withdrawable}
           onSubmit={handleSubmit}

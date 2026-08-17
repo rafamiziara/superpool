@@ -1,29 +1,35 @@
 import React, { useMemo, useState } from 'react'
 import { Pressable, Text, TextInput, View } from 'react-native'
-import { formatEther, parseEther } from 'viem'
+import { formatUnits } from 'viem'
 import { z } from 'zod'
-import { formatToken } from '../../utils/format'
+import type { Denomination } from '../../utils/denomination'
+import { amountPattern, formatAmount, formatToken, parseToken } from '../../utils/format'
 
 /**
  * Parses what the user typed into the amount `withdraw` takes.
  *
- * People think in POL, the contract takes wei. Same translation as the
- * contribute form, kept here rather than in the hook so the screen never
- * converts twice.
+ * People think in whole units, the contract takes the smallest one. Same
+ * translation as the contribute form, kept here rather than in the hook so the
+ * screen never converts twice, and a factory for the same reason: the exponent
+ * belongs to the pool, not to the app.
  */
-export const withdrawFormSchema = z.object({
-  amount: z
-    .string()
-    .trim()
-    .min(1, 'Enter an amount')
-    .refine((value) => /^\d+(\.\d{1,18})?$/.test(value), 'Enter an amount in POL, with at most 18 decimals')
-    .transform((value) => parseEther(value))
-    .refine((value) => value > 0n, 'Enter an amount greater than zero'),
-})
+export function withdrawFormSchema({ symbol, decimals }: Denomination) {
+  return z.object({
+    amount: z
+      .string()
+      .trim()
+      .min(1, 'Enter an amount')
+      .refine((value) => amountPattern(decimals).test(value), `Enter an amount in ${symbol}, with at most ${decimals} decimals`)
+      .transform((value) => parseToken(value, decimals))
+      .refine((value) => value > 0n, 'Enter an amount greater than zero'),
+  })
+}
 
 export interface WithdrawFormProps {
   /** Named so the form can confirm where the money is coming from. */
   poolName: string
+  /** What the pool holds. Decides both the unit shown and the exponent parsed. */
+  denomination: Denomination
   /** Wei the caller has in this pool, read from the chain. */
   position?: bigint
   /**
@@ -48,6 +54,7 @@ export interface WithdrawFormProps {
  */
 export function WithdrawForm({
   poolName,
+  denomination,
   position,
   withdrawable,
   onSubmit,
@@ -58,7 +65,8 @@ export function WithdrawForm({
   const [amount, setAmount] = useState('')
   const [touched, setTouched] = useState(false)
 
-  const parsed = useMemo(() => withdrawFormSchema.safeParse({ amount }), [amount])
+  const schema = useMemo(() => withdrawFormSchema(denomination), [denomination])
+  const parsed = useMemo(() => schema.safeParse({ amount }), [schema, amount])
 
   const fieldError = useMemo(() => {
     if (parsed.success) return undefined
@@ -82,12 +90,12 @@ export function WithdrawForm({
     void onSubmit(parsed.data.amount)
   }
 
-  // `formatEther` rather than the display formatter: this fills the input, so it
+  // `formatUnits` rather than the display formatter: this fills the input, so it
   // has to round-trip back through the schema exactly.
   const fillMax = () => {
     if (withdrawable === undefined || withdrawable === 0n) return
 
-    setAmount(formatEther(withdrawable))
+    setAmount(formatUnits(withdrawable, denomination.decimals))
     setTouched(true)
   }
 
@@ -100,12 +108,12 @@ export function WithdrawForm({
         </Text>
         {position !== undefined && (
           <Text className="mt-1 text-xs text-fog" testID="withdraw-position">
-            You have {formatToken(position)} POL in this pool
+            You have {formatAmount(position, denomination)} in this pool
           </Text>
         )}
         {withdrawable !== undefined && position !== undefined && withdrawable < position && (
           <Text className="mt-1 text-xs text-amber" testID="withdraw-liquidity-capped">
-            {formatToken(withdrawable)} POL available right now — the rest is lent out
+            {formatAmount(withdrawable, denomination)} available right now — the rest is lent out
           </Text>
         )}
       </View>
@@ -143,7 +151,11 @@ export function WithdrawForm({
             {fieldError}
           </Text>
         ) : (
-          <Text className="text-xs text-mist">In POL{withdrawable === undefined ? '' : ` — up to ${formatToken(withdrawable)} POL`}</Text>
+          <Text className="text-xs text-mist">
+            {withdrawable === undefined
+              ? `In ${denomination.symbol}`
+              : `In ${denomination.symbol} — up to ${formatToken(withdrawable, denomination.decimals)} ${denomination.symbol}`}
+          </Text>
         )}
       </View>
 

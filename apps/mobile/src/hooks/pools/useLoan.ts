@@ -3,6 +3,7 @@ import { useAccount, usePublicClient, useWriteContract } from 'wagmi'
 import { DEFAULT_CHAIN_ID } from '../../config/contracts'
 import { LendingPoolABI } from '../../constants/abis'
 import { pendingTransactionsStore } from '../../stores/PendingTransactionsStore'
+import type { Denomination } from '../../utils/denomination'
 import { describeTransactionError } from './transactionErrors'
 
 /**
@@ -22,6 +23,12 @@ export interface BorrowParams {
   poolName: string
   /** Principal, in wei. */
   amount: bigint
+  /**
+   * What the pool is denominated in. Recorded on the pending transaction so its
+   * card can show the amount in the right unit at startup, before any pool has
+   * been fetched — the same reason `poolName` is denormalised.
+   */
+  denomination: Denomination
 }
 
 export interface RepayParams {
@@ -39,6 +46,12 @@ export interface RepayParams {
    * overpaying costs only gas.
    */
   amount: bigint
+  /**
+   * What the pool is denominated in. Recorded on the pending transaction so its
+   * card can show the amount in the right unit at startup, before any pool has
+   * been fetched — the same reason `poolName` is denormalised.
+   */
+  denomination: Denomination
 }
 
 /**
@@ -60,6 +73,12 @@ export interface LoanDecisionParams {
   amount: bigint
   /** Whose request this is. Set by the owner's screens; omitted by the borrower's. */
   borrower?: string
+  /**
+   * What the pool is denominated in. Recorded on the pending transaction so its
+   * card can show the amount in the right unit at startup, before any pool has
+   * been fetched — the same reason `poolName` is denormalised.
+   */
+  denomination: Denomination
 }
 
 export interface UseLoanReturn {
@@ -342,6 +361,7 @@ export const useLoan = (): UseLoanReturn => {
           type: 'BORROW',
           status: 'submitted',
           timestamp: Date.now(),
+          denomination: params.denomination,
           params: {
             poolId: params.poolId,
             poolAddress: params.poolAddress,
@@ -409,6 +429,7 @@ export const useLoan = (): UseLoanReturn => {
           type: 'REPAY',
           status: 'submitted',
           timestamp: Date.now(),
+          denomination: params.denomination,
           params: {
             poolId: params.poolId,
             poolAddress: params.poolAddress,
@@ -489,6 +510,7 @@ export const useLoan = (): UseLoanReturn => {
           type,
           status: 'submitted',
           timestamp: Date.now(),
+          denomination: params.denomination,
           params: {
             poolId: params.poolId,
             poolAddress: params.poolAddress,
@@ -568,6 +590,7 @@ export const useLoan = (): UseLoanReturn => {
           type: 'REQUEST_LOAN',
           status: 'submitted',
           timestamp: Date.now(),
+          denomination: params.denomination,
           params: {
             poolId: params.poolId,
             poolAddress: params.poolAddress,

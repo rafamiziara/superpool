@@ -1,29 +1,34 @@
 import React, { useMemo, useState } from 'react'
 import { Pressable, Text, TextInput, View } from 'react-native'
-import { formatEther, parseEther } from 'viem'
+import { formatUnits } from 'viem'
 import { z } from 'zod'
-import { formatToken } from '../../utils/format'
+import type { Denomination } from '../../utils/denomination'
+import { amountPattern, formatAmount, formatToken, parseToken } from '../../utils/format'
 
 /**
- * Parses what the user typed into the amount `repayLoan` takes as its `value`.
+ * Parses what the user typed into the amount `repayLoan` takes.
  *
- * People think in POL, the contract takes wei. Same translation as the
- * contribute and withdraw forms, kept here rather than in the hook so the
- * screen never converts twice.
+ * People think in whole units, the contract takes the smallest one. Same
+ * translation as the contribute and withdraw forms, kept here rather than in the
+ * hook so the screen never converts twice.
  */
-export const repayFormSchema = z.object({
-  amount: z
-    .string()
-    .trim()
-    .min(1, 'Enter an amount')
-    .refine((value) => /^\d+(\.\d{1,18})?$/.test(value), 'Enter an amount in POL, with at most 18 decimals')
-    .transform((value) => parseEther(value))
-    .refine((value) => value > 0n, 'Enter an amount greater than zero'),
-})
+export function repayFormSchema({ symbol, decimals }: Denomination) {
+  return z.object({
+    amount: z
+      .string()
+      .trim()
+      .min(1, 'Enter an amount')
+      .refine((value) => amountPattern(decimals).test(value), `Enter an amount in ${symbol}, with at most ${decimals} decimals`)
+      .transform((value) => parseToken(value, decimals))
+      .refine((value) => value > 0n, 'Enter an amount greater than zero'),
+  })
+}
 
 export interface RepayFormProps {
   /** Named so the form can confirm where the money is going. */
   poolName: string
+  /** What the pool lent, and therefore what it is repaid in. */
+  denomination: Denomination
   /** Per-pool loan id, shown so a borrower can match it to the pool's records. */
   loanId: number
   /** What was borrowed, in wei — for context, not for arithmetic. */
@@ -71,6 +76,7 @@ export interface RepayFormProps {
  */
 export function RepayForm({
   poolName,
+  denomination,
   loanId,
   borrowed,
   principal,
@@ -84,12 +90,13 @@ export function RepayForm({
   const outstanding = principal + interest
   const hasPaidSome = amountRepaid > 0n
 
-  // `formatEther`, not the display formatter: this fills the input, so it has
+  // `formatUnits`, not the display formatter: this fills the input, so it has
   // to round-trip back through the schema exactly.
-  const [amount, setAmount] = useState(() => formatEther(outstanding))
+  const [amount, setAmount] = useState(() => formatUnits(outstanding, denomination.decimals))
   const [touched, setTouched] = useState(false)
 
-  const parsed = useMemo(() => repayFormSchema.safeParse({ amount }), [amount])
+  const schema = useMemo(() => repayFormSchema(denomination), [denomination])
+  const parsed = useMemo(() => schema.safeParse({ amount }), [schema, amount])
 
   const fieldError = useMemo(() => {
     if (parsed.success) return undefined
@@ -113,7 +120,7 @@ export function RepayForm({
   }
 
   const fillFull = () => {
-    setAmount(formatEther(outstanding))
+    setAmount(formatUnits(outstanding, denomination.decimals))
     setTouched(true)
   }
 
@@ -125,22 +132,23 @@ export function RepayForm({
           {poolName}
         </Text>
         <Text className="mt-1 text-xs text-fog">
-          Borrowed {formatToken(borrowed)} POL · loan #{loanId}
+          Borrowed {formatAmount(borrowed, denomination)} · loan #{loanId}
         </Text>
       </View>
 
       <View className="rounded-2xl border-continuous border-hairline border-veil bg-raised px-4 py-3">
         <Text className="text-sm text-fog">
-          Owed now <Text className="font-mono font-bold text-snow">{formatToken(outstanding)}</Text> POL
+          Owed now <Text className="font-mono font-bold text-snow">{formatToken(outstanding, denomination.decimals)}</Text>{' '}
+          {denomination.symbol}
         </Text>
         {/* The split is the point of an accruing rate: one half stops growing
             when it is paid, the other keeps growing until it is. */}
         <Text className="mt-1 text-xs text-mist" testID="repay-breakdown">
-          {formatToken(principal)} POL borrowed back · {formatToken(interest)} POL interest so far
+          {formatAmount(principal, denomination)} borrowed back · {formatAmount(interest, denomination)} interest so far
         </Text>
         {hasPaidSome ? (
           <Text className="mt-1 text-xs text-mist" testID="repay-progress">
-            You have paid {formatToken(amountRepaid)} POL towards it.
+            You have paid {formatAmount(amountRepaid, denomination)} towards it.
           </Text>
         ) : null}
         <Text className="mt-2 text-xs text-mist">Interest builds each day on what is still out, so paying sooner costs less.</Text>
@@ -177,7 +185,9 @@ export function RepayForm({
             {fieldError}
           </Text>
         ) : (
-          <Text className="text-xs text-mist">In POL — up to {formatToken(outstanding)} POL</Text>
+          <Text className="text-xs text-mist">
+            In {denomination.symbol} — up to {formatAmount(outstanding, denomination)}
+          </Text>
         )}
       </View>
 
@@ -194,8 +204,8 @@ export function RepayForm({
       {parsed.success && !exceedsOutstanding && !isSettling && (
         <View className="rounded-2xl border-continuous border-hairline border-amber/20 bg-amber-deep px-4 py-3" testID="repay-partial-note">
           <Text className="text-sm text-amber">
-            {formatToken(outstanding - parsed.data.amount)} POL will still be owed, and will keep building interest. The loan stays open and
-            you cannot borrow again from this pool until it is settled.
+            {formatAmount(outstanding - parsed.data.amount, denomination)} will still be owed, and will keep building interest. The loan
+            stays open and you cannot borrow again from this pool until it is settled.
           </Text>
         </View>
       )}
@@ -228,7 +238,7 @@ export function RepayForm({
         className="items-center justify-center rounded-2xl border-continuous bg-mint px-6 py-4 shadow-glow-mint active:opacity-90 disabled:bg-veil disabled:shadow-none"
       >
         <Text className="text-base font-bold text-abyss disabled:text-mist">
-          {isSubmitting ? 'Submitting…' : parsed.success ? `Repay ${formatToken(parsed.data.amount)} POL` : 'Repay'}
+          {isSubmitting ? 'Submitting…' : parsed.success ? `Repay ${formatAmount(parsed.data.amount, denomination)}` : 'Repay'}
         </Text>
       </Pressable>
     </View>

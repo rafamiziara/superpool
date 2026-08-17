@@ -6,12 +6,14 @@ import React, { useState } from 'react'
 import { ActivityIndicator, Pressable, ScrollView, Text, View } from 'react-native'
 import { useAccount, useBalance } from 'wagmi'
 import { ContributeForm } from '../../../src/components/lending/ContributeForm'
+import { UnsupportedPoolNotice } from '../../../src/components/lending/UnsupportedPoolNotice'
 import { palette } from '../../../src/constants/palette'
 import { useContribution } from '../../../src/hooks/pools/useContribution'
 import { usePoolIndexing } from '../../../src/hooks/pools/usePoolIndexing'
 import { useTransactionMonitoring } from '../../../src/hooks/pools/useTransactionMonitoring'
 import { poolStore } from '../../../src/stores/PoolStore'
-import { formatToken } from '../../../src/utils/format'
+import { denominationFor } from '../../../src/utils/denomination'
+import { formatAmount } from '../../../src/utils/format'
 
 /**
  * Where the flow is. Distinct from the hooks' own flags because it has to
@@ -45,10 +47,11 @@ function ContributeScreen() {
   const [contributed, setContributed] = useState<bigint | null>(null)
 
   const pool = poolStore.poolById(Number(poolId))
+  const denomination = pool ? denominationFor(pool) : undefined
   const membership = pool ? poolStore.membershipFor(pool.poolId) : undefined
 
   const handleSubmit = async (amount: bigint) => {
-    if (!pool) return
+    if (!pool || !denomination) return
 
     setFailure(null)
     reset()
@@ -60,6 +63,7 @@ function ContributeScreen() {
         poolId: pool.poolId,
         poolAddress: pool.poolAddress as `0x${string}`,
         poolName: pool.name,
+        denomination,
         amount,
       })
     } catch (error) {
@@ -105,6 +109,17 @@ function ContributeScreen() {
     )
   }
 
+  // Before anything that shows or collects an amount: this screen exists to move
+  // money, and it cannot say how much in a unit it does not know.
+  if (!denomination) {
+    return (
+      <>
+        <Stack.Screen options={{ title: 'Contribute' }} />
+        <UnsupportedPoolNotice />
+      </>
+    )
+  }
+
   if (stage === 'done') {
     return (
       <View className="flex-1 items-center justify-center gap-4 bg-abyss px-10" testID="contribute-success">
@@ -115,7 +130,7 @@ function ContributeScreen() {
         <Text className="text-center text-sm text-fog">
           {contributed === null
             ? `Your funds are in ${pool.name}.`
-            : `${formatToken(contributed)} POL is now in ${pool.name} and available to lend.`}
+            : `${formatAmount(contributed, denomination)} is now in ${pool.name} and available to lend.`}
         </Text>
         <Pressable
           // `dismissTo`, not `replace`: this screen was pushed from the pool
@@ -163,6 +178,7 @@ function ContributeScreen() {
 
         <ContributeForm
           poolName={pool.name}
+          denomination={denomination}
           currentPosition={membership?.totalContributed}
           walletBalance={balance?.value}
           onSubmit={handleSubmit}

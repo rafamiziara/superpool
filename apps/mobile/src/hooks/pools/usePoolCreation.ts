@@ -8,6 +8,7 @@ import { DEFAULT_CHAIN_ID, getPoolFactoryAddress } from '../../config/contracts'
 import { PoolFactoryABI } from '../../constants/abis'
 import { MAX_INTEREST_RATE_BPS } from '../../constants/pools'
 import { pendingTransactionsStore } from '../../stores/PendingTransactionsStore'
+import type { Denomination } from '../../utils/denomination'
 import { describeTransactionError } from './transactionErrors'
 
 /**
@@ -34,6 +35,12 @@ export interface PoolCreationParams {
    * since nothing about a pool should depend on a field being forgotten.
    */
   requiresMembership: boolean
+  /**
+   * What the pool will lend. Native today — the form offers no choice yet — and
+   * carried explicitly rather than assumed so that the pending card, which
+   * renders before the pool exists, shows the amount in the right unit.
+   */
+  denomination: Denomination
 }
 
 export interface UsePoolCreationReturn {
@@ -148,10 +155,10 @@ export const usePoolCreation = (): UsePoolCreationReturn => {
           name: params.name,
           description: params.description,
           requiresMembership: params.requiresMembership,
-          // Native POL. The contract takes a denomination now, but the app
-          // still only offers one — picking a token is phase 4 of the ERC-20
-          // work, once the forms understand decimals other than 18.
-          loanToken: zeroAddress,
+          // From the denomination the form was given, which is the chain's own
+          // coin: a native denomination carries no address, and `address(0)` is
+          // exactly what the contract reads as native.
+          loanToken: params.denomination.address ?? zeroAddress,
         },
       ] as const
 
@@ -188,6 +195,7 @@ export const usePoolCreation = (): UsePoolCreationReturn => {
           type: 'CREATE_POOL',
           status: 'submitted',
           timestamp: Date.now(),
+          denomination: params.denomination,
           params: {
             name: params.name,
             description: params.description,

@@ -11,6 +11,7 @@ import {
 import { LendingPoolABI } from '../../constants/abis'
 import { pendingTransactionsStore } from '../../stores/PendingTransactionsStore'
 import { type ClaimInterestParams, describeClaimInterestError, useInterest } from './useInterest'
+import { NATIVE } from '../../__tests__/fixtures/denomination'
 
 const POOL_ADDRESS = '0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0'
 const WALLET_ADDRESS = '0x70997970C51812dc3A010C7d01b50e0d17dc79C8'
@@ -27,6 +28,7 @@ function makeParams(overrides: Partial<ClaimInterestParams> = {}): ClaimInterest
     poolId: 1,
     poolAddress: POOL_ADDRESS,
     poolName: 'Neighbourhood Fund',
+    denomination: NATIVE,
     ...overrides,
   }
 }
@@ -201,6 +203,9 @@ describe('useInterest', () => {
       expect(recorded.txHash).toBe(TX_HASH)
       expect(recorded.status).toBe('submitted')
       expect(recorded.chainId).toBe(LOCALHOST_CHAIN_ID)
+      // On the record itself, not in its params: every pending transaction is
+      // denominated, and a card has to read it without knowing the type.
+      expect(recorded.denomination).toEqual(NATIVE)
       expect(recorded.params).toEqual({
         poolId: 1,
         poolAddress: POOL_ADDRESS,

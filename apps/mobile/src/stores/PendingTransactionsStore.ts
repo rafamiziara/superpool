@@ -2,6 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage'
 import { makeAutoObservable, runInAction } from 'mobx'
 import { parseEventLogs, type TransactionReceipt } from 'viem'
 import { LendingPoolABI, PoolFactoryABI } from '../constants/abis'
+import type { Denomination } from '../utils/denomination'
 import { logger } from '../utils/logger'
 
 /** AsyncStorage key holding the serialised transaction list. */
@@ -195,6 +196,19 @@ interface PendingTransactionBase {
   chainId: number
   status: PendingTransactionStatus
   timestamp: number
+  /**
+   * What the amounts in this record are quantities of.
+   *
+   * Denormalised for the same reason `poolName` is: a pending card has to render
+   * at startup, before any pool has been fetched, and an amount shown in the
+   * wrong unit is worse than one shown late.
+   *
+   * Optional in two senses. A membership action moves no money and denominates
+   * nothing. And a record persisted before pools had a denomination has no
+   * field — nothing but a native pool could have written one, which is what
+   * `recordedDenomination` relies on.
+   */
+  denomination?: Denomination
 }
 
 export interface CreatePoolTransaction extends PendingTransactionBase {
@@ -354,6 +368,23 @@ function isJsonObject(value: JsonValue | undefined): value is { [key: string]: J
   return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
 
+/**
+ * A denomination off a persisted record, or `null` for one written before the
+ * field existed — which callers read as native. A malformed one is dropped for
+ * the same reason a malformed amount is: a guessed exponent is worse than a
+ * missing record.
+ */
+function toDenomination(value: JsonValue | undefined): Denomination | null {
+  if (!isJsonObject(value)) return null
+
+  const { symbol, decimals, address } = value
+
+  if (typeof symbol !== 'string' || typeof decimals !== 'number') return null
+  if (address !== undefined && (typeof address !== 'string' || !isHexString(address))) return null
+
+  return { symbol, decimals, ...(address === undefined ? {} : { address }) }
+}
+
 function toCreatePoolParams(value: JsonValue | undefined): CreatePoolParams | null {
   if (!isJsonObject(value)) return null
 
@@ -481,7 +512,9 @@ function toPendingTransaction(value: JsonValue): PendingTransaction | null {
   if (typeof chainId !== 'number' || typeof timestamp !== 'number') return null
   if (status !== 'submitted' && status !== 'confirmed' && status !== 'failed') return null
 
-  const base = { txHash, chainId, status, timestamp } as const
+  const parsedDenomination = toDenomination(value.denomination)
+
+  const base = { txHash, chainId, status, timestamp, ...(parsedDenomination ? { denomination: parsedDenomination } : {}) } as const
 
   if (type === 'CREATE_POOL') {
     const parsedParams = toCreatePoolParams(params)

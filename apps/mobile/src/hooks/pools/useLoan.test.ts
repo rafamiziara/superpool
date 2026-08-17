@@ -10,6 +10,7 @@ import {
 } from '../../__tests__/mocks'
 import { LendingPoolABI } from '../../constants/abis'
 import { pendingTransactionsStore } from '../../stores/PendingTransactionsStore'
+import { NATIVE } from '../../__tests__/fixtures/denomination'
 import {
   type BorrowParams,
   calculateRepayment,
@@ -40,6 +41,7 @@ function makeBorrowParams(overrides: Partial<BorrowParams> = {}): BorrowParams {
     poolId: 1,
     poolAddress: POOL_ADDRESS,
     poolName: 'Neighbourhood Fund',
+    denomination: NATIVE,
     amount: 5_000_000_000_000_000_000n,
     ...overrides,
   }
@@ -50,6 +52,7 @@ function makeRepayParams(overrides: Partial<RepayParams> = {}): RepayParams {
     poolId: 1,
     poolAddress: POOL_ADDRESS,
     poolName: 'Neighbourhood Fund',
+    denomination: NATIVE,
     loanId: 3,
     amount: 5_250_000_000_000_000_000n,
     ...overrides,
@@ -61,6 +64,7 @@ function makeDecisionParams(overrides: Partial<LoanDecisionParams> = {}): LoanDe
     poolId: 1,
     poolAddress: POOL_ADDRESS,
     poolName: 'Neighbourhood Fund',
+    denomination: NATIVE,
     loanId: 7,
     amount: 5_000_000_000_000_000_000n,
     ...overrides,

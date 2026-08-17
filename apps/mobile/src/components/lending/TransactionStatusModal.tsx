@@ -9,7 +9,8 @@ import {
   type PendingTransactionStatus,
   type PendingTransactionType,
 } from '../../stores/PendingTransactionsStore'
-import { bpsToPercent, formatDuration, formatToken, shortAddress } from '../../utils/format'
+import { recordedDenomination } from '../../utils/denomination'
+import { bpsToPercent, formatAmount, formatDuration, shortAddress } from '../../utils/format'
 import { chainName, transactionUrl } from '../../utils/explorer'
 
 /** Where a step is, which is all the row needs to render itself. */
@@ -277,6 +278,8 @@ interface DetailRow {
  * contribution or withdrawal by its amount and the pool it moved through.
  */
 function detailsFor(transaction: PendingTransaction): DetailRow[] {
+  const denomination = recordedDenomination(transaction)
+
   if (isLoanTransaction(transaction)) {
     const { params, result } = transaction
 
@@ -285,7 +288,7 @@ function detailsFor(transaction: PendingTransaction): DetailRow[] {
       // Only on the owner's decisions, where the request being acted on is
       // someone else's — see `LoanParams.borrower`.
       ...(params.borrower ? [{ label: 'Borrower', value: shortAddress(params.borrower), mono: true }] : []),
-      { label: 'Amount', value: `${formatToken(result?.amount ?? params.amount)} POL`, mono: true },
+      { label: 'Amount', value: formatAmount(result?.amount ?? params.amount, denomination), mono: true },
       // Absent while borrowing or requesting: the contract assigns the id, so it
       // only exists once the receipt is in hand.
       ...(result || params.loanId !== undefined ? [{ label: 'Loan ID', value: `#${result?.loanId ?? params.loanId}`, mono: true }] : []),
@@ -314,7 +317,7 @@ function detailsFor(transaction: PendingTransaction): DetailRow[] {
       // The chain's figure once confirmed, the submitted one before that. They
       // agree in practice; preferring the receipt keeps the display honest if
       // they ever do not.
-      { label: 'Amount', value: `${formatToken(result?.amount ?? params.amount)} POL`, mono: true },
+      { label: 'Amount', value: formatAmount(result?.amount ?? params.amount, denomination), mono: true },
     ]
   }
 
@@ -325,7 +328,7 @@ function detailsFor(transaction: PendingTransaction): DetailRow[] {
       { label: 'Pool', value: params.poolName },
       // Only known from the receipt: `claimInterest` takes no amount and pays
       // out everything owed, so before it confirms there is no figure to show.
-      ...(result ? [{ label: 'Amount', value: `${formatToken(result.amount)} POL`, mono: true }] : []),
+      ...(result ? [{ label: 'Amount', value: formatAmount(result.amount, denomination), mono: true }] : []),
     ]
   }
 
@@ -335,7 +338,7 @@ function detailsFor(transaction: PendingTransaction): DetailRow[] {
     { label: 'Pool', value: params.name },
     {
       label: 'Terms',
-      value: `${formatToken(params.maxLoanAmount)} POL · ${bpsToPercent(params.interestRate)} · ${formatDuration(params.loanDuration)}`,
+      value: `${formatAmount(params.maxLoanAmount, denomination)} · ${bpsToPercent(params.interestRate)} · ${formatDuration(params.loanDuration)}`,
       mono: true,
     },
     ...(result ? [{ label: 'Pool ID', value: `#${result.poolId}`, mono: true }] : []),

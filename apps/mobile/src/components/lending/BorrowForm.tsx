@@ -1,29 +1,33 @@
 import React, { useMemo, useState } from 'react'
 import { Pressable, Text, TextInput, View } from 'react-native'
-import { parseEther } from 'viem'
 import { z } from 'zod'
 import { calculateRepayment } from '../../hooks/pools/useLoan'
-import { bpsToPercent, formatDuration, formatToken } from '../../utils/format'
+import type { Denomination } from '../../utils/denomination'
+import { amountPattern, bpsToPercent, formatAmount, formatDuration, formatToken, parseToken } from '../../utils/format'
 
 /**
  * Parses what the user typed into the amount `createLoan` takes.
  *
- * Same translation as the contribute form — people think in POL, the contract
- * takes wei — and `validateBorrowParams` re-checks the converted value against
- * the pool's own limits before anything is sent.
+ * Same translation as the contribute form — people think in whole units, the
+ * contract takes the smallest one — and `validateBorrowParams` re-checks the
+ * converted value against the pool's own limits before anything is sent.
  */
-export const borrowFormSchema = z.object({
-  amount: z
-    .string()
-    .trim()
-    .min(1, 'Enter an amount')
-    .refine((value) => /^\d+(\.\d{1,18})?$/.test(value), 'Enter an amount in POL, with at most 18 decimals')
-    .transform((value) => parseEther(value))
-    .refine((value) => value > 0n, 'Enter an amount greater than zero'),
-})
+export function borrowFormSchema({ symbol, decimals }: Denomination) {
+  return z.object({
+    amount: z
+      .string()
+      .trim()
+      .min(1, 'Enter an amount')
+      .refine((value) => amountPattern(decimals).test(value), `Enter an amount in ${symbol}, with at most ${decimals} decimals`)
+      .transform((value) => parseToken(value, decimals))
+      .refine((value) => value > 0n, 'Enter an amount greater than zero'),
+  })
+}
 
 export interface BorrowFormProps {
   poolName: string
+  /** What the pool lends, and therefore what is borrowed and repaid. */
+  denomination: Denomination
   /** The pool's per-loan cap, in wei. */
   maxLoanAmount: bigint
   /** Basis points: 500 = 5%. Fixed at the moment the loan is created. */
@@ -66,6 +70,7 @@ export interface BorrowFormProps {
  */
 export function BorrowForm({
   poolName,
+  denomination,
   maxLoanAmount,
   interestRate,
   loanDuration,
@@ -78,7 +83,8 @@ export function BorrowForm({
   const [amount, setAmount] = useState('')
   const [touched, setTouched] = useState(false)
 
-  const parsed = useMemo(() => borrowFormSchema.safeParse({ amount }), [amount])
+  const schema = useMemo(() => borrowFormSchema(denomination), [denomination])
+  const parsed = useMemo(() => schema.safeParse({ amount }), [schema, amount])
 
   const fieldError = useMemo(() => {
     if (parsed.success) return undefined
@@ -111,11 +117,11 @@ export function BorrowForm({
           {poolName}
         </Text>
         <Text className="mt-1 text-xs text-fog" testID="borrow-terms">
-          Up to {formatToken(maxLoanAmount)} POL · {bpsToPercent(interestRate)} · {formatDuration(loanDuration)}
+          Up to {formatAmount(maxLoanAmount, denomination)} · {bpsToPercent(interestRate)} · {formatDuration(loanDuration)}
         </Text>
         {available !== undefined && (
           <Text className="mt-1 text-xs text-fog" testID="borrow-available">
-            {formatToken(available)} POL available right now
+            {formatAmount(available, denomination)} available right now
           </Text>
         )}
       </View>
@@ -146,14 +152,15 @@ export function BorrowForm({
             {fieldError}
           </Text>
         ) : (
-          <Text className="text-xs text-mist">In POL</Text>
+          <Text className="text-xs text-mist">In {denomination.symbol}</Text>
         )}
       </View>
 
       {repayment !== null && !exceedsMax && !exceedsAvailable && (
         <View className="rounded-2xl border-continuous border-hairline border-veil bg-raised px-4 py-3" testID="borrow-repayment">
           <Text className="text-sm text-fog">
-            You will repay <Text className="font-mono font-bold text-snow">{formatToken(repayment)}</Text> POL if you take the full term.
+            You will repay <Text className="font-mono font-bold text-snow">{formatToken(repayment, denomination.decimals)}</Text>{' '}
+            {denomination.symbol} if you take the full term.
           </Text>
           <Text className="mt-1 text-xs text-mist">
             {requiresApproval
@@ -165,7 +172,7 @@ export function BorrowForm({
 
       {exceedsMax && (
         <View className="rounded-2xl border-continuous border-hairline border-coral bg-coral-deep px-4 py-3" testID="borrow-exceeds-max">
-          <Text className="text-sm text-coral">This pool lends at most {formatToken(maxLoanAmount)} POL at once.</Text>
+          <Text className="text-sm text-coral">This pool lends at most {formatAmount(maxLoanAmount, denomination)} at once.</Text>
         </View>
       )}
 
@@ -175,7 +182,7 @@ export function BorrowForm({
           testID="borrow-exceeds-available"
         >
           <Text className="text-sm text-coral">
-            The pool only has {formatToken(available ?? 0n)} POL available right now. It grows as members contribute or repay.
+            The pool only has {formatAmount(available ?? 0n, denomination)} available right now. It grows as members contribute or repay.
           </Text>
         </View>
       )}

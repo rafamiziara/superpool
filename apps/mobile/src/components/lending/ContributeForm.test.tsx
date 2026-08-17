@@ -1,13 +1,14 @@
 import React from 'react'
 import { parseEther } from 'viem'
 import { fireEvent, render } from '../../__tests__/test-utils'
+import { NATIVE } from '../../__tests__/fixtures/denomination'
 import { ContributeForm } from './ContributeForm'
 
 const POOL_NAME = 'Neighbourhood Fund'
 
 function renderForm(props: Partial<React.ComponentProps<typeof ContributeForm>> = {}) {
   const onSubmit = jest.fn()
-  const utils = render(<ContributeForm poolName={POOL_NAME} onSubmit={onSubmit} {...props} />)
+  const utils = render(<ContributeForm poolName={POOL_NAME} denomination={NATIVE} onSubmit={onSubmit} {...props} />)
 
   return { ...utils, onSubmit }
 }
@@ -86,7 +87,7 @@ describe('ContributeForm', () => {
   it('shows the existing position when there is one', () => {
     const { getByTestId } = renderForm({ currentPosition: parseEther('12') })
 
-    expect(getByTestId('contribute-current-position').props.children).toContain('12')
+    expect(getByTestId('contribute-current-position').props.children).toContain('12 POL')
   })
 
   it('omits the position line for a first contribution', () => {

@@ -57,6 +57,7 @@ const STORAGE_KEY = '@superpool/pending_transactions'
 const FACTORY_ADDRESS = '0x5FbDB2315678afecb367f032d93F642f64180aa3'
 const POOL_ADDRESS = '0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0'
 const POOL_OWNER = '0x70997970C51812dc3A010C7d01b50e0d17dc79C8'
+const USDC_ADDRESS = '0x3c499c542cef5e3811e1192ce70d8cc03d5c3359'
 
 /** A claim's params: a pool and nothing else, since the amount is not known yet. */
 const CLAIM_PARAMS = { poolId: 1, poolAddress: POOL_ADDRESS, poolName: 'Neighbourhood Fund' }
@@ -290,6 +291,37 @@ describe('PendingTransactionsStore', () => {
       await store.loadFromStorage()
 
       expect(store.transactions[0].result).toEqual({ poolId: 7, poolAddress: POOL_ADDRESS })
+    })
+
+    it('restores the denomination the record was written with', async () => {
+      const usdc = makePendingTransaction({ denomination: { symbol: 'USDC', decimals: 6, address: USDC_ADDRESS } })
+      await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify([usdc]))
+
+      await store.loadFromStorage()
+
+      expect(store.transactions[0].denomination).toEqual({ symbol: 'USDC', decimals: 6, address: USDC_ADDRESS })
+    })
+
+    it('leaves a record written before denominations existed without one', async () => {
+      // Nothing but a native pool could have written such a record, which is
+      // what lets `recordedDenomination` read the absence as native rather than
+      // as unknown.
+      await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify([makePendingTransaction()]))
+
+      await store.loadFromStorage()
+
+      expect(store.transactions[0].denomination).toBeUndefined()
+    })
+
+    it('drops a malformed denomination rather than restoring half of it', async () => {
+      // A guessed exponent is worse than a missing one: the fallback is native,
+      // which is at least what every record without the field really was.
+      const broken = makePendingTransaction({ denomination: { symbol: 'USDC' } as never })
+      await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify([broken]))
+
+      await store.loadFromStorage()
+
+      expect(store.transactions[0].denomination).toBeUndefined()
     })
 
     it('starts empty when nothing is stored', async () => {

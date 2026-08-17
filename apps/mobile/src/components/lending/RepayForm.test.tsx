@@ -1,6 +1,7 @@
 import { fireEvent, render, screen } from '@testing-library/react-native'
 import React from 'react'
 import { parseEther } from 'viem'
+import { NATIVE } from '../../__tests__/fixtures/denomination'
 import { RepayForm } from './RepayForm'
 
 /** 4 POL borrowed, 0.2 POL of interest accrued against it so far. */
@@ -17,6 +18,7 @@ function renderForm(props: Partial<React.ComponentProps<typeof RepayForm>> = {})
   render(
     <RepayForm
       poolName="Neighbourhood Fund"
+      denomination={NATIVE}
       loanId={3}
       borrowed={BORROWED}
       principal={PRINCIPAL}

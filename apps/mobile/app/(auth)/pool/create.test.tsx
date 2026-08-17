@@ -129,6 +129,8 @@ describe('CreatePoolScreen', () => {
       await submitForm()
 
       expect(mockCreatePool).toHaveBeenCalledWith({
+        // The chain's own coin — the form offers no other choice yet.
+        denomination: { symbol: 'POL', decimals: 18 },
         name: 'Neighbourhood Fund',
         description: 'Micro-loans for the block',
         maxLoanAmount: 100_000_000_000_000_000_000n,

@@ -7,13 +7,15 @@ import React, { useState } from 'react'
 import { ActivityIndicator, Pressable, RefreshControl, ScrollView, Text, View } from 'react-native'
 import { useReadContract } from 'wagmi'
 import { LoanRequestCard } from '../../../src/components/lending/LoanRequestCard'
+import { UnsupportedPoolNotice } from '../../../src/components/lending/UnsupportedPoolNotice'
 import { LendingPoolABI } from '../../../src/constants/abis'
 import { palette } from '../../../src/constants/palette'
 import { useLoan } from '../../../src/hooks/pools/useLoan'
 import { usePoolIndexing } from '../../../src/hooks/pools/usePoolIndexing'
 import { useTransactionMonitoring } from '../../../src/hooks/pools/useTransactionMonitoring'
 import { poolStore } from '../../../src/stores/PoolStore'
-import { formatToken, sameAddress } from '../../../src/utils/format'
+import { denominationFor } from '../../../src/utils/denomination'
+import { formatAmount, sameAddress } from '../../../src/utils/format'
 
 /** Where a decision is. One at a time, so the whole list locks while it runs. */
 type Stage = 'idle' | 'submitting' | 'confirming' | 'indexing'
@@ -46,6 +48,7 @@ function ApprovalsScreen() {
   const [failure, setFailure] = useState<string | null>(null)
 
   const pool = poolStore.poolById(Number(poolId))
+  const denomination = pool ? denominationFor(pool) : undefined
   const requests = pool ? poolStore.pendingLoansFor(pool.poolId) : []
 
   // What the pool can actually pay today. `approveLoan` checks liquidity at
@@ -68,7 +71,7 @@ function ApprovalsScreen() {
    * would take it off the list.
    */
   const decide = async (request: LoanInfo, decision: 'approve' | 'reject') => {
-    if (!pool || isBusy) return
+    if (!pool || !denomination || isBusy) return
 
     setFailure(null)
     reset()
@@ -82,6 +85,7 @@ function ApprovalsScreen() {
         poolId: pool.poolId,
         poolAddress: pool.poolAddress as `0x${string}`,
         poolName: pool.name,
+        denomination,
         loanId: request.loanId,
         amount: BigInt(request.amount),
         // Named because the sender is the owner: without it every card in this
@@ -154,6 +158,16 @@ function ApprovalsScreen() {
     )
   }
 
+  // Before the queue: every decision on it is a decision about an amount.
+  if (!denomination) {
+    return (
+      <>
+        <Stack.Screen options={{ title: 'Loan requests' }} />
+        <UnsupportedPoolNotice />
+      </>
+    )
+  }
+
   // Someone who is not the owner cannot decide anything: `approveLoan` and
   // `rejectLoan` are `onlyOwner`, so showing the queue would be an invitation to
   // a transaction that reverts. Compared case-insensitively — a strict compare
@@ -200,7 +214,7 @@ function ApprovalsScreen() {
           </Text>
           {typeof available === 'bigint' && (
             <Text className="mt-2 text-xs text-mist" testID="approvals-available">
-              {formatToken(available)} POL available to lend right now
+              {formatAmount(available, denomination)} available to lend right now
             </Text>
           )}
         </View>
@@ -239,6 +253,7 @@ function ApprovalsScreen() {
             <LoanRequestCard
               key={request.id}
               request={request}
+              denomination={denomination}
               // Read here rather than inside the card so the card stays a
               // presentational component; the store is the only thing that
               // knows this borrower's loans in other pools.

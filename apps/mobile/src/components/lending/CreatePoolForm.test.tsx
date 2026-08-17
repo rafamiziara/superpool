@@ -2,6 +2,7 @@ import { fireEvent, render, screen } from '@testing-library/react-native'
 import React from 'react'
 import { parseEther } from 'viem'
 import { CreatePoolForm, createPoolFormSchema } from './CreatePoolForm'
+import { NATIVE } from '../../__tests__/fixtures/denomination'
 
 /** Fills every field with values that parse, so tests can vary one at a time. */
 function fillValidForm(overrides: Partial<Record<string, string>> = {}) {
@@ -29,7 +30,7 @@ describe('createPoolFormSchema', () => {
   }
 
   it('converts the units the user types into the units the contract takes', () => {
-    const parsed = createPoolFormSchema.parse(validInput)
+    const parsed = createPoolFormSchema(NATIVE).parse(validInput)
 
     expect(parsed).toEqual({
       name: 'Neighbourhood Fund',
@@ -41,23 +42,23 @@ describe('createPoolFormSchema', () => {
   })
 
   it('keeps sub-percent rates exact in basis points', () => {
-    expect(createPoolFormSchema.parse({ ...validInput, interestRate: '7.25' }).interestRate).toBe(725)
+    expect(createPoolFormSchema(NATIVE).parse({ ...validInput, interestRate: '7.25' }).interestRate).toBe(725)
   })
 
   it('accepts a fractional amount', () => {
-    expect(createPoolFormSchema.parse({ ...validInput, maxLoanAmount: '0.5' }).maxLoanAmount).toBe(parseEther('0.5'))
+    expect(createPoolFormSchema(NATIVE).parse({ ...validInput, maxLoanAmount: '0.5' }).maxLoanAmount).toBe(parseEther('0.5'))
   })
 
   it('trims surrounding whitespace from the name', () => {
-    expect(createPoolFormSchema.parse({ ...validInput, name: '  Fund  ' }).name).toBe('Fund')
+    expect(createPoolFormSchema(NATIVE).parse({ ...validInput, name: '  Fund  ' }).name).toBe('Fund')
   })
 
   it('accepts an empty description', () => {
-    expect(createPoolFormSchema.parse({ ...validInput, description: '' }).description).toBe('')
+    expect(createPoolFormSchema(NATIVE).parse({ ...validInput, description: '' }).description).toBe('')
   })
 
   it('allows the contract ceiling of exactly 100%', () => {
-    expect(createPoolFormSchema.parse({ ...validInput, interestRate: '100' }).interestRate).toBe(10_000)
+    expect(createPoolFormSchema(NATIVE).parse({ ...validInput, interestRate: '100' }).interestRate).toBe(10_000)
   })
 
   it.each([
@@ -77,7 +78,7 @@ describe('createPoolFormSchema', () => {
     ['a fractional duration', { loanDuration: '1.5' }, 'Enter a whole number of days'],
     ['a zero duration', { loanDuration: '0' }, 'Loan duration must be at least one day'],
   ])('rejects %s', (_label, overrides, expected) => {
-    const result = createPoolFormSchema.safeParse({ ...validInput, ...overrides })
+    const result = createPoolFormSchema(NATIVE).safeParse({ ...validInput, ...overrides })
 
     expect(result.success).toBe(false)
     expect(result.error?.issues[0].message).toBe(expected)
@@ -92,7 +93,7 @@ describe('CreatePoolForm', () => {
   })
 
   it('renders every field', () => {
-    render(<CreatePoolForm onSubmit={onSubmit} />)
+    render(<CreatePoolForm denomination={NATIVE} onSubmit={onSubmit} />)
 
     expect(screen.getByTestId('create-pool-name')).toBeTruthy()
     expect(screen.getByTestId('create-pool-description')).toBeTruthy()
@@ -102,18 +103,19 @@ describe('CreatePoolForm', () => {
   })
 
   it('starts with submission disabled', () => {
-    render(<CreatePoolForm onSubmit={onSubmit} />)
+    render(<CreatePoolForm denomination={NATIVE} onSubmit={onSubmit} />)
 
     expect(screen.getByTestId('create-pool-submit').props.accessibilityState.disabled).toBe(true)
   })
 
   it('submits the converted parameters once every field parses', () => {
-    render(<CreatePoolForm onSubmit={onSubmit} />)
+    render(<CreatePoolForm denomination={NATIVE} onSubmit={onSubmit} />)
 
     fillValidForm()
     fireEvent.press(screen.getByTestId('create-pool-submit'))
 
     expect(onSubmit).toHaveBeenCalledWith({
+      denomination: NATIVE,
       name: 'Neighbourhood Fund',
       description: 'Micro-loans for the block',
       maxLoanAmount: parseEther('100'),
@@ -126,7 +128,7 @@ describe('CreatePoolForm', () => {
   })
 
   it('submits an open pool when the switch is turned off', () => {
-    render(<CreatePoolForm onSubmit={onSubmit} />)
+    render(<CreatePoolForm denomination={NATIVE} onSubmit={onSubmit} />)
 
     fillValidForm()
     fireEvent.press(screen.getByTestId('create-pool-private'))
@@ -136,7 +138,7 @@ describe('CreatePoolForm', () => {
   })
 
   it('enables submission without a description', () => {
-    render(<CreatePoolForm onSubmit={onSubmit} />)
+    render(<CreatePoolForm denomination={NATIVE} onSubmit={onSubmit} />)
 
     fillValidForm({ 'create-pool-description': '' })
 
@@ -144,7 +146,7 @@ describe('CreatePoolForm', () => {
   })
 
   it('does not submit while a field is invalid', () => {
-    render(<CreatePoolForm onSubmit={onSubmit} />)
+    render(<CreatePoolForm denomination={NATIVE} onSubmit={onSubmit} />)
 
     fillValidForm({ 'create-pool-interest-rate': '150' })
     fireEvent.press(screen.getByTestId('create-pool-submit'))
@@ -155,7 +157,7 @@ describe('CreatePoolForm', () => {
 
   describe('inline errors', () => {
     it('stays quiet while a field is still being typed in', () => {
-      render(<CreatePoolForm onSubmit={onSubmit} />)
+      render(<CreatePoolForm denomination={NATIVE} onSubmit={onSubmit} />)
 
       fireEvent.changeText(screen.getByTestId('create-pool-max-loan'), 'ten')
 
@@ -163,7 +165,7 @@ describe('CreatePoolForm', () => {
     })
 
     it('shows the message once the field is left', () => {
-      render(<CreatePoolForm onSubmit={onSubmit} />)
+      render(<CreatePoolForm denomination={NATIVE} onSubmit={onSubmit} />)
 
       fireEvent.changeText(screen.getByTestId('create-pool-max-loan'), 'ten')
       fireEvent(screen.getByTestId('create-pool-max-loan'), 'blur')
@@ -172,7 +174,7 @@ describe('CreatePoolForm', () => {
     })
 
     it('clears the message once the field is corrected', () => {
-      render(<CreatePoolForm onSubmit={onSubmit} />)
+      render(<CreatePoolForm denomination={NATIVE} onSubmit={onSubmit} />)
 
       fireEvent.changeText(screen.getByTestId('create-pool-interest-rate'), '500')
       fireEvent(screen.getByTestId('create-pool-interest-rate'), 'blur')
@@ -184,7 +186,7 @@ describe('CreatePoolForm', () => {
     })
 
     it('reports each invalid field independently', () => {
-      render(<CreatePoolForm onSubmit={onSubmit} />)
+      render(<CreatePoolForm denomination={NATIVE} onSubmit={onSubmit} />)
 
       fireEvent(screen.getByTestId('create-pool-name'), 'blur')
       fireEvent(screen.getByTestId('create-pool-loan-duration'), 'blur')
@@ -197,7 +199,7 @@ describe('CreatePoolForm', () => {
 
   describe('flow state', () => {
     it('blocks submission and relabels the button while submitting', () => {
-      render(<CreatePoolForm onSubmit={onSubmit} isSubmitting />)
+      render(<CreatePoolForm denomination={NATIVE} onSubmit={onSubmit} isSubmitting />)
 
       fillValidForm()
       fireEvent.press(screen.getByTestId('create-pool-submit'))
@@ -207,25 +209,25 @@ describe('CreatePoolForm', () => {
     })
 
     it('shows the flow error', () => {
-      render(<CreatePoolForm onSubmit={onSubmit} error="Transaction cancelled" />)
+      render(<CreatePoolForm denomination={NATIVE} onSubmit={onSubmit} error="Transaction cancelled" />)
 
       expect(screen.getByTestId('create-pool-error')).toHaveTextContent('Transaction cancelled')
     })
 
     it('shows a gas estimate when the screen supplies one', () => {
-      render(<CreatePoolForm onSubmit={onSubmit} gasEstimate="0.0021 POL" />)
+      render(<CreatePoolForm denomination={NATIVE} onSubmit={onSubmit} gasEstimate="0.0021 POL" />)
 
       expect(screen.getByTestId('create-pool-gas-estimate')).toHaveTextContent('0.0021 POL')
     })
 
     it('omits the fee row when there is no estimate', () => {
-      render(<CreatePoolForm onSubmit={onSubmit} />)
+      render(<CreatePoolForm denomination={NATIVE} onSubmit={onSubmit} />)
 
       expect(screen.queryByTestId('create-pool-gas-estimate')).toBeNull()
     })
 
     it('honours a custom submit label', () => {
-      render(<CreatePoolForm onSubmit={onSubmit} submitLabel="Launch pool" />)
+      render(<CreatePoolForm denomination={NATIVE} onSubmit={onSubmit} submitLabel="Launch pool" />)
 
       expect(screen.getByText('Launch pool')).toBeTruthy()
     })

@@ -4,6 +4,7 @@ import { type Address, parseEther } from 'viem'
 import { mockWagmiUseAccount, mockWagmiUseReadContract } from '../../__tests__/mocks'
 import { poolStore } from '../../stores/PoolStore'
 import { ClaimInterestCard } from './ClaimInterestCard'
+import { NATIVE } from '../../__tests__/fixtures/denomination'
 
 const WALLET_ADDRESS = '0x70997970C51812dc3A010C7d01b50e0d17dc79C8'
 const POOL_ADDRESS = '0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0'
@@ -51,7 +52,7 @@ function chainReads(claimable: bigint | undefined) {
 }
 
 function renderCard() {
-  return render(<ClaimInterestCard poolId={1} poolAddress={POOL_ADDRESS} poolName="Neighbourhood Fund" />)
+  return render(<ClaimInterestCard denomination={NATIVE} poolId={1} poolAddress={POOL_ADDRESS} poolName="Neighbourhood Fund" />)
 }
 
 /** Presses claim and flushes the async flow. */
@@ -151,6 +152,7 @@ describe('ClaimInterestCard', () => {
         poolId: 1,
         poolAddress: POOL_ADDRESS,
         poolName: 'Neighbourhood Fund',
+        denomination: NATIVE,
       })
     })
 

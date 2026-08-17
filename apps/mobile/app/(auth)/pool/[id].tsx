@@ -20,7 +20,8 @@ import {
   pendingTransactionsStore,
 } from '../../../src/stores/PendingTransactionsStore'
 import { poolStore } from '../../../src/stores/PoolStore'
-import { bpsToPercent, formatDuration, formatToken, sameAddress, shortAddress } from '../../../src/utils/format'
+import { denominationFor } from '../../../src/utils/denomination'
+import { bpsToPercent, formatAmount, formatDuration, sameAddress, shortAddress } from '../../../src/utils/format'
 
 /**
  * This pool's deposits that are not yet reflected in its liquidity, newest first.
@@ -133,6 +134,13 @@ function membershipNoticeFor(requiresMembership: boolean, status: MemberStatus |
 function PoolDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>()
   const pool = poolStore.poolById(Number(id))
+  /**
+   * Absent for a pool denominated in a token the backend could not read. Not a
+   * reason to refuse the whole screen, unlike the forms: a pool's name, members
+   * and description are all still true, and `formatAmount` renders the figures
+   * as dashes rather than as guesses. The actions lead to screens that do refuse.
+   */
+  const denomination = pool ? denominationFor(pool) : undefined
   const membership = pool ? poolStore.membershipFor(pool.poolId) : undefined
   const outstandingLoan = pool ? poolStore.activeLoanFor(pool.poolId) : undefined
   /** Every member's request awaiting a decision — the owner's queue, not the user's. */
@@ -206,8 +214,8 @@ function PoolDetailScreen() {
   const canBorrow = isActiveMember || Boolean(outstandingLoan) || Boolean(myRequest)
 
   const stats = [
-    { label: 'Liquidity', value: `${formatToken(poolStore.poolLiquidity(pool.poolId))} POL` },
-    { label: 'Max loan', value: `${formatToken(pool.maxLoanAmount)} POL` },
+    { label: 'Liquidity', value: formatAmount(poolStore.poolLiquidity(pool.poolId), denomination) },
+    { label: 'Max loan', value: formatAmount(pool.maxLoanAmount, denomination) },
     { label: 'Interest', value: bpsToPercent(pool.interestRate) },
     { label: 'Term', value: formatDuration(pool.loanDuration) },
   ]
@@ -286,11 +294,15 @@ function PoolDetailScreen() {
               <View className="mt-4 flex-row justify-between">
                 <View>
                   <Text className="text-xs text-fog">Balance</Text>
-                  <Text className="mt-1 font-mono text-lg font-bold text-snow">{formatToken(membership.currentBalance)} POL</Text>
+                  <Text className="mt-1 font-mono text-lg font-bold text-snow">
+                    {formatAmount(membership.currentBalance, denomination)}
+                  </Text>
                 </View>
                 <View className="items-end">
                   <Text className="text-xs text-fog">Contributed</Text>
-                  <Text className="mt-1 font-mono text-lg font-bold text-snow">{formatToken(membership.totalContributed)} POL</Text>
+                  <Text className="mt-1 font-mono text-lg font-bold text-snow">
+                    {formatAmount(membership.totalContributed, denomination)}
+                  </Text>
                 </View>
               </View>
             </View>
@@ -307,9 +319,14 @@ function PoolDetailScreen() {
           the contract is not: interest earned while your money was in the pool
           stays yours after you leave or are removed.
         */}
-        {membership && (
+        {membership && denomination && (
           <View className="mt-4 px-6">
-            <ClaimInterestCard poolId={pool.poolId} poolAddress={pool.poolAddress as `0x${string}`} poolName={pool.name} />
+            <ClaimInterestCard
+              poolId={pool.poolId}
+              poolAddress={pool.poolAddress as `0x${string}`}
+              poolName={pool.name}
+              denomination={denomination}
+            />
           </View>
         )}
 
@@ -401,7 +418,7 @@ function PoolDetailScreen() {
             <Text className="text-lg font-bold text-snow">Pool activity</Text>
             <View className="mt-4 rounded-3xl border-continuous border-hairline border-veil bg-surface py-1">
               {transactions.map((tx) => (
-                <ActivityRow key={tx.id} tx={tx} />
+                <ActivityRow key={tx.id} tx={tx} denomination={denomination} />
               ))}
             </View>
           </View>

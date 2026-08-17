@@ -1,6 +1,7 @@
 import type { Transaction } from '@superpool/types'
 import { TransactionStatus, TransactionType } from '@superpool/types'
 import React from 'react'
+import { NATIVE } from '../../__tests__/fixtures/denomination'
 import { render } from '../../__tests__/test-utils'
 import { ActivityRow } from './ActivityRow'
 
@@ -37,7 +38,7 @@ describe('ActivityRow signs', () => {
     [TransactionType.CONTRIBUTION, '+'],
     [TransactionType.LOAN_REPAYMENT, '+'],
   ])('marks %s as money arriving', (type, sign) => {
-    const { getByText } = render(<ActivityRow tx={makeTx({ type })} />)
+    const { getByText } = render(<ActivityRow denomination={NATIVE} tx={makeTx({ type })} />)
 
     expect(getByText(`${sign}3 POL`)).toBeTruthy()
   })
@@ -46,20 +47,22 @@ describe('ActivityRow signs', () => {
     [TransactionType.WITHDRAWAL, '−'],
     [TransactionType.LOAN_DISBURSEMENT, '−'],
   ])('marks %s as money leaving', (type, sign) => {
-    const { getByText } = render(<ActivityRow tx={makeTx({ type })} />)
+    const { getByText } = render(<ActivityRow denomination={NATIVE} tx={makeTx({ type })} />)
 
     expect(getByText(`${sign}3 POL`)).toBeTruthy()
   })
 
   it('gives a request no sign, because nothing has moved', () => {
-    const { getByText } = render(<ActivityRow tx={makeTx({ type: TransactionType.LOAN_REQUEST })} />)
+    const { getByText } = render(<ActivityRow denomination={NATIVE} tx={makeTx({ type: TransactionType.LOAN_REQUEST })} />)
 
     expect(getByText('3 POL')).toBeTruthy()
   })
 
   it('does not describe a disbursement as received', () => {
     // Received by whom, on a feed of other people's loans.
-    const { getByText, queryByText } = render(<ActivityRow tx={makeTx({ type: TransactionType.LOAN_DISBURSEMENT })} />)
+    const { getByText, queryByText } = render(
+      <ActivityRow denomination={NATIVE} tx={makeTx({ type: TransactionType.LOAN_DISBURSEMENT })} />
+    )
 
     expect(getByText('Loan disbursed')).toBeTruthy()
     expect(queryByText('Loan received')).toBeNull()
@@ -68,21 +71,21 @@ describe('ActivityRow signs', () => {
   it('reads a contribution and a withdrawal as opposites', () => {
     // The regression: both once carried the wallet's sign, so a pool feed
     // showed deposits as losses and withdrawals as gains.
-    const deposit = render(<ActivityRow tx={makeTx({ type: TransactionType.CONTRIBUTION })} />)
-    const withdrawal = render(<ActivityRow tx={makeTx({ type: TransactionType.WITHDRAWAL })} />)
+    const deposit = render(<ActivityRow denomination={NATIVE} tx={makeTx({ type: TransactionType.CONTRIBUTION })} />)
+    const withdrawal = render(<ActivityRow denomination={NATIVE} tx={makeTx({ type: TransactionType.WITHDRAWAL })} />)
 
     expect(deposit.getByText('+3 POL')).toBeTruthy()
     expect(withdrawal.getByText('−3 POL')).toBeTruthy()
   })
 
   it('omits the amount entirely when there is none', () => {
-    const { queryByText } = render(<ActivityRow tx={makeTx({ type: TransactionType.POOL_CREATION, amount: 0n })} />)
+    const { queryByText } = render(<ActivityRow denomination={NATIVE} tx={makeTx({ type: TransactionType.POOL_CREATION, amount: 0n })} />)
 
     expect(queryByText(/POL/)).toBeNull()
   })
 
   it('flags a transaction the chain has not confirmed', () => {
-    const { getByText } = render(<ActivityRow tx={makeTx({ status: TransactionStatus.PENDING })} />)
+    const { getByText } = render(<ActivityRow denomination={NATIVE} tx={makeTx({ status: TransactionStatus.PENDING })} />)
 
     expect(getByText('Pending')).toBeTruthy()
   })
@@ -91,14 +94,18 @@ describe('ActivityRow signs', () => {
     // Only correct on a feed already narrowed to one wallet. The same event is a
     // gain under one perspective and a loss under the other.
     it('reads a contribution as money the member sent', () => {
-      const { getByText } = render(<ActivityRow tx={makeTx({ type: TransactionType.CONTRIBUTION })} perspective="wallet" />)
+      const { getByText } = render(
+        <ActivityRow denomination={NATIVE} tx={makeTx({ type: TransactionType.CONTRIBUTION })} perspective="wallet" />
+      )
 
       expect(getByText('−3 POL')).toBeTruthy()
     })
 
     it('reads a disbursed loan as money the member received', () => {
       // The reason the prop exists: the pool's sign would mark this negative.
-      const { getByText } = render(<ActivityRow tx={makeTx({ type: TransactionType.LOAN_DISBURSEMENT })} perspective="wallet" />)
+      const { getByText } = render(
+        <ActivityRow denomination={NATIVE} tx={makeTx({ type: TransactionType.LOAN_DISBURSEMENT })} perspective="wallet" />
+      )
 
       expect(getByText('+3 POL')).toBeTruthy()
       expect(getByText('Loan received')).toBeTruthy()
@@ -106,10 +113,10 @@ describe('ActivityRow signs', () => {
 
     it('mirrors the pool exactly', () => {
       for (const type of [TransactionType.CONTRIBUTION, TransactionType.WITHDRAWAL, TransactionType.LOAN_DISBURSEMENT]) {
-        const asPool = render(<ActivityRow tx={makeTx({ type })} />)
+        const asPool = render(<ActivityRow denomination={NATIVE} tx={makeTx({ type })} />)
           .getByText(/POL/)
           .props.children.join('')
-        const asWallet = render(<ActivityRow tx={makeTx({ type })} perspective="wallet" />)
+        const asWallet = render(<ActivityRow denomination={NATIVE} tx={makeTx({ type })} perspective="wallet" />)
           .getByText(/POL/)
           .props.children.join('')
 
@@ -118,14 +125,16 @@ describe('ActivityRow signs', () => {
     })
 
     it('leaves a request unsigned either way', () => {
-      const { getByText } = render(<ActivityRow tx={makeTx({ type: TransactionType.LOAN_REQUEST })} perspective="wallet" />)
+      const { getByText } = render(
+        <ActivityRow denomination={NATIVE} tx={makeTx({ type: TransactionType.LOAN_REQUEST })} perspective="wallet" />
+      )
 
       expect(getByText('3 POL')).toBeTruthy()
     })
   })
 
   it('names the pool when given one', () => {
-    const { getByText } = render(<ActivityRow tx={makeTx()} poolName="Neighbourhood Circle" />)
+    const { getByText } = render(<ActivityRow denomination={NATIVE} tx={makeTx()} poolName="Neighbourhood Circle" />)
 
     expect(getByText(/Neighbourhood Circle/)).toBeTruthy()
   })
