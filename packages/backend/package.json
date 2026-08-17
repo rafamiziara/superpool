@@ -16,6 +16,7 @@
     "testInterest": "ts-node scripts/testInterestClaims.ts",
     "testHistory": "ts-node scripts/testBorrowerHistory.ts",
     "testPartial": "ts-node scripts/testPartialRepayment.ts",
+    "testAccrual": "ts-node scripts/testAccruedInterest.ts",
     "test": "jest",
     "format": "prettier --write . --ignore-path ../../.prettierignore",
     "type-check": "tsc --noEmit",

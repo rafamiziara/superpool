@@ -1,17 +1,19 @@
 /**
  * Manual integration test for paying a loan down in instalments.
  *
- * Drives real loans through a live local Hardhat node: one settled in four
- * uneven payments, one settled in a single payment, one left part-paid. Then
- * indexes them and checks the three things that only exist together on a real
- * chain — the loan's running `amountRepaid`, one `loan_repayments` document per
- * instalment, and the interest actually credited to lenders.
+ * Drives real loans through a live local Hardhat node: one settled in several
+ * uneven payments, one left part-paid. Then indexes them and checks what only
+ * exists together on a real chain — the loan's running `amountRepaid`, one
+ * `loan_repayments` document per instalment, and the sweep picking up a payment
+ * the app never reported.
  *
  * The unit suites mock ethers entirely, so this is the only place the shipped
- * ABI, the contract's pro-rata interest split and the document shapes are
- * exercised at once. The arithmetic check that matters most is the last one:
- * four instalments must credit lenders exactly what one payment would, and no
- * test with a single repayment can see it.
+ * ABI and the document shapes are exercised together. What it is *about* is the
+ * records — one `loan_repayments` document per instalment, each with its own
+ * date and transaction — and it deliberately reads the debt from the chain
+ * before every payment rather than assuming a total. Interest accrues per
+ * second, so there is no fixed sum to divide up; the accrual arithmetic itself
+ * is checked by `testAccruedInterest.ts`.
  *
  * Prerequisites:
  *   Terminal 1 → cd packages/contracts && pnpm node:local
@@ -182,6 +184,23 @@ async function borrow(provider: JsonRpcProvider, pool: PoolHandle, borrower: Wal
   }
 }
 
+/**
+ * What a loan owes right now, and what it would owe an hour from now.
+ *
+ * Both come from the chain on every call. Nothing here caches a debt: interest
+ * accrues per second, so a figure read once and reused is wrong by the time it
+ * is used — which is the trap the app's settlement buffer exists to cover.
+ */
+async function owed(pool: PoolHandle, loanId: number): Promise<bigint> {
+  return pool.contract.outstandingBalance(loanId)
+}
+
+async function settlementQuote(provider: JsonRpcProvider, pool: PoolHandle, loanId: number): Promise<bigint> {
+  const latest = await provider.getBlock('latest')
+
+  return pool.contract.outstandingBalanceAt(loanId, latest!.timestamp + 3600)
+}
+
 /** Pays `amount` towards a loan and returns the receipt facts the index keys on. */
 async function pay(provider: JsonRpcProvider, pool: PoolHandle, borrower: Wallet, loanId: number, amount: bigint) {
   const tx = await as(pool.contract.connect(borrower)).repayLoan(loanId, {
@@ -234,45 +253,52 @@ async function main() {
   await deposit.wait()
 
   const loan = await borrow(provider, pool, instalments, parseEther('10'))
-  // 10 POL at 1000bp — 11 to settle.
-  const totalOwed: bigint = await pool.contract.calculateRepaymentAmount(loan.loanId)
 
-  check('the loan owes principal plus interest', totalOwed === parseEther('11'), `got ${totalOwed}`)
-  check('and outstandingBalance agrees before anything is paid', (await pool.contract.outstandingBalance(loan.loanId)) === totalOwed)
+  // The quote is the price of the whole term; what is owed now is far less,
+  // because the loan is seconds old. The two are different questions.
+  const quote: bigint = await pool.contract.calculateRepaymentAmount(loan.loanId)
+  const owedAtStart = await owed(pool, loan.loanId)
 
-  const parts = [parseEther('0.3'), parseEther('4.7'), parseEther('2'), parseEther('4')]
+  check('the term’s price is principal plus the full rate', quote === parseEther('11'), `got ${quote}`)
+  check('but a new loan owes barely more than principal', owedAtStart < parseEther('10.001'), `owes ${owedAtStart}`)
+
+  // Three instalments, then whatever is left. Deliberately not a clean
+  // division of anything — the debt moves between them.
+  const parts = [parseEther('0.3'), parseEther('4.7'), parseEther('2')]
   const payments: { txHash: string; amount: bigint }[] = []
   let running = 0n
 
   for (const [index, part] of parts.entries()) {
+    const before = await owed(pool, loan.loanId)
     const receipt = await pay(provider, pool, instalments, loan.loanId, part)
     running += part
     payments.push({ txHash: receipt.txHash, amount: part })
 
     const onChain = await pool.contract.getLoan(loan.loanId)
-    const isLast = index === parts.length - 1
+    const after = await owed(pool, loan.loanId)
 
     check(
       `instalment ${index + 1} is credited on chain`,
       onChain.amountRepaid === running,
       `chain ${onChain.amountRepaid}, sent ${running}`
     )
-    check(`  and the loan is ${isLast ? 'settled' : 'still open'}`, onChain.isRepaid === isLast)
-    check(
-      `  outstandingBalance reports ${isLast ? 'nothing' : 'the rest'}`,
-      (await pool.contract.outstandingBalance(loan.loanId)) === totalOwed - running
-    )
+    check('  and the loan is still open', onChain.isRepaid === false)
+    check('  with less owed than before it', after < before, `${before} → ${after}`)
   }
+
+  // Settled with a quote for an hour ahead, as the app does — an exact payment
+  // would land a block late and leave a sliver behind.
+  const finalQuote = await settlementQuote(provider, pool, loan.loanId)
+  const finalReceipt = await pay(provider, pool, instalments, loan.loanId, finalQuote)
+  payments.push({ txHash: finalReceipt.txHash, amount: finalQuote })
 
   const settledLoan = await pool.contract.getLoan(loan.loanId)
 
-  // Read here, before the part-paid loan below adds interest of its own to the
-  // same pool. Comparing after it would be comparing two different pools.
-  const splitClaimable: bigint = await pool.contract.claimable(lender.address)
-
-  check('the whole debt came back', settledLoan.amountRepaid === totalOwed)
+  check('the last payment closes the debt', settledLoan.isRepaid === true)
+  check('nothing is owed', (await owed(pool, loan.loanId)) === 0n)
   check('repaidAt dates the settlement, not the first payment', Number(settledLoan.repaidAt) > 0)
   check('the borrower’s slot is free again', (await pool.contract.activeLoanId(instalments.address)) === 0n)
+  check('the running total counts every payment', settledLoan.amountRepaid > running, `got ${settledLoan.amountRepaid}`)
 
   // ---------------------------------------------------------------------------
   separator('A part-paid loan still holds the borrower’s slot')
@@ -309,43 +335,24 @@ async function main() {
   check('so a second loan is refused while the first is part-paid', secondLoanReverted)
 
   // ---------------------------------------------------------------------------
-  separator('The interest lenders are credited does not depend on the split')
+  separator('Lenders are credited exactly the interest each payment covered')
   // ---------------------------------------------------------------------------
-  // The check no single-repayment test can make. Two pools, same deposit, same
-  // loan, same rate — one settled in four payments and one in a single one.
-  const lumpPool = await createPool(provider, owner, 'lump')
-  await admit(provider, lumpPool, owner, lender)
-  await admit(provider, lumpPool, owner, lumpSum)
-
-  const lumpDeposit = await as(lumpPool.contract.connect(lender)).depositFunds({
-    value: parseEther('40'),
-    nonce: await nextNonce(provider, lender.address),
-  })
-  await lumpDeposit.wait()
-
-  const lumpLoan = await borrow(provider, lumpPool, lumpSum, parseEther('10'))
-  const lumpOwed: bigint = await lumpPool.contract.calculateRepaymentAmount(lumpLoan.loanId)
-  const lumpReceipt = await pay(provider, lumpPool, lumpSum, lumpLoan.loanId, lumpOwed)
-
-  const lumpClaimable: bigint = await lumpPool.contract.claimable(lender.address)
-
-  console.log(`  four payments → ${splitClaimable} wei claimable`)
-  console.log(`  one payment   → ${lumpClaimable} wei claimable`)
-
-  // Never more, and short only by truncation dust. The bound is structural
-  // rather than a guessed constant: `accInterestPerShare` loses up to one wei
-  // per payment, and a stake of `contributions` turns each of those into
-  // `contributions / PRECISION` wei of claimable. Observed 120 on a 40 POL
-  // stake over four payments — three wei of accumulator, times forty.
-  const contributions: bigint = await pool.contract.totalContributions()
-  const dustBound = BigInt(parts.length) * (contributions / 10n ** 18n)
-
-  check('a split never earns lenders more than a lump sum', splitClaimable <= lumpClaimable)
-  check(
-    'and is short only by truncation dust',
-    lumpClaimable - splitClaimable <= dustBound,
-    `differs by ${lumpClaimable - splitClaimable}, bound ${dustBound}`
+  // Under a flat rate this was a comparison against a single lump repayment,
+  // because splitting was neutral. It is not neutral any more — money handed
+  // back early stops costing the borrower — so the invariant that survives is
+  // that the pool distributes precisely what borrowers paid in interest and
+  // never a wei more. `testAccruedInterest.ts` covers the arithmetic itself.
+  const distributions = await pool.contract.queryFilter(pool.contract.filters.InterestDistributed())
+  const totalDistributed = distributions.reduce(
+    (sum: bigint, log: { topics: readonly string[] }) => sum + BigInt(log.topics[2]),
+    0n as bigint
   )
+  const claimable: bigint = await pool.contract.claimable(lender.address)
+
+  console.log(`  distributed ${totalDistributed} wei across ${distributions.length} payments`)
+
+  check('interest reached the lenders', totalDistributed > 0n)
+  check('and none of it was conjured', claimable <= totalDistributed, `claimable ${claimable}, distributed ${totalDistributed}`)
 
   // ---------------------------------------------------------------------------
   separator('Each instalment is indexed as its own record')
@@ -361,15 +368,22 @@ async function main() {
     .where('loanId', '==', loan.loanId)
     .get()
 
-  check('one document per payment', repaymentDocs.size === parts.length, `found ${repaymentDocs.size}`)
+  check('one document per payment', repaymentDocs.size === payments.length, `found ${repaymentDocs.size}`)
 
   const storedAmounts = repaymentDocs.docs.map((doc) => BigInt(doc.data().amount as string)).sort((a, b) => (a < b ? -1 : 1))
-  const expectedAmounts = [...parts].sort((a, b) => (a < b ? -1 : 1))
 
+  // Every fixed instalment is stored at exactly its face value. The settling
+  // payment is not among them — it was quoted with head-room and the pool
+  // credited only what was owed, which is the figure that lands here.
   check(
     'each carrying what it paid, not a running total',
-    storedAmounts.every((amount, index) => amount === expectedAmounts[index]),
+    parts.every((part) => storedAmounts.includes(part)),
     `stored ${storedAmounts.join(', ')}`
+  )
+  check(
+    'and the settling one carrying what was kept, not what was sent',
+    storedAmounts.some((amount) => amount < finalQuote),
+    `quote was ${finalQuote}`
   )
   check(
     'each dated by its own block',
@@ -381,7 +395,7 @@ async function main() {
   )
   check(
     'and keyed on the log, so nothing collapses onto one document',
-    new Set(repaymentDocs.docs.map((doc) => doc.id)).size === parts.length
+    new Set(repaymentDocs.docs.map((doc) => doc.id)).size === payments.length
   )
   check(
     'with the id the indexer computes',
@@ -399,8 +413,13 @@ async function main() {
     .get()
   const loanData = loanDoc.data() ?? {}
 
-  check('the settled loan stores the whole sum', loanData.amountRepaid === totalOwed.toString(), `stored ${loanData.amountRepaid}`)
+  check(
+    'the settled loan stores what the chain says',
+    loanData.amountRepaid === settledLoan.amountRepaid.toString(),
+    `stored ${loanData.amountRepaid}`
+  )
   check('and is marked repaid', loanData.isRepaid === true)
+  check('with nothing left outstanding', loanData.principalOutstanding === '0' && loanData.interestOutstanding === '0')
 
   // The one that mocks cannot catch: an instalment moves `amountRepaid` and
   // nothing else, so a currency check that does not compare it reports the
@@ -502,23 +521,25 @@ async function main() {
   // The overpayment refund, which is what makes "pay in full" safe against a
   // balance that moved between the read and the send.
   const beforeRefund = await provider.getBalance(partial.address)
-  const owedNow: bigint = await pool.contract.outstandingBalance(openLoan.loanId)
+  const sent = (await settlementQuote(provider, pool, openLoan.loanId)) + parseEther('1')
+  const repaidBefore = (await pool.contract.getLoan(openLoan.loanId)).amountRepaid as bigint
   const overpay = await as(pool.contract.connect(partial)).repayLoan(openLoan.loanId, {
-    value: owedNow + parseEther('1'),
+    value: sent,
     nonce: await nextNonce(provider, partial.address),
   })
   const overpayReceipt = await overpay.wait()
   const gas = BigInt(overpayReceipt.gasUsed) * BigInt(overpayReceipt.gasPrice)
   const afterRefund = await provider.getBalance(partial.address)
+  const settledOpen = await pool.contract.getLoan(openLoan.loanId)
+  const credited = (settledOpen.amountRepaid as bigint) - repaidBefore
 
-  check('an overpayment is credited only up to the debt', (await pool.contract.getLoan(openLoan.loanId)).amountRepaid === parseEther('4.4'))
+  check('the overpayment settles the loan', settledOpen.isRepaid === true)
+  check('only the debt is credited', credited < sent, `credited ${credited} of ${sent}`)
   check(
     'and the difference comes back',
-    beforeRefund - afterRefund - gas === owedNow,
+    beforeRefund - afterRefund - gas === credited,
     `wallet moved by ${beforeRefund - afterRefund - gas}`
   )
-
-  console.log(`\n  lump-sum settlement indexed from ${lumpReceipt.txHash}`)
 
   // ---------------------------------------------------------------------------
   separator(`${passed} passed, ${failed} failed`)

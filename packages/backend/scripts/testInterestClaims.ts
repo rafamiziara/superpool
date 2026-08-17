@@ -208,7 +208,11 @@ async function main() {
     return
   }
 
-  const provider = new JsonRpcProvider(RPC_URL)
+  // `cacheTimeout: -1` disables ethers' 250ms read cache. This script moves the
+  // chain's clock, and a cached `getBlock('latest')` would hand back a block
+  // from before the jump — quoting a repayment for a moment already in the
+  // past, which under-charges and quietly fails to settle the loan.
+  const provider = new JsonRpcProvider(RPC_URL, undefined, { cacheTimeout: -1 })
 
   console.log(`\nFactory:    ${FACTORY_ADDRESS}`)
   console.log(`Chain:      ${CHAIN_ID}`)

@@ -192,8 +192,19 @@ async function borrow(provider: JsonRpcProvider, pool: PoolHandle, borrower: Wal
   }
 }
 
+/**
+ * Settles a loan, quoting an hour ahead.
+ *
+ * **Not `calculateRepaymentAmount`**, which is the price of the full term and
+ * not the bill. Interest accrues per second and is uncapped past the due date,
+ * so one of the loans below — a one-minute term repaid two hours late — owes
+ * roughly a hundred and twenty times its stated rate. Sending the term's price
+ * there does not settle it, and a payment that fails to settle looks like
+ * success.
+ */
 async function repay(provider: JsonRpcProvider, pool: PoolHandle, borrower: Wallet, loanId: number) {
-  const due = await pool.contract.calculateRepaymentAmount(loanId)
+  const latest = await provider.getBlock('latest')
+  const due = await pool.contract.outstandingBalanceAt(loanId, latest!.timestamp + 3600)
   const tx = await as(pool.contract.connect(borrower)).repayLoan(loanId, {
     value: due,
     nonce: await nextNonce(provider, borrower.address),
@@ -212,7 +223,11 @@ async function main() {
     return
   }
 
-  const provider = new JsonRpcProvider(RPC_URL)
+  // `cacheTimeout: -1` disables ethers' 250ms read cache. This script moves the
+  // chain's clock, and a cached `getBlock('latest')` would hand back a block
+  // from before the jump — quoting a repayment for a moment already in the
+  // past, which under-charges and quietly fails to settle the loan.
+  const provider = new JsonRpcProvider(RPC_URL, undefined, { cacheTimeout: -1 })
 
   const owner = new Wallet(KEYS.owner, provider)
   const lender = new Wallet(KEYS.lender, provider)
