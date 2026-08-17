@@ -122,8 +122,9 @@ is the callable that supports that flow.
 - `ApiError` - Error information structure
 - Authentication: `GenerateAuthMessageRequest/Response`, `VerifySignatureRequest/Response`
 - Pool management: `ListPoolsRequest/Response`, `IndexPoolRequest/Response`
-- Loan management: `RequestLoanRequest/Response`, `GetLoansRequest/Response`
-- Transaction history: `GetTransactionsRequest/Response`
+- Loan management: `ListLoansRequest/Response`, `IndexLoanRequest/Response`
+- Per-event feeds: `ListContributionsRequest/Response`,
+  `ListWithdrawalsRequest/Response`, `ListInterestClaimsRequest/Response`
 
 ## 🛠️ Usage Examples
 

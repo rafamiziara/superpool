@@ -496,35 +496,8 @@ export interface RequestLoanResponse {
   transactionHash?: string
 }
 
-export interface GetLoansRequest {
-  poolId?: string
-  borrower?: string
-  status?: string
-  limit?: number
-  offset?: number
-}
-
-export interface GetLoansResponse {
-  loans: Loan[]
-  total: number
-  hasMore: boolean
-}
-
-// Transaction API types
-export interface GetTransactionsRequest {
-  poolId?: string
-  userAddress?: string
-  type?: string
-  status?: string
-  limit?: number
-  offset?: number
-}
-
-export interface GetTransactionsResponse {
-  transactions: Transaction[]
-  total: number
-  hasMore: boolean
-}
-
-// Import shared types
-import type { Loan, Transaction } from './lending'
+// `GetLoansRequest/Response` and `GetTransactionsRequest/Response` were deleted
+// on 2026-08-17, the last of the REST-shaped types that described a backend
+// nobody wrote. The real feeds are `ListLoansRequest/Response` and the per-event
+// list callables above; a transaction feed is assembled in the app by
+// `PoolStore.recentTransactions`, not fetched.
