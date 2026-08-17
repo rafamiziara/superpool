@@ -45,6 +45,34 @@ Three things follow, and all three are load-bearing:
 is off. An owner's decision to keep someone out has to survive the gate being
 opened, or turning it back on would silently readmit them.
 
+## The owner is always a member
+
+`_transferOwnership` grants `Active` to whoever takes the pool, and
+`initialize` reaches it through `__Ownable_init` — so a pool's creator is a
+member from birth and the first log a pool ever emits is its own `MemberJoined`.
+
+Before that, the owner of a **permissioned** pool could not fund it:
+`depositFunds` requires `Active`, nothing had ever granted it to them, and the
+only way in was to call `requestMembership` and then approve themselves.
+Borrowing was shut the same way.
+
+Three consequences:
+
+- **The hook, not `initialize`.** Granting in `initialize` would have left a
+  later `transferOwnership` handing the pool to a non-member, recreating the
+  lockout on a pool that may already be permissioned. The hook is also the one
+  path OpenZeppelin routes both through.
+- **`removeMember` and `leavePool` refuse the owner** (`OwnerIsAlwaysAMember`),
+  or the invariant could be broken from the other side. Handing a pool over is
+  `transferOwnership`, not either of these.
+- **`memberCount` starts at 1**, and the outgoing owner keeps their membership
+  after a transfer — they may still hold a contribution, and being demoted is
+  not being turned out. Anyone already `Active` is not counted twice.
+
+`indexPool` indexes the memberships in the creation transaction as well as the
+pool, best-effort, so the owner is in their own roster immediately rather than
+at the next sweep.
+
 ## Rules that must not be broken
 
 - **`withdraw` is never gated on membership.** Removal takes away what you may

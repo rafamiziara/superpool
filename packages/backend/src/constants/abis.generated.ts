@@ -1321,6 +1321,11 @@ export const LendingPoolABI = [
   },
   {
     "inputs": [],
+    "name": "OwnerIsAlwaysAMember",
+    "type": "error"
+  },
+  {
+    "inputs": [],
     "name": "PoolNotActive",
     "type": "error"
   },

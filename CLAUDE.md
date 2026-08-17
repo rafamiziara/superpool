@@ -473,6 +473,12 @@ it, a permissioned one requires `Active` first. That is what keeps one answer to
 "is this address a member", and why an owner can close an open pool without
 stranding anyone.
 
+**The pool's owner is `Active` from the moment they own it** — granted in
+`_transferOwnership`, so `initialize` and every later transfer both go through
+it. Without that, the owner of a permissioned pool could not fund their own
+pool. `removeMember` and `leavePool` refuse the owner for the same reason, and
+`memberCount` therefore starts at 1.
+
 Two rules that are easy to break and hard to notice:
 
 - **Never gate `withdraw` or `repayLoan` on membership.** Removal takes away

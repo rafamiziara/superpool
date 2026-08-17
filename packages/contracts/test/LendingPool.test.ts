@@ -816,11 +816,24 @@ describe('LendingPool', function () {
     const REMOVED = 4n
     const LEFT = 5n
 
+    /**
+     * Every count here is relative to the owner, who is `Active` in their own
+     * pool from the moment they own it — otherwise a permissioned pool would
+     * refuse its own creator's deposit.
+     */
+    const OWNER_ONLY = 1n
+
     it('starts every address at None with the correct zero value', async function () {
       // Unlike LoanStatus, this enum gets to put the semantically right value at
       // zero: an address nobody has heard of has no membership.
       expect(await lendingPool.membership(otherAccount.address)).to.equal(NONE)
-      expect(await lendingPool.memberCount()).to.equal(0)
+      expect(await lendingPool.memberCount()).to.equal(OWNER_ONLY)
+    })
+
+    it('makes the pool’s creator a member of it', async function () {
+      // `initialize` reaches `_transferOwnership`, so the grant happens at
+      // birth and the first log a pool ever emits is its owner joining.
+      expect(await lendingPool.membership(owner.address)).to.equal(ACTIVE)
     })
 
     it('leaves a new pool open, as every pool was before this existed', async function () {
@@ -834,14 +847,14 @@ describe('LendingPool', function () {
           .withArgs(lender.address)
 
         expect(await lendingPool.membership(lender.address)).to.equal(ACTIVE)
-        expect(await lendingPool.memberCount()).to.equal(1)
+        expect(await lendingPool.memberCount()).to.equal(OWNER_ONLY + 1n)
       })
 
       it('does not enrol the same depositor twice', async function () {
         await lendingPool.connect(lender).depositFunds({ value: deposit })
         await expect(lendingPool.connect(lender).depositFunds({ value: deposit })).to.not.emit(lendingPool, 'MemberJoined')
 
-        expect(await lendingPool.memberCount()).to.equal(1)
+        expect(await lendingPool.memberCount()).to.equal(OWNER_ONLY + 1n)
       })
 
       it('does not readmit someone the owner removed', async function () {
@@ -853,7 +866,7 @@ describe('LendingPool', function () {
         await lendingPool.connect(lender).depositFunds({ value: deposit })
 
         expect(await lendingPool.membership(lender.address)).to.equal(REMOVED)
-        expect(await lendingPool.memberCount()).to.equal(0)
+        expect(await lendingPool.memberCount()).to.equal(OWNER_ONLY)
       })
 
       it('re-enrols someone who left of their own accord', async function () {
@@ -917,7 +930,7 @@ describe('LendingPool', function () {
 
         expect(await lendingPool.membership(otherAccount.address)).to.equal(REQUESTED)
         // Asking is not joining.
-        expect(await lendingPool.memberCount()).to.equal(0)
+        expect(await lendingPool.memberCount()).to.equal(OWNER_ONLY)
       })
 
       it('refuses a second request while one is waiting', async function () {
@@ -940,7 +953,7 @@ describe('LendingPool', function () {
           .withArgs(otherAccount.address)
 
         expect(await lendingPool.membership(otherAccount.address)).to.equal(ACTIVE)
-        expect(await lendingPool.memberCount()).to.equal(1)
+        expect(await lendingPool.memberCount()).to.equal(OWNER_ONLY + 1n)
       })
 
       it('turns an applicant down', async function () {
@@ -951,7 +964,7 @@ describe('LendingPool', function () {
           .withArgs(otherAccount.address)
 
         expect(await lendingPool.membership(otherAccount.address)).to.equal(REJECTED)
-        expect(await lendingPool.memberCount()).to.equal(0)
+        expect(await lendingPool.memberCount()).to.equal(OWNER_ONLY)
       })
 
       it('lets a rejected applicant ask again', async function () {
@@ -1006,14 +1019,14 @@ describe('LendingPool', function () {
           .withArgs(lender.address)
 
         expect(await lendingPool.membership(lender.address)).to.equal(REMOVED)
-        expect(await lendingPool.memberCount()).to.equal(0)
+        expect(await lendingPool.memberCount()).to.equal(OWNER_ONLY)
       })
 
       it('lets a member leave', async function () {
         await expect(lendingPool.connect(lender).leavePool()).to.emit(lendingPool, 'MembershipLeft').withArgs(lender.address)
 
         expect(await lendingPool.membership(lender.address)).to.equal(LEFT)
-        expect(await lendingPool.memberCount()).to.equal(0)
+        expect(await lendingPool.memberCount()).to.equal(OWNER_ONLY)
       })
 
       it('cannot remove someone who is not a member', async function () {
@@ -1046,6 +1059,80 @@ describe('LendingPool', function () {
 
         const due = await lendingPool.calculateRepaymentAmount(1)
         await expect(lendingPool.connect(borrower).repayLoan(1, { value: due })).to.emit(lendingPool, 'LoanRepaid')
+      })
+
+      it('refuses to remove the owner from their own pool', async function () {
+        await expect(lendingPool.connect(owner).removeMember(owner.address)).to.be.revertedWithCustomError(
+          lendingPool,
+          'OwnerIsAlwaysAMember'
+        )
+      })
+
+      it('refuses to let the owner leave', async function () {
+        await expect(lendingPool.connect(owner).leavePool()).to.be.revertedWithCustomError(lendingPool, 'OwnerIsAlwaysAMember')
+      })
+    })
+
+    describe('the owner’s own standing', function () {
+      // The lockout this exists to prevent: `depositFunds` on a permissioned
+      // pool requires `Active`, and nothing used to grant it to the creator —
+      // so the owner could not fund the pool they had just made, and the only
+      // way in was to ask themselves and then approve it.
+
+      it('lets the owner fund a permissioned pool', async function () {
+        await lendingPool.connect(owner).setRequiresMembership(true)
+
+        await expect(lendingPool.connect(owner).depositFunds({ value: deposit })).to.not.be.reverted
+      })
+
+      it('lets the owner borrow from it', async function () {
+        await lendingPool.connect(owner).setRequiresMembership(true)
+        await lendingPool.connect(owner).depositFunds({ value: ethers.parseEther('50') })
+
+        await expect(lendingPool.connect(owner).createLoan(ethers.parseEther('5'))).to.not.be.reverted
+      })
+
+      it('does not enrol the owner twice when they deposit', async function () {
+        await expect(lendingPool.connect(owner).depositFunds({ value: deposit })).to.not.emit(lendingPool, 'MemberJoined')
+
+        expect(await lendingPool.memberCount()).to.equal(OWNER_ONLY)
+      })
+
+      it('refuses the owner a request to join what they already own', async function () {
+        await expect(lendingPool.connect(owner).requestMembership()).to.be.revertedWithCustomError(lendingPool, 'AlreadyMember')
+      })
+
+      it('enrols a new owner on transfer', async function () {
+        // Otherwise handing the pool over recreates the lockout for its new
+        // owner, on a pool that may already be permissioned.
+        await expect(lendingPool.connect(owner).transferOwnership(otherAccount.address))
+          .to.emit(lendingPool, 'MemberJoined')
+          .withArgs(otherAccount.address)
+
+        expect(await lendingPool.membership(otherAccount.address)).to.equal(ACTIVE)
+        expect(await lendingPool.memberCount()).to.equal(OWNER_ONLY + 1n)
+      })
+
+      it('leaves the outgoing owner a member', async function () {
+        // They may still hold a contribution, and being demoted is not being
+        // turned out.
+        await lendingPool.connect(owner).transferOwnership(otherAccount.address)
+
+        expect(await lendingPool.membership(owner.address)).to.equal(ACTIVE)
+      })
+
+      it('does not count a member promoted to owner twice', async function () {
+        await lendingPool.connect(lender).depositFunds({ value: deposit })
+
+        await lendingPool.connect(owner).transferOwnership(lender.address)
+
+        expect(await lendingPool.memberCount()).to.equal(OWNER_ONLY + 1n)
+      })
+
+      it('lets the new owner leave once they are only a member again', async function () {
+        await lendingPool.connect(owner).transferOwnership(otherAccount.address)
+
+        await expect(lendingPool.connect(owner).leavePool()).to.emit(lendingPool, 'MembershipLeft').withArgs(owner.address)
       })
     })
 

@@ -157,6 +157,9 @@ contract LendingPool is
      * but never membership — and it is why an owner can turn
      * `requiresMembership` on later without stranding anyone who already
      * deposited.
+     *
+     * The pool's owner is `Active` from the moment they own it, deposit or no
+     * deposit; see `_transferOwnership`.
      */
     mapping(address => Membership) public membership;
 
@@ -335,11 +338,15 @@ contract LendingPool is
      */
     event MembershipLeft(address indexed account);
     /**
-     * @notice Emitted when depositing into an open pool enrols the depositor
-     * @param account Address that became a member by funding the pool
-     * @dev Kept distinct from `MembershipApproved` so the activity feed can tell
-     * "the owner let them in" from "they joined by putting money in", even
-     * though both land on `Active`.
+     * @notice Emitted when someone becomes a member without anybody deciding
+     * @param account Address that became a member
+     * @dev Two ways in: depositing into an open pool, and taking ownership of a
+     * pool — which includes creating one, so a pool's first log is its owner
+     * joining it.
+     *
+     * Kept distinct from `MembershipApproved` so the activity feed can tell "the
+     * owner let them in" from "they joined without being let in", even though
+     * both land on `Active`. Nothing notifies on this one for the same reason.
      */
     event MemberJoined(address indexed account);
     /**
@@ -391,6 +398,15 @@ contract LendingPool is
     error NoPendingRequest();
     /// @dev Claiming interest when none has accrued.
     error NothingToClaim();
+    /**
+     * @dev Removing the owner from their own pool, or the owner leaving it.
+     *
+     * The owner is `Active` by construction — see `_transferOwnership` — and a
+     * permissioned pool only lets an `Active` address deposit. Letting the
+     * membership go would lock the owner out of funding their own pool with no
+     * way back other than approving themselves.
+     */
+    error OwnerIsAlwaysAMember();
 
     /**
      * @notice Initialize the contract (replaces constructor for upgradeable contracts)
@@ -778,6 +794,11 @@ contract LendingPool is
      * reason `withdraw` is. Someone who wants out entirely withdraws.
      */
     function removeMember(address _account) external onlyOwner whenNotPaused {
+        // The owner is `Active` by construction; removing them would lock them
+        // out of funding their own pool. Transferring ownership is what hands a
+        // pool over, not this.
+        if (_account == owner()) revert OwnerIsAlwaysAMember();
+
         if (membership[_account] != Membership.Active) revert NotAMember();
 
         membership[_account] = Membership.Removed;
@@ -795,6 +816,10 @@ contract LendingPool is
      * lent out.
      */
     function leavePool() external whenNotPaused {
+        // Same reason `removeMember` refuses: the owner would be locked out of
+        // their own pool. Leaving is for members, handing it over is for owners.
+        if (msg.sender == owner()) revert OwnerIsAlwaysAMember();
+
         if (membership[msg.sender] != Membership.Active) revert NotAMember();
 
         membership[msg.sender] = Membership.Left;
@@ -810,6 +835,38 @@ contract LendingPool is
     function _grantMembership(address _account) private {
         membership[_account] = Membership.Active;
         ++memberCount;
+    }
+
+    /**
+     * @dev Whoever owns the pool is a member of it.
+     *
+     * `initialize` calls `__Ownable_init`, which reaches here, so a pool's
+     * creator is `Active` from birth — before this, the owner of a
+     * **permissioned** pool could not fund it: `depositFunds` requires `Active`
+     * and nothing had granted it, so the only way in was to call
+     * `requestMembership` and then approve themselves. Borrowing was shut the
+     * same way.
+     *
+     * Overriding the hook rather than granting in `initialize` covers the later
+     * transfer too, which would otherwise hand the pool to a non-member and
+     * recreate exactly that lockout. `_transferOwnership` is also the one path
+     * OpenZeppelin routes both through, so the invariant cannot be sidestepped.
+     *
+     * The previous owner keeps their membership: they may still hold a
+     * contribution, and being demoted is not being turned out.
+     */
+    function _transferOwnership(address newOwner) internal override {
+        super._transferOwnership(newOwner);
+
+        // `renounceOwnership` passes the zero address; there is nobody to
+        // enrol. Anyone already `Active` — the usual case for a member promoted
+        // to owner — must not be counted twice.
+        if (
+            newOwner != address(0) && membership[newOwner] != Membership.Active
+        ) {
+            _grantMembership(newOwner);
+            emit MemberJoined(newOwner);
+        }
     }
 
     /**
