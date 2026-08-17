@@ -283,6 +283,7 @@ async function runDemo(): Promise<void> {
           name: 'Demo Pool',
           description: 'Multi-sig simulation demo pool',
           requiresMembership: false,
+          loanToken: ethers.ZeroAddress,
         }
 
         await simulatePoolCreation(safeAddress, targetAddress, poolParams)

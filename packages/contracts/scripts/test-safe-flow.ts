@@ -70,6 +70,7 @@ async function testSafeFlow() {
       name: 'Test Pool',
       description: 'A test lending pool for Safe ownership testing',
       requiresMembership: false,
+      loanToken: ethers.ZeroAddress,
     }
 
     const createTx = await poolFactory.connect(deployer).createPool(poolParams)
@@ -124,6 +125,7 @@ async function testSafeFlow() {
       name: 'Pending Phase Pool',
       description: 'Pool created during pending transfer phase',
       requiresMembership: false,
+      loanToken: ethers.ZeroAddress,
     })
     const poolCount2 = await poolFactory.getPoolCount()
     console.log(`✅ Original owner can still create pools. Total pools: ${poolCount2}`)

@@ -61,6 +61,7 @@ async function testLocalFlow() {
       name: 'Test Pool',
       description: 'A test lending pool for ownership transfer testing',
       requiresMembership: false,
+      loanToken: ethers.ZeroAddress,
     }
 
     const createTx = await poolFactory.connect(deployer).createPool(poolParams)
@@ -116,6 +117,7 @@ async function testLocalFlow() {
       name: 'Test Pool 2',
       description: 'Second test pool',
       requiresMembership: false,
+      loanToken: ethers.ZeroAddress,
     })
     const poolCount2 = await poolFactory.getPoolCount()
     console.log(`✅ Original owner can still create pools. Total pools: ${poolCount2}`)
@@ -170,6 +172,7 @@ async function testLocalFlow() {
       name: 'New Owner Pool',
       description: 'Pool created by new owner',
       requiresMembership: false,
+      loanToken: ethers.ZeroAddress,
     })
     const finalPoolCount = await poolFactory.getPoolCount()
     console.log(`✅ New owner can create pools. Total pools: ${finalPoolCount}`)

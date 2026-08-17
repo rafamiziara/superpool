@@ -149,6 +149,7 @@ async function main() {
       name: 'SuperPool Sample Lending Pool',
       description: 'A sample lending pool for testing and demonstration purposes',
       requiresMembership: false,
+      loanToken: ethers.ZeroAddress,
     }
 
     console.log('Sample pool parameters:')

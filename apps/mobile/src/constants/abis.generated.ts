@@ -85,6 +85,11 @@ export const PoolFactoryABI = [
   },
   {
     "inputs": [],
+    "name": "InvalidLoanToken",
+    "type": "error"
+  },
+  {
+    "inputs": [],
     "name": "InvalidMaxLoanAmount",
     "type": "error"
   },
@@ -167,6 +172,11 @@ export const PoolFactoryABI = [
     "type": "error"
   },
   {
+    "inputs": [],
+    "name": "UnauthorizedLoanToken",
+    "type": "error"
+  },
+  {
     "anonymous": false,
     "inputs": [
       {
@@ -215,6 +225,25 @@ export const PoolFactoryABI = [
       }
     ],
     "name": "Initialized",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "token",
+        "type": "address"
+      },
+      {
+        "indexed": true,
+        "internalType": "bool",
+        "name": "authorized",
+        "type": "bool"
+      }
+    ],
+    "name": "LoanTokenAuthorized",
     "type": "event"
   },
   {
@@ -455,6 +484,25 @@ export const PoolFactoryABI = [
   {
     "inputs": [
       {
+        "internalType": "address",
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "name": "authorizedLoanTokens",
+    "outputs": [
+      {
+        "internalType": "bool",
+        "name": "",
+        "type": "bool"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
         "components": [
           {
             "internalType": "uint256",
@@ -485,6 +533,11 @@ export const PoolFactoryABI = [
             "internalType": "bool",
             "name": "requiresMembership",
             "type": "bool"
+          },
+          {
+            "internalType": "address",
+            "name": "loanToken",
+            "type": "address"
           }
         ],
         "internalType": "struct PoolFactory.PoolParams",
@@ -665,6 +718,11 @@ export const PoolFactoryABI = [
             "internalType": "string",
             "name": "description",
             "type": "string"
+          },
+          {
+            "internalType": "address",
+            "name": "loanToken",
+            "type": "address"
           }
         ],
         "internalType": "struct PoolFactory.PoolInfo",
@@ -760,6 +818,11 @@ export const PoolFactoryABI = [
             "internalType": "string",
             "name": "description",
             "type": "string"
+          },
+          {
+            "internalType": "address",
+            "name": "loanToken",
+            "type": "address"
           }
         ],
         "internalType": "struct PoolFactory.PoolInfo[]",
@@ -797,6 +860,25 @@ export const PoolFactoryABI = [
       }
     ],
     "name": "isAuthorizedCreator",
+    "outputs": [
+      {
+        "internalType": "bool",
+        "name": "",
+        "type": "bool"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "_token",
+        "type": "address"
+      }
+    ],
+    "name": "isAuthorizedLoanToken",
     "outputs": [
       {
         "internalType": "bool",
@@ -1066,6 +1148,11 @@ export const PoolFactoryABI = [
         "internalType": "string",
         "name": "description",
         "type": "string"
+      },
+      {
+        "internalType": "address",
+        "name": "loanToken",
+        "type": "address"
       }
     ],
     "stateMutability": "view",
@@ -1118,6 +1205,24 @@ export const PoolFactoryABI = [
       }
     ],
     "name": "setCreatorAuthorization",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "_token",
+        "type": "address"
+      },
+      {
+        "internalType": "bool",
+        "name": "_authorized",
+        "type": "bool"
+      }
+    ],
+    "name": "setLoanTokenAuthorization",
     "outputs": [],
     "stateMutability": "nonpayable",
     "type": "function"
@@ -1289,6 +1394,11 @@ export const LendingPoolABI = [
   },
   {
     "inputs": [],
+    "name": "NativePoolOnly",
+    "type": "error"
+  },
+  {
+    "inputs": [],
     "name": "NoPendingRequest",
     "type": "error"
   },
@@ -1363,6 +1473,22 @@ export const LendingPoolABI = [
       }
     ],
     "name": "SafeCastOverflowedUintDowncast",
+    "type": "error"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "token",
+        "type": "address"
+      }
+    ],
+    "name": "SafeERC20FailedOperation",
+    "type": "error"
+  },
+  {
+    "inputs": [],
+    "name": "TokenPoolOnly",
     "type": "error"
   },
   {
@@ -1953,6 +2079,19 @@ export const LendingPoolABI = [
     "inputs": [
       {
         "internalType": "uint256",
+        "name": "_amount",
+        "type": "uint256"
+      }
+    ],
+    "name": "depositTokens",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
         "name": "_loanId",
         "type": "uint256"
       }
@@ -2056,6 +2195,11 @@ export const LendingPoolABI = [
         "internalType": "bool",
         "name": "_requiresMembership",
         "type": "bool"
+      },
+      {
+        "internalType": "address",
+        "name": "_loanToken",
+        "type": "address"
       }
     ],
     "name": "initialize",
@@ -2341,6 +2485,11 @@ export const LendingPoolABI = [
         "internalType": "bool",
         "name": "requiresMembership",
         "type": "bool"
+      },
+      {
+        "internalType": "address",
+        "name": "loanToken",
+        "type": "address"
       }
     ],
     "stateMutability": "view",
@@ -2403,6 +2552,24 @@ export const LendingPoolABI = [
     "name": "repayLoan",
     "outputs": [],
     "stateMutability": "payable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "_loanId",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "_amount",
+        "type": "uint256"
+      }
+    ],
+    "name": "repayLoanWithTokens",
+    "outputs": [],
+    "stateMutability": "nonpayable",
     "type": "function"
   },
   {

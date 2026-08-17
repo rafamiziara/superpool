@@ -38,6 +38,7 @@ describe('Security Improvements Summary', function () {
         name: 'Test Pool',
         description: 'Test pool description',
         requiresMembership: false,
+        loanToken: ethers.ZeroAddress,
       }
 
       await poolFactory.connect(owner).createPool(poolParams)
@@ -74,6 +75,7 @@ describe('Security Improvements Summary', function () {
         name: 'High Interest Pool',
         description: 'Test pool with high interest',
         requiresMembership: false,
+        loanToken: ethers.ZeroAddress,
       }
 
       await poolFactory.connect(owner).createPool(poolParams)
@@ -115,6 +117,7 @@ describe('Security Improvements Summary', function () {
         name: 'Zero Interest Pool',
         description: 'Test pool with zero interest',
         requiresMembership: false,
+        loanToken: ethers.ZeroAddress,
       }
 
       await poolFactory.connect(owner).createPool(poolParams)
@@ -147,6 +150,7 @@ describe('Security Improvements Summary', function () {
           name: `Pool ${i}`,
           description: `Test pool ${i}`,
           requiresMembership: false,
+          loanToken: ethers.ZeroAddress,
         }
         await poolFactory.connect(owner).createPool(poolParams)
       }
@@ -171,6 +175,7 @@ describe('Security Improvements Summary', function () {
         name: 'Valid Pool',
         description: 'Pool with valid owner (caller becomes owner)',
         requiresMembership: false,
+        loanToken: ethers.ZeroAddress,
       }
 
       // Normal accounts can create pools (they become the owner)
@@ -191,6 +196,7 @@ describe('Security Improvements Summary', function () {
         name: 'Test Pool',
         description: 'Test pool',
         requiresMembership: false,
+        loanToken: ethers.ZeroAddress,
       }
 
       // Non-owner cannot create pools (not authorized)
@@ -258,6 +264,7 @@ describe('Security Improvements Summary', function () {
         name: 'Integration Test Pool',
         description: 'Pool for integration testing',
         requiresMembership: false,
+        loanToken: ethers.ZeroAddress,
       }
 
       // Lazy whitelisting: the backend authorizes the creator before they submit.

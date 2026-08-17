@@ -36,7 +36,7 @@ describe('Security Tests', function () {
   beforeEach(async function () {
     ;[owner, borrower, lender] = await ethers.getSigners()
 
-    lendingPool = await deployPoolBehindBeacon([owner.address, maxLoanAmount, interestRate, loanDuration, false])
+    lendingPool = await deployPoolBehindBeacon([owner.address, maxLoanAmount, interestRate, loanDuration, false, ethers.ZeroAddress])
 
     await lendingPool.waitForDeployment()
 
@@ -128,7 +128,14 @@ describe('Security Tests', function () {
       const largeLoanAmount = ethers.parseEther('1000') // 1000 tokens
       const highInterestRate = 9999 // 99.99%
 
-      const largeLendingPool = await deployPoolBehindBeacon([owner.address, largeLoanAmount, highInterestRate, loanDuration, false])
+      const largeLendingPool = await deployPoolBehindBeacon([
+        owner.address,
+        largeLoanAmount,
+        highInterestRate,
+        loanDuration,
+        false,
+        ethers.ZeroAddress,
+      ])
 
       await largeLendingPool.waitForDeployment()
 
@@ -159,7 +166,14 @@ describe('Security Tests', function () {
       const maxSafeAmount = ethers.parseEther('100') // 100 tokens
       const maxInterestRate = 10000 // 100%
 
-      const testPool = await deployPoolBehindBeacon([owner.address, maxSafeAmount, maxInterestRate, loanDuration, false])
+      const testPool = await deployPoolBehindBeacon([
+        owner.address,
+        maxSafeAmount,
+        maxInterestRate,
+        loanDuration,
+        false,
+        ethers.ZeroAddress,
+      ])
 
       await testPool.waitForDeployment()
       await testPool.connect(lender).depositFunds({ value: ethers.parseEther('200') })
@@ -183,7 +197,14 @@ describe('Security Tests', function () {
       ]
 
       for (const testCase of testCases) {
-        const testPool = await deployPoolBehindBeacon([owner.address, ethers.parseEther('10'), testCase.rate, loanDuration, false])
+        const testPool = await deployPoolBehindBeacon([
+          owner.address,
+          ethers.parseEther('10'),
+          testCase.rate,
+          loanDuration,
+          false,
+          ethers.ZeroAddress,
+        ])
 
         await testPool.waitForDeployment()
         await testPool.connect(lender).depositFunds({ value: ethers.parseEther('20') })
@@ -250,6 +271,7 @@ describe('Security Tests', function () {
         0, // 0% interest
         loanDuration,
         false,
+        ethers.ZeroAddress,
       ])
 
       await zeroPool.waitForDeployment()

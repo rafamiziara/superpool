@@ -127,6 +127,7 @@ describe('Whitelist System', function () {
       name: 'Test Pool',
       description: 'Test pool description',
       requiresMembership: false,
+      loanToken: ethers.ZeroAddress,
     }
 
     it('Should allow owner to create pools (owner always authorized)', async function () {
@@ -194,6 +195,7 @@ describe('Whitelist System', function () {
       name: 'Test Pool',
       description: 'Test pool description',
       requiresMembership: false,
+      loanToken: ethers.ZeroAddress,
     }
 
     it('Should allow multiple authorized creators when whitelisted', async function () {

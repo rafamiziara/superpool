@@ -9,6 +9,8 @@ import {
 } from "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 import {ReentrancyGuardTransient} from "@openzeppelin/contracts/utils/ReentrancyGuardTransient.sol";
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
 
@@ -29,6 +31,8 @@ contract LendingPool is
     PausableUpgradeable,
     ReentrancyGuardTransient
 {
+    using SafeERC20 for IERC20;
+
     /// @dev Pool configuration
     struct PoolConfig {
         uint256 maxLoanAmount;
@@ -47,6 +51,28 @@ contract LendingPool is
          * existed; on makes it the private trust circle the product is about.
          */
         bool requiresMembership;
+        /**
+         * @dev What this pool lends, and the only thing it will accept.
+         *
+         * **`address(0)` means native POL**, which is the zero value — so every
+         * pool created before this field existed stays native with no migration
+         * and no flag day. The same retrofit the codebase already relies on
+         * twice: `LoanStatus.Disbursed` is ordinal 0 because every pre-existing
+         * loan was disbursed, and `requiresApproval` reads `false` because that
+         * was the old behaviour. A field that did not exist should read as the
+         * world before it.
+         *
+         * Chosen at creation and never changed. A pool is a group of people
+         * lending each other one thing; re-denominating it mid-life would
+         * reinterpret every `contributions` entry and every outstanding loan as
+         * a quantity of something else. `updatePoolConfig` deliberately does not
+         * touch it.
+         *
+         * Packs into the three bools' slot: 3 bytes used, 20 more here, so the
+         * struct still spans slots 0–3 and `totalFunds` does not move. That is
+         * why there was no storage deadline on this change.
+         */
+        address loanToken;
     }
 
     /**
@@ -501,6 +527,25 @@ contract LendingPool is
      * way back other than approving themselves.
      */
     error OwnerIsAlwaysAMember();
+    /**
+     * @dev Sending native value to a pool denominated in a token.
+     *
+     * Thrown by the `payable` `depositFunds()` and `repayLoan(uint256)` when
+     * `loanToken` is set. The token pool's counterparts take an explicit amount
+     * and pull it, so there is no path where value arrives here by accident and
+     * is credited as something else.
+     */
+    error TokenPoolOnly();
+    /**
+     * @dev Calling a token entry point on a native pool.
+     *
+     * The mirror of `TokenPoolOnly`, thrown by `depositTokens` and
+     * `repayLoanWithTokens`. Both pairs revert rather than one function
+     * quietly accepting either: a payable function that also takes an amount
+     * has two ways of being told how much, and disagreeing with itself is how a
+     * member deposits 100 and is credited 0.
+     */
+    error NativePoolOnly();
 
     /**
      * @notice Initialize the contract (replaces constructor for upgradeable contracts)
@@ -511,13 +556,17 @@ contract LendingPool is
      * @param _loanDuration Loan duration in seconds
      * @param _requiresMembership Whether the owner admits members, or the pool
      * is open to anyone who funds it
+     * @param _loanToken The ERC-20 this pool is denominated in, or
+     * `address(0)` for native POL. Appended last, like `_requiresMembership`
+     * before it, because every caller encodes these positionally.
      */
     function initialize(
         address _owner,
         uint256 _maxLoanAmount,
         uint256 _interestRate,
         uint256 _loanDuration,
-        bool _requiresMembership
+        bool _requiresMembership,
+        address _loanToken
     ) public initializer {
         __Ownable_init(_owner);
         __Pausable_init();
@@ -535,7 +584,10 @@ contract LendingPool is
             // private or open from birth, and the owner can still change its
             // mind later through `setRequiresMembership`. The register is
             // written either way.
-            requiresMembership: _requiresMembership
+            requiresMembership: _requiresMembership,
+            // The one setting with no setter. Zero here is native POL, which is
+            // what every pool made before this field was one.
+            loanToken: _loanToken
         });
 
         nextLoanId = 1;
@@ -544,15 +596,76 @@ contract LendingPool is
     }
 
     /**
-     * @notice Deposit funds into the pool
+     * @notice Deposit native POL into the pool
      * @dev Credits the caller's contribution balance as well as pool liquidity.
      * The two differ once loans are outstanding: `totalFunds` is what the pool
      * can currently lend or return, while the sum of `contributions` is what it
      * owes its members.
+     *
+     * Native pools only. A pool denominated in a token has
+     * `depositTokens` instead, and this refuses rather than accepting
+     * POL a token pool has no way to account for.
      */
     function depositFunds() external payable whenNotPaused {
+        if (poolConfig.loanToken != address(0)) revert TokenPoolOnly();
         if (msg.value == 0) revert InvalidAmount();
 
+        _deposit(msg.value);
+    }
+
+    /**
+     * @notice Deposit tokens into a pool denominated in an ERC-20
+     * @param _amount How much to deposit, in the token's own units
+     * @dev The token counterpart of `depositFunds()`, and a separate function
+     * rather than a payable one that also takes an amount — see
+     * `NativePoolOnly`. Requires the caller to have approved this pool for at
+     * least `_amount` first; that approval is a second transaction, which is
+     * why the app treats it as a stage of the deposit rather than an action of
+     * its own.
+     *
+     * **A distinct name rather than an overload of `depositFunds`.** Solidity
+     * would happily take a `depositFunds(uint256)` beside the payable one, and
+     * the ABI would carry both — but ethers then refuses to resolve
+     * `contract.depositFunds(…)` at all, because the bare name is ambiguous, so
+     * every existing native call site in the backend, the scripts and the tests
+     * would have to name a full signature to keep working. The overload buys
+     * nothing that the name does not, and costs that.
+     *
+     * **What gets credited is what arrived, not what was asked for.** A
+     * fee-on-transfer token delivers less than `_amount`, and crediting
+     * `_amount` would inflate `totalContributions` — the denominator every
+     * interest distribution divides by — quietly diluting every other lender in
+     * the pool for the life of it. So the balance is measured either side of
+     * the transfer and the difference is what counts.
+     *
+     * `nonReentrant` because the transfer happens before any state is written,
+     * which it has to: the delta is unknowable until the token has moved.
+     */
+    function depositTokens(
+        uint256 _amount
+    ) external whenNotPaused nonReentrant {
+        if (poolConfig.loanToken == address(0)) revert NativePoolOnly();
+        if (_amount == 0) revert InvalidAmount();
+
+        uint256 received = _pullIn(msg.sender, _amount);
+
+        // A token that delivered nothing at all is an invalid deposit, not a
+        // zero-value member. Without this the caller would be enrolled and
+        // settled for no money.
+        if (received == 0) revert InvalidAmount();
+
+        _deposit(received);
+    }
+
+    /**
+     * @notice Record a deposit that has already arrived
+     * @param _amount What actually arrived, in the pool's own denomination
+     * @dev Everything a deposit does once the money is in: membership,
+     * accounting and the event. Shared so the two entry points above cannot
+     * drift — a token deposit that enrolled differently from a native one would
+     * make `membership` mean two things.
+     */
+    function _deposit(uint256 _amount) private {
         if (poolConfig.requiresMembership) {
             if (membership[msg.sender] != Membership.Active) revert NotAMember();
         } else if (
@@ -574,13 +687,13 @@ contract LendingPool is
         // would retroactively earn a share of every past repayment.
         _settle(msg.sender);
 
-        totalFunds += msg.value;
-        contributions[msg.sender] += msg.value;
-        totalContributions += msg.value;
+        totalFunds += _amount;
+        contributions[msg.sender] += _amount;
+        totalContributions += _amount;
 
         _restampDebt(msg.sender);
 
-        emit FundsDeposited(msg.sender, msg.value);
+        emit FundsDeposited(msg.sender, _amount);
     }
 
     /**
@@ -626,8 +739,7 @@ contract LendingPool is
         // Emit event before external call
         emit FundsWithdrawn(msg.sender, _amount);
 
-        (bool success, ) = payable(msg.sender).call{value: _amount}("");
-        if (!success) revert TransferFailed();
+        _payOut(msg.sender, _amount);
     }
 
     /**
@@ -686,8 +798,7 @@ contract LendingPool is
         // Emit event before external call
         emit InterestClaimed(msg.sender, amount);
 
-        (bool success, ) = payable(msg.sender).call{value: amount}("");
-        if (!success) revert TransferFailed();
+        _payOut(msg.sender, amount);
     }
 
     /**
@@ -791,8 +902,7 @@ contract LendingPool is
         emit LoanCreated(loanId, msg.sender, _amount);
 
         // Transfer funds to borrower (external call moved to end)
-        (bool success, ) = payable(msg.sender).call{value: _amount}("");
-        if (!success) revert TransferFailed();
+        _payOut(msg.sender, _amount);
 
         return loanId;
     }
@@ -1055,8 +1165,7 @@ contract LendingPool is
 
         emit LoanApproved(_loanId, borrower, amount);
 
-        (bool success, ) = payable(borrower).call{value: amount}("");
-        if (!success) revert TransferFailed();
+        _payOut(borrower, amount);
     }
 
     /**
@@ -1098,9 +1207,12 @@ contract LendingPool is
     }
 
     /**
-     * @notice Pay towards a loan, in part or in full
+     * @notice Pay native POL towards a loan, in part or in full
      * @param _loanId The ID of the loan to pay down
-     * @dev Any amount above zero is accepted and credited against
+     * @dev Native pools only; a token pool takes `repayLoanWithTokens`,
+     * which needs no refund at all — see there.
+     *
+     * Any amount above zero is accepted and credited against
      * `amount + interest`; anything beyond what is still owed is refunded, so
      * overpaying is as safe as it was when the call demanded the exact sum. The
      * loan closes — `isRepaid`, `repaidAt`, the borrower's lock released — on
@@ -1132,6 +1244,64 @@ contract LendingPool is
     function repayLoan(
         uint256 _loanId
     ) external payable whenNotPaused nonReentrant {
+        if (poolConfig.loanToken != address(0)) revert TokenPoolOnly();
+
+        _repay(_loanId, msg.value, true);
+    }
+
+    /**
+     * @notice Pay towards a loan in a token pool, in part or in full
+     * @param _loanId The ID of the loan to pay down
+     * @param _amount The most to pay. Anything beyond the debt is left alone.
+     * @dev The token counterpart of `repayLoan(uint256)`, and the same
+     * arithmetic underneath: `_amount` plays exactly the part `msg.value` plays
+     * in a native pool, capped by what is actually owed at execution time.
+     *
+     * Named rather than overloaded, for the reason `depositTokens` is.
+     *
+     * **Nothing is refunded, because nothing is overpaid.** A native repayment
+     * has to take the value up front and hand back the excess, which is why the
+     * app quotes an hour ahead and warns that the wallet will ask for slightly
+     * more than the screen says (see `outstandingBalanceAt`). Here the pool
+     * pulls `min(_amount, outstanding)` — the debt is priced at the moment the
+     * transaction executes, so "pay it off" is exact and the borrower is never
+     * out of pocket for a quote that aged.
+     *
+     * The head-room does not disappear; it moves to the **allowance**, which
+     * must cover a debt that is still growing while the transaction waits. That
+     * is the right place for it: an allowance larger than the debt costs the
+     * borrower nothing, where an over-payment costs them a refund transfer.
+     *
+     * `_amount` is still explicit rather than inferred from the allowance. An
+     * allowance left over from an abandoned deposit would otherwise decide how
+     * much a later repayment took, which is a surprise the caller cannot see
+     * coming.
+     */
+    function repayLoanWithTokens(
+        uint256 _loanId,
+        uint256 _amount
+    ) external whenNotPaused nonReentrant {
+        if (poolConfig.loanToken == address(0)) revert NativePoolOnly();
+
+        _repay(_loanId, _amount, false);
+    }
+
+    /**
+     * @notice Credit a payment against a loan, whichever denomination it is in
+     * @param _loanId The loan being paid down
+     * @param _offered The most the caller is willing to pay
+     * @param _isNative Whether the money is already here (`msg.value`) or has
+     * still to be pulled
+     * @dev The whole of `repayLoan`, shared by both entry points so the two can
+     * never disagree about what a payment does. The denomination changes only
+     * how the money moves: everything about accrual, the interest/principal
+     * split, settlement and distribution is identical.
+     */
+    function _repay(
+        uint256 _loanId,
+        uint256 _offered,
+        bool _isNative
+    ) private {
         Loan storage loan = loans[_loanId];
 
         if (loan.borrower != msg.sender) {
@@ -1149,7 +1319,7 @@ contract LendingPool is
             revert LoanAlreadyRepaid();
         }
 
-        if (msg.value == 0) revert InvalidAmount();
+        if (_offered == 0) revert InvalidAmount();
 
         // Stop the clock before pricing the payment. Everything below is
         // arithmetic on figures that are now current.
@@ -1159,7 +1329,18 @@ contract LendingPool is
         uint256 principalDue = loan.principalOutstanding;
         uint256 outstanding = interestDue + principalDue;
 
-        uint256 payment = msg.value < outstanding ? msg.value : outstanding;
+        uint256 payment = _offered < outstanding ? _offered : outstanding;
+
+        // A token pool takes the money here rather than having been sent it,
+        // and credits what arrived: a fee-on-transfer token delivers less than
+        // it was asked for, and a payment that under-delivers simply does not
+        // settle the loan. Same rule as `depositTokens`, and it matters
+        // for the same reason — `interestPaid` below moves the accumulator
+        // every other lender is paid from.
+        if (!_isNative) {
+            payment = _pullIn(msg.sender, payment);
+            if (payment == 0) revert InvalidAmount();
+        }
 
         // Complete all state changes before external call (CEI pattern)
         uint256 interestPaid = _creditPayment(loan, payment);
@@ -1169,18 +1350,7 @@ contract LendingPool is
 
         if (settled) _closeLoan(loan, _loanId);
 
-        // Share the interest out across the contributions standing behind the
-        // loan. The denominator is `totalContributions`, never `totalFunds` —
-        // the latter is missing exactly the money that was lent out.
-        if (interestPaid > 0 && totalContributions > 0) {
-            accInterestPerShare += Math.mulDiv(
-                interestPaid,
-                PRECISION,
-                totalContributions
-            );
-
-            emit InterestDistributed(_loanId, interestPaid);
-        }
+        _distributeInterest(_loanId, interestPaid);
 
         // Emit events before external call
         emit LoanRepaymentMade(_loanId, msg.sender, payment);
@@ -1189,14 +1359,108 @@ contract LendingPool is
             emit LoanRepaid(_loanId, msg.sender, loan.amountRepaid);
         }
 
-        // Store refund amount for external call
-        uint256 refundAmount = msg.value - payment;
+        // Native only: the value arrived up front, so whatever the debt did not
+        // need goes back. A token pool pulled the payment and no more, so there
+        // is nothing to return.
+        if (_isNative) {
+            uint256 refundAmount = _offered - payment;
 
-        // Refund any excess payment (external call moved to end)
-        if (refundAmount > 0) {
-            (bool success, ) = payable(msg.sender).call{value: refundAmount}("");
-            if (!success) revert RefundFailed();
+            if (refundAmount > 0) {
+                (bool success, ) = payable(msg.sender).call{
+                    value: refundAmount
+                }("");
+                if (!success) revert RefundFailed();
+            }
         }
+    }
+
+    /**
+     * @notice Credit a payment's interest to everyone standing behind the loan
+     * @param _loanId The loan the interest came from
+     * @param _interestPaid The interest this payment covered
+     * @dev **The denominator is `totalContributions`, never `totalFunds`.**
+     * `totalFunds` falls when money is lent out, which is exactly when interest
+     * is being earned, so dividing by it would pay roughly double on any pool
+     * with a loan outstanding — and no test in which nothing is borrowed would
+     * notice.
+     *
+     * A pool with no contributions left at all — every member having withdrawn
+     * while the loan was out — has nobody to share with, and the interest stays
+     * in the contract as it did before distribution existed. No event either:
+     * nothing was distributed.
+     */
+    function _distributeInterest(
+        uint256 _loanId,
+        uint256 _interestPaid
+    ) private {
+        if (_interestPaid == 0 || totalContributions == 0) return;
+
+        accInterestPerShare += Math.mulDiv(
+            _interestPaid,
+            PRECISION,
+            totalContributions
+        );
+
+        emit InterestDistributed(_loanId, _interestPaid);
+    }
+
+    /**
+     * @notice Send the pool's denomination to an address
+     * @param _to Recipient
+     * @param _amount How much, in the pool's own denomination
+     * @dev The single outbound path, shared by `withdraw`, `claimInterest`,
+     * `createLoan` and `approveLoan`. One place decides native or token, so a
+     * value-moving function added later cannot get it half right.
+     *
+     * Always last in its caller, after every state change and every event —
+     * the CEI ordering the native transfers already followed, and now also what
+     * keeps a token with a transfer callback from re-entering mid-update.
+     */
+    function _payOut(address _to, uint256 _amount) private {
+        // Some ERC-20s revert on a zero-value transfer, and at least one caller
+        // can reach here with nothing to send: `createLoan(0)` is not refused
+        // anywhere above. Native pools were unbothered by this, so guarding
+        // here keeps the two denominations behaving the same.
+        if (_amount == 0) return;
+
+        address token = poolConfig.loanToken;
+
+        if (token == address(0)) {
+            (bool success, ) = payable(_to).call{value: _amount}("");
+            if (!success) revert TransferFailed();
+
+            return;
+        }
+
+        IERC20(token).safeTransfer(_to, _amount);
+    }
+
+    /**
+     * @notice Take the pool's token from an address, and report what arrived
+     * @param _from Who to pull from. Must have approved this pool already.
+     * @param _amount How much to ask for
+     * @return received What the pool's balance actually grew by
+     * @dev **The return value is the point.** A fee-on-transfer token delivers
+     * less than it was asked for, and every caller here credits the result
+     * against figures other members are paid from — `totalContributions` is the
+     * denominator of every interest distribution, and over-crediting it dilutes
+     * every other lender in the pool for as long as it exists. Measuring the
+     * balance either side is the only way to know, and it costs two reads.
+     *
+     * `SafeERC20` rather than `IERC20` directly: USDT and friends do not return
+     * a bool from `transfer`, so a bare call reverts on decoding a return value
+     * that is not there.
+     */
+    function _pullIn(
+        address _from,
+        uint256 _amount
+    ) private returns (uint256 received) {
+        IERC20 token = IERC20(poolConfig.loanToken);
+
+        uint256 balanceBefore = token.balanceOf(address(this));
+        token.safeTransferFrom(_from, address(this), _amount);
+
+        return token.balanceOf(address(this)) - balanceBefore;
     }
 
     /**

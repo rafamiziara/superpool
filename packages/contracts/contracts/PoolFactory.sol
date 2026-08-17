@@ -62,9 +62,22 @@ contract PoolFactory is
          * positionally — is untouched.
          */
         bool requiresMembership;
+        /**
+         * @dev The ERC-20 the new pool is denominated in, or `address(0)` for
+         * native POL. Appended last for the same reason `requiresMembership`
+         * was: the mobile ABI and every script encode these fields positionally,
+         * so inserting anywhere else silently reinterprets every existing
+         * caller's arguments.
+         *
+         * Validated against `authorizedLoanTokens` — a pool denominated in an
+         * arbitrary address is either unusable, because the app cannot format
+         * it, or a rug, because its "stablecoin" is a contract the pool's own
+         * owner controls.
+         */
+        address loanToken;
     }
 
-    /// @dev Pool registry information - optimized for gas efficiency  
+    /// @dev Pool registry information - optimized for gas efficiency
     struct PoolInfo {
         address poolAddress;      // 20 bytes
         address poolOwner;        // 20 bytes - cannot fit together (40 bytes > 32)
@@ -75,6 +88,23 @@ contract PoolFactory is
         uint256 createdAt;        // 32 bytes - new slot
         string name;              // 32 bytes - new slot
         string description;       // 32 bytes - new slot
+        /**
+         * @dev What the pool lends, mirrored from its `PoolConfig`.
+         *
+         * Appended last, and safe to append: `pools` is a mapping, so each entry
+         * hashes to its own base slot and a wider struct extends into words that
+         * were never allocated. A pool registered before this field reads
+         * `address(0)` here, which is exactly what it is — native.
+         *
+         * Carried here as well as on the pool so `getPoolsRange` can hand back a
+         * denominated list in one call. Reading it per pool instead would cost
+         * an RPC round trip per card in a scrolling list, which is the same
+         * price that keeps `requiresMembership` off the pool cards.
+         *
+         * Unlike `requiresMembership`, this one cannot go stale: the pool has no
+         * setter for it.
+         */
+        address loanToken;        // 32 bytes - new slot
     }
 
     /// @notice Address of the lending pool implementation contract
@@ -108,6 +138,25 @@ contract PoolFactory is
      * factory, which is what lets `updateImplementation` stay `onlyOwner`.
      */
     UpgradeableBeacon public poolBeacon;
+
+    /**
+     * @notice Tokens a pool may be denominated in
+     * @dev Appended after `poolBeacon`, for the reason that one was appended
+     * after `isWhitelistEnabled`: this factory sits behind a UUPS proxy, so its
+     * storage may only ever grow at the end.
+     *
+     * A curated list rather than a free-form address, and the second reason is
+     * the real one:
+     *
+     * - a pool denominated in a token the app cannot format is unusable, since
+     *   decimals decide whether a balance reads as 5 or as 5,000,000;
+     * - an arbitrary-token pool is a rug vector — a pool whose "stablecoin" is a
+     *   contract its own owner wrote, sitting in Discover beside the rest.
+     *
+     * `address(0)` is never in here and never needs to be: native POL is the
+     * absence of a token, and `createPool` lets it through without asking.
+     */
+    mapping(address => bool) public authorizedLoanTokens;
 
     /// @notice Events
     /**
@@ -163,6 +212,19 @@ contract PoolFactory is
      * @param enabled Whether whitelist mode is now enabled
      */
     event WhitelistModeChanged(bool indexed enabled);
+    /**
+     * @notice Emitted when a token is allowed or disallowed as a pool's denomination
+     * @param token Address of the ERC-20
+     * @param authorized Whether pools may now be denominated in it
+     * @dev Shaped like `CreatorAuthorized`: both parameters indexed, `data`
+     * empty, so the two decode the same way off chain.
+     *
+     * Disallowing a token does **not** touch pools already denominated in it.
+     * They hold real balances and real debts in it, and a pool that could not
+     * be repaid because the factory changed its mind would strand both sides.
+     * This gate is on creation only.
+     */
+    event LoanTokenAuthorized(address indexed token, bool indexed authorized);
 
     /// @notice Custom errors for gas optimization
     error InvalidPoolOwner();
@@ -178,6 +240,17 @@ contract PoolFactory is
     /// @dev `migrateToBeacon` is a one-time migration; a second call is a mistake.
     error BeaconAlreadySet();
     error UnauthorizedCreator();
+    /// @dev Creating a pool denominated in a token the factory has not allowed.
+    error UnauthorizedLoanToken();
+    /**
+     * @dev Authorizing something that cannot be a pool's denomination.
+     *
+     * Either `address(0)`, which is how a pool says "native" and so is not a
+     * token to allow; or an address with no code, which is the shape a
+     * mistyped token address takes and which would deploy a pool that reverts
+     * on its first deposit.
+     */
+    error InvalidLoanToken();
 
     /// @notice Modifier to check if pool exists
     modifier poolExists(uint256 _poolId) {
@@ -279,6 +352,12 @@ contract PoolFactory is
         if (_params.interestRate > 10000) revert InvalidInterestRate(); // Max 100%
         if (_params.loanDuration == 0) revert InvalidLoanDuration();
         if (bytes(_params.name).length == 0) revert EmptyName();
+        // `address(0)` is native POL and always allowed; anything else has to
+        // be on the list. See `authorizedLoanTokens`.
+        if (
+            _params.loanToken != address(0) &&
+            !authorizedLoanTokens[_params.loanToken]
+        ) revert UnauthorizedLoanToken();
         if (address(poolBeacon) == address(0)) revert ImplementationNotSet();
 
         // Deploy a beacon proxy. Unlike a clone this keeps no implementation of
@@ -293,7 +372,8 @@ contract PoolFactory is
             _params.maxLoanAmount,
             _params.interestRate,
             _params.loanDuration,
-            _params.requiresMembership
+            _params.requiresMembership,
+            _params.loanToken
         );
 
         // Increment pool count and assign ID (using pre-increment for gas efficiency)
@@ -309,7 +389,8 @@ contract PoolFactory is
             name: _params.name,
             description: _params.description,
             createdAt: block.timestamp,
-            isActive: true
+            isActive: true,
+            loanToken: _params.loanToken
         });
 
         // Update mappings
@@ -621,6 +702,48 @@ contract PoolFactory is
 
         // Check whitelist authorization
         return authorizedCreators[_creator];
+    }
+
+    /**
+     * @notice Allow or disallow a token as a pool denomination (only owner)
+     * @param _token Address of the ERC-20
+     * @param _authorized Whether pools may be denominated in it
+     * @dev Only affects pools created from here on; see `LoanTokenAuthorized`
+     * for why disallowing cannot reach back.
+     */
+    function setLoanTokenAuthorization(
+        address _token,
+        bool _authorized
+    ) external onlyOwner {
+        // `address(0)` is not a token that could be allowed or refused — it is
+        // how a pool says it is native, which `createPool` never consults this
+        // list about. Accepting it would write a flag nothing reads.
+        if (_token == address(0)) revert InvalidLoanToken();
+
+        // A token address with no code behind it is the shape a typo takes.
+        // Cheap to catch here, where the owner is watching, rather than at the
+        // first deposit into a pool that can never hold anything.
+        if (_token.code.length == 0) revert InvalidLoanToken();
+
+        authorizedLoanTokens[_token] = _authorized;
+
+        emit LoanTokenAuthorized(_token, _authorized);
+    }
+
+    /**
+     * @notice Whether a pool may be denominated in a token
+     * @param _token Address to check, or `address(0)` for native POL
+     * @return True if `createPool` would accept it
+     * @dev Answers `true` for `address(0)`: every pool may be native, and a
+     * caller checking before it creates should not have to special-case the
+     * denomination that needs no permission.
+     */
+    function isAuthorizedLoanToken(
+        address _token
+    ) external view returns (bool) {
+        if (_token == address(0)) return true;
+
+        return authorizedLoanTokens[_token];
     }
 
     /**

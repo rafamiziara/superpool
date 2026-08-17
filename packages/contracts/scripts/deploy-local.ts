@@ -156,6 +156,7 @@ async function main() {
         name: 'Quick Loans Pool',
         description: 'Short-term loans with fast approval',
         requiresMembership: false,
+        loanToken: ethers.ZeroAddress,
       },
       {
         creator: accounts[2],
@@ -165,6 +166,7 @@ async function main() {
         name: 'Medium Term Pool',
         description: 'Medium-term loans for moderate amounts',
         requiresMembership: false,
+        loanToken: ethers.ZeroAddress,
       },
       {
         creator: deployer,
@@ -174,6 +176,7 @@ async function main() {
         name: 'Large Loan Pool',
         description: 'High-value loans with extended terms',
         requiresMembership: false,
+        loanToken: ethers.ZeroAddress,
       },
     ]
 

@@ -154,6 +154,7 @@ describe('PoolFactory Ownable2Step', function () {
         name: 'Test Pool',
         description: 'A test lending pool',
         requiresMembership: false,
+        loanToken: ethers.ZeroAddress,
       }
 
       await expect(poolFactory.connect(owner).createPool(params)).to.not.be.reverted
@@ -236,6 +237,7 @@ describe('PoolFactory Ownable2Step', function () {
         name: 'Test Pool',
         description: 'A test lending pool',
         requiresMembership: false,
+        loanToken: ethers.ZeroAddress,
       }
       await poolFactory.connect(owner).createPool(params)
       expect(await poolFactory.getPoolCount()).to.equal(1)
@@ -260,6 +262,7 @@ describe('PoolFactory Ownable2Step', function () {
           name: 'Pool 2',
           description: 'Second pool',
           requiresMembership: false,
+          loanToken: ethers.ZeroAddress,
         })
       ).to.not.be.reverted
 

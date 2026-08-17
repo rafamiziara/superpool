@@ -1,6 +1,7 @@
 import type { PreparePoolCreationRequest, PreparePoolCreationResponse } from '@superpool/types'
 import { httpsCallable } from 'firebase/functions'
 import { useCallback, useState } from 'react'
+import { zeroAddress } from 'viem'
 import { useAccount, usePublicClient, useWriteContract } from 'wagmi'
 import { FIREBASE_FUNCTIONS } from '../../config/firebase'
 import { DEFAULT_CHAIN_ID, getPoolFactoryAddress } from '../../config/contracts'
@@ -147,6 +148,10 @@ export const usePoolCreation = (): UsePoolCreationReturn => {
           name: params.name,
           description: params.description,
           requiresMembership: params.requiresMembership,
+          // Native POL. The contract takes a denomination now, but the app
+          // still only offers one — picking a token is phase 4 of the ERC-20
+          // work, once the forms understand decimals other than 18.
+          loanToken: zeroAddress,
         },
       ] as const
 

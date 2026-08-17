@@ -18,6 +18,7 @@ describe('PoolFactory', function () {
     name: 'Test Pool',
     description: 'A test lending pool',
     requiresMembership: false,
+    loanToken: ethers.ZeroAddress,
   }
 
   beforeEach(async function () {
@@ -160,6 +161,7 @@ describe('PoolFactory', function () {
         name: 'Test Pool 2',
         description: 'Second test pool',
         requiresMembership: false,
+        loanToken: ethers.ZeroAddress,
       }
 
       // Enable whitelist and authorize users (simulating lazy whitelisting)
@@ -230,6 +232,7 @@ describe('PoolFactory', function () {
           name: defaultPoolParams.name,
           description: defaultPoolParams.description,
           requiresMembership: false,
+          loanToken: ethers.ZeroAddress,
         })
       ).to.be.revertedWithCustomError(poolFactory, 'InvalidMaxLoanAmount')
 
@@ -242,6 +245,7 @@ describe('PoolFactory', function () {
           name: defaultPoolParams.name,
           description: defaultPoolParams.description,
           requiresMembership: false,
+          loanToken: ethers.ZeroAddress,
         })
       ).to.be.revertedWithCustomError(poolFactory, 'InvalidInterestRate')
 
@@ -254,6 +258,7 @@ describe('PoolFactory', function () {
           name: defaultPoolParams.name,
           description: defaultPoolParams.description,
           requiresMembership: false,
+          loanToken: ethers.ZeroAddress,
         })
       ).to.be.revertedWithCustomError(poolFactory, 'InvalidLoanDuration')
 
@@ -266,6 +271,7 @@ describe('PoolFactory', function () {
           name: '',
           description: defaultPoolParams.description,
           requiresMembership: false,
+          loanToken: ethers.ZeroAddress,
         })
       ).to.be.revertedWithCustomError(poolFactory, 'EmptyName')
     })
@@ -300,6 +306,7 @@ describe('PoolFactory', function () {
         name: 'Pool 2',
         description: 'Second pool',
         requiresMembership: false,
+        loanToken: ethers.ZeroAddress,
       })
     })
 
@@ -505,6 +512,7 @@ describe('PoolFactory', function () {
         name: 'Pool 1',
         description: 'First pool',
         requiresMembership: false,
+        loanToken: ethers.ZeroAddress,
       })
 
       await poolFactory.connect(poolOwner2).createPool({
@@ -514,6 +522,7 @@ describe('PoolFactory', function () {
         name: 'Pool 2',
         description: 'Second pool',
         requiresMembership: false,
+        loanToken: ethers.ZeroAddress,
       })
 
       // Get both pools

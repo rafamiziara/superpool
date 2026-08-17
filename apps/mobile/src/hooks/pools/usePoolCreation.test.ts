@@ -197,6 +197,12 @@ describe('usePoolCreation', () => {
               name: 'Neighbourhood Fund',
               description: 'Micro-loans for the block',
               requiresMembership: false,
+              // Native POL, and the app has no way to ask for anything else
+              // yet. Asserted rather than omitted because the field decides
+              // what the pool is denominated in for its whole life, and a
+              // wrong-but-plausible address here is not something a later
+              // screen could correct.
+              loanToken: '0x0000000000000000000000000000000000000000',
             },
           ],
         })
