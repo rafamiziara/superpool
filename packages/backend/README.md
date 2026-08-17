@@ -224,6 +224,15 @@ Required for local development and Firebase Admin SDK:
   [`docs/LOANS.md`](../../docs/LOANS.md#borrowing-history)
 - `amountRepaid` is a decimal wei string, the chain's running total, `'0'` on
   records indexed before instalments were possible
+- `principalOutstanding` and `interestOutstanding` are the debt split in two,
+  and `accruedAt` is when the interest half was measured. Interest accrues per
+  second, so the stored figure is a **snapshot**: what is owed now is it
+  projected forward at `interestRate` over `duration`. Carrying it means a list
+  of loans can price itself without an RPC call each
+- **`accruedAt` absent means the figures are static**, not unknown — a loan made
+  before interest accrued keeps its flat price until its first payment converts
+  it. The indexer prices those from the contract's `loanBalance` rather than
+  storing the zeroes their struct reads
 - Requires authentication
 
 **`listLoanRepayments`**

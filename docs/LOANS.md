@@ -139,17 +139,18 @@ the request ended up, not who ended it.
 
 ## The contract still implements less than the UI describes
 
-`Loan` in `@superpool/types` is closer than it was — the approval step is real,
-and so is partial repayment — but two gaps remain:
+`Loan` in `@superpool/types` is nearly the shape the app always described. One
+gap remains:
 
 | The app's model        | The contract                                                       |
 | ---------------------- | ------------------------------------------------------------------ |
-| `interestAccrued`      | flat `amount × rate / 10000`, fixed at disbursement, never accrues |
 | `dueDate`, `DEFAULTED` | `startTime + duration` is stored; **nothing on chain enforces it** |
 
-`repaidAt` is no longer one of them — see [Borrowing history](#borrowing-history)
-— and neither is `amountRepaid`, which is a real running total on chain now.
-See [Paying in instalments](#paying-in-instalments).
+`repaidAt` stopped being one of them with borrowing history, `amountRepaid` with
+[instalments](#paying-in-instalments), and `interestAccrued` with
+[accrual](#interest-accrues). Note the last one does not make the term
+_enforced_ — nothing marks a loan defaulted — it only makes running late cost
+money.
 
 `LoanStatus.APPROVED` never occurs either: approval disburses in the same
 transaction, so an approved loan is already `DISBURSED`.
@@ -177,9 +178,10 @@ means "requested at" while pending and "disbursed at" afterwards. `PoolStore`
 leaves `approvedAt`, `disbursedAt` and `dueDate` undefined until the loan is
 disbursed rather than pretending to know them.
 
-**Interest does not accrue**, which is worth repeating because it is
-counter-intuitive: repaying on day 1 costs exactly what repaying on day 30 does.
-`BorrowForm` states the total before the user signs for that reason.
+**Interest accrues per second** on the principal still out — see
+[Interest accrues](#interest-accrues). `BorrowForm` states the cost of the full
+term before the user signs, which is a ceiling a borrower can beat rather than a
+fixed price.
 
 ## Paying in instalments
 
@@ -205,14 +207,10 @@ Four rules the whole design rests on:
   Releasing the lock earlier is the expensive mistake available here: it is what
   caps a borrower at one open loan, so a borrower who paid a wei could open a
   second.
-- **Interest is shared out in proportion to what has been paid**, as a
-  difference of two cumulative figures rather than `payment × rate`. The parts
-  therefore sum to exactly the interest a single payment produces, so a borrower
-  cannot change what the pool distributes by choosing how to split. The
-  per-share accumulator is the one place a split is not quite free — it divides
-  by `totalContributions` once per payment — and the loss is bounded by one wei
-  per payment, always downwards. Live-verified: four instalments credited a 40
-  POL lender 120 wei less than one payment would, on a full POL of interest.
+- **A payment settles interest first, then principal**, so the interest it
+  carries is exactly the interest it covered — no apportioning. Under the flat
+  rate this had to be a share of a fixed total; with accrual the split is simply
+  read off the debt. See [Interest accrues](#interest-accrues).
 - **Overpaying is refunded** down to what is owed, so "pay in full" is safe
   against a balance that moved between the read and the send.
 - **A request is not a debt.** `repayLoan` refuses anything whose status is not
@@ -222,13 +220,11 @@ Four rules the whole design rests on:
   record marked settled, and nothing ever lent. Nothing in the app routes there,
   which is exactly why the contract has to be the one to refuse.
 
-`calculateRepaymentAmount` and `outstandingBalance` are **not** the same figure
-and both are worth having. The first is the loan's lifetime cost and never
-moves, so everything that read it stayed correct; the second is what is owed now
-and is what to send as `value`. `outstandingBalance` returns 0 for anything that
-is not an open debt — a settled loan, a request, a refusal — mirroring the gate
-in `repayLoan`, so a caller can send it without first working out whether the
-call would revert.
+`outstandingBalance` returns 0 for anything that is not an open debt — a settled
+loan, a request, a refusal — mirroring the gate in `repayLoan`, so a caller can
+read it without first working out whether the call would revert. How it relates
+to `calculateRepaymentAmount`, and why sending it exactly does not settle a
+loan, is in [Interest accrues](#interest-accrues).
 
 ### An instalment is a log; a loan is not
 
@@ -277,6 +273,87 @@ record was written" and "nothing happened worth telling anybody" stay separable.
 It is gated on the loan still being open, because a record written before
 `amountRepaid` existed reads it as absent — without the gate, the first sweep
 after the upgrade would announce a payment on every settled loan in the index.
+
+## Interest accrues
+
+`interestRate` is the price of **one full term**. It always was — what changed
+is that the price is now charged per second rather than in one lump the moment
+the loan exists. A pool's stated rate therefore means what it always meant, and
+no existing pool, screen or figure had to be reinterpreted.
+
+```
+interest owed = principal still out × rate × seconds held / (10000 × duration)
+```
+
+Four properties, and each is a decision:
+
+- **It accrues on the principal still out**, not on what was borrowed. Handing
+  some back makes the rest cheaper, which is the whole point and the thing a
+  flat rate could not express. Live-verified: half the principal returned at the
+  halfway mark costs a quarter of the term's interest, not a half.
+- **The clock never stops at the due date.** A loan held twice its term costs
+  twice its rate, three times for three. There is no cap, deliberately — a cap
+  is a rule that has to be invented, and it says time is free after day 30,
+  which leaves a borrower no reason ever to settle. This is the closest thing
+  the project has to a consequence for running late, and it is not a penalty:
+  it is the same price applied to more time.
+- **Simple, not compounding.** Unpaid interest does not itself accrue. Same
+  reasoning as unclaimed interest not earning — see [`INTEREST.md`](INTEREST.md).
+- **A payment settles interest before principal.** Not a convention borrowed for
+  its own sake: interest is the price of time already used, and letting a
+  payment cut principal while interest stands would let a borrower reduce what
+  they owe for time they have not paid for. It also makes the lenders' share
+  _exact_ — the interest in a payment is simply the interest it covered, where
+  the flat model had to apportion each payment across a fixed total.
+
+### Three figures, and they are not interchangeable
+
+| Call                       | Answers                                     | Moves?      |
+| -------------------------- | ------------------------------------------- | ----------- |
+| `calculateRepaymentAmount` | what the loan costs held exactly its term   | no          |
+| `outstandingBalance`       | what is owed **right now**                  | every block |
+| `loanBalance`              | the same, split into principal and interest | every block |
+
+`calculateRepaymentAmount` is unchanged, arithmetic and all, so everything that
+read it stayed correct — it was "what you will pay" and is now "what you will
+pay if you take the whole term". It is the borrow form's quote. It is **not**
+the figure to send.
+
+### Settling needs a quote for later, not for now
+
+The trap this creates, and it is a quiet one. Send exactly what
+`outstandingBalance` reports and the block mines a second or two later, by which
+time a sliver more has accrued. The payment is credited, the loan stays open,
+and **it looks like success** — no revert, no error, just a debt that survived
+being paid off.
+
+So anything meaning to close a loan quotes slightly ahead and lets the refund
+return the difference. `outstandingBalanceAt(loanId, when)` is the contract's
+own answer; the app uses an hour of head-room, which on a 30-day loan is worth
+about 0.014% of principal and is refunded anyway. `RepayForm` says so rather
+than surprising the wallet with a larger number than the one on screen.
+
+Overpaying remains free: `repayLoan` credits only what is owed.
+
+### Storage, and loans made before it
+
+Two words were appended to `Loan`: `principalOutstanding`, and
+`interestOutstanding` packed with `accruedAt` — a snapshot and the moment it was
+taken. Nothing between payments moves them, because nothing but `repayLoan`
+calls `_accrue`.
+
+**A loan made before accrual reads all three as zero**, none of the fields
+having existed when it was written — and reading `principalOutstanding`
+literally would say the principal is already back. Such a loan is converted on
+its first touch, on exactly the terms it was made under: it was priced flat and
+`amountRepaid` was applied across principal and that flat interest pro rata, so
+that is how it is split. No money is invented and none forgiven. Accrual then
+starts **from the conversion**, not from `startTime`, or the loan would be
+charged twice for time its flat interest already covered.
+
+`accruedAt == 0` is the flag, and it survives into the index as an _absent_
+`accruedAt` — which is what tells the app the figures are static rather than
+unknown.
 
 ## Borrowing rules, and where each is enforced
 
@@ -503,9 +580,15 @@ The default is `pool`, the only safe answer for a feed nobody has narrowed.
   ABI, so a sweep silently skips them. Verified live.
 - **`calculateRepayment` in `useLoan` must agree with the contract's
   `calculateRepaymentAmount`.** Verified live: both give 4.3 POL for 4 POL at
-  750 bps, and 4.2 for 4 POL at 500 bps. Note that is the _lifetime_ cost;
-  what to send is that minus `amountRepaid`, and `outstandingBalance` is the
-  chain's own answer.
+  750 bps, and 4.2 for 4 POL at 500 bps. Both are the _term's price_; what to
+  send is `outstandingBalance`, or a quote a little ahead of it.
+- **A short term makes lateness expensive fast.** Accrual is uncapped and the
+  denominator is the term, so a one-minute loan held two hours owes a hundred
+  and twenty times its rate. That is the model working, and it is why
+  `testBorrowerHistory` cannot repay with the term's price any more.
+- **`PoolStore.accruedInterestNow` runs on the device clock**, the contract on
+  block time. Right for a figure in a list; wrong for one about to be signed
+  for, which is why `pool/borrow.tsx` reads `loanBalance` from the chain.
 - **`UnauthorizedBorrower` is checked before `LoanNotDisbursed`**, so paying
   towards someone else's request reports the wrong loan rather than the wrong
   state. Both revert; only the wording differs.
@@ -526,8 +609,11 @@ The default is `pool`, the only safe answer for a feed nobody has narrowed.
   borrower's own `cancelLoanRequest` frees their slot.
 - **No minimum payment, and no schedule.** Any amount above zero is accepted,
   and nothing requires a borrower to make progress — a loan can sit part-paid
-  indefinitely, holding its borrower's one slot in the pool. That is the same
-  gap as the unenforced term above, not a separate one.
+  indefinitely, holding its borrower's one slot in the pool. Its debt does keep
+  growing now, which is a pressure rather than an enforcement.
+- **Nothing marks a loan defaulted.** Accrual makes lateness cost money; it does
+  not liquidate, penalise at a higher rate, or produce a `Defaulted` state. See
+  `ROADMAP.md` Phase 3.
 - **The `loans` composite indexes are declared in
   `config/firestore.indexes.json`.** The emulator does not enforce them, so a
   query that works locally can still need an index in production.
@@ -538,6 +624,13 @@ Same environment as pool creation — see
 [`POOL_CREATION.md`](POOL_CREATION.md#running-it-locally). Borrowing needs a
 pool behind the beacon that you have contributed to; `pnpm --filter backend
 testSweep` reports loans alongside the other feeds.
+
+`pnpm --filter backend testAccrual` drives loans through the node and moves its
+clock — half a term, a full term, well past it, and one paid down early — then
+checks what the contract charges, what the indexer stores, and that the app's
+own projection of the stored snapshot agrees with the chain to the wei. 36
+checks, including a loan whose accrual fields are blanked to simulate one made
+before any of this existed.
 
 `pnpm --filter backend testPartial` drives three loans through the node — one
 settled in four uneven instalments, one in a single payment, one left part-paid

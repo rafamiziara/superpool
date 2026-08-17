@@ -16,7 +16,7 @@ To build a functional micro-lending decentralized application on Polygon where u
 | 4 · Pool Membership            | ✅ Complete                                         |
 | 5 · Pool Liquidity             | 🚧 Native currency only; ERC-20 outstanding         |
 | 6 · Loan Requests              | 🚧 Request flow complete; AI assessment not started |
-| 7 · Loan Repayments            | ✅ Full and partial; no schedule or reminders       |
+| 7 · Loan Repayments            | ✅ Full, partial and accruing; no schedule          |
 | 8 · Withdrawals                | ✅ Complete                                         |
 | 9 · Reputations                | 🚧 History shipped; no score, deliberately          |
 | 10 · Loan Management           | 🚧 Decisions and borrower history; AI support not   |
@@ -318,8 +318,10 @@ See [`LOANS.md`](LOANS.md) for how the shipped system works.
     the loan closes only on the payment that finishes it. Each payment is its
     own indexed record in `loan_repayments`, because a loan holds one
     `repaidAt` and a debt returned in four transactions has four dates
-  - Interest calculation ✅ — **flat, fixed at disbursement, not accrued**, so
-    repaying early costs exactly the same
+  - Interest calculation ✅ — **accrued per second** on the principal still
+    out, uncapped past the due date. `interestRate` still means the price of one
+    full term, so nothing had to be reinterpreted; repaying early now costs
+    less and running late costs more
 
 - **User Experience** ✅
   - Borrower dashboard with active loans
@@ -348,10 +350,18 @@ borrower who could pay half could pay nothing, which is the one that made the
 product unusable for the people it is for; closed 2026-08-17, live-verified
 with 47 checks (`pnpm --filter backend testPartial`).
 
+Accrued interest landed the same day (`testAccrual`, 36 live checks). The rate
+is the price of one full term and the clock never stops at the due date — no
+cap, deliberately, because a cap makes time free once a loan is late and leaves
+a borrower no reason to settle. That is the closest thing the project has to a
+consequence for running late, and it is not a penalty: it is the same price
+applied to more time.
+
 What is left here is **scheduling**: no minimum payment, no instalment plan, no
 reminder when a term lapses. Due and overdue are not events — nothing on chain
 fires when a term passes — so that is a scheduled scan, not an indexer hook, and
-it is Sprint 12's remainder.
+it is Sprint 12's remainder. Note accrual is pressure, not enforcement: nothing
+still marks a loan defaulted.
 
 The live run also found what mocks could not: an instalment moves `amountRepaid`
 and nothing else, so an indexer currency check that does not compare it reports

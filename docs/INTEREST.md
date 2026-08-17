@@ -17,12 +17,18 @@ member array to walk — deliberately, see `memberCount` — and adding one woul
 make every repayment cost gas proportional to the membership.
 
 ```
-repayLoan                     → accInterestPerShare += interest / totalContributions
+repayLoan                     → accInterestPerShare += interest paid / totalContributions
 claimable(address)            → what one account has earned and not taken out
 claimInterest()               → pays it, out of totalFunds
 InterestClaimed               → interestClaimIndexer → the interest_claims collection
 InterestDistributed           → nothing. It moves a pool-level figure read from the chain.
 ```
+
+**The interest in a payment is exact**, not apportioned. A payment settles
+accrued interest before it touches principal, so what it credited to lenders is
+simply the interest it covered. That is a consequence of interest accruing —
+under the flat rate there was one fixed total to divide each payment against.
+See [`LOANS.md`](LOANS.md#interest-accrues).
 
 Four storage slots, all appended in v3:
 
@@ -105,7 +111,13 @@ than inventing.
 - **Rounding dust stays in the pool.** Integer division never overpays; the
   remainder is a few wei and belongs to nobody.
 - **Unclaimed interest does not itself earn.** Compounding would mean adding it
-  to `contributions`, which changes what `withdraw` means. Out of scope.
+  to `contributions`, which changes what `withdraw` means. Out of scope. A
+  borrower's unpaid interest does not compound either, for the same reason —
+  accrual is simple, on principal alone.
+- **A pool earns nothing from a loan repaid immediately.** Interest is the price
+  of time, and no time has passed. Any test written before accrual that borrows
+  and repays in the same breath now measures a second or two of dust, which is
+  why the contract suite runs its loans to term.
 
 ## Known limitations
 

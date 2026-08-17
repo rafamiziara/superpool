@@ -534,8 +534,31 @@ follow and are easy to break:
   cumulative shares. Taking `payment × rate` instead would let a borrower change
   what lenders earn by choosing how to split.
 
-`calculateRepaymentAmount` is the loan's lifetime cost and never moves;
-`outstandingBalance` is what is owed now, and is the figure to send as `value`.
+**Interest accrues per second**, on the principal still out, at
+`rate × elapsed / duration`. `interestRate` still means the price of one full
+term — so no pool, screen or stored figure had to be reinterpreted — but the
+price is now charged by the second. Four things follow:
+
+- **The clock does not stop at the due date.** Twice the term costs twice the
+  rate, uncapped. Not a penalty: the same price applied to more time. Capping
+  would be the invented rule, and it would make time free once a loan is late.
+- **Paying principal down makes the rest cheaper**, which is the point.
+  A payment settles accrued interest first, then principal.
+- **Three figures, not one.** `calculateRepaymentAmount` is the term's price and
+  never moves; `outstandingBalance` is what is owed now; `loanBalance` splits
+  that into principal and interest. Only the first is a quote.
+- **Sending exactly `outstandingBalance` does not settle a loan** — a block
+  passes and a sliver more accrues, so the payment succeeds and the debt
+  survives. Quote ahead with `outstandingBalanceAt` and let the refund return
+  the difference; the app uses an hour.
+
+A loan made before accrual reads its new fields as zero and is converted on
+first touch, on the flat terms it was made under, with accrual starting from the
+conversion rather than from `startTime`. In the index that shows up as an
+**absent** `accruedAt`, which means "these figures are static", not "unknown".
+
+`PoolStore.accruedInterestNow` projects the indexed snapshot for display and
+runs on the device clock. Anything about to send money reads the chain.
 
 Borrowing history — what this project has instead of a reputation score — is in
 the same document. `repaidAt` is the fact it is made of, and **zero means "no
