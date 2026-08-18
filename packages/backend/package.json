@@ -19,6 +19,7 @@
     "testAccrual": "ts-node scripts/testAccruedInterest.ts",
     "testErc20": "ts-node scripts/testErc20Pools.ts",
     "testDefaults": "ts-node scripts/testDefaults.ts",
+    "testNotes": "ts-node scripts/testNotes.ts",
     "test": "jest",
     "format": "prettier --write . --ignore-path ../../.prettierignore",
     "type-check": "tsc --noEmit",
