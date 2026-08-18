@@ -5,6 +5,7 @@ import { LendingPoolABI, PoolFactoryABI } from '../constants'
 import { indexContributionEvent, parseFundsDepositedLog, resolvePoolId } from './contributionIndexer'
 import { fetchPoolActive, fetchPoolMetadata, indexPoolEvent, parsePoolCreatedLog, updatePoolActive } from './eventIndexer'
 import { indexInterestClaimEvent, parseInterestClaimedLog } from './interestClaimIndexer'
+import { indexLoanDecisionEvent, LOAN_DECISION_TOPICS, parseLoanDecisionLog, readDecisionSender } from './loanDecisionIndexer'
 import { indexLoanFromLog, LOAN_TOPICS } from './loanIndexer'
 import { indexLoanRepaymentEvent, LOAN_REPAYMENT_MADE_TOPIC, parseLoanRepaymentLog } from './loanRepaymentIndexer'
 import { indexMembershipFromLog, MEMBERSHIP_TOPICS } from './membershipIndexer'
@@ -34,6 +35,8 @@ export interface SweepCounts {
   memberships: number
   /** Payments towards loans written. A log already indexed is not counted. */
   loanRepayments: number
+  /** Decisions written — approvals, refusals, withdrawals and declarations. */
+  loanDecisions: number
   /** Interest claims written. A log already indexed is not counted. */
   interestClaims: number
   /** Pools whose stored `isActive` disagreed with the chain and was corrected. */
@@ -62,6 +65,15 @@ export interface SweepBlockRangeOptions {
 interface SweepCaches {
   blockTimestamps: Map<number, number>
   poolIds: Map<string, number>
+  /**
+   * Transaction hash → sender, for the decision sweep alone.
+   *
+   * A transaction is immutable, so this is as safe to hold as the other two.
+   * It earns its place on the one transaction that decides several loans at
+   * once — impossible today, since every decision is its own call, but a
+   * pool owner acting through a Safe batch would produce exactly that.
+   */
+  senders: Map<string, string>
 }
 
 async function getBlockTimestamp(blockNumber: number, provider: Provider, caches: SweepCaches): Promise<number> {
@@ -76,6 +88,16 @@ async function getBlockTimestamp(blockNumber: number, provider: Provider, caches
 
   caches.blockTimestamps.set(blockNumber, block.timestamp)
   return block.timestamp
+}
+
+async function getSender(transactionHash: string, provider: Provider, caches: SweepCaches): Promise<string> {
+  const cached = caches.senders.get(transactionHash)
+  if (cached !== undefined) return cached
+
+  const sender = await readDecisionSender(transactionHash, provider)
+
+  caches.senders.set(transactionHash, sender)
+  return sender
 }
 
 async function getPoolId(poolAddress: string, factoryAddress: string, provider: Provider, caches: SweepCaches): Promise<number> {
@@ -361,6 +383,56 @@ async function sweepLoanRepayments(options: SweepBlockRangeOptions, caches: Swee
 }
 
 /**
+ * Index every decision made in the range.
+ *
+ * These three logs are swept **twice** — once here for the decision record and
+ * once by `sweepLoans`, which needs them to keep the loan's status current. The
+ * same deliberate duplication repayments have, and for the same reason: the
+ * loan says what is true now and this says what was decided and by whom, and
+ * neither is derivable from the other.
+ *
+ * Because every field comes from the logs and the chain rather than from a
+ * comparison against what is stored, **re-scanning a range rebuilds exactly
+ * what is already there** — which is also how decisions made before this
+ * existed are backfilled: re-run the sweep from the factory's deployment block.
+ * A transition-based record could not have done either.
+ */
+async function sweepLoanDecisions(options: SweepBlockRangeOptions, caches: SweepCaches): Promise<number> {
+  const { provider, firestore, chainId, factoryAddress, fromBlock, toBlock } = options
+
+  const logs = await queryLogs(provider, [...LOAN_DECISION_TOPICS], fromBlock, toBlock)
+
+  let stored = 0
+
+  for (const log of logs) {
+    try {
+      const timestamp = await getBlockTimestamp(log.blockNumber, provider, caches)
+      // Before the pool lookup: an unreadable sender is the one failure that
+      // must not be worked around, since a refusal and a withdrawal are the
+      // same log and only this separates them.
+      const sender = await getSender(log.transactionHash, provider, caches)
+      const parsed = parseLoanDecisionLog(log, chainId, timestamp, sender)
+      const poolId = await getPoolId(parsed.poolAddress, factoryAddress, provider, caches)
+
+      if (poolId === UNKNOWN_POOL_ID) continue
+
+      const result = await indexLoanDecisionEvent({ ...parsed, poolId }, firestore)
+
+      if (result.stored) stored++
+    } catch (error) {
+      logger.error('Failed to sweep loan decision log', {
+        chainId,
+        blockNumber: log.blockNumber,
+        transactionHash: log.transactionHash,
+        error: error instanceof Error ? error.message : String(error),
+      })
+    }
+  }
+
+  return stored
+}
+
+/**
  * Index every membership touched in the range.
  *
  * All six membership events take one topic-OR query and the same path, for the
@@ -413,7 +485,7 @@ async function sweepMemberships(options: SweepBlockRangeOptions): Promise<number
  * skipped, because one undecodable event must not wedge the sweep forever.
  */
 export async function sweepBlockRange(options: SweepBlockRangeOptions): Promise<SweepCounts> {
-  const caches: SweepCaches = { blockTimestamps: new Map(), poolIds: new Map() }
+  const caches: SweepCaches = { blockTimestamps: new Map(), poolIds: new Map(), senders: new Map() }
 
   const pools = await sweepPoolCreated(options, caches)
   const statusUpdates = await sweepPoolStatus(options)
@@ -427,6 +499,9 @@ export async function sweepBlockRange(options: SweepBlockRangeOptions): Promise<
   // After the loans, so a payment record never points at a loan the index has
   // not heard of yet. Same dependency ordering pools get ahead of everything.
   const loanRepayments = await sweepLoanRepayments(options, caches)
+  // After the loans for the same reason repayments are: a decision record
+  // should never point at a loan the index has not heard of yet.
+  const loanDecisions = await sweepLoanDecisions(options, caches)
 
-  return { pools, contributions, withdrawals, interestClaims, loans, loanRepayments, memberships, statusUpdates }
+  return { pools, contributions, withdrawals, interestClaims, loans, loanRepayments, loanDecisions, memberships, statusUpdates }
 }

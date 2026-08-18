@@ -14,6 +14,11 @@ jest.mock('./loanRepaymentIndexer', () => {
   const actual = jest.requireActual('./loanRepaymentIndexer')
   return { ...actual, indexLoanRepaymentEvent: jest.fn(), parseLoanRepaymentLog: jest.fn() }
 })
+jest.mock('./loanDecisionIndexer', () => {
+  // The three topics are real for the same reason: the sweep routes on them.
+  const actual = jest.requireActual('./loanDecisionIndexer')
+  return { ...actual, indexLoanDecisionEvent: jest.fn(), parseLoanDecisionLog: jest.fn(), readDecisionSender: jest.fn() }
+})
 jest.mock('./loanIndexer', () => {
   // The topics are real: the sweep routes on them, and stubbing them would let
   // the test agree with itself rather than with the shipped ABI.
@@ -31,6 +36,13 @@ const { indexWithdrawalEvent, parseFundsWithdrawnLog } = require('./withdrawalIn
 const { indexInterestClaimEvent, parseInterestClaimedLog } = require('./interestClaimIndexer')
 const { indexLoanFromLog, LOAN_CREATED_TOPIC, LOAN_REPAID_TOPIC, LOAN_TOPICS } = require('./loanIndexer')
 const { indexLoanRepaymentEvent, parseLoanRepaymentLog, LOAN_REPAYMENT_MADE_TOPIC } = require('./loanRepaymentIndexer')
+const {
+  indexLoanDecisionEvent,
+  parseLoanDecisionLog,
+  readDecisionSender,
+  LOAN_APPROVED_TOPIC,
+  LOAN_DECISION_TOPICS,
+} = require('./loanDecisionIndexer')
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -44,6 +56,7 @@ const OTHER_POOL_ADDRESS = '0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0'
 const FROM_BLOCK = 100
 const TO_BLOCK = 599
 const BLOCK_TIMESTAMP = 1700000000
+const OWNER = '0x70997970c51812dc3a010c7d01b50e0d17dc79c8'
 
 const POOL_CREATED_TOPIC = new Interface([...PoolFactoryABI]).getEvent('PoolCreated')!.topicHash
 const FUNDS_DEPOSITED_TOPIC = new Interface([...LendingPoolABI]).getEvent('FundsDeposited')!.topicHash
@@ -86,6 +99,7 @@ interface ProviderLogs {
   status?: object[]
   loans?: object[]
   loanRepayments?: object[]
+  decisions?: object[]
 }
 
 /**
@@ -108,10 +122,15 @@ function buildMockProvider(logs: ProviderLogs = {}, options: { blockTimestamp?: 
     getLogs: jest.fn().mockImplementation((filter: { topics: (string | string[])[] }) => {
       const topic = filter.topics[0]
 
-      // Two topic-OR queries now — pool status and loans — told apart by which
-      // topics they ask for rather than by call order.
+      // Three topic-OR queries now — pool status, loans and decisions — told
+      // apart by which topics they ask for rather than by call order. Loans
+      // first: LOAN_TOPICS contains the decision topics too, and only the
+      // decision query lacks LoanCreated.
       if (Array.isArray(topic)) {
-        return Promise.resolve(topic.includes(LOAN_CREATED_TOPIC) ? (logs.loans ?? []) : (logs.status ?? []))
+        if (topic.includes(LOAN_CREATED_TOPIC)) return Promise.resolve(logs.loans ?? [])
+        if (topic.includes(LOAN_APPROVED_TOPIC)) return Promise.resolve(logs.decisions ?? [])
+
+        return Promise.resolve(logs.status ?? [])
       }
 
       return Promise.resolve(byTopic[topic as string] ?? [])
@@ -159,6 +178,17 @@ beforeEach(() => {
   parseLoanRepaymentLog.mockImplementation(() => ({ poolAddress: POOL_ADDRESS, loanId: 1, borrower: '0xabc', amount: '1' }))
   indexLoanRepaymentEvent.mockResolvedValue({ id: 'r1', loanId: 1, poolId: 1, alreadyIndexed: false, stored: true })
 
+  parseLoanDecisionLog.mockImplementation(() => ({
+    poolAddress: POOL_ADDRESS,
+    loanId: 1,
+    borrower: '0xabc',
+    amount: '1',
+    outcome: 'approved',
+    decidedBy: OWNER,
+  }))
+  indexLoanDecisionEvent.mockResolvedValue({ id: 'd1', loanId: 1, poolId: 1, outcome: 'approved', alreadyIndexed: false, stored: true })
+  readDecisionSender.mockResolvedValue(OWNER)
+
   fetchPoolActive.mockResolvedValue(false)
   updatePoolActive.mockResolvedValue(true)
 
@@ -193,6 +223,7 @@ describe('sweepBlockRange', () => {
         interestClaims: 2,
         loans: 0,
         loanRepayments: 0,
+        loanDecisions: 0,
         memberships: 0,
         statusUpdates: 0,
       })
@@ -213,6 +244,7 @@ describe('sweepBlockRange', () => {
         interestClaims: 0,
         loans: 0,
         loanRepayments: 0,
+        loanDecisions: 0,
         memberships: 0,
         statusUpdates: 0,
       })
@@ -239,6 +271,7 @@ describe('sweepBlockRange', () => {
         interestClaims: 0,
         loans: 0,
         loanRepayments: 0,
+        loanDecisions: 0,
         memberships: 0,
         statusUpdates: 0,
       })
@@ -343,6 +376,7 @@ describe('sweepBlockRange', () => {
         interestClaims: 0,
         loans: 0,
         loanRepayments: 0,
+        loanDecisions: 0,
         memberships: 0,
         statusUpdates: 0,
       })
@@ -392,6 +426,112 @@ describe('sweepBlockRange', () => {
       // Assert
       expect(counts.loanRepayments).toBe(1)
       expect(mockLogger.error).toHaveBeenCalledWith('Failed to sweep LoanRepaymentMade log', expect.objectContaining({ chainId: CHAIN_ID }))
+    })
+
+    it('should record every decision in the range', async () => {
+      // Arrange
+      const provider = buildMockProvider({ decisions: [buildLog(), buildLog({ index: 1 })] })
+
+      // Act
+      const counts = await sweep(provider)
+
+      // Assert
+      expect(indexLoanDecisionEvent).toHaveBeenCalledTimes(2)
+      expect(counts.loanDecisions).toBe(2)
+    })
+
+    /**
+     * Swept twice for the reason repayments are: `sweepLoans` needs an
+     * approval to move the loan's status, and this needs it for the record of
+     * who decided and when. The loan cannot answer the second question — it
+     * keeps only the state left behind — and the decision cannot answer the
+     * first.
+     */
+    it('should drive both the loan record and the decision record from one log', async () => {
+      // Arrange
+      const log = buildLog()
+      const provider = buildMockProvider({ loans: [log], decisions: [log] })
+
+      // Act
+      const counts = await sweep(provider)
+
+      // Assert
+      expect(indexLoanFromLog).toHaveBeenCalled()
+      expect(indexLoanDecisionEvent).toHaveBeenCalled()
+      expect(counts).toMatchObject({ loans: 1, loanDecisions: 1 })
+    })
+
+    it('should skip a decision emitted by a contract the factory does not know', async () => {
+      // Arrange
+      const provider = buildMockProvider({ decisions: [buildLog()] })
+      resolvePoolId.mockResolvedValue(0)
+
+      // Act
+      const counts = await sweep(provider)
+
+      // Assert
+      expect(indexLoanDecisionEvent).not.toHaveBeenCalled()
+      expect(counts.loanDecisions).toBe(0)
+    })
+
+    it('should skip a decision whose sender cannot be read rather than guess it', async () => {
+      // Arrange — a rejection and a cancellation are the same log, so an
+      // unknown sender means an unknown outcome. The guess would be written
+      // once and read as history forever; leaving the log to a later re-scan
+      // costs nothing, because the record is keyed on the log.
+      const provider = buildMockProvider({ decisions: [buildLog()] })
+      readDecisionSender.mockRejectedValue(new Error('RPC unavailable'))
+
+      // Act
+      const counts = await sweep(provider)
+
+      // Assert
+      expect(indexLoanDecisionEvent).not.toHaveBeenCalled()
+      expect(counts.loanDecisions).toBe(0)
+      expect(mockLogger.error).toHaveBeenCalledWith('Failed to sweep loan decision log', expect.objectContaining({ chainId: CHAIN_ID }))
+    })
+
+    it('should read a transaction sender once however many decisions it carried', async () => {
+      // Arrange — one call today, since every decision is its own
+      // transaction; a Safe batch would put several in one.
+      const provider = buildMockProvider({ decisions: [buildLog(), buildLog({ index: 1 })] })
+
+      // Act
+      await sweep(provider)
+
+      // Assert
+      expect(readDecisionSender).toHaveBeenCalledTimes(1)
+    })
+
+    it('should keep sweeping decisions after one of them fails', async () => {
+      // Arrange
+      const provider = buildMockProvider({ decisions: [buildLog(), buildLog({ index: 1 })] })
+      indexLoanDecisionEvent.mockRejectedValueOnce(new Error('firestore unavailable'))
+
+      // Act
+      const counts = await sweep(provider)
+
+      // Assert
+      expect(counts.loanDecisions).toBe(1)
+    })
+
+    it('should query the three decision topics with no address filter', async () => {
+      // Arrange — decisions are emitted by each pool, not by the factory, so
+      // there is no single address to filter on.
+      const provider = buildMockProvider()
+
+      // Act
+      await sweep(provider)
+
+      // Assert
+      const call = provider.getLogs.mock.calls.find(
+        ([f]: [{ topics: unknown[] }]) =>
+          Array.isArray(f.topics[0]) &&
+          (f.topics[0] as string[]).includes(LOAN_APPROVED_TOPIC) &&
+          !(f.topics[0] as string[]).includes(LOAN_CREATED_TOPIC)
+      )
+      expect(call?.[0].topics[0]).toEqual([...LOAN_DECISION_TOPICS])
+      expect(call?.[0].address).toBeUndefined()
     })
 
     it('should skip foreign logs silently rather than as errors', async () => {

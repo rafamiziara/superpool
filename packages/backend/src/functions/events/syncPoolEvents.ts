@@ -132,6 +132,7 @@ export const syncPoolEventsHandler = async (options: SyncPoolEventsOptions = {})
     interestClaims: 0,
     loans: 0,
     loanRepayments: 0,
+    loanDecisions: 0,
     memberships: 0,
     statusUpdates: 0,
   }
@@ -171,6 +172,7 @@ export const syncPoolEventsHandler = async (options: SyncPoolEventsOptions = {})
     totals.interestClaims += counts.interestClaims
     totals.loans += counts.loans
     totals.loanRepayments += counts.loanRepayments
+    totals.loanDecisions += counts.loanDecisions
     totals.memberships += counts.memberships
     totals.statusUpdates += counts.statusUpdates
     lastSweptBlock = toBlock
@@ -194,6 +196,7 @@ export const syncPoolEventsHandler = async (options: SyncPoolEventsOptions = {})
           totalInterestClaimsIndexed: FieldValue.increment(counts.interestClaims),
           totalLoansIndexed: FieldValue.increment(counts.loans),
           totalLoanRepaymentsIndexed: FieldValue.increment(counts.loanRepayments),
+          totalLoanDecisionsIndexed: FieldValue.increment(counts.loanDecisions),
           totalMembershipsIndexed: FieldValue.increment(counts.memberships),
           totalPoolStatusUpdates: FieldValue.increment(counts.statusUpdates),
         },

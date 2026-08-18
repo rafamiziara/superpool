@@ -11,6 +11,10 @@ jest.mock('../../services/loanRepaymentIndexer', () => ({
   ...jest.requireActual('../../services/loanRepaymentIndexer'),
   indexLoanRepaymentsByTxHash: jest.fn(),
 }))
+jest.mock('../../services/loanDecisionIndexer', () => ({
+  ...jest.requireActual('../../services/loanDecisionIndexer'),
+  indexLoanDecisionsByTxHash: jest.fn(),
+}))
 
 // `ACTIVE_CHAIN_CONFIG` reads the environment once, at module load. Set this
 // before the requires below or every case fails on an unconfigured factory.
@@ -21,6 +25,7 @@ const { indexLoanHandler } = require('./indexLoan')
 const { getProvider } = require('../../utils/blockchain')
 const { indexLoansByTxHash } = require('../../services/loanIndexer')
 const { indexLoanRepaymentsByTxHash } = require('../../services/loanRepaymentIndexer')
+const { indexLoanDecisionsByTxHash } = require('../../services/loanDecisionIndexer')
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -80,6 +85,9 @@ beforeEach(() => {
   // helper returns an empty result rather than throwing, so the callable's
   // counts must be unaffected by it.
   indexLoanRepaymentsByTxHash.mockResolvedValue({ repayments: [], results: [] })
+  // Same shape and the same common case: most loan transactions decide
+  // nothing, and the helper says so with an empty result rather than throwing.
+  indexLoanDecisionsByTxHash.mockResolvedValue({ decisions: [], results: [] })
 })
 
 // ---------------------------------------------------------------------------
@@ -190,6 +198,35 @@ describe('indexLoanHandler', () => {
 
       expect(result.repayments).toEqual([])
       expect(result.storedCount).toBe(1)
+    })
+
+    it('should index the decision alongside the loan it decided', async () => {
+      // An approval writes two records — the loan's new status and the
+      // decision itself — and the app knows only that it confirmed a
+      // transaction.
+      indexLoanDecisionsByTxHash.mockResolvedValue({
+        decisions: [{ loanId: 3, poolId: 7, outcome: 'approved' }],
+        results: [{ id: '31337-0xtx-0', loanId: 3, poolId: 7, outcome: 'approved', alreadyIndexed: false, stored: true }],
+      })
+
+      const result = await indexLoanHandler(buildRequest() as never)
+
+      expect(indexLoanDecisionsByTxHash).toHaveBeenCalledWith(VALID_TX_HASH, SUPPORTED_CHAIN_ID, FACTORY_ADDRESS, {}, expect.anything())
+      expect(result.storedCount).toBe(2)
+    })
+
+    it('should not return decisions to the caller that made one', async () => {
+      // The deciding client re-reads the loan; a decision record is history
+      // for a screen that asks for it by pool, so it has no place in this
+      // response and nothing in the app reads it from here.
+      indexLoanDecisionsByTxHash.mockResolvedValue({
+        decisions: [{ loanId: 3, poolId: 7, outcome: 'rejected' }],
+        results: [{ id: '31337-0xtx-0', loanId: 3, poolId: 7, outcome: 'rejected', alreadyIndexed: false, stored: true }],
+      })
+
+      const result = await indexLoanHandler(buildRequest() as never)
+
+      expect(result).not.toHaveProperty('decisions')
     })
 
     it('should report alreadyIndexed when nothing changed', async () => {

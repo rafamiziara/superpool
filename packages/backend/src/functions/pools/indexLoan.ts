@@ -3,6 +3,7 @@ import { logger } from 'firebase-functions/v2'
 import { CallableRequest, HttpsError, onCall } from 'firebase-functions/v2/https'
 import { DEFAULT_CHAIN_ID, getChainConfig } from '../../constants'
 import { firestore } from '../../services'
+import { indexLoanDecisionsByTxHash } from '../../services/loanDecisionIndexer'
 import { indexLoansByTxHash, loanDocId, ParsedLoan } from '../../services/loanIndexer'
 import { indexLoanRepaymentsByTxHash, loanRepaymentDocId, ParsedLoanRepaymentEvent } from '../../services/loanRepaymentIndexer'
 import { getProvider } from '../../utils/blockchain'
@@ -92,7 +93,22 @@ export const indexLoanHandler = async (request: CallableRequest<IndexLoanRequest
       firestore
     )
 
-    const storedCount = results.filter((result) => result.stored).length + repaymentResults.filter((result) => result.stored).length
+    // Also in the same call, and also silent for the transactions that decide
+    // nothing. Not returned to the caller: the app confirms a transaction and
+    // re-reads the loan, and a decision record is history for a screen that
+    // asks for it by pool rather than something the deciding client needs back.
+    const { results: decisionResults } = await indexLoanDecisionsByTxHash(
+      txHash,
+      chainId,
+      chainConfig.poolFactoryAddress,
+      provider,
+      firestore
+    )
+
+    const storedCount =
+      results.filter((result) => result.stored).length +
+      repaymentResults.filter((result) => result.stored).length +
+      decisionResults.filter((result) => result.stored).length
 
     logger.info('Loan indexing completed', { txHash, chainId, count: loans.length, repayments: repayments.length, storedCount })
 
