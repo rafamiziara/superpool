@@ -2,6 +2,8 @@ import type {
   BorrowerHistory,
   ContributionInfo,
   InterestClaimInfo,
+  ListBorrowerHistoriesRequest,
+  ListBorrowerHistoriesResponse,
   ListContributionsRequest,
   ListContributionsResponse,
   ListInterestClaimsRequest,
@@ -52,6 +54,15 @@ function usingMockPools(): boolean {
 }
 
 const DEFAULT_PAGE_SIZE = 50
+
+/**
+ * How many wallets one summary call may ask about.
+ *
+ * Mirrors `MAX_BORROWERS_PER_CALL` in the backend, which rejects more —
+ * clipping here means a long queue loses the tail of its summaries rather than
+ * all of them.
+ */
+const MAX_BORROWER_HISTORIES = 25
 
 /**
  * The indexed record's state in the app's vocabulary.
@@ -236,6 +247,19 @@ export class PoolStore {
    * belongs, never how much they hold.
    */
   memberRecords: MemberInfo[] = []
+  /**
+   * Borrowing records the backend has summarised, keyed by lowercased address.
+   *
+   * Not derived from `loans` like everything else here, and that is the point:
+   * `loans` is one page of the chain's newest, so a wallet with more loans than
+   * that page would be judged on part of its record. The backend filters by
+   * borrower first and summarises the whole of it — and judges lateness on
+   * **chain time**, which this store has no way to read.
+   *
+   * Filled by `loadBorrowerHistories`, and read through `borrowerHistory`,
+   * which falls back to the local derivation when a wallet is not in here.
+   */
+  borrowerHistories: Record<string, BorrowerHistory> = {}
   transactions: Transaction[] = []
 
   /** Initial loads. Pull-to-refresh uses `isRefreshing` so the list is not torn down. */
@@ -1033,6 +1057,15 @@ export class PoolStore {
    * one chain would be summarised from part of its history.
    */
   borrowerHistory = (address: string): BorrowerHistory => {
+    // The backend's figure wins whenever there is one: it is summarised from
+    // the wallet's whole record rather than from the page below, and its
+    // `overdue` is judged on chain time. The derivation that follows is the
+    // fallback — for mock mode, which has no backend, and for the moment
+    // before `loadBorrowerHistories` has answered.
+    const summarised = this.borrowerHistories[address?.toLowerCase()]
+
+    if (summarised) return summarised
+
     const now = Date.now()
     const history: BorrowerHistory = {
       total: 0,
@@ -1085,6 +1118,43 @@ export class PoolStore {
   /** The connected wallet's own record, for showing someone their standing. */
   get myBorrowingHistory(): BorrowerHistory {
     return this.borrowerHistory(this.userAddress)
+  }
+
+  /**
+   * Ask the backend to summarise these wallets' whole borrowing records.
+   *
+   * Called by the screens that show somebody's record — the approvals queue,
+   * the overdue queue, the dashboard — with the wallets on screen. Until it
+   * answers, `borrowerHistory` serves the local derivation, so a screen never
+   * waits and never shows nothing.
+   *
+   * Silent on failure, like `triggerIndexing`: the fallback is the figure the
+   * app showed before any of this existed, and an error message about a
+   * summary nobody asked for is worse than a slightly narrower one.
+   */
+  loadBorrowerHistories = async (addresses: string[]): Promise<void> => {
+    // Mock mode has no backend to ask, and the fixtures are the only loans
+    // there are — the local derivation is the whole truth there.
+    if (usingMockPools()) return
+
+    const wallets = [...new Set(addresses.filter(Boolean).map((address) => address.toLowerCase()))].slice(0, MAX_BORROWER_HISTORIES)
+
+    if (wallets.length === 0) return
+
+    try {
+      const listBorrowerHistories = httpsCallable<ListBorrowerHistoriesRequest, ListBorrowerHistoriesResponse>(
+        FIREBASE_FUNCTIONS,
+        'listBorrowerHistories'
+      )
+
+      const response = await listBorrowerHistories({ chainId: authStore.chainId ?? DEFAULT_CHAIN_ID, borrowers: wallets })
+
+      runInAction(() => {
+        this.borrowerHistories = { ...this.borrowerHistories, ...response.data.histories }
+      })
+    } catch (error) {
+      logger.warn('Could not summarise borrowing histories; falling back to the loaded page:', error)
+    }
   }
 
   /**

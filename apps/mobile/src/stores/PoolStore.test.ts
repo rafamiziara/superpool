@@ -1289,6 +1289,7 @@ describe('PoolStore loan states', () => {
   let listLoansCallable: jest.Mock
   let listContributionsCallable: jest.Mock
   let listLoanRepaymentsCallable: jest.Mock
+  let listBorrowerHistoriesCallable: jest.Mock
 
   async function loadWithLoans(loans: LoanInfo[]) {
     listLoansCallable.mockResolvedValue({ data: { loans, totalCount: loans.length, limit: 50 } })
@@ -1312,12 +1313,14 @@ describe('PoolStore loan states', () => {
     listLoansCallable = jest.fn().mockResolvedValue({ data: { loans: [], totalCount: 0, limit: 50 } })
     listContributionsCallable = jest.fn().mockResolvedValue({ data: { contributions: [], totalCount: 0, limit: 50 } })
     listLoanRepaymentsCallable = jest.fn().mockResolvedValue({ data: { repayments: [], totalCount: 0, limit: 50 } })
+    listBorrowerHistoriesCallable = jest.fn().mockResolvedValue({ data: { histories: {}, asOf: '2026-08-18T09:00:00.000Z' } })
     mockFirebaseCallable.mockImplementation((_functions?: unknown, name?: string) => {
       if (name === 'listLoans') return listLoansCallable
       if (name === 'listContributions') return listContributionsCallable
       if (name === 'listWithdrawals') return jest.fn().mockResolvedValue({ data: { withdrawals: [], totalCount: 0, limit: 50 } })
       if (name === 'listInterestClaims') return jest.fn().mockResolvedValue({ data: { claims: [], totalCount: 0, limit: 50 } })
       if (name === 'listLoanRepayments') return listLoanRepaymentsCallable
+      if (name === 'listBorrowerHistories') return listBorrowerHistoriesCallable
       return jest.fn().mockResolvedValue({
         data: { pools: [LIVE_POOL], totalCount: 1, page: 1, limit: 50, hasNextPage: false, hasPreviousPage: false },
       })
@@ -1582,6 +1585,101 @@ describe('PoolStore loan states', () => {
       await loadWithLoans([REPAID_LOAN])
 
       expect(store.myBorrowingHistory).toMatchObject({ total: 1, repaid: 1, isNew: false })
+    })
+  })
+
+  // -------------------------------------------------------------------------
+  // Borrower history, summarised by the backend.
+  //
+  // The derivation above runs over `loans`, which is one page of the chain's
+  // newest — so a wallet with more loans than that page is judged on part of
+  // its record, on the panel a pool owner reads before lending. The backend
+  // filters by borrower first and summarises the whole of it, and judges
+  // lateness on chain time, which this store cannot read.
+  // -------------------------------------------------------------------------
+
+  describe('loadBorrowerHistories', () => {
+    const SUMMARISED = { total: 9, repaid: 8, onTime: 7, late: 1, undated: 0, outstanding: 1, overdue: 1, defaulted: 0, isNew: false }
+
+    async function summarise(histories: Record<string, unknown>) {
+      listBorrowerHistoriesCallable.mockResolvedValue({ data: { histories, asOf: '2026-08-18T09:00:00.000Z' } })
+      await store.loadBorrowerHistories([USER_WALLET])
+    }
+
+    it('asks the backend for the wallets it was given', async () => {
+      await store.loadBorrowerHistories([USER_WALLET, STRANGER_WALLET])
+
+      expect(listBorrowerHistoriesCallable).toHaveBeenCalledWith({
+        chainId: 31337,
+        borrowers: [USER_WALLET.toLowerCase(), STRANGER_WALLET.toLowerCase()],
+      })
+    })
+
+    it('prefers the summary over the page it could derive', async () => {
+      await loadWithLoans([REPAID_LOAN])
+      expect(store.borrowerHistory(USER_WALLET)).toMatchObject({ total: 1 })
+
+      await summarise({ [USER_WALLET.toLowerCase()]: SUMMARISED })
+
+      expect(store.borrowerHistory(USER_WALLET)).toEqual(SUMMARISED)
+    })
+
+    it('matches the summary case-insensitively, as every address here is', async () => {
+      await summarise({ [USER_WALLET.toLowerCase()]: SUMMARISED })
+
+      expect(store.borrowerHistory(USER_WALLET.toUpperCase())).toEqual(SUMMARISED)
+    })
+
+    // Nothing waits on this: the derivation is on screen until it answers, and
+    // stays there if it never does.
+    it('keeps the derived figure for a wallet the backend did not summarise', async () => {
+      await loadWithLoans([REPAID_LOAN])
+
+      await summarise({ [STRANGER_WALLET.toLowerCase()]: SUMMARISED })
+
+      expect(store.borrowerHistory(USER_WALLET)).toMatchObject({ total: 1, repaid: 1 })
+    })
+
+    // Silent like `triggerIndexing`: the fallback is the figure the app showed
+    // before any of this existed, and an error about a summary nobody asked
+    // for is worse than a slightly narrower one.
+    it('falls back rather than surfacing a failure', async () => {
+      await loadWithLoans([REPAID_LOAN])
+      listBorrowerHistoriesCallable.mockRejectedValue(new Error('offline'))
+
+      await store.loadBorrowerHistories([USER_WALLET])
+
+      expect(store.borrowerHistory(USER_WALLET)).toMatchObject({ total: 1 })
+      expect(store.error).toBeNull()
+    })
+
+    it('asks about each wallet once, however many times it was named', async () => {
+      await store.loadBorrowerHistories([USER_WALLET, USER_WALLET.toUpperCase(), ''])
+
+      expect(listBorrowerHistoriesCallable).toHaveBeenCalledWith(expect.objectContaining({ borrowers: [USER_WALLET.toLowerCase()] }))
+    })
+
+    it('asks nothing when there is nobody to ask about', async () => {
+      await store.loadBorrowerHistories([])
+
+      expect(listBorrowerHistoriesCallable).not.toHaveBeenCalled()
+    })
+
+    // Mock mode has no backend, and the fixtures are the only loans there are.
+    it('does not ask at all on mock data', async () => {
+      process.env.EXPO_PUBLIC_USE_MOCK_POOLS = 'true'
+
+      await store.loadBorrowerHistories([USER_WALLET])
+
+      expect(listBorrowerHistoriesCallable).not.toHaveBeenCalled()
+    })
+
+    it('clips a queue longer than one call may summarise', async () => {
+      const many = Array.from({ length: 30 }, (_, index) => `0x${String(index).padStart(40, '0')}`)
+
+      await store.loadBorrowerHistories(many)
+
+      expect(listBorrowerHistoriesCallable.mock.calls[0][0].borrowers).toHaveLength(25)
     })
   })
 

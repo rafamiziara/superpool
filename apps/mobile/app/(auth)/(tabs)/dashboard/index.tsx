@@ -2,7 +2,7 @@ import { FontAwesome } from '@expo/vector-icons'
 import { router } from 'expo-router'
 import { StatusBar } from 'expo-status-bar'
 import { observer } from 'mobx-react-lite'
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { Pressable, ScrollView, Text, View } from 'react-native'
 import { useAccount } from 'wagmi'
 import { ActivityRow } from '../../../../src/components/lending/ActivityRow'
@@ -25,6 +25,21 @@ const CARD_GAP = 16
 function DashboardScreen() {
   const { chainId } = useAccount()
   const activeChainId = chainId ?? DEFAULT_CHAIN_ID
+
+  /*
+    The user's own record, summarised by the backend from the whole of it.
+    The store's derivation runs over one page of the chain's newest loans, so
+    somebody with a long history would be shown part of it — on the one screen
+    that is about them.
+
+    Re-runs on a chain change as well as a wallet change: every feed here is
+    per chain, and a record is no exception.
+  */
+  const ownAddress = poolStore.userAddress
+
+  useEffect(() => {
+    if (ownAddress) void poolStore.loadBorrowerHistories([ownAddress])
+  }, [ownAddress, activeChainId])
   /**
    * The headline is the chain's own coin; anything held in a token gets its own
    * line beneath. Adding them would need a price, and this app deliberately has

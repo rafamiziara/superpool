@@ -3,7 +3,7 @@ import type { LoanInfo } from '@superpool/types'
 import { router, Stack, useLocalSearchParams } from 'expo-router'
 import { StatusBar } from 'expo-status-bar'
 import { observer } from 'mobx-react-lite'
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { ActivityIndicator, Pressable, RefreshControl, ScrollView, Text, View } from 'react-native'
 import { useReadContract } from 'wagmi'
 import { OverdueLoanCard } from '../../../src/components/lending/OverdueLoanCard'
@@ -84,6 +84,21 @@ function OverdueLoansScreen() {
   })
 
   const isBusy = stage !== 'idle'
+
+  const borrowerKey = loans.map((loan) => loan.borrower).join(',')
+
+  /*
+    Summaries come from the backend, which reads each wallet's whole record —
+    the store's own derivation runs over one page of the chain's newest loans,
+    so a borrower with more loans than that would be judged on part of it.
+
+    Keyed on a joined string rather than the array, so this re-runs when the
+    queue's borrowers change and not on every render. Never awaited: the local
+    derivation is on screen until this answers, so nothing waits.
+  */
+  useEffect(() => {
+    if (borrowerKey) void poolStore.loadBorrowerHistories(borrowerKey.split(','))
+  }, [borrowerKey])
 
   const declare = async (loan: LoanInfo) => {
     if (!pool || !denomination || isBusy) return
