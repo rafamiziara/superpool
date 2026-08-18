@@ -3,6 +3,7 @@ import { type Address, BaseError, ContractFunctionRevertedError, InsufficientFun
 import {
   mockEstimateContractGas,
   mockGetTransactionReceipt,
+  mockReadContract,
   mockWagmiUseAccount,
   mockWagmiUsePublicClient,
   mockWaitForTransactionReceipt,
@@ -133,6 +134,7 @@ describe('useWithdrawal', () => {
       estimateContractGas: mockEstimateContractGas,
       waitForTransactionReceipt: mockWaitForTransactionReceipt,
       getTransactionReceipt: mockGetTransactionReceipt,
+      readContract: mockReadContract,
     })
     mockEstimateContractGas.mockResolvedValue(100_000n)
     mockWriteContractAsync.mockResolvedValue(TX_HASH)

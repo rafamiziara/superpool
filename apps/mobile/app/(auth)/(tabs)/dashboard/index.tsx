@@ -17,7 +17,6 @@ import { DEFAULT_CHAIN_ID } from '../../../../src/config/contracts'
 import { palette } from '../../../../src/constants/palette'
 import { isDismissable, type PendingTransaction, pendingTransactionsStore } from '../../../../src/stores/PendingTransactionsStore'
 import { poolStore } from '../../../../src/stores/PoolStore'
-import { nativeDenomination } from '../../../../src/utils/denomination'
 import { daysUntil, formatAmount, formatToken } from '../../../../src/utils/format'
 
 const CARD_WIDTH = 288 // w-72
@@ -27,12 +26,13 @@ function DashboardScreen() {
   const { chainId } = useAccount()
   const activeChainId = chainId ?? DEFAULT_CHAIN_ID
   /**
-   * The hero figure sums across pools, so it can only be stated in one unit.
-   * Every pool this app creates is native, which is what makes that sum
-   * meaningful today — see `DENOMINATIONS` in the plan for why a mixed total
-   * needs prices rather than formatting.
+   * The headline is the chain's own coin; anything held in a token gets its own
+   * line beneath. Adding them would need a price, and this app deliberately has
+   * no oracle — a total in "POL" that quietly included USDC would be wrong by
+   * whatever the rate happened to be, and wrong silently.
    */
-  const nativeUnit = nativeDenomination(activeChainId)
+  const [nativeBalance, ...otherBalances] = poolStore.balancesByDenomination
+  const nativeUnit = nativeBalance.denomination
   const loan = poolStore.activeLoan
   const loanPool = loan ? poolStore.poolById(Number(loan.poolId)) : undefined
   const loanUnit = loan ? poolStore.denominationFor(Number(loan.poolId)) : undefined
@@ -76,9 +76,18 @@ function DashboardScreen() {
             <NetworkBadge chainId={activeChainId} testID="dashboard-network" />
           </View>
           <View className="mt-2 flex-row items-baseline gap-2">
-            <Text className="text-5xl font-bold tracking-tight text-snow">{formatToken(poolStore.totalBalance, nativeUnit.decimals)}</Text>
+            <Text className="text-5xl font-bold tracking-tight text-snow">{formatToken(nativeBalance.total, nativeUnit.decimals)}</Text>
             <Text className="text-xl font-bold text-mint">{nativeUnit.symbol}</Text>
           </View>
+          {otherBalances.length > 0 && (
+            <View className="mt-2 flex-row flex-wrap gap-x-4" testID="dashboard-other-balances">
+              {otherBalances.map(({ denomination, total }) => (
+                <Text key={denomination.symbol} className="font-mono text-sm text-fog">
+                  {formatAmount(total, denomination)}
+                </Text>
+              ))}
+            </View>
+          )}
           {poolStore.totalEarned > 0n && (
             <Text className="mt-2 text-sm text-mint">+{formatAmount(poolStore.totalEarned, nativeUnit)} earned all-time</Text>
           )}

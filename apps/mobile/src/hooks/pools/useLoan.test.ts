@@ -3,6 +3,7 @@ import { type Address, BaseError, ContractFunctionRevertedError, UserRejectedReq
 import {
   mockEstimateContractGas,
   mockGetTransactionReceipt,
+  mockReadContract,
   mockWagmiUseAccount,
   mockWagmiUsePublicClient,
   mockWaitForTransactionReceipt,
@@ -107,6 +108,7 @@ beforeEach(async () => {
     estimateContractGas: mockEstimateContractGas,
     waitForTransactionReceipt: mockWaitForTransactionReceipt,
     getTransactionReceipt: mockGetTransactionReceipt,
+    readContract: mockReadContract,
   })
   mockEstimateContractGas.mockResolvedValue(100_000n)
   mockWriteContractAsync.mockResolvedValue(TX_HASH)

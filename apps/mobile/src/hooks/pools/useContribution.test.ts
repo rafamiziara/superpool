@@ -3,6 +3,7 @@ import { type Address, BaseError, ContractFunctionRevertedError, InsufficientFun
 import {
   mockEstimateContractGas,
   mockGetTransactionReceipt,
+  mockReadContract,
   mockWagmiUseAccount,
   mockWagmiUsePublicClient,
   mockWaitForTransactionReceipt,
@@ -11,7 +12,7 @@ import {
 import { LendingPoolABI } from '../../constants/abis'
 import { pendingTransactionsStore } from '../../stores/PendingTransactionsStore'
 import { type ContributionParams, describeContributionError, useContribution, validateContributionParams } from './useContribution'
-import { NATIVE } from '../../__tests__/fixtures/denomination'
+import { NATIVE, USDC } from '../../__tests__/fixtures/denomination'
 
 const POOL_ADDRESS = '0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0'
 const WALLET_ADDRESS = '0x70997970C51812dc3A010C7d01b50e0d17dc79C8'
@@ -115,6 +116,7 @@ describe('useContribution', () => {
       estimateContractGas: mockEstimateContractGas,
       waitForTransactionReceipt: mockWaitForTransactionReceipt,
       getTransactionReceipt: mockGetTransactionReceipt,
+      readContract: mockReadContract,
     })
     mockEstimateContractGas.mockResolvedValue(100_000n)
     mockWriteContractAsync.mockResolvedValue(TX_HASH)
@@ -277,6 +279,53 @@ describe('useContribution', () => {
       })
 
       expect(mockWriteContractAsync).toHaveBeenCalledWith(expect.not.objectContaining({ gas: expect.anything() }))
+    })
+  })
+
+  describe('a token pool', () => {
+    it('sends depositTokens with the amount as an argument, and no value', async () => {
+      // Not an overload of `depositFunds`: two ABI entries under one name leave
+      // ethers unable to resolve either. See ERC20_PLAN §3.1.
+      const { result } = renderHook(() => useContribution())
+
+      await act(async () => {
+        await result.current.contribute(makeParams({ denomination: USDC, amount: 5_000_000n }))
+      })
+
+      expect(mockWriteContractAsync).toHaveBeenCalledWith(
+        expect.objectContaining({
+          address: POOL_ADDRESS,
+          abi: LendingPoolABI,
+          functionName: 'depositTokens',
+          args: [5_000_000n],
+          chainId: LOCALHOST_CHAIN_ID,
+        })
+      )
+      expect(mockWriteContractAsync.mock.calls[0][0]).not.toHaveProperty('value')
+    })
+
+    it('estimates the token call, which is what catches a missing allowance', async () => {
+      // The failure an abandoned approval leads to, and the one worth turning
+      // into a message rather than a signature prompt the user pays for.
+      const { result } = renderHook(() => useContribution())
+
+      await act(async () => {
+        await result.current.contribute(makeParams({ denomination: USDC, amount: 5_000_000n }))
+      })
+
+      expect(mockEstimateContractGas).toHaveBeenCalledWith(expect.objectContaining({ functionName: 'depositTokens', args: [5_000_000n] }))
+    })
+
+    it('records the transaction in the token’s own unit', async () => {
+      const { result } = renderHook(() => useContribution())
+
+      await act(async () => {
+        await result.current.contribute(makeParams({ denomination: USDC, amount: 5_000_000n }))
+      })
+
+      const [stored] = pendingTransactionsStore.transactions
+      expect(stored.denomination).toEqual(USDC)
+      expect(stored.params).toEqual(expect.objectContaining({ amount: '5000000' }))
     })
   })
 

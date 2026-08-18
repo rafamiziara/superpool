@@ -120,9 +120,43 @@ export const MOCK_POOLS: PoolInfo[] = [
     isActive: true,
     loanToken: zeroAddress,
   },
+  // The one pool here that is not native, and the reason it exists: without it
+  // mock mode never shows six decimals, an approval or a symbol that is not the
+  // chain's — so the whole token path would be invisible without a live node.
+  //
+  // Amounts are in the token's own smallest unit, which is what makes the
+  // figure meaningful: 5,000 USDC is 5_000_000_000, not 5000e18.
+  {
+    poolId: 7,
+    poolAddress: '0xA1c5B8e93D0f47a2E6b1C48F5093Dd7a2E4B6c81',
+    poolOwner: MOCK_USER_ADDRESS,
+    name: 'Stablecoin Circle',
+    description: 'Lending in USDC, so a loan means the same thing in a month as it does today.',
+    maxLoanAmount: (500n * 10n ** 6n).toString(),
+    interestRate: 600,
+    loanDuration: 30 * 86_400,
+    chainId: CHAIN_ID,
+    createdBy: MOCK_USER_ADDRESS,
+    createdAt: daysAgo(12).toISOString(),
+    transactionHash: '0x9a8b7c6d5e4f30291827364554637281909a8b7c6d5e4f302918273645546372',
+    isActive: true,
+    loanToken: '0x3c499c542cef5e3811e1192ce70d8cc03d5c3359',
+    tokenSymbol: 'USDC',
+    tokenDecimals: 6,
+  },
 ]
 
 export const MOCK_MEMBERSHIPS: PoolMember[] = [
+  {
+    walletAddress: MOCK_USER_ADDRESS,
+    poolId: '7',
+    joinedAt: daysAgo(12),
+    // Six decimals, like the pool: 1,200 USDC and 1,214.5 after interest.
+    totalContributed: 1_200_000_000n,
+    currentBalance: 1_214_500_000n,
+    isAdmin: true,
+    status: MemberStatus.ACTIVE,
+  },
   {
     walletAddress: MOCK_USER_ADDRESS,
     poolId: '1',

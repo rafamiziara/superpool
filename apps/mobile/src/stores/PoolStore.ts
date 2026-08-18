@@ -33,7 +33,7 @@ import { makeAutoObservable, runInAction } from 'mobx'
 import { DEFAULT_CHAIN_ID } from '../config/contracts'
 import { FIREBASE_FUNCTIONS } from '../config/firebase'
 import { MOCK_LOANS, MOCK_MEMBERSHIPS, MOCK_POOLS, MOCK_TRANSACTIONS, MOCK_USER_ADDRESS } from '../mocks/lending'
-import { type Denomination, denominationFor } from '../utils/denomination'
+import { type Denomination, denominationFor, nativeDenomination } from '../utils/denomination'
 import { sameAddress } from '../utils/format'
 import { logger } from '../utils/logger'
 import { authStore } from './AuthStore'
@@ -692,9 +692,45 @@ export class PoolStore {
     return this.memberships.filter((member) => member.poolId === String(poolId) && member.status === MemberStatus.ACTIVE).length
   }
 
-  /** Sum of the user's active balances across pools (wei). */
+  /**
+   * The user's balances, one figure per unit they are held in.
+   *
+   * **Not one number.** A balance in USDC and a balance in POL cannot be added
+   * without a price, and this app deliberately has no oracle — so it reports
+   * them side by side instead of inventing a total. Adding them would have been
+   * silent and wrong by whatever the exchange rate happens to be.
+   *
+   * The chain's own coin comes first, and is present even at zero: it is what
+   * the dashboard's headline figure is, and a headline that disappears when a
+   * user's only position is in a token reads as having lost the money.
+   */
+  get balancesByDenomination(): { denomination: Denomination; total: bigint }[] {
+    const native = nativeDenomination(authStore.chainId ?? DEFAULT_CHAIN_ID)
+    const totals = new Map<string, { denomination: Denomination; total: bigint }>([[native.symbol, { denomination: native, total: 0n }]])
+
+    for (const member of this.activeMemberships) {
+      const denomination = this.denominationFor(Number(member.poolId))
+      // A pool whose token the app cannot read contributes nothing rather than
+      // an amount in an unknown unit — see `denominationFor`.
+      if (!denomination) continue
+
+      const entry = totals.get(denomination.symbol) ?? { denomination, total: 0n }
+      totals.set(denomination.symbol, { denomination, total: entry.total + member.currentBalance })
+    }
+
+    return [...totals.values()]
+  }
+
+  /**
+   * The user's balance in the chain's own coin (wei).
+   *
+   * Native only, and that is the whole point: this used to add every pool's
+   * balance together, which stopped being a number the moment a pool could be
+   * denominated in something else. `balancesByDenomination` is what reports the
+   * rest.
+   */
   get totalBalance(): bigint {
-    return this.activeMemberships.reduce((sum, member) => sum + member.currentBalance, 0n)
+    return this.balancesByDenomination[0].total
   }
 
   /** Interest the connected wallet has already taken out, across pools (wei). */

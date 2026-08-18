@@ -3,7 +3,7 @@ import { useAccount, usePublicClient, useWriteContract } from 'wagmi'
 import { DEFAULT_CHAIN_ID } from '../../config/contracts'
 import { LendingPoolABI } from '../../constants/abis'
 import { pendingTransactionsStore } from '../../stores/PendingTransactionsStore'
-import type { Denomination } from '../../utils/denomination'
+import { type Denomination, isNative } from '../../utils/denomination'
 import { describeTransactionError } from './transactionErrors'
 
 /**
@@ -41,6 +41,8 @@ export interface UseContributionReturn {
 const CONTRACT_ERROR_MESSAGES: Record<string, string> = {
   InvalidAmount: 'Enter an amount greater than zero',
   EnforcedPause: 'This pool is not accepting contributions at the moment',
+  NativePoolOnly: 'This pool takes the network’s own coin, not a token',
+  TokenPoolOnly: 'This pool takes a token, not the network’s own coin',
 }
 
 /** `describeTransactionError` bound to the deposit path's wording. */
@@ -60,14 +62,22 @@ export function validateContributionParams(params: ContributionParams): string |
 }
 
 /**
- * Contributes liquidity to a pool: the user sends `depositFunds` from their own
- * wallet with the amount as `msg.value`, and the transaction is recorded for
- * monitoring.
+ * Contributes liquidity to a pool, by whichever of the two entry points the
+ * pool's denomination calls for, and records the transaction for monitoring.
  *
- * Unlike pool creation there is no backend preparation step. `depositFunds` is
- * open to anyone — the factory's creator whitelist governs who may *create* a
- * pool, not who may fund one — so there is nothing to authorise and no gas for
- * the backend to pay.
+ * **Two functions, not one payable one.** A native pool takes `depositFunds`
+ * with the amount as `msg.value`; a token pool takes `depositTokens(amount)`
+ * and pulls it, which is why the screen has to get an approval in first. Each
+ * reverts against the wrong kind of pool rather than guessing.
+ *
+ * They are separate *names* rather than overloads because ethers refuses to
+ * resolve a bare name with two ABI entries — see ERC20_PLAN §3.1. Do not tidy
+ * them back together.
+ *
+ * Unlike pool creation there is no backend preparation step. Depositing is open
+ * to anyone — the factory's creator whitelist governs who may *create* a pool,
+ * not who may fund one — so there is nothing to authorise and no gas for the
+ * backend to pay.
  *
  * Validation failures throw without setting `error`, leaving field-level
  * messages to the form; everything after that sets `error` and rethrows.
@@ -103,32 +113,66 @@ export const useContribution = (): UseContributionReturn => {
       setError(null)
       setIsSubmitting(true)
 
+      /** Head-room on an estimate, or nothing when there is no client to ask. */
+      const withBuffer = (estimate: bigint) => estimate + (estimate * GAS_BUFFER_PERCENT) / 100n
+
       try {
         // Estimating first turns a doomed transaction into a message rather than
-        // a signature prompt the user pays for. The `value` is part of the
-        // estimate, so a wallet that cannot cover deposit *plus* fee is caught
-        // here rather than at signing. Skipped when no client is configured for
-        // the chain, leaving the estimate to the wallet.
-        let gas: bigint | undefined
-        if (publicClient) {
-          const estimate = await publicClient.estimateContractGas({
+        // a signature prompt the user pays for. For a native deposit the `value`
+        // is part of the estimate, so a wallet that cannot cover deposit *plus*
+        // fee is caught here; for a token deposit it also catches a missing
+        // allowance, which is the failure an abandoned approval leads to.
+        // Skipped when no client is configured, leaving the estimate to the
+        // wallet.
+        //
+        // The two branches are spelled out rather than sharing a spread call:
+        // `value` and `args` are mutually exclusive in Viem's types, and a union
+        // of the two is not something it will accept.
+        let txHash: `0x${string}`
+
+        if (isNative(params.denomination)) {
+          const gas = publicClient
+            ? withBuffer(
+                await publicClient.estimateContractGas({
+                  address: params.poolAddress,
+                  abi: LendingPoolABI,
+                  functionName: 'depositFunds',
+                  value: params.amount,
+                  account: address,
+                })
+              )
+            : undefined
+
+          txHash = await writeContractAsync({
             address: params.poolAddress,
             abi: LendingPoolABI,
             functionName: 'depositFunds',
             value: params.amount,
-            account: address,
+            chainId: activeChainId,
+            ...(gas === undefined ? {} : { gas }),
           })
-          gas = estimate + (estimate * GAS_BUFFER_PERCENT) / 100n
-        }
+        } else {
+          const gas = publicClient
+            ? withBuffer(
+                await publicClient.estimateContractGas({
+                  address: params.poolAddress,
+                  abi: LendingPoolABI,
+                  functionName: 'depositTokens',
+                  args: [params.amount],
+                  account: address,
+                })
+              )
+            : undefined
 
-        const txHash = await writeContractAsync({
-          address: params.poolAddress,
-          abi: LendingPoolABI,
-          functionName: 'depositFunds',
-          value: params.amount,
-          chainId: activeChainId,
-          ...(gas === undefined ? {} : { gas }),
-        })
+          txHash = await writeContractAsync({
+            address: params.poolAddress,
+            abi: LendingPoolABI,
+            functionName: 'depositTokens',
+            args: [params.amount],
+            chainId: activeChainId,
+            ...(gas === undefined ? {} : { gas }),
+          })
+        }
 
         // Recorded before returning so a kill straight after signing still leaves
         // the transaction recoverable at next launch.

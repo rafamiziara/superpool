@@ -3,6 +3,7 @@ import React from 'react'
 import {
   mockEstimateContractGas,
   mockGetTransactionReceipt,
+  mockReadContract,
   mockWagmiUsePublicClient,
   mockWaitForTransactionReceipt,
 } from '../__tests__/mocks'
@@ -36,6 +37,7 @@ describe('PendingTransactionsInitializer', () => {
       estimateContractGas: mockEstimateContractGas,
       waitForTransactionReceipt: mockWaitForTransactionReceipt,
       getTransactionReceipt: mockGetTransactionReceipt,
+      readContract: mockReadContract,
     })
   })
 

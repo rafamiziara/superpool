@@ -27,12 +27,32 @@ describe('PoolStore', () => {
   })
 
   it('exposes the pools the user belongs to', () => {
-    expect(store.myPools.map((pool) => pool.poolId)).toEqual([1, 2, 3, 4])
+    expect(store.myPools.map((pool) => pool.poolId)).toEqual([1, 2, 3, 4, 7])
   })
 
-  it('sums balances of active memberships only', () => {
-    // 195.4 + 331.2 + 75 (pending membership excluded)
+  it('sums balances of active memberships only, in the chain’s own coin', () => {
+    // 195.4 + 331.2 + 75 (pending membership excluded). Pool 7 is denominated
+    // in USDC and is deliberately not in this figure: adding 1,214 USDC to a
+    // POL total would be wrong by whatever the exchange rate happens to be.
     expect(store.totalBalance).toBe(parseEther('601.6'))
+  })
+
+  it('reports a balance per unit rather than one impossible total', () => {
+    const balances = store.balancesByDenomination
+
+    expect(balances).toEqual([
+      { denomination: { symbol: 'POL', decimals: 18 }, total: parseEther('601.6') },
+      { denomination: expect.objectContaining({ symbol: 'USDC', decimals: 6 }), total: 1_214_500_000n },
+    ])
+  })
+
+  it('keeps the chain’s own coin first and present even with nothing in it', () => {
+    // The dashboard's headline figure. A headline that vanishes because the
+    // user holds no POL reads as having lost the money.
+    const empty = new PoolStore()
+
+    expect(empty.balancesByDenomination).toEqual([{ denomination: { symbol: 'POL', decimals: 18 }, total: 0n }])
+    expect(empty.totalBalance).toBe(0n)
   })
 
   it('reports no earnings until something says otherwise', () => {

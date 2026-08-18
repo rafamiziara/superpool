@@ -17,6 +17,8 @@ const mockContribute = jest.fn()
 const mockWaitForTransaction = jest.fn()
 const mockTriggerIndexing = jest.fn()
 const mockReset = jest.fn()
+const mockReadAllowance = jest.fn()
+const mockApprove = jest.fn()
 let mockContributionError: string | null = null
 
 jest.mock('expo-status-bar', () => ({
@@ -38,6 +40,16 @@ jest.mock('../../../src/hooks/pools/useTransactionMonitoring', () => ({
 
 jest.mock('../../../src/hooks/pools/usePoolIndexing', () => ({
   usePoolIndexing: () => ({ triggerIndexing: mockTriggerIndexing, indexConfirmed: jest.fn(), isIndexing: false }),
+}))
+
+jest.mock('../../../src/hooks/pools/useTokenApproval', () => ({
+  useTokenApproval: () => ({
+    readAllowance: mockReadAllowance,
+    approve: mockApprove,
+    isSubmitting: false,
+    error: null,
+    reset: jest.fn(),
+  }),
 }))
 
 /** Enters an amount and presses submit, flushing the async flow. */
@@ -62,6 +74,8 @@ describe('ContributeScreen', () => {
     })
     mockWagmiUseBalance.mockReturnValue({ data: { value: parseEther('50') } })
 
+    mockReadAllowance.mockResolvedValue(0n)
+    mockApprove.mockResolvedValue(TX_HASH)
     mockContribute.mockResolvedValue(TX_HASH)
     mockWaitForTransaction.mockResolvedValue({ amount: parseEther('5').toString(), txHash: TX_HASH })
     mockTriggerIndexing.mockResolvedValue(undefined)
@@ -180,6 +194,76 @@ describe('ContributeScreen', () => {
       render(<ContributeScreen />)
 
       expect(screen.getByTestId('contribute-error').props.children).toBe('Insufficient balance for gas')
+    })
+  })
+
+  describe('a token pool', () => {
+    /** Pool 7 in the mock data is denominated in USDC, at six decimals. */
+    const TOKEN_POOL_ID = '7'
+    const TOKEN = '0x3c499c542cef5e3811e1192ce70d8cc03d5c3359'
+
+    beforeEach(() => {
+      mockLocalSearchParams.mockReturnValue({ poolId: TOKEN_POOL_ID })
+    })
+
+    it('asks the token for an approval before asking the pool for anything', async () => {
+      render(<ContributeScreen />)
+
+      await submitAmount('5')
+
+      expect(mockApprove).toHaveBeenCalledWith({
+        token: TOKEN,
+        spender: poolStore.poolById(7)!.poolAddress,
+        // The amount, never the maximum: a bug in the pool must not be able to
+        // reach the rest of the member's balance. Six decimals, not eighteen.
+        amount: 5_000_000n,
+      })
+      expect(mockApprove.mock.invocationCallOrder[0]).toBeLessThan(mockContribute.mock.invocationCallOrder[0])
+    })
+
+    it('skips the approval when the pool may already take the amount', async () => {
+      // A flow abandoned between the two transactions resumes at the deposit
+      // rather than asking for a second approval.
+      mockReadAllowance.mockResolvedValue(10_000_000n)
+      render(<ContributeScreen />)
+
+      await submitAmount('5')
+
+      expect(mockApprove).not.toHaveBeenCalled()
+      expect(mockContribute).toHaveBeenCalled()
+    })
+
+    it('asks for an approval when the allowance cannot be read', async () => {
+      // Undefined is not zero — but asking is the safe way to be wrong: a
+      // needless approval costs gas, a missing one costs a reverted deposit.
+      mockReadAllowance.mockResolvedValue(undefined)
+      render(<ContributeScreen />)
+
+      await submitAmount('5')
+
+      expect(mockApprove).toHaveBeenCalled()
+    })
+
+    it('stops at the form when the approval is refused', async () => {
+      mockApprove.mockRejectedValue(new Error('User rejected the request'))
+      render(<ContributeScreen />)
+
+      await submitAmount('5')
+
+      expect(mockContribute).not.toHaveBeenCalled()
+      await waitFor(() => expect(screen.getByTestId('contribute-error')).toHaveTextContent('User rejected the request'))
+    })
+  })
+
+  describe('a native pool', () => {
+    it('asks for no approval at all', async () => {
+      // There is nothing to approve: the amount travels as `msg.value`.
+      render(<ContributeScreen />)
+
+      await submitAmount('5')
+
+      expect(mockReadAllowance).not.toHaveBeenCalled()
+      expect(mockApprove).not.toHaveBeenCalled()
     })
   })
 })

@@ -10,6 +10,7 @@ import {
 import {
   mockEstimateContractGas,
   mockGetTransactionReceipt,
+  mockReadContract,
   mockWagmiUsePublicClient,
   mockWaitForTransactionReceipt,
 } from '../../__tests__/mocks'
@@ -97,6 +98,7 @@ describe('useTransactionMonitoring', () => {
       estimateContractGas: mockEstimateContractGas,
       waitForTransactionReceipt: mockWaitForTransactionReceipt,
       getTransactionReceipt: mockGetTransactionReceipt,
+      readContract: mockReadContract,
     })
     mockWaitForTransactionReceipt.mockResolvedValue(makeReceipt())
   })

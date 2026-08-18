@@ -19,6 +19,8 @@ export const mockWriteContractAsync = jest.fn()
 export const mockEstimateContractGas = jest.fn()
 export const mockWaitForTransactionReceipt = jest.fn()
 export const mockGetTransactionReceipt = jest.fn()
+/** `publicClient.readContract` — the allowance read, and anything else a hook reads directly. */
+export const mockReadContract = jest.fn()
 
 export const mockWagmiUseWriteContract = jest.fn(() => ({
   writeContractAsync: mockWriteContractAsync,
@@ -48,6 +50,7 @@ export type MockPublicClient = {
   estimateContractGas: jest.Mock
   waitForTransactionReceipt: jest.Mock
   getTransactionReceipt: jest.Mock
+  readContract: jest.Mock
 }
 
 export const mockWagmiUsePublicClient = jest.fn((): MockPublicClient | undefined => ({
@@ -55,6 +58,7 @@ export const mockWagmiUsePublicClient = jest.fn((): MockPublicClient | undefined
   estimateContractGas: mockEstimateContractGas,
   waitForTransactionReceipt: mockWaitForTransactionReceipt,
   getTransactionReceipt: mockGetTransactionReceipt,
+  readContract: mockReadContract,
 }))
 
 // Firebase service mocks

@@ -4,6 +4,7 @@ import {
   mockEstimateContractGas,
   mockFirebaseCallable,
   mockGetTransactionReceipt,
+  mockReadContract,
   mockWagmiUseAccount,
   mockWagmiUsePublicClient,
   mockWaitForTransactionReceipt,
@@ -144,6 +145,7 @@ describe('usePoolCreation', () => {
       estimateContractGas: mockEstimateContractGas,
       waitForTransactionReceipt: mockWaitForTransactionReceipt,
       getTransactionReceipt: mockGetTransactionReceipt,
+      readContract: mockReadContract,
     })
     getPoolFactoryAddress.mockImplementation((chainId: number) => (chainId === LOCALHOST_CHAIN_ID ? FACTORY_ADDRESS : undefined))
 

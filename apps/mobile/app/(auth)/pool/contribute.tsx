@@ -4,24 +4,33 @@ import { StatusBar } from 'expo-status-bar'
 import { observer } from 'mobx-react-lite'
 import React, { useState } from 'react'
 import { ActivityIndicator, Pressable, ScrollView, Text, View } from 'react-native'
-import { useAccount, useBalance } from 'wagmi'
+import { useAccount, useBalance, useReadContract } from 'wagmi'
 import { ContributeForm } from '../../../src/components/lending/ContributeForm'
 import { UnsupportedPoolNotice } from '../../../src/components/lending/UnsupportedPoolNotice'
+import { ERC20ABI } from '../../../src/constants/abis'
 import { palette } from '../../../src/constants/palette'
 import { useContribution } from '../../../src/hooks/pools/useContribution'
 import { usePoolIndexing } from '../../../src/hooks/pools/usePoolIndexing'
+import { useTokenApproval } from '../../../src/hooks/pools/useTokenApproval'
 import { useTransactionMonitoring } from '../../../src/hooks/pools/useTransactionMonitoring'
 import { poolStore } from '../../../src/stores/PoolStore'
-import { denominationFor } from '../../../src/utils/denomination'
+import { denominationFor, isNative } from '../../../src/utils/denomination'
 import { formatAmount } from '../../../src/utils/format'
 
 /**
  * Where the flow is. Distinct from the hooks' own flags because it has to
- * survive across three of them and outlive the last one.
+ * survive across four of them and outlive the last one.
+ *
+ * `approving` exists because funding a token pool is two transactions: the
+ * token has to be told the pool may take the amount before the pool can take
+ * it. It is a stage here rather than a pending transaction because it changes
+ * nothing the app displays and has nothing to recover into — see
+ * `useTokenApproval`.
  */
-type Stage = 'form' | 'submitting' | 'confirming' | 'indexing' | 'done'
+type Stage = 'form' | 'approving' | 'submitting' | 'confirming' | 'indexing' | 'done'
 
 const STAGE_MESSAGES: Record<Exclude<Stage, 'form' | 'done'>, string> = {
+  approving: 'Approve the pool to take the amount — this is the first of two transactions',
   submitting: 'Approve the transaction in your wallet',
   confirming: 'Waiting for the network to confirm',
   indexing: 'Recording your contribution',
@@ -39,6 +48,7 @@ function ContributeScreen() {
   const { data: balance } = useBalance({ address })
 
   const { contribute, error: contributionError, reset } = useContribution()
+  const { readAllowance, approve, error: approvalError, reset: resetApproval } = useTokenApproval()
   const { waitForTransaction } = useTransactionMonitoring()
   const { triggerIndexing } = usePoolIndexing()
 
@@ -50,11 +60,55 @@ function ContributeScreen() {
   const denomination = pool ? denominationFor(pool) : undefined
   const membership = pool ? poolStore.membershipFor(pool.poolId) : undefined
 
+  /**
+   * The balance the form warns against has to be in the pool's own unit: a
+   * wallet holding 200 POL and no USDC would otherwise be told it can fund a
+   * USDC pool with 100.
+   *
+   * `useBalance` reads the chain's coin only — wagmi v2 dropped its `token`
+   * argument — so a token pool needs its own read.
+   */
+  const tokenAddress = denomination && !isNative(denomination) ? denomination.address : undefined
+  const { data: tokenBalance } = useReadContract({
+    address: tokenAddress,
+    abi: ERC20ABI,
+    functionName: 'balanceOf',
+    args: address ? [address] : undefined,
+    query: { enabled: Boolean(tokenAddress && address) },
+  })
+  const spendableBalance = tokenAddress ? tokenBalance : balance?.value
+
   const handleSubmit = async (amount: bigint) => {
     if (!pool || !denomination) return
 
     setFailure(null)
     reset()
+    resetApproval()
+
+    // The token has to be told first. Read what the pool may already take, so a
+    // flow abandoned between the two transactions resumes at the deposit rather
+    // than asking for a second approval — and so does a member who approved
+    // more than they spent last time.
+    if (!isNative(denomination) && denomination.address) {
+      const allowance = await readAllowance({ token: denomination.address, spender: pool.poolAddress as `0x${string}` })
+
+      // `undefined` means the allowance could not be read, not that it is zero.
+      // Asking for an approval is the safe way to be wrong: a needless one costs
+      // gas, a missing one costs a reverted deposit.
+      if (allowance === undefined || allowance < amount) {
+        try {
+          setStage('approving')
+          // The amount, never `type(uint256).max`: a bug in the pool must not be
+          // able to reach the rest of the member's balance.
+          await approve({ token: denomination.address, spender: pool.poolAddress as `0x${string}`, amount })
+        } catch (error) {
+          setStage('form')
+          setFailure(error instanceof Error ? error.message : 'Could not approve the token')
+
+          return
+        }
+      }
+    }
 
     let txHash: `0x${string}`
     try {
@@ -180,10 +234,10 @@ function ContributeScreen() {
           poolName={pool.name}
           denomination={denomination}
           currentPosition={membership?.totalContributed}
-          walletBalance={balance?.value}
+          walletBalance={spendableBalance}
           onSubmit={handleSubmit}
           isSubmitting={isBusy}
-          error={failure ?? contributionError}
+          error={failure ?? contributionError ?? approvalError}
         />
       </ScrollView>
     </View>
