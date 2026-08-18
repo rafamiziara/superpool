@@ -1,5 +1,5 @@
 import { FontAwesome } from '@expo/vector-icons'
-import { MemberStatus } from '@superpool/types'
+import { MemberStatus, type NoteKind } from '@superpool/types'
 import { router, Stack, useLocalSearchParams } from 'expo-router'
 import { StatusBar } from 'expo-status-bar'
 import { observer } from 'mobx-react-lite'
@@ -8,6 +8,7 @@ import { Pressable, ScrollView, Text, View } from 'react-native'
 import { useReadContract } from 'wagmi'
 import { ActivityRow } from '../../../src/components/lending/ActivityRow'
 import { ApprovalsLink } from '../../../src/components/lending/ApprovalsLink'
+import { NoteCallout } from '../../../src/components/lending/NoteCallout'
 import { OverdueLink } from '../../../src/components/lending/OverdueLink'
 import { ClaimInterestCard } from '../../../src/components/lending/ClaimInterestCard'
 import { PendingContributionCard } from '../../../src/components/lending/PendingContributionCard'
@@ -20,6 +21,7 @@ import {
   type PendingTransaction,
   pendingTransactionsStore,
 } from '../../../src/stores/PendingTransactionsStore'
+import { useNotes } from '../../../src/hooks/pools/useNotes'
 import { poolStore } from '../../../src/stores/PoolStore'
 import { denominationFor } from '../../../src/utils/denomination'
 import { bpsToPercent, formatAmount, formatDuration, sameAddress, shortAddress } from '../../../src/utils/format'
@@ -36,6 +38,23 @@ function pendingContributionsFor(poolId: number): ContributeTransaction[] {
     .filter((transaction): transaction is ContributeTransaction => transaction.type === 'CONTRIBUTE')
     .filter((transaction) => transaction.params.poolId === poolId)
     .sort((a, b) => b.timestamp - a.timestamp)
+}
+
+/**
+ * The outcome whose reason belongs beside each standing.
+ *
+ * Notes are keyed on the outcome rather than on the record, so asking for the
+ * one that matches where the wallet stands *now* is what keeps a reason from
+ * an earlier decision off a later one.
+ *
+ * `LEFT` and `PENDING` are absent deliberately: leaving is self-authored, and
+ * nobody has decided anything about a request still waiting.
+ */
+const NOTE_KIND_FOR_STANDING: Partial<Record<MemberStatus, NoteKind>> = {
+  [MemberStatus.ACTIVE]: 'membership_approved',
+  [MemberStatus.REJECTED]: 'membership_rejected',
+  // `SUSPENDED` is how the register's `removed` arrives — see `PoolStore`.
+  [MemberStatus.SUSPENDED]: 'membership_removed',
 }
 
 /** What the membership notice says, and whether it offers a way in. */
@@ -160,6 +179,20 @@ function PoolDetailScreen() {
    * stranger, and they must not see the same screen.
    */
   const standing = pool ? poolStore.registerStandingFor(pool.poolId) : undefined
+
+  /**
+   * What the owner said, if they said anything.
+   *
+   * Read from the register's word rather than the merged view: this is about a
+   * decision somebody made, and the merged view defaults an unswept contributor
+   * to active — which is nobody's decision at all.
+   */
+  const { noteFor } = useNotes(pool?.poolId)
+  const standingKind = membership?.status ? NOTE_KIND_FOR_STANDING[membership.status] : undefined
+  const decisionNote =
+    pool && standingKind && poolStore.userAddress
+      ? noteFor(`${pool.chainId}-${pool.poolId}-${poolStore.userAddress.toLowerCase()}`, standingKind)
+      : undefined
 
   // Read from the chain, never from the indexed pool record: the owner can flip
   // this at any moment and nothing indexes it.
@@ -286,6 +319,18 @@ function PoolDetailScreen() {
               )}
             </View>
           </View>
+
+          {/*
+            Where a removal reason finally lands. A removal sends no
+            notification — it is not a decision on anything the member asked
+            for — so this screen is the only place it is ever read, which is
+            still more than the nothing they used to be told.
+          */}
+          {!isOwner ? (
+            <View className="mt-3">
+              <NoteCallout note={decisionNote} label={`From ${pool.name}`} testID="pool-membership-note" />
+            </View>
+          ) : null}
         </View>
 
         {/* Membership card */}

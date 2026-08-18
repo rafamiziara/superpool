@@ -18,6 +18,12 @@ jest.mock('expo-status-bar', () => ({
   StatusBar: () => null,
 }))
 
+const mockNoteFor = jest.fn()
+
+jest.mock('../../../src/hooks/pools/useNotes', () => ({
+  useNotes: () => ({ notes: [], isLoading: false, refresh: jest.fn(), noteFor: mockNoteFor, writeNote: jest.fn() }),
+}))
+
 /** The contribution fixture's params, so each case only varies the pool. */
 const CONTRIBUTION_PARAMS = {
   poolId: 1,
@@ -468,6 +474,37 @@ describe('PoolDetailScreen', () => {
 
         expect(getByText(/You asked before and were turned down/)).toBeTruthy()
         expect(queryByTestId('pool-membership-ask')).toBeNull()
+      })
+
+      // A removal sends no notification, deliberately, so this screen is the
+      // only place its reason is ever read.
+      it('shows a removed member why, which is the only place they hear it', () => {
+        mockLocalSearchParams.mockReturnValue({ id: STRANGER_POOL })
+        givenStanding(STRANGER_POOL, MemberStatus.SUSPENDED)
+        mockNoteFor.mockReturnValue({ text: 'The circle is going back to six people.' })
+
+        const { getByTestId } = render(<PoolDetailScreen />)
+
+        expect(getByTestId('pool-membership-note-text')).toHaveTextContent('The circle is going back to six people.')
+      })
+
+      it('asks for the reason belonging to where the wallet stands now', () => {
+        mockLocalSearchParams.mockReturnValue({ id: STRANGER_POOL })
+        givenStanding(STRANGER_POOL, MemberStatus.REJECTED)
+
+        render(<PoolDetailScreen />)
+
+        expect(mockNoteFor).toHaveBeenCalledWith(expect.stringContaining(poolStore.userAddress.toLowerCase()), 'membership_rejected')
+      })
+
+      it('shows nothing where nobody wrote a reason', () => {
+        mockLocalSearchParams.mockReturnValue({ id: STRANGER_POOL })
+        givenStanding(STRANGER_POOL, MemberStatus.SUSPENDED)
+        mockNoteFor.mockReturnValue(undefined)
+
+        const { queryByTestId } = render(<PoolDetailScreen />)
+
+        expect(queryByTestId('pool-membership-note')).toBeNull()
       })
 
       it('tells a removed member their money is still theirs', () => {
