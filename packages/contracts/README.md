@@ -112,9 +112,24 @@ pnpm verify <IMPLEMENTATION_ADDRESS>
 | `pnpm test:gas`      | Run tests with gas usage reporting                   |
 | `pnpm coverage`      | Generate test coverage report                        |
 | `pnpm deploy:amoy`   | Deploy contracts to Polygon Amoy testnet             |
+| `pnpm env:print`     | Emit the `.env` lines for a deployment               |
 | `pnpm verify`        | Verify contracts using Etherscan API v2 (multichain) |
 | `pnpm lint`          | Run Solidity and TypeScript linting                  |
 | `pnpm clean`         | Clean compilation artifacts                          |
+
+### Configuring the rest of the monorepo after a deploy
+
+Both deploy scripts write `deployments/<network>.json`. `pnpm env:print` reads
+one back and prints the lines the backend and the mobile app need, so the
+addresses are not carried across by scrolling through a deploy log:
+
+```bash
+pnpm env:print                 # the only deployment, or an error naming them
+pnpm env:print localhost       # a named one
+```
+
+It never writes to a `.env`. Both are gitignored and hold secrets — a private
+key pasted under one of these lines has to survive the next redeploy.
 
 ## Contract ABIs
 
@@ -141,7 +156,11 @@ packages/contracts/
 ├── contracts/              # Solidity smart contracts
 │   └── LendingPool.sol
 ├── scripts/                # Deployment and utility scripts
-│   └── deploy.ts
+│   ├── deploy.ts
+│   ├── print-env.ts        # Emits .env lines from a deployment record
+│   └── lib/                # Shared by the scripts above
+│       └── verification.ts # Explorer verification, retry and backoff
+├── deployments/            # One record per network, written by the deploy scripts
 ├── test/                   # Test files
 │   └── LendingPool.test.ts
 ├── typechain-types/        # Generated TypeScript types
@@ -192,6 +211,14 @@ A fully upgradeable lending pool contract that demonstrates the core functionali
 - **Chain ID**: 137
 - **RPC URL**: https://polygon-rpc.com/
 - **Explorer**: https://polygonscan.com/
+
+### Also configured, nothing deployed
+
+`mainnet` (1), `arbitrumOne` (42161), `base` (8453) and `bsc` (56) — the chains
+the mobile app's network picker already offers. Their RPC defaults are public
+endpoints rather than production ones; set `ETHEREUM_RPC_URL`, `ARBITRUM_RPC_URL`,
+`BASE_RPC_URL` or `BSC_RPC_URL` before deploying to any of them. One
+`ETHERSCAN_API_KEY` verifies on all of them, which is what the v2 API buys.
 
 ## Security Features
 

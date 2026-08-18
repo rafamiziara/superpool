@@ -1,5 +1,6 @@
 import * as dotenv from 'dotenv'
-import { network, run } from 'hardhat'
+import { network } from 'hardhat'
+import { manualVerifyCommand, verificationBlocker, verifyAllWithRetry, VerifyTarget } from './lib/verification'
 
 dotenv.config()
 
@@ -19,17 +20,12 @@ async function main() {
   console.log('🔍 Starting contract verification process...')
   console.log(`📍 Network: ${network.name} (${network.config.chainId})`)
 
-  // Skip verification for local networks
-  if (network.name === 'localhost' || network.name === 'hardhat' || network.name === 'hardhatFork') {
-    console.log('⏭️ Skipping verification on local network')
-    return
-  }
+  const blocker = verificationBlocker()
 
-  // Check if API key is configured
-  if (!process.env.ETHERSCAN_API_KEY || process.env.ETHERSCAN_API_KEY === '') {
-    console.log('❌ ETHERSCAN_API_KEY not configured. Please set it in your .env file')
-    console.log('   Get your API key from: https://etherscan.io/apis')
-    process.exit(1)
+  if (blocker) {
+    console.log(`⏭️ Nothing to verify: ${blocker}`)
+    console.log('   An Etherscan API key comes from: https://etherscan.io/apis')
+    return
   }
 
   // Get contracts to verify from command line args or use defaults
@@ -58,11 +54,7 @@ async function main() {
 
       // Provide manual verification command
       console.log(`\n🔧 Manual verification command:`)
-      console.log(
-        `   pnpm hardhat verify --network ${network.name} ${contract.address}${
-          contract.constructorArgs ? ' ' + contract.constructorArgs.join(' ') : ''
-        }`
-      )
+      console.log(`   ${manualVerifyCommand(contract.address, contract.constructorArgs)}`)
     }
   }
 
@@ -80,48 +72,23 @@ async function main() {
 }
 
 /**
- * Verify a single contract with retry logic
+ * Verify one entry, implementation first where it has one.
+ *
+ * Throws on exhaustion so `main` can count the failure and print the manual
+ * command. The retry, the backoff and the "already verified" match all live in
+ * `lib/verification` now, and each target is retried on its own — see
+ * `verifyAllWithRetry` for the bug that pairing them caused.
  */
-async function verifyContract(contractInfo: ContractInfo, maxRetries: number = 3): Promise<void> {
-  for (let attempt = 1; attempt <= maxRetries; attempt++) {
-    try {
-      if (attempt > 1) {
-        console.log(`   🔄 Retry attempt ${attempt}/${maxRetries}...`)
-        // Wait before retry (exponential backoff)
-        await new Promise((resolve) => setTimeout(resolve, Math.pow(2, attempt) * 1000))
-      }
+async function verifyContract(contractInfo: ContractInfo): Promise<void> {
+  const targets: VerifyTarget[] = []
 
-      if (contractInfo.isProxy && contractInfo.implementationAddress) {
-        // For proxy contracts, verify the implementation first if provided
-        await run('verify:verify', {
-          address: contractInfo.implementationAddress,
-          constructorArguments: [],
-        })
-        console.log(`   ✅ Implementation verified at ${contractInfo.implementationAddress}`)
-      }
-
-      // Verify the main contract
-      await run('verify:verify', {
-        address: contractInfo.address,
-        constructorArguments: contractInfo.constructorArgs || [],
-      })
-
-      return // Success
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error'
-
-      if (errorMessage.toLowerCase().includes('already verified')) {
-        console.log(`   ✅ ${contractInfo.name} is already verified`)
-        return
-      }
-
-      if (attempt === maxRetries) {
-        throw error // Re-throw on final attempt
-      }
-
-      console.log(`   ⚠️ Attempt ${attempt} failed: ${errorMessage}`)
-    }
+  if (contractInfo.isProxy && contractInfo.implementationAddress) {
+    targets.push({ label: `${contractInfo.name} implementation`, address: contractInfo.implementationAddress })
   }
+
+  targets.push({ label: contractInfo.name, address: contractInfo.address, constructorArguments: contractInfo.constructorArgs })
+
+  await verifyAllWithRetry(targets)
 }
 
 /**

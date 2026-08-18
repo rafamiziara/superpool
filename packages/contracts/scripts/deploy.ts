@@ -1,76 +1,20 @@
 import * as dotenv from 'dotenv'
-import { ethers, network, run, upgrades } from 'hardhat'
+import { mkdirSync, writeFileSync } from 'fs'
+import { ethers, network, upgrades } from 'hardhat'
+import { join } from 'path'
+import { isLocalNetwork, verifyContract } from './lib/verification'
 
 dotenv.config()
-
-/**
- * Verify a contract with retry logic
- */
-async function verifyContract(
-  contractName: string,
-  address: string,
-  constructorArgs: unknown[] = [],
-  maxRetries: number = 3
-): Promise<void> {
-  // Skip verification for local networks
-  if (network.name === 'localhost' || network.name === 'hardhat' || network.name === 'hardhatFork') {
-    console.log(`   ⏭️ Skipping verification for ${contractName} on local network`)
-    return
-  }
-
-  // Check if API key is configured
-  if (!process.env.ETHERSCAN_API_KEY || process.env.ETHERSCAN_API_KEY === '') {
-    console.log(`   ⚠️ ETHERSCAN_API_KEY not configured, skipping verification for ${contractName}`)
-    return
-  }
-
-  console.log(`\n🔍 Verifying ${contractName} at ${address}...`)
-
-  for (let attempt = 1; attempt <= maxRetries; attempt++) {
-    try {
-      if (attempt > 1) {
-        console.log(`   🔄 Retry attempt ${attempt}/${maxRetries}...`)
-        // Wait before retry (exponential backoff)
-        await new Promise((resolve) => setTimeout(resolve, Math.pow(2, attempt) * 1000))
-      }
-
-      await run('verify:verify', {
-        address: address,
-        constructorArguments: constructorArgs,
-      })
-
-      console.log(`   ✅ ${contractName} verified successfully`)
-      return
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error'
-
-      if (errorMessage.toLowerCase().includes('already verified')) {
-        console.log(`   ✅ ${contractName} is already verified`)
-        return
-      }
-
-      if (attempt === maxRetries) {
-        console.log(`   ❌ Failed to verify ${contractName}: ${errorMessage}`)
-        console.log(`   🔧 Manual verification command:`)
-        console.log(
-          `      pnpm hardhat verify --network ${network.name} ${address}${
-            constructorArgs.length > 0 ? ' ' + constructorArgs.join(' ') : ''
-          }`
-        )
-        return
-      }
-
-      console.log(`   ⚠️ Attempt ${attempt} failed: ${errorMessage}`)
-    }
-  }
-}
 
 /**
  * Wait for a number of block confirmations
  */
 async function waitForConfirmations(txHash: string, confirmations: number = 5): Promise<void> {
-  if (network.name === 'localhost' || network.name === 'hardhat') {
-    return // Skip on local networks
+  // Every local network, not just the two that were named here: a fork mines
+  // on demand, so waiting for five confirmations on `polygonAmoyFork` waits
+  // for blocks nothing is going to produce.
+  if (isLocalNetwork()) {
+    return
   }
 
   console.log(`   ⏳ Waiting for ${confirmations} block confirmations...`)
@@ -198,7 +142,7 @@ async function main() {
     console.log('\n🎉 All deployments completed successfully!')
 
     // Verification summary
-    if (network.name !== 'localhost' && network.name !== 'hardhat' && network.name !== 'hardhatFork') {
+    if (!isLocalNetwork()) {
       console.log('\n📋 Contract Verification Summary:')
       console.log(`   🔗 View contracts on Polygonscan:`)
       console.log(
@@ -224,24 +168,64 @@ async function main() {
     console.log('4. Test loan creation with createLoan()')
     console.log('5. Set up multi-sig Safe for production ownership transfer')
 
-    // Save comprehensive deployment info
+    /*
+     * Persist the deployment record.
+     *
+     * This used to `console.log(JSON.stringify(...))` and stop there, so the
+     * only network that ever produced a `deployments/<network>.json` was
+     * localhost — the one whose addresses matter least, because they are
+     * regenerated on demand. Amoy's went to scrollback.
+     *
+     * The record also could not have said which chain it was for: `network`
+     * held ethers' `Network` object, whose name and chain id are private
+     * fields, so `JSON.stringify` rendered it as `{}`.
+     */
+    const providerNetwork = await ethers.provider.getNetwork()
+    const factoryReceipt = await poolFactory.deploymentTransaction()?.wait()
+
     const deploymentInfo = {
-      network: await ethers.provider.getNetwork(),
+      network: {
+        name: network.name,
+        chainId: Number(providerNetwork.chainId),
+        rpcUrl: 'url' in network.config ? network.config.url : '',
+      },
       timestamp: new Date().toISOString(),
       deployer: deployer.address,
+      /*
+       * Where a first event sweep should start. Without it the backend falls
+       * back to a short lookback on a public chain, which silently misses every
+       * pool created before the backend was pointed at it.
+       */
+      startBlock: factoryReceipt?.blockNumber ?? 0,
+      whitelistMode: await poolFactory.isWhitelistEnabled(),
       contracts: {
         lendingPoolImplementation: implementationAddress,
+        // Every pool proxies through this; upgrading it upgrades them all.
+        poolBeacon: await poolFactory.poolBeacon(),
         poolFactory: {
           proxy: factoryAddress,
           implementation: factoryImplementationAddress,
         },
         samplePool: samplePoolAddress || null,
       },
-      samplePoolParameters: samplePoolParams,
+      samplePoolParameters: {
+        ...samplePoolParams,
+        maxLoanAmount: samplePoolParams.maxLoanAmount.toString(),
+      },
     }
 
-    console.log('\n📄 Deployment Info:')
-    console.log(JSON.stringify(deploymentInfo, null, 2))
+    const deploymentsDir = join(__dirname, '..', 'deployments')
+    mkdirSync(deploymentsDir, { recursive: true })
+    const deploymentPath = join(deploymentsDir, `${network.name}.json`)
+    writeFileSync(
+      deploymentPath,
+      `${JSON.stringify(deploymentInfo, null, 2)}
+`
+    )
+
+    console.log(`
+📄 Deployment record written to: ${deploymentPath}`)
+    console.log(`   Emit the .env lines for it with: pnpm env:print --network ${network.name}`)
   } catch (error) {
     console.error('❌ Deployment failed:')
     console.error(error)

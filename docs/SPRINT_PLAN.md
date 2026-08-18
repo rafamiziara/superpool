@@ -820,12 +820,16 @@ SDK 53.
   pruning exists; Expo's `getReceipts` needs a deferred second pass.
 - **Discovery**: search tokens written onto the pool document by the indexer, so
   search stops being client-side over one page of 50 pools.
-- **Contracts tooling**
+- ~~**Contracts tooling**~~ — shipped 2026-08-19
   ([`.dev/contracts/CONTRACTS_BACKLOG.md`](../.dev/contracts/CONTRACTS_BACKLOG.md)
-  §4): deduplicate `verifyContractWithRetry` (three copies and a partial
-  fourth), a reader that emits the `.env` lines from `deployments/<network>.json`
-  instead of a human copying addresses, the missing Arbitrum/Base/BSC network
-  entries, and the Hardhat 3 / Solidity 0.8.30 / Ignition upgrades.
+  §4). Verification deduplicated into `scripts/lib/verification.ts`;
+  `pnpm env:print` emits the `.env` lines from `deployments/<network>.json`;
+  Arbitrum, Base, BSC and mainnet added. **The find that mattered was not on the
+  list**: `hardhat-verify` picks its API from the _shape_ of `etherscan.apiKey`,
+  and the per-network map the config used selects the **v1** API that was
+  switched off in May 2025 — so verification on the Amoy deploy would have
+  failed against a dead endpoint. One string selects v2. Left as migrations:
+  Hardhat 3, Solidity 0.8.30, Ignition.
 - **Chores** ([`.dev/todo.md`](../.dev/todo.md)): Zod validation, Maestro + EAS
   workflows for E2E, an environments document, the 'Empty' illustration and a
   hero background.

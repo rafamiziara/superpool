@@ -1,7 +1,8 @@
 import * as dotenv from 'dotenv'
 import { mkdirSync, writeFileSync } from 'fs'
-import { ethers, network, run, upgrades } from 'hardhat'
+import { ethers, network, upgrades } from 'hardhat'
 import { join } from 'path'
+import { verifyContract } from './lib/verification'
 
 dotenv.config()
 
@@ -11,60 +12,6 @@ dotenv.config()
  * backend setup is copy-pasteable. Never use it on a live network.
  */
 const HARDHAT_ACCOUNT_0_PRIVATE_KEY = '0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80'
-
-/**
- * Verify a contract with retry logic (skips on localhost)
- */
-async function verifyContract(
-  contractName: string,
-  address: string,
-  constructorArgs: unknown[] = [],
-  maxRetries: number = 3
-): Promise<void> {
-  // Skip verification for local networks
-  if (network.name === 'localhost' || network.name === 'hardhat' || network.name === 'hardhatFork') {
-    console.log(`   ⏭️ Skipping verification for ${contractName} on local network`)
-    return
-  }
-
-  // Check if API key is configured
-  if (!process.env.ETHERSCAN_API_KEY || process.env.ETHERSCAN_API_KEY === '') {
-    console.log(`   ⚠️ ETHERSCAN_API_KEY not configured, skipping verification for ${contractName}`)
-    return
-  }
-
-  console.log(`\n🔍 Verifying ${contractName} at ${address}...`)
-
-  for (let attempt = 1; attempt <= maxRetries; attempt++) {
-    try {
-      if (attempt > 1) {
-        console.log(`   🔄 Retry attempt ${attempt}/${maxRetries}...`)
-        await new Promise((resolve) => setTimeout(resolve, Math.pow(2, attempt) * 1000))
-      }
-
-      await run('verify:verify', {
-        address: address,
-        constructorArguments: constructorArgs,
-      })
-
-      console.log(`   ✅ ${contractName} verified successfully`)
-      return
-    } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error'
-      if (errorMessage.toLowerCase().includes('already verified')) {
-        console.log(`   ✅ ${contractName} is already verified`)
-        return
-      }
-
-      if (attempt === maxRetries) {
-        console.log(`   ❌ Failed to verify ${contractName}: ${errorMessage}`)
-        return
-      }
-
-      console.log(`   ⚠️ Attempt ${attempt} failed: ${errorMessage}`)
-    }
-  }
-}
 
 async function main() {
   console.log('🚀 Starting LOCAL deployment...')
@@ -364,6 +311,12 @@ async function main() {
       },
       timestamp: new Date().toISOString(),
       deployer: deployer.address,
+      /*
+       * Where a first event sweep should start. Zero on a local chain, and
+       * recorded anyway so `deployments/<network>.json` has one shape for
+       * `pnpm env:print` to read whichever network wrote it.
+       */
+      startBlock: (await poolFactory.deploymentTransaction()?.wait())?.blockNumber ?? 0,
       whitelistMode: await poolFactory.isWhitelistEnabled(),
       contracts: {
         lendingPoolImplementation: implementationAddress,

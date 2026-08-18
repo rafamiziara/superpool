@@ -241,22 +241,20 @@ Verification is configured in `hardhat.config.ts`:
 
 ```typescript
 etherscan: {
-  apiKey: {
-    polygonAmoy: process.env.ETHERSCAN_API_KEY || '',
-    polygon: process.env.ETHERSCAN_API_KEY || '',
-  },
-  customChains: [
-    {
-      network: 'polygonAmoy',
-      chainId: 80002,
-      urls: {
-        apiURL: 'https://api-amoy.polygonscan.com/api',
-        browserURL: 'https://amoy.polygonscan.com',
-      },
-    },
-  ],
+  apiKey: process.env.ETHERSCAN_API_KEY || '',
 }
 ```
+
+**A single string, not a per-network map, and the difference is load-bearing.**
+`hardhat-verify` reads the shape of `apiKey` to decide which API it talks to: a
+map means explorer-specific keys and selects each chain's **v1** API, which was
+switched off on 31 May 2025; a string selects Etherscan **v2**, one endpoint
+that routes by chain id. The map form also printed a deprecation warning on
+every run.
+
+`customChains` went with it. v2 ignores the per-explorer `apiURL`, and
+`polygonAmoy` is in the plugin's builtin chain list, so the override said
+nothing the plugin did not already know.
 
 ## API Keys
 
