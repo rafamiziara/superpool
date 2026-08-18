@@ -266,7 +266,11 @@ async function main() {
   })
   await deposit.wait()
 
-  check('the pool reviews requests before lending', (await pool.contract.requiresApproval()) === true)
+  // `poolConfig[4]`, not a getter of its own: the flag packs into `isActive`'s
+  // slot, and like `requiresMembership` it is read from the chain because the
+  // owner can change it at any moment.
+  const config = await pool.contract.poolConfig()
+  check('the pool reviews requests before lending', config[4] === true, `${config[4]}`)
 
   // ---------------------------------------------------------------------------
   separator('An approval')
@@ -436,9 +440,14 @@ async function main() {
   check('asking for refusals returns one', refusalsOnly.docs.length === 1, `${refusalsOnly.docs.length}`)
   check('and it is the one the owner refused', refusalsOnly.docs[0]?.data().loanId === declinedLoan)
 
+  // Scoped to this run's pool like every other read here. Without it the query
+  // spans the chain, and the chain outlives a run — a second run against the
+  // same node would count the first run's decisions and fail on a script bug
+  // that looks exactly like a filtering bug.
   const byDecider = await firestore
     .collection(LOAN_DECISIONS_COLLECTION)
     .where('chainId', '==', CHAIN_ID)
+    .where('poolId', '==', pool.poolId)
     .where('decidedBy', '==', owner.address.toLowerCase())
     .get()
 
@@ -447,6 +456,7 @@ async function main() {
   const byBorrower = await firestore
     .collection(LOAN_DECISIONS_COLLECTION)
     .where('chainId', '==', CHAIN_ID)
+    .where('poolId', '==', pool.poolId)
     .where('borrower', '==', approvedBorrower.address.toLowerCase())
     .get()
 
