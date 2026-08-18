@@ -14,7 +14,7 @@ To build a functional micro-lending decentralized application on Polygon where u
 | 2 · Authentication Enhancement | ✅ Complete                                             |
 | 3 · Pool Creation              | 🚧 Complete locally; blocked on testnet deployment      |
 | 4 · Pool Membership            | ✅ Complete                                             |
-| 5 · Pool Liquidity             | 🚧 Native currency only; ERC-20 outstanding             |
+| 5 · Pool Liquidity             | ✅ Complete — native POL and ERC-20 pools               |
 | 6 · Loan Requests              | ✅ Complete — request flow and AI assessment            |
 | 7 · Loan Repayments            | ✅ Full, partial, accruing; reminders; no schedule      |
 | 8 · Withdrawals                | ✅ Complete                                             |
@@ -36,6 +36,12 @@ Everything shipped is verified against a live Hardhat node and the Firebase
 emulators, not only against mocked tests. **Nothing is deployed to a public
 chain**, which is the single biggest gap in the project and is owned by no
 sprint — see "Cross-cutting" at the end.
+
+**Most of what is left is configuration, not code.** The three things that would
+change what an outsider can see — a public deployment, a build that can actually
+receive push, and a deployed agent service — are keys, funding and credentials.
+The development work that remains is real but optional, and none of it blocks a
+demo; both halves are listed under "What is left, split by kind" at the end.
 
 ---
 
@@ -159,9 +165,9 @@ One thing gates the rest now: **no funded Amoy deployer or backend wallet.**
 The other half of the blocker was code and is fixed — the backend resolved
 exactly one chain at a time, so localhost and Amoy could not both be served and
 the app's network picker was presentational. It now serves every chain
-configured; see the Chains section in [`CLAUDE.md`](../CLAUDE.md). What remains
-is a chequebook, a `hardhat.config.ts` network entry and the per-network
-deployment checklist.
+configured; see the Chains section in [`CLAUDE.md`](../CLAUDE.md).
+`hardhat.config.ts` already carries `polygonAmoy` and its explorer entry, so what
+remains is a chequebook and the per-network deployment checklist.
 
 ---
 
@@ -235,8 +241,12 @@ See [`CONTRIBUTIONS.md`](CONTRIBUTIONS.md) for how the shipped system works.
 
 ### Features:
 
-- **Liquidity Contribution System** 🚧
-  - `depositFunds` for POL — ✅; **ERC-20 — ❌**, needs contract work
+- **Liquidity Contribution System** ✅
+  - `depositFunds` for POL ✅; **ERC-20 — ✅ 2026-08-18** via `depositTokens`.
+    One asset per pool, chosen at creation and never changed, with `address(0)`
+    meaning native so nothing existing had to migrate. Deliberately **not** an
+    overload of `depositFunds`: ethers refuses to resolve an ambiguous bare
+    name, which would have broken every native call site
   - Contribution amount validation — ✅; **a minimum deposit — ❌**, and no
     longer implied: the `minimumContribution` field that promised one was
     deleted rather than implemented
@@ -265,7 +275,38 @@ See [`CONTRIBUTIONS.md`](CONTRIBUTIONS.md) for how the shipped system works.
 - Member contribution management system — ✅
 - Off-chain liquidity data synchronization — ✅
 
-### Current Status: **Native currency complete; ERC-20 outstanding** 🚧
+### Current Status: **COMPLETE — native and token pools** ✅
+
+ERC-20 shipped 2026-08-18, all five phases of
+[`.dev/contracts/ERC20_PLAN.md`](../.dev/contracts/ERC20_PLAN.md), live-verified
+with 29 checks (`pnpm --filter backend testErc20`). Each protection was checked
+by **mutation** rather than trusted for passing: crediting the requested amount
+instead of the delivered balance fails exactly the two fee-on-transfer checks.
+
+Phase 3 before phase 4 is the ordering worth remembering — the decimals refactor
+landed while every pool was still native and 18-decimal, so the existing mobile
+suite was the proof it changed nothing, and making `formatToken`'s exponent
+_required_ let the type checker enumerate all 42 arithmetic sites.
+
+Three rules that are easy to break, all in
+[`CLAUDE.md`](../CLAUDE.md#denominations):
+
+- **Formatting is three-way**, and collapsing it to two is a factor-of-10¹² bug:
+  native, a token whose decimals the backend read, and a token it could not —
+  the third is shown as unsupported and never falls back to 18.
+- **Credit the balance delta, never the requested amount.** A fee-on-transfer
+  token delivers less than it was asked for, and crediting the request inflates
+  `totalContributions` — the denominator every interest distribution divides by.
+- **Never sum balances across pools.** `totalBalance` and `totalEarned` are
+  native-only now; adding a USDC balance to a POL one needs a price, and the
+  oracle is deliberately absent.
+
+One thing is still open here and it is **configuration**: which stablecoin to use
+on Amoy. The app reads it from `EXPO_PUBLIC_USDC_ADDRESS_AMOY` and offers native
+alone until it is set, and the token must also be authorized on the deployed
+factory with `setLoanTokenAuthorization`. Nothing is blocked and nothing is
+guessed — a wrong address would create pools denominated in nothing,
+permanently, since `loanToken` has no setter.
 
 ---
 
@@ -293,7 +334,12 @@ See [`LOANS.md`](LOANS.md) for how the shipped system works.
   - **Advisory, never load-bearing**, and it produces a band rather than a
     score — `REPUTATION_PLAN` §7's argument was kept, not overturned. See
     [Assessment](../CLAUDE.md#assessment).
-  - Held by seven eval cases and 17 live checks against a real model.
+  - Held by seven eval cases (`pnpm --filter agents eval`) and 21 live checks
+    against a real model (`pnpm --filter backend testAssessment`). The last of
+    those is a **daily per-wallet cap** on fresh readings, shipped 2026-08-18:
+    this is the only callable in the project that spends money on somebody
+    else's behalf, and the owner's queue asks for a reading per undecided
+    request the first time it opens.
 
 - **User Interface** ✅
   - Loan request form for members
@@ -546,9 +592,11 @@ reputation is still waiting on those sprints.
 - Complete administrative loan management tools — 🚧
 - Comprehensive loan decision audit system — 🚧
 
-### Current Status: \*\*Decisions and decision support work; queue prioritisation
+### Current Status: **Decisions and decision support work; prioritisation and portfolio statistics remain** 🚧
 
-and portfolio statistics remain\*\* 🚧
+This is the largest block of unbuilt product work left in the project —
+prioritisation over the queue, a portfolio overview for a pool owner, and
+analytics over decisions already made. Nothing else in the plan waits on it.
 
 ---
 
@@ -688,15 +736,30 @@ SDK 53.
 
 - **Deployment to a public chain.** Sprint 3 names it as blocked but nothing
   owns fixing it. The backend half is done — it serves every configured chain
-  now — so what is left is a funded deployer and backend wallet, an Amoy entry
-  in `hardhat.config.ts`, and the per-network checklist in
-  [`.dev/deployment/GOING_PUBLIC.md`](../.dev/deployment/GOING_PUBLIC.md)
-  §2.2. Until this moves, nothing in the project is publicly inspectable.
-- **Nothing in the app says which chain a pool is on.** Now that the backend can
-  serve several, this is the gap it exposes: pool cards carry no network badge,
-  and joining a pool on another network fails at the wallet rather than being
-  explained. The old multi-chain plan's §3.2 and §4.1 are still the right
-  sketch for it.
+  now — and `hardhat.config.ts` already carries `polygonAmoy`, so what is left
+  is a funded deployer key, a funded backend wallet and the per-network
+  checklist in
+  [`.dev/deployment/GOING_PUBLIC.md`](../.dev/deployment/GOING_PUBLIC.md) §1.
+  Until this moves, nothing in the project is publicly inspectable.
+- **`main` is 158 commits behind `develop`** (measured 2026-08-18). GitHub shows
+  `main` by default, so every visitor sees a snapshot with no loans, no
+  contributions, no interest, no notifications and none of the docs. Cheaper
+  than the deploy, and worth doing before it.
+- **The agent service runs nowhere but a laptop.** `packages/agents` is packaged
+  and deployable, but a deployed backend needs `AGENT_SERVICE_URL`, a shared
+  `MASTRA_JWT_SECRET`, and an `ANTHROPIC_API_KEY` living with the agent and
+  nowhere else. Without them `assessLoan` degrades to `not-configured`, which is
+  by design and silent — so the AI half is simply invisible until the
+  credentials exist. The eval suite is out of CI for the same reason: it needs a
+  provider key there, which is a deployment decision.
+- ~~**Nothing in the app says which chain a pool is on.**~~ Closed 2026-08-17.
+  `NetworkBadge` goes **one per screen, never one per card**: every list is
+  already narrowed to the connected chain, so a badge per pool would repeat one
+  fact as many times as there are pools. It sits on the Pools and Discover
+  headers and beside the dashboard balance, which is the per-chain figure that
+  reads as everything the user owns without it. Joining a pool on another
+  network turned out to be unreachable for the same reason. See the Chains
+  section in [`CLAUDE.md`](../CLAUDE.md#chains).
 - **Default handling — shipped 2026-08-18.** `LoanStatus.Defaulted`, an
   owner-only `markDefaulted` behind a settable `defaultGracePeriod`, the
   owner's late-loan list, the borrower's notice, and the scheduled reminder scan
@@ -714,3 +777,48 @@ SDK 53.
   Its known limit is written down rather than fixed: search is client-side over
   one page of 50 pools, because `listPools` has no text filter and Firestore
   cannot match a substring. The fix is search tokens on the pool document.
+
+---
+
+## 🧭 What is left, split by kind (2026-08-18)
+
+### Configuration and credentials — no code
+
+1. **Merge `develop` → `main`.** 158 commits, one hour, and it stops the shop
+   window showing five-month-old stock.
+2. **Amoy.** A funded deployer key and a funded backend wallet, then the
+   per-network checklist. Budget for bugs: this is the first time the mobile
+   screens meet real latency and real reorgs rather than a node that mines
+   instantly.
+3. **A build that can receive push.** `eas build --profile development`, an APNs
+   key and an FCM v1 service account uploaded to EAS. Expo Go on Android cannot
+   receive remote push at all since SDK 53, so the dev build is not optional.
+4. **A deployed agent service**, with its own `ANTHROPIC_API_KEY`.
+5. **Firebase quotas and limits**, before anything is publicly reachable.
+6. **Which stablecoin on Amoy**, and whether it has a faucet.
+
+### Still to build — none of it blocking a demo
+
+- **Sprint 10**: queue prioritisation, a portfolio overview and statistics,
+  analytics over past decisions, tooling over the audit trail.
+- **Sprint 12**: receipt polling. Only send-response `DeviceNotRegistered`
+  pruning exists; Expo's `getReceipts` needs a deferred second pass.
+- **Discovery**: search tokens written onto the pool document by the indexer, so
+  search stops being client-side over one page of 50 pools.
+- **Contracts tooling**
+  ([`.dev/contracts/CONTRACTS_BACKLOG.md`](../.dev/contracts/CONTRACTS_BACKLOG.md)
+  §4): deduplicate `verifyContractWithRetry` (three copies and a partial
+  fourth), a reader that emits the `.env` lines from `deployments/<network>.json`
+  instead of a human copying addresses, the missing Arbitrum/Base/BSC network
+  entries, and the Hardhat 3 / Solidity 0.8.30 / Ignition upgrades.
+- **Chores** ([`.dev/todo.md`](../.dev/todo.md)): Zod validation, Maestro + EAS
+  workflows for E2E, an environments document, the 'Empty' illustration and a
+  hero background.
+
+### Deliberately not built, so it is not re-proposed
+
+A reputation **score** and its enforcing half (eligibility, terms); liquidation
+and penalty rates; batch loan decisions; auto-approval from an assessment;
+editing or deleting a note; cross-chain views; a member cap; and a minimum
+deposit. Each has its reasoning recorded where it was refused — that reasoning
+is the point of keeping the entry.
