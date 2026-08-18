@@ -10,6 +10,7 @@ import { LoanRequestCard } from '../../../src/components/lending/LoanRequestCard
 import { UnsupportedPoolNotice } from '../../../src/components/lending/UnsupportedPoolNotice'
 import { LendingPoolABI } from '../../../src/constants/abis'
 import { palette } from '../../../src/constants/palette'
+import { useAssessments } from '../../../src/hooks/pools/useAssessment'
 import { useLoan } from '../../../src/hooks/pools/useLoan'
 import { useNotes } from '../../../src/hooks/pools/useNotes'
 import { usePoolIndexing } from '../../../src/hooks/pools/usePoolIndexing'
@@ -68,6 +69,16 @@ function ApprovalsScreen() {
   const isBusy = stage !== 'idle'
 
   const borrowerKey = requests.map((request) => request.borrower).join(',')
+
+  /*
+    One reading per undecided request, made the first time the queue shows it.
+
+    The backend reads a stored one back rather than making a new one, so this
+    is paid once per loan rather than once per open. Advisory throughout: it
+    gates nothing, and a queue whose assistant is unreachable decides exactly
+    as it did before any of this existed.
+  */
+  const { assessments, pending: assessing, unavailable, refresh: refreshAssessment } = useAssessments(requests.map((request) => request.id))
 
   /*
     Summaries come from the backend, which reads each wallet's whole record —
@@ -297,6 +308,10 @@ function ApprovalsScreen() {
               history={poolStore.borrowerHistory(request.borrower)}
               available={typeof available === 'bigint' ? available : undefined}
               purpose={noteFor(request.id, 'loan_purpose')}
+              assessment={assessments[request.id]}
+              isAssessing={Boolean(assessing[request.id])}
+              assessmentUnavailable={unavailable[request.id]}
+              onRefreshAssessment={() => refreshAssessment(request.id)}
               reason={reasons[request.loanId] ?? ''}
               onChangeReason={(text) => setReasons((current) => ({ ...current, [request.loanId]: text }))}
               onApprove={() => decide(request, 'approve')}

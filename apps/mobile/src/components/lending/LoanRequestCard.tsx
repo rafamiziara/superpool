@@ -1,9 +1,10 @@
-import type { BorrowerHistory, LoanInfo, Note } from '@superpool/types'
+import type { AssessLoanResponse, AssessmentInfo, BorrowerHistory, LoanInfo, Note } from '@superpool/types'
 import React from 'react'
 import { ActivityIndicator, Pressable, Text, View } from 'react-native'
 import { calculateRepayment } from '../../hooks/pools/useLoan'
 import type { Denomination } from '../../utils/denomination'
 import { formatToken, shortAddress, timeAgo } from '../../utils/format'
+import { AssessmentPanel } from './AssessmentPanel'
 import { BorrowerHistoryPanel } from './BorrowerHistoryPanel'
 import { NoteCallout } from './NoteCallout'
 import { NoteField } from './NoteField'
@@ -40,6 +41,18 @@ export interface LoanRequestCardProps {
    * against.
    */
   purpose?: Note
+  /**
+   * What the assistant made of this request, if it has read it.
+   *
+   * Between the purpose and the record, which is the order an owner reads in:
+   * what they asked for, why, what a reader notices, what their record says.
+   * **Advisory only** — it gates neither button below it.
+   */
+  assessment?: AssessmentInfo
+  isAssessing?: boolean
+  assessmentUnavailable?: NonNullable<AssessLoanResponse['unavailable']>
+  /** Read it again. Costs a model call, so it is the owner's explicit action. */
+  onRefreshAssessment?: () => void
   /** The reason the owner is typing, held by the screen so it survives a re-render. */
   reason: string
   onChangeReason: (text: string) => void
@@ -66,6 +79,10 @@ export function LoanRequestCard({
   available,
   denomination,
   purpose,
+  assessment,
+  isAssessing = false,
+  assessmentUnavailable,
+  onRefreshAssessment,
   reason,
   onChangeReason,
   onApprove,
@@ -107,6 +124,16 @@ export function LoanRequestCard({
       </View>
 
       <NoteCallout note={purpose} label="What it is for" testID={`loan-request-purpose-${request.loanId}`} />
+
+      <AssessmentPanel
+        assessment={assessment}
+        isLoading={isAssessing}
+        unavailable={assessmentUnavailable}
+        available={available}
+        denomination={denomination}
+        onRefresh={onRefreshAssessment}
+        testID={`loan-request-assessment-${request.loanId}`}
+      />
 
       {/* Above the buttons rather than below them: it is what the decision is
           made on, and a record read after deciding is a record read too late. */}

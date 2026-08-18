@@ -48,6 +48,17 @@ jest.mock('../../../src/hooks/pools/usePoolIndexing', () => ({
 
 const mockWriteNote = jest.fn()
 const mockNoteFor = jest.fn()
+const mockRefreshAssessment = jest.fn()
+let mockAssessments: Record<string, unknown> = {}
+
+jest.mock('../../../src/hooks/pools/useAssessment', () => ({
+  useAssessments: () => ({
+    assessments: mockAssessments,
+    pending: {},
+    unavailable: {},
+    refresh: mockRefreshAssessment,
+  }),
+}))
 
 jest.mock('../../../src/hooks/pools/useNotes', () => ({
   useNotes: () => ({ notes: [], isLoading: false, refresh: jest.fn(), noteFor: mockNoteFor, writeNote: mockWriteNote }),
@@ -101,6 +112,7 @@ beforeEach(async () => {
   mockTriggerIndexing.mockResolvedValue(undefined)
   mockWriteNote.mockResolvedValue(true)
   mockNoteFor.mockReturnValue(undefined)
+  mockAssessments = {}
   mockWagmiUseReadContract.mockReturnValue({ data: 100_000_000_000_000_000_000n, refetch: jest.fn().mockResolvedValue({ data: 0n }) })
   authStore.walletAddress = null
   await poolStore.fetchPools()
@@ -299,6 +311,43 @@ describe('ApprovalsScreen', () => {
       })
 
       expect(mockWriteNote).not.toHaveBeenCalled()
+    })
+
+    // Advisory throughout: it sits between the purpose and the record, and it
+    // gates neither button below it.
+    it('shows the assistant’s reading, named as one', async () => {
+      mockAssessments = {
+        '31337-2-5': {
+          id: '31337-2-5',
+          chainId: 31337,
+          poolId: 2,
+          loanId: 5,
+          risk: 'low',
+          summary: 'A modest ask against a clean record.',
+          observations: [],
+          questions: [],
+          limitations: ['No purpose was stated.'],
+          inputs: { amount: 4, liquidity: 100, symbol: 'POL', hadPurpose: false, borrower: poolStore.borrowerHistory(STRANGER) },
+          createdAt: new Date().toISOString(),
+        },
+      }
+
+      const { getByTestId, getByText } = render(<ApprovalsScreen />)
+
+      expect(getByTestId('loan-request-assessment-5-summary')).toHaveTextContent(/modest ask/)
+      expect(getByText('Assistant’s reading')).toBeTruthy()
+    })
+
+    it('leaves the decisions working when there is no reading at all', async () => {
+      const { getByTestId, queryByTestId } = render(<ApprovalsScreen />)
+
+      expect(queryByTestId('loan-request-assessment-5')).toBeNull()
+
+      await act(async () => {
+        fireEvent.press(getByTestId('loan-request-approve-5'))
+      })
+
+      expect(mockApproveLoan).toHaveBeenCalled()
     })
 
     it('shows the borrower’s stated purpose above the decision', async () => {
