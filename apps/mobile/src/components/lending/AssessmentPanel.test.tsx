@@ -121,6 +121,21 @@ describe('AssessmentPanel', () => {
 
       expect(getByTestId('assessment-unavailable')).toHaveTextContent(/could not be reached/)
     })
+
+    // Nobody's fault and nothing broken — but the one an owner would otherwise
+    // keep tapping at, so it says plainly that today is spent.
+    it('says today is spent when the daily cap is reached', () => {
+      const { getByTestId } = renderPanel({ assessment: undefined, unavailable: 'quota-reached' })
+
+      expect(getByTestId('assessment-unavailable')).toHaveTextContent(/today’s readings/)
+    })
+
+    // The card already reports an unreadable pool; a second notice repeats it.
+    it('stays silent for a pool whose figures cannot be printed', () => {
+      const { queryByTestId } = renderPanel({ assessment: undefined, unavailable: 'unsupported-denomination' })
+
+      expect(queryByTestId('assessment-unavailable')).toBeNull()
+    })
   })
 
   describe('staleness', () => {

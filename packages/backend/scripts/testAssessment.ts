@@ -40,11 +40,13 @@ dotenv.config()
 import { BaseContract, Contract, JsonRpcProvider, parseEther, Wallet, ZeroAddress } from 'ethers'
 import type { CallableRequest } from 'firebase-functions/v2/https'
 import type { AssessLoanRequest, GetAssessmentRequest } from '@superpool/types'
+import { ASSESSMENT_QUOTA_COLLECTION } from '../src/constants/firestore'
 import { LendingPoolABI, PoolFactoryABI } from '../src/constants/abis'
 import { assessLoanHandler } from '../src/functions/assessments/assessLoan'
 import { getAssessmentHandler } from '../src/functions/assessments/getAssessment'
 import { firestore } from '../src/services'
 import { pingAgentService } from '../src/services/agentClient'
+import { ASSESSMENT_DAILY_CAP, quotaDay } from '../src/services/assessments'
 import { indexPoolByTxHash } from '../src/services/eventIndexer'
 import { indexLoansByTxHash, loanDocId } from '../src/services/loanIndexer'
 import { indexMembershipsByTxHash } from '../src/services/membershipIndexer'
@@ -312,6 +314,37 @@ async function main() {
       JSON.stringify(refreshed.assessment?.history)
     )
   }
+
+  // ---------------------------------------------------------------------------
+  separator('A wallet may only spend so much of a day')
+  // ---------------------------------------------------------------------------
+  // The cap on the one callable that spends money on somebody else's behalf.
+  // Exercised by writing the counter to its ceiling rather than by making fifty
+  // real readings, which would cost fifty model calls to prove arithmetic.
+  const quotaRef = firestore.collection(ASSESSMENT_QUOTA_COLLECTION).doc(`${owner.address.toLowerCase()}-${quotaDay()}`)
+  const spentBefore = ((await quotaRef.get()).data()?.count as number | undefined) ?? 0
+
+  check('a reading that was made counted against the day', spentBefore > 0, `${spentBefore} used`)
+
+  await quotaRef.set({ wallet: owner.address.toLowerCase(), day: quotaDay(), count: ASSESSMENT_DAILY_CAP })
+
+  const capped = await request(provider, pool, lender, parseEther('3'), 'A small top-up.')
+  const refusedByCap = await assessLoanHandler(callable<AssessLoanRequest>(owner.address, { loanId: capped }))
+
+  check('a spent day refuses a fresh reading', refusedByCap.unavailable === 'quota-reached', JSON.stringify(refusedByCap))
+  check('and nothing was stored for it', refusedByCap.assessment === undefined)
+
+  // Reading a stored one back costs nothing, so a spent day must not hide it.
+  const storedWhileCapped = await assessLoanHandler(callable<AssessLoanRequest>(owner.address, { loanId: loanDoc }))
+
+  check(
+    'a stored reading is still served while the day is spent',
+    storedWhileCapped.cached === true && storedWhileCapped.assessment !== undefined,
+    JSON.stringify({ cached: storedWhileCapped.cached, unavailable: storedWhileCapped.unavailable })
+  )
+
+  // Put it back, so the rest of the run — and the next one — is not capped.
+  await quotaRef.set({ wallet: owner.address.toLowerCase(), day: quotaDay(), count: spentBefore })
 
   // ---------------------------------------------------------------------------
   separator('A first-time borrower is new, not risky')

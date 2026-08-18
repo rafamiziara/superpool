@@ -2,7 +2,7 @@ import { AssessmentInfo, AssessmentInputs } from '@superpool/types'
 import { formatUnits } from 'ethers'
 import { Firestore, Timestamp } from 'firebase-admin/firestore'
 import { logger } from 'firebase-functions/v2'
-import { ASSESSMENTS_COLLECTION, LOANS_COLLECTION, nativeSymbolFor, POOLS_COLLECTION } from '../constants'
+import { ASSESSMENT_QUOTA_COLLECTION, ASSESSMENTS_COLLECTION, LOANS_COLLECTION, nativeSymbolFor, POOLS_COLLECTION } from '../constants'
 import type { AgentAssessmentFacts } from './agentClient'
 import { borrowerHistoriesFor } from './borrowerHistory'
 import { noteFor } from './notes'
@@ -54,6 +54,96 @@ export interface GatheredFacts {
   chainId: number
   poolId: number
   loanId: number
+}
+
+/**
+ * How many readings one wallet may pay for in a day.
+ *
+ * Generous rather than tight: a busy owner with twenty requests should get
+ * through their queue, and the ceiling is there to bound the accident — a loop,
+ * a stuck refresh, a screen left open — rather than to ration ordinary use.
+ *
+ * Configurable because the right number depends on what a reading costs and on
+ * whose key is paying, and neither is settled while this runs on one laptop.
+ */
+export const ASSESSMENT_DAILY_CAP = parseInt(process.env.ASSESSMENT_DAILY_CAP || '50')
+
+/**
+ * The day a claim belongs to, in UTC.
+ *
+ * UTC rather than the caller's zone, and it is worth saying why: a wallet has
+ * no timezone. Anything else would need one guessed from a request, and a
+ * guess that resets a quota is a guess that can be gamed.
+ */
+export function quotaDay(now: Date = new Date()): string {
+  return now.toISOString().slice(0, 10)
+}
+
+function quotaDocId(wallet: string, day: string): string {
+  return `${wallet.toLowerCase()}-${day}`
+}
+
+export interface QuotaClaim {
+  granted: boolean
+  used: number
+  cap: number
+}
+
+/**
+ * Take one reading off a wallet's day, if it has one left.
+ *
+ * **Claimed before the model is asked, not after**, and released when the ask
+ * comes to nothing — the same shape `notifyOnce` uses, and for the same
+ * reason. Counting afterwards lets two calls that started together both pass
+ * the check, which is exactly the shape the approvals queue produces: it asks
+ * for every undecided request in parallel the first time it opens.
+ *
+ * A transaction rather than `FieldValue.increment`, because the question is
+ * "is there one left" and not "add one" — an increment cannot refuse.
+ */
+export async function claimAssessment(wallet: string, firestore: Firestore): Promise<QuotaClaim> {
+  const docRef = firestore.collection(ASSESSMENT_QUOTA_COLLECTION).doc(quotaDocId(wallet, quotaDay()))
+
+  return firestore.runTransaction(async (transaction) => {
+    const used = ((await transaction.get(docRef)).data()?.count as number | undefined) ?? 0
+
+    if (used >= ASSESSMENT_DAILY_CAP) {
+      logger.info('Assessment quota reached for the day', { wallet: wallet.toLowerCase(), used, cap: ASSESSMENT_DAILY_CAP })
+
+      return { granted: false, used, cap: ASSESSMENT_DAILY_CAP }
+    }
+
+    transaction.set(docRef, { wallet: wallet.toLowerCase(), day: quotaDay(), count: used + 1 })
+
+    return { granted: true, used: used + 1, cap: ASSESSMENT_DAILY_CAP }
+  })
+}
+
+/**
+ * Give a claim back when the reading never happened.
+ *
+ * An agent that was unreachable cost nothing, so it must not cost a day's
+ * allowance either. Failing to release is deliberately survivable — the count
+ * resets at midnight — which is why this never throws.
+ */
+export async function releaseAssessment(wallet: string, firestore: Firestore): Promise<void> {
+  try {
+    // Inside the try, deliberately: "never throws" has to mean the whole of
+    // it, and a reference built outside would escape the one thing this
+    // function promises.
+    const docRef = firestore.collection(ASSESSMENT_QUOTA_COLLECTION).doc(quotaDocId(wallet, quotaDay()))
+
+    await firestore.runTransaction(async (transaction) => {
+      const used = ((await transaction.get(docRef)).data()?.count as number | undefined) ?? 0
+
+      transaction.set(docRef, { wallet: wallet.toLowerCase(), day: quotaDay(), count: Math.max(0, used - 1) })
+    })
+  } catch (error) {
+    logger.warn('Could not release an assessment claim; it expires at midnight anyway', {
+      wallet: wallet.toLowerCase(),
+      error: error instanceof Error ? error.message : String(error),
+    })
+  }
 }
 
 /** Who owns the pool a loan belongs to, where to read its liquidity, and in what unit. */

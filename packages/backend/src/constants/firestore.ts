@@ -172,3 +172,18 @@ export const STAGED_NOTES_COLLECTION = 'staged_notes'
  * answer.
  */
 export const ASSESSMENTS_COLLECTION = 'assessments'
+
+/**
+ * The name of the Firestore collection used to count how many assessments a
+ * wallet has paid for today.
+ *
+ * One document per (wallet, UTC day), holding a count. The cap exists because
+ * an assessment is the one thing in this backend that **spends money on
+ * somebody else's behalf**: a pool owner opening a queue of twenty requests
+ * buys twenty readings, and nothing else in the system has that shape.
+ *
+ * Counts only readings that were actually made. A stored one read back costs
+ * nothing and must not consume anybody's day — otherwise an owner scrolling
+ * their queue would exhaust it looking at answers they already had.
+ */
+export const ASSESSMENT_QUOTA_COLLECTION = 'assessment_quota'

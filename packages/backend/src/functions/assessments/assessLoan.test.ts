@@ -3,8 +3,10 @@ jest.mock('../../services/agentClient', () => ({ assessLoanWithAgent: jest.fn() 
 jest.mock('../../services/assessments', () => ({
   ...jest.requireActual('../../services/assessments'),
   assessmentFor: jest.fn(),
+  claimAssessment: jest.fn(),
   gatherFacts: jest.fn(),
   ownershipOf: jest.fn(),
+  releaseAssessment: jest.fn(),
   saveAssessment: jest.fn(),
 }))
 jest.mock('../../utils/blockchain', () => ({ getProvider: jest.fn() }))
@@ -13,7 +15,14 @@ jest.mock('ethers', () => ({ ...jest.requireActual('ethers'), Contract: jest.fn(
 const { assessLoanHandler } = require('./assessLoan')
 const { getAssessmentHandler } = require('./getAssessment')
 const { assessLoanWithAgent } = require('../../services/agentClient')
-const { assessmentFor, gatherFacts, ownershipOf, saveAssessment } = require('../../services/assessments')
+const {
+  assessmentFor,
+  claimAssessment,
+  gatherFacts,
+  ownershipOf,
+  releaseAssessment,
+  saveAssessment,
+} = require('../../services/assessments')
 const { getProvider } = require('../../utils/blockchain')
 const { Contract } = require('ethers')
 
@@ -70,6 +79,8 @@ beforeEach(() => {
   gatherFacts.mockResolvedValue(FACTS)
   assessLoanWithAgent.mockResolvedValue({ status: 'ok', assessment: READING })
   saveAssessment.mockResolvedValue(STORED)
+  claimAssessment.mockResolvedValue({ granted: true, used: 1, cap: 50 })
+  releaseAssessment.mockResolvedValue(undefined)
   Contract.mockImplementation(() => ({ totalFunds: jest.fn().mockResolvedValue(200_000_000n) }))
   getProvider.mockReturnValue({ getBlock: jest.fn().mockResolvedValue({ timestamp: 1_800_000_000 }) })
 })
@@ -213,6 +224,82 @@ describe('assessLoan', () => {
     getProvider.mockReturnValue({ getBlock: jest.fn().mockResolvedValue(null) })
 
     await expect(assessLoanHandler(buildRequest())).rejects.toThrow(/Failed to assess/i)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// The daily cap.
+//
+// This is the one callable that spends money on somebody else's behalf, and
+// the queue asks for a reading per undecided request the first time it opens.
+// ---------------------------------------------------------------------------
+
+describe('the daily cap', () => {
+  it('takes one off the day before asking a model', async () => {
+    await assessLoanHandler(buildRequest())
+
+    expect(claimAssessment).toHaveBeenCalledWith(OWNER.toLowerCase(), expect.anything())
+    expect(claimAssessment.mock.invocationCallOrder[0]).toBeLessThan(assessLoanWithAgent.mock.invocationCallOrder[0])
+  })
+
+  it('says not today, rather than not available', async () => {
+    claimAssessment.mockResolvedValue({ granted: false, used: 50, cap: 50 })
+
+    await expect(assessLoanHandler(buildRequest())).resolves.toEqual({ unavailable: 'quota-reached', cached: false })
+    expect(assessLoanWithAgent).not.toHaveBeenCalled()
+  })
+
+  it('still hands back a stored reading when the day is spent', async () => {
+    assessmentFor.mockResolvedValue(STORED)
+    claimAssessment.mockResolvedValue({ granted: false, used: 50, cap: 50 })
+
+    await expect(assessLoanHandler(buildRequest({ data: { loanId: LOAN_ID, refresh: true } }))).resolves.toEqual({
+      assessment: STORED,
+      unavailable: 'quota-reached',
+      cached: true,
+    })
+  })
+
+  /*
+    Everything before the claim is free — a stored reading, an unpriceable
+    pool, an unentitled caller — and none of it should cost anybody a day's
+    allowance.
+  */
+  it('costs nothing to read a stored one back', async () => {
+    assessmentFor.mockResolvedValue(STORED)
+
+    await assessLoanHandler(buildRequest())
+
+    expect(claimAssessment).not.toHaveBeenCalled()
+  })
+
+  it('costs nothing to be refused', async () => {
+    await expect(assessLoanHandler(buildRequest({ auth: { uid: BORROWER } }))).rejects.toThrow()
+
+    expect(claimAssessment).not.toHaveBeenCalled()
+  })
+
+  it('costs nothing when the pool cannot be priced', async () => {
+    ownershipOf.mockResolvedValue({ ...OWNERSHIP, denomination: undefined })
+
+    await assessLoanHandler(buildRequest())
+
+    expect(claimAssessment).not.toHaveBeenCalled()
+  })
+
+  // Nothing was read, so nothing was spent.
+  it('gives the claim back when the agent never answered', async () => {
+    assessLoanWithAgent.mockResolvedValue({ status: 'unreachable', reason: 'fetch failed' })
+
+    await assessLoanHandler(buildRequest())
+
+    expect(releaseAssessment).toHaveBeenCalledWith(OWNER.toLowerCase(), expect.anything())
+  })
+
+  it('keeps the claim when a reading was actually made', async () => {
+    await assessLoanHandler(buildRequest())
+
+    expect(releaseAssessment).not.toHaveBeenCalled()
   })
 })
 

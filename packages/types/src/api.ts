@@ -555,8 +555,16 @@ export interface AssessLoanResponse {
    * which of those happened.
    */
   assessment?: AssessmentInfo
-  /** Present only when there is no assessment. */
-  unavailable?: 'not-configured' | 'unreachable' | 'unsupported-denomination'
+  /**
+   * Present only when there is no *fresh* assessment.
+   *
+   * `quota-reached` is the one that is nobody's fault and nothing being wrong:
+   * a wallet may only spend so many readings a day, and the queue asks for one
+   * per undecided request the first time it shows them. It says "not today"
+   * rather than "not available", and any stored reading still comes back
+   * beside it.
+   */
+  unavailable?: 'not-configured' | 'unreachable' | 'unsupported-denomination' | 'quota-reached'
   /** True when the answer came from storage rather than from a fresh reading. */
   cached: boolean
 }

@@ -948,6 +948,13 @@ Seven rules that are easy to break:
   each time. Recomputed only on the owner's explicit ask, or when liquidity has
   drifted 25% — `approveLoan` checks liquidity at approval, not at request
   time, so that is the figure that moves under a stored reading.
+- **Capped per wallet per day**, `ASSESSMENT_DAILY_CAP` (50). This is the only
+  callable in the backend that **spends money on somebody else's behalf**, and
+  the queue asks for a reading per undecided request the first time it opens.
+  The claim is taken _before_ the model is asked and given back if it never
+  answered — the shape `notifyOnce` uses, because the queue asks in parallel
+  and counting afterwards lets two calls both pass the check. Reading a stored
+  one back costs nothing and must never consume a day.
 - **Do not put character caps on model prose.** A `.max(140)` per observation
   cost a whole reading the first time a model wrote 141: structured-output
   validation rejects the _entire_ response, and the owner sees nothing for a

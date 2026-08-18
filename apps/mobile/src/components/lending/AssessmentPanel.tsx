@@ -30,6 +30,17 @@ export interface AssessmentPanelProps {
 /** How far liquidity may drift before the reading is worth flagging. Mirrors the backend. */
 const STALE_DRIFT = 0.25
 
+/** What to say when there is no reading — and where saying nothing is right. */
+const UNAVAILABLE_NOTICE: Record<NonNullable<AssessmentPanelProps['unavailable']>, string | null> = {
+  // Ordinary: this checkout has no assistant set up, and nobody asked for one.
+  'not-configured': null,
+  // Also silent. The pool's figures cannot be printed, so the whole card
+  // already says so — a second notice would be repeating it.
+  'unsupported-denomination': null,
+  unreachable: 'The assistant could not be reached. Decide as you would without it.',
+  'quota-reached': 'You have used today’s readings. Any already made are still here, and more are available tomorrow.',
+}
+
 /**
  * The three bands, and what each is called on screen.
  *
@@ -77,15 +88,24 @@ export function AssessmentPanel({
     )
   }
 
-  // Nothing at all rather than an apology. The owner did not ask for this by
-  // name, and a notice about missing help is worse than the absence it
-  // describes — the queue decides fine without it.
+  /*
+    Nothing at all rather than an apology. The owner did not ask for this by
+    name, and a notice about missing help is worse than the absence it
+    describes — the queue decides fine without it.
+
+    Two exceptions, and they say different things. `unreachable` is something
+    being wrong, and the owner may be waiting for it. `quota-reached` is
+    nobody's fault and nothing broken — but it is the one an owner would
+    otherwise keep tapping at, so it says plainly that today is spent.
+  */
   if (!assessment) {
-    if (unavailable !== 'unreachable') return null
+    const notice = UNAVAILABLE_NOTICE[unavailable ?? 'not-configured']
+
+    if (!notice) return null
 
     return (
       <View className="rounded-2xl border-continuous border-hairline border-veil bg-raised px-4 py-3" testID={`${testID}-unavailable`}>
-        <Text className="text-xs text-mist">The assistant could not be reached. Decide as you would without it.</Text>
+        <Text className="text-xs text-mist">{notice}</Text>
       </View>
     )
   }

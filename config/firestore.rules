@@ -212,6 +212,17 @@ service cloud.firestore {
       allow read, write: if false; // backend-only (assessLoan / getAssessment)
     }
 
+    // --- assessment_quota --------------------------------------------------
+    // How many assessments a wallet has paid for today, one document per
+    // (wallet, UTC day). Closed in both directions: this is the counter that
+    // stops one caller spending the provider key, so a client that could write
+    // it could lift its own ceiling, and a client that could read it learns
+    // what everyone else has been doing.
+
+    match /assessment_quota/{claimId} {
+      allow read, write: if false; // backend-only (assessLoan)
+    }
+
     // --- staged_notes ------------------------------------------------------
     // A loan purpose waiting for its loan to exist. Written by `saveNote`,
     // moved onto the loan by the indexer and deleted in the same pass. Closed

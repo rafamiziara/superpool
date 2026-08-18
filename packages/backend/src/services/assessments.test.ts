@@ -10,7 +10,19 @@ jest.mock('./notes', () => ({ ...jest.requireActual('./notes'), noteFor: jest.fn
 
 import { borrowerHistoriesFor } from './borrowerHistory'
 import { noteFor } from './notes'
-import { assessmentFor, denominationOf, gatherFacts, isStale, ownershipOf, saveAssessment, toWholeUnits } from './assessments'
+import {
+  ASSESSMENT_DAILY_CAP,
+  assessmentFor,
+  claimAssessment,
+  denominationOf,
+  gatherFacts,
+  isStale,
+  ownershipOf,
+  quotaDay,
+  releaseAssessment,
+  saveAssessment,
+  toWholeUnits,
+} from './assessments'
 
 const ZERO = '0x0000000000000000000000000000000000000000'
 const USDC = '0x1111111111111111111111111111111111111111'
@@ -49,6 +61,8 @@ function buildFirestore(seed: Docs = {}) {
         }
       },
       doc: (id: string) => ({
+        id,
+        path: name,
         get: async () => ({ id, exists: id in store[name], data: () => store[name][id] }),
         set: async (data: Record<string, unknown>) => {
           store[name][id] = data
@@ -59,7 +73,44 @@ function buildFirestore(seed: Docs = {}) {
     return self
   }
 
-  return { firestore: { collection } as unknown as Firestore, store }
+  /**
+   * Just enough of a transaction to exercise read-then-conditionally-write.
+   *
+   * Runs the body once against the same store, which is what a real
+   * transaction does when nothing else is contending. What it cannot show is a
+   * genuine race — that is what the live script is for.
+   */
+  const runTransaction = async <T>(body: (transaction: FakeTransaction) => Promise<T>): Promise<T> => {
+    const writes: [string, string, Record<string, unknown>][] = []
+
+    const transaction: FakeTransaction = {
+      get: async (ref) => ({ exists: ref.id in (store[ref.path] ?? {}), data: () => store[ref.path]?.[ref.id] }),
+      set: (ref, data) => {
+        writes.push([ref.path, ref.id, data])
+      },
+    }
+
+    const result = await body(transaction)
+
+    writes.forEach(([path, id, data]) => {
+      store[path] ??= {}
+      store[path][id] = data
+    })
+
+    return result
+  }
+
+  return { firestore: { collection, runTransaction } as unknown as Firestore, store }
+}
+
+interface FakeRef {
+  id: string
+  path: string
+}
+
+interface FakeTransaction {
+  get: (ref: FakeRef) => Promise<{ exists: boolean; data: () => Record<string, unknown> | undefined }>
+  set: (ref: FakeRef, data: Record<string, unknown>) => void
 }
 
 const seeded = (overrides: { loan?: Record<string, unknown>; pool?: Record<string, unknown> } = {}): Docs => ({
@@ -349,5 +400,96 @@ describe('isStale', () => {
   it('treats a pool that has gone from empty to funded as stale', () => {
     expect(isStale({ inputs: { ...inputs, liquidity: 0 } } as AssessmentInfo, 100)).toBe(true)
     expect(isStale({ inputs: { ...inputs, liquidity: 0 } } as AssessmentInfo, 0)).toBe(false)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// The daily cap.
+//
+// `assessLoan` is the one callable that spends money on somebody else's
+// behalf, and a queue asks for a reading per undecided request. The ceiling
+// bounds the accident — a loop, a stuck refresh, a screen left open — rather
+// than rationing ordinary use.
+// ---------------------------------------------------------------------------
+
+describe('claimAssessment', () => {
+  it('grants a reading and counts it', async () => {
+    const { firestore } = buildFirestore({})
+
+    await expect(claimAssessment(OWNER, firestore)).resolves.toMatchObject({ granted: true, used: 1, cap: ASSESSMENT_DAILY_CAP })
+  })
+
+  it('counts each one, so a day adds up', async () => {
+    const { firestore } = buildFirestore({})
+
+    await claimAssessment(OWNER, firestore)
+    await claimAssessment(OWNER, firestore)
+
+    await expect(claimAssessment(OWNER, firestore)).resolves.toMatchObject({ used: 3 })
+  })
+
+  it('refuses once the day is spent', async () => {
+    const { firestore, store } = buildFirestore({})
+    store.assessment_quota = { [`${OWNER.toLowerCase()}-${quotaDay()}`]: { count: ASSESSMENT_DAILY_CAP } }
+
+    await expect(claimAssessment(OWNER, firestore)).resolves.toMatchObject({ granted: false, used: ASSESSMENT_DAILY_CAP })
+  })
+
+  // A wallet has no timezone, and a guess that resets a quota is a guess that
+  // can be gamed.
+  it('keys the day in UTC, and each wallet has its own', async () => {
+    const { firestore, store } = buildFirestore({})
+
+    await claimAssessment(OWNER, firestore)
+    await claimAssessment(BORROWER, firestore)
+
+    expect(Object.keys(store.assessment_quota).sort()).toEqual(
+      [`${BORROWER.toLowerCase()}-${quotaDay()}`, `${OWNER.toLowerCase()}-${quotaDay()}`].sort()
+    )
+  })
+
+  it('matches the wallet case-insensitively, as every address here is', async () => {
+    const { firestore } = buildFirestore({})
+
+    await claimAssessment(OWNER.toUpperCase(), firestore)
+
+    await expect(claimAssessment(OWNER.toLowerCase(), firestore)).resolves.toMatchObject({ used: 2 })
+  })
+
+  it('reads yesterday as a fresh day', async () => {
+    const { firestore, store } = buildFirestore({})
+    store.assessment_quota = { [`${OWNER.toLowerCase()}-2020-01-01`]: { count: ASSESSMENT_DAILY_CAP } }
+
+    await expect(claimAssessment(OWNER, firestore)).resolves.toMatchObject({ granted: true, used: 1 })
+  })
+})
+
+describe('releaseAssessment', () => {
+  // An agent that was unreachable cost nothing, so it must not cost a day's
+  // allowance either.
+  it('gives a claim back', async () => {
+    const { firestore } = buildFirestore({})
+
+    await claimAssessment(OWNER, firestore)
+    await releaseAssessment(OWNER, firestore)
+
+    await expect(claimAssessment(OWNER, firestore)).resolves.toMatchObject({ used: 1 })
+  })
+
+  it('never goes below nothing', async () => {
+    const { firestore, store } = buildFirestore({})
+
+    await releaseAssessment(OWNER, firestore)
+
+    expect(store.assessment_quota[`${OWNER.toLowerCase()}-${quotaDay()}`].count).toBe(0)
+  })
+
+  // Failing to release is survivable — the count resets at midnight — so this
+  // must never be the thing that fails a request.
+  it('swallows a failure rather than taking the request down with it', async () => {
+    const firestore = { runTransaction: jest.fn().mockRejectedValue(new Error('contention')) } as unknown as Firestore
+
+    await expect(releaseAssessment(OWNER, firestore)).resolves.toBeUndefined()
+    expect(mockLogger.warn).toHaveBeenCalled()
   })
 })

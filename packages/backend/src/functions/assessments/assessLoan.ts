@@ -5,7 +5,16 @@ import { CallableRequest, HttpsError, onCall } from 'firebase-functions/v2/https
 import { DEFAULT_CHAIN_ID, LendingPoolABI } from '../../constants'
 import { firestore } from '../../services'
 import { assessLoanWithAgent } from '../../services/agentClient'
-import { assessmentFor, gatherFacts, isStale, ownershipOf, saveAssessment, toWholeUnits } from '../../services/assessments'
+import {
+  assessmentFor,
+  claimAssessment,
+  gatherFacts,
+  isStale,
+  ownershipOf,
+  releaseAssessment,
+  saveAssessment,
+  toWholeUnits,
+} from '../../services/assessments'
 import { getProvider } from '../../utils/blockchain'
 
 export const assessLoanHandler = async (request: CallableRequest<AssessLoanRequest>): Promise<AssessLoanResponse> => {
@@ -72,6 +81,23 @@ export const assessLoanHandler = async (request: CallableRequest<AssessLoanReque
       throw new HttpsError('not-found', 'There is no indexed loan to assess')
     }
 
+    /*
+      Claimed before the model is asked, and released below if it never
+      answered — the same shape `notifyOnce` uses.
+
+      Claimed *here* rather than at the top of the handler, because everything
+      above this line is free: a stored reading, an unpriceable pool and an
+      unentitled caller all cost nothing, and none of them should cost anybody
+      a day's allowance. This is the first line past which money is spent.
+    */
+    const claim = await claimAssessment(caller, firestore)
+
+    if (!claim.granted) {
+      logger.info('Assessment refused: the wallet has spent its day', { loanDocId, cap: claim.cap })
+
+      return { ...(stored ? { assessment: stored } : {}), unavailable: 'quota-reached', cached: Boolean(stored) }
+    }
+
     const result = await assessLoanWithAgent(gathered.facts)
 
     // The agent is an optional dependency, and its absence is not a failure:
@@ -80,6 +106,9 @@ export const assessLoanHandler = async (request: CallableRequest<AssessLoanReque
     // is one, is the better of the two silences.
     if (result.status !== 'ok') {
       logger.info('No assessment available', { loanDocId, status: result.status })
+
+      // Nothing was read, so nothing was spent.
+      await releaseAssessment(caller, firestore)
 
       return { ...(stored ? { assessment: stored } : {}), unavailable: result.status, cached: Boolean(stored) }
     }
@@ -132,6 +161,12 @@ export const assessLoanHandler = async (request: CallableRequest<AssessLoanReque
  * the wrong default. Stored once, so the same screen says the same thing
  * twice; recomputed only when the owner asks or when the pool's liquidity has
  * moved far enough that the reading describes a pool that no longer exists.
+ *
+ * **Capped per wallet per day.** This is the one callable that spends money on
+ * somebody else's behalf, and a queue asks for a reading per undecided
+ * request. The ceiling bounds the accident — a loop, a stuck refresh, a screen
+ * left open — rather than rationing ordinary use, and only readings actually
+ * made are counted against it.
  *
  * @param {CallableRequest<AssessLoanRequest>} request the loan, and whether to read it again
  * @returns {Promise<AssessLoanResponse>} the assessment, or why there is none
