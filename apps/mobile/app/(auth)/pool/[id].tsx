@@ -475,7 +475,11 @@ function PoolDetailScreen() {
             <Text className="text-lg font-bold text-snow">Pool activity</Text>
             <View className="mt-4 rounded-3xl border-continuous border-hairline border-veil bg-surface py-1">
               {transactions.map((tx) => (
-                <ActivityRow key={tx.id} tx={tx} denomination={denomination} />
+                // A loan row's id is the loan's own document id, so the
+                // purpose attaches without the row fetching anything. Every
+                // other row asks for a note that was never written and gets
+                // nothing, which is the right answer.
+                <ActivityRow key={tx.id} tx={tx} denomination={denomination} note={noteFor(tx.id, 'loan_purpose')} />
               ))}
             </View>
           </View>

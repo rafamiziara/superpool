@@ -1,5 +1,5 @@
 import { FontAwesome } from '@expo/vector-icons'
-import type { Transaction } from '@superpool/types'
+import type { Note, Transaction } from '@superpool/types'
 import { TransactionStatus, TransactionType } from '@superpool/types'
 import React from 'react'
 import { Text, View } from 'react-native'
@@ -81,9 +81,18 @@ interface ActivityRowProps {
    * safe answer for a feed that has not been narrowed to one wallet.
    */
   perspective?: ActivityPerspective
+  /**
+   * What the borrower said the money was for, on the rows that have one.
+   *
+   * Only ever a loan row, and only ever on a feed whose screen already loads
+   * notes — a row does not fetch anything. Absent is the ordinary case, and
+   * the row is unchanged by it: a purpose is optional, so a feed where most
+   * rows carry nothing must not look like a feed with something missing.
+   */
+  note?: Note
 }
 
-export function ActivityRow({ tx, poolName, denomination, perspective = 'pool' }: ActivityRowProps) {
+export function ActivityRow({ tx, poolName, denomination, perspective = 'pool', note }: ActivityRowProps) {
   const config = VIEWS[perspective][tx.type]
   const isPending = tx.status === TransactionStatus.PENDING
 
@@ -99,6 +108,11 @@ export function ActivityRow({ tx, poolName, denomination, perspective = 'pool' }
           {poolName ? `${poolName} · ` : ''}
           {timeAgo(tx.createdAt)}
         </Text>
+        {note ? (
+          <Text className="mt-0.5 text-xs text-fog" numberOfLines={1} testID={`activity-note-${tx.id}`}>
+            “{note.text}”
+          </Text>
+        ) : null}
       </View>
 
       <View className="items-end">

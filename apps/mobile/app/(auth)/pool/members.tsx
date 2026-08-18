@@ -71,7 +71,7 @@ function MembersScreen() {
   const [removing, setRemoving] = useState<string | null>(null)
 
   const pool = poolStore.poolById(Number(poolId))
-  const { writeNote } = useNotes(pool?.poolId)
+  const { noteFor, writeNote } = useNotes(pool?.poolId)
   const denomination = pool ? denominationFor(pool) : undefined
   const waiting = pool ? poolStore.pendingMembersFor(pool.poolId) : []
 
@@ -309,6 +309,14 @@ function MembersScreen() {
                   <View className="flex-1">
                     <Text className="font-mono text-sm text-snow">{shortAddress(member.account)}</Text>
                     <Text className="mt-1 text-xs text-mist">{formatAmount(member.balance ?? 0n, denomination)} in</Text>
+                    {/* One line rather than a callout: the roster is a list to
+                        read, and most rows carry nothing — an open pool admits
+                        whoever funds it, and nobody wrote a reason for that. */}
+                    {noteFor(`${pool.chainId}-${pool.poolId}-${member.account.toLowerCase()}`, 'membership_approved') ? (
+                      <Text className="mt-1 text-xs text-fog" numberOfLines={1} testID={`members-note-${member.account}`}>
+                        “{noteFor(`${pool.chainId}-${pool.poolId}-${member.account.toLowerCase()}`, 'membership_approved')!.text}”
+                      </Text>
+                    ) : null}
                   </View>
                   {/*
                     The owner is a member of their own pool and cannot be removed

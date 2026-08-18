@@ -139,3 +139,35 @@ describe('ActivityRow signs', () => {
     expect(getByText(/Neighbourhood Circle/)).toBeTruthy()
   })
 })
+
+// A purpose is optional, so most rows carry nothing — and a feed where most
+// rows carry nothing must not look like a feed with something missing.
+describe('a row with a note', () => {
+  it('quotes what the borrower said the money was for', () => {
+    const { getByTestId } = render(
+      <ActivityRow
+        tx={makeTx({ type: TransactionType.LOAN_DISBURSEMENT })}
+        denomination={NATIVE}
+        note={{
+          id: 'n',
+          recordId: '31337-0xabc-0',
+          kind: 'loan_purpose',
+          text: 'School fees.',
+          author: '0xabc',
+          subject: '0xabc',
+          chainId: 31337,
+          poolId: 1,
+          createdAt: '2026-08-18T09:00:00.000Z',
+        }}
+      />
+    )
+
+    expect(getByTestId('activity-note-31337-0xabc-0')).toHaveTextContent(/School fees\./)
+  })
+
+  it('is unchanged by a row that has none', () => {
+    const { queryByTestId } = render(<ActivityRow tx={makeTx()} denomination={NATIVE} />)
+
+    expect(queryByTestId('activity-note-31337-0xabc-0')).toBeNull()
+  })
+})
