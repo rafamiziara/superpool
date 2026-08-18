@@ -31,6 +31,18 @@ jest.mock('./poolNotifications', () => ({
   notifyLoanDecided: (...args: unknown[]) => mockNotifyLoanDecided(...args),
 }))
 
+/**
+ * A loan purpose is staged under the transaction that asked for the loan and
+ * moved onto the loan here, where both are in hand. Mocked for the same reason
+ * the notifications are — `notes.test.ts` covers what the move does.
+ */
+const mockResolveStagedNote = jest.fn()
+
+jest.mock('./notes', () => ({
+  ...jest.requireActual('./notes'),
+  resolveStagedNote: (...args: unknown[]) => mockResolveStagedNote(...args),
+}))
+
 const {
   fetchLoan,
   indexLoan,
@@ -205,6 +217,9 @@ beforeEach(() => {
   mockNotifyLoanRequested.mockResolvedValue(undefined)
   mockNotifyLoanDecided.mockReset()
   mockNotifyLoanDecided.mockResolvedValue(undefined)
+  mockResolveStagedNote.mockReset()
+  // Nothing staged: the ordinary case, since a purpose is optional.
+  mockResolveStagedNote.mockResolvedValue(null)
 })
 
 // ---------------------------------------------------------------------------
@@ -966,6 +981,75 @@ describe('indexLoanFromLog notifications', () => {
 
     await expect(indexLoanFromLog(buildLog(), CHAIN_ID, FACTORY_ADDRESS, buildProvider(), mockFs)).resolves.toBeNull()
     expect(mockNotifyLoanRequested).not.toHaveBeenCalled()
+  })
+})
+
+// ---------------------------------------------------------------------------
+// The purpose a borrower stated.
+//
+// Written before the loan existed — the contract assigns the id when the
+// transaction is mined — so it is staged under the transaction and moved here.
+// ---------------------------------------------------------------------------
+
+describe('indexLoanFromLog and a staged purpose', () => {
+  it('moves it onto the loan a lend-on-demand pool created', async () => {
+    const { mockFs } = buildFirestore({ exists: false })
+
+    await indexLoanFromLog(buildLog(), CHAIN_ID, FACTORY_ADDRESS, buildProvider(), mockFs)
+
+    expect(mockResolveStagedNote).toHaveBeenCalledWith(
+      CHAIN_ID,
+      expect.any(String),
+      loanDocId(CHAIN_ID, POOL_ID, LOAN_ID),
+      'loan_purpose',
+      BORROWER.toLowerCase(),
+      POOL_ID,
+      mockFs
+    )
+  })
+
+  it('moves it onto a request at a pool that reviews them', async () => {
+    mockGetLoan.mockResolvedValue(buildChainLoan({ status: 1 }))
+    const { mockFs } = buildFirestore({ exists: false })
+
+    await indexLoanFromLog(buildLog(), CHAIN_ID, FACTORY_ADDRESS, buildProvider(), mockFs)
+
+    expect(mockResolveStagedNote).toHaveBeenCalled()
+  })
+
+  // The check that keeps this cheap, and the one a mutation would break
+  // silently: every other transition would cost a read per log forever and
+  // find nothing — and would move the note again on the approval, whose
+  // transaction staged nothing.
+  it('does not look on a transition that did not create the loan', async () => {
+    mockGetLoan.mockResolvedValue(buildChainLoan({ status: 0 }))
+    const { mockFs } = buildFirestore({ exists: true, storedStatus: 'requested' })
+
+    await indexLoanFromLog(buildLog(), CHAIN_ID, FACTORY_ADDRESS, buildProvider(), mockFs)
+
+    expect(mockResolveStagedNote).not.toHaveBeenCalled()
+  })
+
+  it('indexes the loan even when the purpose cannot be attached', async () => {
+    // A note is never load-bearing: losing one must not fail an index.
+    mockResolveStagedNote.mockRejectedValue(new Error('firestore is down'))
+    const { mockFs } = buildFirestore({ exists: false })
+
+    const indexed = await indexLoanFromLog(buildLog(), CHAIN_ID, FACTORY_ADDRESS, buildProvider(), mockFs)
+
+    expect(indexed!.result.stored).toBe(true)
+    expect(mockLogger.error).toHaveBeenCalled()
+  })
+
+  it('attaches the purpose before the owner is told there is something to decide', async () => {
+    const order: string[] = []
+    mockResolveStagedNote.mockImplementation(async () => void order.push('note'))
+    mockNotifyLoanRequested.mockImplementation(async () => void order.push('notify'))
+    const { mockFs } = buildFirestore({ exists: false })
+
+    await indexLoanFromLog(buildLog(), CHAIN_ID, FACTORY_ADDRESS, buildProvider(), mockFs)
+
+    expect(order).toEqual(['note', 'notify'])
   })
 })
 

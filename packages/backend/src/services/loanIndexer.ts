@@ -4,6 +4,7 @@ import { logger } from 'firebase-functions/v2'
 import { HttpsError } from 'firebase-functions/v2/https'
 import { LendingPoolABI, LOANS_COLLECTION } from '../constants'
 import { resolvePoolId } from './contributionIndexer'
+import { resolveStagedNote } from './notes'
 import { notifyLoanDecided, notifyLoanRequested } from './poolNotifications'
 
 /**
@@ -567,6 +568,31 @@ export async function indexLoanFromLog(
   }
 
   const result = await indexLoan(loan, firestore)
+
+  // A purpose is written before the loan exists — the contract assigns the id
+  // when the transaction is mined — so it is staged under the transaction and
+  // moved here, where both the hash and the document id are in hand.
+  //
+  // **Only on the two transitions that bring a loan into existence.** Those
+  // are the transactions a purpose can have been staged under: `requested` at
+  // a pool that reviews requests, and `disbursed` — absent → disbursed — at
+  // one that lends on demand. Looking on every transition would cost a read
+  // per log forever and find nothing, and would move the note again on the
+  // approval, whose transaction staged nothing.
+  //
+  // Before the notification below, so the owner's push can carry it. Failures
+  // are swallowed like the notifications: a note is never load-bearing, and
+  // must never turn a successful index into an error.
+  if (result.transition === 'requested' || result.transition === 'disbursed') {
+    await resolveStagedNote(chainId, log.transactionHash, result.id, 'loan_purpose', loan.borrower, poolId, firestore).catch(
+      (error: unknown) => {
+        logger.error('Could not attach a staged purpose; indexing stands', {
+          docId: result.id,
+          error: error instanceof Error ? error.message : String(error),
+        })
+      }
+    )
+  }
 
   // Here rather than in the callable, so the sweep notifies too — a request
   // made while the app was closed is exactly the one the owner needs telling

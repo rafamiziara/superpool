@@ -470,6 +470,18 @@ describe('the reason a push carries', () => {
     expect(mockNoteFor).toHaveBeenCalledWith(`${CHAIN_ID}-${POOL_ID}-1`, 'loan_approved', firestore)
   })
 
+  // The single most valuable place a purpose can appear: this is the owner
+  // being told there is something to decide, and "what for" is most of it.
+  it('carries the purpose in the owner’s queue notification', async () => {
+    const { firestore } = buildFirestore()
+    mockNoteFor.mockResolvedValue({ text: 'School fees, due at the end of the month.' })
+
+    await notifyLoanRequested(loanResult('requested'), parsedLoan(), firestore)
+
+    expect(mockNoteFor).toHaveBeenCalledWith(`${CHAIN_ID}-${POOL_ID}-1`, 'loan_purpose', firestore)
+    expect(bodyOf()).toContain('School fees, due at the end of the month.')
+  })
+
   it('carries a reason on a membership decision too', async () => {
     const { firestore } = buildFirestore()
     mockNoteFor.mockResolvedValue({ text: 'We already have someone from your street.' })

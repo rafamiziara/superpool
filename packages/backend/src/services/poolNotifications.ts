@@ -66,12 +66,18 @@ export async function notifyLoanRequested(result: IndexLoanResult, loan: ParsedL
     actor: loan.borrower,
   }
 
+  // The single most valuable place a purpose can appear: this is the owner
+  // being told there is something to decide, and "what for" is most of the
+  // decision. The loan indexer resolves the staged note just before calling
+  // this, so by now it is attached to the loan.
+  const body = await withReason(`Someone asked to borrow from ${pool.name}.`, result.id, 'loan_purpose', firestore)
+
   await notifyOnce(
     notificationKey(result.id, 'loan_requested'),
     pool.poolOwner,
     {
       title: 'New loan request',
-      body: `Someone asked to borrow from ${pool.name}.`,
+      body,
       data,
     },
     firestore
