@@ -12,2756 +12,2756 @@
 
 export const PoolFactoryABI = [
   {
-    inputs: [
+    "inputs": [
       {
-        internalType: 'address',
-        name: 'target',
-        type: 'address',
-      },
+        "internalType": "address",
+        "name": "target",
+        "type": "address"
+      }
     ],
-    name: 'AddressEmptyCode',
-    type: 'error',
+    "name": "AddressEmptyCode",
+    "type": "error"
   },
   {
-    inputs: [],
-    name: 'BeaconAlreadySet',
-    type: 'error',
+    "inputs": [],
+    "name": "BeaconAlreadySet",
+    "type": "error"
   },
   {
-    inputs: [
+    "inputs": [
       {
-        internalType: 'address',
-        name: 'implementation',
-        type: 'address',
-      },
+        "internalType": "address",
+        "name": "implementation",
+        "type": "address"
+      }
     ],
-    name: 'ERC1967InvalidImplementation',
-    type: 'error',
+    "name": "ERC1967InvalidImplementation",
+    "type": "error"
   },
   {
-    inputs: [],
-    name: 'ERC1967NonPayable',
-    type: 'error',
+    "inputs": [],
+    "name": "ERC1967NonPayable",
+    "type": "error"
   },
   {
-    inputs: [],
-    name: 'EmptyName',
-    type: 'error',
+    "inputs": [],
+    "name": "EmptyName",
+    "type": "error"
   },
   {
-    inputs: [],
-    name: 'EnforcedPause',
-    type: 'error',
+    "inputs": [],
+    "name": "EnforcedPause",
+    "type": "error"
   },
   {
-    inputs: [],
-    name: 'ExpectedPause',
-    type: 'error',
+    "inputs": [],
+    "name": "ExpectedPause",
+    "type": "error"
   },
   {
-    inputs: [],
-    name: 'FailedCall',
-    type: 'error',
+    "inputs": [],
+    "name": "FailedCall",
+    "type": "error"
   },
   {
-    inputs: [],
-    name: 'ImplementationNotSet',
-    type: 'error',
+    "inputs": [],
+    "name": "ImplementationNotSet",
+    "type": "error"
   },
   {
-    inputs: [],
-    name: 'InvalidInitialization',
-    type: 'error',
+    "inputs": [],
+    "name": "InvalidInitialization",
+    "type": "error"
   },
   {
-    inputs: [],
-    name: 'InvalidInterestRate',
-    type: 'error',
+    "inputs": [],
+    "name": "InvalidInterestRate",
+    "type": "error"
   },
   {
-    inputs: [],
-    name: 'InvalidLoanDuration',
-    type: 'error',
+    "inputs": [],
+    "name": "InvalidLoanDuration",
+    "type": "error"
   },
   {
-    inputs: [],
-    name: 'InvalidLoanToken',
-    type: 'error',
+    "inputs": [],
+    "name": "InvalidLoanToken",
+    "type": "error"
   },
   {
-    inputs: [],
-    name: 'InvalidMaxLoanAmount',
-    type: 'error',
+    "inputs": [],
+    "name": "InvalidMaxLoanAmount",
+    "type": "error"
   },
   {
-    inputs: [],
-    name: 'InvalidPoolOwner',
-    type: 'error',
+    "inputs": [],
+    "name": "InvalidPoolOwner",
+    "type": "error"
   },
   {
-    inputs: [],
-    name: 'InvalidPoolOwnerAddress',
-    type: 'error',
+    "inputs": [],
+    "name": "InvalidPoolOwnerAddress",
+    "type": "error"
   },
   {
-    inputs: [],
-    name: 'NotInitializing',
-    type: 'error',
+    "inputs": [],
+    "name": "NotInitializing",
+    "type": "error"
   },
   {
-    inputs: [
+    "inputs": [
       {
-        internalType: 'address',
-        name: 'owner',
-        type: 'address',
-      },
+        "internalType": "address",
+        "name": "owner",
+        "type": "address"
+      }
     ],
-    name: 'OwnableInvalidOwner',
-    type: 'error',
+    "name": "OwnableInvalidOwner",
+    "type": "error"
   },
   {
-    inputs: [
+    "inputs": [
       {
-        internalType: 'address',
-        name: 'account',
-        type: 'address',
-      },
+        "internalType": "address",
+        "name": "account",
+        "type": "address"
+      }
     ],
-    name: 'OwnableUnauthorizedAccount',
-    type: 'error',
+    "name": "OwnableUnauthorizedAccount",
+    "type": "error"
   },
   {
-    inputs: [],
-    name: 'PoolAlreadyExists',
-    type: 'error',
+    "inputs": [],
+    "name": "PoolAlreadyExists",
+    "type": "error"
   },
   {
-    inputs: [],
-    name: 'PoolCreationFailed',
-    type: 'error',
+    "inputs": [],
+    "name": "PoolCreationFailed",
+    "type": "error"
   },
   {
-    inputs: [],
-    name: 'PoolNotFound',
-    type: 'error',
+    "inputs": [],
+    "name": "PoolNotFound",
+    "type": "error"
   },
   {
-    inputs: [],
-    name: 'ReentrancyGuardReentrantCall',
-    type: 'error',
+    "inputs": [],
+    "name": "ReentrancyGuardReentrantCall",
+    "type": "error"
   },
   {
-    inputs: [],
-    name: 'UUPSUnauthorizedCallContext',
-    type: 'error',
+    "inputs": [],
+    "name": "UUPSUnauthorizedCallContext",
+    "type": "error"
   },
   {
-    inputs: [
+    "inputs": [
       {
-        internalType: 'bytes32',
-        name: 'slot',
-        type: 'bytes32',
-      },
+        "internalType": "bytes32",
+        "name": "slot",
+        "type": "bytes32"
+      }
     ],
-    name: 'UUPSUnsupportedProxiableUUID',
-    type: 'error',
+    "name": "UUPSUnsupportedProxiableUUID",
+    "type": "error"
   },
   {
-    inputs: [],
-    name: 'UnauthorizedCreator',
-    type: 'error',
+    "inputs": [],
+    "name": "UnauthorizedCreator",
+    "type": "error"
   },
   {
-    inputs: [],
-    name: 'UnauthorizedLoanToken',
-    type: 'error',
+    "inputs": [],
+    "name": "UnauthorizedLoanToken",
+    "type": "error"
   },
   {
-    anonymous: false,
-    inputs: [
+    "anonymous": false,
+    "inputs": [
       {
-        indexed: true,
-        internalType: 'address',
-        name: 'creator',
-        type: 'address',
+        "indexed": true,
+        "internalType": "address",
+        "name": "creator",
+        "type": "address"
       },
       {
-        indexed: true,
-        internalType: 'bool',
-        name: 'authorized',
-        type: 'bool',
-      },
+        "indexed": true,
+        "internalType": "bool",
+        "name": "authorized",
+        "type": "bool"
+      }
     ],
-    name: 'CreatorAuthorized',
-    type: 'event',
+    "name": "CreatorAuthorized",
+    "type": "event"
   },
   {
-    anonymous: false,
-    inputs: [
+    "anonymous": false,
+    "inputs": [
       {
-        indexed: true,
-        internalType: 'address',
-        name: 'oldImplementation',
-        type: 'address',
+        "indexed": true,
+        "internalType": "address",
+        "name": "oldImplementation",
+        "type": "address"
       },
       {
-        indexed: true,
-        internalType: 'address',
-        name: 'newImplementation',
-        type: 'address',
-      },
+        "indexed": true,
+        "internalType": "address",
+        "name": "newImplementation",
+        "type": "address"
+      }
     ],
-    name: 'ImplementationUpdated',
-    type: 'event',
+    "name": "ImplementationUpdated",
+    "type": "event"
   },
   {
-    anonymous: false,
-    inputs: [
+    "anonymous": false,
+    "inputs": [
       {
-        indexed: false,
-        internalType: 'uint64',
-        name: 'version',
-        type: 'uint64',
-      },
+        "indexed": false,
+        "internalType": "uint64",
+        "name": "version",
+        "type": "uint64"
+      }
     ],
-    name: 'Initialized',
-    type: 'event',
+    "name": "Initialized",
+    "type": "event"
   },
   {
-    anonymous: false,
-    inputs: [
+    "anonymous": false,
+    "inputs": [
       {
-        indexed: true,
-        internalType: 'address',
-        name: 'token',
-        type: 'address',
+        "indexed": true,
+        "internalType": "address",
+        "name": "token",
+        "type": "address"
       },
       {
-        indexed: true,
-        internalType: 'bool',
-        name: 'authorized',
-        type: 'bool',
-      },
+        "indexed": true,
+        "internalType": "bool",
+        "name": "authorized",
+        "type": "bool"
+      }
     ],
-    name: 'LoanTokenAuthorized',
-    type: 'event',
+    "name": "LoanTokenAuthorized",
+    "type": "event"
   },
   {
-    anonymous: false,
-    inputs: [
+    "anonymous": false,
+    "inputs": [
       {
-        indexed: true,
-        internalType: 'address',
-        name: 'previousOwner',
-        type: 'address',
+        "indexed": true,
+        "internalType": "address",
+        "name": "previousOwner",
+        "type": "address"
       },
       {
-        indexed: true,
-        internalType: 'address',
-        name: 'newOwner',
-        type: 'address',
-      },
+        "indexed": true,
+        "internalType": "address",
+        "name": "newOwner",
+        "type": "address"
+      }
     ],
-    name: 'OwnershipTransferStarted',
-    type: 'event',
+    "name": "OwnershipTransferStarted",
+    "type": "event"
   },
   {
-    anonymous: false,
-    inputs: [
+    "anonymous": false,
+    "inputs": [
       {
-        indexed: true,
-        internalType: 'address',
-        name: 'previousOwner',
-        type: 'address',
+        "indexed": true,
+        "internalType": "address",
+        "name": "previousOwner",
+        "type": "address"
       },
       {
-        indexed: true,
-        internalType: 'address',
-        name: 'newOwner',
-        type: 'address',
-      },
+        "indexed": true,
+        "internalType": "address",
+        "name": "newOwner",
+        "type": "address"
+      }
     ],
-    name: 'OwnershipTransferred',
-    type: 'event',
+    "name": "OwnershipTransferred",
+    "type": "event"
   },
   {
-    anonymous: false,
-    inputs: [
+    "anonymous": false,
+    "inputs": [
       {
-        indexed: false,
-        internalType: 'address',
-        name: 'account',
-        type: 'address',
-      },
+        "indexed": false,
+        "internalType": "address",
+        "name": "account",
+        "type": "address"
+      }
     ],
-    name: 'Paused',
-    type: 'event',
+    "name": "Paused",
+    "type": "event"
   },
   {
-    anonymous: false,
-    inputs: [
+    "anonymous": false,
+    "inputs": [
       {
-        indexed: true,
-        internalType: 'uint256',
-        name: 'poolId',
-        type: 'uint256',
+        "indexed": true,
+        "internalType": "uint256",
+        "name": "poolId",
+        "type": "uint256"
       },
       {
-        indexed: true,
-        internalType: 'address',
-        name: 'poolAddress',
-        type: 'address',
+        "indexed": true,
+        "internalType": "address",
+        "name": "poolAddress",
+        "type": "address"
       },
       {
-        indexed: true,
-        internalType: 'address',
-        name: 'poolOwner',
-        type: 'address',
+        "indexed": true,
+        "internalType": "address",
+        "name": "poolOwner",
+        "type": "address"
       },
       {
-        indexed: false,
-        internalType: 'string',
-        name: 'name',
-        type: 'string',
+        "indexed": false,
+        "internalType": "string",
+        "name": "name",
+        "type": "string"
       },
       {
-        indexed: false,
-        internalType: 'uint256',
-        name: 'maxLoanAmount',
-        type: 'uint256',
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "maxLoanAmount",
+        "type": "uint256"
       },
       {
-        indexed: false,
-        internalType: 'uint256',
-        name: 'interestRate',
-        type: 'uint256',
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "interestRate",
+        "type": "uint256"
       },
       {
-        indexed: false,
-        internalType: 'uint256',
-        name: 'loanDuration',
-        type: 'uint256',
-      },
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "loanDuration",
+        "type": "uint256"
+      }
     ],
-    name: 'PoolCreated',
-    type: 'event',
+    "name": "PoolCreated",
+    "type": "event"
   },
   {
-    anonymous: false,
-    inputs: [
+    "anonymous": false,
+    "inputs": [
       {
-        indexed: true,
-        internalType: 'uint256',
-        name: 'poolId',
-        type: 'uint256',
+        "indexed": true,
+        "internalType": "uint256",
+        "name": "poolId",
+        "type": "uint256"
       },
       {
-        indexed: true,
-        internalType: 'address',
-        name: 'poolAddress',
-        type: 'address',
-      },
+        "indexed": true,
+        "internalType": "address",
+        "name": "poolAddress",
+        "type": "address"
+      }
     ],
-    name: 'PoolDeactivated',
-    type: 'event',
+    "name": "PoolDeactivated",
+    "type": "event"
   },
   {
-    anonymous: false,
-    inputs: [
+    "anonymous": false,
+    "inputs": [
       {
-        indexed: true,
-        internalType: 'uint256',
-        name: 'poolId',
-        type: 'uint256',
+        "indexed": true,
+        "internalType": "uint256",
+        "name": "poolId",
+        "type": "uint256"
       },
       {
-        indexed: true,
-        internalType: 'address',
-        name: 'poolAddress',
-        type: 'address',
-      },
+        "indexed": true,
+        "internalType": "address",
+        "name": "poolAddress",
+        "type": "address"
+      }
     ],
-    name: 'PoolReactivated',
-    type: 'event',
+    "name": "PoolReactivated",
+    "type": "event"
   },
   {
-    anonymous: false,
-    inputs: [
+    "anonymous": false,
+    "inputs": [
       {
-        indexed: false,
-        internalType: 'address',
-        name: 'account',
-        type: 'address',
-      },
+        "indexed": false,
+        "internalType": "address",
+        "name": "account",
+        "type": "address"
+      }
     ],
-    name: 'Unpaused',
-    type: 'event',
+    "name": "Unpaused",
+    "type": "event"
   },
   {
-    anonymous: false,
-    inputs: [
+    "anonymous": false,
+    "inputs": [
       {
-        indexed: true,
-        internalType: 'address',
-        name: 'implementation',
-        type: 'address',
-      },
+        "indexed": true,
+        "internalType": "address",
+        "name": "implementation",
+        "type": "address"
+      }
     ],
-    name: 'Upgraded',
-    type: 'event',
+    "name": "Upgraded",
+    "type": "event"
   },
   {
-    anonymous: false,
-    inputs: [
+    "anonymous": false,
+    "inputs": [
       {
-        indexed: true,
-        internalType: 'bool',
-        name: 'enabled',
-        type: 'bool',
-      },
+        "indexed": true,
+        "internalType": "bool",
+        "name": "enabled",
+        "type": "bool"
+      }
     ],
-    name: 'WhitelistModeChanged',
-    type: 'event',
+    "name": "WhitelistModeChanged",
+    "type": "event"
   },
   {
-    inputs: [],
-    name: 'UPGRADE_INTERFACE_VERSION',
-    outputs: [
+    "inputs": [],
+    "name": "UPGRADE_INTERFACE_VERSION",
+    "outputs": [
       {
-        internalType: 'string',
-        name: '',
-        type: 'string',
-      },
+        "internalType": "string",
+        "name": "",
+        "type": "string"
+      }
     ],
-    stateMutability: 'view',
-    type: 'function',
+    "stateMutability": "view",
+    "type": "function"
   },
   {
-    inputs: [],
-    name: 'acceptOwnership',
-    outputs: [],
-    stateMutability: 'nonpayable',
-    type: 'function',
+    "inputs": [],
+    "name": "acceptOwnership",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
   },
   {
-    inputs: [
+    "inputs": [
       {
-        internalType: 'uint256',
-        name: '',
-        type: 'uint256',
-      },
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
     ],
-    name: 'allPools',
-    outputs: [
+    "name": "allPools",
+    "outputs": [
       {
-        internalType: 'address',
-        name: '',
-        type: 'address',
-      },
+        "internalType": "address",
+        "name": "",
+        "type": "address"
+      }
     ],
-    stateMutability: 'view',
-    type: 'function',
+    "stateMutability": "view",
+    "type": "function"
   },
   {
-    inputs: [
+    "inputs": [
       {
-        internalType: 'address',
-        name: '',
-        type: 'address',
-      },
+        "internalType": "address",
+        "name": "",
+        "type": "address"
+      }
     ],
-    name: 'authorizedCreators',
-    outputs: [
+    "name": "authorizedCreators",
+    "outputs": [
       {
-        internalType: 'bool',
-        name: '',
-        type: 'bool',
-      },
+        "internalType": "bool",
+        "name": "",
+        "type": "bool"
+      }
     ],
-    stateMutability: 'view',
-    type: 'function',
+    "stateMutability": "view",
+    "type": "function"
   },
   {
-    inputs: [
+    "inputs": [
       {
-        internalType: 'address',
-        name: '',
-        type: 'address',
-      },
+        "internalType": "address",
+        "name": "",
+        "type": "address"
+      }
     ],
-    name: 'authorizedLoanTokens',
-    outputs: [
+    "name": "authorizedLoanTokens",
+    "outputs": [
       {
-        internalType: 'bool',
-        name: '',
-        type: 'bool',
-      },
+        "internalType": "bool",
+        "name": "",
+        "type": "bool"
+      }
     ],
-    stateMutability: 'view',
-    type: 'function',
+    "stateMutability": "view",
+    "type": "function"
   },
   {
-    inputs: [
+    "inputs": [
       {
-        components: [
+        "components": [
           {
-            internalType: 'uint256',
-            name: 'maxLoanAmount',
-            type: 'uint256',
+            "internalType": "uint256",
+            "name": "maxLoanAmount",
+            "type": "uint256"
           },
           {
-            internalType: 'uint256',
-            name: 'interestRate',
-            type: 'uint256',
+            "internalType": "uint256",
+            "name": "interestRate",
+            "type": "uint256"
           },
           {
-            internalType: 'uint256',
-            name: 'loanDuration',
-            type: 'uint256',
+            "internalType": "uint256",
+            "name": "loanDuration",
+            "type": "uint256"
           },
           {
-            internalType: 'string',
-            name: 'name',
-            type: 'string',
+            "internalType": "string",
+            "name": "name",
+            "type": "string"
           },
           {
-            internalType: 'string',
-            name: 'description',
-            type: 'string',
+            "internalType": "string",
+            "name": "description",
+            "type": "string"
           },
           {
-            internalType: 'bool',
-            name: 'requiresMembership',
-            type: 'bool',
+            "internalType": "bool",
+            "name": "requiresMembership",
+            "type": "bool"
           },
           {
-            internalType: 'address',
-            name: 'loanToken',
-            type: 'address',
-          },
+            "internalType": "address",
+            "name": "loanToken",
+            "type": "address"
+          }
         ],
-        internalType: 'struct PoolFactory.PoolParams',
-        name: '_params',
-        type: 'tuple',
-      },
+        "internalType": "struct PoolFactory.PoolParams",
+        "name": "_params",
+        "type": "tuple"
+      }
     ],
-    name: 'createPool',
-    outputs: [
+    "name": "createPool",
+    "outputs": [
       {
-        internalType: 'uint256',
-        name: 'poolId',
-        type: 'uint256',
+        "internalType": "uint256",
+        "name": "poolId",
+        "type": "uint256"
       },
       {
-        internalType: 'address',
-        name: 'poolAddress',
-        type: 'address',
-      },
+        "internalType": "address",
+        "name": "poolAddress",
+        "type": "address"
+      }
     ],
-    stateMutability: 'nonpayable',
-    type: 'function',
+    "stateMutability": "nonpayable",
+    "type": "function"
   },
   {
-    inputs: [
+    "inputs": [
       {
-        internalType: 'uint256',
-        name: '_poolId',
-        type: 'uint256',
-      },
+        "internalType": "uint256",
+        "name": "_poolId",
+        "type": "uint256"
+      }
     ],
-    name: 'deactivatePool',
-    outputs: [],
-    stateMutability: 'nonpayable',
-    type: 'function',
+    "name": "deactivatePool",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
   },
   {
-    inputs: [],
-    name: 'emergencyPause',
-    outputs: [],
-    stateMutability: 'nonpayable',
-    type: 'function',
+    "inputs": [],
+    "name": "emergencyPause",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
   },
   {
-    inputs: [],
-    name: 'emergencyUnpause',
-    outputs: [],
-    stateMutability: 'nonpayable',
-    type: 'function',
+    "inputs": [],
+    "name": "emergencyUnpause",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
   },
   {
-    inputs: [],
-    name: 'getOwnershipStatus',
-    outputs: [
+    "inputs": [],
+    "name": "getOwnershipStatus",
+    "outputs": [
       {
-        internalType: 'address',
-        name: 'currentOwner',
-        type: 'address',
+        "internalType": "address",
+        "name": "currentOwner",
+        "type": "address"
       },
       {
-        internalType: 'address',
-        name: 'pendingOwnerAddress',
-        type: 'address',
+        "internalType": "address",
+        "name": "pendingOwnerAddress",
+        "type": "address"
       },
       {
-        internalType: 'bool',
-        name: 'hasPendingTransfer',
-        type: 'bool',
-      },
+        "internalType": "bool",
+        "name": "hasPendingTransfer",
+        "type": "bool"
+      }
     ],
-    stateMutability: 'view',
-    type: 'function',
+    "stateMutability": "view",
+    "type": "function"
   },
   {
-    inputs: [
+    "inputs": [
       {
-        internalType: 'uint256',
-        name: '_poolId',
-        type: 'uint256',
-      },
+        "internalType": "uint256",
+        "name": "_poolId",
+        "type": "uint256"
+      }
     ],
-    name: 'getPoolAddress',
-    outputs: [
+    "name": "getPoolAddress",
+    "outputs": [
       {
-        internalType: 'address',
-        name: '',
-        type: 'address',
-      },
+        "internalType": "address",
+        "name": "",
+        "type": "address"
+      }
     ],
-    stateMutability: 'view',
-    type: 'function',
+    "stateMutability": "view",
+    "type": "function"
   },
   {
-    inputs: [],
-    name: 'getPoolCount',
-    outputs: [
+    "inputs": [],
+    "name": "getPoolCount",
+    "outputs": [
       {
-        internalType: 'uint256',
-        name: '',
-        type: 'uint256',
-      },
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
     ],
-    stateMutability: 'view',
-    type: 'function',
+    "stateMutability": "view",
+    "type": "function"
   },
   {
-    inputs: [
+    "inputs": [
       {
-        internalType: 'address',
-        name: '_poolAddress',
-        type: 'address',
-      },
+        "internalType": "address",
+        "name": "_poolAddress",
+        "type": "address"
+      }
     ],
-    name: 'getPoolId',
-    outputs: [
+    "name": "getPoolId",
+    "outputs": [
       {
-        internalType: 'uint256',
-        name: '',
-        type: 'uint256',
-      },
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
     ],
-    stateMutability: 'view',
-    type: 'function',
+    "stateMutability": "view",
+    "type": "function"
   },
   {
-    inputs: [
+    "inputs": [
       {
-        internalType: 'uint256',
-        name: '_poolId',
-        type: 'uint256',
-      },
+        "internalType": "uint256",
+        "name": "_poolId",
+        "type": "uint256"
+      }
     ],
-    name: 'getPoolInfo',
-    outputs: [
+    "name": "getPoolInfo",
+    "outputs": [
       {
-        components: [
+        "components": [
           {
-            internalType: 'address',
-            name: 'poolAddress',
-            type: 'address',
+            "internalType": "address",
+            "name": "poolAddress",
+            "type": "address"
           },
           {
-            internalType: 'address',
-            name: 'poolOwner',
-            type: 'address',
+            "internalType": "address",
+            "name": "poolOwner",
+            "type": "address"
           },
           {
-            internalType: 'bool',
-            name: 'isActive',
-            type: 'bool',
+            "internalType": "bool",
+            "name": "isActive",
+            "type": "bool"
           },
           {
-            internalType: 'uint256',
-            name: 'maxLoanAmount',
-            type: 'uint256',
+            "internalType": "uint256",
+            "name": "maxLoanAmount",
+            "type": "uint256"
           },
           {
-            internalType: 'uint256',
-            name: 'interestRate',
-            type: 'uint256',
+            "internalType": "uint256",
+            "name": "interestRate",
+            "type": "uint256"
           },
           {
-            internalType: 'uint256',
-            name: 'loanDuration',
-            type: 'uint256',
+            "internalType": "uint256",
+            "name": "loanDuration",
+            "type": "uint256"
           },
           {
-            internalType: 'uint256',
-            name: 'createdAt',
-            type: 'uint256',
+            "internalType": "uint256",
+            "name": "createdAt",
+            "type": "uint256"
           },
           {
-            internalType: 'string',
-            name: 'name',
-            type: 'string',
+            "internalType": "string",
+            "name": "name",
+            "type": "string"
           },
           {
-            internalType: 'string',
-            name: 'description',
-            type: 'string',
+            "internalType": "string",
+            "name": "description",
+            "type": "string"
           },
           {
-            internalType: 'address',
-            name: 'loanToken',
-            type: 'address',
-          },
+            "internalType": "address",
+            "name": "loanToken",
+            "type": "address"
+          }
         ],
-        internalType: 'struct PoolFactory.PoolInfo',
-        name: '',
-        type: 'tuple',
-      },
+        "internalType": "struct PoolFactory.PoolInfo",
+        "name": "",
+        "type": "tuple"
+      }
     ],
-    stateMutability: 'view',
-    type: 'function',
+    "stateMutability": "view",
+    "type": "function"
   },
   {
-    inputs: [
+    "inputs": [
       {
-        internalType: 'address',
-        name: '_owner',
-        type: 'address',
-      },
+        "internalType": "address",
+        "name": "_owner",
+        "type": "address"
+      }
     ],
-    name: 'getPoolsByOwner',
-    outputs: [
+    "name": "getPoolsByOwner",
+    "outputs": [
       {
-        internalType: 'uint256[]',
-        name: '',
-        type: 'uint256[]',
-      },
+        "internalType": "uint256[]",
+        "name": "",
+        "type": "uint256[]"
+      }
     ],
-    stateMutability: 'view',
-    type: 'function',
+    "stateMutability": "view",
+    "type": "function"
   },
   {
-    inputs: [
+    "inputs": [
       {
-        internalType: 'uint256',
-        name: '_start',
-        type: 'uint256',
+        "internalType": "uint256",
+        "name": "_start",
+        "type": "uint256"
       },
       {
-        internalType: 'uint256',
-        name: '_limit',
-        type: 'uint256',
-      },
+        "internalType": "uint256",
+        "name": "_limit",
+        "type": "uint256"
+      }
     ],
-    name: 'getPoolsRange',
-    outputs: [
+    "name": "getPoolsRange",
+    "outputs": [
       {
-        internalType: 'uint256[]',
-        name: 'poolIds',
-        type: 'uint256[]',
+        "internalType": "uint256[]",
+        "name": "poolIds",
+        "type": "uint256[]"
       },
       {
-        components: [
+        "components": [
           {
-            internalType: 'address',
-            name: 'poolAddress',
-            type: 'address',
+            "internalType": "address",
+            "name": "poolAddress",
+            "type": "address"
           },
           {
-            internalType: 'address',
-            name: 'poolOwner',
-            type: 'address',
+            "internalType": "address",
+            "name": "poolOwner",
+            "type": "address"
           },
           {
-            internalType: 'bool',
-            name: 'isActive',
-            type: 'bool',
+            "internalType": "bool",
+            "name": "isActive",
+            "type": "bool"
           },
           {
-            internalType: 'uint256',
-            name: 'maxLoanAmount',
-            type: 'uint256',
+            "internalType": "uint256",
+            "name": "maxLoanAmount",
+            "type": "uint256"
           },
           {
-            internalType: 'uint256',
-            name: 'interestRate',
-            type: 'uint256',
+            "internalType": "uint256",
+            "name": "interestRate",
+            "type": "uint256"
           },
           {
-            internalType: 'uint256',
-            name: 'loanDuration',
-            type: 'uint256',
+            "internalType": "uint256",
+            "name": "loanDuration",
+            "type": "uint256"
           },
           {
-            internalType: 'uint256',
-            name: 'createdAt',
-            type: 'uint256',
+            "internalType": "uint256",
+            "name": "createdAt",
+            "type": "uint256"
           },
           {
-            internalType: 'string',
-            name: 'name',
-            type: 'string',
+            "internalType": "string",
+            "name": "name",
+            "type": "string"
           },
           {
-            internalType: 'string',
-            name: 'description',
-            type: 'string',
+            "internalType": "string",
+            "name": "description",
+            "type": "string"
           },
           {
-            internalType: 'address',
-            name: 'loanToken',
-            type: 'address',
-          },
+            "internalType": "address",
+            "name": "loanToken",
+            "type": "address"
+          }
         ],
-        internalType: 'struct PoolFactory.PoolInfo[]',
-        name: 'poolInfos',
-        type: 'tuple[]',
-      },
+        "internalType": "struct PoolFactory.PoolInfo[]",
+        "name": "poolInfos",
+        "type": "tuple[]"
+      }
     ],
-    stateMutability: 'view',
-    type: 'function',
+    "stateMutability": "view",
+    "type": "function"
   },
   {
-    inputs: [
+    "inputs": [
       {
-        internalType: 'address',
-        name: '_owner',
-        type: 'address',
+        "internalType": "address",
+        "name": "_owner",
+        "type": "address"
       },
       {
-        internalType: 'address',
-        name: '_implementation',
-        type: 'address',
-      },
+        "internalType": "address",
+        "name": "_implementation",
+        "type": "address"
+      }
     ],
-    name: 'initialize',
-    outputs: [],
-    stateMutability: 'nonpayable',
-    type: 'function',
+    "name": "initialize",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
   },
   {
-    inputs: [
+    "inputs": [
       {
-        internalType: 'address',
-        name: '_creator',
-        type: 'address',
-      },
+        "internalType": "address",
+        "name": "_creator",
+        "type": "address"
+      }
     ],
-    name: 'isAuthorizedCreator',
-    outputs: [
+    "name": "isAuthorizedCreator",
+    "outputs": [
       {
-        internalType: 'bool',
-        name: '',
-        type: 'bool',
-      },
+        "internalType": "bool",
+        "name": "",
+        "type": "bool"
+      }
     ],
-    stateMutability: 'view',
-    type: 'function',
+    "stateMutability": "view",
+    "type": "function"
   },
   {
-    inputs: [
+    "inputs": [
       {
-        internalType: 'address',
-        name: '_token',
-        type: 'address',
-      },
+        "internalType": "address",
+        "name": "_token",
+        "type": "address"
+      }
     ],
-    name: 'isAuthorizedLoanToken',
-    outputs: [
+    "name": "isAuthorizedLoanToken",
+    "outputs": [
       {
-        internalType: 'bool',
-        name: '',
-        type: 'bool',
-      },
+        "internalType": "bool",
+        "name": "",
+        "type": "bool"
+      }
     ],
-    stateMutability: 'view',
-    type: 'function',
+    "stateMutability": "view",
+    "type": "function"
   },
   {
-    inputs: [
+    "inputs": [
       {
-        internalType: 'address',
-        name: '_address',
-        type: 'address',
-      },
+        "internalType": "address",
+        "name": "_address",
+        "type": "address"
+      }
     ],
-    name: 'isCurrentOwner',
-    outputs: [
+    "name": "isCurrentOwner",
+    "outputs": [
       {
-        internalType: 'bool',
-        name: '',
-        type: 'bool',
-      },
+        "internalType": "bool",
+        "name": "",
+        "type": "bool"
+      }
     ],
-    stateMutability: 'view',
-    type: 'function',
+    "stateMutability": "view",
+    "type": "function"
   },
   {
-    inputs: [
+    "inputs": [
       {
-        internalType: 'address',
-        name: '_address',
-        type: 'address',
-      },
+        "internalType": "address",
+        "name": "_address",
+        "type": "address"
+      }
     ],
-    name: 'isPendingOwner',
-    outputs: [
+    "name": "isPendingOwner",
+    "outputs": [
       {
-        internalType: 'bool',
-        name: '',
-        type: 'bool',
-      },
+        "internalType": "bool",
+        "name": "",
+        "type": "bool"
+      }
     ],
-    stateMutability: 'view',
-    type: 'function',
+    "stateMutability": "view",
+    "type": "function"
   },
   {
-    inputs: [
+    "inputs": [
       {
-        internalType: 'uint256',
-        name: '_poolId',
-        type: 'uint256',
-      },
+        "internalType": "uint256",
+        "name": "_poolId",
+        "type": "uint256"
+      }
     ],
-    name: 'isPoolActive',
-    outputs: [
+    "name": "isPoolActive",
+    "outputs": [
       {
-        internalType: 'bool',
-        name: '',
-        type: 'bool',
-      },
+        "internalType": "bool",
+        "name": "",
+        "type": "bool"
+      }
     ],
-    stateMutability: 'view',
-    type: 'function',
+    "stateMutability": "view",
+    "type": "function"
   },
   {
-    inputs: [],
-    name: 'isWhitelistEnabled',
-    outputs: [
+    "inputs": [],
+    "name": "isWhitelistEnabled",
+    "outputs": [
       {
-        internalType: 'bool',
-        name: '',
-        type: 'bool',
-      },
+        "internalType": "bool",
+        "name": "",
+        "type": "bool"
+      }
     ],
-    stateMutability: 'view',
-    type: 'function',
+    "stateMutability": "view",
+    "type": "function"
   },
   {
-    inputs: [],
-    name: 'lendingPoolImplementation',
-    outputs: [
+    "inputs": [],
+    "name": "lendingPoolImplementation",
+    "outputs": [
       {
-        internalType: 'address',
-        name: '',
-        type: 'address',
-      },
+        "internalType": "address",
+        "name": "",
+        "type": "address"
+      }
     ],
-    stateMutability: 'view',
-    type: 'function',
+    "stateMutability": "view",
+    "type": "function"
   },
   {
-    inputs: [],
-    name: 'migrateToBeacon',
-    outputs: [],
-    stateMutability: 'nonpayable',
-    type: 'function',
+    "inputs": [],
+    "name": "migrateToBeacon",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
   },
   {
-    inputs: [],
-    name: 'owner',
-    outputs: [
+    "inputs": [],
+    "name": "owner",
+    "outputs": [
       {
-        internalType: 'address',
-        name: '',
-        type: 'address',
-      },
+        "internalType": "address",
+        "name": "",
+        "type": "address"
+      }
     ],
-    stateMutability: 'view',
-    type: 'function',
+    "stateMutability": "view",
+    "type": "function"
   },
   {
-    inputs: [
+    "inputs": [
       {
-        internalType: 'address',
-        name: '',
-        type: 'address',
+        "internalType": "address",
+        "name": "",
+        "type": "address"
       },
       {
-        internalType: 'uint256',
-        name: '',
-        type: 'uint256',
-      },
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
     ],
-    name: 'ownerToPools',
-    outputs: [
+    "name": "ownerToPools",
+    "outputs": [
       {
-        internalType: 'uint256',
-        name: '',
-        type: 'uint256',
-      },
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
     ],
-    stateMutability: 'view',
-    type: 'function',
+    "stateMutability": "view",
+    "type": "function"
   },
   {
-    inputs: [],
-    name: 'pause',
-    outputs: [],
-    stateMutability: 'nonpayable',
-    type: 'function',
+    "inputs": [],
+    "name": "pause",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
   },
   {
-    inputs: [],
-    name: 'paused',
-    outputs: [
+    "inputs": [],
+    "name": "paused",
+    "outputs": [
       {
-        internalType: 'bool',
-        name: '',
-        type: 'bool',
-      },
+        "internalType": "bool",
+        "name": "",
+        "type": "bool"
+      }
     ],
-    stateMutability: 'view',
-    type: 'function',
+    "stateMutability": "view",
+    "type": "function"
   },
   {
-    inputs: [],
-    name: 'pendingOwner',
-    outputs: [
+    "inputs": [],
+    "name": "pendingOwner",
+    "outputs": [
       {
-        internalType: 'address',
-        name: '',
-        type: 'address',
-      },
+        "internalType": "address",
+        "name": "",
+        "type": "address"
+      }
     ],
-    stateMutability: 'view',
-    type: 'function',
+    "stateMutability": "view",
+    "type": "function"
   },
   {
-    inputs: [
+    "inputs": [
       {
-        internalType: 'address',
-        name: '',
-        type: 'address',
-      },
+        "internalType": "address",
+        "name": "",
+        "type": "address"
+      }
     ],
-    name: 'poolAddressToId',
-    outputs: [
+    "name": "poolAddressToId",
+    "outputs": [
       {
-        internalType: 'uint256',
-        name: '',
-        type: 'uint256',
-      },
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
     ],
-    stateMutability: 'view',
-    type: 'function',
+    "stateMutability": "view",
+    "type": "function"
   },
   {
-    inputs: [],
-    name: 'poolBeacon',
-    outputs: [
+    "inputs": [],
+    "name": "poolBeacon",
+    "outputs": [
       {
-        internalType: 'contract UpgradeableBeacon',
-        name: '',
-        type: 'address',
-      },
+        "internalType": "contract UpgradeableBeacon",
+        "name": "",
+        "type": "address"
+      }
     ],
-    stateMutability: 'view',
-    type: 'function',
+    "stateMutability": "view",
+    "type": "function"
   },
   {
-    inputs: [],
-    name: 'poolCount',
-    outputs: [
+    "inputs": [],
+    "name": "poolCount",
+    "outputs": [
       {
-        internalType: 'uint256',
-        name: '',
-        type: 'uint256',
-      },
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
     ],
-    stateMutability: 'view',
-    type: 'function',
+    "stateMutability": "view",
+    "type": "function"
   },
   {
-    inputs: [
+    "inputs": [
       {
-        internalType: 'uint256',
-        name: '',
-        type: 'uint256',
-      },
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
     ],
-    name: 'pools',
-    outputs: [
+    "name": "pools",
+    "outputs": [
       {
-        internalType: 'address',
-        name: 'poolAddress',
-        type: 'address',
+        "internalType": "address",
+        "name": "poolAddress",
+        "type": "address"
       },
       {
-        internalType: 'address',
-        name: 'poolOwner',
-        type: 'address',
+        "internalType": "address",
+        "name": "poolOwner",
+        "type": "address"
       },
       {
-        internalType: 'bool',
-        name: 'isActive',
-        type: 'bool',
+        "internalType": "bool",
+        "name": "isActive",
+        "type": "bool"
       },
       {
-        internalType: 'uint256',
-        name: 'maxLoanAmount',
-        type: 'uint256',
+        "internalType": "uint256",
+        "name": "maxLoanAmount",
+        "type": "uint256"
       },
       {
-        internalType: 'uint256',
-        name: 'interestRate',
-        type: 'uint256',
+        "internalType": "uint256",
+        "name": "interestRate",
+        "type": "uint256"
       },
       {
-        internalType: 'uint256',
-        name: 'loanDuration',
-        type: 'uint256',
+        "internalType": "uint256",
+        "name": "loanDuration",
+        "type": "uint256"
       },
       {
-        internalType: 'uint256',
-        name: 'createdAt',
-        type: 'uint256',
+        "internalType": "uint256",
+        "name": "createdAt",
+        "type": "uint256"
       },
       {
-        internalType: 'string',
-        name: 'name',
-        type: 'string',
+        "internalType": "string",
+        "name": "name",
+        "type": "string"
       },
       {
-        internalType: 'string',
-        name: 'description',
-        type: 'string',
+        "internalType": "string",
+        "name": "description",
+        "type": "string"
       },
       {
-        internalType: 'address',
-        name: 'loanToken',
-        type: 'address',
-      },
+        "internalType": "address",
+        "name": "loanToken",
+        "type": "address"
+      }
     ],
-    stateMutability: 'view',
-    type: 'function',
+    "stateMutability": "view",
+    "type": "function"
   },
   {
-    inputs: [],
-    name: 'proxiableUUID',
-    outputs: [
+    "inputs": [],
+    "name": "proxiableUUID",
+    "outputs": [
       {
-        internalType: 'bytes32',
-        name: '',
-        type: 'bytes32',
-      },
+        "internalType": "bytes32",
+        "name": "",
+        "type": "bytes32"
+      }
     ],
-    stateMutability: 'view',
-    type: 'function',
+    "stateMutability": "view",
+    "type": "function"
   },
   {
-    inputs: [
+    "inputs": [
       {
-        internalType: 'uint256',
-        name: '_poolId',
-        type: 'uint256',
-      },
+        "internalType": "uint256",
+        "name": "_poolId",
+        "type": "uint256"
+      }
     ],
-    name: 'reactivatePool',
-    outputs: [],
-    stateMutability: 'nonpayable',
-    type: 'function',
+    "name": "reactivatePool",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
   },
   {
-    inputs: [],
-    name: 'renounceOwnership',
-    outputs: [],
-    stateMutability: 'nonpayable',
-    type: 'function',
+    "inputs": [],
+    "name": "renounceOwnership",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
   },
   {
-    inputs: [
+    "inputs": [
       {
-        internalType: 'address',
-        name: '_creator',
-        type: 'address',
+        "internalType": "address",
+        "name": "_creator",
+        "type": "address"
       },
       {
-        internalType: 'bool',
-        name: '_authorized',
-        type: 'bool',
-      },
+        "internalType": "bool",
+        "name": "_authorized",
+        "type": "bool"
+      }
     ],
-    name: 'setCreatorAuthorization',
-    outputs: [],
-    stateMutability: 'nonpayable',
-    type: 'function',
+    "name": "setCreatorAuthorization",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
   },
   {
-    inputs: [
+    "inputs": [
       {
-        internalType: 'address',
-        name: '_token',
-        type: 'address',
+        "internalType": "address",
+        "name": "_token",
+        "type": "address"
       },
       {
-        internalType: 'bool',
-        name: '_authorized',
-        type: 'bool',
-      },
+        "internalType": "bool",
+        "name": "_authorized",
+        "type": "bool"
+      }
     ],
-    name: 'setLoanTokenAuthorization',
-    outputs: [],
-    stateMutability: 'nonpayable',
-    type: 'function',
+    "name": "setLoanTokenAuthorization",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
   },
   {
-    inputs: [
+    "inputs": [
       {
-        internalType: 'bool',
-        name: '_enabled',
-        type: 'bool',
-      },
+        "internalType": "bool",
+        "name": "_enabled",
+        "type": "bool"
+      }
     ],
-    name: 'setWhitelistMode',
-    outputs: [],
-    stateMutability: 'nonpayable',
-    type: 'function',
+    "name": "setWhitelistMode",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
   },
   {
-    inputs: [
+    "inputs": [
       {
-        internalType: 'address',
-        name: 'newOwner',
-        type: 'address',
-      },
+        "internalType": "address",
+        "name": "newOwner",
+        "type": "address"
+      }
     ],
-    name: 'transferOwnership',
-    outputs: [],
-    stateMutability: 'nonpayable',
-    type: 'function',
+    "name": "transferOwnership",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
   },
   {
-    inputs: [],
-    name: 'unpause',
-    outputs: [],
-    stateMutability: 'nonpayable',
-    type: 'function',
+    "inputs": [],
+    "name": "unpause",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
   },
   {
-    inputs: [
+    "inputs": [
       {
-        internalType: 'address',
-        name: '_newImplementation',
-        type: 'address',
-      },
+        "internalType": "address",
+        "name": "_newImplementation",
+        "type": "address"
+      }
     ],
-    name: 'updateImplementation',
-    outputs: [],
-    stateMutability: 'nonpayable',
-    type: 'function',
+    "name": "updateImplementation",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
   },
   {
-    inputs: [
+    "inputs": [
       {
-        internalType: 'address',
-        name: 'newImplementation',
-        type: 'address',
+        "internalType": "address",
+        "name": "newImplementation",
+        "type": "address"
       },
       {
-        internalType: 'bytes',
-        name: 'data',
-        type: 'bytes',
-      },
+        "internalType": "bytes",
+        "name": "data",
+        "type": "bytes"
+      }
     ],
-    name: 'upgradeToAndCall',
-    outputs: [],
-    stateMutability: 'payable',
-    type: 'function',
+    "name": "upgradeToAndCall",
+    "outputs": [],
+    "stateMutability": "payable",
+    "type": "function"
   },
   {
-    inputs: [],
-    name: 'version',
-    outputs: [
+    "inputs": [],
+    "name": "version",
+    "outputs": [
       {
-        internalType: 'string',
-        name: '',
-        type: 'string',
-      },
+        "internalType": "string",
+        "name": "",
+        "type": "string"
+      }
     ],
-    stateMutability: 'pure',
-    type: 'function',
-  },
+    "stateMutability": "pure",
+    "type": "function"
+  }
 ] as const
 
 export const LendingPoolABI = [
   {
-    inputs: [],
-    name: 'AlreadyMember',
-    type: 'error',
+    "inputs": [],
+    "name": "AlreadyMember",
+    "type": "error"
   },
   {
-    inputs: [],
-    name: 'ApprovalRequired',
-    type: 'error',
+    "inputs": [],
+    "name": "ApprovalRequired",
+    "type": "error"
   },
   {
-    inputs: [],
-    name: 'EnforcedPause',
-    type: 'error',
+    "inputs": [],
+    "name": "EnforcedPause",
+    "type": "error"
   },
   {
-    inputs: [],
-    name: 'ExceedsMaxLoanAmount',
-    type: 'error',
+    "inputs": [],
+    "name": "ExceedsMaxLoanAmount",
+    "type": "error"
   },
   {
-    inputs: [],
-    name: 'ExpectedPause',
-    type: 'error',
+    "inputs": [],
+    "name": "ExpectedPause",
+    "type": "error"
   },
   {
-    inputs: [],
-    name: 'InsufficientBalance',
-    type: 'error',
+    "inputs": [],
+    "name": "InsufficientBalance",
+    "type": "error"
   },
   {
-    inputs: [],
-    name: 'InsufficientFunds',
-    type: 'error',
+    "inputs": [],
+    "name": "InsufficientFunds",
+    "type": "error"
   },
   {
-    inputs: [],
-    name: 'InsufficientLiquidity',
-    type: 'error',
+    "inputs": [],
+    "name": "InsufficientLiquidity",
+    "type": "error"
   },
   {
-    inputs: [],
-    name: 'InvalidAmount',
-    type: 'error',
+    "inputs": [],
+    "name": "InvalidAmount",
+    "type": "error"
   },
   {
-    inputs: [],
-    name: 'InvalidImplementation',
-    type: 'error',
+    "inputs": [],
+    "name": "InvalidImplementation",
+    "type": "error"
   },
   {
-    inputs: [],
-    name: 'InvalidInitialization',
-    type: 'error',
+    "inputs": [],
+    "name": "InvalidInitialization",
+    "type": "error"
   },
   {
-    inputs: [],
-    name: 'InvalidInterestRate',
-    type: 'error',
+    "inputs": [],
+    "name": "InvalidInterestRate",
+    "type": "error"
   },
   {
-    inputs: [],
-    name: 'InvalidLoanDuration',
-    type: 'error',
+    "inputs": [],
+    "name": "InvalidLoanDuration",
+    "type": "error"
   },
   {
-    inputs: [],
-    name: 'LoanAlreadyRepaid',
-    type: 'error',
+    "inputs": [],
+    "name": "LoanAlreadyRepaid",
+    "type": "error"
   },
   {
-    inputs: [],
-    name: 'LoanNotDisbursed',
-    type: 'error',
+    "inputs": [],
+    "name": "LoanNotDisbursed",
+    "type": "error"
   },
   {
-    inputs: [],
-    name: 'LoanNotPending',
-    type: 'error',
+    "inputs": [],
+    "name": "LoanNotPending",
+    "type": "error"
   },
   {
-    inputs: [],
-    name: 'LoanOutstanding',
-    type: 'error',
+    "inputs": [],
+    "name": "LoanOutstanding",
+    "type": "error"
   },
   {
-    inputs: [],
-    name: 'NativePoolOnly',
-    type: 'error',
+    "inputs": [],
+    "name": "NativePoolOnly",
+    "type": "error"
   },
   {
-    inputs: [],
-    name: 'NoPendingRequest',
-    type: 'error',
+    "inputs": [],
+    "name": "NoPendingRequest",
+    "type": "error"
   },
   {
-    inputs: [],
-    name: 'NotAMember',
-    type: 'error',
+    "inputs": [],
+    "name": "NotAMember",
+    "type": "error"
   },
   {
-    inputs: [],
-    name: 'NotInitializing',
-    type: 'error',
+    "inputs": [],
+    "name": "NotInitializing",
+    "type": "error"
   },
   {
-    inputs: [],
-    name: 'NothingToClaim',
-    type: 'error',
+    "inputs": [],
+    "name": "NothingToClaim",
+    "type": "error"
   },
   {
-    inputs: [
+    "inputs": [
       {
-        internalType: 'address',
-        name: 'owner',
-        type: 'address',
-      },
+        "internalType": "address",
+        "name": "owner",
+        "type": "address"
+      }
     ],
-    name: 'OwnableInvalidOwner',
-    type: 'error',
+    "name": "OwnableInvalidOwner",
+    "type": "error"
   },
   {
-    inputs: [
+    "inputs": [
       {
-        internalType: 'address',
-        name: 'account',
-        type: 'address',
-      },
+        "internalType": "address",
+        "name": "account",
+        "type": "address"
+      }
     ],
-    name: 'OwnableUnauthorizedAccount',
-    type: 'error',
+    "name": "OwnableUnauthorizedAccount",
+    "type": "error"
   },
   {
-    inputs: [],
-    name: 'OwnerIsAlwaysAMember',
-    type: 'error',
+    "inputs": [],
+    "name": "OwnerIsAlwaysAMember",
+    "type": "error"
   },
   {
-    inputs: [],
-    name: 'PoolNotActive',
-    type: 'error',
+    "inputs": [],
+    "name": "PoolNotActive",
+    "type": "error"
   },
   {
-    inputs: [],
-    name: 'ReentrancyGuardReentrantCall',
-    type: 'error',
+    "inputs": [],
+    "name": "ReentrancyGuardReentrantCall",
+    "type": "error"
   },
   {
-    inputs: [],
-    name: 'RefundFailed',
-    type: 'error',
+    "inputs": [],
+    "name": "RefundFailed",
+    "type": "error"
   },
   {
-    inputs: [
+    "inputs": [
       {
-        internalType: 'uint8',
-        name: 'bits',
-        type: 'uint8',
+        "internalType": "uint8",
+        "name": "bits",
+        "type": "uint8"
       },
       {
-        internalType: 'uint256',
-        name: 'value',
-        type: 'uint256',
-      },
+        "internalType": "uint256",
+        "name": "value",
+        "type": "uint256"
+      }
     ],
-    name: 'SafeCastOverflowedUintDowncast',
-    type: 'error',
+    "name": "SafeCastOverflowedUintDowncast",
+    "type": "error"
   },
   {
-    inputs: [
+    "inputs": [
       {
-        internalType: 'address',
-        name: 'token',
-        type: 'address',
-      },
+        "internalType": "address",
+        "name": "token",
+        "type": "address"
+      }
     ],
-    name: 'SafeERC20FailedOperation',
-    type: 'error',
+    "name": "SafeERC20FailedOperation",
+    "type": "error"
   },
   {
-    inputs: [],
-    name: 'TokenPoolOnly',
-    type: 'error',
+    "inputs": [],
+    "name": "TokenPoolOnly",
+    "type": "error"
   },
   {
-    inputs: [],
-    name: 'TransferFailed',
-    type: 'error',
+    "inputs": [],
+    "name": "TransferFailed",
+    "type": "error"
   },
   {
-    inputs: [],
-    name: 'UnauthorizedBorrower',
-    type: 'error',
+    "inputs": [],
+    "name": "UnauthorizedBorrower",
+    "type": "error"
   },
   {
-    anonymous: false,
-    inputs: [
+    "anonymous": false,
+    "inputs": [
       {
-        indexed: true,
-        internalType: 'bool',
-        name: 'requiresApproval',
-        type: 'bool',
-      },
+        "indexed": true,
+        "internalType": "bool",
+        "name": "requiresApproval",
+        "type": "bool"
+      }
     ],
-    name: 'ApprovalRequirementChanged',
-    type: 'event',
+    "name": "ApprovalRequirementChanged",
+    "type": "event"
   },
   {
-    anonymous: false,
-    inputs: [
+    "anonymous": false,
+    "inputs": [
       {
-        indexed: true,
-        internalType: 'address',
-        name: 'depositor',
-        type: 'address',
+        "indexed": true,
+        "internalType": "address",
+        "name": "depositor",
+        "type": "address"
       },
       {
-        indexed: true,
-        internalType: 'uint256',
-        name: 'amount',
-        type: 'uint256',
-      },
+        "indexed": true,
+        "internalType": "uint256",
+        "name": "amount",
+        "type": "uint256"
+      }
     ],
-    name: 'FundsDeposited',
-    type: 'event',
+    "name": "FundsDeposited",
+    "type": "event"
   },
   {
-    anonymous: false,
-    inputs: [
+    "anonymous": false,
+    "inputs": [
       {
-        indexed: true,
-        internalType: 'address',
-        name: 'member',
-        type: 'address',
+        "indexed": true,
+        "internalType": "address",
+        "name": "member",
+        "type": "address"
       },
       {
-        indexed: true,
-        internalType: 'uint256',
-        name: 'amount',
-        type: 'uint256',
-      },
+        "indexed": true,
+        "internalType": "uint256",
+        "name": "amount",
+        "type": "uint256"
+      }
     ],
-    name: 'FundsWithdrawn',
-    type: 'event',
+    "name": "FundsWithdrawn",
+    "type": "event"
   },
   {
-    anonymous: false,
-    inputs: [
+    "anonymous": false,
+    "inputs": [
       {
-        indexed: false,
-        internalType: 'uint64',
-        name: 'version',
-        type: 'uint64',
-      },
+        "indexed": false,
+        "internalType": "uint64",
+        "name": "version",
+        "type": "uint64"
+      }
     ],
-    name: 'Initialized',
-    type: 'event',
+    "name": "Initialized",
+    "type": "event"
   },
   {
-    anonymous: false,
-    inputs: [
+    "anonymous": false,
+    "inputs": [
       {
-        indexed: true,
-        internalType: 'address',
-        name: 'account',
-        type: 'address',
+        "indexed": true,
+        "internalType": "address",
+        "name": "account",
+        "type": "address"
       },
       {
-        indexed: true,
-        internalType: 'uint256',
-        name: 'amount',
-        type: 'uint256',
-      },
+        "indexed": true,
+        "internalType": "uint256",
+        "name": "amount",
+        "type": "uint256"
+      }
     ],
-    name: 'InterestClaimed',
-    type: 'event',
+    "name": "InterestClaimed",
+    "type": "event"
   },
   {
-    anonymous: false,
-    inputs: [
+    "anonymous": false,
+    "inputs": [
       {
-        indexed: true,
-        internalType: 'uint256',
-        name: 'loanId',
-        type: 'uint256',
+        "indexed": true,
+        "internalType": "uint256",
+        "name": "loanId",
+        "type": "uint256"
       },
       {
-        indexed: true,
-        internalType: 'uint256',
-        name: 'amount',
-        type: 'uint256',
-      },
+        "indexed": true,
+        "internalType": "uint256",
+        "name": "amount",
+        "type": "uint256"
+      }
     ],
-    name: 'InterestDistributed',
-    type: 'event',
+    "name": "InterestDistributed",
+    "type": "event"
   },
   {
-    anonymous: false,
-    inputs: [
+    "anonymous": false,
+    "inputs": [
       {
-        indexed: true,
-        internalType: 'uint256',
-        name: 'loanId',
-        type: 'uint256',
+        "indexed": true,
+        "internalType": "uint256",
+        "name": "loanId",
+        "type": "uint256"
       },
       {
-        indexed: true,
-        internalType: 'address',
-        name: 'borrower',
-        type: 'address',
+        "indexed": true,
+        "internalType": "address",
+        "name": "borrower",
+        "type": "address"
       },
       {
-        indexed: true,
-        internalType: 'uint256',
-        name: 'amount',
-        type: 'uint256',
-      },
+        "indexed": true,
+        "internalType": "uint256",
+        "name": "amount",
+        "type": "uint256"
+      }
     ],
-    name: 'LoanApproved',
-    type: 'event',
+    "name": "LoanApproved",
+    "type": "event"
   },
   {
-    anonymous: false,
-    inputs: [
+    "anonymous": false,
+    "inputs": [
       {
-        indexed: true,
-        internalType: 'uint256',
-        name: 'loanId',
-        type: 'uint256',
+        "indexed": true,
+        "internalType": "uint256",
+        "name": "loanId",
+        "type": "uint256"
       },
       {
-        indexed: true,
-        internalType: 'address',
-        name: 'borrower',
-        type: 'address',
+        "indexed": true,
+        "internalType": "address",
+        "name": "borrower",
+        "type": "address"
       },
       {
-        indexed: true,
-        internalType: 'uint256',
-        name: 'amount',
-        type: 'uint256',
-      },
+        "indexed": true,
+        "internalType": "uint256",
+        "name": "amount",
+        "type": "uint256"
+      }
     ],
-    name: 'LoanCreated',
-    type: 'event',
+    "name": "LoanCreated",
+    "type": "event"
   },
   {
-    anonymous: false,
-    inputs: [
+    "anonymous": false,
+    "inputs": [
       {
-        indexed: true,
-        internalType: 'uint256',
-        name: 'loanId',
-        type: 'uint256',
+        "indexed": true,
+        "internalType": "uint256",
+        "name": "loanId",
+        "type": "uint256"
       },
       {
-        indexed: true,
-        internalType: 'address',
-        name: 'borrower',
-        type: 'address',
+        "indexed": true,
+        "internalType": "address",
+        "name": "borrower",
+        "type": "address"
       },
       {
-        indexed: true,
-        internalType: 'uint256',
-        name: 'amount',
-        type: 'uint256',
-      },
+        "indexed": true,
+        "internalType": "uint256",
+        "name": "amount",
+        "type": "uint256"
+      }
     ],
-    name: 'LoanRejected',
-    type: 'event',
+    "name": "LoanRejected",
+    "type": "event"
   },
   {
-    anonymous: false,
-    inputs: [
+    "anonymous": false,
+    "inputs": [
       {
-        indexed: true,
-        internalType: 'uint256',
-        name: 'loanId',
-        type: 'uint256',
+        "indexed": true,
+        "internalType": "uint256",
+        "name": "loanId",
+        "type": "uint256"
       },
       {
-        indexed: true,
-        internalType: 'address',
-        name: 'borrower',
-        type: 'address',
+        "indexed": true,
+        "internalType": "address",
+        "name": "borrower",
+        "type": "address"
       },
       {
-        indexed: true,
-        internalType: 'uint256',
-        name: 'amount',
-        type: 'uint256',
-      },
+        "indexed": true,
+        "internalType": "uint256",
+        "name": "amount",
+        "type": "uint256"
+      }
     ],
-    name: 'LoanRepaid',
-    type: 'event',
+    "name": "LoanRepaid",
+    "type": "event"
   },
   {
-    anonymous: false,
-    inputs: [
+    "anonymous": false,
+    "inputs": [
       {
-        indexed: true,
-        internalType: 'uint256',
-        name: 'loanId',
-        type: 'uint256',
+        "indexed": true,
+        "internalType": "uint256",
+        "name": "loanId",
+        "type": "uint256"
       },
       {
-        indexed: true,
-        internalType: 'address',
-        name: 'borrower',
-        type: 'address',
+        "indexed": true,
+        "internalType": "address",
+        "name": "borrower",
+        "type": "address"
       },
       {
-        indexed: true,
-        internalType: 'uint256',
-        name: 'amount',
-        type: 'uint256',
-      },
+        "indexed": true,
+        "internalType": "uint256",
+        "name": "amount",
+        "type": "uint256"
+      }
     ],
-    name: 'LoanRepaymentMade',
-    type: 'event',
+    "name": "LoanRepaymentMade",
+    "type": "event"
   },
   {
-    anonymous: false,
-    inputs: [
+    "anonymous": false,
+    "inputs": [
       {
-        indexed: true,
-        internalType: 'uint256',
-        name: 'loanId',
-        type: 'uint256',
+        "indexed": true,
+        "internalType": "uint256",
+        "name": "loanId",
+        "type": "uint256"
       },
       {
-        indexed: true,
-        internalType: 'address',
-        name: 'borrower',
-        type: 'address',
+        "indexed": true,
+        "internalType": "address",
+        "name": "borrower",
+        "type": "address"
       },
       {
-        indexed: true,
-        internalType: 'uint256',
-        name: 'amount',
-        type: 'uint256',
-      },
+        "indexed": true,
+        "internalType": "uint256",
+        "name": "amount",
+        "type": "uint256"
+      }
     ],
-    name: 'LoanRequested',
-    type: 'event',
+    "name": "LoanRequested",
+    "type": "event"
   },
   {
-    anonymous: false,
-    inputs: [
+    "anonymous": false,
+    "inputs": [
       {
-        indexed: true,
-        internalType: 'address',
-        name: 'account',
-        type: 'address',
-      },
+        "indexed": true,
+        "internalType": "address",
+        "name": "account",
+        "type": "address"
+      }
     ],
-    name: 'MemberJoined',
-    type: 'event',
+    "name": "MemberJoined",
+    "type": "event"
   },
   {
-    anonymous: false,
-    inputs: [
+    "anonymous": false,
+    "inputs": [
       {
-        indexed: true,
-        internalType: 'address',
-        name: 'account',
-        type: 'address',
-      },
+        "indexed": true,
+        "internalType": "address",
+        "name": "account",
+        "type": "address"
+      }
     ],
-    name: 'MembershipApproved',
-    type: 'event',
+    "name": "MembershipApproved",
+    "type": "event"
   },
   {
-    anonymous: false,
-    inputs: [
+    "anonymous": false,
+    "inputs": [
       {
-        indexed: true,
-        internalType: 'address',
-        name: 'account',
-        type: 'address',
-      },
+        "indexed": true,
+        "internalType": "address",
+        "name": "account",
+        "type": "address"
+      }
     ],
-    name: 'MembershipLeft',
-    type: 'event',
+    "name": "MembershipLeft",
+    "type": "event"
   },
   {
-    anonymous: false,
-    inputs: [
+    "anonymous": false,
+    "inputs": [
       {
-        indexed: true,
-        internalType: 'address',
-        name: 'account',
-        type: 'address',
-      },
+        "indexed": true,
+        "internalType": "address",
+        "name": "account",
+        "type": "address"
+      }
     ],
-    name: 'MembershipRejected',
-    type: 'event',
+    "name": "MembershipRejected",
+    "type": "event"
   },
   {
-    anonymous: false,
-    inputs: [
+    "anonymous": false,
+    "inputs": [
       {
-        indexed: true,
-        internalType: 'address',
-        name: 'account',
-        type: 'address',
-      },
+        "indexed": true,
+        "internalType": "address",
+        "name": "account",
+        "type": "address"
+      }
     ],
-    name: 'MembershipRequested',
-    type: 'event',
+    "name": "MembershipRequested",
+    "type": "event"
   },
   {
-    anonymous: false,
-    inputs: [
+    "anonymous": false,
+    "inputs": [
       {
-        indexed: true,
-        internalType: 'bool',
-        name: 'requiresMembership',
-        type: 'bool',
-      },
+        "indexed": true,
+        "internalType": "bool",
+        "name": "requiresMembership",
+        "type": "bool"
+      }
     ],
-    name: 'MembershipRequirementChanged',
-    type: 'event',
+    "name": "MembershipRequirementChanged",
+    "type": "event"
   },
   {
-    anonymous: false,
-    inputs: [
+    "anonymous": false,
+    "inputs": [
       {
-        indexed: true,
-        internalType: 'address',
-        name: 'account',
-        type: 'address',
-      },
+        "indexed": true,
+        "internalType": "address",
+        "name": "account",
+        "type": "address"
+      }
     ],
-    name: 'MembershipRevoked',
-    type: 'event',
+    "name": "MembershipRevoked",
+    "type": "event"
   },
   {
-    anonymous: false,
-    inputs: [
+    "anonymous": false,
+    "inputs": [
       {
-        indexed: true,
-        internalType: 'address',
-        name: 'previousOwner',
-        type: 'address',
+        "indexed": true,
+        "internalType": "address",
+        "name": "previousOwner",
+        "type": "address"
       },
       {
-        indexed: true,
-        internalType: 'address',
-        name: 'newOwner',
-        type: 'address',
-      },
+        "indexed": true,
+        "internalType": "address",
+        "name": "newOwner",
+        "type": "address"
+      }
     ],
-    name: 'OwnershipTransferred',
-    type: 'event',
+    "name": "OwnershipTransferred",
+    "type": "event"
   },
   {
-    anonymous: false,
-    inputs: [
+    "anonymous": false,
+    "inputs": [
       {
-        indexed: false,
-        internalType: 'address',
-        name: 'account',
-        type: 'address',
-      },
+        "indexed": false,
+        "internalType": "address",
+        "name": "account",
+        "type": "address"
+      }
     ],
-    name: 'Paused',
-    type: 'event',
+    "name": "Paused",
+    "type": "event"
   },
   {
-    anonymous: false,
-    inputs: [
+    "anonymous": false,
+    "inputs": [
       {
-        indexed: true,
-        internalType: 'uint256',
-        name: 'maxLoanAmount',
-        type: 'uint256',
+        "indexed": true,
+        "internalType": "uint256",
+        "name": "maxLoanAmount",
+        "type": "uint256"
       },
       {
-        indexed: true,
-        internalType: 'uint256',
-        name: 'interestRate',
-        type: 'uint256',
+        "indexed": true,
+        "internalType": "uint256",
+        "name": "interestRate",
+        "type": "uint256"
       },
       {
-        indexed: true,
-        internalType: 'uint256',
-        name: 'loanDuration',
-        type: 'uint256',
-      },
+        "indexed": true,
+        "internalType": "uint256",
+        "name": "loanDuration",
+        "type": "uint256"
+      }
     ],
-    name: 'PoolConfigured',
-    type: 'event',
+    "name": "PoolConfigured",
+    "type": "event"
   },
   {
-    anonymous: false,
-    inputs: [
+    "anonymous": false,
+    "inputs": [
       {
-        indexed: false,
-        internalType: 'address',
-        name: 'account',
-        type: 'address',
-      },
+        "indexed": false,
+        "internalType": "address",
+        "name": "account",
+        "type": "address"
+      }
     ],
-    name: 'Unpaused',
-    type: 'event',
+    "name": "Unpaused",
+    "type": "event"
   },
   {
-    inputs: [],
-    name: 'accInterestPerShare',
-    outputs: [
+    "inputs": [],
+    "name": "accInterestPerShare",
+    "outputs": [
       {
-        internalType: 'uint256',
-        name: '',
-        type: 'uint256',
-      },
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
     ],
-    stateMutability: 'view',
-    type: 'function',
+    "stateMutability": "view",
+    "type": "function"
   },
   {
-    inputs: [
+    "inputs": [
       {
-        internalType: 'address',
-        name: '',
-        type: 'address',
-      },
+        "internalType": "address",
+        "name": "",
+        "type": "address"
+      }
     ],
-    name: 'activeLoanId',
-    outputs: [
+    "name": "activeLoanId",
+    "outputs": [
       {
-        internalType: 'uint256',
-        name: '',
-        type: 'uint256',
-      },
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
     ],
-    stateMutability: 'view',
-    type: 'function',
+    "stateMutability": "view",
+    "type": "function"
   },
   {
-    inputs: [
+    "inputs": [
       {
-        internalType: 'uint256',
-        name: '_loanId',
-        type: 'uint256',
-      },
+        "internalType": "uint256",
+        "name": "_loanId",
+        "type": "uint256"
+      }
     ],
-    name: 'approveLoan',
-    outputs: [],
-    stateMutability: 'nonpayable',
-    type: 'function',
+    "name": "approveLoan",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
   },
   {
-    inputs: [
+    "inputs": [
       {
-        internalType: 'address',
-        name: '_account',
-        type: 'address',
-      },
+        "internalType": "address",
+        "name": "_account",
+        "type": "address"
+      }
     ],
-    name: 'approveMember',
-    outputs: [],
-    stateMutability: 'nonpayable',
-    type: 'function',
+    "name": "approveMember",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
   },
   {
-    inputs: [
+    "inputs": [
       {
-        internalType: 'uint256',
-        name: '_loanId',
-        type: 'uint256',
-      },
+        "internalType": "uint256",
+        "name": "_loanId",
+        "type": "uint256"
+      }
     ],
-    name: 'calculateRepaymentAmount',
-    outputs: [
+    "name": "calculateRepaymentAmount",
+    "outputs": [
       {
-        internalType: 'uint256',
-        name: '',
-        type: 'uint256',
-      },
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
     ],
-    stateMutability: 'view',
-    type: 'function',
+    "stateMutability": "view",
+    "type": "function"
   },
   {
-    inputs: [
+    "inputs": [
       {
-        internalType: 'uint256',
-        name: '_loanId',
-        type: 'uint256',
-      },
+        "internalType": "uint256",
+        "name": "_loanId",
+        "type": "uint256"
+      }
     ],
-    name: 'cancelLoanRequest',
-    outputs: [],
-    stateMutability: 'nonpayable',
-    type: 'function',
+    "name": "cancelLoanRequest",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
   },
   {
-    inputs: [],
-    name: 'claimInterest',
-    outputs: [],
-    stateMutability: 'nonpayable',
-    type: 'function',
+    "inputs": [],
+    "name": "claimInterest",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
   },
   {
-    inputs: [
+    "inputs": [
       {
-        internalType: 'address',
-        name: '_account',
-        type: 'address',
-      },
+        "internalType": "address",
+        "name": "_account",
+        "type": "address"
+      }
     ],
-    name: 'claimable',
-    outputs: [
+    "name": "claimable",
+    "outputs": [
       {
-        internalType: 'uint256',
-        name: '',
-        type: 'uint256',
-      },
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
     ],
-    stateMutability: 'view',
-    type: 'function',
+    "stateMutability": "view",
+    "type": "function"
   },
   {
-    inputs: [
+    "inputs": [
       {
-        internalType: 'address',
-        name: '',
-        type: 'address',
-      },
+        "internalType": "address",
+        "name": "",
+        "type": "address"
+      }
     ],
-    name: 'contributions',
-    outputs: [
+    "name": "contributions",
+    "outputs": [
       {
-        internalType: 'uint256',
-        name: '',
-        type: 'uint256',
-      },
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
     ],
-    stateMutability: 'view',
-    type: 'function',
+    "stateMutability": "view",
+    "type": "function"
   },
   {
-    inputs: [
+    "inputs": [
       {
-        internalType: 'uint256',
-        name: '_amount',
-        type: 'uint256',
-      },
+        "internalType": "uint256",
+        "name": "_amount",
+        "type": "uint256"
+      }
     ],
-    name: 'createLoan',
-    outputs: [
+    "name": "createLoan",
+    "outputs": [
       {
-        internalType: 'uint256',
-        name: '',
-        type: 'uint256',
-      },
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
     ],
-    stateMutability: 'nonpayable',
-    type: 'function',
+    "stateMutability": "nonpayable",
+    "type": "function"
   },
   {
-    inputs: [],
-    name: 'depositFunds',
-    outputs: [],
-    stateMutability: 'payable',
-    type: 'function',
+    "inputs": [],
+    "name": "depositFunds",
+    "outputs": [],
+    "stateMutability": "payable",
+    "type": "function"
   },
   {
-    inputs: [
+    "inputs": [
       {
-        internalType: 'uint256',
-        name: '_amount',
-        type: 'uint256',
-      },
+        "internalType": "uint256",
+        "name": "_amount",
+        "type": "uint256"
+      }
     ],
-    name: 'depositTokens',
-    outputs: [],
-    stateMutability: 'nonpayable',
-    type: 'function',
+    "name": "depositTokens",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
   },
   {
-    inputs: [
+    "inputs": [
       {
-        internalType: 'uint256',
-        name: '_loanId',
-        type: 'uint256',
-      },
+        "internalType": "uint256",
+        "name": "_loanId",
+        "type": "uint256"
+      }
     ],
-    name: 'getLoan',
-    outputs: [
+    "name": "getLoan",
+    "outputs": [
       {
-        components: [
+        "components": [
           {
-            internalType: 'address',
-            name: 'borrower',
-            type: 'address',
+            "internalType": "address",
+            "name": "borrower",
+            "type": "address"
           },
           {
-            internalType: 'bool',
-            name: 'isRepaid',
-            type: 'bool',
+            "internalType": "bool",
+            "name": "isRepaid",
+            "type": "bool"
           },
           {
-            internalType: 'enum LendingPool.LoanStatus',
-            name: 'status',
-            type: 'uint8',
+            "internalType": "enum LendingPool.LoanStatus",
+            "name": "status",
+            "type": "uint8"
           },
           {
-            internalType: 'uint64',
-            name: 'repaidAt',
-            type: 'uint64',
+            "internalType": "uint64",
+            "name": "repaidAt",
+            "type": "uint64"
           },
           {
-            internalType: 'uint256',
-            name: 'amount',
-            type: 'uint256',
+            "internalType": "uint256",
+            "name": "amount",
+            "type": "uint256"
           },
           {
-            internalType: 'uint256',
-            name: 'interestRate',
-            type: 'uint256',
+            "internalType": "uint256",
+            "name": "interestRate",
+            "type": "uint256"
           },
           {
-            internalType: 'uint256',
-            name: 'startTime',
-            type: 'uint256',
+            "internalType": "uint256",
+            "name": "startTime",
+            "type": "uint256"
           },
           {
-            internalType: 'uint256',
-            name: 'duration',
-            type: 'uint256',
+            "internalType": "uint256",
+            "name": "duration",
+            "type": "uint256"
           },
           {
-            internalType: 'uint256',
-            name: 'amountRepaid',
-            type: 'uint256',
+            "internalType": "uint256",
+            "name": "amountRepaid",
+            "type": "uint256"
           },
           {
-            internalType: 'uint256',
-            name: 'principalOutstanding',
-            type: 'uint256',
+            "internalType": "uint256",
+            "name": "principalOutstanding",
+            "type": "uint256"
           },
           {
-            internalType: 'uint192',
-            name: 'interestOutstanding',
-            type: 'uint192',
+            "internalType": "uint192",
+            "name": "interestOutstanding",
+            "type": "uint192"
           },
           {
-            internalType: 'uint64',
-            name: 'accruedAt',
-            type: 'uint64',
-          },
+            "internalType": "uint64",
+            "name": "accruedAt",
+            "type": "uint64"
+          }
         ],
-        internalType: 'struct LendingPool.Loan',
-        name: '',
-        type: 'tuple',
-      },
+        "internalType": "struct LendingPool.Loan",
+        "name": "",
+        "type": "tuple"
+      }
     ],
-    stateMutability: 'view',
-    type: 'function',
+    "stateMutability": "view",
+    "type": "function"
   },
   {
-    inputs: [
+    "inputs": [
       {
-        internalType: 'address',
-        name: '_owner',
-        type: 'address',
+        "internalType": "address",
+        "name": "_owner",
+        "type": "address"
       },
       {
-        internalType: 'uint256',
-        name: '_maxLoanAmount',
-        type: 'uint256',
+        "internalType": "uint256",
+        "name": "_maxLoanAmount",
+        "type": "uint256"
       },
       {
-        internalType: 'uint256',
-        name: '_interestRate',
-        type: 'uint256',
+        "internalType": "uint256",
+        "name": "_interestRate",
+        "type": "uint256"
       },
       {
-        internalType: 'uint256',
-        name: '_loanDuration',
-        type: 'uint256',
+        "internalType": "uint256",
+        "name": "_loanDuration",
+        "type": "uint256"
       },
       {
-        internalType: 'bool',
-        name: '_requiresMembership',
-        type: 'bool',
+        "internalType": "bool",
+        "name": "_requiresMembership",
+        "type": "bool"
       },
       {
-        internalType: 'address',
-        name: '_loanToken',
-        type: 'address',
-      },
+        "internalType": "address",
+        "name": "_loanToken",
+        "type": "address"
+      }
     ],
-    name: 'initialize',
-    outputs: [],
-    stateMutability: 'nonpayable',
-    type: 'function',
+    "name": "initialize",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
   },
   {
-    inputs: [
+    "inputs": [
       {
-        internalType: 'address',
-        name: '',
-        type: 'address',
-      },
+        "internalType": "address",
+        "name": "",
+        "type": "address"
+      }
     ],
-    name: 'interestDebt',
-    outputs: [
+    "name": "interestDebt",
+    "outputs": [
       {
-        internalType: 'uint256',
-        name: '',
-        type: 'uint256',
-      },
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
     ],
-    stateMutability: 'view',
-    type: 'function',
+    "stateMutability": "view",
+    "type": "function"
   },
   {
-    inputs: [],
-    name: 'leavePool',
-    outputs: [],
-    stateMutability: 'nonpayable',
-    type: 'function',
+    "inputs": [],
+    "name": "leavePool",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
   },
   {
-    inputs: [
+    "inputs": [
       {
-        internalType: 'uint256',
-        name: '_loanId',
-        type: 'uint256',
-      },
+        "internalType": "uint256",
+        "name": "_loanId",
+        "type": "uint256"
+      }
     ],
-    name: 'loanBalance',
-    outputs: [
+    "name": "loanBalance",
+    "outputs": [
       {
-        internalType: 'uint256',
-        name: 'principal',
-        type: 'uint256',
+        "internalType": "uint256",
+        "name": "principal",
+        "type": "uint256"
       },
       {
-        internalType: 'uint256',
-        name: 'interest',
-        type: 'uint256',
-      },
+        "internalType": "uint256",
+        "name": "interest",
+        "type": "uint256"
+      }
     ],
-    stateMutability: 'view',
-    type: 'function',
+    "stateMutability": "view",
+    "type": "function"
   },
   {
-    inputs: [
+    "inputs": [
       {
-        internalType: 'uint256',
-        name: '',
-        type: 'uint256',
-      },
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
     ],
-    name: 'loans',
-    outputs: [
+    "name": "loans",
+    "outputs": [
       {
-        internalType: 'address',
-        name: 'borrower',
-        type: 'address',
+        "internalType": "address",
+        "name": "borrower",
+        "type": "address"
       },
       {
-        internalType: 'bool',
-        name: 'isRepaid',
-        type: 'bool',
+        "internalType": "bool",
+        "name": "isRepaid",
+        "type": "bool"
       },
       {
-        internalType: 'enum LendingPool.LoanStatus',
-        name: 'status',
-        type: 'uint8',
+        "internalType": "enum LendingPool.LoanStatus",
+        "name": "status",
+        "type": "uint8"
       },
       {
-        internalType: 'uint64',
-        name: 'repaidAt',
-        type: 'uint64',
+        "internalType": "uint64",
+        "name": "repaidAt",
+        "type": "uint64"
       },
       {
-        internalType: 'uint256',
-        name: 'amount',
-        type: 'uint256',
+        "internalType": "uint256",
+        "name": "amount",
+        "type": "uint256"
       },
       {
-        internalType: 'uint256',
-        name: 'interestRate',
-        type: 'uint256',
+        "internalType": "uint256",
+        "name": "interestRate",
+        "type": "uint256"
       },
       {
-        internalType: 'uint256',
-        name: 'startTime',
-        type: 'uint256',
+        "internalType": "uint256",
+        "name": "startTime",
+        "type": "uint256"
       },
       {
-        internalType: 'uint256',
-        name: 'duration',
-        type: 'uint256',
+        "internalType": "uint256",
+        "name": "duration",
+        "type": "uint256"
       },
       {
-        internalType: 'uint256',
-        name: 'amountRepaid',
-        type: 'uint256',
+        "internalType": "uint256",
+        "name": "amountRepaid",
+        "type": "uint256"
       },
       {
-        internalType: 'uint256',
-        name: 'principalOutstanding',
-        type: 'uint256',
+        "internalType": "uint256",
+        "name": "principalOutstanding",
+        "type": "uint256"
       },
       {
-        internalType: 'uint192',
-        name: 'interestOutstanding',
-        type: 'uint192',
+        "internalType": "uint192",
+        "name": "interestOutstanding",
+        "type": "uint192"
       },
       {
-        internalType: 'uint64',
-        name: 'accruedAt',
-        type: 'uint64',
-      },
+        "internalType": "uint64",
+        "name": "accruedAt",
+        "type": "uint64"
+      }
     ],
-    stateMutability: 'view',
-    type: 'function',
+    "stateMutability": "view",
+    "type": "function"
   },
   {
-    inputs: [],
-    name: 'memberCount',
-    outputs: [
+    "inputs": [],
+    "name": "memberCount",
+    "outputs": [
       {
-        internalType: 'uint256',
-        name: '',
-        type: 'uint256',
-      },
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
     ],
-    stateMutability: 'view',
-    type: 'function',
+    "stateMutability": "view",
+    "type": "function"
   },
   {
-    inputs: [
+    "inputs": [
       {
-        internalType: 'address',
-        name: '',
-        type: 'address',
-      },
+        "internalType": "address",
+        "name": "",
+        "type": "address"
+      }
     ],
-    name: 'membership',
-    outputs: [
+    "name": "membership",
+    "outputs": [
       {
-        internalType: 'enum LendingPool.Membership',
-        name: '',
-        type: 'uint8',
-      },
+        "internalType": "enum LendingPool.Membership",
+        "name": "",
+        "type": "uint8"
+      }
     ],
-    stateMutability: 'view',
-    type: 'function',
+    "stateMutability": "view",
+    "type": "function"
   },
   {
-    inputs: [],
-    name: 'nextLoanId',
-    outputs: [
+    "inputs": [],
+    "name": "nextLoanId",
+    "outputs": [
       {
-        internalType: 'uint256',
-        name: '',
-        type: 'uint256',
-      },
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
     ],
-    stateMutability: 'view',
-    type: 'function',
+    "stateMutability": "view",
+    "type": "function"
   },
   {
-    inputs: [
+    "inputs": [
       {
-        internalType: 'uint256',
-        name: '_loanId',
-        type: 'uint256',
-      },
+        "internalType": "uint256",
+        "name": "_loanId",
+        "type": "uint256"
+      }
     ],
-    name: 'outstandingBalance',
-    outputs: [
+    "name": "outstandingBalance",
+    "outputs": [
       {
-        internalType: 'uint256',
-        name: '',
-        type: 'uint256',
-      },
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
     ],
-    stateMutability: 'view',
-    type: 'function',
+    "stateMutability": "view",
+    "type": "function"
   },
   {
-    inputs: [
+    "inputs": [
       {
-        internalType: 'uint256',
-        name: '_loanId',
-        type: 'uint256',
+        "internalType": "uint256",
+        "name": "_loanId",
+        "type": "uint256"
       },
       {
-        internalType: 'uint256',
-        name: '_at',
-        type: 'uint256',
-      },
+        "internalType": "uint256",
+        "name": "_at",
+        "type": "uint256"
+      }
     ],
-    name: 'outstandingBalanceAt',
-    outputs: [
+    "name": "outstandingBalanceAt",
+    "outputs": [
       {
-        internalType: 'uint256',
-        name: '',
-        type: 'uint256',
-      },
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
     ],
-    stateMutability: 'view',
-    type: 'function',
+    "stateMutability": "view",
+    "type": "function"
   },
   {
-    inputs: [],
-    name: 'owner',
-    outputs: [
+    "inputs": [],
+    "name": "owner",
+    "outputs": [
       {
-        internalType: 'address',
-        name: '',
-        type: 'address',
-      },
+        "internalType": "address",
+        "name": "",
+        "type": "address"
+      }
     ],
-    stateMutability: 'view',
-    type: 'function',
+    "stateMutability": "view",
+    "type": "function"
   },
   {
-    inputs: [],
-    name: 'pause',
-    outputs: [],
-    stateMutability: 'nonpayable',
-    type: 'function',
+    "inputs": [],
+    "name": "pause",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
   },
   {
-    inputs: [],
-    name: 'paused',
-    outputs: [
+    "inputs": [],
+    "name": "paused",
+    "outputs": [
       {
-        internalType: 'bool',
-        name: '',
-        type: 'bool',
-      },
+        "internalType": "bool",
+        "name": "",
+        "type": "bool"
+      }
     ],
-    stateMutability: 'view',
-    type: 'function',
+    "stateMutability": "view",
+    "type": "function"
   },
   {
-    inputs: [],
-    name: 'poolConfig',
-    outputs: [
+    "inputs": [],
+    "name": "poolConfig",
+    "outputs": [
       {
-        internalType: 'uint256',
-        name: 'maxLoanAmount',
-        type: 'uint256',
+        "internalType": "uint256",
+        "name": "maxLoanAmount",
+        "type": "uint256"
       },
       {
-        internalType: 'uint256',
-        name: 'interestRate',
-        type: 'uint256',
+        "internalType": "uint256",
+        "name": "interestRate",
+        "type": "uint256"
       },
       {
-        internalType: 'uint256',
-        name: 'loanDuration',
-        type: 'uint256',
+        "internalType": "uint256",
+        "name": "loanDuration",
+        "type": "uint256"
       },
       {
-        internalType: 'bool',
-        name: 'isActive',
-        type: 'bool',
+        "internalType": "bool",
+        "name": "isActive",
+        "type": "bool"
       },
       {
-        internalType: 'bool',
-        name: 'requiresApproval',
-        type: 'bool',
+        "internalType": "bool",
+        "name": "requiresApproval",
+        "type": "bool"
       },
       {
-        internalType: 'bool',
-        name: 'requiresMembership',
-        type: 'bool',
+        "internalType": "bool",
+        "name": "requiresMembership",
+        "type": "bool"
       },
       {
-        internalType: 'address',
-        name: 'loanToken',
-        type: 'address',
-      },
+        "internalType": "address",
+        "name": "loanToken",
+        "type": "address"
+      }
     ],
-    stateMutability: 'view',
-    type: 'function',
+    "stateMutability": "view",
+    "type": "function"
   },
   {
-    inputs: [
+    "inputs": [
       {
-        internalType: 'uint256',
-        name: '_loanId',
-        type: 'uint256',
-      },
+        "internalType": "uint256",
+        "name": "_loanId",
+        "type": "uint256"
+      }
     ],
-    name: 'rejectLoan',
-    outputs: [],
-    stateMutability: 'nonpayable',
-    type: 'function',
+    "name": "rejectLoan",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
   },
   {
-    inputs: [
+    "inputs": [
       {
-        internalType: 'address',
-        name: '_account',
-        type: 'address',
-      },
+        "internalType": "address",
+        "name": "_account",
+        "type": "address"
+      }
     ],
-    name: 'rejectMember',
-    outputs: [],
-    stateMutability: 'nonpayable',
-    type: 'function',
+    "name": "rejectMember",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
   },
   {
-    inputs: [
+    "inputs": [
       {
-        internalType: 'address',
-        name: '_account',
-        type: 'address',
-      },
+        "internalType": "address",
+        "name": "_account",
+        "type": "address"
+      }
     ],
-    name: 'removeMember',
-    outputs: [],
-    stateMutability: 'nonpayable',
-    type: 'function',
+    "name": "removeMember",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
   },
   {
-    inputs: [],
-    name: 'renounceOwnership',
-    outputs: [],
-    stateMutability: 'nonpayable',
-    type: 'function',
+    "inputs": [],
+    "name": "renounceOwnership",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
   },
   {
-    inputs: [
+    "inputs": [
       {
-        internalType: 'uint256',
-        name: '_loanId',
-        type: 'uint256',
-      },
+        "internalType": "uint256",
+        "name": "_loanId",
+        "type": "uint256"
+      }
     ],
-    name: 'repayLoan',
-    outputs: [],
-    stateMutability: 'payable',
-    type: 'function',
+    "name": "repayLoan",
+    "outputs": [],
+    "stateMutability": "payable",
+    "type": "function"
   },
   {
-    inputs: [
+    "inputs": [
       {
-        internalType: 'uint256',
-        name: '_loanId',
-        type: 'uint256',
+        "internalType": "uint256",
+        "name": "_loanId",
+        "type": "uint256"
       },
       {
-        internalType: 'uint256',
-        name: '_amount',
-        type: 'uint256',
-      },
+        "internalType": "uint256",
+        "name": "_amount",
+        "type": "uint256"
+      }
     ],
-    name: 'repayLoanWithTokens',
-    outputs: [],
-    stateMutability: 'nonpayable',
-    type: 'function',
+    "name": "repayLoanWithTokens",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
   },
   {
-    inputs: [
+    "inputs": [
       {
-        internalType: 'uint256',
-        name: '_amount',
-        type: 'uint256',
-      },
+        "internalType": "uint256",
+        "name": "_amount",
+        "type": "uint256"
+      }
     ],
-    name: 'requestLoan',
-    outputs: [
+    "name": "requestLoan",
+    "outputs": [
       {
-        internalType: 'uint256',
-        name: '',
-        type: 'uint256',
-      },
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
     ],
-    stateMutability: 'nonpayable',
-    type: 'function',
+    "stateMutability": "nonpayable",
+    "type": "function"
   },
   {
-    inputs: [],
-    name: 'requestMembership',
-    outputs: [],
-    stateMutability: 'nonpayable',
-    type: 'function',
+    "inputs": [],
+    "name": "requestMembership",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
   },
   {
-    inputs: [
+    "inputs": [
       {
-        internalType: 'bool',
-        name: '_requiresApproval',
-        type: 'bool',
-      },
+        "internalType": "bool",
+        "name": "_requiresApproval",
+        "type": "bool"
+      }
     ],
-    name: 'setRequiresApproval',
-    outputs: [],
-    stateMutability: 'nonpayable',
-    type: 'function',
+    "name": "setRequiresApproval",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
   },
   {
-    inputs: [
+    "inputs": [
       {
-        internalType: 'bool',
-        name: '_requiresMembership',
-        type: 'bool',
-      },
+        "internalType": "bool",
+        "name": "_requiresMembership",
+        "type": "bool"
+      }
     ],
-    name: 'setRequiresMembership',
-    outputs: [],
-    stateMutability: 'nonpayable',
-    type: 'function',
+    "name": "setRequiresMembership",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
   },
   {
-    inputs: [],
-    name: 'togglePoolStatus',
-    outputs: [],
-    stateMutability: 'nonpayable',
-    type: 'function',
+    "inputs": [],
+    "name": "togglePoolStatus",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
   },
   {
-    inputs: [],
-    name: 'totalContributions',
-    outputs: [
+    "inputs": [],
+    "name": "totalContributions",
+    "outputs": [
       {
-        internalType: 'uint256',
-        name: '',
-        type: 'uint256',
-      },
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
     ],
-    stateMutability: 'view',
-    type: 'function',
+    "stateMutability": "view",
+    "type": "function"
   },
   {
-    inputs: [],
-    name: 'totalFunds',
-    outputs: [
+    "inputs": [],
+    "name": "totalFunds",
+    "outputs": [
       {
-        internalType: 'uint256',
-        name: '',
-        type: 'uint256',
-      },
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
     ],
-    stateMutability: 'view',
-    type: 'function',
+    "stateMutability": "view",
+    "type": "function"
   },
   {
-    inputs: [
+    "inputs": [
       {
-        internalType: 'address',
-        name: 'newOwner',
-        type: 'address',
-      },
+        "internalType": "address",
+        "name": "newOwner",
+        "type": "address"
+      }
     ],
-    name: 'transferOwnership',
-    outputs: [],
-    stateMutability: 'nonpayable',
-    type: 'function',
+    "name": "transferOwnership",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
   },
   {
-    inputs: [
+    "inputs": [
       {
-        internalType: 'address',
-        name: '',
-        type: 'address',
-      },
+        "internalType": "address",
+        "name": "",
+        "type": "address"
+      }
     ],
-    name: 'unclaimedInterest',
-    outputs: [
+    "name": "unclaimedInterest",
+    "outputs": [
       {
-        internalType: 'uint256',
-        name: '',
-        type: 'uint256',
-      },
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
     ],
-    stateMutability: 'view',
-    type: 'function',
+    "stateMutability": "view",
+    "type": "function"
   },
   {
-    inputs: [],
-    name: 'unpause',
-    outputs: [],
-    stateMutability: 'nonpayable',
-    type: 'function',
+    "inputs": [],
+    "name": "unpause",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
   },
   {
-    inputs: [
+    "inputs": [
       {
-        internalType: 'uint256',
-        name: '_maxLoanAmount',
-        type: 'uint256',
+        "internalType": "uint256",
+        "name": "_maxLoanAmount",
+        "type": "uint256"
       },
       {
-        internalType: 'uint256',
-        name: '_interestRate',
-        type: 'uint256',
+        "internalType": "uint256",
+        "name": "_interestRate",
+        "type": "uint256"
       },
       {
-        internalType: 'uint256',
-        name: '_loanDuration',
-        type: 'uint256',
-      },
+        "internalType": "uint256",
+        "name": "_loanDuration",
+        "type": "uint256"
+      }
     ],
-    name: 'updatePoolConfig',
-    outputs: [],
-    stateMutability: 'nonpayable',
-    type: 'function',
+    "name": "updatePoolConfig",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
   },
   {
-    inputs: [],
-    name: 'version',
-    outputs: [
+    "inputs": [],
+    "name": "version",
+    "outputs": [
       {
-        internalType: 'string',
-        name: '',
-        type: 'string',
-      },
+        "internalType": "string",
+        "name": "",
+        "type": "string"
+      }
     ],
-    stateMutability: 'pure',
-    type: 'function',
+    "stateMutability": "pure",
+    "type": "function"
   },
   {
-    inputs: [
+    "inputs": [
       {
-        internalType: 'uint256',
-        name: '_amount',
-        type: 'uint256',
-      },
+        "internalType": "uint256",
+        "name": "_amount",
+        "type": "uint256"
+      }
     ],
-    name: 'withdraw',
-    outputs: [],
-    stateMutability: 'nonpayable',
-    type: 'function',
+    "name": "withdraw",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
   },
   {
-    inputs: [
+    "inputs": [
       {
-        internalType: 'address',
-        name: '_member',
-        type: 'address',
-      },
+        "internalType": "address",
+        "name": "_member",
+        "type": "address"
+      }
     ],
-    name: 'withdrawableAmount',
-    outputs: [
+    "name": "withdrawableAmount",
+    "outputs": [
       {
-        internalType: 'uint256',
-        name: '',
-        type: 'uint256',
-      },
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
     ],
-    stateMutability: 'view',
-    type: 'function',
-  },
+    "stateMutability": "view",
+    "type": "function"
+  }
 ] as const
