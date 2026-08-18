@@ -33,7 +33,7 @@ import { makeAutoObservable, runInAction } from 'mobx'
 import { DEFAULT_CHAIN_ID } from '../config/contracts'
 import { FIREBASE_FUNCTIONS } from '../config/firebase'
 import { MOCK_LOANS, MOCK_MEMBERSHIPS, MOCK_POOLS, MOCK_TRANSACTIONS, MOCK_USER_ADDRESS } from '../mocks/lending'
-import { type Denomination, denominationFor, nativeDenomination } from '../utils/denomination'
+import { type Denomination, denominationFor, isNative, nativeDenomination } from '../utils/denomination'
 import { sameAddress } from '../utils/format'
 import { logger } from '../utils/logger'
 import { authStore } from './AuthStore'
@@ -736,13 +736,37 @@ export class PoolStore {
   /** Interest the connected wallet has already taken out, across pools (wei). */
   get claimedInterest(): bigint {
     return this.interestClaims
-      .filter((claim) => sameAddress(claim.account, this.userAddress))
+      .filter((claim) => sameAddress(claim.account, this.userAddress) && this.isNativePool(Number(claim.poolId)))
       .reduce((sum, claim) => sum + BigInt(claim.amount), 0n)
   }
 
   /** Interest credited to the connected wallet and not yet taken out (wei). */
   get claimableInterest(): bigint {
-    return Object.values(this.claimableByPool).reduce((sum, amount) => sum + BigInt(amount), 0n)
+    return Object.entries(this.claimableByPool)
+      .filter(([poolId]) => this.isNativePool(Number(poolId)))
+      .reduce((sum, [, amount]) => sum + BigInt(amount), 0n)
+  }
+
+  /**
+   * Whether a pool lends the chain's own coin.
+   *
+   * Used to keep the two lifetime-earnings figures in one unit. Interest is
+   * paid in whatever the pool lends, so summing across pools has the same
+   * problem `balancesByDenomination` exists to solve — and the dashboard shows
+   * earnings beside the native headline, so native is the unit it is in.
+   *
+   * A pool that is not loaded counts as native: earnings the user has already
+   * taken out should not vanish from the total while the pool list is fetching.
+   */
+  private isNativePool = (poolId: number): boolean => {
+    const pool = this.poolById(poolId)
+    if (!pool) return true
+
+    const denomination = denominationFor(pool)
+
+    // An unreadable token is not native and not countable: its earnings are a
+    // quantity of something the app cannot name.
+    return denomination !== undefined && isNative(denomination)
   }
 
   /**

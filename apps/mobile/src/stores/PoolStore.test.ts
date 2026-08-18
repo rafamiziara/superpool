@@ -55,6 +55,16 @@ describe('PoolStore', () => {
     expect(empty.totalBalance).toBe(0n)
   })
 
+  it('keeps lifetime earnings in the unit the headline is in', () => {
+    // Interest is paid in whatever the pool lends, so a claim from a USDC pool
+    // cannot be added to one from a POL pool — the same reason `totalBalance`
+    // is native-only. The dashboard shows this figure beside the native
+    // headline, so native is the unit it has to be in.
+    store.claimableByPool = { 1: parseEther('2').toString(), 7: '5000000' }
+
+    expect(store.claimableInterest).toBe(parseEther('2'))
+  })
+
   it('reports no earnings until something says otherwise', () => {
     // Interest is no longer inferred from a balance exceeding what was
     // contributed — that was a stand-in for accounting the contract did not
