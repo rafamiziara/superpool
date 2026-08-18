@@ -136,3 +136,20 @@ export const NOTIFICATIONS_SENT_COLLECTION = 'notifications_sent'
  * sentence about a person is not.
  */
 export const NOTES_COLLECTION = 'notes'
+
+/**
+ * The name of the Firestore collection used to hold a loan purpose between the
+ * transaction that asked for the loan and the loan itself.
+ *
+ * The contract assigns the loan id when the transaction is mined, so a
+ * borrower typing their reason has nothing to key on but the transaction they
+ * just sent. `indexLoanFromLog` knows both, and moves it.
+ *
+ * Its own collection rather than an oddly-keyed row in `notes`: a staged note
+ * is transient — moved and deleted as soon as the loan exists — where a note
+ * is written once and never deleted. Keeping them together would put
+ * deletable documents in the collection whose whole value is that its
+ * documents are not, and would make every listing query exclude rows attached
+ * to nothing.
+ */
+export const STAGED_NOTES_COLLECTION = 'staged_notes'

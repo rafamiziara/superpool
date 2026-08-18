@@ -197,6 +197,18 @@ service cloud.firestore {
       allow read, write: if false; // backend-only (saveNote / listNotes)
     }
 
+    // --- staged_notes ------------------------------------------------------
+    // A loan purpose waiting for its loan to exist. Written by `saveNote`,
+    // moved onto the loan by the indexer and deleted in the same pass. Closed
+    // like `notes`, and for the same reason plus one of its own: entitlement
+    // cannot be checked at staging time — the loan does not exist yet — so
+    // these are claims, honoured only if the transaction turns out to have
+    // produced the claimant's own loan.
+
+    match /staged_notes/{noteId} {
+      allow read, write: if false; // backend-only (saveNote / loan indexer)
+    }
+
     // --- event_sync_state --------------------------------------------------
     // Per-chain indexer cursors (last processed block). Tampering with these
     // would let an attacker skip or replay blockchain event ranges.
