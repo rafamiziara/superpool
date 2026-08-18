@@ -8,7 +8,7 @@ import { logger } from 'firebase-functions/v2'
  * The app never does. Every call to the agent originates here, after this
  * backend has decided who the caller is and what they may see — which is why
  * the agent itself holds no entitlement rules and reads nothing about a pool.
- * See `.dev/features/AI_ASSESSMENT_PLAN.md` §3.
+ * See `.dev/old/AI_ASSESSMENT_PLAN.md` §3.
  *
  * Three states, and they are not the same thing:
  *

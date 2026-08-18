@@ -4,7 +4,7 @@ The SuperPool agent service — a [Mastra](https://mastra.ai) server whose only
 client is `packages/backend`.
 
 Plan and the reasoning behind every decision here:
-[`.dev/features/AI_ASSESSMENT_PLAN.md`](../../.dev/features/AI_ASSESSMENT_PLAN.md).
+[`.dev/old/AI_ASSESSMENT_PLAN.md`](../../.dev/old/AI_ASSESSMENT_PLAN.md).
 
 ## What it is for
 

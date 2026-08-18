@@ -1,7 +1,7 @@
 /**
  * Manual integration test for the backend → agent-service seam.
  *
- * Phase 0 of [`.dev/features/AI_ASSESSMENT_PLAN.md`](../../../.dev/features/AI_ASSESSMENT_PLAN.md).
+ * Phase 0 of [`.dev/old/AI_ASSESSMENT_PLAN.md`](../../../.dev/old/AI_ASSESSMENT_PLAN.md).
  * It proves the boundary and nothing else: a signed service token, the
  * transport, a structured object coming back, and each of the ways it can
  * fail. **No model is involved** — the `ping` workflow calls none — so a

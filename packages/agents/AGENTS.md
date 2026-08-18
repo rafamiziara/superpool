@@ -15,7 +15,7 @@ APIs change between versions, and the embedded docs in
   pool, a wallet or a member.** Its only client is `packages/backend`, which
   decides who may ask for what and sends the facts. If this package ever needs
   its own view of a pool, the entitlement rules have leaked into a second place
-  — see [`.dev/features/AI_ASSESSMENT_PLAN.md`](../../.dev/features/AI_ASSESSMENT_PLAN.md) §3.
+  — see [`.dev/old/AI_ASSESSMENT_PLAN.md`](../../.dev/old/AI_ASSESSMENT_PLAN.md) §3.
 - Auth is on by default. `MASTRA_DISABLE_AUTH=true` is for local Studio only,
   which cannot sign a token; never set it where a real API key is.
 

@@ -12,7 +12,7 @@ import { noteFor } from './notes'
  *
  * Everything the agent is told is assembled here, by the backend that already
  * knows who is asking and what they may see — the agent reads no Firestore and
- * no chain. See `.dev/features/AI_ASSESSMENT_PLAN.md` §3 and §4.
+ * no chain. See `.dev/old/AI_ASSESSMENT_PLAN.md` §3 and §4.
  *
  * **An assessment is never load-bearing.** Nothing in the protocol, the
  * indexer or an eligibility check reads one. This module writes and reads a

@@ -893,7 +893,7 @@ moderation, and no note anywhere in the protocol.
 The assistant's reading of a loan request, for the pool owner deciding on it.
 Sprint 6's AI half and the two blocked parts of Sprint 10, built 2026-08-18 on
 [Mastra](https://mastra.ai). Plan and the reasoning for every decision:
-[`.dev/features/AI_ASSESSMENT_PLAN.md`](.dev/features/AI_ASSESSMENT_PLAN.md).
+[`.dev/old/AI_ASSESSMENT_PLAN.md`](.dev/old/AI_ASSESSMENT_PLAN.md).
 Verified with `pnpm --filter backend testAssessment` (17 checks, real model
 calls) and `pnpm --filter agents eval` (7 cases, 4 gates).
 

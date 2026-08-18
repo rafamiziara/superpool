@@ -65,7 +65,7 @@ export type AssessmentFacts = z.infer<typeof assessmentFactsSchema>
  * What the assessment may say.
  *
  * Shaped to make the things this feature must not do unrepresentable rather
- * than merely discouraged — see `.dev/features/AI_ASSESSMENT_PLAN.md` §5:
+ * than merely discouraged — see `.dev/old/AI_ASSESSMENT_PLAN.md` §5:
  *
  * - **Three bands and no number.** A 0–100 score invites arithmetic nobody
  *   validated, reads as a credit rating, and can be thresholded into a gate.

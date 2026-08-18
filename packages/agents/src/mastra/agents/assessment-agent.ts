@@ -5,7 +5,7 @@ import { Agent } from '@mastra/core/agent'
  *
  * **No tools, and nothing to fetch.** Every fact arrives in the prompt, sent
  * by the backend that already checked who is asking — see
- * `.dev/features/AI_ASSESSMENT_PLAN.md` §4. That is not only a security
+ * `.dev/old/AI_ASSESSMENT_PLAN.md` §4. That is not only a security
  * choice: it makes the happy path one LLM call, makes the inputs auditable
  * beside the answer, and sidesteps the documented limitation that some models
  * will not use tools and structured output together.

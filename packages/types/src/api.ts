@@ -464,7 +464,7 @@ export interface LoanRepaymentInfo {
  * exists to do the reading they have no time for when six requests are waiting.
  *
  * Read by the pool's owner alone — narrower than a note, deliberately. See
- * `.dev/features/AI_ASSESSMENT_PLAN.md` §7.
+ * `.dev/old/AI_ASSESSMENT_PLAN.md` §7.
  */
 export interface AssessmentInfo {
   /** `${chainId}-${poolId}-${loanId}` — the loan's own id, and the document's. */

@@ -20,7 +20,7 @@ import { pingWorkflow } from './workflows/ping'
  * the chain, or anything else about a pool.** If it ever needs to, the
  * entitlement rules have leaked out of the backend and into a second place.
  *
- * See `.dev/features/AI_ASSESSMENT_PLAN.md` §3.
+ * See `.dev/old/AI_ASSESSMENT_PLAN.md` §3.
  */
 
 /**
