@@ -18,6 +18,7 @@ export {
   indexMembership,
   indexPool,
   indexWithdrawal,
+  listBorrowerHistories,
   listContributions,
   listInterestClaims,
   listLoanRepayments,

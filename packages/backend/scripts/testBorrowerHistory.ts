@@ -39,6 +39,7 @@ import { getFirestore, Timestamp } from 'firebase-admin/firestore'
 import { PoolFactoryABI, LendingPoolABI } from '../src/constants/abis'
 import { LOANS_COLLECTION } from '../src/constants/firestore'
 import { sweepBlockRange } from '../src/services/eventSweeper'
+import { borrowerHistoriesFor } from '../src/services/borrowerHistory'
 import { indexLoansByTxHash, loanDocId } from '../src/services/loanIndexer'
 
 // ── Config ────────────────────────────────────────────────────────────────────
@@ -387,6 +388,21 @@ async function main() {
   check('it is not repaid, and not a debt either', requestData.isRepaid === false)
   check('and has no repayment date', requestData.repaidAt === undefined)
 
+  // The same fact read the way a pool owner reads it. A request is not
+  // borrowing, so a wallet waiting on a decision has **no record at all** — and
+  // `isNew` says so, which is what stops a first-time asker being shown as the
+  // worst kind of borrower. Checked here rather than at the end of the run,
+  // because the request is approved a few lines below and stops being one.
+  const waitingBefore = (
+    await borrowerHistoriesFor([waiting.address], CHAIN_ID, (await provider.getBlock('latest'))!.timestamp, firestore)
+  )[waiting.address.toLowerCase()]
+
+  check(
+    'a wallet with only a pending request has no record, and reads as new',
+    waitingBefore.isNew && waitingBefore.total === 0,
+    JSON.stringify(waitingBefore)
+  )
+
   // ---------------------------------------------------------------------------
   separator('Approval restamps the loan, and the record follows it')
   // ---------------------------------------------------------------------------
@@ -490,28 +506,80 @@ async function main() {
   // ---------------------------------------------------------------------------
   separator('What each borrower’s history is made of')
   // ---------------------------------------------------------------------------
-  // The same counting the app does, over the records this run produced. Read
-  // per wallet, because that is how a pool owner reads it.
-  async function loansOf(address: string) {
-    const snapshot = await firestore.collection(LOANS_COLLECTION).where('borrower', '==', address.toLowerCase()).get()
+  // Through `borrowerHistoriesFor`, which is what the app now reads. It used to
+  // be re-counted inline here, and that was a third copy of the same rules —
+  // one in the store, one in the backend, one in this script — with nothing
+  // making them agree.
+  //
+  // **Judged on chain time.** This run pushed the node's clock forward, so the
+  // two clocks genuinely disagree by now; the assertion below proves they do
+  // before anything is read against them, because a history that quietly used
+  // `Date.now()` would pass every check here by accident.
+  const chainSeconds = (await provider.getBlock('latest'))!.timestamp
 
-    return snapshot.docs.map((doc) => doc.data())
-  }
-
-  const punctualLoans = (await loansOf(punctual.address)).filter((loan) => loan.status === 'disbursed')
-  const lateLoans = (await loansOf(late.address)).filter((loan) => loan.status === 'disbursed')
-  const strangerLoans = await loansOf(stranger.address)
-
-  const onTime = punctualLoans.filter(
-    (loan) => loan.isRepaid && loan.repaidAt && loan.repaidAt.toDate().getTime() <= loan.startedAt.toDate().getTime() + loan.duration * 1000
-  )
-  const overdueOnes = lateLoans.filter(
-    (loan) => loan.isRepaid && loan.repaidAt && loan.repaidAt.toDate().getTime() > loan.startedAt.toDate().getTime() + loan.duration * 1000
+  check(
+    'the chain’s clock and this machine’s have diverged, so the next checks mean something',
+    Math.abs(chainSeconds - Math.floor(Date.now() / 1000)) > 60 * 60,
+    `chain ${chainSeconds}, server ${Math.floor(Date.now() / 1000)}`
   )
 
-  check('the punctual borrower has repayments, all inside their terms', onTime.length === punctualLoans.length && onTime.length >= 2)
-  check('the late one has a repayment outside it', overdueOnes.length === 1, `found ${overdueOnes.length}`)
-  check('a wallet nobody has lent to has no record at all, rather than a bad one', strangerLoans.length === 0)
+  const histories = await borrowerHistoriesFor(
+    [punctual.address, late.address, overdue.address, waiting.address, stranger.address],
+    CHAIN_ID,
+    chainSeconds,
+    firestore
+  )
+
+  const punctualHistory = histories[punctual.address.toLowerCase()]
+  const lateHistory = histories[late.address.toLowerCase()]
+  const overdueHistory = histories[overdue.address.toLowerCase()]
+  const waitingHistory = histories[waiting.address.toLowerCase()]
+  const strangerHistory = histories[stranger.address.toLowerCase()]
+
+  check(
+    'the punctual borrower repaid everything on time',
+    punctualHistory.onTime === punctualHistory.repaid && punctualHistory.onTime >= 2,
+    JSON.stringify(punctualHistory)
+  )
+  check('and none of it late', punctualHistory.late === 0, JSON.stringify(punctualHistory))
+  check('the late one has exactly one repayment outside its term', lateHistory.late === 1, JSON.stringify(lateHistory))
+
+  // The check `Date.now()` fails: this loan is past its term on the chain and
+  // comfortably inside it by this machine's clock.
+  check(
+    'the running loan is outstanding and overdue by the chain’s clock',
+    overdueHistory.outstanding === 1 && overdueHistory.overdue === 1,
+    JSON.stringify(overdueHistory)
+  )
+  // The same wallet, the same loans, judged against this machine's clock — and
+  // it reports nothing overdue. That is the whole reason the callable spends a
+  // `getBlock('latest')` rather than reading `Date.now()`, and it is a
+  // difference no mocked test can show.
+  const serverJudged = await borrowerHistoriesFor([overdue.address], CHAIN_ID, Math.floor(Date.now() / 1000), firestore)
+
+  check(
+    'and the same loan reads as inside its term against the server clock, which is the trap',
+    serverJudged[overdue.address.toLowerCase()].overdue === 0,
+    JSON.stringify(serverJudged[overdue.address.toLowerCase()])
+  )
+
+  // The same wallet after the owner approved it above: the request became a
+  // funded loan, so it now has exactly one and it is outstanding. Approval is
+  // what turns an asker into a borrower, and this is the check that says the
+  // history follows it rather than counting the request twice or not at all.
+  check(
+    'the approved asker now has one outstanding loan and is no longer new',
+    waitingHistory.total === 1 && waitingHistory.outstanding === 1 && !waitingHistory.isNew,
+    JSON.stringify(waitingHistory)
+  )
+
+  // The one that quietly makes a lending product unusable for the people it
+  // exists for: zero of zero is a first-time borrower, not the worst kind.
+  check(
+    'a wallet nobody has lent to reads as new, and is still answered for',
+    strangerHistory !== undefined && strangerHistory.isNew,
+    JSON.stringify(strangerHistory)
+  )
 
   // ---------------------------------------------------------------------------
   separator(`${passed} passed, ${failed} failed`)

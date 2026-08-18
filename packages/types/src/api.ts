@@ -1,5 +1,6 @@
 // API request and response types
 
+import type { BorrowerHistory } from './lending'
 import type { NotificationKind } from './notifications'
 
 // Generic API response wrapper
@@ -445,6 +446,41 @@ export interface LoanRepaymentInfo {
   blockNumber: number
   /** ISO 8601, not a Date — see the note on `ContributionInfo.contributedAt`. */
   repaidAt: string
+}
+
+/**
+ * What several wallets have done with money they borrowed before.
+ *
+ * Plural because the caller this exists for is the pool owner's approvals
+ * queue, which shows one card per pending request and needs a record for each.
+ * Asking per wallet would be a round trip per card.
+ */
+export interface ListBorrowerHistoriesRequest {
+  chainId?: number
+  /** Wallets to summarise. Matched case-insensitively, capped by the backend. */
+  borrowers: string[]
+}
+
+export interface ListBorrowerHistoriesResponse {
+  /**
+   * Keyed by lowercased address.
+   *
+   * **Every wallet asked about appears**, including ones that have never
+   * borrowed — those come back with `isNew: true`. An absent key would make a
+   * caller guess whether the wallet is new or the call went wrong, which is
+   * the one distinction `isNew` exists to protect.
+   */
+  histories: Record<string, BorrowerHistory>
+  /**
+   * The moment `overdue` was judged against, ISO 8601 — and it is **chain
+   * time**, not the server's.
+   *
+   * Stated rather than assumed because the two disagree: a local node's clock
+   * is pushed months ahead by the verification scripts, and a history that
+   * judged lateness against `Date.now()` would report every loan on it as
+   * comfortably inside its term. Same rule `sendDueReminders` follows.
+   */
+  asOf: string
 }
 
 export interface ListLoanRepaymentsRequest {
