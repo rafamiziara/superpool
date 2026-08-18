@@ -2,7 +2,7 @@ import React, { useMemo, useState } from 'react'
 import { Pressable, Text, TextInput, View } from 'react-native'
 import { formatUnits } from 'viem'
 import { z } from 'zod'
-import type { Denomination } from '../../utils/denomination'
+import { type Denomination, isNative } from '../../utils/denomination'
 import { amountPattern, formatAmount, formatToken, parseToken } from '../../utils/format'
 
 /**
@@ -210,13 +210,19 @@ export function RepayForm({
         </View>
       )}
 
-      {/* Said only when it applies, and said plainly: the wallet will ask to
-          approve slightly more than the number above. */}
+      {/* Said only when it applies, and said differently for the two ways money
+          reaches a pool. A native repayment is sent up front, so the wallet
+          genuinely asks for more than the screen says and the excess comes
+          back. A token repayment is pulled: the pool takes what is owed at the
+          moment it executes, so the extra is head-room in the approval that is
+          never touched. Saying "comes straight back" there would describe a
+          refund that never happens. */}
       {isSettling && !exceedsOutstanding && (
         <View className="rounded-2xl border-continuous border-hairline border-veil bg-raised px-4 py-3" testID="repay-settle-note">
           <Text className="text-xs text-mist">
-            Your wallet will ask for a little extra to cover the interest that builds while the transaction confirms. Whatever is not needed
-            comes straight back.
+            {isNative(denomination)
+              ? 'Your wallet will ask for a little extra to cover the interest that builds while the transaction confirms. Whatever is not needed comes straight back.'
+              : `You will approve a little more than the amount above, to cover the interest that builds while the transaction confirms. The pool only takes what is owed.`}
           </Text>
         </View>
       )}

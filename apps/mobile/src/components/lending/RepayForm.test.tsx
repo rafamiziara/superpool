@@ -1,7 +1,7 @@
 import { fireEvent, render, screen } from '@testing-library/react-native'
 import React from 'react'
 import { parseEther } from 'viem'
-import { NATIVE } from '../../__tests__/fixtures/denomination'
+import { NATIVE, USDC } from '../../__tests__/fixtures/denomination'
 import { RepayForm } from './RepayForm'
 
 /** 4 POL borrowed, 0.2 POL of interest accrued against it so far. */
@@ -83,6 +83,23 @@ describe('RepayForm', () => {
     renderForm()
 
     expect(screen.getByTestId('repay-settle-note')).toHaveTextContent(/comes straight back/)
+  })
+
+  it('promises no refund on a token pool, because there is none', () => {
+    // The pool pulls what is owed at execution time rather than being sent a
+    // sum up front, so the head-room sits unused in the allowance. Saying it
+    // "comes straight back" would describe a refund that never happens.
+    renderForm({
+      denomination: USDC,
+      borrowed: 4_000_000n,
+      principal: 4_000_000n,
+      interest: 200_000n,
+      settlementQuote: 4_201_000n,
+    })
+
+    const note = screen.getByTestId('repay-settle-note')
+    expect(note).toHaveTextContent(/only takes what is owed/)
+    expect(note).not.toHaveTextContent(/comes straight back/)
   })
 
   it('sends exactly what was typed for a part payment', () => {

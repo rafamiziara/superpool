@@ -11,7 +11,7 @@ import {
 } from '../../__tests__/mocks'
 import { LendingPoolABI } from '../../constants/abis'
 import { pendingTransactionsStore } from '../../stores/PendingTransactionsStore'
-import { NATIVE } from '../../__tests__/fixtures/denomination'
+import { NATIVE, USDC } from '../../__tests__/fixtures/denomination'
 import {
   type BorrowParams,
   calculateRepayment,
@@ -350,6 +350,34 @@ describe('useLoan repay', () => {
 
     expect(mockEstimateContractGas).toHaveBeenCalledWith(
       expect.objectContaining({ functionName: 'repayLoan', value: 5_250_000_000_000_000_000n })
+    )
+  })
+
+  it('sends repayLoanWithTokens for a token pool, with no value at all', async () => {
+    // The pool pulls `min(amount, outstanding)` priced at execution time, so
+    // the amount only has to be big enough — there is no overshoot to refund.
+    // Not an overload of `repayLoan`: see ERC20_PLAN §3.1.
+    const { result } = renderHook(() => useLoan())
+
+    await act(async () => {
+      await result.current.repay(makeRepayParams({ denomination: USDC, amount: 5_250_000n }))
+    })
+
+    expect(mockWriteContractAsync).toHaveBeenCalledWith(
+      expect.objectContaining({ functionName: 'repayLoanWithTokens', args: [3n, 5_250_000n] })
+    )
+    expect(mockWriteContractAsync.mock.calls[0][0]).not.toHaveProperty('value')
+  })
+
+  it('estimates the token repayment, which is what catches a missing allowance', async () => {
+    const { result } = renderHook(() => useLoan())
+
+    await act(async () => {
+      await result.current.repay(makeRepayParams({ denomination: USDC, amount: 5_250_000n }))
+    })
+
+    expect(mockEstimateContractGas).toHaveBeenCalledWith(
+      expect.objectContaining({ functionName: 'repayLoanWithTokens', args: [3n, 5_250_000n] })
     )
   })
 

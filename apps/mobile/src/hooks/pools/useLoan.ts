@@ -3,7 +3,7 @@ import { useAccount, usePublicClient, useWriteContract } from 'wagmi'
 import { DEFAULT_CHAIN_ID } from '../../config/contracts'
 import { LendingPoolABI } from '../../constants/abis'
 import { pendingTransactionsStore } from '../../stores/PendingTransactionsStore'
-import type { Denomination } from '../../utils/denomination'
+import { type Denomination, isNative } from '../../utils/denomination'
 import { describeTransactionError } from './transactionErrors'
 
 /**
@@ -395,33 +395,71 @@ export const useLoan = (): UseLoanReturn => {
       setError(null)
       setIsSubmitting(true)
 
+      const withBuffer = (estimate: bigint) => estimate + (estimate * GAS_BUFFER_PERCENT) / 100n
+
       try {
-        // `repayLoan` is payable, so the value is part of the estimate. It no
-        // longer catches an underfunded repayment — there is no such thing now
-        // — but it still catches a loan that belongs to someone else, one
-        // already settled, and a paused pool.
-        let gas: bigint | undefined
-        if (publicClient) {
-          const estimate = await publicClient.estimateContractGas({
+        // The two paths differ in more than the entry point, and the difference
+        // is the pleasant one. `repayLoan` is payable, so the borrower has to
+        // send value up front and the contract refunds the excess — which is
+        // why the screen quotes an hour ahead. `repayLoanWithTokens` names the
+        // amount and the pool pulls `min(amount, outstanding)` priced at
+        // execution time, so there is no overshoot and nothing to refund; the
+        // head-room moved to the allowance, where it costs nothing.
+        //
+        // Neither estimate catches an underfunded repayment — there is no such
+        // thing now — but both still catch a loan that belongs to someone else,
+        // one already settled, and a paused pool. The token one also catches a
+        // missing allowance.
+        //
+        // Spelled out rather than spread, because `value` and `args` are
+        // mutually exclusive in Viem's types.
+        let txHash: `0x${string}`
+
+        if (isNative(params.denomination)) {
+          const gas = publicClient
+            ? withBuffer(
+                await publicClient.estimateContractGas({
+                  address: params.poolAddress,
+                  abi: LendingPoolABI,
+                  functionName: 'repayLoan',
+                  args: [BigInt(params.loanId)],
+                  account: address,
+                  value: params.amount,
+                })
+              )
+            : undefined
+
+          txHash = await writeContractAsync({
             address: params.poolAddress,
             abi: LendingPoolABI,
             functionName: 'repayLoan',
             args: [BigInt(params.loanId)],
-            account: address,
             value: params.amount,
+            chainId: activeChainId,
+            ...(gas === undefined ? {} : { gas }),
           })
-          gas = estimate + (estimate * GAS_BUFFER_PERCENT) / 100n
-        }
+        } else {
+          const gas = publicClient
+            ? withBuffer(
+                await publicClient.estimateContractGas({
+                  address: params.poolAddress,
+                  abi: LendingPoolABI,
+                  functionName: 'repayLoanWithTokens',
+                  args: [BigInt(params.loanId), params.amount],
+                  account: address,
+                })
+              )
+            : undefined
 
-        const txHash = await writeContractAsync({
-          address: params.poolAddress,
-          abi: LendingPoolABI,
-          functionName: 'repayLoan',
-          args: [BigInt(params.loanId)],
-          value: params.amount,
-          chainId: activeChainId,
-          ...(gas === undefined ? {} : { gas }),
-        })
+          txHash = await writeContractAsync({
+            address: params.poolAddress,
+            abi: LendingPoolABI,
+            functionName: 'repayLoanWithTokens',
+            args: [BigInt(params.loanId), params.amount],
+            chainId: activeChainId,
+            ...(gas === undefined ? {} : { gas }),
+          })
+        }
 
         await pendingTransactionsStore.addPendingTransaction({
           txHash,

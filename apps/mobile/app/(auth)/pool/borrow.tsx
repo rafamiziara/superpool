@@ -11,23 +11,27 @@ import { RepayForm } from '../../../src/components/lending/RepayForm'
 import { LendingPoolABI } from '../../../src/constants/abis'
 import { palette } from '../../../src/constants/palette'
 import { settlementQuote, useLoan } from '../../../src/hooks/pools/useLoan'
+import { useTokenApproval } from '../../../src/hooks/pools/useTokenApproval'
 import { usePoolIndexing } from '../../../src/hooks/pools/usePoolIndexing'
 import { useTransactionMonitoring } from '../../../src/hooks/pools/useTransactionMonitoring'
 import type { LoanTransactionType } from '../../../src/stores/PendingTransactionsStore'
 import { poolStore } from '../../../src/stores/PoolStore'
-import { type Denomination, denominationFor } from '../../../src/utils/denomination'
+import { type Denomination, denominationFor, isNative } from '../../../src/utils/denomination'
 import { formatAmount } from '../../../src/utils/format'
 
 /**
  * Where the flow is. Distinct from the hooks' own flags because it has to
  * survive across three of them and outlive the last one.
  */
-type Stage = 'form' | 'submitting' | 'confirming' | 'indexing' | 'done'
+type Stage = 'form' | 'approving' | 'submitting' | 'confirming' | 'indexing' | 'done'
 
 /** What the wallet just did, which decides the wording on the success screen. */
 type Outcome = 'borrowed' | 'requested' | 'repaid' | 'cancelled'
 
 const STAGE_MESSAGES: Record<Exclude<Stage, 'form' | 'done'>, string> = {
+  // Only ever reached by a repayment into a token pool: borrowing and
+  // requesting move nothing of the borrower's, so there is nothing to approve.
+  approving: 'Approve the pool to take the repayment — this is the first of two transactions',
   submitting: 'Approve the transaction in your wallet',
   confirming: 'Waiting for the network to confirm',
   indexing: 'Recording your loan',
@@ -74,6 +78,7 @@ function BorrowScreen() {
   const { poolId } = useLocalSearchParams<{ poolId: string }>()
 
   const { borrow, requestLoan, repay, cancelLoanRequest, error: loanError, reset } = useLoan()
+  const { readAllowance, approve, error: approvalError, reset: resetApproval } = useTokenApproval()
   const { waitForTransaction } = useTransactionMonitoring()
   const { triggerIndexing } = usePoolIndexing()
 
@@ -198,8 +203,30 @@ function BorrowScreen() {
 
     setFailure(null)
     reset()
+    resetApproval()
 
     const owed = principalOwed + interestOwed
+
+    // A token repayment is pulled, so the token has to be told first. The
+    // amount approved is the one being sent — which, when settling, is the
+    // quote rather than the debt: the pool takes `min(amount, outstanding)` at
+    // execution time, so the head-room sits unused in the allowance instead of
+    // coming back as a refund.
+    if (!isNative(denomination) && denomination.address) {
+      const allowance = await readAllowance({ token: denomination.address, spender: pool.poolAddress as `0x${string}` })
+
+      if (allowance === undefined || allowance < amount) {
+        try {
+          setStage('approving')
+          await approve({ token: denomination.address, spender: pool.poolAddress as `0x${string}`, amount })
+        } catch (error) {
+          setStage('form')
+          setFailure(error instanceof Error ? error.message : 'Could not approve the token')
+
+          return
+        }
+      }
+    }
 
     let txHash: `0x${string}`
     try {
@@ -374,7 +401,7 @@ function BorrowScreen() {
                 settlementQuote={settlementQuote(principalOwed, interestOwed, outstanding.interestRate, outstanding.duration)}
                 onSubmit={handleRepay}
                 isSubmitting={isBusy}
-                error={failure ?? loanError}
+                error={failure ?? loanError ?? approvalError}
               />
             )}
           </View>
