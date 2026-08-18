@@ -2,6 +2,8 @@ import { MastraJwtAuth } from '@mastra/auth'
 import { Mastra } from '@mastra/core/mastra'
 import { LibSQLStore } from '@mastra/libsql'
 import { PinoLogger } from '@mastra/loggers'
+import { assessmentAgent } from './agents/assessment-agent'
+import { assessLoanWorkflow } from './workflows/assess-loan'
 import { pingWorkflow } from './workflows/ping'
 
 /**
@@ -56,11 +58,13 @@ function requireSecret(): string {
 }
 
 export const mastra = new Mastra({
-  workflows: { pingWorkflow },
-  // In memory, deliberately. Nothing here is stateful yet: there are no threads,
-  // no memory and no conversation to resume, so a file or a hosted database
-  // would be storing traces of stateless calls. Revisit when Phase 2 adds an
-  // agent worth tracing across restarts.
+  agents: { assessmentAgent },
+  workflows: { assessLoanWorkflow, pingWorkflow },
+  // In memory, deliberately. Nothing this service does is stateful: there are
+  // no threads, no memory and no conversation to resume, and the assessment
+  // itself is stored by the backend rather than here. What is lost on a
+  // restart is the run history Studio reads, which is a local-development
+  // convenience — revisit alongside the hosted deployment, not before.
   storage: new LibSQLStore({ id: 'agents-storage', url: ':memory:' }),
   logger: new PinoLogger({ name: 'superpool-agents', level: 'info' }),
   server: {

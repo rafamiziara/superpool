@@ -11,6 +11,7 @@
     "dev": "mastra dev",
     "build": "mastra build",
     "start": "mastra start",
+    "test": "jest",
     "type-check": "tsc --noEmit",
     "lint": "eslint src --config ../../eslint.config.mjs",
     "format": "prettier --write . --ignore-path ../../.prettierignore"
@@ -23,8 +24,11 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
+    "@types/jest": "^30.0.0",
     "@types/node": "^25.9.1",
+    "jest": "^30.4.2",
     "mastra": "^1.11.0",
+    "ts-jest": "^29.4.6",
     "typescript": "~6.0.3"
   }
 }
