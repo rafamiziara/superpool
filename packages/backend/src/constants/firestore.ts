@@ -60,6 +60,22 @@ export const LOANS_COLLECTION = 'loans'
 export const LOAN_REPAYMENTS_COLLECTION = 'loan_repayments'
 
 /**
+ * The name of the Firestore collection used to store loan decisions
+ * (`LoanApproved`, `LoanRejected` and `LoanDefaulted` events).
+ *
+ * The contribution shape, not the loan shape, for the same reason
+ * `loan_repayments` is: a decision is one immutable event and the loan document
+ * only ever holds the state it left behind. Three things are recoverable here
+ * and nowhere else — when a decision was made, who made it, and whether a
+ * `LoanRejected` was the owner refusing or the borrower withdrawing.
+ *
+ * Keyed on the log rather than on the loan, so a loan approved and later
+ * declared in default keeps both records instead of the second overwriting the
+ * first, and so re-sweeping a range rebuilds exactly what is already there.
+ */
+export const LOAN_DECISIONS_COLLECTION = 'loan_decisions'
+
+/**
  * The name of the Firestore collection used to store indexed liquidity
  * withdrawals (`FundsWithdrawn` events).
  *

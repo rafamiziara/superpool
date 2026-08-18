@@ -118,6 +118,21 @@ service cloud.firestore {
       allow write: if false; // backend-only (loan repayment indexer)
     }
 
+    // --- loan_decisions ----------------------------------------------------
+    // What a pool owner decided about a loan, indexed from LoanApproved,
+    // LoanRejected and LoanDefaulted events. Append-only like repayments: each
+    // is one immutable log, and the loan document keeps only the state it left.
+    //
+    // Readable by any signed-in caller like every other mirror of the chain —
+    // these events are public there. The reason *behind* a decision is not: it
+    // lives in `notes`, which is backend-only in both directions.
+
+    match /loan_decisions/{decisionId} {
+      allow get: if isSignedIn();
+      allow list: if isSignedIn() && request.query.limit <= 100; // mirrors listLoanDecisions' own cap
+      allow write: if false; // backend-only (loan decision indexer)
+    }
+
     // --- memberships -------------------------------------------------------
     // Pool memberships indexed from the on-chain register. Mutable like loans —
     // one document per pool and address, rewritten by every decision — and

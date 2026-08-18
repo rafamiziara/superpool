@@ -449,6 +449,75 @@ export interface LoanRepaymentInfo {
 }
 
 /**
+ * What was decided about one loan, and by whom.
+ *
+ * The contribution shape rather than the `LoanInfo` shape, and the split is the
+ * point: a loan document is rewritten by every event and holds only what the
+ * loan is *now*, so three facts about a decision live nowhere else.
+ *
+ * - **When it was made.** A defaulted loan's record cannot say when it was
+ *   approved, because `status` moved on; and `approveLoan` restamps
+ *   `startTime`, so an approval overwrites the moment the request was made.
+ * - **Who made it.** No loan event carries a decider — all three parameters are
+ *   the loan, the borrower and the amount — so only the transaction's sender
+ *   says whether the owner acted.
+ * - **Which of two identical outcomes it was.** `cancelLoanRequest` emits
+ *   `LoanRejected` and leaves the loan exactly as `rejectLoan` does, so the
+ *   record cannot tell a refusal from a withdrawal. `outcome` can, because it
+ *   is derived from the sender at the moment it happened.
+ *
+ * Immutable, dated by its own block, and keyed on the log — so re-sweeping a
+ * range rebuilds the same records rather than revising them.
+ */
+export interface LoanDecisionInfo {
+  /** `${chainId}-${transactionHash}-${logIndex}` — the document id, and stable. */
+  id: string
+  /** Per-pool loan id. Join to `LoanInfo.loanId` within the same pool and chain. */
+  loanId: number
+  poolId: number
+  poolAddress: string
+  /** The loan's borrower, lowercased on write; compare case-insensitively. */
+  borrower: string
+  /**
+   * What the event carried, in wei as a decimal string: the amount approved,
+   * refused or left owing when the debt was declared.
+   *
+   * A snapshot, never a running figure — what is owed now is on the loan.
+   */
+  amount: string
+  outcome: LoanDecisionOutcome
+  /**
+   * The transaction's sender, lowercased.
+   *
+   * The owner on every outcome but `cancelled`, where it is the borrower. Kept
+   * even though it is implied, because a pool can change hands: the owner who
+   * decided is not always the owner today.
+   */
+  decidedBy: string
+  chainId: number
+  transactionHash: string
+  /** Position of the decision's log within its transaction. */
+  logIndex: number
+  blockNumber: number
+  /** ISO 8601, not a Date — see the note on `ContributionInfo.contributedAt`. */
+  decidedAt: string
+}
+
+/**
+ * The four ends a decision can reach.
+ *
+ * `rejected` and `cancelled` are the same on-chain event and the same resulting
+ * record — the sender is the only thing that separates a refusal from a
+ * withdrawal, and conflating them tells a borrower they were declined when they
+ * changed their mind.
+ *
+ * `defaulted` is a decision like the others: the owner declaring a debt in
+ * default is a judgement they made and can be asked about. It is **not** an
+ * ending — the debt stays open and interest keeps accruing.
+ */
+export type LoanDecisionOutcome = 'approved' | 'rejected' | 'cancelled' | 'defaulted'
+
+/**
  * What several wallets have done with money they borrowed before.
  *
  * Plural because the caller this exists for is the pool owner's approvals
@@ -620,6 +689,33 @@ export interface ListLoanRepaymentsRequest {
 
 export interface ListLoanRepaymentsResponse {
   repayments: LoanRepaymentInfo[]
+  totalCount: number
+  limit: number
+}
+
+export interface ListLoanDecisionsRequest {
+  chainId?: number
+  /** Restrict to one pool. Omit for every pool on the chain. */
+  poolId?: number
+  /** Restrict to one loan. Only meaningful together with `poolId`, which scopes the id. */
+  loanId?: number
+  /** Restrict to the loans of one wallet. Matched case-insensitively. */
+  borrower?: string
+  /**
+   * Restrict to decisions one wallet made. Matched case-insensitively.
+   *
+   * Not the same question as `borrower`: an owner who borrows from their own
+   * pool appears under both, and a pool that changed hands has decisions from
+   * two owners.
+   */
+  decidedBy?: string
+  /** Restrict to one kind of outcome. */
+  outcome?: LoanDecisionOutcome
+  limit?: number
+}
+
+export interface ListLoanDecisionsResponse {
+  decisions: LoanDecisionInfo[]
   totalCount: number
   limit: number
 }
