@@ -1,10 +1,16 @@
 import { Firestore } from 'firebase-admin/firestore'
 
 const mockNotifyOnce = jest.fn()
+const mockNoteFor = jest.fn()
 
 jest.mock('./notifications', () => ({
   ...jest.requireActual('./notifications'),
   notifyOnce: (...args: unknown[]) => mockNotifyOnce(...args),
+}))
+
+jest.mock('./notes', () => ({
+  ...jest.requireActual('./notes'),
+  noteFor: (...args: unknown[]) => mockNoteFor(...args),
 }))
 
 import { IndexLoanResult, LoanTransition, ParsedLoan } from './loanIndexer'
@@ -69,7 +75,15 @@ function parsedMembership(account = ASKER): ParsedMembership {
 beforeEach(() => {
   mockNotifyOnce.mockReset()
   mockNotifyOnce.mockResolvedValue({ sent: 1, pruned: 0, noRecipients: false })
+  mockNoteFor.mockReset()
+  // Nobody wrote a reason: the ordinary case, and every existing expectation
+  // in this file assumes it.
+  mockNoteFor.mockResolvedValue(null)
 })
+
+function bodyOf(call: number = 0): string {
+  return (mockNotifyOnce.mock.calls[call][2] as { body: string }).body
+}
 
 // ---------------------------------------------------------------------------
 // Loan requests.
@@ -425,5 +439,73 @@ describe('notifyMembershipDecided', () => {
     await notifyMembershipDecided(membershipResult('active'), parsedMembership(), firestore)
 
     expect(mockNotifyOnce).not.toHaveBeenCalled()
+  })
+})
+
+// ---------------------------------------------------------------------------
+// The reason behind a decision.
+//
+// The owner writes it *before* sending the transaction, so by the time the
+// indexer gets here there is something to quote. That ordering is the whole
+// reason a decision note is keyed on a record that already exists.
+// ---------------------------------------------------------------------------
+
+describe('the reason a push carries', () => {
+  it('quotes the reason the owner gave for turning a request down', async () => {
+    const { firestore } = buildFirestore()
+    mockNoteFor.mockResolvedValue({ text: 'The pool is fully lent out until March.' })
+
+    await notifyLoanDecided(loanResult('rejected'), parsedLoan(), ownerSentIt() as never, firestore)
+
+    expect(bodyOf()).toContain('The pool is fully lent out until March.')
+  })
+
+  // Asked for by (record, outcome). An owner who typed a rejection and then
+  // approved instead leaves a note nothing ever asks for.
+  it('asks for the note belonging to the transition that actually happened', async () => {
+    const { firestore } = buildFirestore()
+
+    await notifyLoanDecided(loanResult('approved'), parsedLoan(), ownerSentIt() as never, firestore)
+
+    expect(mockNoteFor).toHaveBeenCalledWith(`${CHAIN_ID}-${POOL_ID}-1`, 'loan_approved', firestore)
+  })
+
+  it('carries a reason on a membership decision too', async () => {
+    const { firestore } = buildFirestore()
+    mockNoteFor.mockResolvedValue({ text: 'We already have someone from your street.' })
+
+    await notifyMembershipDecided(membershipResult('rejected'), parsedMembership(), firestore)
+
+    expect(mockNoteFor).toHaveBeenCalledWith(`${CHAIN_ID}-${POOL_ID}-${ASKER}`, 'membership_rejected', firestore)
+    expect(bodyOf()).toContain('We already have someone from your street.')
+  })
+
+  it('sends the bare body when nobody wrote a reason', async () => {
+    const { firestore } = buildFirestore()
+
+    await notifyLoanDecided(loanResult('rejected'), parsedLoan(), ownerSentIt() as never, firestore)
+
+    expect(bodyOf()).toBe('Builders Guild turned down your loan request.')
+  })
+
+  // The decision is the news and the reason is the courtesy; losing the
+  // courtesy must not lose the news.
+  it('still sends when the note cannot be read', async () => {
+    const { firestore } = buildFirestore()
+    mockNoteFor.mockRejectedValue(new Error('firestore is down'))
+
+    await notifyLoanDecided(loanResult('rejected'), parsedLoan(), ownerSentIt() as never, firestore)
+
+    expect(bodyOf()).toBe('Builders Guild turned down your loan request.')
+  })
+
+  it('keeps a long reason down to what a lock screen shows', async () => {
+    const { firestore } = buildFirestore()
+    mockNoteFor.mockResolvedValue({ text: 'x'.repeat(280) })
+
+    await notifyLoanDecided(loanResult('rejected'), parsedLoan(), ownerSentIt() as never, firestore)
+
+    expect(bodyOf().length).toBe(240)
+    expect(bodyOf().endsWith('…')).toBe(true)
   })
 })

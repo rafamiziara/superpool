@@ -1,4 +1,4 @@
-import { NotificationData } from '@superpool/types'
+import { NoteKind, NotificationData } from '@superpool/types'
 import { Provider } from 'ethers'
 import { Firestore } from 'firebase-admin/firestore'
 import { logger } from 'firebase-functions/v2'
@@ -6,6 +6,7 @@ import { POOLS_COLLECTION } from '../constants'
 import { IndexLoanResult, ParsedLoan } from './loanIndexer'
 import { IndexMembershipResult, ParsedMembership } from './membershipIndexer'
 import { notificationKey, notifyOnce } from './notifications'
+import { noteFor } from './notes'
 
 /**
  * Which transitions are worth a push, and to whom.
@@ -200,7 +201,13 @@ export async function notifyLoanDecided(
     loanId: String(loan.loanId),
   }
 
-  await notifyOnce(notificationKey(result.id, kind), loan.borrower, { ...LOAN_DECISION_COPY[kind](pool.name), data }, firestore)
+  const copy = LOAN_DECISION_COPY[kind](pool.name)
+  // The whole point of the ordering: the owner writes their reason *before*
+  // sending the transaction, so by the time this runs there is something to
+  // quote. A refusal with a reason is a different thing from a refusal.
+  const body = await withReason(copy.body, result.id, kind, firestore)
+
+  await notifyOnce(notificationKey(result.id, kind), loan.borrower, { ...copy, body, data }, firestore)
 }
 
 /**
@@ -241,7 +248,9 @@ export async function notifyMembershipDecided(
     actor: membership.account,
   }
 
-  const body = kind === 'membership_approved' ? `You are now a member of ${pool.name}.` : `Your request to join ${pool.name} was declined.`
+  const opening =
+    kind === 'membership_approved' ? `You are now a member of ${pool.name}.` : `Your request to join ${pool.name} was declined.`
+  const body = await withReason(opening, result.id, kind, firestore)
 
   await notifyOnce(
     notificationKey(result.id, kind),
@@ -249,6 +258,51 @@ export async function notifyMembershipDecided(
     { title: kind === 'membership_approved' ? 'Request approved' : 'Request declined', body, data },
     firestore
   )
+}
+
+/**
+ * What a push body can carry before a phone stops showing it.
+ *
+ * Both platforms truncate rather than reject, so this is about what the
+ * recipient actually reads on a lock screen, not about a limit. A note is
+ * capped at 280 characters and the opening sentence names the pool, so a long
+ * reason is the only thing that can push a body past this.
+ */
+const MAX_BODY_LENGTH = 240
+
+/**
+ * The notification body with the reason somebody gave, if they gave one.
+ *
+ * **Asked for by (record, outcome)**, which is what makes a stale reason
+ * invisible rather than wrong: an owner who typed a rejection and then
+ * approved instead leaves a `loan_rejected` note behind, and nothing ever asks
+ * for it.
+ *
+ * Failing to read a note must not stop a notification — the decision is the
+ * news and the reason is the courtesy — so this falls back to the bare body.
+ */
+async function withReason(body: string, recordId: string, kind: NoteKind, firestore: Firestore): Promise<string> {
+  try {
+    const note = await noteFor(recordId, kind, firestore)
+
+    if (!note) return body
+
+    return truncate(`${body} ${note.text}`, MAX_BODY_LENGTH)
+  } catch (error) {
+    logger.warn('Could not read the note for a notification; sending it without', {
+      recordId,
+      kind,
+      error: error instanceof Error ? error.message : String(error),
+    })
+
+    return body
+  }
+}
+
+function truncate(text: string, limit: number): string {
+  if (text.length <= limit) return text
+
+  return `${text.slice(0, limit - 1).trimEnd()}…`
 }
 
 /** Loan transitions that are an answer to the borrower, by the kind they send. */
