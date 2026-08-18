@@ -19,6 +19,7 @@ export default [
       '**/build/**',
       '**/.next/**',
       '**/.expo/**',
+      '**/.mastra/**',
 
       // Generated files
       '**/typechain-types/**',
@@ -76,6 +77,7 @@ export default [
         project: [
           './tsconfig.json',
           './apps/*/tsconfig.json',
+          './packages/agents/tsconfig.json',
           './packages/backend/tsconfig.json',
           './packages/contracts/tsconfig.json',
           './packages/types/tsconfig.json',

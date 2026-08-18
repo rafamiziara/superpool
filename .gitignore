@@ -15,6 +15,9 @@ bash.exe.stackdump
 # Env Variables
 .env
 .env.*
+
+# Mastra build output and local dev database
+.mastra/
 !.env.template
 
 # Ngrok config (contains personal authtoken)
