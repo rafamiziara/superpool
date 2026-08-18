@@ -634,6 +634,42 @@ And one thing that is only a trap locally: **overdue is judged against
 timestamps track real time, and wrong on a local node whose clock has been
 pushed forward — which is exactly what producing a late repayment requires.
 
+## Why the money is wanted, and why it was refused
+
+A loan carries no purpose on chain and never will: free text costs gas
+proportional to its length, forever, and a sentence somebody typed is the
+opposite of what the chain is for here. Both live in the `notes` collection —
+see [Notes](../CLAUDE.md#notes) for the mechanism and
+[`.dev/old/NOTES_PLAN.md`](../.dev/old/NOTES_PLAN.md) for why each
+call went the way it did.
+
+Four things about them that touch loans specifically:
+
+- **A purpose has no loan to attach to when it is written.** `requestLoan` and
+  `createLoan` assign the id when they are mined, so the app stages the note
+  under the transaction and `indexLoanFromLog` moves it — on the `requested`
+  and absent-to-`disbursed` transitions, the two that bring a loan into
+  existence, and nowhere else.
+- **It must not be joined through `loan.transactionHash`.** That field moves:
+  `datesTheLoan` points the record at the transaction that set the loan's
+  current `startTime`, and `approveLoan` rewrites `startTime`. So a purpose
+  keyed to the requesting transaction reads correctly right up until the owner
+  approves — the moment the loan starts to matter — and then silently belongs
+  to nobody. The note is keyed on the loan's own document id for that reason,
+  and `testNotes` asserts it survives an approval.
+- **A decision reason is written before the transaction that makes the
+  decision.** That is what lets `notifyLoanDecided` quote it, so the borrower
+  reads "declined — the pool is fully lent out until March" rather than
+  "declined". Because it is keyed on the _outcome_, a reason the owner typed
+  and then thought better of is never asked for: approving after drafting a
+  rejection carries nothing.
+- **The purpose is shown wherever the owner is judging.** The approvals queue
+  above `BorrowerHistoryPanel`, and `pool/overdue.tsx` beside what is owed —
+  which is the one fact on a late loan the owner cannot work out themselves.
+
+Neither is ever required, and **neither is ever read to decide anything**. A
+loan with no purpose is an ordinary loan.
+
 ## Loans in the activity feed
 
 `PoolStore.loanActivity` puts loans in the same feed as contributions and

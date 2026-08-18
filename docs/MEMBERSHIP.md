@@ -131,6 +131,30 @@ exists to prevent:
   rejected applicant from a stranger — `removeMember` reverts for anyone the
   register does not hold as `active`, and only this can tell them apart.
 
+## Why a decision went the way it did
+
+Rejection, approval and removal each carry an optional reason, in the `notes`
+collection rather than on chain — exactly where the original deferral said it
+belonged. See [Notes](../CLAUDE.md#notes) for the mechanism.
+
+Two things specific to membership:
+
+- **The note is keyed on the membership record and the outcome**,
+  `${chainId}-${poolId}-${account}:${kind}`, so an address whose standing
+  changes over time carries one sentence per decision rather than one in total.
+  It is the register's own document id, so `memberRecords` and the note always
+  agree on whom they are about.
+- **A removal reason reaches nobody by push.** Removal has no notification and
+  should not have one — it is not a decision on anything the member asked for
+  (see [Notifications](../CLAUDE.md#notifications)) — so the reason waits on
+  `pool/[id]`, under the standing notice, until they next open the pool. That
+  is the whole reason it was worth building: today they are told nothing at
+  all, ever.
+
+The reason is written **before** the transaction, so the applicant's rejection
+or approval push can quote it. Nothing requires one, and nothing reads one to
+decide anything.
+
 ## What the app does not do yet
 
 - **No membership is required to _view_ a pool.** The register gates depositing
@@ -144,5 +168,5 @@ exists to prevent:
   bounds it. There was a `maxMembers` field in `packages/types` promising
   otherwise; it was deleted rather than implemented, because no screen ever
   collected a cap and no pool has ever had one.
-- **Rejection carries no reason.** Deliberate: free text on chain costs gas and
-  is metadata. If it is wanted, it belongs in Firestore beside the record.
+- **A reason is never required, and never load-bearing.** It is a courtesy
+  attached to a decision, not part of it — see the section above.

@@ -23,6 +23,10 @@ To build a functional micro-lending decentralized application on Polygon where u
 | 11 · Interest Distribution     | ✅ Complete                                            |
 | 12 · Notifications             | 🚧 All nine kinds shipped; delivery unverified         |
 
+Three deferrals across Sprints 4, 6 and 10 — a membership reason, a loan
+purpose, a decision reason — turned out to be one missing mechanism, and were
+built together on 2026-08-18 as [Notes](../CLAUDE.md#notes).
+
 Sprints 4–10 were shipped in a different order than planned. Membership (4)
 landed after liquidity (5) and loans (6, 7, 10), and loan management (10)
 shipped ahead of the AI (6) and reputation (9) work it was meant to consume.
@@ -187,8 +191,10 @@ membership from having contributed, which is the model Sprint 4 replaced.
 - **Admin Membership Management** ✅
   - Smart contract `approveMember` / `rejectMember` / `removeMember`, owner-only
   - Admin UI to view pending requests and the roster (`pool/members.tsx`)
-  - Approval/rejection workflow — ✅; **reason tracking — ❌ deliberately deferred**
-    (free text on chain costs gas and is metadata; it belongs in Firestore)
+  - Approval/rejection workflow — ✅; **reason tracking — ✅ 2026-08-18**, in
+    Firestore exactly as the deferral said. See [Notes](../CLAUDE.md#notes).
+    A removal reason has nowhere to be pushed — being removed is not a
+    decision on anything the member asked for — so it lands on the pool page
   - Member list management and permissions ✅
 
 - **Off-chain Integration** ✅
@@ -274,7 +280,9 @@ See [`LOANS.md`](LOANS.md) for how the shipped system works.
 - **Loan Request System** ✅
   - Smart contract `requestLoan` ✅
   - Loan parameter specification: amount ✅, terms ✅ (from the pool's config,
-    not per-loan), **purpose — ❌** (no such field exists)
+    not per-loan), **purpose — ✅ 2026-08-18**, off chain and optional. Staged
+    under the requesting transaction and resolved by the indexer, because the
+    loan has no id until it is mined. See [Notes](../CLAUDE.md#notes)
   - Request validation and eligibility checks ✅
   - Loan request queue management ✅
 
@@ -504,7 +512,9 @@ reputation is still waiting on those sprints.
 - **Admin Loan Management** 🚧
   - Smart contract `approveLoan` and `rejectLoan`, owner-only ✅
   - Admin dashboard for loan request review ✅ (`pool/approvals.tsx`)
-  - Loan decision workflow ✅; **reasoning — ❌**, same deferral as Sprint 4
+  - Loan decision workflow ✅; **reasoning — ✅ 2026-08-18**, same mechanism as
+    Sprint 4 and Sprint 6 — the three were one missing feature. Written before
+    the transaction, so the borrower's push carries it
   - **Batch loan processing — ❌ deliberately.** Decisions are serialised
     because each is a separate transaction from one wallet, and two in flight
     means two signature prompts racing for one nonce.

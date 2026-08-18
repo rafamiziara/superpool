@@ -817,6 +817,77 @@ chain fires when a term lapses.
 **Not verified end to end.** The emulator does not deliver push; the last mile
 needs a dev build, an APNs key and an FCM v1 service account uploaded to EAS.
 
+## Notes
+
+Why a loan was wanted, and why a decision went the way it did. Three
+deferrals — a membership reason (Sprint 4), a loan purpose (Sprint 6), a
+decision reason (Sprint 10) — were one missing mechanism, built together on
+2026-08-18. Plan and the reasoning for each decision:
+[`.dev/old/NOTES_PLAN.md`](.dev/old/NOTES_PLAN.md). Verified live
+with `pnpm --filter backend testNotes` (26 checks).
+
+**A note is never load-bearing.** Nothing in the protocol, the indexer or an
+eligibility check may read one to decide anything. The indexer moves one and
+the notification service quotes one; neither branches on what it says. If a
+note ever gates a transaction, this design is wrong.
+
+Nothing here is on chain, and that is the point rather than a saving: free
+text costs gas forever on a product whose amounts are small by definition, and
+**permanence is a misfeature** for a sentence about a person — on chain a
+rejection reason is public and unretractable to everyone, where in Firestore
+it is visible to the two parties and can be deleted if it turns out to be
+abusive.
+
+Six rules that are easy to break:
+
+- **Keyed on (record id, outcome), never on a transaction hash.**
+  `notes/${recordId}:${kind}`, mirroring `notificationKey`. `indexLoan` moves
+  a loan's `transactionHash` to the earliest event that dates it, and
+  `approveLoan` rewrites `startTime` — so a purpose keyed to the requesting
+  transaction attaches correctly right up until the loan is approved, then
+  **silently** detaches. Keying on the outcome rather than on "a decision" is
+  what also makes a stale reason invisible: the owner types theirs _before_
+  sending, so one they thought better of sits under a key nobody asks for.
+- **Written before the transaction, so the push can carry it.** That ordering
+  is the whole value of the feature — a refusal with a reason is a different
+  thing from a refusal. It is also why a decision note keys on a record that
+  already exists, and why a _purpose_ cannot: the contract assigns the loan id
+  when the transaction is mined. A purpose is therefore **staged** in
+  `staged_notes` under `tx:${chainId}:${txHash}` and moved by
+  `indexLoanFromLog`, on the two transitions that create a loan and nowhere
+  else. That also means the sweep attaches it, so a phone that dies mid-flow
+  still gets its purpose across.
+- **Write-once, through `create()`.** A reason that can be rewritten after the
+  borrower has read it is a draft, not a record of what was said. There is no
+  edit and no delete; deletion is an operator action through the console,
+  which is the right weight for the one case that justifies it.
+- **Backend-only in both directions, unlike every other collection here.**
+  `notes` is the first one that does not mirror the chain, so "public because
+  the chain is public" — the reasoning behind every other read rule — does not
+  apply. Reads go through `listNotes`: a pool's owner sees the notes on their
+  pool, everybody else sees the notes about themselves, and an unentitled
+  caller gets an **empty list rather than an error**, because refusing would
+  confirm a note exists. Other members of a pool are excluded deliberately;
+  widening that later is a one-line change, narrowing it after people have
+  written things is not.
+- **A staged note's entitlement cannot be checked when it is written**, because
+  its loan does not exist. What is stored is a claim on a transaction hash,
+  honoured by `resolveStagedNote` only if that transaction turns out to have
+  produced the claimant's own loan. Every other kind is checked against the
+  indexed record, and the author always comes from `request.auth.uid`.
+- **Nothing is ever required.** A mandatory purpose turns a working borrow flow
+  into a form; a mandatory reason has owners typing "no" to get past it, which
+  is worse than the silence it replaced.
+
+**A removal reason reaches nobody by push**, and that is not an oversight:
+being removed is not a decision on anything the member asked for, so it has no
+notification (see [Notifications](#notifications)). It waits on `pool/[id]`
+until they next open it — still more than the nothing they were told before.
+
+Deliberately absent, so it is not re-proposed: no editing, no deletion, no
+threads or replies, no notes on contributions, withdrawals or repayments, no
+moderation, and no note anywhere in the protocol.
+
 ## Activity feeds
 
 `ActivityRow` takes a `perspective`, and picking the wrong one marks money the
