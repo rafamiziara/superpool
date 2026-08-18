@@ -23,6 +23,7 @@ export {
   listBorrowerHistories,
   listContributions,
   listInterestClaims,
+  listLoanDecisions,
   listLoanRepayments,
   listLoans,
   listMembers,
