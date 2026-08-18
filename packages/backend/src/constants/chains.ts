@@ -123,6 +123,34 @@ export const getChainConfig = (chainId: number): ChainConfig | undefined => {
   return SUPPORTED_CHAINS.find((chain) => chain.chainId === chainId)
 }
 
+/**
+ * What a chain's own coin is called.
+ *
+ * A property of the **chain**, never of the pool — which is why a native pool
+ * deliberately stores no `tokenSymbol`, and why writing one would put POL on a
+ * Base pool. The values mirror the app's `SUPPORTED_CHAINS`, which takes them
+ * from viem's chain definitions; the two must agree, because a figure the
+ * backend labels differently from the screen showing it is worse than an
+ * unlabelled one.
+ *
+ * A chain nobody listed falls back to POL rather than throwing: this is a
+ * label, and a missing one must not be able to fail a request. Add a chain
+ * here when it becomes servable.
+ */
+const NATIVE_SYMBOLS: Record<number, string> = {
+  1: 'ETH',
+  56: 'BNB',
+  137: 'POL',
+  8453: 'ETH',
+  42161: 'ETH',
+  80002: 'POL',
+  // Hardhat's node forks Amoy in `node:fork`, so its coin is POL rather than
+  // the ETH a bare Hardhat chain would report.
+  31337: 'POL',
+}
+
+export const nativeSymbolFor = (chainId: number): string => NATIVE_SYMBOLS[chainId] ?? 'POL'
+
 /** For log lines and error messages that want to list what *is* served. */
 export const SUPPORTED_CHAIN_IDS: number[] = SUPPORTED_CHAINS.map((chain) => chain.chainId)
 

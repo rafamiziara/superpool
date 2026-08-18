@@ -153,3 +153,22 @@ export const NOTES_COLLECTION = 'notes'
  * to nothing.
  */
 export const STAGED_NOTES_COLLECTION = 'staged_notes'
+
+/**
+ * The name of the Firestore collection used to store loan assessments — what
+ * the assistant made of one request, for the owner deciding on it.
+ *
+ * One document per loan, keyed on the loan's own document id, because an
+ * assessment is about a loan rather than about an event and there is only ever
+ * one current reading of it. Recomputing writes a new one and keeps the last
+ * few, unlike `notes`: nobody said this, so there is nothing to preserve — but
+ * an owner who recomputes should be able to see that it changed.
+ *
+ * Closed to clients in both directions, and read through `getAssessment` by
+ * the **pool's owner alone**. Narrower than notes deliberately: a note is a
+ * sentence a person stood behind and the person it is about deserves to read
+ * it, where this is a machine's reading of somebody's record, and showing it
+ * to them turns a lending decision into an argument with a model nobody can
+ * answer.
+ */
+export const ASSESSMENTS_COLLECTION = 'assessments'

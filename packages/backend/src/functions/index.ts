@@ -1,4 +1,5 @@
 export * from './app-check'
+export * from './assessments'
 export * from './auth'
 export * from './events'
 export * from './notes'

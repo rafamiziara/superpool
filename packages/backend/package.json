@@ -21,6 +21,7 @@
     "testDefaults": "ts-node scripts/testDefaults.ts",
     "testNotes": "ts-node scripts/testNotes.ts",
     "testAgentSeam": "ts-node scripts/testAgentSeam.ts",
+    "testAssessment": "ts-node scripts/testAssessment.ts",
     "test": "jest",
     "format": "prettier --write . --ignore-path ../../.prettierignore",
     "type-check": "tsc --noEmit",

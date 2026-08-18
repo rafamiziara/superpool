@@ -24,13 +24,22 @@ import { logger } from 'firebase-functions/v2'
 const TOKEN_TTL_SECONDS = 60
 
 /**
- * How long to wait before giving up.
+ * How long to wait before giving up — and it is **not one number**.
  *
- * Short on purpose. A caller is a Cloud Function with a person waiting on the
- * other end of it, and "the assistant is not available" arrives faster and
- * reads better than a timeout.
+ * The probe and the assessment want opposite things, which a single timeout
+ * got wrong in a way only a live run showed: `ping` calls no model and should
+ * fail fast, while an assessment waits on one and routinely needs longer than
+ * ten seconds. Sharing a ten-second bound made a working model call look like
+ * an unreachable agent, intermittently — the worst shape of bug, because the
+ * fallback path it lands in is silent by design.
  */
-const REQUEST_TIMEOUT_MS = 10_000
+const PING_TIMEOUT_MS = 10_000
+
+/**
+ * Bounded under `assessLoan`'s own `timeoutSeconds`, so this fires first and
+ * the caller gets "no assessment available" rather than a dead callable.
+ */
+const ASSESSMENT_TIMEOUT_MS = 90_000
 
 export interface AgentServiceConfig {
   baseUrl: string
@@ -69,7 +78,7 @@ export function signServiceToken(secret: string): string {
   return jwt.sign({ sub: 'superpool-backend' }, secret, { expiresIn: TOKEN_TTL_SECONDS, algorithm: 'HS256' })
 }
 
-function clientFor(config: AgentServiceConfig): MastraClient {
+export function clientFor(config: AgentServiceConfig, timeoutMs: number): MastraClient {
   return new MastraClient({
     baseUrl: config.baseUrl,
     headers: { Authorization: `Bearer ${signServiceToken(config.secret)}` },
@@ -77,7 +86,7 @@ function clientFor(config: AgentServiceConfig): MastraClient {
     // timeout is just a longer timeout — the sweep-and-retry patterns this
     // backend uses elsewhere exist for indexing, which nobody is watching.
     retries: 0,
-    abortSignal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+    abortSignal: AbortSignal.timeout(timeoutMs),
   })
 }
 
@@ -112,7 +121,7 @@ export async function pingAgentService(echo: string): Promise<AgentPingResult> {
   const startedAt = Date.now()
 
   try {
-    const run = await clientFor(config).getWorkflow('pingWorkflow').createRun()
+    const run = await clientFor(config, PING_TIMEOUT_MS).getWorkflow('pingWorkflow').createRun()
     const outcome = await run.startAsync({ inputData: { echo } })
 
     if (outcome.status !== 'success') {
@@ -124,6 +133,90 @@ export async function pingAgentService(echo: string): Promise<AgentPingResult> {
     const reason = error instanceof Error ? error.message : String(error)
 
     logger.warn('The agent service did not answer', { baseUrl: config.baseUrl, reason })
+
+    return { status: 'unreachable', reason }
+  }
+}
+
+/**
+ * What the assessment workflow is sent.
+ *
+ * Mirrors `assessmentFactsSchema` in `packages/agents`, which validates it at
+ * the HTTP boundary — so a drift between these two shapes is a 400 naming the
+ * field, not a confident judgement about `undefined`. Every figure is in whole
+ * units of the pool's asset; see `gatherFacts`.
+ */
+export interface AgentAssessmentFacts extends Record<string, unknown> {
+  request: { amount: number; termDays: number; interestRatePercent: number; repaymentTotal: number; purpose?: string }
+  pool: { name: string; symbol: string; liquidity: number; maxLoanAmount: number; pendingRequests: number }
+  borrower: {
+    isNew: boolean
+    total: number
+    repaid: number
+    onTime: number
+    late: number
+    undated: number
+    outstanding: number
+    overdue: number
+    defaulted: number
+  }
+}
+
+/**
+ * What the assessment workflow returns, when it returns.
+ *
+ * Mirrors `assessmentSchema` in `packages/agents`. Duplicated rather than
+ * imported: the two packages talk over HTTP and one is ESM, so the schema on
+ * the wire is the contract — and Mastra validates the *input* half of it at the
+ * boundary, which is where a mismatch would actually be caught.
+ */
+export interface AgentAssessment {
+  risk: 'low' | 'medium' | 'high'
+  summary: string
+  observations: string[]
+  questions: string[]
+  limitations: string[]
+}
+
+export type AssessResult =
+  | { status: 'ok'; assessment: AgentAssessment }
+  | { status: 'unreachable'; reason: string }
+  | { status: 'not-configured' }
+
+/**
+ * Ask the agent to read one loan request.
+ *
+ * Never throws, for the same reason `pingAgentService` does not: the approvals
+ * queue worked before this existed and has to keep working while the agent is
+ * down. A caller gets a state to act on rather than an exception to handle.
+ *
+ * **A failed run does not explain itself across the wire.** Mastra returns the
+ * status and an opaque error; the reason — a missing provider key, a rate
+ * limit, a model refusal — is in the agent service's own logs. Worth knowing
+ * before going looking for it here.
+ */
+export async function assessLoanWithAgent(facts: AgentAssessmentFacts): Promise<AssessResult> {
+  const config = agentServiceConfig()
+
+  if (!config) return { status: 'not-configured' }
+
+  try {
+    const run = await clientFor(config, ASSESSMENT_TIMEOUT_MS).getWorkflow('assessLoanWorkflow').createRun()
+    const outcome = await run.startAsync({ inputData: facts })
+
+    if (outcome.status !== 'success') {
+      logger.warn('The assessment workflow did not succeed; its reason is in the agent service logs', {
+        status: outcome.status,
+      })
+
+      return { status: 'unreachable', reason: `The assessment ended as ${outcome.status}` }
+    }
+
+    return { status: 'ok', assessment: outcome.result as AgentAssessment }
+  } catch (error) {
+    const reason = error instanceof Error ? error.message : String(error)
+
+    logger.warn('The agent service did not answer an assessment', { baseUrl: config.baseUrl, reason })
 
     return { status: 'unreachable', reason }
   }

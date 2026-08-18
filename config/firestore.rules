@@ -197,6 +197,21 @@ service cloud.firestore {
       allow read, write: if false; // backend-only (saveNote / listNotes)
     }
 
+    // --- assessments -------------------------------------------------------
+    // What the assistant made of a loan request. Closed in both directions and
+    // read through `getAssessment` by the **pool's owner alone** — narrower
+    // than notes, deliberately. A note is a sentence a person wrote and stood
+    // behind, so the person it is about deserves to read it; this is a
+    // machine's reading of somebody's record, and showing it to them turns a
+    // lending decision into an argument with a model nobody can answer for.
+    //
+    // Nothing in the protocol, the indexer or an eligibility check may read
+    // one either. It is advice for one person, and never a gate.
+
+    match /assessments/{loanId} {
+      allow read, write: if false; // backend-only (assessLoan / getAssessment)
+    }
+
     // --- staged_notes ------------------------------------------------------
     // A loan purpose waiting for its loan to exist. Written by `saveNote`,
     // moved onto the loan by the indexer and deleted in the same pass. Closed

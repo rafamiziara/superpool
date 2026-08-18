@@ -455,6 +455,122 @@ export interface LoanRepaymentInfo {
  * queue, which shows one card per pending request and needs a record for each.
  * Asking per wallet would be a round trip per card.
  */
+/**
+ * What the assistant made of one loan request.
+ *
+ * **Advisory, and never load-bearing.** Nothing in the protocol, the indexer or
+ * an eligibility check may read one to decide anything; if an assessment ever
+ * gates `approveLoan`, the design is wrong. The pool owner decides, and this
+ * exists to do the reading they have no time for when six requests are waiting.
+ *
+ * Read by the pool's owner alone — narrower than a note, deliberately. See
+ * `.dev/features/AI_ASSESSMENT_PLAN.md` §7.
+ */
+export interface AssessmentInfo {
+  /** `${chainId}-${poolId}-${loanId}` — the loan's own id, and the document's. */
+  id: string
+  chainId: number
+  poolId: number
+  loanId: number
+  /**
+   * A band, never a score.
+   *
+   * Three values that cannot be averaged, sorted or thresholded into a gate. A
+   * 0–100 number would invite arithmetic nobody validated and would read as a
+   * credit rating, which is the product this deliberately is not.
+   */
+  risk: 'low' | 'medium' | 'high'
+  /** One sentence, the first thing the owner reads. */
+  summary: string
+  /** What a careful reader would notice. Empty when the request is unremarkable. */
+  observations: string[]
+  /** Worth asking the borrower before deciding. The reply happens off this screen. */
+  questions: string[]
+  /** What the assistant could not see. Never empty — it is reading numbers. */
+  limitations: string[]
+  /**
+   * The figures it was computed from.
+   *
+   * Stored beside the answer so a surprising assessment can be explained, and
+   * so the screen can tell a **stale** one from a current one: `approveLoan`
+   * checks liquidity at approval, not at request time, so a reading taken when
+   * the pool held 500 and read a week later — when it holds 5 — is describing a
+   * pool that no longer exists.
+   */
+  inputs: AssessmentInputs
+  /** ISO 8601. */
+  createdAt: string
+  /**
+   * Earlier readings of the same loan, newest first, capped.
+   *
+   * Unlike a note this is not write-once: nobody said it, so there is nothing
+   * to preserve. But an owner who recomputes should be able to see that it
+   * changed rather than wonder whether they misremembered.
+   */
+  history?: AssessmentSummary[]
+}
+
+/** The facts an assessment was made from, as they stood when it was made. */
+export interface AssessmentInputs {
+  /** Whole units of the pool's asset, e.g. `50` for 50 USDC. */
+  amount: number
+  /** What the pool could lend at that moment, in whole units. */
+  liquidity: number
+  /** What the pool lends. */
+  symbol: string
+  /** True when the borrower had stated a purpose. The text is not copied here. */
+  hadPurpose: boolean
+  /** The borrower's record as it stood, so a changed count is visible. */
+  borrower: BorrowerHistory
+}
+
+/** An earlier reading, kept short — the full one is not worth storing twice. */
+export interface AssessmentSummary {
+  risk: 'low' | 'medium' | 'high'
+  summary: string
+  createdAt: string
+}
+
+export interface AssessLoanRequest {
+  chainId?: number
+  /** The loan to read: `${chainId}-${poolId}-${loanId}`. */
+  loanId: string
+  /**
+   * Read it again even though one is stored.
+   *
+   * The owner's explicit action, never automatic — an assessment is stored
+   * once precisely so a decision surface does not say something different each
+   * time it is opened.
+   */
+  refresh?: boolean
+}
+
+export interface AssessLoanResponse {
+  /**
+   * The assessment, or nothing.
+   *
+   * Absent is a real answer rather than an error: the agent service is an
+   * optional dependency of this backend, and the approvals queue worked before
+   * it existed and has to keep working while it is down. `unavailable` says
+   * which of those happened.
+   */
+  assessment?: AssessmentInfo
+  /** Present only when there is no assessment. */
+  unavailable?: 'not-configured' | 'unreachable' | 'unsupported-denomination'
+  /** True when the answer came from storage rather than from a fresh reading. */
+  cached: boolean
+}
+
+export interface GetAssessmentRequest {
+  chainId?: number
+  loanId: string
+}
+
+export interface GetAssessmentResponse {
+  /** Absent when nobody has asked for one yet, or when the caller may not read it. */
+  assessment?: AssessmentInfo
+}
+
 export interface ListBorrowerHistoriesRequest {
   chainId?: number
   /** Wallets to summarise. Matched case-insensitively, capped by the backend. */
