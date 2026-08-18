@@ -4,7 +4,7 @@ import { render } from '../../__tests__/test-utils'
 import { BorrowerHistoryPanel } from './BorrowerHistoryPanel'
 
 function makeHistory(overrides: Partial<BorrowerHistory> = {}): BorrowerHistory {
-  return { total: 0, repaid: 0, onTime: 0, late: 0, undated: 0, outstanding: 0, overdue: 0, isNew: true, ...overrides }
+  return { total: 0, repaid: 0, onTime: 0, late: 0, undated: 0, outstanding: 0, overdue: 0, defaulted: 0, isNew: true, ...overrides }
 }
 
 function renderPanel(history: Partial<BorrowerHistory> = {}, voice: 'owner' | 'self' = 'owner') {

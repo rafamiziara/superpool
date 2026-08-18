@@ -108,15 +108,19 @@ wallet with no loans reads as **new** and never as bad.
 
 `src/services/pushNotifications.ts` obtains an Expo push token and registers it
 with the backend; `src/components/NotificationListener.tsx` turns an arriving
-notification into a toast and a tap into a deep link (`pool/approvals`,
-`pool/members`).
+notification into a toast and a tap into a deep link. The two owner-facing kinds
+open the queue to act on (`pool/approvals`, `pool/members`); every
+borrower-facing kind opens `pool/[id]`, deliberately and not a deeper screen —
+what a borrower does next depends on the news, and the pool page is where all of
+those start.
 
 Three things not to change without reading the Notifications section in
 [`CLAUDE.md`](../../CLAUDE.md):
 
 - **Permission is asked in exactly one place** — after a pool is created. It is
-  a one-shot on iOS, and only owner-facing notifications exist, so prompting an
-  asker would spend it on a channel that delivers them nothing.
+  a one-shot on iOS, and it is asked where the user has just built an
+  expectation of being told something; prompting an asker would spend it before
+  they have any reason to want it.
 - **The token is given back on disconnect _and_ on a wallet switch**
   (`WalletListener`), or the next wallet on the device receives the previous
   one's requests.
@@ -153,6 +157,12 @@ Post-login screens live under `app/(auth)/`:
   on the owner, or borrow — sent as `createLoan` or `requestLoan` depending on the pool
 - **`pool/approvals`** - Owner only. The queue of loan requests, approved or declined one at a
   time, since two signature prompts from one wallet race for a nonce
+- **`pool/overdue`** - Owner only. Every loan past its due date, longest-overdue first, with what
+  is owed read from the chain per card. Marking one in default sits behind a confirmation whose
+  copy is a list of things it does _not_ do — the debt stays, interest keeps accruing, nothing is
+  seized. **Being late and being in default are different questions**, and the screen keeps them
+  apart in as many words; see
+  [`docs/LOANS.md`](../../docs/LOANS.md#late-and-in-default-are-different-questions)
 - **`pool/settings`** - Owner only. Whether this pool reviews requests before lending
 
 The activity feed is signed from the pool's side on `pool/[id]` and from the

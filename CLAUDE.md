@@ -560,12 +560,46 @@ conversion rather than from `startTime`. In the index that shows up as an
 `PoolStore.accruedInterestNow` projects the indexed snapshot for display and
 runs on the device clock. Anything about to send money reads the chain.
 
+**Late and in default are different questions, and conflating them is the bug.**
+_Overdue_ is `startedAt + duration` against a clock — arithmetic, true of plenty
+of loans nobody minds about, and **stored nowhere**, because anyone can work it
+out. _In default_ is the owner saying so: `markDefaulted`, owner-only, stamped
+with `defaultedAt`. The chain records what only the chain can witness.
+
+A declaration is a **label, not an ending**, and five things follow that are
+each their own silent bug if missed:
+
+- **A defaulted loan is still an open debt.** `outstandingBalance`,
+  `loanBalance`, `_repay`, `listLoans`'s `activeOnly` and
+  `PoolStore.activeLoanFor` all admit it. Gating any of them on `Disbursed`
+  alone reports the debt as **zero** and takes it off the borrower's repay
+  screen at the moment it was declared.
+- **Interest keeps accruing**, at the same uncapped rate. There is no penalty
+  rate and no liquidation; nothing is seized, because there is no collateral.
+- **The borrower's `activeLoanId` is not released.** `rejectLoan` frees it
+  because a request took nothing; this has money out, and freeing it would let a
+  defaulter borrow again from the pool they are in default to.
+- **There is no `unmarkDefaulted`.** A loan paid off afterwards keeps
+  `Defaulted` and gains `isRepaid` — that pair is what "recovered" means, and it
+  is a different fact from never having been late.
+- **`defaultGracePeriod` is `poolConfig`-shaped in spirit: read it from the
+  chain, never from an indexed record.** Owner-settable, zero by default, and
+  `defaultableAt(loanId)` is the date a screen should quote.
+
+`sendDueReminders` is the only scheduled notification in the project — a term
+lapsing emits no event — and it **judges on chain time, not server time**. One
+`getBlock('latest')` per chain per run; comparing a block timestamp against
+`Date.now()` reports every loan on a local node as comfortably inside its term.
+At most one due-soon and one overdue reminder per loan, ever.
+
 Borrowing history — what this project has instead of a reputation score — is in
 the same document. `repaidAt` is the fact it is made of, and **zero means "no
 date", never 1970**: on a loan that is still running, and on one settled before
 the field existed. Two rules follow from it and are easy to get wrong: a
 repayment with no date is neither on time nor late, and a wallet with no loans
-is a **new** borrower rather than the worst kind. There is no score, deliberately.
+is a **new** borrower rather than the worst kind. There is no score, deliberately. `BorrowerHistory.defaulted` counts declarations
+over a wallet's whole record, settled or not; **nothing gates on it**, and the
+enforcing half stays unbuilt on purpose.
 
 ## Interest
 
@@ -730,12 +764,20 @@ JS SDK is web-only, so the alternative was a second, native Firebase SDK beside
 the one the app already uses. The backend gains no messaging dependency — it
 POSTs to `exp.host`. `messagingSenderId` in the mobile Firebase config is inert.
 
-Only two notifications exist, both **owner-facing**: somebody asked to join, and
-somebody asked to borrow. They are the ones that cost the asker nothing to make
-and the owner everything to miss. Plan and the reasoning for what is left out:
+Notifications come in three groups. Two are **owner-facing** — somebody asked to
+join, somebody asked to borrow — and they are the reason the feature exists: they
+cost the asker nothing to make and the owner everything to miss. Five are
+**borrower-facing** answers to those questions (`loan_approved`,
+`loan_rejected`, `loan_defaulted`, `membership_approved`,
+`membership_rejected`). Two more come from the **clock** rather than from anyone
+(`loan_due_soon`, `loan_overdue`); see [Loans](#loans). Plan and the reasoning
+for what is left out:
 [`.dev/features/NOTIFICATIONS_PLAN.md`](.dev/features/NOTIFICATIONS_PLAN.md).
 
-Four rules that are easy to break:
+Deliberately absent: being **removed** from a pool, which is not a decision on
+anything the member asked for, and **leaving**, which is self-authored.
+
+Five rules that are easy to break:
 
 - **`stored` is not news.** The loan indexer rewrites a document when only its
   transaction reference moved to an earlier block, so triggering on `stored`
@@ -756,10 +798,21 @@ Four rules that are easy to break:
   when joining or borrowing: those askers have no notifications yet, so the
   prompt would buy a channel that delivers them nothing.
 
+- **A rejection and a cancellation are the same state.** `cancelLoanRequest`
+  emits `LoanRejected` and leaves the loan exactly as `rejectLoan` does, so the
+  record cannot tell them apart and the **transaction's sender** has to —
+  `notifyLoanDecided` reads it, on the rejected path only, and fails closed. A
+  borrower told they were declined when they withdrew it themselves is worse
+  than silence. For the same reason the loan indexer reports `approved` and
+  `disbursed` as different transitions: both end at `disbursed`, but only one is
+  an answer to somebody.
+
 Dispatch is wired into `indexLoanFromLog` / `indexMembershipFromLog` rather than
 the callables, so the sweep notifies too — a request made while the app was
 closed is exactly the one the owner needs. Failures there are swallowed:
-indexing is the job, push is an enhancement.
+indexing is the job, push is an enhancement. The two clock-driven reminders are
+the exception: they come from `sendDueReminders`, a schedule, because nothing on
+chain fires when a term lapses.
 
 **Not verified end to end.** The emulator does not deliver push; the last mile
 needs a dev build, an APNs key and an FCM v1 service account uploaded to EAS.

@@ -8,7 +8,7 @@ const BORROWER = '0x15d34aaf54267db7d7c367839aaf71a00a2c6a65'
 
 /** A wallet nobody has lent to, which is what most fixtures want. */
 function makeHistory(overrides: Partial<BorrowerHistory> = {}): BorrowerHistory {
-  return { total: 0, repaid: 0, onTime: 0, late: 0, undated: 0, outstanding: 0, overdue: 0, isNew: true, ...overrides }
+  return { total: 0, repaid: 0, onTime: 0, late: 0, undated: 0, outstanding: 0, overdue: 0, defaulted: 0, isNew: true, ...overrides }
 }
 
 function makeRequest(overrides: Partial<LoanInfo> = {}): LoanInfo {

@@ -1,4 +1,5 @@
 import { NotificationData } from '@superpool/types'
+import { Provider } from 'ethers'
 import { Firestore } from 'firebase-admin/firestore'
 import { logger } from 'firebase-functions/v2'
 import { POOLS_COLLECTION } from '../constants'
@@ -9,14 +10,22 @@ import { notificationKey, notifyOnce } from './notifications'
 /**
  * Which transitions are worth a push, and to whom.
  *
- * Deliberately only two, both owner-facing: somebody asked to join, and
- * somebody asked to borrow. They are the ones that cost the asker nothing to
- * make and the owner everything to miss — everything an owner is supposed to do
+ * **Owner-facing**, and the reason any of this exists: somebody asked to join,
+ * and somebody asked to borrow. They cost the asker nothing to make and the
+ * owner everything to miss, and everything an owner is supposed to do
  * otherwise depends on them opening the pool and looking.
  *
- * The borrower-facing ones (approved, rejected, repayment reminders) are
- * courtesies and a product decision respectively, and are not built. See
- * `.dev/NOTIFICATIONS_PLAN.md` §8.
+ * **Borrower-facing**: the answers to those two questions, and the declaration
+ * of a default. Courtesies, but ones with a decision behind them — a request
+ * that is answered silently is indistinguishable from one that was ignored.
+ *
+ * Two are deliberately absent. **Being removed from a pool** is not a decision
+ * on anything the member asked for, and reaches them through the pool screen
+ * rather than a push. **Leaving** is self-authored, like cancelling a request:
+ * nobody needs telling what they just did.
+ *
+ * The reminders that come from the clock rather than from an event are in
+ * `dueReminders.ts`; nothing on chain fires when a term lapses.
  */
 
 interface PoolSummary {
@@ -137,6 +146,165 @@ async function poolSummary(chainId: number, poolId: number, firestore: Firestore
   if (!data.poolOwner) return null
 
   return { poolOwner: data.poolOwner as string, name: (data.name as string) || `pool #${poolId}` }
+}
+
+/**
+ * Tell a borrower what happened to the request or the debt they were waiting on.
+ *
+ * Three transitions, all reaching the same wallet: the owner approved, the
+ * owner refused, or the owner declared the debt in default.
+ *
+ * The provider is here for one reason, and it is the trap this whole function
+ * is shaped around — see `wasSelfAuthored`.
+ */
+export async function notifyLoanDecided(
+  result: IndexLoanResult,
+  loan: ParsedLoan,
+  provider: Provider,
+  firestore: Firestore
+): Promise<void> {
+  const kind = DECIDED_KINDS[result.transition as keyof typeof DECIDED_KINDS]
+
+  if (!kind) return
+
+  // `cancelLoanRequest` emits `LoanRejected` and leaves the loan in exactly the
+  // state `rejectLoan` does — deliberately, since the record tracks the state
+  // and not who ended the request. So the state cannot tell the two apart and
+  // the *sender* has to: telling a borrower their request was declined when
+  // they withdrew it themselves is worse than saying nothing.
+  if (result.transition === 'rejected' && (await wasSelfAuthored(loan, provider))) {
+    logger.info('Skipping notification for a request its borrower withdrew', {
+      poolId: loan.poolId,
+      loanId: loan.loanId,
+    })
+
+    return
+  }
+
+  const pool = await poolSummary(loan.chainId, loan.poolId, firestore)
+
+  if (!pool) return
+
+  // An owner borrowing from their own pool decided this themselves.
+  if (isSameAddress(pool.poolOwner, loan.borrower)) {
+    logger.info('Skipping self-authored loan decision notification', { poolId: loan.poolId, borrower: loan.borrower })
+
+    return
+  }
+
+  const data: NotificationData = {
+    kind,
+    poolId: String(loan.poolId),
+    poolName: pool.name,
+    actor: loan.borrower,
+    loanId: String(loan.loanId),
+  }
+
+  await notifyOnce(notificationKey(result.id, kind), loan.borrower, { ...LOAN_DECISION_COPY[kind](pool.name), data }, firestore)
+}
+
+/**
+ * Tell an applicant whether they are in.
+ *
+ * Only the two outcomes of a decision. Reaching `active` from nothing is
+ * `MemberJoined` — an open pool enrolling whoever deposited — and the
+ * membership indexer already reports that as no transition at all, so a
+ * depositor is never congratulated on being admitted to a pool that admits
+ * everybody.
+ */
+export async function notifyMembershipDecided(
+  result: IndexMembershipResult,
+  membership: ParsedMembership,
+  firestore: Firestore
+): Promise<void> {
+  const kind = MEMBERSHIP_KINDS[result.transition as keyof typeof MEMBERSHIP_KINDS]
+
+  if (!kind) return
+
+  const pool = await poolSummary(membership.chainId, membership.poolId, firestore)
+
+  if (!pool) return
+
+  if (isSameAddress(pool.poolOwner, membership.account)) {
+    logger.info('Skipping self-authored membership decision notification', {
+      poolId: membership.poolId,
+      account: membership.account,
+    })
+
+    return
+  }
+
+  const data: NotificationData = {
+    kind,
+    poolId: String(membership.poolId),
+    poolName: pool.name,
+    actor: membership.account,
+  }
+
+  const body = kind === 'membership_approved' ? `You are now a member of ${pool.name}.` : `Your request to join ${pool.name} was declined.`
+
+  await notifyOnce(
+    notificationKey(result.id, kind),
+    membership.account,
+    { title: kind === 'membership_approved' ? 'Request approved' : 'Request declined', body, data },
+    firestore
+  )
+}
+
+/** Loan transitions that are an answer to the borrower, by the kind they send. */
+const DECIDED_KINDS = {
+  approved: 'loan_approved',
+  rejected: 'loan_rejected',
+  defaulted: 'loan_defaulted',
+} as const
+
+/** Membership transitions that are a decision, by the kind they send. */
+const MEMBERSHIP_KINDS = {
+  active: 'membership_approved',
+  rejected: 'membership_rejected',
+} as const
+
+const LOAN_DECISION_COPY: Record<
+  (typeof DECIDED_KINDS)[keyof typeof DECIDED_KINDS],
+  (poolName: string) => { title: string; body: string }
+> = {
+  loan_approved: (poolName) => ({ title: 'Loan approved', body: `${poolName} approved your loan and sent the funds.` }),
+  loan_rejected: (poolName) => ({ title: 'Loan declined', body: `${poolName} turned down your loan request.` }),
+  // Says what is true and what to do, rather than only that something bad
+  // happened: the debt is still open and paying it is still the way out.
+  loan_defaulted: (poolName) => ({
+    title: 'Loan marked in default',
+    body: `${poolName} marked your loan as in default. It is still owed, and interest is still accruing.`,
+  }),
+}
+
+/**
+ * Whether the borrower sent the transaction that produced this state.
+ *
+ * The one question the indexed record cannot answer, because `rejectLoan` and
+ * `cancelLoanRequest` leave it identical. Costs one `getTransaction`, asked
+ * only on the rejected path rather than for every loan event.
+ *
+ * **Fails closed on an unreachable node**: an unknown sender is treated as the
+ * borrower and nothing is sent. A missed courtesy is cheaper than telling
+ * somebody they were refused when they changed their own mind, and the claim
+ * is never made, so a later sweep can still send it.
+ */
+async function wasSelfAuthored(loan: ParsedLoan, provider: Provider): Promise<boolean> {
+  try {
+    const transaction = await provider.getTransaction(loan.transactionHash)
+
+    if (!transaction) return true
+
+    return isSameAddress(transaction.from, loan.borrower)
+  } catch (error) {
+    logger.warn('Could not read the sender of a loan rejection; staying quiet', {
+      transactionHash: loan.transactionHash,
+      error: error instanceof Error ? error.message : String(error),
+    })
+
+    return true
+  }
 }
 
 /**

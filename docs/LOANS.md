@@ -125,7 +125,7 @@ transaction of a loan that has since been approved and repaid correctly writes
 ## `LoanStatus` is an on-chain enum, and its order is load-bearing
 
 ```solidity
-enum LoanStatus { Disbursed, Requested, Rejected }
+enum LoanStatus { Disbursed, Requested, Rejected, Defaulted }
 ```
 
 **`Disbursed` is ordinal 0 on purpose.** A struct field that did not exist reads
@@ -134,23 +134,24 @@ what they all were. Reordering the enum silently relabels history. A contract
 test pins it, and the backend's `LOAN_STATUS` array must track the Solidity enum
 by index.
 
+`Defaulted` was **appended** for the same reason, and appending is the only safe
+place for it: the three before it keep their ordinals, so no stored loan is
+relabelled.
+
 A rejection and a cancellation both land on `Rejected`: the record tracks where
 the request ended up, not who ended it.
 
-## The contract still implements less than the UI describes
+## The contract implements what the UI describes
 
-`Loan` in `@superpool/types` is nearly the shape the app always described. One
-gap remains:
+`Loan` in `@superpool/types` is now the shape the app always described.
+`repaidAt` stopped being a gap with borrowing history, `amountRepaid` with
+[instalments](#paying-in-instalments), `interestAccrued` with
+[accrual](#interest-accrues), and `DEFAULTED` with
+[default handling](#late-and-in-default-are-different-questions).
 
-| The app's model        | The contract                                                       |
-| ---------------------- | ------------------------------------------------------------------ |
-| `dueDate`, `DEFAULTED` | `startTime + duration` is stored; **nothing on chain enforces it** |
-
-`repaidAt` stopped being one of them with borrowing history, `amountRepaid` with
-[instalments](#paying-in-instalments), and `interestAccrued` with
-[accrual](#interest-accrues). Note the last one does not make the term
-_enforced_ — nothing marks a loan defaulted — it only makes running late cost
-money.
+`dueDate` is still the one thing the contract does **not** store, and
+deliberately: it is `startTime + duration`, so anyone with a clock can work it
+out. See the section below for why that distinction is the whole design.
 
 `LoanStatus.APPROVED` never occurs either: approval disburses in the same
 transaction, so an approved loan is already `DISBURSED`.
@@ -182,6 +183,114 @@ disbursed rather than pretending to know them.
 [Interest accrues](#interest-accrues). `BorrowForm` states the cost of the full
 term before the user signs, which is a ceiling a borrower can beat rather than a
 fixed price.
+
+## Late and in default are different questions
+
+The one place this document most rewards reading slowly, because conflating the
+two is how a screen ends up branding a borrower who is three days late.
+
+- **Overdue** is arithmetic. `startTime + duration` against a clock, true the
+  second the term lapses, true of plenty of loans nobody minds about, and
+  **nothing on chain records it** — there is no due-date field, no keeper, no
+  event when a term passes. It needs no transaction because anyone can work it
+  out.
+- **In default** is the pool owner _saying so_. `markDefaulted`, owner-only, a
+  judgement made at a moment and put on the public record where a later lender
+  can read it against the same borrower's history.
+
+That asymmetry is the design: **the chain stores what only the chain can
+witness.** A date anybody can compute is computed; a decision somebody made is
+recorded, with `defaultedAt` stamping when.
+
+### A declaration is a label, not an ending
+
+Everything about the debt survives it, and each of these is a place where the
+obvious implementation is wrong:
+
+- **The money is still owed.** `outstandingBalance`, `outstandingBalanceAt` and
+  `loanBalance` all admit a defaulted loan. They used to be gated on `Disbursed`
+  alone, and leaving them that way would have reported the debt as **zero** the
+  moment it was declared — telling a borrower it had vanished and handing the
+  repay screen nothing to send.
+- **Interest goes on accruing**, at the same uncapped rate. A default changes
+  nothing about how long the money has been out. It is not a penalty rate, and
+  there is no penalty rate.
+- **`repayLoan` still takes payment.** Refusing it would make declaring a
+  default the act that forgave it.
+- **The borrower's `activeLoanId` is still held.** `rejectLoan` frees the slot
+  because a refused request never took anything; this one has money out, and
+  freeing it would let a defaulter open a second loan at the pool they are
+  already in default to.
+- **Nothing is seized.** There is no collateral in this project, so there is
+  nothing a default could take. An owner reaching for the button expecting
+  recovery is the reader the confirmation copy is written for.
+
+### It cannot be undone, and paying is what recovery looks like
+
+There is no `unmarkDefaulted`, so the record says what actually happened. A loan
+settled after a declaration keeps `Defaulted` **and** gains `isRepaid` — and
+that pair is what "recovered" means. It is a different fact from never having
+been late, and a more useful one to a later lender than either half alone.
+`PoolStore` maps such a loan's status to `REPAID` and keeps `defaultedAt`
+beside it, which is why the app's `Loan` carries both.
+
+### The grace period is the owner's own promise
+
+`defaultGracePeriod`, owner-only, **zero by default** — the same retrofit as
+`Disbursed = 0` and `requiresApproval = false`, so a pool that predates it may
+be acted on the moment a term lapses. It bounds the _owner_, not the borrower:
+interest has been accruing since the due date either way, so lengthening it
+costs the borrower nothing and buys them a promise they can check.
+
+`defaultableAt(loanId)` returns `startTime + duration + defaultGracePeriod`, so
+a screen states the date rather than restating the arithmetic. **Read the period
+from the chain, never from an indexed pool record** — like `requiresMembership`
+and `requiresApproval`, the owner can change it at any moment and nothing
+indexes it.
+
+### What the index carries
+
+`status: 'defaulted'` and `defaultedAt`, both read from `getLoan` rather than
+from the `LoanDefaulted` log — the same rule as `repaidAt`, and for the same
+reason: the sweep sees the log on every pass forever, so a date taken from
+whichever log arrived would be rewritten by the wrong one. `defaultedAt` is on
+chain at all so that a loan first indexed _after_ it defaulted can still say
+when.
+
+`listLoans`'s `activeOnly` filters `status in ['disbursed', 'defaulted']`, since
+both are money that is out. `defaultedOnly` narrows to declarations; there is no
+`overdueOnly`, because that would be a query for something no field holds.
+
+### Where it appears in the app
+
+- **`pool/overdue.tsx`** is the owner's list — every loan past its term,
+  longest-overdue first, with `outstandingBalance` read from the chain per card
+  because the indexed snapshot is stalest on exactly these loans. The
+  declaration sits behind a confirmation whose copy is a list of things it does
+  _not_ do.
+- **`OverdueLink`** on the pool page, coral rather than the approvals queue's
+  amber: nobody is waiting on the owner, and there may be nothing to do today.
+- **`LoanDueNotice`** on the borrow screen tells the borrower, leading with the
+  cost of waiting rather than the label — that interest keeps adding up at the
+  same rate is the part they are least likely to know.
+- **`LoanDueBadge`** and `utils/lateness.ts` are the shared judgement.
+  `latenessOf` runs on the **device clock**, which is right for a badge and
+  wrong for anything about to send money.
+- **`BorrowerHistoryPanel`** counts declarations over the wallet's whole record,
+  settled or not, on a line of their own beneath the overdue one.
+
+### The reminders nobody causes
+
+`sendDueReminders` is the only scheduled notification in the project, because a
+term lapsing emits nothing. It scans open loans hourly and sends at most **one**
+due-soon and **one** overdue reminder per loan, ever — a job running against a
+standing condition would otherwise send an hour, for as long as the debt stood.
+
+**It judges on chain time, not server time.** `startedAt` is a block timestamp
+and `duration` counts chain seconds, so a due date is a fact in chain time; one
+`getBlock('latest')` per chain per run buys the right answer. On a local node
+the two clocks are unrelated — the verification script pushes the chain eight
+days ahead of the wall clock and checks the scan still finds the late loans.
 
 ## Paying in instalments
 
@@ -628,17 +737,25 @@ The default is `pool`, the only safe answer for a feed nobody has narrowed.
 - **Approval is the pool owner, not the multi-sig.** `approveLoan` and
   `rejectLoan` are `onlyOwner` on the pool, so the Safe story in `CLAUDE.md`
   still does not reach loans.
-- **No enforcement of the term.** `duration` is recorded and shown, and nothing
-  happens when it passes — there is no liquidation, no penalty, no default.
+- **A default is recorded, not enforced.** `markDefaulted` puts a judgement on
+  the record and stops there: there is no liquidation, no penalty rate, and no
+  collateral to seize. What actually presses a late borrower is accrual, which
+  charges them for the extra time.
+- **A default is the owner's decision, and nothing prompts it.** No keeper marks
+  a loan automatically, deliberately — a term lapsing is not evidence that
+  anyone considers the debt bad.
 - **A request never expires.** If the owner simply never decides, only the
   borrower's own `cancelLoanRequest` frees their slot.
 - **No minimum payment, and no schedule.** Any amount above zero is accepted,
   and nothing requires a borrower to make progress — a loan can sit part-paid
   indefinitely, holding its borrower's one slot in the pool. Its debt does keep
   growing now, which is a pressure rather than an enforcement.
-- **Nothing marks a loan defaulted.** Accrual makes lateness cost money; it does
-  not liquidate, penalise at a higher rate, or produce a `Defaulted` state. See
-  `ROADMAP.md` Phase 3.
+- **Reputation observes defaults; nothing acts on them.** `BorrowerHistory`
+  counts them, and no gate anywhere reads that count. The enforcing half is
+  deliberately unbuilt — see
+  [`.dev/features/REPUTATION_PLAN.md`](../.dev/features/REPUTATION_PLAN.md) §7.
+- **A borrower is reminded once per loan per kind, ever.** Somebody who ignores
+  the overdue push hears nothing further from the app.
 - **A loan is denominated in whatever its pool lends**, and there is no
   conversion anywhere: `amount`, `amountRepaid` and every interest figure are
   quantities of that one asset, in its own smallest unit. The exponent comes
@@ -654,6 +771,11 @@ Same environment as pool creation — see
 [`POOL_CREATION.md`](POOL_CREATION.md#running-it-locally). Borrowing needs a
 pool behind the beacon that you have contributed to; `pnpm --filter backend
 testSweep` reports loans alongside the other feeds.
+
+`pnpm --filter backend testDefaults` drives loans past their terms, declares
+them, pays one off afterwards and runs the reminder scan — 36 checks, including
+that the chain's clock and this machine's genuinely disagree and the scan
+follows the chain's.
 
 `pnpm --filter backend testAccrual` drives loans through the node and moves its
 clock — half a term, a full term, well past it, and one paid down early — then

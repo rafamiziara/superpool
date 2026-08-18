@@ -169,7 +169,13 @@ A fully upgradeable lending pool contract that demonstrates the core functionali
 - `initialize()` - Initialize the contract (replaces constructor)
 - `depositFunds()` - Add funds to the lending pool
 - `createLoan()` - Borrow funds from the pool
-- `repayLoan()` - Repay a loan with interest
+- `repayLoan()` - Repay a loan with interest, in part or in full
+- `markDefaulted()` - Declare an overdue loan in default (owner only). A label
+  on a debt that is still owed: nothing is seized, interest keeps accruing and
+  the borrower can still pay it off
+- `setDefaultGracePeriod()` - How long past a term the owner will wait before
+  declaring one (owner only, zero by default)
+- `defaultableAt()` - When a loan becomes declarable
 - `updatePoolConfig()` - Update pool parameters (owner only)
 - `pause()/unpause()` - Emergency controls (owner only)
 

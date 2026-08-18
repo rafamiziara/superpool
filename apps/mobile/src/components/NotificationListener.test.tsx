@@ -126,6 +126,32 @@ describe('NotificationListener', () => {
       expect(mockRouterPush).toHaveBeenCalledWith('/(auth)/pool/members?poolId=12')
     })
 
+    it.each(['loan_approved', 'loan_rejected', 'loan_defaulted', 'loan_due_soon', 'loan_overdue'] as const)(
+      'opens the pool for a %s notification',
+      (kind) => {
+        // Deliberately the pool and not a deeper screen. What a borrower does
+        // next depends on the news — repay, read the terms, do nothing — and
+        // the pool page is where all of those start.
+        render(<NotificationListener />)
+
+        tappedHandler()({
+          notification: buildNotification({ kind, poolId: '12', poolName: 'Builders Guild', actor: '0xabc', loanId: '3' }),
+        })
+
+        expect(mockRouterPush).toHaveBeenCalledWith('/(auth)/pool/12')
+      }
+    )
+
+    it.each(['membership_approved', 'membership_rejected'] as const)('opens the pool for a %s notification', (kind) => {
+      render(<NotificationListener />)
+
+      tappedHandler()({
+        notification: buildNotification({ kind, poolId: '12', poolName: 'Builders Guild', actor: '0xabc' }),
+      })
+
+      expect(mockRouterPush).toHaveBeenCalledWith('/(auth)/pool/12')
+    })
+
     it('goes nowhere for a payload it cannot read', () => {
       render(<NotificationListener />)
 

@@ -27,6 +27,8 @@ export {
   listWithdrawals,
   preparePoolCreation,
   registerPushToken,
+  sendDueReminders,
+  sendDueRemindersNow,
   syncPoolEvents,
   syncPoolEventsNow,
   unregisterPushToken,

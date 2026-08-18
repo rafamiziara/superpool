@@ -18,6 +18,7 @@ import {
   describeApproveError,
   describeBorrowError,
   describeCancelError,
+  describeDefaultError,
   describeRejectError,
   describeRepayError,
   describeRequestError,
@@ -457,6 +458,26 @@ describe('describeRejectError and describeCancelError', () => {
   })
 })
 
+describe('describeDefaultError', () => {
+  it('should name the grace period on LoanNotOverdue', () => {
+    // The two causes are the term not having run out and the grace period not
+    // having run out. The first is already visible — the button is only
+    // offered on a loan the app can see is late — so the message names the
+    // second.
+    expect(describeDefaultError(wrapped(revertedWith('LoanNotOverdue', 'markDefaulted')))).toMatch(/grace period/)
+  })
+
+  it('should read a race with the borrower as a settled loan, not a fault', () => {
+    // A borrower can pay while the declaration is in flight, and that is a good
+    // outcome.
+    expect(describeDefaultError(wrapped(revertedWith('LoanAlreadyRepaid', 'markDefaulted')))).toMatch(/been paid off/)
+  })
+
+  it('should read a second declaration as already made', () => {
+    expect(describeDefaultError(wrapped(revertedWith('LoanAlreadyDefaulted', 'markDefaulted')))).toMatch(/already in default/)
+  })
+})
+
 describe('useLoan requestLoan', () => {
   it('should call requestLoan with the amount, not createLoan', async () => {
     const { result } = renderHook(() => useLoan())
@@ -549,6 +570,7 @@ describe('useLoan owner decisions', () => {
     ['approveLoan', 'APPROVE_LOAN'],
     ['rejectLoan', 'REJECT_LOAN'],
     ['cancelLoanRequest', 'CANCEL_LOAN_REQUEST'],
+    ['markDefaulted', 'MARK_DEFAULTED'],
   ] as const)('should call %s with the loan id and record it as %s', async (functionName, type) => {
     const { result } = renderHook(() => useLoan())
 
@@ -560,19 +582,22 @@ describe('useLoan owner decisions', () => {
     expect(pendingTransactionsStore.transactions.find((tx) => tx.txHash === TX_HASH)).toMatchObject({ type, params: { loanId: 7 } })
   })
 
-  it.each(['approveLoan', 'rejectLoan', 'cancelLoanRequest'] as const)('should send nothing as value from %s', async (functionName) => {
-    // None of the three is payable. Approval moves money, but out of the pool's
-    // own balance — the owner is not funding it from their wallet.
-    const { result } = renderHook(() => useLoan())
+  it.each(['approveLoan', 'rejectLoan', 'cancelLoanRequest', 'markDefaulted'] as const)(
+    'should send nothing as value from %s',
+    async (functionName) => {
+      // None of the four is payable. Approval moves money, but out of the pool's
+      // own balance — the owner is not funding it from their wallet.
+      const { result } = renderHook(() => useLoan())
 
-    await act(async () => {
-      await result.current[functionName](makeDecisionParams())
-    })
+      await act(async () => {
+        await result.current[functionName](makeDecisionParams())
+      })
 
-    expect(mockWriteContractAsync).toHaveBeenCalledWith(expect.not.objectContaining({ value: expect.anything() }))
-  })
+      expect(mockWriteContractAsync).toHaveBeenCalledWith(expect.not.objectContaining({ value: expect.anything() }))
+    }
+  )
 
-  it.each(['approveLoan', 'rejectLoan', 'cancelLoanRequest'] as const)(
+  it.each(['approveLoan', 'rejectLoan', 'cancelLoanRequest', 'markDefaulted'] as const)(
     'should estimate before %s reaches the wallet',
     async (functionName) => {
       // The estimate is what catches a request someone else already decided.
@@ -615,6 +640,7 @@ describe('useLoan owner decisions', () => {
     ['approveLoan', /Connect a wallet before approving/],
     ['rejectLoan', /Connect a wallet before deciding/],
     ['cancelLoanRequest', /Connect a wallet before withdrawing/],
+    ['markDefaulted', /Connect a wallet before declaring a default/],
   ] as const)('should refuse %s without a connected wallet', async (functionName, expected) => {
     mockWagmiUseAccount.mockReturnValue({ isConnected: false, isConnecting: false, address: undefined, chainId: undefined })
     const { result } = renderHook(() => useLoan())

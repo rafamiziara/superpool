@@ -50,6 +50,7 @@ const MISSING_LOG_MESSAGE: Record<PendingTransactionType, string> = {
   APPROVE_LOAN: 'The transaction confirmed but did not record an approval',
   REJECT_LOAN: 'The transaction confirmed but did not record a decision',
   CANCEL_LOAN_REQUEST: 'The transaction confirmed but did not withdraw the request',
+  MARK_DEFAULTED: 'The transaction confirmed but did not record the default',
   REQUEST_MEMBERSHIP: 'The transaction confirmed but did not record a request to join',
   APPROVE_MEMBER: 'The transaction confirmed but did not record the new member',
   REJECT_MEMBER: 'The transaction confirmed but did not record a decision',

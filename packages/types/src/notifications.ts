@@ -41,10 +41,32 @@ export interface PushToken {
  * What a notification is about.
  *
  * Shared so the backend's payload and the mobile deep-link switch cannot drift
- * apart. Only the two owner-facing kinds exist so far — they are the ones that
- * cost the asker nothing to make and the owner everything to miss.
+ * apart.
+ *
+ * Two groups, and they exist for different reasons. The **owner-facing** pair
+ * is the reason notifications were built at all: a request costs the asker
+ * nothing to make and the owner everything to miss, and the only other way to
+ * find out is to open the pool. The **borrower-facing** rest are answers and
+ * warnings — somebody is waiting on a decision that has now been made, or owes
+ * money on a term that is running out.
+ *
+ * `loan_due_soon` and `loan_overdue` are the only two that are not caused by
+ * anybody doing anything. They come from a scheduled scan, because a term
+ * lapsing emits no event: nothing on chain fires when time passes.
  */
-export type NotificationKind = 'membership_requested' | 'loan_requested'
+export type NotificationKind =
+  // Owner-facing: somebody is waiting on a decision.
+  | 'membership_requested'
+  | 'loan_requested'
+  // Borrower-facing: a decision was made.
+  | 'loan_approved'
+  | 'loan_rejected'
+  | 'membership_approved'
+  | 'membership_rejected'
+  // Borrower-facing: the clock.
+  | 'loan_due_soon'
+  | 'loan_overdue'
+  | 'loan_defaulted'
 
 /**
  * The `data` block carried alongside the title and body.
@@ -56,8 +78,18 @@ export interface NotificationData {
   kind: NotificationKind
   poolId: string
   poolName: string
-  /** The wallet that caused the notification — the asker, never the recipient. */
+  /**
+   * The wallet the notification is *about* — the asker on a request, the
+   * borrower on anything loan-shaped. Never the recipient on an owner-facing
+   * kind; on a borrower-facing one the two are the same wallet, because the
+   * person being told about their own loan is the one whose loan it is.
+   */
   actor: string
+  /**
+   * The loan this is about, as a decimal string. Only on the loan-shaped
+   * kinds, and it is what the deep link needs to open the right screen.
+   */
+  loanId?: string
 }
 
 export interface RegisterPushTokenRequest {

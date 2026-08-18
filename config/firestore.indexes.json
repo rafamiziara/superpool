@@ -669,6 +669,190 @@
           "order": "DESCENDING"
         }
       ]
+    },
+    {
+      "collectionGroup": "loans",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "chainId",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "status",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "isRepaid",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "loans",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "chainId",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "status",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "isRepaid",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "startedAt",
+          "order": "DESCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "loans",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "chainId",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "status",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "startedAt",
+          "order": "DESCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "loans",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "chainId",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "poolId",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "status",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "isRepaid",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "startedAt",
+          "order": "DESCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "loans",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "chainId",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "poolId",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "status",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "startedAt",
+          "order": "DESCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "loans",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "chainId",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "borrower",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "status",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "isRepaid",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "startedAt",
+          "order": "DESCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "loans",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "chainId",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "borrower",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "status",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "startedAt",
+          "order": "DESCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "loans",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "chainId",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "poolId",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "borrower",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "status",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "isRepaid",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "startedAt",
+          "order": "DESCENDING"
+        }
+      ]
     }
   ],
   "fieldOverrides": [

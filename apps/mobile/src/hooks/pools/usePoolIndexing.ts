@@ -42,6 +42,7 @@ const CALLABLE_NAME: Record<PendingTransactionType, string> = {
   APPROVE_LOAN: 'indexLoan',
   REJECT_LOAN: 'indexLoan',
   CANCEL_LOAN_REQUEST: 'indexLoan',
+  MARK_DEFAULTED: 'indexLoan',
   // And every membership action to one callable, for the same reason: it
   // re-reads `membership(address)` and stores the standing afterwards.
   REQUEST_MEMBERSHIP: 'indexMembership',

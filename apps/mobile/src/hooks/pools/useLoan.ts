@@ -93,6 +93,14 @@ export interface UseLoanReturn {
   rejectLoan: (params: LoanDecisionParams) => Promise<`0x${string}`>
   /** Borrower only: withdraws their own request before it is decided. */
   cancelLoanRequest: (params: LoanDecisionParams) => Promise<`0x${string}`>
+  /**
+   * Owner only: declares an overdue loan in default.
+   *
+   * Shares `LoanDecisionParams` and the whole decision path with the two above
+   * because the call is the same shape — `onlyOwner`, one loan id, nothing
+   * moving. What it means is not: this one does not end anything.
+   */
+  markDefaulted: (params: LoanDecisionParams) => Promise<`0x${string}`>
   /** True while the wallet is signing and broadcasting. */
   isSubmitting: boolean
   error: string | null
@@ -230,6 +238,28 @@ const CANCEL_ERROR_MESSAGES: Record<string, string> = {
   EnforcedPause: 'This pool is not processing requests at the moment',
 }
 
+/**
+ * Declaring a default.
+ *
+ * `LoanNotOverdue` is the one that will actually be hit, and it has two quite
+ * different causes: the term has not run out, or the owner set a grace period
+ * and it has not either. The message names the second, because the first is
+ * already visible on the screen — the button is only offered on a loan the
+ * app can see is late.
+ *
+ * `LoanAlreadyRepaid` reads as a race for the same reason `LoanNotPending`
+ * does on the two above: a borrower can settle while the declaration is in
+ * flight, and that is a good outcome rather than a fault.
+ */
+const DEFAULT_ERROR_MESSAGES: Record<string, string> = {
+  LoanNotOverdue: 'This loan is not declarable yet — its grace period has not run out',
+  LoanAlreadyDefaulted: 'This loan is already in default',
+  LoanAlreadyRepaid: 'This loan has been paid off',
+  LoanNotDisbursed: 'Nothing was lent on this loan',
+  OwnableUnauthorizedAccount: 'Only the pool owner can declare a default',
+  EnforcedPause: 'This pool is not processing decisions at the moment',
+}
+
 export function describeBorrowError(error: unknown): string {
   return describeTransactionError(error, BORROW_ERROR_MESSAGES, 'Failed to borrow')
 }
@@ -252,6 +282,10 @@ export function describeRejectError(error: unknown): string {
 
 export function describeCancelError(error: unknown): string {
   return describeTransactionError(error, CANCEL_ERROR_MESSAGES, 'Failed to withdraw the request')
+}
+
+export function describeDefaultError(error: unknown): string {
+  return describeTransactionError(error, DEFAULT_ERROR_MESSAGES, 'Failed to declare the default')
 }
 
 /**
@@ -499,8 +533,8 @@ export const useLoan = (): UseLoanReturn => {
   const sendLoanDecision = useCallback(
     async (
       params: LoanDecisionParams,
-      functionName: 'approveLoan' | 'rejectLoan' | 'cancelLoanRequest',
-      type: 'APPROVE_LOAN' | 'REJECT_LOAN' | 'CANCEL_LOAN_REQUEST',
+      functionName: 'approveLoan' | 'rejectLoan' | 'cancelLoanRequest' | 'markDefaulted',
+      type: 'APPROVE_LOAN' | 'REJECT_LOAN' | 'CANCEL_LOAN_REQUEST' | 'MARK_DEFAULTED',
       describe: (error: unknown) => string,
       notConnected: string
     ): Promise<`0x${string}`> => {
@@ -671,5 +705,11 @@ export const useLoan = (): UseLoanReturn => {
     [sendLoanDecision]
   )
 
-  return { borrow, repay, requestLoan, approveLoan, rejectLoan, cancelLoanRequest, isSubmitting, error, reset }
+  const markDefaulted = useCallback(
+    (params: LoanDecisionParams): Promise<`0x${string}`> =>
+      sendLoanDecision(params, 'markDefaulted', 'MARK_DEFAULTED', describeDefaultError, 'Connect a wallet before declaring a default'),
+    [sendLoanDecision]
+  )
+
+  return { borrow, repay, requestLoan, approveLoan, rejectLoan, cancelLoanRequest, markDefaulted, isSubmitting, error, reset }
 }

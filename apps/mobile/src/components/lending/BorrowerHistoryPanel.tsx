@@ -51,8 +51,9 @@ function Stat({ label, value, tone, testID }: { label: string; value: number; to
  * missing.
  */
 export function BorrowerHistoryPanel({ history, voice, testID = 'borrower-history' }: BorrowerHistoryPanelProps) {
-  const { total, repaid, onTime, late, undated, outstanding, overdue, isNew } = history
+  const { total, repaid, onTime, late, undated, outstanding, overdue, defaulted, isNew } = history
   const subject = voice === 'owner' ? 'They have' : 'You have'
+  const possessive = voice === 'owner' ? 'their' : 'your'
 
   return (
     <View className="gap-3 rounded-2xl border-continuous border-hairline border-veil bg-raised px-4 py-3" testID={testID}>
@@ -85,6 +86,29 @@ export function BorrowerHistoryPanel({ history, voice, testID = 'borrower-histor
                 {overdue === 1
                   ? `${subject} a loan that is past its due date right now.`
                   : `${subject} ${overdue} loans past their due date right now.`}
+              </Text>
+            </View>
+          )}
+
+          {/*
+            A separate line from `overdue`, and a stronger one. Being late is
+            arithmetic and happens to everybody; a default is a pool owner
+            having decided this wallet stopped paying, which is the single most
+            useful thing another owner can know about them.
+
+            Counted over the whole record rather than over open loans, so a
+            declaration that was later paid off still shows — the fact is that
+            it got that far. It is stated without a verdict attached, because a
+            borrower who recovered is a different proposition from one who
+            never paid, and only the reader can weigh that.
+          */}
+          {defaulted > 0 && (
+            <View className="flex-row items-center gap-2">
+              <FontAwesome name="flag" size={12} color={palette.coral} />
+              <Text className="flex-1 text-xs leading-5 text-coral" testID={`${testID}-defaulted`}>
+                {defaulted === 1
+                  ? `A pool owner has marked one of ${possessive} loans in default.`
+                  : `Pool owners have marked ${defaulted} of ${possessive} loans in default.`}
               </Text>
             </View>
           )}

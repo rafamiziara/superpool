@@ -21,10 +21,12 @@ jest.mock('ethers', () => {
  * indexing — `poolNotifications.test.ts` covers what it decides to send.
  */
 const mockNotifyMembershipRequested = jest.fn()
+const mockNotifyMembershipDecided = jest.fn()
 
 jest.mock('./poolNotifications', () => ({
   ...jest.requireActual('./poolNotifications'),
   notifyMembershipRequested: (...args: unknown[]) => mockNotifyMembershipRequested(...args),
+  notifyMembershipDecided: (...args: unknown[]) => mockNotifyMembershipDecided(...args),
 }))
 
 const {
@@ -115,6 +117,8 @@ beforeEach(() => {
   mockGetPoolId.mockResolvedValue(BigInt(POOL_ID))
   mockNotifyMembershipRequested.mockReset()
   mockNotifyMembershipRequested.mockResolvedValue(undefined)
+  mockNotifyMembershipDecided.mockReset()
+  mockNotifyMembershipDecided.mockResolvedValue(undefined)
 })
 
 // ---------------------------------------------------------------------------
@@ -446,6 +450,32 @@ describe('indexMembershipFromLog notifications', () => {
 
     await expect(indexMembershipFromLog(buildLog(), CHAIN_ID, FACTORY_ADDRESS, buildProvider(), mockFs)).resolves.toBeNull()
     expect(mockNotifyMembershipRequested).not.toHaveBeenCalled()
+  })
+
+  it('offers the applicant the decision that was made about them', async () => {
+    // The other half: the owner has now decided, and the applicant is the one
+    // who has been waiting to hear.
+    mockMembership.mockResolvedValue(BigInt(ACTIVE))
+    const { mockFs } = buildFirestore({ exists: true, storedStatus: 'requested' })
+
+    await indexMembershipFromLog(buildLog(), CHAIN_ID, FACTORY_ADDRESS, buildProvider(), mockFs)
+
+    expect(mockNotifyMembershipDecided).toHaveBeenCalledWith(
+      expect.objectContaining({ transition: 'active' }),
+      expect.objectContaining({ account: ACCOUNT.toLowerCase() }),
+      mockFs
+    )
+  })
+
+  it('indexes the membership even when the applicant cannot be told', async () => {
+    mockNotifyMembershipDecided.mockRejectedValue(new Error('expo unreachable'))
+    mockMembership.mockResolvedValue(BigInt(ACTIVE))
+    const { mockFs } = buildFirestore({ exists: true, storedStatus: 'requested' })
+
+    const indexed = await indexMembershipFromLog(buildLog(), CHAIN_ID, FACTORY_ADDRESS, buildProvider(), mockFs)
+
+    expect(indexed!.result.stored).toBe(true)
+    expect(mockLogger.error).toHaveBeenCalledWith('Membership decision notification failed; indexing stands', expect.anything())
   })
 })
 

@@ -8,6 +8,9 @@ import { firestore } from '../../services'
 const MAX_LIMIT = 100
 const DEFAULT_LIMIT = 50
 
+/** The two states a loan can be in while the money is still out. */
+const OPEN_STATUSES = ['disbursed', 'defaulted']
+
 export const listLoansHandler = async (request: CallableRequest<ListLoansRequest>): Promise<ListLoansResponse> => {
   // Gated like the other feeds: this ties a wallet to a debt, and serving it
   // anonymously would make the collection trivially scrapeable in one request
@@ -33,16 +36,27 @@ export const listLoansHandler = async (request: CallableRequest<ListLoansRequest
       query = query.where('borrower', '==', borrower)
     }
 
-    // Outstanding debt: disbursed and not yet settled. Both halves matter now
-    // that a loan can exist without having been funded — a pending request is
-    // not repaid either, and would otherwise read as active.
+    // Outstanding debt: money that is out and not yet back. Both halves matter
+    // now that a loan can exist without having been funded — a pending request
+    // is not repaid either, and would otherwise read as active.
+    //
+    // **`defaulted` belongs here.** A declaration is a judgement on a debt, not
+    // a settlement of one: narrowing this to `disbursed` alone would drop the
+    // loans most worth chasing, and would take a borrower's own debt off their
+    // repay screen at the exact moment it was declared.
     if (request.data.activeOnly) {
-      query = query.where('status', '==', 'disbursed').where('isRepaid', '==', false)
+      query = query.where('status', 'in', OPEN_STATUSES).where('isRepaid', '==', false)
     }
 
     // What a pool owner has to decide on.
     if (request.data.pendingOnly) {
       query = query.where('status', '==', 'requested')
+    }
+
+    // Narrower than "overdue", which needs no query: a due date is
+    // `startedAt + duration` and any reader can work it out.
+    if (request.data.defaultedOnly) {
+      query = query.where('status', '==', 'defaulted')
     }
 
     const totalSnapshot = await query.count().get()
@@ -81,6 +95,9 @@ export const listLoansHandler = async (request: CallableRequest<ListLoansRequest
         // no moment. Also absent on a loan repaid before the contract recorded
         // one, which is why `isRepaid` and not this says whether it was repaid.
         ...(data.repaidAt ? { repaidAt: data.repaidAt.toDate().toISOString() } : {}),
+        // Absent on every loan nobody declared, which is almost all of them,
+        // and left off rather than nulled like the two stamps above.
+        ...(data.defaultedAt ? { defaultedAt: data.defaultedAt.toDate().toISOString() } : {}),
         // Absent on loans indexed before the approval step shipped; they were
         // all disbursed, which is what the contract's enum zero means too.
         status: data.status ?? 'disbursed',

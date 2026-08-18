@@ -8,6 +8,7 @@ import { Pressable, ScrollView, Text, View } from 'react-native'
 import { useReadContract } from 'wagmi'
 import { ActivityRow } from '../../../src/components/lending/ActivityRow'
 import { ApprovalsLink } from '../../../src/components/lending/ApprovalsLink'
+import { OverdueLink } from '../../../src/components/lending/OverdueLink'
 import { ClaimInterestCard } from '../../../src/components/lending/ClaimInterestCard'
 import { PendingContributionCard } from '../../../src/components/lending/PendingContributionCard'
 import { TransactionStatusModal } from '../../../src/components/lending/TransactionStatusModal'
@@ -145,6 +146,7 @@ function PoolDetailScreen() {
   const outstandingLoan = pool ? poolStore.activeLoanFor(pool.poolId) : undefined
   /** Every member's request awaiting a decision — the owner's queue, not the user's. */
   const pendingRequests = pool ? poolStore.pendingLoansFor(pool.poolId) : []
+  const overdueLoans = pool ? poolStore.overdueLoansFor(pool.poolId) : []
   const myRequest = pool ? poolStore.pendingLoanFor(pool.poolId) : undefined
   const transactions = pool ? poolStore.transactionsFor(pool.poolId) : []
 
@@ -336,6 +338,16 @@ function PoolDetailScreen() {
           entry point would be dead weight on most pools. Counting is not
           filtered by wallet — the owner is deciding on other people's requests.
         */}
+        {isOwner && overdueLoans.length > 0 && (
+          <View className="mt-6 px-6">
+            <OverdueLink
+              count={overdueLoans.length}
+              onPress={() => router.push(`/(auth)/pool/overdue?poolId=${pool.poolId}`)}
+              testID="pool-overdue-link"
+            />
+          </View>
+        )}
+
         {isOwner && pendingRequests.length > 0 && (
           <View className="mt-6 px-6">
             <ApprovalsLink

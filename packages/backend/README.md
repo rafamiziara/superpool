@@ -164,6 +164,30 @@ Required for local development and Firebase Admin SDK:
   1000 blocks
 - ⚠️ Scheduled functions do not fire in the emulator; use `syncPoolEventsNow`
 
+**`sendDueReminders`** (scheduled, hourly)
+
+- The only scheduled notification in the project, and the only one nobody
+  causes: a term lapsing emits no event, so there is nothing to hang off an
+  indexer
+- Scans each chain's open loans (`status in ['disbursed', 'defaulted']`,
+  `isRepaid == false`) and sends at most **one** due-soon and **one** overdue
+  reminder per loan, ever — the `notifications_sent` marker is the memory. A job
+  running against a standing condition would otherwise send an hour, for as long
+  as the debt stood
+- **Judges on chain time, not server time.** `startedAt` is a block timestamp and
+  `duration` counts chain seconds, so one `getBlock('latest')` per chain per run
+  is what makes the answer right. On a local node the two clocks are unrelated
+- Walks the chains in turn; one unreachable RPC does not stop the rest
+- ⚠️ Scheduled functions do not fire in the emulator; use `sendDueRemindersNow`
+
+**`sendDueRemindersNow`** (callable)
+
+- Runs the same scan on demand. Safe to repeat: every reminder is claimed before
+  it is sent
+- Requires authentication except in the emulator
+- `pnpm testDefaults` drives loans past their terms, declares them and runs this
+  against a live local node
+
 **`syncPoolEventsNow`** (callable)
 
 - Runs the same sweep on demand: the only way to exercise it locally, and how a
@@ -176,22 +200,27 @@ Required for local development and Firebase Admin SDK:
 
 **`indexLoan`**
 
-- Called by the mobile app after any of the six loan actions is confirmed —
-  borrow, request, approve, reject, cancel or repay. One callable for all of
-  them, since the record written is the loan's state afterwards whichever
-  happened
-- Matches all six loan events (`LoanCreated`, `LoanRequested`, `LoanApproved`,
-  `LoanRejected`, `LoanRepaymentMade`, `LoanRepaid`). A cancellation has no event
-  of its own — it emits `LoanRejected`, because the record tracks the state and
-  not who ended the request. `LoanRepaymentMade` has to be in the set even
-  though it has a collection of its own: a payment that does not settle the loan
-  emits nothing else, so leaving it out would let `amountRepaid` sit at zero
+- Called by the mobile app after any of the seven loan actions is confirmed —
+  borrow, request, approve, reject, cancel, repay or mark defaulted. One
+  callable for all of them, since the record written is the loan's state
+  afterwards whichever happened
+- Matches all seven loan events (`LoanCreated`, `LoanRequested`, `LoanApproved`,
+  `LoanRejected`, `LoanRepaymentMade`, `LoanRepaid`, `LoanDefaulted`). A
+  cancellation has no event of its own — it emits `LoanRejected`, because the
+  record tracks the state and not who ended the request. `LoanRepaymentMade` has
+  to be in the set even though it has a collection of its own: a payment that
+  does not settle the loan emits nothing else, so leaving it out would let
+  `amountRepaid` sit at zero
 - Reads `getLoan` rather than decoding the log, so the stored record cannot
   disagree with the chain whichever event triggered it. This also means indexing
   an **old** transaction stores the loan's state _now_, not then
 - `status` comes from the Solidity enum by ordinal, and `LOAN_STATUS` must track
   it by index — `Disbursed` is 0 so that loans written before the field existed
-  read as disbursed, which is what they were
+  read as disbursed, which is what they were, and `Defaulted` is appended for
+  the same reason
+- `defaultedAt` is read from state rather than from the `LoanDefaulted` log, like
+  `repaidAt` and for the same reason: the sweep sees the log on every pass, so a
+  date taken from whichever arrived would be rewritten by the wrong one
 - Also indexes the payment itself when the transaction carries one, into
   `loan_repayments`, and returns it as `repayments`. Both records at once,
   because the app confirms one transaction and should not have to know it
@@ -208,12 +237,17 @@ Required for local development and Firebase Admin SDK:
 **`listLoans`**
 
 - Lists indexed loans, newest first, filterable by pool, borrower,
-  `activeOnly` and `pendingOnly`
-- `activeOnly` is `status == 'disbursed' && isRepaid == false` — outstanding
-  debt. It is **not** `isRepaid == false`, which would also match a request the
-  owner has not decided on, and so report money that never left the pool
+  `activeOnly`, `pendingOnly` and `defaultedOnly`
+- `activeOnly` is `status in ['disbursed', 'defaulted'] && isRepaid == false` —
+  outstanding debt. It is **not** `isRepaid == false`, which would also match a
+  request the owner has not decided on, and so report money that never left the
+  pool; and it is **not** `status == 'disbursed'` alone, which would drop a
+  declared default — a judgement on a debt, not a settlement of one
 - `pendingOnly` is `status == 'requested'` — the pool owner's queue. It is not
   filtered by borrower, because the owner is deciding on other people's requests
+- `defaultedOnly` is `status == 'defaulted'`. There is deliberately no
+  `overdueOnly`: a due date is `startedAt + duration`, so being late is
+  arithmetic any reader can do and no field holds it
 - A repaid or rejected loan stays in the list as history; `startedAt` is an
   **ISO string**, and it is rewritten on approval, so it means "requested at"
   while pending and "disbursed at" afterwards

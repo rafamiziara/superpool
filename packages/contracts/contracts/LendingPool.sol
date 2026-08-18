@@ -112,7 +112,21 @@ contract LendingPool is
     enum LoanStatus {
         Disbursed,
         Requested,
-        Rejected
+        Rejected,
+        /**
+         * @dev Declared past a loan's term and not paid, by the pool's owner.
+         *
+         * **Appended**, which is the only safe place for it: the three above
+         * keep their ordinals, so no stored loan is relabelled. `Disbursed`
+         * staying at zero is what the retrofit above depends on.
+         *
+         * A label on a debt that is still owed, not an ending. The money is
+         * still due, interest still accrues on it, `repayLoan` still takes it
+         * and the borrower's `activeLoanId` is still held — see
+         * `markDefaulted`. Nothing is seized, because there is no collateral
+         * in this project to seize.
+         */
+        Defaulted
     }
 
     // The gas hint reads the 2 bytes left over in the first slot as waste, but
@@ -195,6 +209,31 @@ contract LendingPool is
          * carries a real timestamp.
          */
         uint64 accruedAt;        // 8 bytes - packs into the same slot (32 bytes)
+        /**
+         * @dev When the owner declared this loan defaulted, or 0 if they never
+         * did.
+         *
+         * **A seventh word, appended**, on the same reasoning that made
+         * `amountRepaid` free: `loans` is a mapping, so each entry hashes to
+         * its own base slot and widening the struct extends into a word that
+         * was never allocated. Nothing above it moves, and a loan written
+         * before this reads 0 — "not defaulted", which every one of them was.
+         *
+         * It leaves 24 bytes of this slot unused, and there is nowhere to pack
+         * it: the first slot has 2 bytes left and the `interestOutstanding`
+         * slot is full. Narrowing either to make room would be a restructure
+         * rather than an append, and would relabel loans that already exist.
+         *
+         * On chain rather than left to the `LoanDefaulted` log for exactly the
+         * reason `repaidAt` is: the indexer reads state, not logs, so that a
+         * re-scan is harmless — and a log is not something a later reader can
+         * ask the chain for by loan id. Without this, a loan first seen after
+         * it defaulted could say *that* it had but never *when*.
+         *
+         * `uint64` like `repaidAt`, and read beside `status`: this answers
+         * *when*, `status` stays the authority on *whether*.
+         */
+        uint64 defaultedAt;      // 8 bytes - new slot
     }
 
     /// @notice Pool configuration
@@ -293,6 +332,27 @@ contract LendingPool is
 
     /// @notice Interest credited to a member and not yet taken out
     mapping(address => uint256) public unclaimedInterest;
+
+    /**
+     * @notice How long past its term a loan is left alone before the owner may
+     * declare it defaulted, in seconds
+     * @dev Appended in v4, and **zero by default** — the same retrofit as
+     * `LoanStatus.Disbursed` being ordinal zero and `requiresApproval` being
+     * false: a pool that predates this reads 0, which means the owner may act
+     * the moment the term lapses. That is the behaviour of a pool that has
+     * never been told otherwise, so nothing has to be migrated or backfilled.
+     *
+     * It exists so an owner can make a promise their members can check —
+     * "nobody is called a defaulter for the first thirty days" — rather than
+     * having to be trusted to wait. It bounds the *owner*, not the borrower:
+     * interest has been accruing since the due date either way, and lengthening
+     * it costs the borrower nothing.
+     *
+     * Read from the chain, never from an indexed pool record. Like
+     * `requiresMembership` and `requiresApproval`, the owner can change it at
+     * any moment and nothing indexes it.
+     */
+    uint256 public defaultGracePeriod;
 
     /**
      * @dev Fixed-point scale for `accInterestPerShare`. Interest divided by the
@@ -477,6 +537,33 @@ contract LendingPool is
      * so the two decode the same way off chain.
      */
     event InterestClaimed(address indexed account, uint256 indexed amount);
+    /**
+     * @notice Emitted when the owner declares a loan defaulted
+     * @param loanId The loan declared
+     * @param borrower Whose debt it is
+     * @param outstanding What was still owed at that moment, in wei
+     * @dev Three indexed parameters and empty `data`, like every other event
+     * here, so it decodes from topics alone.
+     *
+     * `outstanding` is taken after accrual, so it is the debt as of this block
+     * rather than as of the last payment. It is a record of the moment, not a
+     * figure anything should keep: interest goes on accruing afterwards, so
+     * what is owed only grows from here.
+     */
+    event LoanDefaulted(
+        uint256 indexed loanId,
+        address indexed borrower,
+        uint256 indexed outstanding
+    );
+    /**
+     * @notice Emitted when the owner changes how long they will wait before
+     * declaring a loan defaulted
+     * @param gracePeriod The new period, in seconds past a loan's term
+     * @dev Nothing indexes this — like `ApprovalRequirementChanged`, the pool
+     * document carries no such field and every screen that cares reads the
+     * chain. It exists so the change is on the public record.
+     */
+    event DefaultGracePeriodChanged(uint256 indexed gracePeriod);
 
     /// @notice Errors
     error InsufficientFunds();
@@ -518,6 +605,16 @@ contract LendingPool is
     error InvalidInterestRate();
     /// @dev A zero term. It is the denominator interest accrues over.
     error InvalidLoanDuration();
+    /**
+     * @dev Declaring a default before the term plus the grace period is up.
+     *
+     * The one thing that stops `markDefaulted` from being an owner's opinion.
+     * A loan inside its term is not late, and a loan inside the grace period is
+     * late on terms the owner published in advance.
+     */
+    error LoanNotOverdue();
+    /// @dev Declaring a default on a loan already carrying one. Nothing to add.
+    error LoanAlreadyDefaulted();
     /**
      * @dev Removing the owner from their own pool, or the owner leaving it.
      *
@@ -892,6 +989,7 @@ contract LendingPool is
             // Non-zero from birth, which is what tells a loan made under
             // accrual from one that predates it. Interest runs from here.
             accruedAt: SafeCast.toUint64(block.timestamp),
+            defaultedAt: 0,
             status: LoanStatus.Disbursed
         });
 
@@ -919,6 +1017,28 @@ contract LendingPool is
         poolConfig.requiresApproval = _requiresApproval;
 
         emit ApprovalRequirementChanged(_requiresApproval);
+    }
+
+    /**
+     * @notice Set how long past its term a loan is left before it may be
+     * declared defaulted (only owner)
+     * @param _gracePeriod Seconds past `startTime + duration`. Zero means the
+     * owner may act as soon as the term lapses, which is how every pool created
+     * before this behaved.
+     * @dev Deliberately unbounded above. A cap would be this contract deciding
+     * how patient an owner is allowed to be with their own pool's money, and
+     * there is no figure to pick that is not invented; an owner who never wants
+     * to call a default can simply never call one.
+     *
+     * Takes effect immediately, including on loans already overdue. It bounds
+     * when the owner may *act*, so a loan that becomes ineligible again has
+     * lost nothing — the debt and the interest on it are untouched, and a loan
+     * already carrying a default keeps it.
+     */
+    function setDefaultGracePeriod(uint256 _gracePeriod) external onlyOwner {
+        defaultGracePeriod = _gracePeriod;
+
+        emit DefaultGracePeriodChanged(_gracePeriod);
     }
 
     /**
@@ -1126,6 +1246,7 @@ contract LendingPool is
             // Stamped again on approval, like `startTime`: nothing is owed
             // while a request waits, so the clock starts when the money moves.
             accruedAt: SafeCast.toUint64(block.timestamp),
+            defaultedAt: 0,
             status: LoanStatus.Requested
         });
 
@@ -1204,6 +1325,93 @@ contract LendingPool is
         delete activeLoanId[msg.sender];
 
         emit LoanRejected(_loanId, msg.sender, loan.amount);
+    }
+
+    /**
+     * @notice Declare an overdue loan defaulted (only owner)
+     * @param _loanId The loan to declare
+     * @dev **A label, not an ending.** Everything about the debt survives it:
+     * the money is still owed, interest goes on accruing at the same
+     * uncapped rate, `repayLoan` still takes payment, and the borrower's
+     * `activeLoanId` is still held — so a defaulter cannot open a second loan.
+     * Nothing is seized because there is no collateral in this project to
+     * seize, and inventing one here would be a different feature.
+     *
+     * Which is the point: *late* is derivable by anyone with a clock, so it is
+     * not worth a transaction. What only the chain can witness is the owner
+     * **saying so** — a judgement, made at a moment, on the public record,
+     * where a borrower's later history can be read against it.
+     *
+     * Three things it deliberately does not do:
+     *
+     * - **It does not free the borrower's slot.** `rejectLoan` does, because a
+     *   refused request never took anything; this one has money out.
+     * - **It does not stop the clock.** Interest past the due date is not a
+     *   penalty, it is the same price applied to more time, and a default
+     *   changes nothing about how long the money has been out.
+     * - **It cannot be undone.** There is no `unmarkDefaulted`, so that the
+     *   record says what actually happened. The way out is to pay: a loan
+     *   settled after a default keeps `Defaulted` and gains `isRepaid`, which
+     *   reads as recovered — a fact worth more to a later lender than either
+     *   half alone. An owner who would rather not brand a late payer simply
+     *   does not call this.
+     */
+    function markDefaulted(
+        uint256 _loanId
+    ) external onlyOwner whenNotPaused {
+        Loan storage loan = loans[_loanId];
+
+        if (loan.status == LoanStatus.Defaulted) {
+            revert LoanAlreadyDefaulted();
+        }
+
+        // Only a loan the pool actually paid out can be in default. A request
+        // waiting on a decision has taken nothing, and a refused one never
+        // will; both would otherwise pass the date check below on their
+        // `startTime`, and a request left alone long enough would become
+        // declarable.
+        if (loan.status != LoanStatus.Disbursed) revert LoanNotDisbursed();
+
+        if (loan.isRepaid) revert LoanAlreadyRepaid();
+
+        if (block.timestamp <= defaultableAt(_loanId)) revert LoanNotOverdue();
+
+        // Bring the debt up to now, so what the event records is the debt as of
+        // this block rather than as of the last payment. Also the loan's first
+        // touch if it predates accrual, converting it on the flat terms it was
+        // made under — the same conversion a payment would have done, and the
+        // reason this is `_accrue` rather than a view: the figure emitted and
+        // the figure stored must not be able to disagree.
+        _accrue(loan);
+
+        loan.status = LoanStatus.Defaulted;
+        loan.defaultedAt = uint64(block.timestamp);
+
+        emit LoanDefaulted(
+            _loanId,
+            loan.borrower,
+            loan.principalOutstanding + loan.interestOutstanding
+        );
+    }
+
+    /**
+     * @notice The moment after which this loan may be declared defaulted
+     * @param _loanId The loan to ask about
+     * @return Unix seconds: `startTime + duration + defaultGracePeriod`
+     * @dev Public so an owner's screen can show the date rather than restate
+     * the arithmetic, and so a borrower can see the same date the contract
+     * will enforce. Note it moves when the owner changes the grace period, and
+     * is meaningless on a loan that is not an open debt.
+     *
+     * A loan is **overdue** at `startTime + duration`, which is earlier than
+     * this whenever a grace period is set. Overdue is the borrower's fact and
+     * needs no function: `startedAt + duration` is on every indexed record.
+     * This is the owner's.
+     */
+    function defaultableAt(uint256 _loanId) public view returns (uint256) {
+        Loan storage loan = loans[_loanId];
+
+        return loan.startTime + loan.duration + defaultGracePeriod;
     }
 
     /**
@@ -1311,7 +1519,14 @@ contract LendingPool is
         // Before `isRepaid`, because a request that was never funded is not a
         // debt that happens to be unpaid — see `LoanNotDisbursed`. Loans made
         // before `status` existed read `Disbursed`, which is what they all were.
-        if (loan.status != LoanStatus.Disbursed) {
+        //
+        // A **defaulted** loan passes: the declaration is a label on a debt
+        // that is still owed, and refusing payment here would make calling a
+        // default the act that forgave it.
+        if (
+            loan.status != LoanStatus.Disbursed &&
+            loan.status != LoanStatus.Defaulted
+        ) {
             revert LoanNotDisbursed();
         }
 
@@ -1464,6 +1679,30 @@ contract LendingPool is
     }
 
     /**
+     * @notice Whether a loan is money currently owed to the pool
+     * @param loan The loan to judge
+     * @return True while the debt is live, whatever the owner has called it
+     * @dev **`Defaulted` counts.** Declaring a default records a judgement; it
+     * does not cancel the debt, forgive the interest or close the loan. Every
+     * gate and every valuation below therefore has to admit it, and each one
+     * that did not would be its own silent bug: a repayment refused with
+     * `LoanNotDisbursed`, or an outstanding balance quoted as zero — which
+     * would tell a borrower their debt had disappeared and hand a repay screen
+     * a figure of nothing to send.
+     *
+     * The single definition, rather than the same two-clause test written in
+     * four places, precisely because the next state added to the enum has to
+     * be considered once.
+     */
+    function _isOpenDebt(Loan storage loan) private view returns (bool) {
+        if (loan.isRepaid) return false;
+
+        return
+            loan.status == LoanStatus.Disbursed ||
+            loan.status == LoanStatus.Defaulted;
+    }
+
+    /**
      * @notice What a loan owes, projected to a moment in time
      * @param loan The loan to price
      * @param _at The moment to price it at. Earlier than `accruedAt` accrues nothing.
@@ -1487,6 +1726,7 @@ contract LendingPool is
      * A loan whose `accruedAt` is zero predates this and is priced on the terms
      * it was made under; see `_accrue`.
      */
+
     function _balanceAt(
         Loan storage loan,
         uint256 _at
@@ -1780,7 +2020,7 @@ contract LendingPool is
     ) external view returns (uint256 principal, uint256 interest) {
         Loan storage loan = loans[_loanId];
 
-        if (loan.status != LoanStatus.Disbursed || loan.isRepaid) return (0, 0);
+        if (!_isOpenDebt(loan)) return (0, 0);
 
         return _balanceAt(loan, block.timestamp);
     }
@@ -1791,7 +2031,7 @@ contract LendingPool is
     ) private view returns (uint256) {
         Loan storage loan = loans[_loanId];
 
-        if (loan.status != LoanStatus.Disbursed || loan.isRepaid) return 0;
+        if (!_isOpenDebt(loan)) return 0;
 
         (uint256 principal, uint256 interest) = _balanceAt(loan, _at);
 

@@ -14,13 +14,34 @@ import { logger } from '../utils/logger'
 /**
  * Where each kind of notification goes.
  *
- * Both are owner-facing queues, which is the point of the feature: the owner
- * had to open the pool and look, and now the notification takes them to the
- * exact list they need to act on.
+ * The two owner-facing kinds open the **queue** the owner has to act on, which
+ * is the point of the feature: being told a request exists and then having to
+ * find it is most of the problem.
+ *
+ * Every borrower-facing kind opens the **pool**, and deliberately not a
+ * deeper screen. What a borrower does next depends on the news — repay, look
+ * at the terms, do nothing — and the pool page is where all of those start.
+ * `pool/borrow` would be wrong for most of them and wrong in a way that costs
+ * a tap to undo.
+ *
+ * Exhaustive by type: adding a `NotificationKind` without a destination here
+ * fails the build rather than sending a notification that does nothing when
+ * tapped.
  */
 const DESTINATIONS: Record<NotificationKind, (poolId: string) => string> = {
   loan_requested: (poolId) => `/(auth)/pool/approvals?poolId=${poolId}`,
   membership_requested: (poolId) => `/(auth)/pool/members?poolId=${poolId}`,
+  loan_approved: poolPage,
+  loan_rejected: poolPage,
+  loan_defaulted: poolPage,
+  loan_due_soon: poolPage,
+  loan_overdue: poolPage,
+  membership_approved: poolPage,
+  membership_rejected: poolPage,
+}
+
+function poolPage(poolId: string): string {
+  return `/(auth)/pool/${poolId}`
 }
 
 /**

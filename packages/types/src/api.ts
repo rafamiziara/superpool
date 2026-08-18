@@ -356,14 +356,28 @@ export interface LoanInfo {
    */
   repaidAt?: string
   /**
+   * ISO 8601 — when the pool's owner declared this loan defaulted.
+   *
+   * Absent on every loan nobody declared, which is almost all of them. Present
+   * *and* `isRepaid` means the debt was paid after the declaration: the
+   * declaration is never undone, so the pair reads as a recovery.
+   */
+  defaultedAt?: string
+  /**
    * Where the loan is before repayment.
    *
    * Only pools whose owner turned on review ever produce `requested` or
    * `rejected`; a pool that lends on demand goes straight to `disbursed`. Loans
    * written before the field existed also read `disbursed`, which is what they
    * were — see the enum note in `LendingPool`.
+   *
+   * **`defaulted` is still an open debt.** The owner declaring one records a
+   * judgement; it does not close the loan, stop interest or excuse payment. So
+   * anything asking "does this wallet owe money" has to admit it alongside
+   * `disbursed` — reading the two as mutually exclusive is how a debt silently
+   * disappears from a screen.
    */
-  status: 'disbursed' | 'requested' | 'rejected'
+  status: 'disbursed' | 'requested' | 'rejected' | 'defaulted'
   chainId: number
   /** The transaction that created the loan. */
   transactionHash: string
@@ -454,10 +468,24 @@ export interface ListLoansRequest {
   poolId?: number
   /** Restrict to one wallet. Matched case-insensitively. */
   borrower?: string
-  /** Only loans that are disbursed and not yet repaid. */
+  /**
+   * Only loans that are still owed — disbursed **or defaulted**, and not yet
+   * repaid.
+   *
+   * A declared default does not settle anything, so excluding it here would
+   * drop exactly the debts that most need chasing, and would take a borrower's
+   * own loan off their repay screen the moment it was declared.
+   */
   activeOnly?: boolean
   /** Only requests still waiting on the pool owner. */
   pendingOnly?: boolean
+  /**
+   * Only loans the owner has declared defaulted.
+   *
+   * Narrower than "overdue", which is derivable from `startedAt + duration` by
+   * anyone with a clock and needs no query of its own.
+   */
+  defaultedOnly?: boolean
   limit?: number
 }
 

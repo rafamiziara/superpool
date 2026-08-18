@@ -35,6 +35,7 @@ import { FIREBASE_FUNCTIONS } from '../config/firebase'
 import { MOCK_LOANS, MOCK_MEMBERSHIPS, MOCK_POOLS, MOCK_TRANSACTIONS, MOCK_USER_ADDRESS } from '../mocks/lending'
 import { type Denomination, denominationFor, isNative, nativeDenomination } from '../utils/denomination'
 import { sameAddress } from '../utils/format'
+import { isLive, latenessOf } from '../utils/lateness'
 import { logger } from '../utils/logger'
 import { authStore } from './AuthStore'
 
@@ -64,12 +65,49 @@ function loanStatusOf(loan: LoanInfo): LoanStatus {
   if (loan.status === 'requested') return LoanStatus.REQUESTED
   if (loan.status === 'rejected') return LoanStatus.REJECTED
 
-  return loan.isRepaid ? LoanStatus.REPAID : LoanStatus.DISBURSED
+  // `isRepaid` first, so a debt that was declared and then paid reads as
+  // settled. The declaration is not lost — it is on `Loan.defaultedAt`, which
+  // is what makes "recovered" expressible at all.
+  if (loan.isRepaid) return LoanStatus.REPAID
+
+  return loan.status === 'defaulted' ? LoanStatus.DEFAULTED : LoanStatus.DISBURSED
+}
+
+/**
+ * Whether the pool's money actually went out on this loan.
+ *
+ * `defaulted` counts, and every figure derived from it depends on that: a
+ * declared default is a judgement on a debt, not a settlement of one. Reading
+ * it as unfunded reports the amount repaid as nothing, the interest as
+ * nothing, and the loan as having no due date — on precisely the loans where
+ * all three matter most.
+ */
+function wasFunded(loan: LoanInfo): boolean {
+  return loan.status === 'disbursed' || loan.status === 'defaulted'
+}
+
+/**
+ * When an indexed loan came due, in millis.
+ *
+ * `startedAt + duration`, which is all a due date has ever been — nothing on
+ * chain records one, because anyone with a clock can work it out. A loan that
+ * has not been funded has no meaningful answer here, so every caller filters on
+ * `isOutstanding` first.
+ */
+function dueAtOf(loan: LoanInfo): number {
+  return new Date(loan.startedAt).getTime() + loan.duration * 1000
+}
+
+/** Whether a mapped loan is live and past its due date, declared or not. */
+function isLateNow(loan: Loan): boolean {
+  const lateness = latenessOf(loan)
+
+  return lateness === 'overdue' || lateness === 'defaulted'
 }
 
 /** Funded and not yet settled — the only state that owes the pool money. */
 function isOutstanding(loan: LoanInfo): boolean {
-  return loan.status === 'disbursed' && !loan.isRepaid
+  return wasFunded(loan) && !loan.isRepaid
 }
 
 /**
@@ -847,7 +885,7 @@ export class PoolStore {
     return this.loanRecords.map((loan) => {
       const amount = BigInt(loan.amount)
       const startedAt = new Date(loan.startedAt)
-      const isDisbursed = loan.status === 'disbursed'
+      const isDisbursed = wasFunded(loan)
 
       return {
         id: loan.id,
@@ -875,12 +913,15 @@ export class PoolStore {
         // loan settled before the contract recorded one, which is why nothing
         // reads this to decide *whether* a loan was repaid.
         repaidAt: loan.repaidAt ? new Date(loan.repaidAt) : undefined,
+        // Independent of `status`, like the chain's own pair: a loan can be
+        // both declared and settled, and that is what a recovery is.
+        defaultedAt: loan.defaultedAt ? new Date(loan.defaultedAt) : undefined,
       }
     })
   }
 
   get activeLoan(): Loan | undefined {
-    return this.loans.find((loan) => loan.status === LoanStatus.DISBURSED && sameAddress(loan.borrower, this.userAddress))
+    return this.loans.find((loan) => isLive(loan) && sameAddress(loan.borrower, this.userAddress))
   }
 
   /**
@@ -930,6 +971,40 @@ export class PoolStore {
   }
 
   /**
+   * Every loan in one pool that is past its due date, oldest debt first.
+   *
+   * The owner's list, and the counterpart to `pendingLoansFor`: one is people
+   * waiting on a decision, this is money waiting to come back.
+   *
+   * **Derived, not queried.** Overdue is `startedAt + duration` against the
+   * clock, so there is nothing to index and nothing to ask the backend for —
+   * which is also why this includes loans nobody has declared. A pool with an
+   * overdue loan and an owner who has not acted is the ordinary case, and it is
+   * exactly the case this list exists to surface.
+   *
+   * Sorted by due date rather than by amount: the question an owner is
+   * answering is who has been late longest, and the biggest debt is often the
+   * newest one.
+   */
+  overdueLoansFor = (poolId: number): LoanInfo[] => {
+    const now = Date.now()
+
+    return this.loanRecords
+      .filter((loan) => loan.poolId === poolId && isOutstanding(loan) && dueAtOf(loan) < now)
+      .sort((a, b) => dueAtOf(a) - dueAtOf(b))
+  }
+
+  /**
+   * The user's own loans that are late, across every pool on this chain.
+   *
+   * For the dashboard, where a borrower with debts in three pools would
+   * otherwise have to open each one to find out which is overdue.
+   */
+  get myOverdueLoans(): Loan[] {
+    return this.loans.filter((loan) => sameAddress(loan.borrower, this.userAddress) && isLateNow(loan))
+  }
+
+  /**
    * What one wallet has done with money it borrowed before.
    *
    * Counted from the indexed loans rather than stored anywhere, for the same
@@ -967,6 +1042,7 @@ export class PoolStore {
       undated: 0,
       outstanding: 0,
       overdue: 0,
+      defaulted: 0,
       isNew: true,
     }
 
@@ -974,15 +1050,20 @@ export class PoolStore {
     // surface about what a loan is — including under mock pools, where the
     // records are empty and the fixtures are the only loans there are.
     for (const loan of this.loans) {
-      const wasFunded = loan.status === LoanStatus.DISBURSED || loan.status === LoanStatus.REPAID
+      const funded = loan.status === LoanStatus.DISBURSED || loan.status === LoanStatus.REPAID || loan.status === LoanStatus.DEFAULTED
 
-      if (!wasFunded || !sameAddress(loan.borrower, address)) continue
+      if (!funded || !sameAddress(loan.borrower, address)) continue
 
       history.total += 1
 
+      // Read from the date rather than from the status, so a loan that was
+      // declared and then paid still counts here. The two are independent
+      // facts and this is the one an owner is asking about.
+      if (loan.defaultedAt) history.defaulted += 1
+
       const dueAt = loan.dueDate?.getTime()
 
-      if (loan.status === LoanStatus.DISBURSED) {
+      if (isLive(loan)) {
         history.outstanding += 1
         if (dueAt !== undefined && now > dueAt) history.overdue += 1
 

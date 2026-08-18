@@ -4,7 +4,7 @@ import { logger } from 'firebase-functions/v2'
 import { HttpsError } from 'firebase-functions/v2/https'
 import { LendingPoolABI, MEMBERSHIPS_COLLECTION } from '../constants'
 import { resolvePoolId } from './contributionIndexer'
-import { notifyMembershipRequested } from './poolNotifications'
+import { notifyMembershipDecided, notifyMembershipRequested } from './poolNotifications'
 
 /**
  * Where one address stands with one pool, read from the chain rather than
@@ -260,6 +260,14 @@ export async function indexMembershipFromLog(
   // service must not turn a successful index into an error the user is shown.
   await notifyMembershipRequested(result, membership, firestore).catch((error: unknown) => {
     logger.error('Membership notification failed; indexing stands', {
+      docId: result.id,
+      error: error instanceof Error ? error.message : String(error),
+    })
+  })
+
+  // The applicant's half: the owner has decided. Same swallowing, same reason.
+  await notifyMembershipDecided(result, membership, firestore).catch((error: unknown) => {
+    logger.error('Membership decision notification failed; indexing stands', {
       docId: result.id,
       error: error instanceof Error ? error.message : String(error),
     })

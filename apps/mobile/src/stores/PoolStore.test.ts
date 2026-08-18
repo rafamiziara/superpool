@@ -1254,6 +1254,21 @@ const REPAID_LOAN: LoanInfo = {
   interestOutstanding: '0',
 }
 
+/**
+ * The same loan, past its term and declared in default by the pool's owner.
+ *
+ * Note what is unchanged from `LIVE_LOAN`: `isRepaid` is still false and the
+ * principal is still outstanding. A declaration is a judgement on a debt, not a
+ * settlement of one, and everything the store derives has to keep agreeing.
+ */
+const DEFAULTED_LOAN: LoanInfo = {
+  ...LIVE_LOAN,
+  id: '31337-12-6',
+  loanId: 6,
+  status: 'defaulted',
+  defaultedAt: '2026-09-20T09:00:00.000Z',
+}
+
 /** Thirty days after `LIVE_LOAN` started, which is exactly its term. */
 const DUE_AT = new Date(new Date(LIVE_LOAN.startedAt).getTime() + LIVE_LOAN.duration * 1000)
 
@@ -1828,6 +1843,196 @@ describe('PoolStore loan states', () => {
 
       const ids = store.recentTransactions.map((tx) => tx.id)
       expect(new Set(ids).size).toBe(ids.length)
+    })
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Loans the owner declared in default.
+// ---------------------------------------------------------------------------
+
+describe('PoolStore and a defaulted loan', () => {
+  let store: PoolStore
+  let listLoansCallable: jest.Mock
+
+  async function loadWithLoans(loans: LoanInfo[]) {
+    listLoansCallable.mockResolvedValue({ data: { loans, totalCount: loans.length, limit: 50 } })
+    await store.fetchPools()
+  }
+
+  /** Puts the clock a minute past `LIVE_LOAN`'s due date. */
+  function afterDue(offsetMs = 60_000) {
+    jest.spyOn(Date, 'now').mockReturnValue(DUE_AT.getTime() + offsetMs)
+  }
+
+  beforeEach(() => {
+    jest.clearAllMocks()
+    delete process.env.EXPO_PUBLIC_USE_MOCK_POOLS
+
+    authStore.walletAddress = USER_WALLET
+    authStore.chainId = 31337
+
+    store = new PoolStore()
+    listLoansCallable = jest.fn().mockResolvedValue({ data: { loans: [], totalCount: 0, limit: 50 } })
+    mockFirebaseCallable.mockImplementation((_functions?: unknown, name?: string) => {
+      if (name === 'listLoans') return listLoansCallable
+      if (name === 'listContributions') return jest.fn().mockResolvedValue({ data: { contributions: [], totalCount: 0, limit: 50 } })
+      if (name === 'listWithdrawals') return jest.fn().mockResolvedValue({ data: { withdrawals: [], totalCount: 0, limit: 50 } })
+      if (name === 'listInterestClaims') return jest.fn().mockResolvedValue({ data: { claims: [], totalCount: 0, limit: 50 } })
+      if (name === 'listLoanRepayments') return jest.fn().mockResolvedValue({ data: { repayments: [], totalCount: 0, limit: 50 } })
+      return jest.fn().mockResolvedValue({
+        data: { pools: [LIVE_POOL], totalCount: 1, page: 1, limit: 50, hasNextPage: false, hasPreviousPage: false },
+      })
+    })
+  })
+
+  afterEach(() => {
+    jest.spyOn(Date, 'now').mockRestore()
+    process.env.EXPO_PUBLIC_USE_MOCK_POOLS = 'true'
+    authStore.walletAddress = null
+    authStore.chainId = null
+  })
+
+  it('maps the chain state to the app’s status', async () => {
+    await loadWithLoans([DEFAULTED_LOAN])
+
+    expect(store.loans[0].status).toBe(LoanStatus.DEFAULTED)
+  })
+
+  it('carries the date the declaration was made', async () => {
+    await loadWithLoans([DEFAULTED_LOAN])
+
+    expect(store.loans[0].defaultedAt).toEqual(new Date(DEFAULTED_LOAN.defaultedAt!))
+  })
+
+  it('reads as settled once it is paid, and keeps the declaration', async () => {
+    // The pair is what says the borrower recovered, which is a different fact
+    // from never having been late. Collapsing them to one status loses it.
+    await loadWithLoans([{ ...DEFAULTED_LOAN, isRepaid: true, amountRepaid: parseEther('3.15').toString() }])
+
+    expect(store.loans[0].status).toBe(LoanStatus.REPAID)
+    expect(store.loans[0].defaultedAt).toBeDefined()
+  })
+
+  describe('what it must not lose', () => {
+    it('still knows what was borrowed, what came back and when it was due', async () => {
+      // The trap: all of these were gated on `status === 'disbursed'`, so a
+      // declaration reported the debt as repaid nothing and due never — on
+      // exactly the loans where those matter most.
+      await loadWithLoans([{ ...DEFAULTED_LOAN, amountRepaid: parseEther('1').toString() }])
+
+      const [loan] = store.loans
+      expect(loan.amountRepaid).toBe(parseEther('1'))
+      expect(loan.dueDate).toEqual(DUE_AT)
+      expect(loan.disbursedAt).toBeDefined()
+    })
+
+    it('still counts as the borrower’s outstanding loan', async () => {
+      // `activeLoanFor` feeds the repay panel. Dropping a declared loan from it
+      // would take a borrower's own debt off their screen at the moment it was
+      // declared.
+      await loadWithLoans([DEFAULTED_LOAN])
+
+      expect(store.activeLoanFor(12)?.loanId).toBe(6)
+      expect(store.activeLoan?.id).toBe(DEFAULTED_LOAN.id)
+    })
+  })
+
+  describe('the borrowing record', () => {
+    it('counts a declaration whether or not the debt was later paid', async () => {
+      await loadWithLoans([
+        DEFAULTED_LOAN,
+        { ...DEFAULTED_LOAN, id: '31337-12-7', loanId: 7, isRepaid: true, amountRepaid: parseEther('3.15').toString() },
+      ])
+
+      expect(store.borrowerHistory(USER_WALLET).defaulted).toBe(2)
+    })
+
+    it('counts a declared loan as borrowed and still owed', async () => {
+      await loadWithLoans([DEFAULTED_LOAN])
+
+      const history = store.borrowerHistory(USER_WALLET)
+      expect(history.total).toBe(1)
+      expect(history.outstanding).toBe(1)
+      expect(history.isNew).toBe(false)
+    })
+
+    it('reports nothing declared for a borrower nobody judged', async () => {
+      await loadWithLoans([LIVE_LOAN])
+
+      expect(store.borrowerHistory(USER_WALLET).defaulted).toBe(0)
+    })
+  })
+
+  describe('overdueLoansFor', () => {
+    it('lists a loan past its term that nobody has declared', async () => {
+      // The ordinary case, and the one the list exists for: overdue is
+      // arithmetic and happens without anyone doing anything.
+      await loadWithLoans([LIVE_LOAN])
+      afterDue()
+
+      expect(store.overdueLoansFor(12).map((loan) => loan.loanId)).toEqual([1])
+    })
+
+    it('leaves out a loan still inside its term', async () => {
+      await loadWithLoans([LIVE_LOAN])
+      afterDue(-60_000)
+
+      expect(store.overdueLoansFor(12)).toEqual([])
+    })
+
+    it('leaves out a request nobody funded, however old', async () => {
+      await loadWithLoans([REQUESTED_LOAN, REJECTED_LOAN])
+      afterDue(365 * 24 * 60 * 60 * 1000)
+
+      expect(store.overdueLoansFor(12)).toEqual([])
+    })
+
+    it('leaves out a debt that was settled', async () => {
+      await loadWithLoans([REPAID_LOAN])
+      afterDue()
+
+      expect(store.overdueLoansFor(12)).toEqual([])
+    })
+
+    it('keeps a loan that has already been declared', async () => {
+      // Still owed, so still on the owner's list — where the card says it is
+      // declared rather than offering to declare it again.
+      await loadWithLoans([DEFAULTED_LOAN])
+      afterDue()
+
+      expect(store.overdueLoansFor(12).map((loan) => loan.loanId)).toEqual([6])
+    })
+
+    it('puts the longest-overdue debt first', async () => {
+      // The question an owner is answering is who has been late longest; the
+      // biggest debt is often the newest one.
+      const older: LoanInfo = {
+        ...LIVE_LOAN,
+        id: '31337-12-8',
+        loanId: 8,
+        startedAt: new Date(new Date(LIVE_LOAN.startedAt).getTime() - 10 * 24 * 60 * 60 * 1000).toISOString(),
+      }
+      await loadWithLoans([LIVE_LOAN, older])
+      afterDue()
+
+      expect(store.overdueLoansFor(12).map((loan) => loan.loanId)).toEqual([8, 1])
+    })
+  })
+
+  describe('myOverdueLoans', () => {
+    it('gathers the connected wallet’s late debts', async () => {
+      await loadWithLoans([LIVE_LOAN, DEFAULTED_LOAN])
+      afterDue()
+
+      expect(store.myOverdueLoans.map((loan) => loan.id)).toEqual([LIVE_LOAN.id, DEFAULTED_LOAN.id])
+    })
+
+    it('leaves out somebody else’s', async () => {
+      await loadWithLoans([{ ...LIVE_LOAN, borrower: STRANGER_WALLET }])
+      afterDue()
+
+      expect(store.myOverdueLoans).toEqual([])
     })
   })
 })

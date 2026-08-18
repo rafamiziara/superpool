@@ -1374,12 +1374,22 @@ export const LendingPoolABI = [
   },
   {
     "inputs": [],
+    "name": "LoanAlreadyDefaulted",
+    "type": "error"
+  },
+  {
+    "inputs": [],
     "name": "LoanAlreadyRepaid",
     "type": "error"
   },
   {
     "inputs": [],
     "name": "LoanNotDisbursed",
+    "type": "error"
+  },
+  {
+    "inputs": [],
+    "name": "LoanNotOverdue",
     "type": "error"
   },
   {
@@ -1519,6 +1529,19 @@ export const LendingPoolABI = [
     "inputs": [
       {
         "indexed": true,
+        "internalType": "uint256",
+        "name": "gracePeriod",
+        "type": "uint256"
+      }
+    ],
+    "name": "DefaultGracePeriodChanged",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
         "internalType": "address",
         "name": "depositor",
         "type": "address"
@@ -1651,6 +1674,31 @@ export const LendingPoolABI = [
       }
     ],
     "name": "LoanCreated",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "uint256",
+        "name": "loanId",
+        "type": "uint256"
+      },
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "borrower",
+        "type": "address"
+      },
+      {
+        "indexed": true,
+        "internalType": "uint256",
+        "name": "outstanding",
+        "type": "uint256"
+      }
+    ],
+    "name": "LoanDefaulted",
     "type": "event"
   },
   {
@@ -2070,6 +2118,38 @@ export const LendingPoolABI = [
   },
   {
     "inputs": [],
+    "name": "defaultGracePeriod",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "_loanId",
+        "type": "uint256"
+      }
+    ],
+    "name": "defaultableAt",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
     "name": "depositFunds",
     "outputs": [],
     "stateMutability": "payable",
@@ -2158,6 +2238,11 @@ export const LendingPoolABI = [
           {
             "internalType": "uint64",
             "name": "accruedAt",
+            "type": "uint64"
+          },
+          {
+            "internalType": "uint64",
+            "name": "defaultedAt",
             "type": "uint64"
           }
         ],
@@ -2326,9 +2411,27 @@ export const LendingPoolABI = [
         "internalType": "uint64",
         "name": "accruedAt",
         "type": "uint64"
+      },
+      {
+        "internalType": "uint64",
+        "name": "defaultedAt",
+        "type": "uint64"
       }
     ],
     "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "_loanId",
+        "type": "uint256"
+      }
+    ],
+    "name": "markDefaulted",
+    "outputs": [],
+    "stateMutability": "nonpayable",
     "type": "function"
   },
   {
@@ -2594,6 +2697,19 @@ export const LendingPoolABI = [
   {
     "inputs": [],
     "name": "requestMembership",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "_gracePeriod",
+        "type": "uint256"
+      }
+    ],
+    "name": "setDefaultGracePeriod",
     "outputs": [],
     "stateMutability": "nonpayable",
     "type": "function"

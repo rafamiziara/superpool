@@ -7,6 +7,7 @@ import { ActivityIndicator, Pressable, ScrollView, Text, View } from 'react-nati
 import { useReadContract } from 'wagmi'
 import { BorrowForm } from '../../../src/components/lending/BorrowForm'
 import { UnsupportedPoolNotice } from '../../../src/components/lending/UnsupportedPoolNotice'
+import { LoanDueNotice } from '../../../src/components/lending/LoanDueNotice'
 import { RepayForm } from '../../../src/components/lending/RepayForm'
 import { LendingPoolABI } from '../../../src/constants/abis'
 import { palette } from '../../../src/constants/palette'
@@ -378,6 +379,10 @@ function BorrowScreen() {
 
         {outstanding ? (
           <View className="gap-5" testID="repay-panel">
+            {/* Above the form, not inside it: the form is about how much to
+                send, and this is about whether to send it now. It renders
+                nothing on a loan comfortably inside its term. */}
+            <LoanDueNotice loan={outstanding} />
             {/* Held back until the chain answers. A form pre-filled from the
                 indexed record would show a figure a few seconds stale and then
                 change under the borrower's hands. */}

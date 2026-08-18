@@ -6,22 +6,22 @@ This document outlines the structured development sprints for the SuperPool dApp
 
 To build a functional micro-lending decentralized application on Polygon where users can connect wallets, join specific lending pools, contribute liquidity, request and repay loans, with comprehensive reputation tracking.
 
-## 📍 Where things stand (2026-08-12)
+## 📍 Where things stand (2026-08-18)
 
-| Sprint                         | Status                                              |
-| ------------------------------ | --------------------------------------------------- |
-| 1 · Foundation                 | ✅ Complete                                         |
-| 2 · Authentication Enhancement | ✅ Complete                                         |
-| 3 · Pool Creation              | 🚧 Complete locally; blocked on testnet deployment  |
-| 4 · Pool Membership            | ✅ Complete                                         |
-| 5 · Pool Liquidity             | 🚧 Native currency only; ERC-20 outstanding         |
-| 6 · Loan Requests              | 🚧 Request flow complete; AI assessment not started |
-| 7 · Loan Repayments            | ✅ Full, partial and accruing; no schedule          |
-| 8 · Withdrawals                | ✅ Complete                                         |
-| 9 · Reputations                | 🚧 History shipped; no score, deliberately          |
-| 10 · Loan Management           | 🚧 Decisions and borrower history; AI support not   |
-| 11 · Interest Distribution     | ✅ Complete                                         |
-| 12 · Notifications             | 🚧 Owner-facing pushes shipped; delivery unverified |
+| Sprint                         | Status                                                 |
+| ------------------------------ | ------------------------------------------------------ |
+| 1 · Foundation                 | ✅ Complete                                            |
+| 2 · Authentication Enhancement | ✅ Complete                                            |
+| 3 · Pool Creation              | 🚧 Complete locally; blocked on testnet deployment     |
+| 4 · Pool Membership            | ✅ Complete                                            |
+| 5 · Pool Liquidity             | 🚧 Native currency only; ERC-20 outstanding            |
+| 6 · Loan Requests              | 🚧 Request flow complete; AI assessment not started    |
+| 7 · Loan Repayments            | ✅ Full, partial, accruing; reminders; no schedule     |
+| 8 · Withdrawals                | ✅ Complete                                            |
+| 9 · Reputations                | 🚧 History and defaults observed; no score, on purpose |
+| 10 · Loan Management           | 🚧 Decisions and borrower history; AI support not      |
+| 11 · Interest Distribution     | ✅ Complete                                            |
+| 12 · Notifications             | 🚧 All nine kinds shipped; delivery unverified         |
 
 Sprints 4–10 were shipped in a different order than planned. Membership (4)
 landed after liquidity (5) and loans (6, 7, 10), and loan management (10)
@@ -435,8 +435,11 @@ signal that was not there. The contract stamps `repaidAt` now, live-verified.
     plus gas on every loan event. What belongs on chain is what only the chain
     can witness — a repayment's timing — and that is what was added.
   - Repayment history impact on reputation ✅ — counted, not scored
-  - Default and liquidation reputation penalties — ❌; there is no liquidation
-    anywhere in the project and default handling is owned by no sprint
+  - Default and liquidation reputation penalties — 🚧. Default handling shipped
+    2026-08-18, so a default is now **observed**: `BorrowerHistory.defaulted`
+    counts declarations over a wallet's whole record. There is still no
+    _penalty_ — nothing gates on the count, and there is no liquidation anywhere
+    in the project, deliberately
   - Reputation recovery mechanisms — ❌, meaningless until there is a penalty
 
 - **Reputation Integration** 🚧
@@ -633,19 +636,25 @@ to find out was to open the pool.
 
 ### What is left ❌
 
-- **Borrower-facing pushes**: loan approved, loan rejected, membership decided.
-  Courtesies rather than the reason the sprint exists — and note
-  `cancelLoanRequest` emits `LoanRejected`, so a borrower who cancels their own
-  request must not be told it was declined.
-- **`sendDueReminders`** (Sprint 7's half). A scheduled scan, not an event hook,
-  plus its own clock discipline: the record's `startedAt` is chain time and the
-  job's "now" is server time, and a loan has to remember it was reminded.
+- ~~**Borrower-facing pushes**~~ — shipped 2026-08-18: loan approved, loan
+  rejected, loan defaulted, membership approved, membership rejected. The trap
+  the plan predicted was real and is handled by reading the **transaction's
+  sender**: `cancelLoanRequest` emits `LoanRejected` and leaves the record
+  identical to a rejection, so only who sent it separates the two. It also
+  forced a distinction in the indexer — `approved` and `disbursed` are now
+  different transitions, because both end at `disbursed` and only one is an
+  answer to somebody.
+- ~~**`sendDueReminders`**~~ (Sprint 7's half) — shipped 2026-08-18, hourly,
+  with the clock discipline the plan called for: **chain time, not server
+  time**, from one `getBlock('latest')` per chain per run. A loan remembers it
+  was reminded through the same `notifications_sent` marker everything else
+  uses, so it is one due-soon and one overdue reminder per loan, ever.
 - **Receipt polling.** Only send-response `DeviceNotRegistered` pruning is
   implemented. Expo's `getReceipts` needs a deferred second pass.
 - **Preferences beyond on/off**, digests, quiet hours, an in-app notification
   centre — all deliberately out of scope, see the plan §7.
 
-### Current Status: **Owner-facing pushes shipped; delivery unverified** 🚧
+### Current Status: **All nine kinds shipped; delivery unverified** 🚧
 
 The code is written and tested — 116 tests over transitions, idempotency,
 recipient resolution, token pruning and the deep links. **Nothing has reached a
@@ -670,9 +679,14 @@ SDK 53.
   and joining a pool on another network fails at the wallet rather than being
   explained. The old multi-chain plan's §3.2 and §4.1 are still the right
   sketch for it.
-- **Default handling.** A loan's term is recorded and displayed, and nothing on
-  chain enforces it — no liquidation, no penalty, no default state. Listed in
-  [`ROADMAP.md`](ROADMAP.md) Phase 3, absent from every sprint.
+- **Default handling — shipped 2026-08-18.** `LoanStatus.Defaulted`, an
+  owner-only `markDefaulted` behind a settable `defaultGracePeriod`, the
+  owner's late-loan list, the borrower's notice, and the scheduled reminder scan
+  that closes Sprint 7's half of Sprint 12. Still **no liquidation and no
+  penalty rate**: a declaration records a judgement, and what actually presses a
+  late borrower is accrual. See
+  [`LOANS.md`](LOANS.md#late-and-in-default-are-different-questions).
+  36 live checks: `pnpm --filter backend testDefaults`.
 - **Pending transaction tracking.** Shipped without a sprint: persistence across
   restarts, startup recovery, per-type result extraction and the status modal.
   Every write flow depends on it; the plan has never mentioned it.

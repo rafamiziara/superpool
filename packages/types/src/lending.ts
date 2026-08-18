@@ -53,6 +53,16 @@ export interface Loan {
   disbursedAt?: Date
   dueDate?: Date
   repaidAt?: Date
+  /**
+   * When the pool's owner declared this loan in default.
+   *
+   * Beside `repaidAt` and independent of `status`, exactly as the two are on
+   * chain. A loan can carry this **and** be `REPAID`: paying does not undo the
+   * declaration, and the pair is what says the borrower recovered — which is a
+   * different fact from never having been late, and a more useful one than
+   * either half alone.
+   */
+  defaultedAt?: Date
 }
 
 /**
@@ -87,6 +97,16 @@ export interface BorrowerHistory {
   outstanding: number
   /** Still owed and past the due date, which is a subset of `outstanding`. */
   overdue: number
+  /**
+   * Loans a pool owner declared in default, settled or not.
+   *
+   * Counted over the wallet's whole history rather than only its open loans,
+   * because that is the question being asked: `overdue` says a borrower is
+   * late today, and this says somebody once judged them to have stopped
+   * paying. A loan counted here can also be counted in `repaid` — see
+   * `Loan.defaultedAt`.
+   */
+  defaulted: number
   /**
    * True when this wallet has never borrowed.
    *

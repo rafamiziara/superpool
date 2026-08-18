@@ -112,6 +112,24 @@ const COPY: Record<
       failed: 'Nothing was paid out and the request is still waiting on you.',
     },
   },
+  /*
+    A declaration, not an ending. Every line here has to leave the borrower's
+    debt standing — copy that read like a write-off would contradict the
+    contract, which keeps the loan open, keeps interest accruing and keeps the
+    borrower's slot held.
+  */
+  MARK_DEFAULTED: {
+    headline: {
+      submitted: 'Marking the loan in default',
+      confirmed: 'Almost there',
+      failed: 'That did not go through',
+    },
+    summary: {
+      submitted: 'The network is confirming. No funds move either way.',
+      confirmed: 'The loan is marked in default. It is still owed, and the borrower can still pay it.',
+      failed: 'Nothing was recorded and the loan is unchanged.',
+    },
+  },
   REJECT_LOAN: {
     headline: {
       submitted: 'Turning down the request',

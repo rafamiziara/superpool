@@ -20,12 +20,19 @@ export type PendingTransactionStatus = 'submitted' | 'confirmed' | 'failed'
 /**
  * Everything that resolves to one loan record.
  *
- * Six of them because they read as six different things to the user and half
- * are sent by the pool owner rather than the borrower — but they share a
+ * Seven of them because they read as seven different things to the user and
+ * three are sent by the pool owner rather than the borrower — but they share a
  * payload, an extractor and an indexer, so the set is named once here and the
  * dispatches below narrow against it.
  */
-export type LoanTransactionType = 'BORROW' | 'REPAY' | 'REQUEST_LOAN' | 'APPROVE_LOAN' | 'REJECT_LOAN' | 'CANCEL_LOAN_REQUEST'
+export type LoanTransactionType =
+  | 'BORROW'
+  | 'REPAY'
+  | 'REQUEST_LOAN'
+  | 'APPROVE_LOAN'
+  | 'REJECT_LOAN'
+  | 'CANCEL_LOAN_REQUEST'
+  | 'MARK_DEFAULTED'
 
 /**
  * Everything that resolves to one membership record.
@@ -51,6 +58,7 @@ const LOAN_TRANSACTION_TYPES: readonly LoanTransactionType[] = [
   'APPROVE_LOAN',
   'REJECT_LOAN',
   'CANCEL_LOAN_REQUEST',
+  'MARK_DEFAULTED',
 ]
 
 const MEMBERSHIP_TRANSACTION_TYPES: readonly MembershipTransactionType[] = [
@@ -259,6 +267,15 @@ export type ApproveLoanTransaction = LoanTransaction<'APPROVE_LOAN'>
 export type RejectLoanTransaction = LoanTransaction<'REJECT_LOAN'>
 /** The borrower withdrawing their own request before it is decided. */
 export type CancelLoanRequestTransaction = LoanTransaction<'CANCEL_LOAN_REQUEST'>
+/**
+ * The owner declaring an overdue loan in default.
+ *
+ * Nothing moves, like a rejection — but unlike one, nothing is released
+ * either: the debt stands, interest goes on accruing and the borrower's slot
+ * stays held. `amount` on the record is the principal, which is what the card
+ * shows; what is actually owed is larger and is read from the chain.
+ */
+export type MarkDefaultedTransaction = LoanTransaction<'MARK_DEFAULTED'>
 
 /**
  * One membership action, kept generic in its `type` so the union still

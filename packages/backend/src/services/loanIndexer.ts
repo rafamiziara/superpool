@@ -4,7 +4,7 @@ import { logger } from 'firebase-functions/v2'
 import { HttpsError } from 'firebase-functions/v2/https'
 import { LendingPoolABI, LOANS_COLLECTION } from '../constants'
 import { resolvePoolId } from './contributionIndexer'
-import { notifyLoanRequested } from './poolNotifications'
+import { notifyLoanDecided, notifyLoanRequested } from './poolNotifications'
 
 /**
  * One loan, read from the chain rather than decoded from a log.
@@ -75,6 +75,17 @@ export interface ParsedLoan {
    * closes the debt.
    */
   repaidAt?: Date
+  /**
+   * When the pool's owner declared this loan defaulted. Undefined on every
+   * loan nobody declared.
+   *
+   * Read from state for the same reason `repaidAt` is: the sweep sees the
+   * `LoanDefaulted` log on every pass forever, and a date taken from whichever
+   * log happened to arrive would be rewritten by the wrong one. It is on chain
+   * at all so that a loan first indexed *after* it defaulted can still say
+   * when — a log is not something a later reader can ask for by loan id.
+   */
+  defaultedAt?: Date
   status: LoanStatus
   chainId: number
   transactionHash: string
@@ -110,20 +121,28 @@ export interface IndexLoanResult {
  *
  * Named for the state arrived at, not the event observed, because the event is
  * deliberately not consulted anywhere in this indexer — `getLoan` is.
+ *
+ * `disbursed` and `approved` are the one place two journeys reach the same
+ * state and have to be told apart: `createLoan` hands money to a borrower who
+ * asked for it a moment ago and needs no telling, while `approveLoan` answers
+ * a request somebody has been waiting on. Both leave the loan `disbursed`, so
+ * only the state it came *from* separates them — and collapsing the two would
+ * congratulate every borrower on their own transaction.
  */
-export type LoanTransition = 'requested' | 'disbursed' | 'rejected' | 'repayment' | 'repaid' | null
+export type LoanTransition = 'requested' | 'disbursed' | 'approved' | 'rejected' | 'repayment' | 'repaid' | 'defaulted' | null
 
 /** The wire form of `LendingPool.LoanStatus`. */
-export type LoanStatus = 'disbursed' | 'requested' | 'rejected'
+export type LoanStatus = 'disbursed' | 'requested' | 'rejected' | 'defaulted'
 
 /**
  * The contract's enum, by ordinal.
  *
  * `Disbursed` is index 0 on purpose — a loan written before the field existed
  * reads zero, and every one of those was disbursed. Reordering this relabels
- * history, so it must track the Solidity enum exactly.
+ * history, so it must track the Solidity enum exactly, and `defaulted` is
+ * appended here because it was appended there.
  */
-const LOAN_STATUS: readonly LoanStatus[] = ['disbursed', 'requested', 'rejected']
+const LOAN_STATUS: readonly LoanStatus[] = ['disbursed', 'requested', 'rejected', 'defaulted']
 
 const lendingPoolInterface = new Interface([...LendingPoolABI])
 
@@ -133,11 +152,12 @@ export const LOAN_REQUESTED_TOPIC = lendingPoolInterface.getEvent('LoanRequested
 export const LOAN_APPROVED_TOPIC = lendingPoolInterface.getEvent('LoanApproved')!.topicHash
 export const LOAN_REJECTED_TOPIC = lendingPoolInterface.getEvent('LoanRejected')!.topicHash
 export const LOAN_REPAYMENT_MADE_TOPIC = lendingPoolInterface.getEvent('LoanRepaymentMade')!.topicHash
+export const LOAN_DEFAULTED_TOPIC = lendingPoolInterface.getEvent('LoanDefaulted')!.topicHash
 
 /**
  * Every event that touches a loan.
  *
- * All six are treated identically: the log says *which* loan changed and
+ * All seven are treated identically: the log says *which* loan changed and
  * `getLoan` says what it now is, so nothing downstream branches on which one
  * arrived.
  *
@@ -153,6 +173,7 @@ export const LOAN_TOPICS = [
   LOAN_APPROVED_TOPIC,
   LOAN_REJECTED_TOPIC,
   LOAN_REPAYMENT_MADE_TOPIC,
+  LOAN_DEFAULTED_TOPIC,
 ] as const
 
 /** `getPoolId` returns 0 for an unknown address — pool ids start at 1. */
@@ -262,6 +283,10 @@ export async function fetchLoan(
     // Zero means either not repaid or repaid before the field existed; both
     // are "no date", and `isRepaid` is what says which.
     repaidAt: repaidAtFrom(loan.repaidAt as bigint),
+    // Same zero-is-absence rule as `repaidAt` above, and the same reason it
+    // has to be applied here: nothing downstream should have to know that the
+    // chain says "never" by saying 1970.
+    defaultedAt: repaidAtFrom(loan.defaultedAt as bigint),
     // Out-of-range would mean the contract grew a state this build does not
     // know; reading it as disbursed would be a lie, so it fails loudly.
     status: statusFromOrdinal(Number(loan.status)),
@@ -274,6 +299,7 @@ interface StoredLoan {
   status?: LoanStatus
   startedAt?: Timestamp
   repaidAt?: Timestamp
+  defaultedAt?: Timestamp
   amountRepaid?: string
   principalOutstanding?: string
   interestOutstanding?: string
@@ -333,6 +359,15 @@ function transitionOf(stored: StoredLoan | undefined, loan: ParsedLoan): LoanTra
   // news is the loan, not any instalment already paid against it.
   if (!stored?.status) return loan.status
 
+  // A declaration moves `disbursed` → `defaulted` on a loan that is otherwise
+  // untouched: same borrower, same amount, same `isRepaid`. Checked before the
+  // equality below simply because it is a status move like the others; it
+  // needs no special case beyond being reachable, since `disbursed` is not
+  // `requested` and the final clause would otherwise refuse it.
+  if (stored.status === 'disbursed' && loan.status === 'defaulted') {
+    return 'defaulted'
+  }
+
   if (stored.status === loan.status) {
     // Money arrived without closing the debt — a state the loan record could
     // not be in until instalments existed, and one that has to be told apart
@@ -347,11 +382,13 @@ function transitionOf(stored: StoredLoan | undefined, loan: ParsedLoan): LoanTra
     return null
   }
 
-  // `requested` is the only state anything moves out of: a disbursed loan is
-  // settled by repayment, which is handled above, and a rejected one is final.
+  // `requested` is the only *other* state anything moves out of: a disbursed
+  // loan is settled by repayment or declared in default, both handled above,
+  // and a rejected one is final.
   if (stored.status !== 'requested') return null
 
-  return loan.status
+  // Arriving at `disbursed` *from* a request is the owner having approved it.
+  return loan.status === 'disbursed' ? 'approved' : loan.status
 }
 
 /** Whether the chain has been paid more towards this loan than the record knows. */
@@ -427,6 +464,10 @@ export async function indexLoan(loan: ParsedLoan, firestore: Firestore): Promise
     stored.interestOutstanding === loan.interestOutstanding &&
     millisOf(stored.accruedAt) === loan.accruedAt?.getTime() &&
     millisOf(stored.repaidAt) === loan.repaidAt?.getTime() &&
+    // Without this a declaration would be reported as already indexed on a
+    // loan whose figures happened not to move — which is every loan the owner
+    // declares without a payment having arrived first, i.e. all of them.
+    millisOf(stored.defaultedAt) === loan.defaultedAt?.getTime() &&
     millisOf(stored.startedAt) === loan.startedAt.getTime() &&
     // A record whose state is right but whose reference points at a later
     // transaction than this one is not current: nothing else would ever go
@@ -464,6 +505,10 @@ export async function indexLoan(loan: ParsedLoan, firestore: Firestore): Promise
       // an absent key leaves whatever is already there — which is what a
       // stamp the chain still reports would be anyway.
       ...(loan.repaidAt ? { repaidAt: loan.repaidAt } : {}),
+      // Omitted rather than null, like the two stamps above. Absent means
+      // nobody declared this loan, which is the honest reading and the one
+      // almost every loan wants.
+      ...(loan.defaultedAt ? { defaultedAt: loan.defaultedAt } : {}),
       status: loan.status,
       chainId: loan.chainId,
       // The transaction and block always describe the moment `startedAt`
@@ -530,6 +575,17 @@ export async function indexLoanFromLog(
   // user is shown.
   await notifyLoanRequested(result, loan, firestore).catch((error: unknown) => {
     logger.error('Loan notification failed; indexing stands', {
+      docId: result.id,
+      error: error instanceof Error ? error.message : String(error),
+    })
+  })
+
+  // The borrower's half: their request was answered, or their debt was
+  // declared. Needs the provider, which the owner-facing pair does not — a
+  // rejection has to be told apart from the borrower cancelling their own
+  // request, and only the transaction's sender can do that.
+  await notifyLoanDecided(result, loan, provider, firestore).catch((error: unknown) => {
+    logger.error('Loan decision notification failed; indexing stands', {
       docId: result.id,
       error: error instanceof Error ? error.message : String(error),
     })

@@ -1315,6 +1315,265 @@ describe('LendingPool', function () {
     })
   })
 
+  describe('Default handling', function () {
+    const borrowed = ethers.parseEther('5')
+
+    /** Puts a live loan on the books and moves the clock past its term. */
+    async function overdueLoan(): Promise<number> {
+      await lendingPool.connect(lender).depositFunds({ value: ethers.parseEther('50') })
+      await lendingPool.connect(borrower).depositFunds({ value: ethers.parseEther('10') })
+      await lendingPool.connect(borrower).createLoan(borrowed)
+
+      await time.increase(loanDuration + 1)
+
+      return 1
+    }
+
+    /** A live loan, still inside its term. */
+    async function freshLoan(): Promise<number> {
+      await lendingPool.connect(lender).depositFunds({ value: ethers.parseEther('50') })
+      await lendingPool.connect(borrower).depositFunds({ value: ethers.parseEther('10') })
+      await lendingPool.connect(borrower).createLoan(borrowed)
+
+      return 1
+    }
+
+    it('leaves the grace period at zero, so an untouched pool behaves as it always did', async function () {
+      // The retrofit: a pool that predates this reads 0, and its owner may act
+      // the moment the term lapses. Anything else would be a silent change to
+      // pools that already exist.
+      expect(await lendingPool.defaultGracePeriod()).to.equal(0)
+    })
+
+    it('only lets the owner set the grace period', async function () {
+      await expect(lendingPool.connect(borrower).setDefaultGracePeriod(1)).to.be.reverted
+
+      await expect(lendingPool.connect(owner).setDefaultGracePeriod(86400))
+        .to.emit(lendingPool, 'DefaultGracePeriodChanged')
+        .withArgs(86400)
+
+      expect(await lendingPool.defaultGracePeriod()).to.equal(86400)
+    })
+
+    it('only lets the owner declare a default', async function () {
+      const loanId = await overdueLoan()
+
+      await expect(lendingPool.connect(borrower).markDefaulted(loanId)).to.be.reverted
+      await expect(lendingPool.connect(lender).markDefaulted(loanId)).to.be.reverted
+    })
+
+    it('refuses a loan still inside its term', async function () {
+      const loanId = await freshLoan()
+
+      await expect(lendingPool.connect(owner).markDefaulted(loanId)).to.be.revertedWithCustomError(lendingPool, 'LoanNotOverdue')
+    })
+
+    it('refuses at the exact end of the term, and allows a second later', async function () {
+      // The boundary is deliberate: a loan is not late at the instant it comes
+      // due, only afterwards.
+      const loanId = await freshLoan()
+
+      await atEndOfTerm(lendingPool, loanId)
+      await expect(lendingPool.connect(owner).markDefaulted(loanId)).to.be.revertedWithCustomError(lendingPool, 'LoanNotOverdue')
+
+      await expect(lendingPool.connect(owner).markDefaulted(loanId)).to.emit(lendingPool, 'LoanDefaulted')
+    })
+
+    it('waits out the grace period the owner published', async function () {
+      const loanId = await overdueLoan()
+      const week = 7 * 24 * 60 * 60
+
+      await lendingPool.connect(owner).setDefaultGracePeriod(week)
+
+      // Overdue, but inside the promise the owner made.
+      await expect(lendingPool.connect(owner).markDefaulted(loanId)).to.be.revertedWithCustomError(lendingPool, 'LoanNotOverdue')
+
+      await time.increase(week)
+
+      await expect(lendingPool.connect(owner).markDefaulted(loanId)).to.emit(lendingPool, 'LoanDefaulted')
+    })
+
+    it('reports when a loan becomes declarable', async function () {
+      const loanId = await overdueLoan()
+      const { startTime, duration } = await lendingPool.getLoan(loanId)
+
+      expect(await lendingPool.defaultableAt(loanId)).to.equal(startTime + duration)
+
+      await lendingPool.connect(owner).setDefaultGracePeriod(3600)
+
+      expect(await lendingPool.defaultableAt(loanId)).to.equal(startTime + duration + 3600n)
+    })
+
+    it('stamps the declaration and prices the debt as of that block', async function () {
+      const loanId = await overdueLoan()
+      const owed = await lendingPool.outstandingBalance(loanId)
+
+      const tx = await lendingPool.connect(owner).markDefaulted(loanId)
+      const receipt = await tx.wait()
+      const block = await ethers.provider.getBlock(receipt!.blockNumber)
+
+      const loan = await lendingPool.getLoan(loanId)
+      expect(loan.status).to.equal(3) // Defaulted
+      expect(loan.defaultedAt).to.equal(block!.timestamp)
+
+      // Accrued to the declaring block, so the figure on the record is at
+      // least what the debt was a moment before it.
+      await expect(tx).to.emit(lendingPool, 'LoanDefaulted')
+      expect(loan.principalOutstanding + loan.interestOutstanding).to.be.greaterThanOrEqual(owed)
+    })
+
+    it('refuses a second declaration', async function () {
+      const loanId = await overdueLoan()
+
+      await lendingPool.connect(owner).markDefaulted(loanId)
+
+      await expect(lendingPool.connect(owner).markDefaulted(loanId)).to.be.revertedWithCustomError(lendingPool, 'LoanAlreadyDefaulted')
+    })
+
+    it('refuses a request nobody funded, however old', async function () {
+      // A request has taken nothing, so there is nothing to default on — but
+      // its startTime is stamped at the asking, so without the status check an
+      // ignored request would become declarable simply by ageing.
+      await lendingPool.connect(lender).depositFunds({ value: ethers.parseEther('50') })
+      await lendingPool.connect(borrower).depositFunds({ value: ethers.parseEther('10') })
+      await lendingPool.connect(owner).setRequiresApproval(true)
+      await lendingPool.connect(borrower).requestLoan(borrowed)
+
+      await time.increase(loanDuration * 10)
+
+      await expect(lendingPool.connect(owner).markDefaulted(1)).to.be.revertedWithCustomError(lendingPool, 'LoanNotDisbursed')
+    })
+
+    it('refuses a loan that was paid off', async function () {
+      const loanId = await overdueLoan()
+
+      await repayInFull(lendingPool, borrower, loanId)
+
+      await expect(lendingPool.connect(owner).markDefaulted(loanId)).to.be.revertedWithCustomError(lendingPool, 'LoanAlreadyRepaid')
+    })
+
+    it('refuses to declare while the pool is paused', async function () {
+      const loanId = await overdueLoan()
+      await lendingPool.connect(owner).pause()
+
+      await expect(lendingPool.connect(owner).markDefaulted(loanId)).to.be.reverted
+    })
+
+    it('reads zero on a loan nobody declared', async function () {
+      const loanId = await freshLoan()
+
+      const loan = await lendingPool.getLoan(loanId)
+      expect(loan.defaultedAt).to.equal(0)
+      expect(loan.status).to.equal(0) // Disbursed
+    })
+
+    describe('what survives the declaration', function () {
+      it('still owes the money, and owes more of it every second', async function () {
+        // The trap this pins: every valuation gated on `Disbursed` alone, so
+        // declaring a default would have reported the debt as zero — telling
+        // the borrower it had vanished and handing a repay screen nothing to
+        // send.
+        const loanId = await overdueLoan()
+        await lendingPool.connect(owner).markDefaulted(loanId)
+
+        const owed = await lendingPool.outstandingBalance(loanId)
+        expect(owed).to.be.greaterThan(borrowed)
+
+        const [principal, interest] = await lendingPool.loanBalance(loanId)
+        expect(principal).to.equal(borrowed)
+        expect(interest).to.be.greaterThan(0)
+        expect(principal + interest).to.equal(owed)
+
+        await time.increase(loanDuration)
+        expect(await lendingPool.outstandingBalance(loanId)).to.be.greaterThan(owed)
+      })
+
+      it('still takes a payment, in part', async function () {
+        const loanId = await overdueLoan()
+        await lendingPool.connect(owner).markDefaulted(loanId)
+
+        await expect(lendingPool.connect(borrower).repayLoan(loanId, { value: ethers.parseEther('1') })).to.emit(
+          lendingPool,
+          'LoanRepaymentMade'
+        )
+
+        const loan = await lendingPool.getLoan(loanId)
+        expect(loan.amountRepaid).to.equal(ethers.parseEther('1'))
+        expect(loan.isRepaid).to.be.false
+        expect(loan.status).to.equal(3) // still Defaulted
+      })
+
+      it('closes on the payment that settles it, and reads as recovered', async function () {
+        const loanId = await overdueLoan()
+        await lendingPool.connect(owner).markDefaulted(loanId)
+
+        await expect(repayInFull(lendingPool, borrower, loanId)).to.emit(lendingPool, 'LoanRepaid')
+
+        const loan = await lendingPool.getLoan(loanId)
+        expect(loan.isRepaid).to.be.true
+        expect(loan.repaidAt).to.be.greaterThan(0)
+        // Paying does not undo the declaration. A loan reading `Defaulted`
+        // *and* `isRepaid` is one that recovered, which is worth more to a
+        // later lender than either half alone.
+        expect(loan.status).to.equal(3)
+        expect(loan.defaultedAt).to.be.greaterThan(0)
+      })
+
+      it('still holds the borrower to one loan at a time', async function () {
+        // Freeing the slot would be the expensive mistake: a defaulter could
+        // borrow again from the pool they are already in default to.
+        const loanId = await overdueLoan()
+        await lendingPool.connect(owner).markDefaulted(loanId)
+
+        expect(await lendingPool.activeLoanId(borrower.address)).to.equal(loanId)
+
+        await expect(lendingPool.connect(borrower).createLoan(ethers.parseEther('1'))).to.be.revertedWithCustomError(
+          lendingPool,
+          'LoanOutstanding'
+        )
+      })
+
+      it('releases the borrower once the debt is actually settled', async function () {
+        const loanId = await overdueLoan()
+        await lendingPool.connect(owner).markDefaulted(loanId)
+        await repayInFull(lendingPool, borrower, loanId)
+
+        expect(await lendingPool.activeLoanId(borrower.address)).to.equal(0)
+        await expect(lendingPool.connect(borrower).createLoan(ethers.parseEther('1'))).to.not.be.reverted
+      })
+
+      it('still pays the lenders what the recovery earned', async function () {
+        const loanId = await overdueLoan()
+        await lendingPool.connect(owner).markDefaulted(loanId)
+
+        const before = await lendingPool.claimable(lender.address)
+        await repayInFull(lendingPool, borrower, loanId)
+
+        expect(await lendingPool.claimable(lender.address)).to.be.greaterThan(before)
+      })
+    })
+
+    it('lands the stamp in a word of its own, leaving every field above it where it was', async function () {
+      const loanId = await overdueLoan()
+      const address = await lendingPool.getAddress()
+      const before = await lendingPool.getLoan(loanId)
+      const slot = await findLoanSlot(address, loanId, borrower.address)
+
+      await lendingPool.connect(owner).markDefaulted(loanId)
+      const after = await lendingPool.getLoan(loanId)
+
+      // Slots 1-4 are the terms of the loan and a declaration touches none of
+      // them. The struct grew from seven words to eight, which is only safe
+      // because `loans` is a mapping and the eighth was never allocated.
+      expect(BigInt(await ethers.provider.getStorage(address, slot + 1n))).to.equal(before.amount)
+      expect(BigInt(await ethers.provider.getStorage(address, slot + 2n))).to.equal(before.interestRate)
+      expect(BigInt(await ethers.provider.getStorage(address, slot + 3n))).to.equal(before.startTime)
+      expect(BigInt(await ethers.provider.getStorage(address, slot + 4n))).to.equal(before.duration)
+
+      expect(BigInt(await ethers.provider.getStorage(address, slot + 8n))).to.equal(after.defaultedAt)
+    })
+  })
+
   describe('Membership', function () {
     const deposit = ethers.parseEther('10')
 

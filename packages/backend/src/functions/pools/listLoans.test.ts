@@ -169,7 +169,9 @@ describe('listLoansHandler', () => {
     // `isRepaid` alone would report unfunded requests as active debt.
     await listLoansHandler(buildRequest({ data: { activeOnly: true } }) as never)
 
-    expect(mockQuery.where).toHaveBeenCalledWith('status', '==', 'disbursed')
+    // A declared default is still a debt, so `activeOnly` has to admit it —
+    // narrowing to `disbursed` alone drops exactly the loans worth chasing.
+    expect(mockQuery.where).toHaveBeenCalledWith('status', 'in', ['disbursed', 'defaulted'])
     expect(mockQuery.where).toHaveBeenCalledWith('isRepaid', '==', false)
   })
 
@@ -177,6 +179,43 @@ describe('listLoansHandler', () => {
     await listLoansHandler(buildRequest({ data: { pendingOnly: true } }) as never)
 
     expect(mockQuery.where).toHaveBeenCalledWith('status', '==', 'requested')
+  })
+
+  it('should restrict to declared defaults when defaultedOnly is set', async () => {
+    // Narrower than "overdue", which needs no query at all: a due date is
+    // `startedAt + duration` and any reader can work it out.
+    await listLoansHandler(buildRequest({ data: { defaultedOnly: true } }) as never)
+
+    expect(mockQuery.where).toHaveBeenCalledWith('status', '==', 'defaulted')
+  })
+
+  it('should pass the declaration date through as an ISO string', async () => {
+    const declaredAt = new Date('2026-08-14T10:00:00.000Z')
+    mockQuery.get.mockResolvedValue({
+      docs: [
+        {
+          id: '31337-1-1',
+          data: () => ({
+            ...mockLoans[0],
+            status: 'defaulted',
+            startedAt: { toDate: () => new Date() },
+            defaultedAt: { toDate: () => declaredAt },
+          }),
+        },
+      ],
+    })
+
+    const result = await listLoansHandler(buildRequest() as never)
+
+    expect(result.loans[0].defaultedAt).toBe(declaredAt.toISOString())
+    expect(result.loans[0].status).toBe('defaulted')
+  })
+
+  it('should leave the declaration date off a loan nobody declared', async () => {
+    // Absent rather than null, like `repaidAt`: absent is the statement.
+    const result = await listLoansHandler(buildRequest() as never)
+
+    expect(result.loans[0]).not.toHaveProperty('defaultedAt')
   })
 
   it('should read a record stored before the approval step as disbursed', async () => {

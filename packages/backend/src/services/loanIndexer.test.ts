@@ -23,10 +23,12 @@ jest.mock('ethers', () => {
  * `poolNotifications.test.ts` covers what it decides to send.
  */
 const mockNotifyLoanRequested = jest.fn()
+const mockNotifyLoanDecided = jest.fn()
 
 jest.mock('./poolNotifications', () => ({
   ...jest.requireActual('./poolNotifications'),
   notifyLoanRequested: (...args: unknown[]) => mockNotifyLoanRequested(...args),
+  notifyLoanDecided: (...args: unknown[]) => mockNotifyLoanDecided(...args),
 }))
 
 const {
@@ -89,6 +91,8 @@ function buildChainLoan(
     interestOutstanding: bigint
     /** Seconds. 0 marks a loan made before interest accrued. */
     accruedAt: number
+    /** Seconds. 0 is the contract's "nobody declared this". */
+    defaultedAt: number
   }> = {}
 ) {
   return {
@@ -101,6 +105,7 @@ function buildChainLoan(
     principalOutstanding: overrides.principalOutstanding ?? 5_000_000_000_000_000_000n,
     interestOutstanding: overrides.interestOutstanding ?? 0n,
     accruedAt: BigInt(overrides.accruedAt ?? START_TIME),
+    defaultedAt: BigInt(overrides.defaultedAt ?? 0),
     amount: overrides.amount ?? 5_000_000_000_000_000_000n,
     interestRate: 500n,
     startTime: BigInt(START_TIME),
@@ -128,6 +133,7 @@ function buildFirestore(
     storedPrincipalOutstanding?: string
     storedInterestOutstanding?: string
     storedAccruedAt?: Date | null
+    storedDefaultedAt?: Date
   } = {}
 ) {
   const {
@@ -141,6 +147,7 @@ function buildFirestore(
     storedPrincipalOutstanding = '5000000000000000000',
     storedInterestOutstanding = '0',
     storedAccruedAt = new Date(START_TIME * 1000),
+    storedDefaultedAt,
   } = options
   const mockSet = jest.fn().mockResolvedValue(undefined)
   const storedData = {
@@ -153,6 +160,7 @@ function buildFirestore(
     startedAt: timestampOf(storedStartedAt),
     blockNumber: storedBlockNumber,
     ...(storedRepaidAt ? { repaidAt: timestampOf(storedRepaidAt) } : {}),
+    ...(storedDefaultedAt ? { defaultedAt: timestampOf(storedDefaultedAt) } : {}),
   }
   const mockDocRef = {
     get: jest.fn().mockResolvedValue({ exists, data: () => (exists ? storedData : undefined) }),
@@ -195,6 +203,8 @@ beforeEach(() => {
   mockGetPoolId.mockResolvedValue(BigInt(POOL_ID))
   mockNotifyLoanRequested.mockReset()
   mockNotifyLoanRequested.mockResolvedValue(undefined)
+  mockNotifyLoanDecided.mockReset()
+  mockNotifyLoanDecided.mockResolvedValue(undefined)
 })
 
 // ---------------------------------------------------------------------------
@@ -727,12 +737,15 @@ describe('indexLoan transitions', () => {
     expect(result.transition).toBe('disbursed')
   })
 
-  it('reports the owner approving a request', async () => {
+  it('reports the owner approving a request, distinctly from a borrow', async () => {
+    // Both journeys end at `disbursed`, and only the state moved *from*
+    // separates them. Collapsing the two congratulates every borrower on a
+    // transaction they sent themselves a second ago.
     const { mockFs } = buildFirestore({ exists: true, storedStatus: 'requested' })
 
     const result = await indexLoan(parsedLoan, mockFs)
 
-    expect(result.transition).toBe('disbursed')
+    expect(result.transition).toBe('approved')
   })
 
   it('reports the owner rejecting a request', async () => {
@@ -953,5 +966,158 @@ describe('indexLoanFromLog notifications', () => {
 
     await expect(indexLoanFromLog(buildLog(), CHAIN_ID, FACTORY_ADDRESS, buildProvider(), mockFs)).resolves.toBeNull()
     expect(mockNotifyLoanRequested).not.toHaveBeenCalled()
+  })
+})
+
+// ---------------------------------------------------------------------------
+// A loan the owner declared in default.
+// ---------------------------------------------------------------------------
+
+/** Forty days in: past a thirty-day term. */
+const DECLARED_AT_SECONDS = START_TIME + 40 * 24 * 60 * 60
+const DECLARED_AT = new Date(DECLARED_AT_SECONDS * 1000)
+
+describe('a defaulted loan', () => {
+  it('reads the contract enum ordinal 3 as defaulted', async () => {
+    // The ordinal has to track the Solidity enum exactly: it was appended
+    // there, so it is appended here, and reordering either relabels history.
+    mockGetLoan.mockResolvedValue(buildChainLoan({ status: 3, defaultedAt: DECLARED_AT_SECONDS }))
+
+    const loan = await fetchLoan(LOAN_ID, POOL_ADDRESS, {})
+
+    expect(loan.status).toBe('defaulted')
+  })
+
+  it('turns the chain zero back into an absence', async () => {
+    // Same rule as `repaidAt`: 0 means "never", and letting it through would
+    // date every undeclared loan to 1970.
+    mockGetLoan.mockResolvedValue(buildChainLoan())
+
+    const loan = await fetchLoan(LOAN_ID, POOL_ADDRESS, {})
+
+    expect(loan.defaultedAt).toBeUndefined()
+  })
+
+  it('reads the declaration stamp when there is one', async () => {
+    mockGetLoan.mockResolvedValue(buildChainLoan({ status: 3, defaultedAt: DECLARED_AT_SECONDS }))
+
+    const loan = await fetchLoan(LOAN_ID, POOL_ADDRESS, {})
+
+    expect(loan.defaultedAt).toEqual(DECLARED_AT)
+  })
+
+  it('omits the stamp from the write rather than storing undefined', async () => {
+    const { mockFs, mockDocRef } = buildFirestore({ exists: false })
+
+    await indexLoan(parsedLoan, mockFs)
+
+    expect(mockDocRef.set).toHaveBeenCalledWith(expect.not.objectContaining({ defaultedAt: expect.anything() }), { merge: true })
+  })
+
+  it('rewrites a loan that has just been declared', async () => {
+    // The sharpest version of the currency check: a declaration moves the
+    // status and the stamp and *nothing else* — same amount, same
+    // `amountRepaid`, same accrual snapshot if no payment came with it. Without
+    // the stamp in the comparison this reads as already indexed.
+    const { mockFs, mockDocRef } = buildFirestore({ exists: true, storedStatus: 'disbursed' })
+
+    const result = await indexLoan({ ...parsedLoan, status: 'defaulted', defaultedAt: DECLARED_AT }, mockFs)
+
+    expect(result.stored).toBe(true)
+    expect(mockDocRef.set).toHaveBeenCalledWith(expect.objectContaining({ status: 'defaulted', defaultedAt: DECLARED_AT }), {
+      merge: true,
+    })
+  })
+
+  it('writes nothing when the declaration is already recorded', async () => {
+    const { mockFs, mockDocRef } = buildFirestore({
+      exists: true,
+      storedStatus: 'defaulted',
+      storedDefaultedAt: DECLARED_AT,
+    })
+
+    const result = await indexLoan({ ...parsedLoan, status: 'defaulted', defaultedAt: DECLARED_AT }, mockFs)
+
+    expect(mockDocRef.set).not.toHaveBeenCalled()
+    expect(result.alreadyIndexed).toBe(true)
+  })
+
+  it('reports the declaration as a transition', async () => {
+    const { mockFs } = buildFirestore({ exists: true, storedStatus: 'disbursed' })
+
+    const result = await indexLoan({ ...parsedLoan, status: 'defaulted', defaultedAt: DECLARED_AT }, mockFs)
+
+    expect(result.transition).toBe('defaulted')
+  })
+
+  it('keeps the declaration when the debt is finally settled', async () => {
+    // Paying does not undo the declaration on chain, so the index must not
+    // undo it either: `defaulted` plus `isRepaid` is a recovery, and it is a
+    // different fact from a loan that was never late.
+    const { mockFs, mockDocRef } = buildFirestore({
+      exists: true,
+      storedStatus: 'defaulted',
+      storedDefaultedAt: DECLARED_AT,
+    })
+
+    const result = await indexLoan(
+      { ...parsedLoan, status: 'defaulted', defaultedAt: DECLARED_AT, isRepaid: true, repaidAt: REPAID_AT },
+      mockFs
+    )
+
+    expect(result.transition).toBe('repaid')
+    expect(mockDocRef.set).toHaveBeenCalledWith(expect.objectContaining({ status: 'defaulted', isRepaid: true }), { merge: true })
+  })
+
+  it('does not announce a declaration twice', async () => {
+    const { mockFs } = buildFirestore({
+      exists: true,
+      storedStatus: 'defaulted',
+      storedDefaultedAt: DECLARED_AT,
+      storedBlockNumber: 100,
+    })
+
+    // Same state, an earlier transaction reference: the write happens, but
+    // only to correct the reference. `stored` is not news.
+    const result = await indexLoan({ ...parsedLoan, status: 'defaulted', defaultedAt: DECLARED_AT, blockNumber: 90 }, mockFs)
+
+    expect(result.stored).toBe(true)
+    expect(result.transition).toBeNull()
+  })
+
+  it('dispatches the borrower-facing notification from the log path', async () => {
+    // Here rather than in the callable, so the sweep notifies too.
+    mockGetLoan.mockResolvedValue(buildChainLoan({ status: 3, defaultedAt: DECLARED_AT_SECONDS }))
+    const { mockFs } = buildFirestore({ exists: true, storedStatus: 'disbursed' })
+
+    await indexLoanFromLog(buildLog(), CHAIN_ID, FACTORY_ADDRESS, {}, mockFs)
+
+    expect(mockNotifyLoanDecided).toHaveBeenCalledWith(
+      expect.objectContaining({ transition: 'defaulted' }),
+      expect.objectContaining({ status: 'defaulted' }),
+      expect.anything(),
+      mockFs
+    )
+  })
+
+  it('indexes the loan even when the borrower cannot be told', async () => {
+    // Indexing is the job; push is an enhancement. A thrown notification must
+    // not turn a successful index into an error the user is shown.
+    mockNotifyLoanDecided.mockRejectedValue(new Error('expo is down'))
+    mockGetLoan.mockResolvedValue(buildChainLoan({ status: 3, defaultedAt: DECLARED_AT_SECONDS }))
+    const { mockFs } = buildFirestore({ exists: true, storedStatus: 'disbursed' })
+
+    const indexed = await indexLoanFromLog(buildLog(), CHAIN_ID, FACTORY_ADDRESS, {}, mockFs)
+
+    expect(indexed.result.stored).toBe(true)
+    expect(mockLogger.error).toHaveBeenCalledWith('Loan decision notification failed; indexing stands', expect.anything())
+  })
+
+  it('refuses an ordinal the build does not know', async () => {
+    // A pool upgraded past this build would otherwise be read as disbursed,
+    // which is a lie rather than a gap.
+    mockGetLoan.mockResolvedValue(buildChainLoan({ status: 9 }))
+
+    await expect(fetchLoan(LOAN_ID, POOL_ADDRESS, {})).rejects.toThrow('Unknown LoanStatus ordinal from chain: 9')
   })
 })
