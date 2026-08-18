@@ -73,6 +73,14 @@ distribution is wrong and nothing says so.
 - **A claim the pool cannot cover is refused, not paid partially.** A silent
   partial payment reads as a successful claim in every UI, and the remainder
   would be invisible. `InsufficientLiquidity` says it is delayed, not lost.
+- **Earnings are paid in whatever the pool lends.** The accumulator is unit-free
+  — it divides one quantity of the pool's asset by another — so nothing in the
+  arithmetic changed when pools gained denominations. What did change is that
+  **earnings from different pools cannot be added.** `PoolStore.totalEarned` is
+  native-only for exactly that reason, the same way `totalBalance` is: summing
+  a USDC claim into a POL total is wrong by whatever the exchange rate happens
+  to be, and wrong silently. Reporting per unit is the alternative to a price
+  oracle, and the oracle is deliberately absent.
 
 ## `claimable` is not capped by liquidity
 
@@ -129,5 +137,8 @@ than inventing.
   holding deposits when the beacon is upgraded would under-count for ever. This
   is survivable only because no pool exists outside a disposable local chain; it
   stops being survivable the moment a public chain holds pools.
+- **No mixed-denomination total.** The dashboard shows the chain's own coin as
+  its headline and each token beneath, rather than one figure — see the rule
+  above. A single number would need prices, which would need an oracle.
 - **The claim has no activity row.** `interest_claims` is indexed and listed but
   does not yet appear in the pool or wallet feeds.

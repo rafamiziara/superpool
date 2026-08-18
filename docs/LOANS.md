@@ -335,6 +335,31 @@ than surprising the wallet with a larger number than the one on screen.
 
 Overpaying remains free: `repayLoan` credits only what is owed.
 
+### A token repayment needs no buffer, because nothing is overpaid
+
+The pleasant half of denominations, and worth knowing before wondering why the
+two repayment paths read differently.
+
+With the chain's own coin the borrower must send value up front, so `repayLoan`
+takes whatever arrives and refunds the excess — which is the whole reason for
+the quote above. With a token the pool **pulls**: `repayLoanWithTokens(loanId,
+amount)` takes `min(amount, outstanding)` priced at execution time, so there is
+no overshoot, no refund, and `amount` only has to be _big enough_.
+
+The head-room does not vanish; it moves to the **allowance**, which is the right
+place for it. An allowance larger than the debt costs the borrower nothing,
+where an over-payment costs them a refund transfer.
+
+Two things follow:
+
+- **`amount` stays an explicit argument.** Inferring it from the allowance would
+  let a leftover approval — from an abandoned deposit, say — decide how much a
+  later repayment took. An allowance is a ceiling, which is what an allowance is
+  for.
+- **The copy differs, and has to.** Telling a token borrower that the extra
+  "comes straight back" describes a refund that never happens. `RepayForm` says
+  the pool only takes what is owed.
+
 ### Storage, and loans made before it
 
 Two words were appended to `Loan`: `principalOutstanding`, and
@@ -614,6 +639,11 @@ The default is `pool`, the only safe answer for a feed nobody has narrowed.
 - **Nothing marks a loan defaulted.** Accrual makes lateness cost money; it does
   not liquidate, penalise at a higher rate, or produce a `Defaulted` state. See
   `ROADMAP.md` Phase 3.
+- **A loan is denominated in whatever its pool lends**, and there is no
+  conversion anywhere: `amount`, `amountRepaid` and every interest figure are
+  quantities of that one asset, in its own smallest unit. The exponent comes
+  from the pool — see [`CONTRIBUTIONS.md`](CONTRIBUTIONS.md) — and a pool whose
+  token the app cannot read shows no figures at all rather than guessed ones.
 - **The `loans` composite indexes are declared in
   `config/firestore.indexes.json`.** The emulator does not enforce them, so a
   query that works locally can still need an index in production.

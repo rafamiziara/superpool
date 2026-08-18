@@ -605,8 +605,9 @@ pool would reinterpret every `contributions` entry and every outstanding debt as
 a quantity of something else.
 
 Plan and the reasoning behind each decision:
-[`.dev/contracts/ERC20_PLAN.md`](.dev/contracts/ERC20_PLAN.md). Phases 1–2 are
-built; the app still creates native pools only.
+[`.dev/contracts/ERC20_PLAN.md`](.dev/contracts/ERC20_PLAN.md). All five phases
+are built and verified against a live node with
+`pnpm --filter backend testErc20`.
 
 **Formatting is three-way, and collapsing it to two is a factor-of-10¹² bug.**
 `PoolInfo` carries `loanToken`, `tokenSymbol` and `tokenDecimals`:
@@ -625,8 +626,8 @@ Four more rules that are easy to break:
 
 - **The token entry points are `depositTokens` and `repayLoanWithTokens`, not
   overloads of `depositFunds` / `repayLoan`.** Solidity accepts the overloads,
-  but ethers then refuses to resolve either bare name — *ambiguous function
-  description* — breaking every existing native call site in the backend, the
+  but ethers then refuses to resolve either bare name — _ambiguous function
+  description_ — breaking every existing native call site in the backend, the
   scripts and the tests. Do not "tidy" them back into overloads.
 - **Credit the balance delta, never the requested amount.** A fee-on-transfer
   token delivers less than it was asked for, and crediting the request inflates
@@ -634,7 +635,7 @@ Four more rules that are easy to break:
   — diluting every other lender for the life of the pool, invisibly.
 - **A token repayment needs no refund and no settlement buffer**, unlike the
   native one. The pool pulls `min(_amount, outstanding)` priced at execution
-  time, so `_amount` only has to be *big enough*; the head-room moved to the
+  time, so `_amount` only has to be _big enough_; the head-room moved to the
   allowance, where it costs the borrower nothing. Keep `_amount` explicit —
   inferring it from the allowance would let a leftover approval decide how much
   a later repayment took.
@@ -645,8 +646,40 @@ Four more rules that are easy to break:
 
 `PoolFactory` gates creation on an owner-curated allowlist
 (`setLoanTokenAuthorization`); `address(0)` is never on it and never needs to
-be. Disallowing a token does **not** reach back to pools already holding
-balances in it — that would strand both sides of a live loan.
+be — `isAuthorizedLoanToken` answers `true` for it, so a caller checking before
+creating need not special-case the one denomination that needs no permission.
+Disallowing a token does **not** reach back to pools already holding balances in
+it — that would strand both sides of a live loan.
+
+### In the app
+
+`utils/denomination.ts` is the single place a `PoolInfo` becomes a symbol and an
+exponent. `formatToken(amount, decimals)` and `parseToken(value, decimals)`
+both **require** the exponent; `formatAmount(amount, denomination)` adds the
+symbol and renders a dash where the denomination is unknown, so the three-way
+rule is applied once rather than at every call site.
+
+Four rules that are easy to break:
+
+- **Funding or repaying a token pool is two transactions.** The approval is a
+  stage in the screen's own state machine (`useTokenApproval`), not a pending
+  transaction: it displays nothing and has nothing to recover into. The
+  allowance is read on submit, so a flow abandoned between the two resumes at
+  the second. **Never approve `type(uint256).max`** — a bug in the pool would
+  reach the member's whole balance.
+- **Never sum balances across pools.** `PoolStore.balancesByDenomination`
+  reports one figure per unit; `totalBalance` and `totalEarned` are native-only
+  because the dashboard's headline is. Adding a USDC balance to a POL one is
+  wrong by whatever the rate happens to be, and wrong silently — the app has no
+  price oracle, deliberately.
+- **The wallet-balance check reads the pool's asset.** `useBalance` returns the
+  chain's coin only, so a token pool reads `balanceOf` itself; otherwise a
+  wallet holding POL and no USDC is told it can fund a USDC pool.
+- **The token allowlist is per chain and configured**
+  (`config/tokens.ts`, from `EXPO_PUBLIC_USDC_ADDRESS_*`). Empty is normal: the
+  create form then offers native alone, with no picker. `deploy:local` deploys a
+  six-decimal mock and prints its address, and its address changes on every
+  redeploy exactly as the factory's does.
 
 ## Chains
 

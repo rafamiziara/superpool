@@ -13,13 +13,43 @@ A contribution is one `FundsDeposited` event. That is the whole model: there is
 no separate deposit record, no running total, and nothing to reconcile.
 
 ```
-ContributeForm (POL)          → wei
-useContribution               → depositFunds{value} from the user's own wallet
+ContributeForm (POL or USDC)  → the token's own smallest unit
+useTokenApproval              → approve, on a token pool only, and waits for it
+useContribution               → depositFunds{value}, or depositTokens(amount)
 useTransactionMonitoring      → waits for the receipt, decodes FundsDeposited
 usePoolIndexing               → indexContribution
 contributionIndexer           → one Firestore document per log
 listContributions             → the app sums them
 ```
+
+## A pool takes one asset, and the app has to know which
+
+`PoolConfig.loanToken` says what a pool lends, with `address(0)` meaning the
+chain's own coin. The two deposit paths are separate entry points rather than
+overloads of one name — `depositFunds` is payable and native-only,
+`depositTokens(uint256)` pulls, and each reverts against the wrong kind of pool.
+See [`../.dev/contracts/ERC20_PLAN.md`](../.dev/contracts/ERC20_PLAN.md) §3.1
+for why the overload does not work.
+
+Three rules follow, and each has cost something to learn:
+
+- **Decimals come from the pool, never from a default.** `denominationFor` in
+  the app resolves a `PoolInfo` into a symbol and an exponent, and returns
+  `undefined` for a pool whose token the backend could not read — which the
+  screens show as unsupported rather than formatting with a guess. Eighteen
+  against USDC renders 5 as five trillion.
+- **Funding a token pool is two transactions.** The approval is a stage in the
+  contribute screen's own state machine, not a pending transaction: it changes
+  nothing the app displays and has nothing to recover into. The allowance is
+  read on submit, so a flow abandoned between the two resumes at the deposit.
+  The amount is approved and never `type(uint256).max` — the convenient thing
+  means a bug in the pool can reach the rest of the member's balance.
+- **The pool credits what arrived, not what was asked for.** A fee-on-transfer
+  token delivers less, and crediting the request inflates `totalContributions`
+  — the denominator every interest distribution divides by — diluting every
+  other lender for the life of the pool, invisibly. Verified with a mock fee
+  token in `pnpm --filter backend testErc20`, and confirmed by mutation: credit
+  the request instead and exactly two checks there fail.
 
 ## Membership is a register now, not an inference
 
@@ -114,9 +144,22 @@ answer is the pre-flight `estimateContractGas` inside `useContribution` — whic
 includes the `value`, so an unaffordable deposit is caught before the signature
 prompt rather than after it.
 
+The balance it warns against is **the pool's own unit**: a wallet holding POL
+and no USDC would otherwise be told it can fund a USDC pool. `useBalance` reads
+the chain's coin only — wagmi v2 dropped its `token` argument — so a token pool
+reads `balanceOf` itself.
+
 ## Known limitations
 
-- **Native currency only.** ERC-20 deposits need contract work.
+- **One asset per pool, chosen at creation and never changed.** There is no
+  setter on `loanToken`, deliberately: re-denominating a pool would reinterpret
+  every stored contribution as a quantity of something else. A group wanting to
+  lend a different token creates a different pool.
+- **The token allowlist is small and configured, not discovered.** Localhost
+  gets a mock deployed by `deploy:local`; Amoy's test USDC is still unconfirmed,
+  so the create form there offers native alone until
+  `EXPO_PUBLIC_USDC_ADDRESS_AMOY` is set. A pool denominated in a token the app
+  cannot format is unusable, and an arbitrary-token pool is a rug vector.
 - **A contribution is not earnings.** Members can withdraw
   (`LendingPool.withdraw` → `FundsWithdrawn` → the `withdrawals`
   collection), and `currentBalance` is deposits minus withdrawals, while
