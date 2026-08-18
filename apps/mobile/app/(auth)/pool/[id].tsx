@@ -404,6 +404,31 @@ function PoolDetailScreen() {
         )}
 
         {/*
+          The owner's own view of the pool. Always offered, unlike the two
+          queues above: a portfolio exists from the first loan, and unlike a
+          queue it is not waiting on anybody — an owner opens it to see how
+          the pool is doing rather than because something demands an answer.
+        */}
+        {isOwner && (
+          <View className="mt-3 px-6">
+            <Pressable
+              onPress={() => router.push(`/(auth)/pool/portfolio?poolId=${pool.poolId}`)}
+              className="flex-row items-center gap-4 rounded-3xl border-continuous border-hairline border-veil bg-surface px-5 py-4 active:opacity-80"
+              testID="pool-portfolio-link"
+            >
+              <View className="h-10 w-10 items-center justify-center rounded-2xl border-continuous bg-raised">
+                <FontAwesome name="pie-chart" size={16} color={palette.mist} />
+              </View>
+              <View className="flex-1">
+                <Text className="text-base font-bold text-snow">Lending overview</Text>
+                <Text className="mt-0.5 text-xs text-fog">What the pool has lent, what is still out, and what you decided</Text>
+              </View>
+              <FontAwesome name="chevron-right" size={12} color={palette.mist} />
+            </Pressable>
+          </View>
+        )}
+
+        {/*
           Settings, unlike the queue above, are always offered to the owner: the
           one setting there is decides whether a queue can exist at all, so
           hiding it until something happens would make the feature unreachable.
