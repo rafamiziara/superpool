@@ -47,6 +47,13 @@ jest.mock('../../../src/hooks/pools/usePoolIndexing', () => ({
   usePoolIndexing: () => ({ triggerIndexing: mockTriggerIndexing, indexConfirmed: jest.fn(), isIndexing: false }),
 }))
 
+const mockWriteNote = jest.fn()
+const mockNoteFor = jest.fn()
+
+jest.mock('../../../src/hooks/pools/useNotes', () => ({
+  useNotes: () => ({ notes: [], isLoading: false, refresh: jest.fn(), noteFor: mockNoteFor, writeNote: mockWriteNote }),
+}))
+
 /** A loan in pool 2 whose term ended `overdueBy` ago. */
 function lateLoan(overrides: Partial<LoanInfo> = {}, overdueBy = 5 * DAY): LoanInfo {
   return {
@@ -85,6 +92,8 @@ beforeEach(async () => {
   mockMarkDefaulted.mockResolvedValue(TX_HASH)
   mockWaitForTransaction.mockResolvedValue({ loanId: 5 })
   mockTriggerIndexing.mockResolvedValue(undefined)
+  mockWriteNote.mockResolvedValue(true)
+  mockNoteFor.mockReturnValue(undefined)
   // The grace period and the outstanding balance both come through here.
   mockWagmiUseReadContract.mockReturnValue({ data: 0n, refetch: jest.fn() })
   authStore.walletAddress = null
@@ -157,6 +166,34 @@ describe('OverdueLoansScreen', () => {
     await waitFor(() => expect(mockMarkDefaulted).toHaveBeenCalledWith(expect.objectContaining({ loanId: 5, borrower: STRANGER })))
     await waitFor(() => expect(mockWaitForTransaction).toHaveBeenCalledWith(TX_HASH, 'MARK_DEFAULTED'))
     await waitFor(() => expect(mockTriggerIndexing).toHaveBeenCalledWith(TX_HASH, 'MARK_DEFAULTED'))
+  })
+
+  // A declaration cannot be undone, which makes the reason beside it the only
+  // part of it the borrower can answer.
+  it('writes the reason before declaring', async () => {
+    withIndexedLoans([lateLoan()])
+
+    const { getByTestId } = render(<OverdueLoansScreen />)
+
+    fireEvent.press(getByTestId('overdue-ask-5'))
+    fireEvent.changeText(getByTestId('overdue-reason-5-input'), 'Four months, no answer.')
+    fireEvent.press(getByTestId('overdue-declare-5'))
+
+    await waitFor(() =>
+      expect(mockWriteNote).toHaveBeenCalledWith({ kind: 'loan_defaulted', recordId: '31337-2-5', text: 'Four months, no answer.' })
+    )
+    expect(mockWriteNote.mock.invocationCallOrder[0]).toBeLessThan(mockMarkDefaulted.mock.invocationCallOrder[0])
+  })
+
+  // The one thing on this card the owner could not work out for themselves.
+  it('shows what the borrower said the money was for', () => {
+    withIndexedLoans([lateLoan()])
+    mockNoteFor.mockReturnValue({ text: 'School fees.' })
+
+    const { getByTestId } = render(<OverdueLoansScreen />)
+
+    expect(mockNoteFor).toHaveBeenCalledWith('31337-2-5', 'loan_purpose')
+    expect(getByTestId('overdue-purpose-5-text')).toHaveTextContent('School fees.')
   })
 
   it('does not send anything on the first tap', async () => {

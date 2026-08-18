@@ -1,5 +1,5 @@
 import { FontAwesome } from '@expo/vector-icons'
-import type { BorrowerHistory, LoanInfo } from '@superpool/types'
+import type { BorrowerHistory, LoanInfo, Note } from '@superpool/types'
 import React from 'react'
 import { Pressable, Text, View } from 'react-native'
 import { useReadContract } from 'wagmi'
@@ -8,6 +8,8 @@ import { palette } from '../../constants/palette'
 import type { Denomination } from '../../utils/denomination'
 import { formatToken, shortAddress, timeAgo } from '../../utils/format'
 import { BorrowerHistoryPanel } from './BorrowerHistoryPanel'
+import { NoteCallout } from './NoteCallout'
+import { NoteField } from './NoteField'
 
 export interface OverdueLoanCardProps {
   loan: LoanInfo
@@ -17,6 +19,16 @@ export interface OverdueLoanCardProps {
   /** Seconds past the due date the owner promised to wait, from the chain. */
   gracePeriod: number
   history: BorrowerHistory
+  /**
+   * What the borrower said the money was for, if they said anything.
+   *
+   * Exactly the context an owner deciding whether to declare wants, and the
+   * one thing on the card they could not work out for themselves.
+   */
+  purpose?: Note
+  /** The reason the owner is typing, held by the screen so it survives a re-render. */
+  reason: string
+  onChangeReason: (text: string) => void
   /** True once the owner has asked to declare and not yet confirmed. */
   isConfirming: boolean
   onAskToDeclare: () => void
@@ -46,6 +58,9 @@ export function OverdueLoanCard({
   poolAddress,
   gracePeriod,
   history,
+  purpose,
+  reason,
+  onChangeReason,
   isConfirming,
   onAskToDeclare,
   onCancelDeclare,
@@ -102,6 +117,8 @@ export function OverdueLoanCard({
         <Text className="mt-1 text-xs text-mist">Interest is still accruing on this, at the pool&apos;s rate.</Text>
       </View>
 
+      <NoteCallout note={purpose} label="What it was for" testID={`overdue-purpose-${loan.loanId}`} />
+
       <BorrowerHistoryPanel history={history} voice="owner" testID={`overdue-history-${loan.loanId}`} />
 
       {alreadyDeclared ? (
@@ -137,6 +154,16 @@ export function OverdueLoanCard({
             It records that you consider this loan unpaid. Nothing is recovered and nothing is seized — the debt stays, interest keeps
             accruing, and {shortAddress(loan.borrower)} can still pay it off. It cannot be undone.
           </Text>
+          {/* The declaration cannot be undone, so the reason beside it is the
+              only part of this the borrower can answer. */}
+          <NoteField
+            value={reason}
+            onChangeText={onChangeReason}
+            label="Say why"
+            placeholder="They will see this with the declaration"
+            isBusy={isBusy}
+            testID={`overdue-reason-${loan.loanId}`}
+          />
           <View className="flex-row gap-3">
             <Pressable
               onPress={onCancelDeclare}

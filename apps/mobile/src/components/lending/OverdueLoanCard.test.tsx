@@ -44,6 +44,8 @@ function renderCard(props: Partial<React.ComponentProps<typeof OverdueLoanCard>>
       poolAddress={POOL_ADDRESS}
       gracePeriod={0}
       history={history()}
+      reason=""
+      onChangeReason={jest.fn()}
       isConfirming={false}
       onAskToDeclare={jest.fn()}
       onCancelDeclare={jest.fn()}
