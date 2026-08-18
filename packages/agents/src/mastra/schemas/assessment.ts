@@ -78,13 +78,22 @@ export type AssessmentFacts = z.infer<typeof assessmentFactsSchema>
  *   chat with the assistant.
  * - **`limitations` is required.** An assessment that never says what it could
  *   not see reads as complete.
+ *
+ * **The counts are validated; the lengths are not**, and the eval suite is why.
+ * A `.max(140)` on each observation looked harmless and cost a whole reading
+ * the first time a model wrote 141 characters: structured-output validation
+ * rejects the entire response, so `assessLoan` reports "no assessment
+ * available" and the owner sees nothing — for a reading that was perfectly
+ * good. Brevity is a preference and belongs in the instructions; a validation
+ * rule is a thing that throws away work. Array counts stay because they are
+ * structural and a model obeys them reliably.
  */
 export const assessmentSchema = z.object({
   risk: z.enum(['low', 'medium', 'high']).describe('A band, never a score'),
-  summary: z.string().max(280).describe('One sentence the owner reads first'),
-  observations: z.array(z.string().max(140)).max(4).describe('What a careful reader would notice. Fewer is better than padded.'),
-  questions: z.array(z.string().max(140)).max(3).describe('Worth asking the borrower before deciding. Empty when there is nothing to ask.'),
-  limitations: z.array(z.string().max(140)).max(3).describe('What you could not see. Honest gaps, not hedging.'),
+  summary: z.string().describe('One sentence the owner reads first'),
+  observations: z.array(z.string()).max(4).describe('What a careful reader would notice. Fewer is better than padded.'),
+  questions: z.array(z.string()).max(3).describe('Worth asking the borrower before deciding. Empty when there is nothing to ask.'),
+  limitations: z.array(z.string()).max(3).describe('What you could not see. Honest gaps, not hedging.'),
 })
 
 export type Assessment = z.infer<typeof assessmentSchema>

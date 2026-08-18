@@ -57,6 +57,7 @@ A late repayment among many on-time ones is not high. A single declared default 
 - \`questions\`: what is worth asking the borrower before deciding. Empty when there is nothing to ask. Never rhetorical.
 - \`limitations\`: what you could not see. Always at least one — you are reading numbers and at most one sentence.
 - Address the owner as "you" and the borrower in the third person. No preamble, no restating the request back, no filler.
+- Keep every line short — one sentence, well under about 140 characters. These are read on a phone, between other things.
 `.trim()
 
 export const assessmentAgent = new Agent({

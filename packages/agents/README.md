@@ -94,6 +94,30 @@ comes back as `status: 'failed'` and an opaque error; the reason
 ("Could not find API key…") is in this service's logs. Worth knowing when the
 backend reports "no assessment available" and you go looking.
 
+## Evals
+
+```bash
+pnpm eval    # runs every case against a real model — this spends money
+```
+
+Seven hand-written cases, four gates, all of which must score 1 or the run
+fails. There is deliberately **no quality score**: whether a reading is _good_
+is the pool owner's judgement, and a number for it would be the same mistake
+this feature refuses to make about borrowers.
+
+The cases exist because getting each one wrong would be a specific, nameable
+failure — a first-time borrower read as high risk, a shortfall missed, a
+declared default treated as a verdict, an unstated purpose held against
+somebody, or a claim about a person the model knows nothing about.
+
+Three gates are plain functions: deterministic, free, and unable to be wrong
+about what they saw. The fourth — did this say anything about the person — is
+the one place a judge earns its place, because the failure is a tone rather
+than a word.
+
+Not wired into CI yet: it needs a provider key there, which is a deployment
+decision rather than a code one.
+
 ## The `ping` workflow
 
 The seam probe. Echoes what it is sent, names itself and stamps its own clock.
