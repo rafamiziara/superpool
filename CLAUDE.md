@@ -601,6 +601,68 @@ is a **new** borrower rather than the worst kind. There is no score, deliberatel
 over a wallet's whole record, settled or not; **nothing gates on it**, and the
 enforcing half stays unbuilt on purpose.
 
+## Decisions
+
+For anything touching what an owner decided — approvals, refusals, withdrawn
+requests, declarations of default — read the `loan_decisions` collection.
+**The contribution shape, not the loan shape**, and that split is the whole
+point: a loan document is rewritten by every event and holds only the state
+left behind, so three facts live here and nowhere else.
+
+- **When a decision was made.** `approveLoan` restamps `startTime`, so an
+  approval overwrites the moment the request was made; and a loan approved in
+  March and declared in default in August is one record reading `defaulted`.
+- **Who made it.** No loan event carries a decider — all three parameters are
+  the loan, the borrower and the amount — so only the transaction's sender
+  says who acted.
+- **Which of two identical outcomes it was.** `cancelLoanRequest` emits
+  `LoanRejected` and leaves the loan exactly as `rejectLoan` does, so the
+  record cannot tell a refusal from a withdrawal. `outcome` can, because it is
+  derived from the sender at the moment it happened — `rejected` when somebody
+  else sent it, `cancelled` when the borrower did.
+
+Four rules that are easy to break:
+
+- **Derived from the logs, never from a transition.** The loan indexer's
+  `transition` is a comparison against what is stored, so it is empty on a
+  re-scan; every field here comes from the log, the block and the transaction.
+  That is what makes re-sweeping idempotent **and** what makes backfilling
+  possible — decisions made before the collection existed are recovered by
+  re-running the sweep from the factory's deployment block.
+- **The sender is never guessed.** An unreadable one skips the log for a later
+  re-scan rather than defaulting to the borrower or the owner: the guess would
+  be written once and read as history forever, and on a `LoanRejected` the two
+  available guesses are opposite claims about a person.
+- **A decision is not its reason.** The reason lives in
+  [Notes](#notes) — backend-only, visible to the two parties. This collection
+  says that a decision happened and is readable by any signed-in caller, like
+  every other mirror of the chain.
+- **`decidedBy` is the transaction's sender, not "the owner".** A pool owned
+  by a Safe reports whichever address relayed the execution, and a pool can
+  change hands — so the wallet that decided is not always the wallet that owns
+  it now.
+
+### In the app
+
+`pool/portfolio` is the owner's view of it: what is out on loan, what the pool
+holds, how much is working, the loans split into running / overdue / in
+default / settled, and the decisions counted by outcome with the last ten
+listed. Every figure is derived on read; only `totalFunds` comes from the
+chain, because no amount of indexed history can reconstruct it.
+
+Two things that screen keeps apart, and a third the queue does:
+
+- **Overdue is not in default**, as everywhere else.
+- **A refusal is not a withdrawal.** Counting them together would credit an
+  owner with declining requests nobody put to them, which is why `answered`
+  excludes withdrawals.
+- **The queue is ordered by facts about the request**, never by assessment
+  band or borrowing history. `pendingLoansFor` answers the longest wait first;
+  `sortLoanQueue` adds the two orders by amount. A band cannot be sorted by
+  design, and "fewest defaults first" is a score with the arithmetic hidden.
+  Nor by what the pool can afford — liquidity moves with every approval, so
+  the queue would reshuffle under the owner's finger.
+
 ## Interest
 
 For anything touching what a member has earned, read

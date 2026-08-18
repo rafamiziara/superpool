@@ -6,22 +6,22 @@ This document outlines the structured development sprints for the SuperPool dApp
 
 To build a functional micro-lending decentralized application on Polygon where users can connect wallets, join specific lending pools, contribute liquidity, request and repay loans, with comprehensive reputation tracking.
 
-## 📍 Where things stand (2026-08-18)
+## 📍 Where things stand (2026-08-19)
 
-| Sprint                         | Status                                                  |
-| ------------------------------ | ------------------------------------------------------- |
-| 1 · Foundation                 | ✅ Complete                                             |
-| 2 · Authentication Enhancement | ✅ Complete                                             |
-| 3 · Pool Creation              | 🚧 Complete locally; blocked on testnet deployment      |
-| 4 · Pool Membership            | ✅ Complete                                             |
-| 5 · Pool Liquidity             | ✅ Complete — native POL and ERC-20 pools               |
-| 6 · Loan Requests              | ✅ Complete — request flow and AI assessment            |
-| 7 · Loan Repayments            | ✅ Full, partial, accruing; reminders; no schedule      |
-| 8 · Withdrawals                | ✅ Complete                                             |
-| 9 · Reputations                | 🚧 History and defaults observed; no score, on purpose  |
-| 10 · Loan Management           | 🚧 Decisions, history and AI support; no prioritisation |
-| 11 · Interest Distribution     | ✅ Complete                                             |
-| 12 · Notifications             | 🚧 All nine kinds shipped; delivery unverified          |
+| Sprint                         | Status                                                 |
+| ------------------------------ | ------------------------------------------------------ |
+| 1 · Foundation                 | ✅ Complete                                            |
+| 2 · Authentication Enhancement | ✅ Complete                                            |
+| 3 · Pool Creation              | 🚧 Complete locally; blocked on testnet deployment     |
+| 4 · Pool Membership            | ✅ Complete                                            |
+| 5 · Pool Liquidity             | ✅ Complete — native POL and ERC-20 pools              |
+| 6 · Loan Requests              | ✅ Complete — request flow and AI assessment           |
+| 7 · Loan Repayments            | ✅ Full, partial, accruing; reminders; no schedule     |
+| 8 · Withdrawals                | ✅ Complete                                            |
+| 9 · Reputations                | 🚧 History and defaults observed; no score, on purpose |
+| 10 · Loan Management           | ✅ Complete — decisions, support, queue and portfolio  |
+| 11 · Interest Distribution     | ✅ Complete                                            |
+| 12 · Notifications             | 🚧 All nine kinds shipped; delivery unverified         |
 
 Three deferrals across Sprints 4, 6 and 10 — a membership reason, a loan
 purpose, a decision reason — turned out to be one missing mechanism, and were
@@ -555,8 +555,9 @@ be summarised from part of its history.
 **Sprint Goal:** Complete loan approval and rejection system for pool administrators.
 
 **Built out of order**, ahead of Sprints 6 and 9 whose outputs it was meant to
-consume. The mechanical half shipped; every part that depends on AI or
-reputation is still waiting on those sprints.
+consume — so the mechanical half shipped first and everything depending on AI
+or reputation waited for them. Closed on 2026-08-19, a day after the
+assessment work landed.
 
 ### Features:
 
@@ -570,33 +571,49 @@ reputation is still waiting on those sprints.
     because each is a separate transaction from one wallet, and two in flight
     means two signature prompts racing for one nonce.
 
-- **Decision Support System 🚧**
+- **Decision Support System ✅**
   - AI recommendation integration — ✅ 2026-08-18, as a _reading_ rather than a
     recommendation: it says what it notices and never what to do
   - Borrower reputation display ✅ — `BorrowerHistoryPanel` on every card in
     the queue, above the buttons rather than below them
   - Risk assessment summary — ✅ 2026-08-18 (`AssessmentPanel`)
-  - Historical decision tracking and analytics — not started
+  - Historical decision tracking and analytics — ✅ 2026-08-19, as the
+    `loan_decisions` collection: one immutable record per decision log, which
+    is the only place a decision's date, its author, and the difference
+    between a refusal and a withdrawal exist. See
+    [Decisions](../CLAUDE.md#decisions)
 
-- **Administrative Tools** 🚧
-  - Loan queue management ✅; prioritisation ❌
-  - Decision audit trail — on chain by construction; **no tooling over it** ❌
+- **Administrative Tools** ✅
+  - Loan queue management ✅; **prioritisation — ✅ 2026-08-19.** Longest
+    waiting by default, plus two orders by amount. Deliberately never by
+    assessment band or borrowing history: a band cannot be sorted by design,
+    and "fewest defaults first" is a score with the arithmetic hidden
+  - Decision audit trail — on chain by construction; **tooling over it — ✅
+    2026-08-19** (`listLoanDecisions`, and the history on `pool/portfolio`)
   - Admin notification and alert system — ✅ Sprint 12. A loan request now
     reaches the owner's phone and deep-links to the queue.
-  - **Loan portfolio overview and statistics — ❌**
+  - **Loan portfolio overview and statistics — ✅ 2026-08-19** — what is out
+    on loan, what the pool holds, how much of it is working, the loans by
+    state, and the decisions by outcome
 
 ### Expected Deliverables:
 
 - Pool admins can approve or reject loan requests — ✅
 - AI-assisted loan decision making system — ✅ 2026-08-18, advisory only
-- Complete administrative loan management tools — 🚧
-- Comprehensive loan decision audit system — 🚧
+- Complete administrative loan management tools — ✅
+- Comprehensive loan decision audit system — ✅ 2026-08-19
 
-### Current Status: **Decisions and decision support work; prioritisation and portfolio statistics remain** 🚧
+### Current Status: **COMPLETE** ✅
 
-This is the largest block of unbuilt product work left in the project —
-prioritisation over the queue, a portfolio overview for a pool owner, and
-analytics over decisions already made. Nothing else in the plan waits on it.
+The last three items shipped together on 2026-08-19, because they were one
+missing record: a loan document keeps only the state a decision left behind, so
+prioritisation had no wait to sort by past the approval, a portfolio had no
+approvals to count, and an audit trail had nothing to read. `loan_decisions`
+answers all three.
+
+Still deliberately absent: **batch processing**, for the reason above — two
+decisions in flight from one wallet means two signature prompts racing for one
+nonce.
 
 ---
 
@@ -780,7 +797,7 @@ SDK 53.
 
 ---
 
-## 🧭 What is left, split by kind (2026-08-18)
+## 🧭 What is left, split by kind (2026-08-19)
 
 ### Configuration and credentials — no code
 
@@ -799,8 +816,6 @@ SDK 53.
 
 ### Still to build — none of it blocking a demo
 
-- **Sprint 10**: queue prioritisation, a portfolio overview and statistics,
-  analytics over past decisions, tooling over the audit trail.
 - **Sprint 12**: receipt polling. Only send-response `DeviceNotRegistered`
   pruning exists; Expo's `getReceipts` needs a deferred second pass.
 - **Discovery**: search tokens written onto the pool document by the indexer, so
