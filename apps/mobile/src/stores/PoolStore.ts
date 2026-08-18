@@ -989,9 +989,24 @@ export class PoolStore {
     )
   }
 
-  /** Every request in one pool awaiting the owner's decision, for the approvals screen. */
+  /*
+    Every request in one pool awaiting the owner's decision, for the approvals
+    screen — oldest first, deliberately.
+
+    `loanRecords` arrives newest-first, which is right for a feed and wrong for
+    a queue: served that way, whoever asked earliest is answered last every
+    time somebody new asks, and a request can sit at the bottom indefinitely.
+    `startedAt` is the moment the request was made for exactly as long as it is
+    pending — `approveLoan` restamps it — so it is the right clock here and
+    only here.
+
+    The owner can re-order by amount on the queue screen; this is the order
+    every other reader of this list gets, including the dashboard's count.
+  */
   pendingLoansFor = (poolId: number): LoanInfo[] => {
-    return this.loanRecords.filter((loan) => loan.poolId === poolId && loan.status === 'requested')
+    return this.loanRecords
+      .filter((loan) => loan.poolId === poolId && loan.status === 'requested')
+      .sort((a, b) => new Date(a.startedAt).getTime() - new Date(b.startedAt).getTime())
   }
 
   /**

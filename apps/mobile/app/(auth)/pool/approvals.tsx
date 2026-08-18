@@ -3,7 +3,7 @@ import type { LoanInfo } from '@superpool/types'
 import { router, Stack, useLocalSearchParams } from 'expo-router'
 import { StatusBar } from 'expo-status-bar'
 import { observer } from 'mobx-react-lite'
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 import { ActivityIndicator, Pressable, RefreshControl, ScrollView, Text, View } from 'react-native'
 import { useReadContract } from 'wagmi'
 import { LoanRequestCard } from '../../../src/components/lending/LoanRequestCard'
@@ -18,6 +18,7 @@ import { useTransactionMonitoring } from '../../../src/hooks/pools/useTransactio
 import { poolStore } from '../../../src/stores/PoolStore'
 import { denominationFor } from '../../../src/utils/denomination'
 import { formatAmount, sameAddress } from '../../../src/utils/format'
+import { QUEUE_ORDER_LABELS, QUEUE_ORDERS, type QueueOrder, sortLoanQueue } from '../../../src/utils/loanQueue'
 
 /** Where a decision is. One at a time, so the whole list locks while it runs. */
 type Stage = 'idle' | 'submitting' | 'confirming' | 'indexing'
@@ -50,11 +51,34 @@ function ApprovalsScreen() {
   const [failure, setFailure] = useState<string | null>(null)
   /** Keyed by loan, so a half-typed reason survives the list re-rendering. */
   const [reasons, setReasons] = useState<Record<number, string>>({})
+  /*
+    Not persisted, and not a setting.
+
+    An owner reorders to answer a particular question — "what are the big ones
+    today" — and the answer to the next question is the fair order again. A
+    remembered preference would quietly leave somebody at the bottom of every
+    future queue, which is the failure this whole control exists to make
+    visible rather than to automate.
+  */
+  const [order, setOrder] = useState<QueueOrder>('waiting')
 
   const pool = poolStore.poolById(Number(poolId))
   const { noteFor, writeNote } = useNotes(pool?.poolId)
   const denomination = pool ? denominationFor(pool) : undefined
-  const requests = pool ? poolStore.pendingLoansFor(pool.poolId) : []
+  const pending = pool ? poolStore.pendingLoansFor(pool.poolId) : []
+  /*
+    Ordered here rather than in the store: the store's order is the fair one
+    every other reader gets, and this is one owner's view of one queue.
+
+    `pending` is rebuilt on every render by `filter`, so the dependency is the
+    ids rather than the array — otherwise this memo would never hit.
+  */
+  const requestKey = pending.map((request) => request.id).join(',')
+  const requests = useMemo(
+    () => sortLoanQueue(pending, order),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [requestKey, order]
+  )
 
   // What the pool can actually pay today. `approveLoan` checks liquidity at
   // approval rather than at request time, so this is the figure that decides
@@ -266,6 +290,40 @@ function ApprovalsScreen() {
             </Text>
           )}
         </View>
+
+        {/*
+          Only worth showing when there is something to order. One request has
+          no order, and the row would read as a setting the owner has to
+          understand before deciding anything.
+        */}
+        {requests.length > 1 ? (
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerClassName="gap-2"
+            className="grow-0"
+            testID="approvals-order"
+          >
+            {QUEUE_ORDERS.map((value) => (
+              <Pressable
+                key={value}
+                onPress={() => setOrder(value)}
+                accessibilityRole="button"
+                accessibilityState={{ selected: order === value }}
+                testID={`approvals-order-${value}`}
+                className={
+                  order === value
+                    ? 'rounded-full border-continuous border-hairline border-mint bg-mint-deep px-4 py-2 active:opacity-70'
+                    : 'rounded-full border-continuous border-hairline border-veil bg-surface px-4 py-2 active:opacity-70'
+                }
+              >
+                <Text className={order === value ? 'text-xs font-semibold text-mint' : 'text-xs font-semibold text-fog'}>
+                  {QUEUE_ORDER_LABELS[value]}
+                </Text>
+              </Pressable>
+            ))}
+          </ScrollView>
+        ) : null}
 
         {isBusy ? (
           <View

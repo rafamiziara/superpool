@@ -253,6 +253,73 @@ describe('ApprovalsScreen', () => {
     expect(getByTestId('approvals-empty')).toBeTruthy()
   })
 
+  describe('ordering', () => {
+    /*
+      Three requests, made a day apart, in an order that is neither.
+
+      Built per test rather than once: `makeRequest` reads the pool's address
+      from the store, and the store is loaded in `beforeEach`.
+    */
+    const queue = () => [
+      makeRequest({ id: '31337-2-5', loanId: 5, amount: '500000000000000000', startedAt: '2026-08-05T09:00:00.000Z' }),
+      makeRequest({ id: '31337-2-6', loanId: 6, amount: '1000000000000000000', startedAt: '2026-08-02T09:00:00.000Z' }),
+      makeRequest({ id: '31337-2-7', loanId: 7, amount: '9000000000000000000', startedAt: '2026-08-08T09:00:00.000Z' }),
+    ]
+
+    const renderedOrder = (getAllByTestId: (id: RegExp) => { props: { testID: string } }[]) =>
+      getAllByTestId(/^loan-request-card-/).map((card) => card.props.testID)
+
+    it('answers the longest wait first', () => {
+      // The default, and the reason it is the default: served newest-first,
+      // whoever asked earliest is pushed down every time somebody new asks.
+      poolStore.loanRecords = queue()
+
+      const { getAllByTestId } = render(<ApprovalsScreen />)
+
+      expect(renderedOrder(getAllByTestId)).toEqual(['loan-request-card-6', 'loan-request-card-5', 'loan-request-card-7'])
+    })
+
+    it('reorders by amount when the owner asks', () => {
+      // Deliberately not the waiting order: the smallest request here is also
+      // the middle one by age, so an order that did nothing would still pass
+      // the default case above.
+      poolStore.loanRecords = queue()
+
+      const { getAllByTestId, getByTestId } = render(<ApprovalsScreen />)
+      fireEvent.press(getByTestId('approvals-order-largest'))
+
+      expect(renderedOrder(getAllByTestId)).toEqual(['loan-request-card-7', 'loan-request-card-6', 'loan-request-card-5'])
+
+      fireEvent.press(getByTestId('approvals-order-smallest'))
+
+      expect(renderedOrder(getAllByTestId)).toEqual(['loan-request-card-5', 'loan-request-card-6', 'loan-request-card-7'])
+    })
+
+    it('offers only orders that are facts about the request', () => {
+      // Nothing here ranks borrowers. An order by assessment band or by
+      // borrowing history is a score with the arithmetic hidden, and this
+      // project refused to build a score.
+      poolStore.loanRecords = queue()
+
+      const { getByTestId, queryByTestId } = render(<ApprovalsScreen />)
+
+      expect(getByTestId('approvals-order-waiting')).toBeTruthy()
+      expect(getByTestId('approvals-order-largest')).toBeTruthy()
+      expect(getByTestId('approvals-order-smallest')).toBeTruthy()
+      expect(queryByTestId('approvals-order-risk')).toBeNull()
+    })
+
+    it('hides the control when there is nothing to order', () => {
+      // One request has no order, and the row would read as a setting to
+      // understand before deciding anything.
+      poolStore.loanRecords = [makeRequest()]
+
+      const { queryByTestId } = render(<ApprovalsScreen />)
+
+      expect(queryByTestId('approvals-order')).toBeNull()
+    })
+  })
+
   describe('deciding', () => {
     beforeEach(() => {
       poolStore.loanRecords = [makeRequest()]
