@@ -48,6 +48,12 @@ jest.mock('../../../src/hooks/pools/usePoolIndexing', () => ({
   usePoolIndexing: () => ({ triggerIndexing: mockTriggerIndexing, indexConfirmed: jest.fn(), isIndexing: false }),
 }))
 
+const mockWriteNote = jest.fn()
+
+jest.mock('../../../src/hooks/pools/useNotes', () => ({
+  useNotes: () => ({ notes: [], isLoading: false, refresh: jest.fn(), noteFor: jest.fn(), writeNote: mockWriteNote }),
+}))
+
 function member(account: string, status: MemberInfo['status']): MemberInfo {
   return {
     id: `31337-2-${account.toLowerCase()}`,
@@ -70,6 +76,7 @@ beforeEach(async () => {
   mockRemoveMember.mockResolvedValue(TX_HASH)
   mockWaitForTransaction.mockResolvedValue({ account: APPLICANT, txHash: TX_HASH })
   mockTriggerIndexing.mockResolvedValue(undefined)
+  mockWriteNote.mockResolvedValue(true)
   mockLocalSearchParams.mockReturnValue({ poolId: POOL_ID })
   authStore.walletAddress = MOCK_USER_ADDRESS
   await poolStore.fetchPools()
@@ -174,7 +181,9 @@ describe('MembersScreen', () => {
     expect(getByTestId('members-error')).toBeTruthy()
   })
 
-  it('removes a member', async () => {
+  // Removal asks twice. The roster is a list to read, and a destructive action
+  // one tap deep on a row somebody was scrolling past is the wrong shape.
+  it('removes a member, once it has been confirmed', async () => {
     poolStore.memberRecords = [member(APPLICANT, 'active')]
     const { getByTestId } = render(<MembersScreen />)
 
@@ -182,7 +191,53 @@ describe('MembersScreen', () => {
       fireEvent.press(getByTestId(`members-remove-${APPLICANT.toLowerCase()}`))
     })
 
+    expect(mockRemoveMember).not.toHaveBeenCalled()
+
+    await act(async () => {
+      fireEvent.press(getByTestId(`members-remove-confirm-${APPLICANT.toLowerCase()}`))
+    })
+
     expect(mockRemoveMember).toHaveBeenCalledWith(expect.objectContaining({ account: APPLICANT.toLowerCase() }))
+  })
+
+  it('lets the owner back out of a removal they opened', async () => {
+    poolStore.memberRecords = [member(APPLICANT, 'active')]
+    const { getByTestId, queryByTestId } = render(<MembersScreen />)
+
+    await act(async () => {
+      fireEvent.press(getByTestId(`members-remove-${APPLICANT.toLowerCase()}`))
+    })
+    await act(async () => {
+      fireEvent.press(getByTestId(`members-remove-${APPLICANT.toLowerCase()}`))
+    })
+
+    expect(queryByTestId(`members-removing-${APPLICANT.toLowerCase()}`)).toBeNull()
+  })
+
+  // Before the transaction, so the indexer has it to quote when it tells them.
+  it('writes the reason before sending the decision', async () => {
+    poolStore.memberRecords = [member(APPLICANT, 'requested')]
+    const { getByTestId } = render(<MembersScreen />)
+
+    fireEvent.changeText(getByTestId(`members-reason-${APPLICANT.toLowerCase()}-input`), 'We are full this season.')
+
+    await act(async () => {
+      fireEvent.press(getByTestId(`members-reject-${APPLICANT.toLowerCase()}`))
+    })
+
+    expect(mockWriteNote).toHaveBeenCalledWith(expect.objectContaining({ kind: 'membership_rejected', text: 'We are full this season.' }))
+    expect(mockWriteNote.mock.invocationCallOrder[0]).toBeLessThan(mockRejectMember.mock.invocationCallOrder[0])
+  })
+
+  it('writes nothing when the owner said nothing', async () => {
+    poolStore.memberRecords = [member(APPLICANT, 'requested')]
+    const { getByTestId } = render(<MembersScreen />)
+
+    await act(async () => {
+      fireEvent.press(getByTestId(`members-approve-${APPLICANT.toLowerCase()}`))
+    })
+
+    expect(mockWriteNote).not.toHaveBeenCalled()
   })
 
   it('does not offer to remove the owner from their own pool', () => {

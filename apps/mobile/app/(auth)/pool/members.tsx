@@ -5,8 +5,10 @@ import { StatusBar } from 'expo-status-bar'
 import { observer } from 'mobx-react-lite'
 import React, { useState } from 'react'
 import { ActivityIndicator, Pressable, RefreshControl, ScrollView, Text, View } from 'react-native'
+import { NoteField } from '../../../src/components/lending/NoteField'
 import { palette } from '../../../src/constants/palette'
 import { useMembership } from '../../../src/hooks/pools/useMembership'
+import { useNotes } from '../../../src/hooks/pools/useNotes'
 import { usePoolIndexing } from '../../../src/hooks/pools/usePoolIndexing'
 import { useTransactionMonitoring } from '../../../src/hooks/pools/useTransactionMonitoring'
 import { poolStore } from '../../../src/stores/PoolStore'
@@ -23,6 +25,18 @@ const STAGE_MESSAGES: Record<Exclude<Stage, 'idle'>, string> = {
 }
 
 type Decision = 'approve' | 'reject' | 'remove'
+
+/**
+ * The outcome each decision writes its reason under.
+ *
+ * The note is keyed on the outcome, not on "a decision", which is what stops a
+ * reason typed for one answer from surfacing on another.
+ */
+const NOTE_KIND = {
+  approve: 'membership_approved',
+  reject: 'membership_rejected',
+  remove: 'membership_removed',
+} as const
 
 /**
  * The pool owner's members: who is waiting, and who is in.
@@ -45,8 +59,19 @@ function MembersScreen() {
 
   const [stage, setStage] = useState<Stage>('idle')
   const [failure, setFailure] = useState<string | null>(null)
+  /** Keyed by address, so a half-typed reason survives the list re-rendering. */
+  const [reasons, setReasons] = useState<Record<string, string>>({})
+  /**
+   * The member whose removal is being composed, if any.
+   *
+   * Removal asks twice rather than showing a reason box on every row. The
+   * roster is a list to read, not a list of decisions, and a destructive action
+   * that takes one tap on a row you were scrolling past is the wrong shape.
+   */
+  const [removing, setRemoving] = useState<string | null>(null)
 
   const pool = poolStore.poolById(Number(poolId))
+  const { writeNote } = useNotes(pool?.poolId)
   const denomination = pool ? denominationFor(pool) : undefined
   const waiting = pool ? poolStore.pendingMembersFor(pool.poolId) : []
 
@@ -74,11 +99,26 @@ function MembersScreen() {
 
   const isBusy = stage !== 'idle'
 
+  const setReason = (account: string, text: string) => setReasons((current) => ({ ...current, [account.toLowerCase()]: text }))
+
   const decide = async (account: string, decision: Decision) => {
     if (!pool || isBusy) return
 
     setFailure(null)
     reset()
+
+    /*
+      Before the transaction, so the indexer has it to quote when it tells the
+      applicant. **Except on a removal**, which sends no notification at all —
+      being removed is not a decision on anything the member asked for — so
+      that reason waits on the pool screen until they next open it. Worth
+      writing anyway: today they are told nothing, ever.
+    */
+    const reason = reasons[account.toLowerCase()]?.trim()
+
+    if (reason && pool) {
+      await writeNote({ kind: NOTE_KIND[decision], recordId: `${pool.chainId}-${pool.poolId}-${account.toLowerCase()}`, text: reason })
+    }
 
     const send = decision === 'approve' ? approveMember : decision === 'reject' ? rejectMember : removeMember
     const type = decision === 'approve' ? 'APPROVE_MEMBER' : decision === 'reject' ? 'REJECT_MEMBER' : 'REMOVE_MEMBER'
@@ -115,6 +155,8 @@ function MembersScreen() {
 
     setStage('indexing')
     await triggerIndexing(txHash, type)
+
+    setRemoving(null)
 
     // The reload is what moves the row: the applicant leaves `pendingMembersFor`
     // once the backend has re-read the register, and nothing else would.
@@ -217,6 +259,14 @@ function MembersScreen() {
             {waiting.map((applicant: MemberInfo) => (
               <View key={applicant.id} className="gap-4 rounded-3xl border-continuous border-hairline border-veil bg-surface p-5">
                 <Text className="font-mono text-sm text-snow">{shortAddress(applicant.account)}</Text>
+                <NoteField
+                  value={reasons[applicant.account.toLowerCase()] ?? ''}
+                  onChangeText={(text) => setReason(applicant.account, text)}
+                  label="Say why"
+                  placeholder="They will see this with your decision"
+                  isBusy={isBusy}
+                  testID={`members-reason-${applicant.account}`}
+                />
                 <View className="flex-row gap-3">
                   <Pressable
                     onPress={() => decide(applicant.account, 'approve')}
@@ -254,32 +304,61 @@ function MembersScreen() {
             </View>
           ) : (
             members.map((member) => (
-              <View
-                key={member.account}
-                className="flex-row items-center justify-between gap-3 rounded-2xl border-continuous border-hairline border-veil bg-surface px-4 py-3"
-              >
-                <View className="flex-1">
-                  <Text className="font-mono text-sm text-snow">{shortAddress(member.account)}</Text>
-                  <Text className="mt-1 text-xs text-mist">{formatAmount(member.balance ?? 0n, denomination)} in</Text>
+              <View key={member.account} className="gap-3 rounded-2xl border-continuous border-hairline border-veil bg-surface px-4 py-3">
+                <View className="flex-row items-center justify-between gap-3">
+                  <View className="flex-1">
+                    <Text className="font-mono text-sm text-snow">{shortAddress(member.account)}</Text>
+                    <Text className="mt-1 text-xs text-mist">{formatAmount(member.balance ?? 0n, denomination)} in</Text>
+                  </View>
+                  {/*
+                    The owner is a member of their own pool and cannot be removed
+                    from it — `removeMember` would succeed, but locking yourself
+                    out of your own circle is not a thing to offer by accident.
+                  */}
+                  {sameAddress(member.account, pool.poolOwner) ? (
+                    <Text className="text-xs text-mist">Owner</Text>
+                  ) : (
+                    <Pressable
+                      onPress={() => setRemoving(sameAddress(removing, member.account) ? null : member.account)}
+                      disabled={isBusy}
+                      accessibilityRole="button"
+                      testID={`members-remove-${member.account}`}
+                      className="rounded-full border-continuous border-hairline border-veil px-3 py-1 active:opacity-70 disabled:opacity-50"
+                    >
+                      <Text className="text-xs font-semibold text-coral">
+                        {sameAddress(removing, member.account) ? 'Cancel' : 'Remove'}
+                      </Text>
+                    </Pressable>
+                  )}
                 </View>
+
                 {/*
-                  The owner is a member of their own pool and cannot be removed
-                  from it — `removeMember` would succeed, but locking yourself
-                  out of your own circle is not a thing to offer by accident.
+                  A removal sends no notification — being removed is not a
+                  decision on anything the member asked for — so this reason
+                  waits on the pool screen until they next open it. Which is
+                  still more than they are told today, which is nothing.
                 */}
-                {sameAddress(member.account, pool.poolOwner) ? (
-                  <Text className="text-xs text-mist">Owner</Text>
-                ) : (
-                  <Pressable
-                    onPress={() => decide(member.account, 'remove')}
-                    disabled={isBusy}
-                    accessibilityRole="button"
-                    testID={`members-remove-${member.account}`}
-                    className="rounded-full border-continuous border-hairline border-veil px-3 py-1 active:opacity-70 disabled:opacity-50"
-                  >
-                    <Text className="text-xs font-semibold text-coral">Remove</Text>
-                  </Pressable>
-                )}
+                {sameAddress(removing, member.account) ? (
+                  <View className="gap-3" testID={`members-removing-${member.account}`}>
+                    <NoteField
+                      value={reasons[member.account.toLowerCase()] ?? ''}
+                      onChangeText={(text) => setReason(member.account, text)}
+                      label="Say why"
+                      placeholder="They will see this on the pool"
+                      isBusy={isBusy}
+                      testID={`members-remove-reason-${member.account}`}
+                    />
+                    <Pressable
+                      onPress={() => decide(member.account, 'remove')}
+                      disabled={isBusy}
+                      accessibilityRole="button"
+                      testID={`members-remove-confirm-${member.account}`}
+                      className="items-center rounded-2xl border-continuous border-hairline border-coral bg-coral-deep px-4 py-3 active:opacity-80 disabled:opacity-50"
+                    >
+                      <Text className="text-sm font-bold text-coral">Remove {shortAddress(member.account)}</Text>
+                    </Pressable>
+                  </View>
+                ) : null}
               </View>
             ))
           )}

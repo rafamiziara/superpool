@@ -11,6 +11,7 @@ import { UnsupportedPoolNotice } from '../../../src/components/lending/Unsupport
 import { LendingPoolABI } from '../../../src/constants/abis'
 import { palette } from '../../../src/constants/palette'
 import { useLoan } from '../../../src/hooks/pools/useLoan'
+import { useNotes } from '../../../src/hooks/pools/useNotes'
 import { usePoolIndexing } from '../../../src/hooks/pools/usePoolIndexing'
 import { useTransactionMonitoring } from '../../../src/hooks/pools/useTransactionMonitoring'
 import { poolStore } from '../../../src/stores/PoolStore'
@@ -46,8 +47,11 @@ function ApprovalsScreen() {
 
   const [stage, setStage] = useState<Stage>('idle')
   const [failure, setFailure] = useState<string | null>(null)
+  /** Keyed by loan, so a half-typed reason survives the list re-rendering. */
+  const [reasons, setReasons] = useState<Record<number, string>>({})
 
   const pool = poolStore.poolById(Number(poolId))
+  const { noteFor, writeNote } = useNotes(pool?.poolId)
   const denomination = pool ? denominationFor(pool) : undefined
   const requests = pool ? poolStore.pendingLoansFor(pool.poolId) : []
 
@@ -75,6 +79,24 @@ function ApprovalsScreen() {
 
     setFailure(null)
     reset()
+
+    /*
+      Saved *before* the transaction, and that ordering is the whole point.
+
+      By the time the indexer reaches this decision the note is there to be
+      read, so the push the borrower receives says why rather than only what.
+      Doing it afterwards would send the refusal bare and attach the reason to
+      a screen they may never open again.
+
+      A reason the owner typed and then answered the other way is left behind
+      under a key nobody asks for, so it can never surface on the wrong answer.
+      `writeNote` never throws — a note is not worth losing a decision over.
+    */
+    const reason = reasons[request.loanId]?.trim()
+
+    if (reason) {
+      await writeNote({ kind: decision === 'approve' ? 'loan_approved' : 'loan_rejected', recordId: request.id, text: reason })
+    }
 
     const send = decision === 'approve' ? approveLoan : rejectLoan
 
@@ -259,6 +281,9 @@ function ApprovalsScreen() {
               // knows this borrower's loans in other pools.
               history={poolStore.borrowerHistory(request.borrower)}
               available={typeof available === 'bigint' ? available : undefined}
+              purpose={noteFor(request.id, 'loan_purpose')}
+              reason={reasons[request.loanId] ?? ''}
+              onChangeReason={(text) => setReasons((current) => ({ ...current, [request.loanId]: text }))}
               onApprove={() => decide(request, 'approve')}
               onReject={() => decide(request, 'reject')}
               isBusy={isBusy}

@@ -46,6 +46,13 @@ jest.mock('../../../src/hooks/pools/usePoolIndexing', () => ({
   usePoolIndexing: () => ({ triggerIndexing: mockTriggerIndexing, indexConfirmed: jest.fn(), isIndexing: false }),
 }))
 
+const mockWriteNote = jest.fn()
+const mockNoteFor = jest.fn()
+
+jest.mock('../../../src/hooks/pools/useNotes', () => ({
+  useNotes: () => ({ notes: [], isLoading: false, refresh: jest.fn(), noteFor: mockNoteFor, writeNote: mockWriteNote }),
+}))
+
 function makeRequest(overrides: Partial<LoanInfo> = {}): LoanInfo {
   return {
     id: '31337-2-5',
@@ -92,6 +99,8 @@ beforeEach(async () => {
   mockRejectLoan.mockResolvedValue(TX_HASH)
   mockWaitForTransaction.mockResolvedValue({ loanId: 5, amount: '4000000000000000000' })
   mockTriggerIndexing.mockResolvedValue(undefined)
+  mockWriteNote.mockResolvedValue(true)
+  mockNoteFor.mockReturnValue(undefined)
   mockWagmiUseReadContract.mockReturnValue({ data: 100_000_000_000_000_000_000n, refetch: jest.fn().mockResolvedValue({ data: 0n }) })
   authStore.walletAddress = null
   await poolStore.fetchPools()
@@ -249,6 +258,55 @@ describe('ApprovalsScreen', () => {
       expect(mockApproveLoan).toHaveBeenCalledWith(
         expect.objectContaining({ poolId: 2, loanId: 5, amount: 4_000_000_000_000_000_000n, borrower: STRANGER })
       )
+    })
+
+    // Saved before the transaction, which is what lets the borrower's push
+    // carry it. Afterwards would send the refusal bare.
+    it('writes the reason before sending the decision', async () => {
+      const { getByTestId } = render(<ApprovalsScreen />)
+
+      fireEvent.changeText(getByTestId('loan-request-reason-5-input'), 'The pool is fully lent out until March.')
+
+      await act(async () => {
+        fireEvent.press(getByTestId('loan-request-reject-5'))
+      })
+
+      expect(mockWriteNote).toHaveBeenCalledWith(
+        expect.objectContaining({ kind: 'loan_rejected', recordId: '31337-2-5', text: 'The pool is fully lent out until March.' })
+      )
+      expect(mockWriteNote.mock.invocationCallOrder[0]).toBeLessThan(mockRejectLoan.mock.invocationCallOrder[0])
+    })
+
+    // One box serves both answers: the kind follows the button pressed, so a
+    // reason typed while hesitating becomes the reason for whichever was given.
+    it('files the reason under the decision that was actually made', async () => {
+      const { getByTestId } = render(<ApprovalsScreen />)
+
+      fireEvent.changeText(getByTestId('loan-request-reason-5-input'), 'Glad to help.')
+
+      await act(async () => {
+        fireEvent.press(getByTestId('loan-request-approve-5'))
+      })
+
+      expect(mockWriteNote).toHaveBeenCalledWith(expect.objectContaining({ kind: 'loan_approved' }))
+    })
+
+    it('writes nothing when the owner said nothing', async () => {
+      const { getByTestId } = render(<ApprovalsScreen />)
+
+      await act(async () => {
+        fireEvent.press(getByTestId('loan-request-approve-5'))
+      })
+
+      expect(mockWriteNote).not.toHaveBeenCalled()
+    })
+
+    it('shows the borrower’s stated purpose above the decision', async () => {
+      mockNoteFor.mockReturnValue({ id: 'n', recordId: '31337-2-5', kind: 'loan_purpose', text: 'School fees.' })
+
+      const { getByTestId } = render(<ApprovalsScreen />)
+
+      expect(getByTestId('loan-request-purpose-5-text')).toHaveTextContent('School fees.')
     })
 
     it('indexes an approval as an approval', async () => {

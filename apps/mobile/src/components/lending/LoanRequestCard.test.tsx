@@ -40,6 +40,8 @@ function renderCard(props: Partial<React.ComponentProps<typeof LoanRequestCard>>
       request={makeRequest()}
       history={makeHistory()}
       denomination={NATIVE}
+      reason=""
+      onChangeReason={jest.fn()}
       onApprove={jest.fn()}
       onReject={jest.fn()}
       {...props}

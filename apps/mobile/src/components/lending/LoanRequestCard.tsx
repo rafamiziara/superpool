@@ -1,10 +1,12 @@
-import type { BorrowerHistory, LoanInfo } from '@superpool/types'
+import type { BorrowerHistory, LoanInfo, Note } from '@superpool/types'
 import React from 'react'
 import { ActivityIndicator, Pressable, Text, View } from 'react-native'
 import { calculateRepayment } from '../../hooks/pools/useLoan'
 import type { Denomination } from '../../utils/denomination'
 import { formatToken, shortAddress, timeAgo } from '../../utils/format'
 import { BorrowerHistoryPanel } from './BorrowerHistoryPanel'
+import { NoteCallout } from './NoteCallout'
+import { NoteField } from './NoteField'
 
 export interface LoanRequestCardProps {
   request: LoanInfo
@@ -29,6 +31,18 @@ export interface LoanRequestCardProps {
    * so this is never absent here.
    */
   denomination: Denomination
+  /**
+   * What the borrower said the money is for, when they said anything.
+   *
+   * Above the history rather than below it: an assessment over an amount and a
+   * repayment record is arithmetic the owner can already do, and an assessment
+   * over a stated purpose is a judgement. This is the fact the rest is read
+   * against.
+   */
+  purpose?: Note
+  /** The reason the owner is typing, held by the screen so it survives a re-render. */
+  reason: string
+  onChangeReason: (text: string) => void
   onApprove: () => void
   onReject: () => void
   /** True while any decision on this pool is in flight; both buttons lock. */
@@ -46,7 +60,18 @@ export interface LoanRequestCardProps {
  * pool's money and is the decision worth pausing over; rejection moves nothing
  * and can be undone by the borrower simply asking again.
  */
-export function LoanRequestCard({ request, history, available, denomination, onApprove, onReject, isBusy = false }: LoanRequestCardProps) {
+export function LoanRequestCard({
+  request,
+  history,
+  available,
+  denomination,
+  purpose,
+  reason,
+  onChangeReason,
+  onApprove,
+  onReject,
+  isBusy = false,
+}: LoanRequestCardProps) {
   const { symbol, decimals } = denomination
   const amount = BigInt(request.amount)
   const repayment = calculateRepayment(amount, request.interestRate)
@@ -81,6 +106,8 @@ export function LoanRequestCard({ request, history, available, denomination, onA
         <Text className="mt-1 text-xs text-mist">Interest is fixed the moment you approve, at the pool&apos;s rate on that day.</Text>
       </View>
 
+      <NoteCallout note={purpose} label="What it is for" testID={`loan-request-purpose-${request.loanId}`} />
+
       {/* Above the buttons rather than below them: it is what the decision is
           made on, and a record read after deciding is a record read too late. */}
       <BorrowerHistoryPanel history={history} voice="owner" testID={`loan-request-history-${request.loanId}`} />
@@ -96,6 +123,21 @@ export function LoanRequestCard({ request, history, available, denomination, onA
           </Text>
         </View>
       )}
+
+      {/*
+        Written before either button is pressed, which is what lets the push
+        the borrower receives carry it. The kind follows the button, so this one
+        box serves both decisions: what is typed here becomes the reason for
+        whichever answer is given.
+      */}
+      <NoteField
+        value={reason}
+        onChangeText={onChangeReason}
+        label="Say why"
+        placeholder="They will see this with your decision"
+        isBusy={isBusy}
+        testID={`loan-request-reason-${request.loanId}`}
+      />
 
       <View className="flex-row gap-3">
         <Pressable
