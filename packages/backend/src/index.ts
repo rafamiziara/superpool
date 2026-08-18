@@ -44,4 +44,8 @@ const isDev = process.env.FUNCTIONS_EMULATOR === 'true' || process.env.NODE_ENV 
 if (isDev) {
   const devFunctions = require('./functions')
   exports.signMessageForTesting = devFunctions.signMessageForTesting
+  // The agent-service seam probe. Dev-only for the same reason the signer is:
+  // nothing in production asks it, and an endpoint that reports what
+  // infrastructure exists is a free thing for a stranger to learn.
+  exports.pingAgentService = devFunctions.pingAgentService
 }

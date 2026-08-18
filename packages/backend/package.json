@@ -20,6 +20,7 @@
     "testErc20": "ts-node scripts/testErc20Pools.ts",
     "testDefaults": "ts-node scripts/testDefaults.ts",
     "testNotes": "ts-node scripts/testNotes.ts",
+    "testAgentSeam": "ts-node scripts/testAgentSeam.ts",
     "test": "jest",
     "format": "prettier --write . --ignore-path ../../.prettierignore",
     "type-check": "tsc --noEmit",
@@ -30,15 +31,18 @@
   },
   "main": "lib/index.js",
   "dependencies": {
+    "@mastra/client-js": "^1.40.0",
     "@superpool/types": "workspace:*",
     "dotenv": "^17.2.1",
     "ethers": "^6.15.0",
     "firebase-admin": "^12.7.0",
     "firebase-functions": "^6.4.0",
+    "jsonwebtoken": "^9.0.3",
     "uuid": "^11.1.0"
   },
   "devDependencies": {
     "@types/jest": "^30.0.0",
+    "@types/jsonwebtoken": "^9.0.10",
     "firebase-functions-test": "^3.4.1",
     "jest": "^30.0.5",
     "minimatch": "^10.0.3",
