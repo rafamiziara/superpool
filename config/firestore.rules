@@ -180,6 +180,23 @@ service cloud.firestore {
       allow read, write: if false; // backend-only
     }
 
+    // --- notes -------------------------------------------------------------
+    // Why a loan was wanted, and why a decision went the way it did. The one
+    // collection here that does not mirror the chain: these are sentences
+    // people wrote about each other, so "public because the chain is public"
+    // — the reasoning behind every read rule above — does not apply.
+    //
+    // Closed in both directions. Reads go through `listNotes`, which returns
+    // only what the caller is entitled to: a pool's owner sees the notes on
+    // their pool, and everybody else sees the notes about themselves. Writes
+    // go through `saveNote`, which takes the author from `request.auth.uid`
+    // rather than from the request body and refuses a second note under the
+    // same key.
+
+    match /notes/{noteId} {
+      allow read, write: if false; // backend-only (saveNote / listNotes)
+    }
+
     // --- event_sync_state --------------------------------------------------
     // Per-chain indexer cursors (last processed block). Tampering with these
     // would let an attacker skip or replay blockchain event ranges.

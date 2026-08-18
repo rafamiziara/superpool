@@ -38,6 +38,10 @@ const DESTINATIONS: Record<NotificationKind, (poolId: string) => string> = {
   loan_overdue: poolPage,
   membership_approved: poolPage,
   membership_rejected: poolPage,
+  // Nothing sends this one — a removal is not answered news (see
+  // `NotificationKind`). It is here because the record is exhaustive by type,
+  // and the pool page is where a member would go to find out anyway.
+  membership_removed: poolPage,
 }
 
 function poolPage(poolId: string): string {

@@ -67,6 +67,12 @@ export type NotificationKind =
   | 'loan_due_soon'
   | 'loan_overdue'
   | 'loan_defaulted'
+  // Never sent, and deliberately: being removed from a pool is not a decision
+  // on anything the member asked for, so it reaches them through the pool
+  // screen rather than a push. It is in this union because a *note* can be
+  // attached to it (`NoteKind`), and one vocabulary for both features is what
+  // stops them from calling the same event two different things.
+  | 'membership_removed'
 
 /**
  * The `data` block carried alongside the title and body.

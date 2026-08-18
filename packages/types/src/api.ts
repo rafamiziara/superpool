@@ -1,5 +1,7 @@
 // API request and response types
 
+import type { NotificationKind } from './notifications'
+
 // Generic API response wrapper
 export interface ApiResponse<T = unknown> {
   success: boolean
@@ -638,6 +640,113 @@ export interface ListContributionsRequest {
 
 export interface ListContributionsResponse {
   contributions: ContributionInfo[]
+  totalCount: number
+  limit: number
+}
+
+/**
+ * A sentence somebody wrote about a record: why a loan was wanted, why a
+ * request was turned down, why a member was removed.
+ *
+ * **Deliberately off chain.** Free text costs gas proportional to its length,
+ * forever, on a product whose amounts are small by definition; and it is
+ * metadata, where the chain's job here is to record what only the chain can
+ * witness. Permanence is a misfeature besides — a rejection reason is a
+ * statement about a person, and one that turns out to be abusive has to be
+ * removable.
+ *
+ * **A note is never load-bearing.** Nothing in the protocol, the indexer or an
+ * eligibility check may ever read one. If a note ever gates a transaction,
+ * this design is wrong.
+ */
+export interface Note {
+  /** `${recordId}:${kind}` — the document id. See `kind` for why both. */
+  id: string
+  /**
+   * The record this is about: a loan's `${chainId}-${poolId}-${loanId}` or a
+   * membership's `${chainId}-${poolId}-${account}`.
+   *
+   * The record's own id, never the transaction that produced it. `indexLoan`
+   * moves a loan's `transactionHash` to the earliest event that dates it, and
+   * `approveLoan` rewrites `startTime` — so a note keyed to the request
+   * transaction attaches correctly right up until the loan is approved, then
+   * silently detaches.
+   */
+  recordId: string
+  kind: NoteKind
+  /** At most `NOTE_MAX_LENGTH` characters. A reason, not a document. */
+  text: string
+  /** Lowercased. Who wrote it: the borrower on a purpose, else the owner. */
+  author: string
+  /** Lowercased. The wallet the note is *about*, and who may read it. */
+  subject: string
+  chainId: number
+  poolId: number
+  /** ISO 8601. */
+  createdAt: string
+}
+
+/**
+ * What a note is attached to.
+ *
+ * The outcome, not just "a decision", and that is what makes stale reasons
+ * invisible: an owner types a reason *before* sending the transaction, so a
+ * rejection they thought better of leaves a `loan_rejected` note behind on a
+ * loan that was approved. The reader asks for the note belonging to the
+ * transition that actually happened, so the orphan is never found.
+ *
+ * Every value but `loan_purpose` is a `NotificationKind`, so the two features
+ * cannot drift apart in what they call the same event.
+ */
+export type NoteKind =
+  | 'loan_purpose'
+  | Extract<
+      NotificationKind,
+      'loan_approved' | 'loan_rejected' | 'loan_defaulted' | 'membership_approved' | 'membership_rejected' | 'membership_removed'
+    >
+
+/** Long enough to say why, short enough to fit in a push body. */
+export const NOTE_MAX_LENGTH = 280
+
+export interface SaveNoteRequest {
+  kind: NoteKind
+  /**
+   * The record the note belongs to. Required for every kind but
+   * `loan_purpose`, whose record does not exist yet.
+   */
+  recordId?: string
+  /**
+   * Stage a `loan_purpose` under the transaction that requests the loan.
+   *
+   * The contract assigns the loan id when the transaction is mined, so there
+   * is no record to key on at the moment the borrower types the reason. The
+   * loan indexer resolves this to `recordId` on the transition that creates
+   * the loan — which means it works from the scheduled sweep too, so a phone
+   * that died between sending and indexing still gets its purpose attached.
+   */
+  txHash?: string
+  chainId?: number
+  text: string
+}
+
+export interface SaveNoteResponse {
+  note: Note
+}
+
+export interface ListNotesRequest {
+  chainId?: number
+  /**
+   * Restrict to one pool. Omit to get only the caller's own notes, wherever
+   * they are.
+   */
+  poolId?: number
+  /** Restrict to the notes on one record. */
+  recordId?: string
+  limit?: number
+}
+
+export interface ListNotesResponse {
+  notes: Note[]
   totalCount: number
   limit: number
 }

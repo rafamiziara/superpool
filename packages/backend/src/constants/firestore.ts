@@ -117,3 +117,22 @@ export const PUSH_TOKENS_COLLECTION = 'push_tokens'
  * request ever made.
  */
 export const NOTIFICATIONS_SENT_COLLECTION = 'notifications_sent'
+
+/**
+ * The name of the Firestore collection used to store notes — the reasons
+ * behind decisions, and the purpose a loan was asked for.
+ *
+ * One document per (record, outcome): `${recordId}:${kind}`, mirroring
+ * `notificationKey` and for the same reason — one loan is worth several
+ * statements over its life, and keying on the record alone would collapse
+ * them. Keying on the *outcome* is also what makes a stale reason invisible:
+ * an owner types theirs before sending the transaction, so one they thought
+ * better of is never asked for.
+ *
+ * The first collection here that is **not** a mirror of chain state, which is
+ * why it is closed to clients in both directions and reached through the
+ * `saveNote` / `listNotes` callables instead. Every other feed is
+ * world-readable to any signed-in wallet because the chain already is; a
+ * sentence about a person is not.
+ */
+export const NOTES_COLLECTION = 'notes'
