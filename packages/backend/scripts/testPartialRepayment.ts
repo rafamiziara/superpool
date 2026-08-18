@@ -33,7 +33,7 @@ process.env.FIRESTORE_EMULATOR_HOST = process.env.FIRESTORE_EMULATOR_HOST || 'lo
 import * as dotenv from 'dotenv'
 dotenv.config()
 
-import { BaseContract, Contract, JsonRpcProvider, parseEther, Wallet } from 'ethers'
+import { BaseContract, Contract, JsonRpcProvider, parseEther, Wallet, ZeroAddress } from 'ethers'
 import { initializeApp } from 'firebase-admin/app'
 import { getFirestore, Timestamp } from 'firebase-admin/firestore'
 import { LendingPoolABI, PoolFactoryABI } from '../src/constants/abis'
@@ -143,6 +143,9 @@ async function createPool(provider: JsonRpcProvider, owner: Wallet, name: string
       name: `${name}-${Date.now()}`,
       description: 'partial repayment verification',
       requiresMembership: true,
+      // Native POL. Appended to `PoolParams` in the ERC-20 work, and positional —
+      // omitting it makes ethers reject the struct rather than default it.
+      loanToken: ZeroAddress,
     },
     { nonce: await nextNonce(provider, owner.address) }
   )

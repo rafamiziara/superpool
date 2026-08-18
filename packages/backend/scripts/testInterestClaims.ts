@@ -27,7 +27,7 @@ dotenv.config()
 
 import { initializeApp } from 'firebase-admin/app'
 import { getFirestore } from 'firebase-admin/firestore'
-import { BaseContract, Contract, JsonRpcProvider, parseEther, Wallet } from 'ethers'
+import { BaseContract, Contract, JsonRpcProvider, parseEther, Wallet, ZeroAddress } from 'ethers'
 import { PoolFactoryABI, LendingPoolABI } from '../src/constants/abis'
 import { INTEREST_CLAIMS_COLLECTION } from '../src/constants/firestore'
 import { indexInterestClaimsByTxHash } from '../src/services/interestClaimIndexer'
@@ -137,6 +137,9 @@ async function produceClaim(provider: JsonRpcProvider) {
       name: `claim-indexing-${Date.now()}`,
       description: 'interest claim indexing verification',
       requiresMembership: true,
+      // Native POL. Appended to `PoolParams` in the ERC-20 work, and positional —
+      // omitting it makes ethers reject the struct rather than default it.
+      loanToken: ZeroAddress,
     },
     { nonce: await nextNonce(provider, owner.address) }
   )
