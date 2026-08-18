@@ -76,6 +76,13 @@ jest.mock('../../../src/hooks/pools/usePoolIndexing', () => ({
   usePoolIndexing: () => ({ triggerIndexing: mockTriggerIndexing, indexConfirmed: jest.fn(), isIndexing: false }),
 }))
 
+const mockWriteNote = jest.fn()
+const mockNoteFor = jest.fn()
+
+jest.mock('../../../src/hooks/pools/useNotes', () => ({
+  useNotes: () => ({ notes: [], isLoading: false, refresh: jest.fn(), noteFor: mockNoteFor, writeNote: mockWriteNote }),
+}))
+
 /** An outstanding loan for pool 1, in the shape `listLoans` returns. */
 function outstandingLoan(overrides: Record<string, unknown> = {}) {
   return {
@@ -110,6 +117,8 @@ beforeEach(async () => {
   mockCancelLoanRequest.mockResolvedValue(TX_HASH)
   mockWaitForTransaction.mockResolvedValue({ loanId: 3, amount: '5000000000000000000' })
   mockTriggerIndexing.mockResolvedValue(undefined)
+  mockWriteNote.mockResolvedValue(true)
+  mockNoteFor.mockReturnValue(undefined)
   mockChainReads()
   await poolStore.fetchPools()
   poolStore.loanRecords = []
@@ -149,6 +158,59 @@ describe('BorrowScreen', () => {
       })
 
       await waitFor(() => expect(mockTriggerIndexing).toHaveBeenCalledWith(TX_HASH, 'BORROW'))
+    })
+
+    // The loan does not exist yet — the contract assigns its id when this is
+    // mined — so the purpose is staged under the transaction and the indexer
+    // moves it, before the owner's queue notification goes out.
+    it('stages the purpose under the transaction that asked for the loan', async () => {
+      const { getByTestId } = render(<BorrowScreen />)
+
+      fireEvent.changeText(getByTestId('borrow-amount'), '5')
+      fireEvent.changeText(getByTestId('borrow-purpose-input'), 'School fees.')
+      await act(async () => {
+        fireEvent.press(getByTestId('borrow-submit'))
+      })
+
+      expect(mockWriteNote).toHaveBeenCalledWith({ kind: 'loan_purpose', txHash: TX_HASH, text: 'School fees.' })
+    })
+
+    // Written before indexing, so a phone that dies in the next few seconds
+    // still gets its purpose across when the sweep reaches the loan.
+    it('stages it before asking the backend to index anything', async () => {
+      const { getByTestId } = render(<BorrowScreen />)
+
+      fireEvent.changeText(getByTestId('borrow-amount'), '5')
+      fireEvent.changeText(getByTestId('borrow-purpose-input'), 'School fees.')
+      await act(async () => {
+        fireEvent.press(getByTestId('borrow-submit'))
+      })
+
+      expect(mockWriteNote.mock.invocationCallOrder[0]).toBeLessThan(mockTriggerIndexing.mock.invocationCallOrder[0])
+    })
+
+    it('says nothing when the borrower would rather not', async () => {
+      const { getByTestId } = render(<BorrowScreen />)
+
+      fireEvent.changeText(getByTestId('borrow-amount'), '5')
+      await act(async () => {
+        fireEvent.press(getByTestId('borrow-submit'))
+      })
+
+      expect(mockWriteNote).not.toHaveBeenCalled()
+    })
+
+    it('does not stage a purpose for a transaction the wallet refused', async () => {
+      mockBorrow.mockRejectedValue(new Error('nope'))
+      const { getByTestId } = render(<BorrowScreen />)
+
+      fireEvent.changeText(getByTestId('borrow-amount'), '5')
+      fireEvent.changeText(getByTestId('borrow-purpose-input'), 'School fees.')
+      await act(async () => {
+        fireEvent.press(getByTestId('borrow-submit'))
+      })
+
+      expect(mockWriteNote).not.toHaveBeenCalled()
     })
 
     it('returns to the form when the wallet refuses', async () => {
@@ -196,6 +258,15 @@ describe('BorrowScreen', () => {
   describe('repaying', () => {
     beforeEach(() => {
       poolStore.loanRecords = [outstandingLoan()]
+    })
+
+    it('reminds the borrower what they said the money was for', () => {
+      mockNoteFor.mockReturnValue({ text: 'School fees.' })
+
+      const { getByTestId } = render(<BorrowScreen />)
+
+      expect(mockNoteFor).toHaveBeenCalledWith('31337-1-3', 'loan_purpose')
+      expect(getByTestId('repay-purpose-text')).toHaveTextContent('School fees.')
     })
 
     it('offers repayment instead of borrowing when a loan is open', () => {

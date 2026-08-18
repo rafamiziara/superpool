@@ -40,7 +40,19 @@ describe('BorrowForm', () => {
     fireEvent.changeText(getByTestId('borrow-amount'), '2.5')
     fireEvent.press(getByTestId('borrow-submit'))
 
-    expect(onSubmit).toHaveBeenCalledWith(2_500_000_000_000_000_000n)
+    expect(onSubmit).toHaveBeenCalledWith(2_500_000_000_000_000_000n, '')
+  })
+
+  // Never required: a member who would rather not say must not be blocked
+  // from borrowing, so this comes back empty as often as not.
+  it('carries what the borrower said it is for, and does not insist on it', () => {
+    const { getByTestId, onSubmit } = renderForm()
+
+    fireEvent.changeText(getByTestId('borrow-amount'), '2')
+    fireEvent.changeText(getByTestId('borrow-purpose-input'), '  School fees.  ')
+    fireEvent.press(getByTestId('borrow-submit'))
+
+    expect(onSubmit).toHaveBeenCalledWith(2_000_000_000_000_000_000n, 'School fees.')
   })
 
   it('shows what the loan will cost to repay', () => {
@@ -167,7 +179,7 @@ describe('BorrowForm', () => {
 
       fireEvent.press(getByTestId('borrow-submit'))
 
-      expect(onSubmit).toHaveBeenCalledWith(4_000_000_000_000_000_000n)
+      expect(onSubmit).toHaveBeenCalledWith(4_000_000_000_000_000_000n, '')
     })
 
     it('still enforces the per-loan cap', () => {

@@ -4,6 +4,7 @@ import { z } from 'zod'
 import { calculateRepayment } from '../../hooks/pools/useLoan'
 import type { Denomination } from '../../utils/denomination'
 import { amountPattern, bpsToPercent, formatAmount, formatDuration, formatToken, parseToken } from '../../utils/format'
+import { NoteField } from './NoteField'
 
 /**
  * Parses what the user typed into the amount `createLoan` takes.
@@ -49,7 +50,15 @@ export interface BorrowFormProps {
    * repayment total are the same question either way.
    */
   requiresApproval?: boolean
-  onSubmit: (amount: bigint) => void | Promise<void>
+  /**
+   * The amount, and what the borrower said it is for.
+   *
+   * The purpose is **never required**. A mandatory field turns a working
+   * borrow flow into a form, and a member who would rather not say should not
+   * be stopped from borrowing — so it comes back as an empty string as often
+   * as not.
+   */
+  onSubmit: (amount: bigint, purpose: string) => void | Promise<void>
   isSubmitting?: boolean
   /** Shown above the button — the flow's error, not a field's. */
   error?: string | null
@@ -81,6 +90,7 @@ export function BorrowForm({
   error,
 }: BorrowFormProps) {
   const [amount, setAmount] = useState('')
+  const [purpose, setPurpose] = useState('')
   const [touched, setTouched] = useState(false)
 
   const schema = useMemo(() => borrowFormSchema(denomination), [denomination])
@@ -104,7 +114,7 @@ export function BorrowForm({
   const handleSubmit = () => {
     if (!canSubmit) return
 
-    void onSubmit(parsed.data.amount)
+    void onSubmit(parsed.data.amount, purpose.trim())
   }
 
   return (
@@ -155,6 +165,22 @@ export function BorrowForm({
           <Text className="text-xs text-mist">In {denomination.symbol}</Text>
         )}
       </View>
+
+      {/*
+        After the amount and before the quote: it is the one thing on this
+        screen the owner cannot work out for themselves, and the reason their
+        queue notification is worth reading at all. Optional, and shown whether
+        or not the pool reviews requests — a purpose is worth recording on a
+        loan nobody had to approve.
+      */}
+      <NoteField
+        value={purpose}
+        onChangeText={setPurpose}
+        label="What is it for?"
+        placeholder={`${poolName}'s owner will see this`}
+        isBusy={isSubmitting}
+        testID="borrow-purpose"
+      />
 
       {repayment !== null && !exceedsMax && !exceedsAvailable && (
         <View className="rounded-2xl border-continuous border-hairline border-veil bg-raised px-4 py-3" testID="borrow-repayment">

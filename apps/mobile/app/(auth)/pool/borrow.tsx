@@ -8,10 +8,12 @@ import { useReadContract } from 'wagmi'
 import { BorrowForm } from '../../../src/components/lending/BorrowForm'
 import { UnsupportedPoolNotice } from '../../../src/components/lending/UnsupportedPoolNotice'
 import { LoanDueNotice } from '../../../src/components/lending/LoanDueNotice'
+import { NoteCallout } from '../../../src/components/lending/NoteCallout'
 import { RepayForm } from '../../../src/components/lending/RepayForm'
 import { LendingPoolABI } from '../../../src/constants/abis'
 import { palette } from '../../../src/constants/palette'
 import { settlementQuote, useLoan } from '../../../src/hooks/pools/useLoan'
+import { useNotes } from '../../../src/hooks/pools/useNotes'
 import { useTokenApproval } from '../../../src/hooks/pools/useTokenApproval'
 import { usePoolIndexing } from '../../../src/hooks/pools/usePoolIndexing'
 import { useTransactionMonitoring } from '../../../src/hooks/pools/useTransactionMonitoring'
@@ -92,6 +94,10 @@ function BorrowScreen() {
   const outstanding = pool ? poolStore.activeLoanFor(pool.poolId) : undefined
   const pendingRequest = pool ? poolStore.pendingLoanFor(pool.poolId) : undefined
 
+  const { noteFor, writeNote } = useNotes(pool?.poolId)
+  const ownLoan = outstanding ?? pendingRequest
+  const purpose = ownLoan ? noteFor(ownLoan.id, 'loan_purpose') : undefined
+
   // Read from the chain rather than summed from indexed events. `createLoan`
   // checks against `totalFunds`, which is deposits minus withdrawals minus what
   // is already lent out — a figure derived from the contribution feed would
@@ -164,7 +170,7 @@ function BorrowScreen() {
    * identical either way, and the difference — funds now, or an answer later —
    * is already stated in the copy above it.
    */
-  const handleBorrow = async (amount: bigint) => {
+  const handleBorrow = async (amount: bigint, purposeText: string) => {
     if (!pool || !denomination) return
 
     setFailure(null)
@@ -187,6 +193,20 @@ function BorrowScreen() {
       setFailure(error instanceof Error ? error.message : 'Could not send the loan request')
 
       return
+    }
+
+    /*
+      Staged under the transaction, because the loan does not exist yet: the
+      contract assigns its id when this is mined. The loan indexer moves it onto
+      the loan on the transition that creates one, which is *before* the owner's
+      queue notification goes out — and the queue notification is the single
+      most valuable place a purpose can appear.
+
+      Written here rather than after indexing so the sweep can finish the job:
+      a phone that dies in the next few seconds still gets its purpose across.
+    */
+    if (purposeText) {
+      await writeNote({ kind: 'loan_purpose', txHash, text: purposeText })
     }
 
     await settle(txHash, requiresApproval ? 'REQUEST_LOAN' : 'BORROW', amount, requiresApproval ? 'requested' : 'borrowed')
@@ -383,6 +403,7 @@ function BorrowScreen() {
                 send, and this is about whether to send it now. It renders
                 nothing on a loan comfortably inside its term. */}
             <LoanDueNotice loan={outstanding} />
+            <NoteCallout note={purpose} label="What you said it was for" testID="repay-purpose" />
             {/* Held back until the chain answers. A form pre-filled from the
                 indexed record would show a figure a few seconds stale and then
                 change under the borrower's hands. */}
@@ -421,6 +442,8 @@ function BorrowScreen() {
                 Requested from {pool.name} · request #{pendingRequest.loanId}
               </Text>
             </View>
+
+            <NoteCallout note={purpose} label="What you said it was for" testID="pending-request-purpose" />
 
             <View className="rounded-2xl border-continuous border-hairline border-veil bg-raised px-4 py-3">
               <Text className="text-sm text-fog">Nothing has left the pool yet.</Text>
