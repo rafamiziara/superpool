@@ -8,20 +8,20 @@ To build a functional micro-lending decentralized application on Polygon where u
 
 ## 📍 Where things stand (2026-08-18)
 
-| Sprint                         | Status                                                 |
-| ------------------------------ | ------------------------------------------------------ |
-| 1 · Foundation                 | ✅ Complete                                            |
-| 2 · Authentication Enhancement | ✅ Complete                                            |
-| 3 · Pool Creation              | 🚧 Complete locally; blocked on testnet deployment     |
-| 4 · Pool Membership            | ✅ Complete                                            |
-| 5 · Pool Liquidity             | 🚧 Native currency only; ERC-20 outstanding            |
-| 6 · Loan Requests              | 🚧 Request flow complete; AI assessment not started    |
-| 7 · Loan Repayments            | ✅ Full, partial, accruing; reminders; no schedule     |
-| 8 · Withdrawals                | ✅ Complete                                            |
-| 9 · Reputations                | 🚧 History and defaults observed; no score, on purpose |
-| 10 · Loan Management           | 🚧 Decisions and borrower history; AI support not      |
-| 11 · Interest Distribution     | ✅ Complete                                            |
-| 12 · Notifications             | 🚧 All nine kinds shipped; delivery unverified         |
+| Sprint                         | Status                                                  |
+| ------------------------------ | ------------------------------------------------------- |
+| 1 · Foundation                 | ✅ Complete                                             |
+| 2 · Authentication Enhancement | ✅ Complete                                             |
+| 3 · Pool Creation              | 🚧 Complete locally; blocked on testnet deployment      |
+| 4 · Pool Membership            | ✅ Complete                                             |
+| 5 · Pool Liquidity             | 🚧 Native currency only; ERC-20 outstanding             |
+| 6 · Loan Requests              | ✅ Complete — request flow and AI assessment            |
+| 7 · Loan Repayments            | ✅ Full, partial, accruing; reminders; no schedule      |
+| 8 · Withdrawals                | ✅ Complete                                             |
+| 9 · Reputations                | 🚧 History and defaults observed; no score, on purpose  |
+| 10 · Loan Management           | 🚧 Decisions, history and AI support; no prioritisation |
+| 11 · Interest Distribution     | ✅ Complete                                             |
+| 12 · Notifications             | 🚧 All nine kinds shipped; delivery unverified          |
 
 Three deferrals across Sprints 4, 6 and 10 — a membership reason, a loan
 purpose, a decision reason — turned out to be one missing mechanism, and were
@@ -286,11 +286,14 @@ See [`LOANS.md`](LOANS.md) for how the shipped system works.
   - Request validation and eligibility checks ✅
   - Loan request queue management ✅
 
-- **AI Assessment Integration — ❌ NOT STARTED**
-  - No AI agent, no scoring, no assessment storage. Nothing in the repo
-    references an LLM provider of any kind.
-  - This is the largest unstarted scope in the plan and it also blocks half of
-    Sprint 10. Worth splitting into its own sprint before it is picked up.
+- **AI Assessment Integration — ✅ 2026-08-18**
+  - `packages/agents` (Mastra), the `assessLoan` / `getAssessment` callables,
+    and the panel on the owner's queue. It was split into its own sprint, as
+    the note here recommended.
+  - **Advisory, never load-bearing**, and it produces a band rather than a
+    score — `REPUTATION_PLAN` §7's argument was kept, not overturned. See
+    [Assessment](../CLAUDE.md#assessment).
+  - Held by seven eval cases and 17 live checks against a real model.
 
 - **User Interface** ✅
   - Loan request form for members
@@ -301,11 +304,13 @@ See [`LOANS.md`](LOANS.md) for how the shipped system works.
 ### Expected Deliverables:
 
 - Members can request loans through the dApp — ✅
-- AI assessment system evaluates loan requests — ❌
+- AI assessment system evaluates loan requests — ✅ 2026-08-18
 - Loan request management and tracking system — ✅
-- Preliminary risk scoring for loan decisions — ❌
+- Preliminary risk scoring for loan decisions — **deliberately not built.** A
+  band, not a score: a number can be thresholded into a gate, and this feature
+  must never gate anything
 
-### Current Status: **Request flow complete; the AI half not started** 🚧
+### Current Status: **Complete** ✅
 
 ---
 
@@ -520,10 +525,11 @@ reputation is still waiting on those sprints.
     means two signature prompts racing for one nonce.
 
 - **Decision Support System 🚧**
-  - AI recommendation integration — blocked on Sprint 6
+  - AI recommendation integration — ✅ 2026-08-18, as a _reading_ rather than a
+    recommendation: it says what it notices and never what to do
   - Borrower reputation display ✅ — `BorrowerHistoryPanel` on every card in
     the queue, above the buttons rather than below them
-  - Risk assessment summary — blocked on Sprint 6
+  - Risk assessment summary — ✅ 2026-08-18 (`AssessmentPanel`)
   - Historical decision tracking and analytics — not started
 
 - **Administrative Tools** 🚧
@@ -536,11 +542,13 @@ reputation is still waiting on those sprints.
 ### Expected Deliverables:
 
 - Pool admins can approve or reject loan requests — ✅
-- AI-assisted loan decision making system — ❌
+- AI-assisted loan decision making system — ✅ 2026-08-18, advisory only
 - Complete administrative loan management tools — 🚧
 - Comprehensive loan decision audit system — 🚧
 
-### Current Status: **Decisions work; decision _support_ not started** 🚧
+### Current Status: \*\*Decisions and decision support work; queue prioritisation
+
+and portfolio statistics remain\*\* 🚧
 
 ---
 

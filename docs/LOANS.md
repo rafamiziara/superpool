@@ -670,6 +670,30 @@ Four things about them that touch loans specifically:
 Neither is ever required, and **neither is ever read to decide anything**. A
 loan with no purpose is an ordinary loan.
 
+## What the assistant makes of a request
+
+A pool owner reviewing requests sees a reading of each one, between the stated
+purpose and the borrower's record. See [Assessment](../CLAUDE.md#assessment)
+for the mechanism; three things about it touch loans specifically:
+
+- **It reads a request, never a borrower.** The facts it is given are this
+  loan, this pool's capacity, and the wallet's counts from `BorrowerHistory` —
+  no balance in the pool (holding a stake is not evidence about a debt, and
+  using it would quietly reintroduce "contributed = creditworthy", which the
+  membership design rejected) and nothing from another chain.
+- **It quotes the term's price, not what is owed now.** Interest accrues per
+  second, and a reading of a moving figure would be describing a different loan
+  by the time anybody opened it. `repaymentTotal` is the same quote the borrow
+  form shows.
+- **It is stale when the pool moves, not when time passes.** `approveLoan`
+  checks liquidity at approval rather than at request time, so a reading taken
+  when the pool held 80 describes a pool that no longer exists once it holds 5.
+  The queue marks that, and the backend recomputes past a 25% drift.
+
+**Nothing reads it back.** No eligibility check, no gate, no figure anywhere is
+derived from an assessment — it is one person's advice to another person, and
+the pool owner still decides.
+
 ## Loans in the activity feed
 
 `PoolStore.loanActivity` puts loans in the same feed as contributions and

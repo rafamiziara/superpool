@@ -888,6 +888,85 @@ Deliberately absent, so it is not re-proposed: no editing, no deletion, no
 threads or replies, no notes on contributions, withdrawals or repayments, no
 moderation, and no note anywhere in the protocol.
 
+## Assessment
+
+The assistant's reading of a loan request, for the pool owner deciding on it.
+Sprint 6's AI half and the two blocked parts of Sprint 10, built 2026-08-18 on
+[Mastra](https://mastra.ai). Plan and the reasoning for every decision:
+[`.dev/features/AI_ASSESSMENT_PLAN.md`](.dev/features/AI_ASSESSMENT_PLAN.md).
+Verified with `pnpm --filter backend testAssessment` (17 checks, real model
+calls) and `pnpm --filter agents eval` (7 cases, 4 gates).
+
+**An assessment is never load-bearing** — the same rule notes ship under, and
+for a stronger reason. Nothing in the protocol, the indexer or an eligibility
+check may read one. There is no auto-approval and no setting that would add
+one. If an assessment ever gates a transaction, this design is wrong.
+
+**It is not there to reveal a fact.** The owner can already see the amount, the
+term price, the record and the purpose — all four are on the card. It exists to
+do the reading nobody has time for with six requests waiting.
+
+### Where it runs
+
+`packages/agents` is a Mastra service, packaged and deployed like
+`superwallet/packages/agents` — but **its only client is `packages/backend`,
+never the app**. The backend gathers the facts, checks the caller owns the
+pool, and calls the agent over HTTP with a short-lived HS256 service token
+(`MastraJwtAuth`, shared `MASTRA_JWT_SECRET`). So `packages/agents` reads no
+Firestore, no chain, and nothing about a pool or a wallet — if it ever needs
+to, the entitlement rules have leaked into a second place.
+
+`ANTHROPIC_API_KEY` lives with the agent and nowhere else: exactly one thing
+can spend it.
+
+Seven rules that are easy to break:
+
+- **Bands, never a score.** `low | medium | high`, which cannot be averaged,
+  sorted or thresholded into a gate. A 0–100 number would read as a credit
+  rating, which is the product [`REPUTATION_PLAN`](.dev/old/REPUTATION_PLAN.md)
+  §7 refused to build — a model producing it does not make it a different
+  thing.
+- **No recommendation field, ever.** It says what it notices; the button is the
+  owner's. A `recommendation: 'approve'` is one product decision away from
+  being the button.
+- **A first-time borrower is new, not risky.** `isNew` must never on its own
+  produce `high`. Stated in the instructions _and_ in the facts prose, and
+  gated by an eval — it is the one failure that would make the app unusable for
+  exactly the people it exists for.
+- **Nothing is said about the person.** Only the request, the pool and the
+  wallet's counts. A purpose like "rent is due" invites a reading of somebody's
+  life, and the model knows nothing of it. An LLM judge gates this, because the
+  failure is a tone rather than a word.
+- **The owner alone may read one.** Narrower than a note, deliberately: a note
+  is a sentence a person stood behind, so its subject deserves it; this is a
+  machine's reading of somebody's record, and showing it to them turns a
+  lending decision into an argument with a model nobody can answer for.
+  `getAssessment` answers _nothing_ rather than refusing — an error would
+  confirm one exists.
+- **Stored once, read back.** An LLM judgement is not reproducible, so a
+  decision surface that recomputed on every open would say something different
+  each time. Recomputed only on the owner's explicit ask, or when liquidity has
+  drifted 25% — `approveLoan` checks liquidity at approval, not at request
+  time, so that is the figure that moves under a stored reading.
+- **Do not put character caps on model prose.** A `.max(140)` per observation
+  cost a whole reading the first time a model wrote 141: structured-output
+  validation rejects the _entire_ response, and the owner sees nothing for a
+  reading that was fine. Brevity belongs in the instructions. Array counts are
+  fine — those are structural.
+
+Every figure reaches the agent in **whole units, formatted by the backend** —
+never wei, and never with the exponent left for it to apply. A pool whose token
+the backend could not read is refused outright rather than defaulting to 18.
+
+### Deliberately not built
+
+No score. No recommendation. Nothing shown to the borrower. No assessment of
+membership requests — that is a judgement about a person with no transaction
+attached. No chat: the `questions` field exists so the owner asks the
+**borrower**, which is the conversation that should be happening. No
+cross-chain reading. And no dataset of decisions fed back into the model, which
+is how an advisory feature quietly becomes a scoring system nobody chose.
+
 ## Activity feeds
 
 `ActivityRow` takes a `perspective`, and picking the wrong one marks money the
