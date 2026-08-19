@@ -1,4 +1,5 @@
 import type { LoanInfo } from '@superpool/types'
+import type { RenderResult } from '@testing-library/react-native'
 import { act, fireEvent, render, waitFor } from '@testing-library/react-native'
 import React from 'react'
 import { mockWagmiUseReadContract } from '../../../src/__tests__/mocks'
@@ -266,8 +267,11 @@ describe('ApprovalsScreen', () => {
       makeRequest({ id: '31337-2-7', loanId: 7, amount: '9000000000000000000', startedAt: '2026-08-08T09:00:00.000Z' }),
     ]
 
-    const renderedOrder = (getAllByTestId: (id: RegExp) => { props: { testID: string } }[]) =>
-      getAllByTestId(/^loan-request-card-/).map((card) => card.props.testID)
+    // Taken from `render`'s own result rather than hand-written: the shape it
+    // described stopped matching the library's `GetAllByQuery`, which failed
+    // type-check while the test itself kept passing.
+    const renderedOrder = (getAllByTestId: RenderResult['getAllByTestId']) =>
+      getAllByTestId(/^loan-request-card-/).map((card) => String(card.props.testID))
 
     it('answers the longest wait first', () => {
       // The default, and the reason it is the default: served newest-first,

@@ -1019,32 +1019,18 @@ export interface SignMessageResponse {
   message: string
 }
 
-export interface JoinPoolRequest {
-  poolId: string
-  userAddress: string
-}
-
-export interface JoinPoolResponse {
-  success: boolean
-  transactionHash?: string
-}
-
-// Loan API types
-export interface RequestLoanRequest {
-  poolId: string
-  amount: string // bigint as string
-  purpose: string
-  duration?: number
-}
-
-export interface RequestLoanResponse {
-  loanId: string
-  status: string
-  transactionHash?: string
-}
-
-// `GetLoansRequest/Response` and `GetTransactionsRequest/Response` were deleted
-// on 2026-08-17, the last of the REST-shaped types that described a backend
-// nobody wrote. The real feeds are `ListLoansRequest/Response` and the per-event
-// list callables above; a transaction feed is assembled in the app by
-// `PoolStore.recentTransactions`, not fetched.
+// `GetLoansRequest/Response` and `GetTransactionsRequest/Response` went on
+// 2026-08-17, and `JoinPoolRequest/Response` and `RequestLoanRequest/Response`
+// on 2026-08-19 — the last of the REST-shaped types describing a backend nobody
+// wrote. Each one lived here and nowhere else: no callable took them, no client
+// built them, and their field names had already drifted from the contracts
+// (`poolId` is a number everywhere real, and a loan's purpose is a note rather
+// than a transaction parameter).
+//
+// Where the real answers are: the feeds are `ListLoansRequest/Response` and the
+// per-event list callables above; a transaction feed is assembled in the app by
+// `PoolStore.recentTransactions` rather than fetched; and **joining a pool and
+// requesting a loan are transactions, not requests to this backend** — the app
+// calls `requestMembership` and `requestLoan` on the pool itself and the
+// indexer picks the events up. That is the reason these were never implemented,
+// and the reason nothing should reinstate them.
