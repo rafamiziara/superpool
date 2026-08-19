@@ -3,6 +3,7 @@ import { Contract, Interface, JsonRpcProvider, Log, Provider, ZeroAddress } from
 import { logger } from 'firebase-functions/v2'
 import { HttpsError } from 'firebase-functions/v2/https'
 import { ERC20MetadataABI, PoolFactoryABI, POOLS_COLLECTION } from '../constants'
+import { buildSearchTokens, mergeSearchTokens } from '../utils/searchTokens'
 
 export interface ParsedPoolEvent {
   poolId: number
@@ -222,28 +223,45 @@ const ALREADY_EXISTS = 6
  * `loanToken` and are native, which is what they are, so there is nothing to
  * repair on them.
  */
-async function repairTokenMetadata(docRef: DocumentReference, parsedPool: ParsedPoolEvent): Promise<boolean> {
-  if (parsedPool.loanToken === ZeroAddress) return false
-  if (parsedPool.tokenDecimals === undefined) return false
-
+async function repairPool(docRef: DocumentReference, parsedPool: ParsedPoolEvent): Promise<boolean> {
   const doc = await docRef.get()
 
   if (!doc.exists) return false
-  if (doc.data()!.tokenDecimals != null) return false
 
-  await docRef.update({
-    loanToken: parsedPool.loanToken.toLowerCase(),
-    tokenDecimals: parsedPool.tokenDecimals,
+  const stored = doc.data()!
+  const repairs: Record<string, unknown> = {}
+
+  // Token metadata: absent to known, one direction only, so a later failed read
+  // cannot undo a good value. A pool with no `loanToken` predates denominations
+  // and is native, which is what it is — nothing to repair.
+  if (parsedPool.loanToken !== ZeroAddress && parsedPool.tokenDecimals !== undefined && stored.tokenDecimals == null) {
+    repairs.loanToken = parsedPool.loanToken.toLowerCase()
+    repairs.tokenDecimals = parsedPool.tokenDecimals
+
     // Never written as `undefined`: Firestore rejects it outright. In practice
     // the symbol is always there when the decimals are — they are read in one
     // `Promise.all`, so either both arrive or neither does.
-    ...(parsedPool.tokenSymbol === undefined ? {} : { tokenSymbol: parsedPool.tokenSymbol }),
-  })
+    if (parsedPool.tokenSymbol !== undefined) repairs.tokenSymbol = parsedPool.tokenSymbol
+  }
 
-  logger.info('Filled in token metadata on a pool indexed without it', {
+  // Search tokens: added, never replaced. This is what backfills every pool
+  // indexed before Discover could search past its first page — re-run the sweep
+  // from the factory's deployment block and they all gain one.
+  const merged = mergeSearchTokens(
+    Array.isArray(stored.searchTokens) ? (stored.searchTokens as string[]) : [],
+    buildSearchTokens(parsedPool.name, parsedPool.description)
+  )
+
+  if (merged) repairs.searchTokens = merged
+
+  if (Object.keys(repairs).length === 0) return false
+
+  await docRef.update(repairs)
+
+  logger.info('Filled in fields on a pool indexed without them', {
     poolId: parsedPool.poolId,
     chainId: parsedPool.chainId,
-    loanToken: parsedPool.loanToken,
+    repaired: Object.keys(repairs),
   })
 
   return true
@@ -284,13 +302,18 @@ export async function indexPoolEvent(parsedPool: ParsedPoolEvent, firestore: Fir
       // must stay absent rather than acquire a plausible default.
       ...(parsedPool.tokenSymbol === undefined ? {} : { tokenSymbol: parsedPool.tokenSymbol }),
       ...(parsedPool.tokenDecimals === undefined ? {} : { tokenDecimals: parsedPool.tokenDecimals }),
+      // Every prefix of every word in the name and description, so `listPools`
+      // can narrow the whole chain rather than the app filtering one page of
+      // fifty. Safe to store for the same reason the token's decimals are:
+      // neither field has a setter on `PoolFactory`.
+      searchTokens: buildSearchTokens(parsedPool.name, parsedPool.description),
     })
   } catch (error) {
     const alreadyExists = typeof error === 'object' && error !== null && 'code' in error && error.code === ALREADY_EXISTS
 
     if (!alreadyExists) throw error
 
-    const repaired = await repairTokenMetadata(docRef, parsedPool)
+    const repaired = await repairPool(docRef, parsedPool)
 
     logger.info('Pool already indexed, skipping', {
       poolId: parsedPool.poolId,

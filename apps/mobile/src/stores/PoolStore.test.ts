@@ -266,6 +266,110 @@ describe('PoolStore against listPools', () => {
     })
   })
 
+  describe('searching for pools beyond the loaded page', () => {
+    /** A pool the page never held, which is the whole point of asking. */
+    const REMOTE_POOL = { ...LIVE_POOL, poolId: 99, name: 'Builders Guild', description: 'Tools and rent' }
+
+    it('sends the term as typed, on the connected chain', async () => {
+      // Raw rather than normalised: the backend folds it the same way it built
+      // the tokens, so there is one implementation rather than two.
+      await store.searchPools('Builders')
+
+      expect(listPoolsCallable).toHaveBeenCalledWith({ chainId: 31337, activeOnly: true, limit: 50, searchTerm: 'Builders' })
+    })
+
+    it('keeps the results apart from the loaded pools', async () => {
+      // `pools` is what every balance, liquidity figure and `myPools` derives
+      // from. Replacing it with a search result would empty the Pools tab while
+      // somebody typed in Discover.
+      await store.fetchPools()
+      listPoolsCallable.mockResolvedValue({
+        data: { pools: [REMOTE_POOL], totalCount: 1, page: 1, limit: 50, hasNextPage: false, hasPreviousPage: false },
+      })
+
+      await store.searchPools('builders')
+
+      expect(store.pools.map((pool) => pool.poolId)).toEqual([12])
+      expect(store.poolSearchResults.map((pool) => pool.poolId)).toEqual([99])
+    })
+
+    it('offers the loaded page and the results together, without repeating one', async () => {
+      await store.fetchPools()
+      listPoolsCallable.mockResolvedValue({
+        data: {
+          pools: [LIVE_POOL, REMOTE_POOL],
+          totalCount: 2,
+          page: 1,
+          limit: 50,
+          hasNextPage: false,
+          hasPreviousPage: false,
+        },
+      })
+
+      await store.searchPools('pool')
+
+      expect(store.discoverableMatches.map((pool) => pool.poolId)).toEqual([12, 99])
+    })
+
+    it('never surfaces a pool the user is already in', async () => {
+      // The partition Discover and Pools are defined by. A search is exactly
+      // how a pool the user belongs to would otherwise leak into a list of
+      // strangers.
+      authStore.walletAddress = LIVE_POOL.poolOwner
+      await store.fetchPools()
+      listPoolsCallable.mockResolvedValue({
+        data: { pools: [LIVE_POOL], totalCount: 1, page: 1, limit: 50, hasNextPage: false, hasPreviousPage: false },
+      })
+
+      await store.searchPools('live')
+
+      expect(store.myPools.map((pool) => pool.poolId)).toEqual([12])
+      expect(store.discoverableMatches).toEqual([])
+    })
+
+    it('keeps the previous results when a search fails', async () => {
+      // The screen is still showing the cached page filtered locally, which is
+      // what it showed before search existed. Degrading to that beats putting
+      // an error where results were.
+      listPoolsCallable.mockResolvedValue({
+        data: { pools: [REMOTE_POOL], totalCount: 1, page: 1, limit: 50, hasNextPage: false, hasPreviousPage: false },
+      })
+      await store.searchPools('builders')
+
+      listPoolsCallable.mockRejectedValue(new Error('functions/unavailable'))
+      await store.searchPools('builder')
+
+      expect(store.poolSearchResults.map((pool) => pool.poolId)).toEqual([99])
+      expect(store.error).toBeNull()
+    })
+
+    it('forgets the results when the box is emptied', async () => {
+      listPoolsCallable.mockResolvedValue({
+        data: { pools: [REMOTE_POOL], totalCount: 1, page: 1, limit: 50, hasNextPage: false, hasPreviousPage: false },
+      })
+      await store.searchPools('builders')
+
+      store.clearPoolSearch()
+
+      expect(store.poolSearchResults).toEqual([])
+    })
+
+    it('reports when a search is in flight, without blanking the list', async () => {
+      let release: (value: unknown) => void = () => {}
+      listPoolsCallable.mockImplementation(() => new Promise((resolve) => (release = resolve)))
+
+      const pending = store.searchPools('builders')
+
+      expect(store.isSearchingPools).toBe(true)
+      expect(store.isLoading).toBe(false)
+
+      release({ data: { pools: [], totalCount: 0, page: 1, limit: 50, hasNextPage: false, hasPreviousPage: false } })
+      await pending
+
+      expect(store.isSearchingPools).toBe(false)
+    })
+  })
+
   it('stores what the backend returned', async () => {
     await store.fetchPools()
 

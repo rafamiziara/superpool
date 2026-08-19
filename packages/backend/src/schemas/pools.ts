@@ -50,6 +50,10 @@ export const listPoolsSchema = z.object({
   ownerAddress: optional(walletAddress),
   chainId: optional(chainId),
   activeOnly: optional(z.boolean()),
+  // Whatever was typed. Length-capped rather than pattern-checked: it is free
+  // text by definition, and the handler reduces it to one normalised token
+  // before it reaches a query.
+  searchTerm: optional(z.string().max(200)),
 }) satisfies z.ZodType<ListPoolsRequest>
 
 export const listContributionsSchema = z.object({

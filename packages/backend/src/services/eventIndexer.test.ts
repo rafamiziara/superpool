@@ -1,4 +1,5 @@
 import { mockLogger } from '../__tests__/setup'
+import { buildSearchTokens } from '../utils/searchTokens'
 import { ParsedPoolEvent } from './eventIndexer'
 
 // ---------------------------------------------------------------------------
@@ -228,8 +229,14 @@ describe('indexPoolEvent', () => {
     // it with ALREADY_EXISTS rather than overwriting.
     const mockCreate = docExists ? jest.fn().mockRejectedValue(alreadyExistsError()) : jest.fn().mockResolvedValue(undefined)
 
+    // `get` and `update` are here because the already-exists path reads the
+    // document back to see what needs filling in — token metadata, and now the
+    // search tokens that backfill every pool indexed before Discover could
+    // search past its first page.
     const mockDocRef = {
       create: mockCreate,
+      get: jest.fn().mockResolvedValue({ exists: true, data: () => ({ searchTokens: [] }) }),
+      update: jest.fn().mockResolvedValue(undefined),
     }
 
     const mockCollection = {
@@ -284,7 +291,13 @@ describe('indexPoolEvent', () => {
       created = true
     })
     const mockFs = {
-      collection: jest.fn().mockReturnValue({ doc: jest.fn().mockReturnValue({ create: mockCreate }) }),
+      collection: jest.fn().mockReturnValue({
+        doc: jest.fn().mockReturnValue({
+          create: mockCreate,
+          get: jest.fn().mockResolvedValue({ exists: true, data: () => ({ searchTokens: [] }) }),
+          update: jest.fn().mockResolvedValue(undefined),
+        }),
+      }),
     }
     const parsedPool = buildParsedPool({ poolId: 5, chainId: CHAIN_ID })
 
@@ -450,7 +463,7 @@ describe('indexPoolEvent', () => {
     })
   })
 
-  describe('repairing token metadata on a pool already indexed without it', () => {
+  describe('repairing a pool already indexed without something', () => {
     function buildExistingPool(stored: Record<string, unknown>) {
       const mockUpdate = jest.fn().mockResolvedValue(undefined)
       const mockGet = jest.fn().mockResolvedValue({ exists: true, data: () => stored })
@@ -470,7 +483,10 @@ describe('indexPoolEvent', () => {
       // One RPC hiccup at creation would otherwise mark a pool unsupported for
       // ever, because `create()` never runs again for it. The sweep re-scans
       // ranges deliberately, so this path actually runs.
-      const { mockFs, mockUpdate } = buildExistingPool({ loanToken: TOKEN.toLowerCase() })
+      const { mockFs, mockUpdate } = buildExistingPool({
+        loanToken: TOKEN.toLowerCase(),
+        searchTokens: ['te', 'tes', 'test', 'po', 'poo', 'pool'],
+      })
 
       const result = await indexPoolEvent(buildParsedPool({ loanToken: TOKEN, tokenSymbol: 'USDC', tokenDecimals: 6 }), mockFs)
 
@@ -483,7 +499,12 @@ describe('indexPoolEvent', () => {
     it('never overwrites metadata that is already there', async () => {
       // Repairs in one direction only — absent to known — so a later failed
       // read cannot undo a good value.
-      const { mockFs, mockUpdate } = buildExistingPool({ loanToken: TOKEN.toLowerCase(), tokenSymbol: 'USDC', tokenDecimals: 6 })
+      const { mockFs, mockUpdate } = buildExistingPool({
+        loanToken: TOKEN.toLowerCase(),
+        tokenSymbol: 'USDC',
+        tokenDecimals: 6,
+        searchTokens: ['te', 'tes', 'test', 'po', 'poo', 'pool'],
+      })
 
       await indexPoolEvent(buildParsedPool({ loanToken: TOKEN, tokenSymbol: 'WRONG', tokenDecimals: 18 }), mockFs)
 
@@ -493,7 +514,10 @@ describe('indexPoolEvent', () => {
     it('leaves a pool indexed before denominations existed alone', async () => {
       // It has no `loanToken` because it is native, which is what it is. There
       // is nothing to repair, and touching it would be a rewrite for nothing.
-      const { mockFs, mockUpdate } = buildExistingPool({ name: 'An older pool' })
+      const { mockFs, mockUpdate } = buildExistingPool({
+        name: 'An older pool',
+        searchTokens: ['te', 'tes', 'test', 'po', 'poo', 'pool'],
+      })
 
       await indexPoolEvent(buildParsedPool(), mockFs)
 
@@ -501,9 +525,44 @@ describe('indexPoolEvent', () => {
     })
 
     it('does not repair when this read failed too', async () => {
-      const { mockFs, mockUpdate } = buildExistingPool({ loanToken: TOKEN.toLowerCase() })
+      const { mockFs, mockUpdate } = buildExistingPool({
+        loanToken: TOKEN.toLowerCase(),
+        searchTokens: ['te', 'tes', 'test', 'po', 'poo', 'pool'],
+      })
 
       await indexPoolEvent(buildParsedPool({ loanToken: TOKEN }), mockFs)
+
+      expect(mockUpdate).not.toHaveBeenCalled()
+    })
+
+    it('backfills search tokens onto a pool indexed before Discover could search', async () => {
+      // The whole backfill story: `create()` never runs again for a pool, so
+      // without this every pool that existed before search tokens did would be
+      // unfindable past the first page for ever. Re-running the sweep from the
+      // factory's block is what applies it.
+      const { mockFs, mockUpdate } = buildExistingPool({ name: 'Builders Guild' })
+
+      await indexPoolEvent(buildParsedPool({ name: 'Builders Guild' }), mockFs)
+
+      expect(mockUpdate).toHaveBeenCalledWith({ searchTokens: expect.arrayContaining(['guild', 'builders']) })
+    })
+
+    it('adds to search tokens rather than replacing them', async () => {
+      // `fetchPoolMetadata` returns an empty description when the read *failed*,
+      // and an empty description is also what most pools legitimately have — so
+      // rebuilding the array would let one RPC hiccup delete a pool's
+      // description from the index. A union cannot.
+      const { mockFs, mockUpdate } = buildExistingPool({ searchTokens: ['re', 'ren', 'rent'] })
+
+      await indexPoolEvent(buildParsedPool({ name: 'Test Pool', description: '' }), mockFs)
+
+      expect(mockUpdate).toHaveBeenCalledWith({ searchTokens: expect.arrayContaining(['rent', 'test', 'pool']) })
+    })
+
+    it('writes nothing when the stored tokens already cover this read', async () => {
+      const { mockFs, mockUpdate } = buildExistingPool({ searchTokens: buildSearchTokens('Test Pool', '') })
+
+      await indexPoolEvent(buildParsedPool(), mockFs)
 
       expect(mockUpdate).not.toHaveBeenCalled()
     })
@@ -632,7 +691,13 @@ describe('indexPoolByTxHash', () => {
 
   function buildMockFirestoreForIndex(docExists: boolean) {
     const mockCreate = docExists ? jest.fn().mockRejectedValue(alreadyExistsError()) : jest.fn().mockResolvedValue(undefined)
-    const mockDocRef = { create: mockCreate }
+    // `get`/`update` for the already-exists path, which reads the document back
+    // to fill in anything missing. See `buildMockFirestore` above.
+    const mockDocRef = {
+      create: mockCreate,
+      get: jest.fn().mockResolvedValue({ exists: true, data: () => ({ searchTokens: [] }) }),
+      update: jest.fn().mockResolvedValue(undefined),
+    }
     const mockCollection = { doc: jest.fn().mockReturnValue(mockDocRef) }
     return {
       collection: jest.fn().mockReturnValue(mockCollection),

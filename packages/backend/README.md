@@ -25,6 +25,7 @@ packages/backend/
 │   ├── utils/             # Shared utilities
 │   │   ├── auth.ts        # Authentication helpers
 │   │   ├── blockchain.ts  # Blockchain interaction utilities
+│   │   ├── searchTokens.ts # Prefixes for pool search, and the query's own term
 │   │   └── validation.ts  # `parseRequest` / `parseBody` — payloads, before a handler reads them
 │   ├── config/            # Firebase configuration
 │   ├── constants/         # ABIs, chain configs, Firestore collections
@@ -367,6 +368,21 @@ pnpm signMessage <nonce> <timestamp>
 1. Call `generateAuthMessage` to get nonce/timestamp
 2. Use `pnpm signMessage` to generate signature
 3. Call `verifySignatureAndLogin` with signature
+
+### Live verification
+
+`scripts/test*.ts` drive real transactions against a local Hardhat node and the
+Firestore emulator, then check what was indexed. They exist because mocked tests
+cannot see ABI drift, ethers' read cache, or a field the chain never carried —
+every one of them has found a bug green unit tests could not. Each script's
+header lists the terminals it needs.
+
+```bash
+pnpm testSweep      # the scheduled sweep, and that a second one writes nothing
+pnpm testSearch     # pool search: tokens written, matched, and backfilled
+pnpm testDecisions  # what an owner decided, and who decided it
+pnpm testErc20      # token pools end to end
+```
 
 ## Deployment
 

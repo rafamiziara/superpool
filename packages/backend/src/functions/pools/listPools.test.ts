@@ -210,6 +210,65 @@ describe('listPoolsHandler', () => {
     expect(result.totalCount).toBe(1)
   })
 
+  describe('searching by name and description', () => {
+    it('narrows on the most selective term, normalised', async () => {
+      // The longest word, because it is the one that cuts the chain down most.
+      // Normalised on this side of the wire so there is one implementation of
+      // "what counts as the same word" rather than two that can drift.
+      const mockQuery = createMockQuery([mockPools[0]], 1)
+      firestore.collection.mockReturnValue(mockQuery)
+
+      await listPoolsHandler({ data: { searchTerm: 'East Side LENDING' } })
+
+      expect(mockQuery.where).toHaveBeenCalledWith('searchTokens', 'array-contains', 'lending')
+    })
+
+    it('truncates a term longer than the stored prefixes', async () => {
+      // The array holds prefixes up to a cap, so a longer query has to be cut
+      // to the same length or it matches nothing at all.
+      const mockQuery = createMockQuery([], 0)
+      firestore.collection.mockReturnValue(mockQuery)
+
+      await listPoolsHandler({ data: { searchTerm: 'neighbourhood' } })
+
+      expect(mockQuery.where).toHaveBeenCalledWith('searchTokens', 'array-contains', 'neighbourhoo')
+    })
+
+    it('does not query on a term too short to narrow anything', async () => {
+      // One letter matches most of the chain. The caller already has a page it
+      // can filter, so this is no search rather than a bad one.
+      const mockQuery = createMockQuery(mockPools, 2)
+      firestore.collection.mockReturnValue(mockQuery)
+
+      await listPoolsHandler({ data: { searchTerm: 'a' } })
+
+      expect(mockQuery.where).not.toHaveBeenCalledWith('searchTokens', 'array-contains', expect.anything())
+    })
+
+    it('ignores an empty search rather than matching nothing', async () => {
+      const mockQuery = createMockQuery(mockPools, 2)
+      firestore.collection.mockReturnValue(mockQuery)
+
+      const result = await listPoolsHandler({ data: { searchTerm: '   ' } })
+
+      expect(mockQuery.where).not.toHaveBeenCalledWith('searchTokens', 'array-contains', expect.anything())
+      expect(result.pools).toHaveLength(2)
+    })
+
+    it('searches within the chain and the active filter, not instead of them', async () => {
+      // Every feed is per chain by construction. A search that dropped the
+      // chain filter would show pools from a network the user is not on.
+      const mockQuery = createMockQuery([mockPools[0]], 1)
+      firestore.collection.mockReturnValue(mockQuery)
+
+      await listPoolsHandler({ data: { chainId: 80002, searchTerm: 'guild' } })
+
+      expect(mockQuery.where).toHaveBeenCalledWith('chainId', '==', 80002)
+      expect(mockQuery.where).toHaveBeenCalledWith('isActive', '==', true)
+      expect(mockQuery.where).toHaveBeenCalledWith('searchTokens', 'array-contains', 'guild')
+    })
+  })
+
   // Test Case: Filter by chainId
   it('should filter pools by chainId', async () => {
     // Arrange

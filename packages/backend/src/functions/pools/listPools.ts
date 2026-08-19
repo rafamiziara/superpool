@@ -4,6 +4,7 @@ import { logger } from 'firebase-functions/v2'
 import { CallableRequest, HttpsError, onCall } from 'firebase-functions/v2/https'
 import { listPoolsSchema } from '../../schemas'
 import { firestore } from '../../services'
+import { searchTokenFor } from '../../utils/searchTokens'
 import { parseRequest } from '../../utils/validation'
 
 export const listPoolsHandler = async (request: CallableRequest<ListPoolsRequest>): Promise<ListPoolsResponse> => {
@@ -34,6 +35,26 @@ export const listPoolsHandler = async (request: CallableRequest<ListPoolsRequest
     // Add active filter if specified
     if (activeOnly) {
       query = query.where('isActive', '==', true)
+    }
+
+    /*
+      Search, on one term.
+
+      Firestore allows a single `array-contains` per query, so a multi-word
+      search narrows on its most selective word and the caller filters the
+      rest — which is sound because the result is a **superset** of a full
+      match, never a subset. Normalised here rather than by the caller so
+      there is one implementation of "what counts as the same word" rather
+      than two that can drift.
+
+      A term below the minimum length produces nothing and is treated as no
+      search at all: it would match most of the chain, and the caller already
+      has a page it can filter.
+    */
+    const searchToken = data.searchTerm === undefined ? undefined : searchTokenFor(data.searchTerm)
+
+    if (searchToken) {
+      query = query.where('searchTokens', 'array-contains', searchToken)
     }
 
     // 3. Get total count for pagination

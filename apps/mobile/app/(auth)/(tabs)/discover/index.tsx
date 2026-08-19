@@ -2,7 +2,7 @@ import { FontAwesome } from '@expo/vector-icons'
 import { router } from 'expo-router'
 import { StatusBar } from 'expo-status-bar'
 import { observer } from 'mobx-react-lite'
-import React, { useCallback, useMemo, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import { ActivityIndicator, Pressable, RefreshControl, ScrollView, Text, TextInput, View } from 'react-native'
 import { useAccount } from 'wagmi'
 import { DiscoverPoolCard } from '../../../../src/components/lending/DiscoverPoolCard'
@@ -21,11 +21,16 @@ import { filterPools, POOL_SORT_LABELS, POOL_SORT_MODES, type PoolSortMode, sort
  * and that was reachable only from a list which excluded every pool worth
  * joining. Someone could be invited to a pool and had no way to find it.
  *
- * The search is client-side over `poolStore.discoverablePools`, which is one
- * page of the chain's pools rather than all of them — see the note on that
- * getter. That is honest at this scale and wrong at a larger one; the fix is a
- * server-side query on `listPools`, which Firestore cannot do on a substring
- * without the indexer writing search tokens onto the pool document.
+ * Search is in two halves, and both are needed. The backend narrows the whole
+ * chain on the query's most selective word — Firestore allows one
+ * `array-contains` per query — and `filterPools` then applies every term to
+ * what came back. The server answer is a superset of a full match, never a
+ * subset, which is what makes filtering on top of it correct rather than
+ * merely convenient.
+ *
+ * The cached page stays in the candidates, so the first characters filter what
+ * is already on the device while the query is still in flight. Nothing here
+ * blocks on the network.
  */
 function DiscoverScreen() {
   const { chainId } = useAccount()
@@ -33,7 +38,30 @@ function DiscoverScreen() {
   const [sort, setSort] = useState<PoolSortMode>('newest')
 
   const activeChainId = chainId ?? DEFAULT_CHAIN_ID
-  const pools = poolStore.discoverablePools
+  const isSearching = query.trim().length > 0
+  const pools = isSearching ? poolStore.discoverableMatches : poolStore.discoverablePools
+
+  /*
+    Debounced, because this is a callable and the box is typed into.
+
+    300ms is long enough that a word costs one request rather than seven, and
+    short enough that the results arrive while the user is still looking at the
+    box. The local filter has already narrowed the cached page by then, so the
+    wait is never a blank screen.
+  */
+  useEffect(() => {
+    const term = query.trim()
+
+    if (!term) {
+      poolStore.clearPoolSearch()
+
+      return
+    }
+
+    const timer = setTimeout(() => void poolStore.searchPools(term), 300)
+
+    return () => clearTimeout(timer)
+  }, [query])
 
   /**
    * Sorted after filtering, not before: the comparators run over the smaller
@@ -50,8 +78,6 @@ function DiscoverScreen() {
   const handleRefresh = useCallback(async () => {
     await poolStore.syncAndRefresh()
   }, [])
-
-  const isSearching = query.trim().length > 0
 
   if (poolStore.isLoading && pools.length === 0) {
     return (
@@ -181,11 +207,26 @@ function DiscoverScreen() {
             user can back out of, so it offers that; "there are none" is the
             state of the chain, and suggesting a search would be nonsense.
           */}
+          {/*
+            A search still in flight is not "nothing matches". Saying so before
+            the answer arrives tells the user their pool does not exist, and
+            then contradicts itself a moment later.
+          */}
+          {results.length === 0 && isSearching && poolStore.isSearchingPools && (
+            <View className="items-center gap-3 py-10" testID="discover-searching">
+              <ActivityIndicator colorClassName="accent-mint" />
+              <Text className="text-sm text-fog">Looking across the network</Text>
+            </View>
+          )}
+
           {results.length === 0 &&
+            !poolStore.isSearchingPools &&
             (isSearching ? (
               <View className="items-center gap-2 py-10" testID="discover-no-results">
                 <Text className="text-base font-semibold text-snow">Nothing matches “{query.trim()}”</Text>
-                <Text className="text-center text-sm text-fog">Try a shorter search, or pull down to look for new circles.</Text>
+                <Text className="text-center text-sm text-fog">
+                  Nothing on {chainName(activeChainId)} goes by that. Try a shorter search, or one word instead of several.
+                </Text>
                 <Pressable onPress={() => setQuery('')} className="mt-2 active:opacity-70" testID="discover-clear-search">
                   <Text className="font-semibold text-mint">Clear search</Text>
                 </Pressable>

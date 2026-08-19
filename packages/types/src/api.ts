@@ -54,6 +54,19 @@ export interface ListPoolsRequest {
   ownerAddress?: string
   chainId?: number
   activeOnly?: boolean
+  /**
+   * Free text, matched against the pool's name and description.
+   *
+   * Sent as the user typed it — the backend normalises it the same way it built
+   * the tokens, so there is one normaliser rather than two that can drift.
+   *
+   * **Matching is per-word prefix, and only the most selective term is used.**
+   * Firestore allows one `array-contains` per query, so a multi-word search
+   * narrows on its longest word here and the caller filters the rest. The
+   * result is therefore a superset of a full match, never a subset — which is
+   * what makes a client-side filter on top of it correct.
+   */
+  searchTerm?: string
 }
 
 export interface PoolInfo {

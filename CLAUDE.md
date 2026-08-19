@@ -1114,11 +1114,26 @@ what happened rather than in a list of strangers.
 
 Two things to keep in mind:
 
-- **The list is one page, not the chain.** `listPools` has no text filter and
-  Firestore cannot match a substring, so search is client-side over the newest
-  `DEFAULT_PAGE_SIZE` (50) pools. Honest at this scale, wrong at a larger one;
-  the fix is search tokens written onto the pool document by the indexer, not a
-  bigger page.
+- **Search is two halves, and both are load-bearing.** The indexer writes
+  `searchTokens` — every prefix of every word in a pool's name and description —
+  and `listPools` narrows the whole chain with one `array-contains`. Firestore
+  allows only one per query, so a multi-word search matches on its **longest**
+  term server-side and `filterPools` applies the rest on the device. That is
+  correct rather than merely convenient: the server answer is a **superset** of
+  a full match, never a subset. The cached page stays in the candidates, so the
+  first characters filter what is already there while the query is in flight.
+- **Matching is per-word prefix, not mid-word substring.** "guild" finds
+  "Builders Guild"; "uild" no longer does. `String.includes` matching inside a
+  word was a property of the old client-side filter rather than a decision.
+- **`searchTokens` is written once and backfilled additively.** A pool document
+  is created once, so every pool older than the feature depends on the repair
+  path in `indexPoolEvent` — re-run the sweep from the factory's block and they
+  all gain one. The repair takes the **union**, never a rebuild: a failed
+  `fetchPoolMetadata` returns an empty description, which is indistinguishable
+  from a pool that legitimately has none, so rebuilding would let one RPC hiccup
+  delete a pool's description from the index. Safe because `name` and
+  `description` have **no setter** on `PoolFactory`. If either becomes editable,
+  `mergeSearchTokens` is what has to change.
 - **Discover shows no open/private badge on purpose.** `requiresMembership` is
   `poolConfig[5]` and has to be read from the chain (see
   [Membership](#membership)) — one RPC call per card is not a price a scrolling

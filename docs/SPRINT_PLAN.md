@@ -791,9 +791,10 @@ SDK 53.
 - **Pool discovery.** Also shipped without a sprint, and Sprint 4 had ticked it
   years-of-code before it existed. `PoolStore.discoverablePools` is the
   complement of `myPools`, so the Pools and Discover tabs partition the chain.
-  Its known limit is written down rather than fixed: search is client-side over
-  one page of 50 pools, because `listPools` has no text filter and Firestore
-  cannot match a substring. The fix is search tokens on the pool document.
+  Its known limit — search over one page of 50 rather than the chain — was
+  fixed on 2026-08-19: the indexer writes `searchTokens` and `listPools` matches
+  one of them, with the client filter kept on top because Firestore allows a
+  single `array-contains` per query.
 
 ---
 
@@ -818,8 +819,12 @@ SDK 53.
 
 - **Sprint 12**: receipt polling. Only send-response `DeviceNotRegistered`
   pruning exists; Expo's `getReceipts` needs a deferred second pass.
-- **Discovery**: search tokens written onto the pool document by the indexer, so
-  search stops being client-side over one page of 50 pools.
+- ~~**Discovery**~~ — shipped 2026-08-19. `searchTokens` on the pool document,
+  one `array-contains` in `listPools`, and the client filter kept on top —
+  Firestore allows one such clause per query, so the server narrows on the
+  longest term and the device applies the rest. Live-verified with
+  `pnpm --filter backend testSearch` (22 checks, three consecutive runs on the
+  same chain). See [`CLAUDE.md` → Discovery](../CLAUDE.md#discovery).
 - ~~**Contracts tooling**~~ — shipped 2026-08-19
   ([`.dev/contracts/CONTRACTS_BACKLOG.md`](../.dev/contracts/CONTRACTS_BACKLOG.md)
   §4). Verification deduplicated into `scripts/lib/verification.ts`;

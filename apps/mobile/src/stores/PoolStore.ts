@@ -261,10 +261,22 @@ export class PoolStore {
    */
   borrowerHistories: Record<string, BorrowerHistory> = {}
   transactions: Transaction[] = []
+  /**
+   * Pools a search found beyond the page `pools` holds.
+   *
+   * Kept apart from `pools` rather than replacing it, because `pools` is what
+   * `myPools`, every balance and every liquidity figure derive from — swapping
+   * it for a search result would empty the Pools tab while somebody typed in
+   * Discover. These are additional candidates, and `discoverableMatches` is
+   * where the two are put together.
+   */
+  poolSearchResults: PoolInfo[] = []
 
   /** Initial loads. Pull-to-refresh uses `isRefreshing` so the list is not torn down. */
   isLoading = false
   isRefreshing = false
+  /** A search in flight. Separate from `isLoading`, which would blank the list. */
+  isSearchingPools = false
   error: string | null = null
   lastFetchedAt: Date | null = null
 
@@ -741,6 +753,80 @@ export class PoolStore {
     const mine = new Set(this.myPools.map((pool) => pool.poolId))
 
     return this.pools.filter((pool) => !mine.has(pool.poolId))
+  }
+
+  /**
+   * What a search may show: the cached page plus whatever the backend found
+   * beyond it, still partitioned against `myPools`.
+   *
+   * The partition is applied here rather than only in `discoverablePools` for
+   * the reason it exists at all — a pool the user is already in must not appear
+   * in a list of strangers, and a search is exactly how they would surface one.
+   *
+   * The union is deliberate: results arrive from the server matching **one**
+   * term, so they are a superset of the answer rather than the answer, and the
+   * screen's own filter narrows them. Keeping the cached page in the candidates
+   * is what makes typing feel instant — the first characters filter what is
+   * already on the device while the query is still in flight.
+   */
+  get discoverableMatches(): PoolInfo[] {
+    const mine = new Set(this.myPools.map((pool) => pool.poolId))
+    const seen = new Set<number>()
+
+    return [...this.discoverablePools, ...this.poolSearchResults].filter((pool) => {
+      if (mine.has(pool.poolId) || seen.has(pool.poolId)) return false
+
+      seen.add(pool.poolId)
+
+      return true
+    })
+  }
+
+  /**
+   * Ask the backend for pools matching what was typed.
+   *
+   * Additive and never destructive: a failure leaves the previous results in
+   * place and says nothing, because the screen is still showing the cached page
+   * filtered locally — which is what it showed before this existed. A search
+   * that quietly degrades to "the newest fifty" is better than one that puts an
+   * error where results were.
+   *
+   * Nothing is cleared on a short query either. `clearPoolSearch` is the only
+   * thing that empties the results, and the screen calls it when the box is.
+   */
+  searchPools = async (term: string): Promise<void> => {
+    if (usingMockPools()) return
+
+    runInAction(() => {
+      this.isSearchingPools = true
+    })
+
+    try {
+      const listPools = httpsCallable<ListPoolsRequest, ListPoolsResponse>(FIREBASE_FUNCTIONS, 'listPools')
+      const response = await listPools({
+        chainId: authStore.chainId ?? DEFAULT_CHAIN_ID,
+        activeOnly: true,
+        limit: DEFAULT_PAGE_SIZE,
+        searchTerm: term,
+      })
+
+      runInAction(() => {
+        this.poolSearchResults = response.data.pools ?? []
+      })
+    } catch (error) {
+      logger.warn('Could not search for circles; showing what is already loaded:', error)
+    } finally {
+      runInAction(() => {
+        this.isSearchingPools = false
+      })
+    }
+  }
+
+  /** Forget what the last search found. Called when the box is emptied. */
+  clearPoolSearch = (): void => {
+    runInAction(() => {
+      this.poolSearchResults = []
+    })
   }
 
   /**

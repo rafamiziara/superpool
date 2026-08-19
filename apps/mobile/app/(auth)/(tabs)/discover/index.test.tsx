@@ -224,6 +224,137 @@ describe('DiscoverScreen', () => {
   })
 
   // -------------------------------------------------------------------------
+  // Searching past the page the device holds.
+  // -------------------------------------------------------------------------
+
+  describe('searching past the loaded page', () => {
+    /** A pool the fixtures never loaded, which is the whole point of asking. */
+    const REMOTE_POOL = {
+      poolId: 99,
+      poolAddress: '0xB30dAf0240261Be564Cea33260F01213c47AAa0D',
+      poolOwner: '0x90f79bf6eb2c4f870365e785982e1f101e93b906',
+      name: 'Builders Guild',
+      description: 'Tools and rent',
+      maxLoanAmount: '10000000000000000000',
+      interestRate: 500,
+      loanDuration: 2_592_000,
+      chainId: LOCALHOST_CHAIN_ID,
+      createdBy: '0x90f79bf6eb2c4f870365e785982e1f101e93b906',
+      createdAt: '2026-08-10T07:10:36.642Z',
+      transactionHash: '0xaaaa',
+      isActive: true,
+    }
+
+    beforeEach(() => {
+      // The backend is skipped entirely on mock pools, so the search path is
+      // unreachable with them on.
+      delete process.env.EXPO_PUBLIC_USE_MOCK_POOLS
+      jest.useFakeTimers()
+    })
+
+    afterEach(() => {
+      jest.useRealTimers()
+      process.env.EXPO_PUBLIC_USE_MOCK_POOLS = 'true'
+      poolStore.clearPoolSearch()
+    })
+
+    it('asks the backend once for a word rather than once per keystroke', async () => {
+      const search = jest.fn().mockResolvedValue({ data: { pools: [] } })
+      mockFirebaseCallable.mockReturnValue(search)
+
+      const { getByTestId } = render(<DiscoverScreen />)
+
+      for (const term of ['g', 'gu', 'gui', 'guil', 'guild']) {
+        fireEvent.changeText(getByTestId('discover-search'), term)
+      }
+
+      await act(async () => {
+        jest.advanceTimersByTime(300)
+      })
+
+      expect(search).toHaveBeenCalledTimes(1)
+      expect(search).toHaveBeenCalledWith(expect.objectContaining({ searchTerm: 'guild' }))
+    })
+
+    it('does not ask while the user is still typing', () => {
+      const search = jest.fn().mockResolvedValue({ data: { pools: [] } })
+      mockFirebaseCallable.mockReturnValue(search)
+
+      const { getByTestId } = render(<DiscoverScreen />)
+
+      fireEvent.changeText(getByTestId('discover-search'), 'guild')
+
+      act(() => {
+        jest.advanceTimersByTime(200)
+      })
+
+      expect(search).not.toHaveBeenCalled()
+    })
+
+    it('shows a pool the loaded page never held', async () => {
+      // The point of the feature: before this, a pool past the newest fifty was
+      // unfindable no matter what the user typed.
+      mockFirebaseCallable.mockReturnValue(jest.fn().mockResolvedValue({ data: { pools: [REMOTE_POOL] } }))
+
+      const { getByTestId, queryByTestId } = render(<DiscoverScreen />)
+
+      expect(queryByTestId('discover-pool-card-99')).toBeNull()
+
+      fireEvent.changeText(getByTestId('discover-search'), 'builders')
+
+      await act(async () => {
+        jest.advanceTimersByTime(300)
+      })
+
+      expect(getByTestId('discover-pool-card-99')).toBeTruthy()
+    })
+
+    it('says it is looking rather than that nothing matches', async () => {
+      // A search still in flight is not an answer. Saying "nothing matches"
+      // before the result arrives tells the user their pool does not exist and
+      // then contradicts itself a moment later.
+      let release: (value: unknown) => void = () => {}
+      mockFirebaseCallable.mockReturnValue(jest.fn().mockImplementation(() => new Promise((resolve) => (release = resolve))))
+
+      const { getByTestId, queryByTestId } = render(<DiscoverScreen />)
+
+      fireEvent.changeText(getByTestId('discover-search'), 'zzzzz')
+
+      await act(async () => {
+        jest.advanceTimersByTime(300)
+      })
+
+      expect(getByTestId('discover-searching')).toBeTruthy()
+      expect(queryByTestId('discover-no-results')).toBeNull()
+
+      await act(async () => {
+        release({ data: { pools: [] } })
+      })
+
+      expect(queryByTestId('discover-searching')).toBeNull()
+      expect(getByTestId('discover-no-results')).toBeTruthy()
+    })
+
+    it('forgets the results when the box is emptied', async () => {
+      mockFirebaseCallable.mockReturnValue(jest.fn().mockResolvedValue({ data: { pools: [REMOTE_POOL] } }))
+
+      const { getByTestId, queryByTestId } = render(<DiscoverScreen />)
+
+      fireEvent.changeText(getByTestId('discover-search'), 'builders')
+
+      await act(async () => {
+        jest.advanceTimersByTime(300)
+      })
+
+      expect(getByTestId('discover-pool-card-99')).toBeTruthy()
+
+      fireEvent.press(getByTestId('discover-search-clear'))
+
+      expect(queryByTestId('discover-pool-card-99')).toBeNull()
+    })
+  })
+
+  // -------------------------------------------------------------------------
   // Refreshing.
   // -------------------------------------------------------------------------
 
