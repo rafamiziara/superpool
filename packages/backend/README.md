@@ -380,6 +380,7 @@ header lists the terminals it needs.
 ```bash
 pnpm testSweep      # the scheduled sweep, and that a second one writes nothing
 pnpm testSearch     # pool search: tokens written, matched, and backfilled
+pnpm testReceipts   # the push receipt queue (add --probe-expo for a live call)
 pnpm testDecisions  # what an owner decided, and who decided it
 pnpm testErc20      # token pools end to end
 ```

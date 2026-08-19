@@ -135,6 +135,25 @@ export const PUSH_TOKENS_COLLECTION = 'push_tokens'
 export const NOTIFICATIONS_SENT_COLLECTION = 'notifications_sent'
 
 /**
+ * The name of the Firestore collection holding push receipts still to be
+ * collected.
+ *
+ * Expo answers a send with a **ticket**, which says only that it accepted the
+ * message — the *receipt*, fetched minutes later by ticket id, is what says
+ * whether Apple or Google took it. `DeviceNotRegistered` almost always arrives
+ * there rather than in the ticket, so a service that reads tickets alone prunes
+ * a small fraction of the dead tokens it should.
+ *
+ * A queue rather than a log: a row exists only while its receipt is
+ * outstanding, and is deleted the moment one arrives. Expo discards receipts
+ * after about 24 hours, so a row older than that will never be answered and is
+ * dropped.
+ *
+ * Keyed by the ticket id, which is what `getReceipts` is asked about.
+ */
+export const PUSH_RECEIPTS_COLLECTION = 'push_receipts'
+
+/**
  * The name of the Firestore collection used to store notes — the reasons
  * behind decisions, and the purpose a loan was asked for.
  *

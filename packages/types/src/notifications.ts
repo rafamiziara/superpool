@@ -38,6 +38,31 @@ export interface PushToken {
 }
 
 /**
+ * A send Expo accepted but has not yet said it delivered.
+ *
+ * Expo answers `/push/send` with a **ticket** — "I have queued this" — and the
+ * delivery verdict comes later from `/push/getReceipts`, asked by ticket id.
+ * `DeviceNotRegistered` almost always arrives in the receipt rather than the
+ * ticket, so a service that reads tickets alone prunes only a fraction of the
+ * dead tokens it should.
+ *
+ * These rows are a queue, not a log: one exists while a receipt is outstanding
+ * and is deleted the moment it arrives.
+ */
+export interface PushReceipt {
+  /** Expo's ticket id, and the document id. What `getReceipts` is asked about. */
+  ticketId: string
+  /** The token the message went to, so a failure knows what to prune. */
+  token: string
+  /** Lowercased, like everything address-shaped on write. */
+  walletAddress: string
+  /** What the message was about, for the log a failure produces. */
+  kind: NotificationKind
+  /** Epoch millis. Expo discards a receipt after about 24 hours. */
+  createdAt: number
+}
+
+/**
  * What a notification is about.
  *
  * Shared so the backend's payload and the mobile deep-link switch cannot drift

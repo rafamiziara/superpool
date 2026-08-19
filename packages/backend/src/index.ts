@@ -11,6 +11,8 @@ setGlobalOptions({ maxInstances: 10 })
 // passes every test, and is simply never served. Add both.
 export {
   assessLoan,
+  collectPushReceipts,
+  collectPushReceiptsNow,
   customAppCheckMinter,
   generateAuthMessage,
   getAssessment,

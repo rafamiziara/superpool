@@ -42,6 +42,11 @@ function buildFirestore(options: { tokens?: string[]; markerExists?: boolean } =
 
   const markerDocRef = { create: mockCreate, delete: mockDelete }
 
+  // The receipt queue writes through a batch. Without this the queuing half of
+  // a send is unreachable from these tests and only looks covered.
+  const batchSets: { ticketId: string; token: string }[] = []
+  const mockBatchCommit = jest.fn().mockResolvedValue(undefined)
+
   const mockCollection = jest.fn().mockImplementation((name: string) => {
     if (name === 'notifications_sent') return { doc: jest.fn().mockReturnValue(markerDocRef) }
 
@@ -49,10 +54,17 @@ function buildFirestore(options: { tokens?: string[]; markerExists?: boolean } =
   })
 
   return {
-    firestore: { collection: mockCollection } as unknown as Firestore,
+    firestore: {
+      collection: mockCollection,
+      batch: jest.fn().mockReturnValue({
+        set: jest.fn().mockImplementation((_ref: unknown, data: { ticketId: string; token: string }) => batchSets.push(data)),
+        commit: mockBatchCommit,
+      }),
+    } as unknown as Firestore,
     mockCreate,
     mockDelete,
     mockTokenDelete,
+    batchSets,
   }
 }
 
@@ -96,7 +108,7 @@ describe('notifyWallet', () => {
   it('posts nothing for a wallet with no devices', async () => {
     const { firestore } = buildFirestore({ tokens: [] })
 
-    await expect(notifyWallet(WALLET, NOTIFICATION, firestore)).resolves.toEqual({ sent: 0, pruned: 0, noRecipients: true })
+    await expect(notifyWallet(WALLET, NOTIFICATION, firestore)).resolves.toEqual({ sent: 0, pruned: 0, queued: 0, noRecipients: true })
     expect(fetchSpy).not.toHaveBeenCalled()
   })
 
@@ -121,6 +133,44 @@ describe('notifyWallet', () => {
 
     await expect(notifyWallet(WALLET, NOTIFICATION, firestore)).resolves.toMatchObject({ sent: 2, pruned: 1 })
     expect(mockTokenDelete).toHaveBeenCalledTimes(1)
+  })
+
+  it('queues every accepted ticket for a receipt', async () => {
+    /*
+      The half a ticket cannot answer.
+
+      A ticket means "Expo has queued this", nothing more —
+      `DeviceNotRegistered` is written into the *receipt*, minutes later, once
+      Expo has actually spoken to Apple or Google. Without this queue the only
+      pruning that ever happens is the small fraction visible above, and every
+      other dead token is POSTed to for ever.
+    */
+    fetchSpy.mockResolvedValue(
+      expoReply([
+        { status: 'ok', id: 'ticket-a' },
+        { status: 'ok', id: 'ticket-b' },
+      ]) as never
+    )
+    const { firestore, batchSets } = buildFirestore({ tokens: ['ExponentPushToken[a]', 'ExponentPushToken[b]'] })
+
+    await expect(notifyWallet(WALLET, NOTIFICATION, firestore)).resolves.toMatchObject({ sent: 2, queued: 2 })
+    expect(batchSets.map((record) => record.ticketId)).toEqual(['ticket-a', 'ticket-b'])
+    // Paired by index, the only correspondence Expo offers — and the pairing
+    // cannot be rebuilt after this loop, which is why it is stored.
+    expect(batchSets.map((record) => record.token)).toEqual(['ExponentPushToken[a]', 'ExponentPushToken[b]'])
+  })
+
+  it('queues nothing for a ticket that was rejected outright', async () => {
+    fetchSpy.mockResolvedValue(
+      expoReply([
+        { status: 'ok', id: 'ticket-a' },
+        { status: 'error', details: { error: 'DeviceNotRegistered' } },
+      ]) as never
+    )
+    const { firestore, batchSets } = buildFirestore({ tokens: ['ExponentPushToken[a]', 'ExponentPushToken[b]'] })
+
+    await expect(notifyWallet(WALLET, NOTIFICATION, firestore)).resolves.toMatchObject({ sent: 1, pruned: 1, queued: 1 })
+    expect(batchSets.map((record) => record.ticketId)).toEqual(['ticket-a'])
   })
 
   it('keeps a token that failed for some other reason', async () => {

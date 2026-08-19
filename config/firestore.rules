@@ -195,6 +195,16 @@ service cloud.firestore {
       allow read, write: if false; // backend-only
     }
 
+    // --- push_receipts -----------------------------------------------------
+    // Tickets Expo accepted whose delivery verdict has not been collected yet.
+    // Closed for the same reason push_tokens is, and harder: each row carries a
+    // token *and* the wallet it belongs to, so a readable one would hand over
+    // the send capability and the identity behind it in a single document.
+
+    match /push_receipts/{ticketId} {
+      allow read, write: if false; // backend-only
+    }
+
     // --- notes -------------------------------------------------------------
     // Why a loan was wanted, and why a decision went the way it did. The one
     // collection here that does not mirror the chain: these are sentences

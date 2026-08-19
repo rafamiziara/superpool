@@ -2,6 +2,7 @@ import { NotificationData } from '@superpool/types'
 import { Firestore } from 'firebase-admin/firestore'
 import { logger } from 'firebase-functions/v2'
 import { NOTIFICATIONS_SENT_COLLECTION } from '../constants'
+import { AcceptedTicket, recordTickets } from './pushReceipts'
 import { deletePushToken, tokensForWallet } from './pushTokens'
 
 /**
@@ -41,10 +42,25 @@ export interface Notification {
 }
 
 export interface NotifyResult {
-  /** How many devices Expo accepted the message for. */
+  /**
+   * How many devices Expo **accepted** the message for.
+   *
+   * Accepted, not delivered. A ticket says Expo has queued the message; only
+   * the receipt collected later says whether Apple or Google took it. See
+   * `pushReceipts.ts`.
+   */
   sent: number
-  /** Tokens dropped because the app is no longer installed. */
+  /**
+   * Tokens dropped because the app is no longer installed.
+   *
+   * Almost always zero here: `DeviceNotRegistered` is written into the
+   * *receipt* rather than the ticket, because at ticket time Expo has not yet
+   * spoken to Apple or Google. The pruning that matters happens in
+   * `collectReceipts`.
+   */
   pruned: number
+  /** Tickets queued for a receipt, which is how many will actually be checked. */
+  queued: number
   /** True when the wallet had no registered device at all. */
   noRecipients: boolean
 }
@@ -64,7 +80,7 @@ export async function notifyWallet(walletAddress: string, notification: Notifica
   if (tokens.length === 0) {
     logger.info('No push tokens for wallet, nothing to send', { walletAddress: walletAddress.toLowerCase() })
 
-    return { sent: 0, pruned: 0, noRecipients: true }
+    return { sent: 0, pruned: 0, queued: 0, noRecipients: true }
   }
 
   const messages: ExpoPushMessage[] = tokens.map((token) => ({
@@ -78,17 +94,24 @@ export async function notifyWallet(walletAddress: string, notification: Notifica
 
   let sent = 0
   let pruned = 0
+  const accepted: AcceptedTicket[] = []
 
   for (const batch of chunk(messages, MAX_MESSAGES_PER_REQUEST)) {
     const tickets = await postToExpo(batch)
 
     // Expo returns one ticket per message, in order. Zipping by index is the
-    // only correspondence available — tickets carry no token.
+    // only correspondence available — tickets carry no token, and this is also
+    // the only moment a ticket id can be paired with the token it went to.
+    // Nothing after this loop can rebuild that link, which is why the receipt
+    // row stores the token rather than looking it up later.
     for (const [index, ticket] of tickets.entries()) {
       const token = batch[index]?.to
 
       if (ticket.status === 'ok') {
         sent += 1
+
+        if (ticket.id && token) accepted.push({ ticketId: ticket.id, token, kind: notification.data.kind })
+
         continue
       }
 
@@ -104,9 +127,17 @@ export async function notifyWallet(walletAddress: string, notification: Notifica
     }
   }
 
-  logger.info('Push notification dispatched', { walletAddress: walletAddress.toLowerCase(), kind: notification.data.kind, sent, pruned })
+  const queued = await recordTickets(accepted, walletAddress, firestore)
 
-  return { sent, pruned, noRecipients: false }
+  logger.info('Push notification dispatched', {
+    walletAddress: walletAddress.toLowerCase(),
+    kind: notification.data.kind,
+    sent,
+    pruned,
+    queued,
+  })
+
+  return { sent, pruned, queued, noRecipients: false }
 }
 
 /**

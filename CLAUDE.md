@@ -834,7 +834,7 @@ cost the asker nothing to make and the owner everything to miss. Five are
 `membership_rejected`). Two more come from the **clock** rather than from anyone
 (`loan_due_soon`, `loan_overdue`); see [Loans](#loans). Plan and the reasoning
 for what is left out:
-[`.dev/features/NOTIFICATIONS_PLAN.md`](.dev/features/NOTIFICATIONS_PLAN.md).
+[`.dev/old/NOTIFICATIONS_PLAN.md`](.dev/old/NOTIFICATIONS_PLAN.md).
 
 Deliberately absent: being **removed** from a pool, which is not a decision on
 anything the member asked for, and **leaving**, which is self-authored.
@@ -855,6 +855,21 @@ Five rules that are easy to break:
   requests. `push_tokens` is its own collection because
   `DeviceVerificationService.approveDevice` writes `approved_devices` with
   `set()` and no merge, which happens on every cold start.
+- **A ticket is not a delivery.** Expo answers `/push/send` with a _ticket_
+  meaning "queued"; the verdict comes minutes later from `/push/getReceipts`,
+  and **`DeviceNotRegistered` is written into the receipt, not the ticket** —
+  at ticket time Expo has not spoken to Apple or Google yet. So the pruning the
+  send path can do is a small fraction of what is needed, and the rest happens
+  in `collectPushReceipts`, a 15-minute schedule over the `push_receipts`
+  queue. Rows leave the queue on any answer (delivered, failed, or expired at
+  24 hours, when Expo has discarded the receipt); only "no receipt yet" keeps
+  one.
+- **Only `DeviceNotRegistered` prunes a token.** `MismatchSenderId` and
+  `InvalidCredentials` are faults in the project's own FCM or APNs setup: they
+  arrive on _every_ message at once, so pruning on them would empty
+  `push_tokens` — every device, every wallet — because somebody uploaded the
+  wrong key. They get a loud log instead, because nothing else in the system
+  would report that push is entirely broken.
 - **The permission prompt is spent once.** Asked only after a pool is created,
   where the user has just built an expectation of being told something. Not
   when joining or borrowing: those askers have no notifications yet, so the
@@ -878,6 +893,9 @@ chain fires when a term lapses.
 
 **Not verified end to end.** The emulator does not deliver push; the last mile
 needs a dev build, an APNs key and an FCM v1 service account uploaded to EAS.
+The receipt queue _is_ verified against a real Firestore
+(`pnpm --filter backend testReceipts`, 23 checks including one live call to
+Expo's endpoint), which covers everything up to the point a phone is involved.
 
 ## Notes
 

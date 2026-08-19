@@ -8,20 +8,20 @@ To build a functional micro-lending decentralized application on Polygon where u
 
 ## 📍 Where things stand (2026-08-19)
 
-| Sprint                         | Status                                                 |
-| ------------------------------ | ------------------------------------------------------ |
-| 1 · Foundation                 | ✅ Complete                                            |
-| 2 · Authentication Enhancement | ✅ Complete                                            |
-| 3 · Pool Creation              | 🚧 Complete locally; blocked on testnet deployment     |
-| 4 · Pool Membership            | ✅ Complete                                            |
-| 5 · Pool Liquidity             | ✅ Complete — native POL and ERC-20 pools              |
-| 6 · Loan Requests              | ✅ Complete — request flow and AI assessment           |
-| 7 · Loan Repayments            | ✅ Full, partial, accruing; reminders; no schedule     |
-| 8 · Withdrawals                | ✅ Complete                                            |
-| 9 · Reputations                | 🚧 History and defaults observed; no score, on purpose |
-| 10 · Loan Management           | ✅ Complete — decisions, support, queue and portfolio  |
-| 11 · Interest Distribution     | ✅ Complete                                            |
-| 12 · Notifications             | 🚧 All nine kinds shipped; delivery unverified         |
+| Sprint                         | Status                                                   |
+| ------------------------------ | -------------------------------------------------------- |
+| 1 · Foundation                 | ✅ Complete                                              |
+| 2 · Authentication Enhancement | ✅ Complete                                              |
+| 3 · Pool Creation              | 🚧 Complete locally; blocked on testnet deployment       |
+| 4 · Pool Membership            | ✅ Complete                                              |
+| 5 · Pool Liquidity             | ✅ Complete — native POL and ERC-20 pools                |
+| 6 · Loan Requests              | ✅ Complete — request flow and AI assessment             |
+| 7 · Loan Repayments            | ✅ Full, partial, accruing; reminders; no schedule       |
+| 8 · Withdrawals                | ✅ Complete                                              |
+| 9 · Reputations                | 🚧 History and defaults observed; no score, on purpose   |
+| 10 · Loan Management           | ✅ Complete — decisions, support, queue and portfolio    |
+| 11 · Interest Distribution     | ✅ Complete                                              |
+| 12 · Notifications             | 🚧 Code complete, receipts included; delivery unverified |
 
 Three deferrals across Sprints 4, 6 and 10 — a membership reason, a loan
 purpose, a decision reason — turned out to be one missing mechanism, and were
@@ -690,7 +690,7 @@ Added 2026-08-12. Not previously its own sprint, but Sprints 4, 7 and 10 each
 list notifications as a feature and none of them had any — so it kept being
 "part of" work that shipped without it.
 
-Plan: [`.dev/features/NOTIFICATIONS_PLAN.md`](../.dev/features/NOTIFICATIONS_PLAN.md). How it
+Plan: [`.dev/old/NOTIFICATIONS_PLAN.md`](../.dev/old/NOTIFICATIONS_PLAN.md). How it
 works: the Notifications section in [`CLAUDE.md`](../CLAUDE.md).
 
 ### Why it needed a sprint of its own
@@ -732,12 +732,20 @@ to find out was to open the pool.
   time**, from one `getBlock('latest')` per chain per run. A loan remembers it
   was reminded through the same `notifications_sent` marker everything else
   uses, so it is one due-soon and one overdue reminder per loan, ever.
-- **Receipt polling.** Only send-response `DeviceNotRegistered` pruning is
-  implemented. Expo's `getReceipts` needs a deferred second pass.
+- ~~**Receipt polling**~~ — shipped 2026-08-19. `push_receipts` queues every
+  ticket Expo accepts and `collectPushReceipts` asks about them on a 15-minute
+  schedule. The reason it mattered turned out to be sharper than "a second
+  pass": **`DeviceNotRegistered` is written into the receipt, not the ticket**,
+  because at ticket time Expo has not yet spoken to Apple or Google — so the
+  pruning that existed caught a small fraction of dead tokens and kept POSTing
+  to the rest. The trap on the way in: **only that error may prune**.
+  `MismatchSenderId` and `InvalidCredentials` arrive on every message at once
+  when the project's FCM or APNs setup is wrong, and pruning on them would
+  empty `push_tokens` for every wallet on one bad upload.
 - **Preferences beyond on/off**, digests, quiet hours, an in-app notification
   centre — all deliberately out of scope, see the plan §7.
 
-### Current Status: **All nine kinds shipped; delivery unverified** 🚧
+### Current Status: **Code complete, receipts included; delivery unverified** 🚧
 
 The code is written and tested — 116 tests over transitions, idempotency,
 recipient resolution, token pruning and the deep links. **Nothing has reached a
@@ -817,8 +825,16 @@ SDK 53.
 
 ### Still to build — none of it blocking a demo
 
-- **Sprint 12**: receipt polling. Only send-response `DeviceNotRegistered`
-  pruning exists; Expo's `getReceipts` needs a deferred second pass.
+**Nothing here is a feature any more.** What is left is chores and migrations.
+
+- ~~**Sprint 12: receipt polling**~~ — shipped 2026-08-19. `push_receipts` plus
+  `collectPushReceipts`, a 15-minute schedule. The find that made it worth
+  doing: **`DeviceNotRegistered` is written into the receipt, not the ticket**,
+  because at ticket time Expo has not spoken to Apple or Google yet — so the
+  pruning that existed caught a small fraction of dead tokens and POSTed to the
+  rest for ever. Live-verified with `pnpm --filter backend testReceipts`
+  (23 checks). Delivery to a phone is still unverified and still needs
+  credentials.
 - ~~**Discovery**~~ — shipped 2026-08-19. `searchTokens` on the pool document,
   one `array-contains` in `listPools`, and the client filter kept on top —
   Firestore allows one such clause per query, so the server narrows on the
