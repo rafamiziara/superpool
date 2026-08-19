@@ -1,5 +1,6 @@
+import { isMain } from './lib/main'
+import { ethers, network } from '../hardhat.connection'
 import * as dotenv from 'dotenv'
-import { ethers, network } from 'hardhat'
 import { PoolFactory } from '../typechain-types'
 
 dotenv.config()
@@ -259,7 +260,7 @@ async function main() {
 }
 
 // Only run if this file is executed directly
-if (require.main === module) {
+if (isMain(import.meta.url)) {
   main()
     .then(() => process.exit(0))
     .catch((error) => {

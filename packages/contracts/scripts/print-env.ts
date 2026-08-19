@@ -31,7 +31,7 @@ interface DeploymentRecord {
   }
 }
 
-const DEPLOYMENTS_DIR = join(__dirname, '..', 'deployments')
+const DEPLOYMENTS_DIR = join(import.meta.dirname, '..', 'deployments')
 
 /**
  * How the mobile app spells a chain.

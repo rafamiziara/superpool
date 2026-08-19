@@ -1,32 +1,31 @@
-import { SignerWithAddress } from '@nomicfoundation/hardhat-ethers/signers'
-import { expect } from 'chai'
+import { ethers, isSimulatedNetwork, network } from '../hardhat.connection'
+import type { HardhatEthersSigner } from '@nomicfoundation/hardhat-ethers/types'
+import { expect, use } from 'chai'
 import chaiAsPromised from 'chai-as-promised'
-import { ethers, network } from 'hardhat'
 
-// Use chai-as-promised for async testing
-import chai from 'chai'
 import { deploySafe, SafeConfig } from '../scripts/deploy-safe'
 import { completeOwnershipTransfer, initiateOwnershipTransfer, verifyOwnershipStatus } from '../scripts/transfer-ownership'
 import { LendingPool, PoolFactory } from '../typechain-types'
-chai.use(chaiAsPromised)
+// chai-as-promised, for the async assertions below.
+use(chaiAsPromised)
 
 describe('Safe Integration Tests', function () {
   // The Safe SDK deploys via a live JSON-RPC node and the canonical Safe
   // singletons, neither of which exist on the ephemeral in-process network.
   // Run against a node: `pnpm test:integration` (fork) or --network localhost.
   before(function () {
-    if (network.name === 'hardhat') {
+    if (isSimulatedNetwork) {
       this.skip()
     }
   })
 
   let poolFactory: PoolFactory
   let lendingPoolImplementation: LendingPool
-  let deployer: SignerWithAddress
-  let safeOwner1: SignerWithAddress
-  let safeOwner2: SignerWithAddress
-  let safeOwner3: SignerWithAddress
-  let otherAccount: SignerWithAddress
+  let deployer: HardhatEthersSigner
+  let safeOwner1: HardhatEthersSigner
+  let safeOwner2: HardhatEthersSigner
+  let safeOwner3: HardhatEthersSigner
+  let otherAccount: HardhatEthersSigner
   let safeAddress: string
 
   beforeEach(async function () {
@@ -61,7 +60,10 @@ describe('Safe Integration Tests', function () {
       expect(deploymentResult.safeAddress).to.not.equal(ethers.ZeroAddress)
       expect(deploymentResult.owners).to.deep.equal(safeConfig.owners)
       expect(deploymentResult.threshold).to.equal(safeConfig.threshold)
-      expect(deploymentResult.networkName).to.equal('hardhat')
+      // Whatever node this suite was pointed at. It cannot be the simulated
+      // chain — the `before` hook skips that — so the old literal 'hardhat'
+      // was a value this assertion could never legitimately see.
+      expect(deploymentResult.networkName).to.equal(network.name)
 
       // Verify Safe deployment by checking code at address
       const code = await ethers.provider.getCode(deploymentResult.safeAddress)

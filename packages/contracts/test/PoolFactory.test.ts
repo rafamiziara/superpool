@@ -1,15 +1,15 @@
-import { SignerWithAddress } from '@nomicfoundation/hardhat-ethers/signers'
+import { ethers, upgrades } from '../hardhat.connection'
+import type { HardhatEthersSigner } from '@nomicfoundation/hardhat-ethers/types'
 import { expect } from 'chai'
-import { ethers, upgrades } from 'hardhat'
 import { LendingPool, PoolFactory } from '../typechain-types'
 
 describe('PoolFactory', function () {
   let poolFactory: PoolFactory
   let lendingPoolImplementation: LendingPool
-  let owner: SignerWithAddress
-  let poolOwner1: SignerWithAddress
-  let poolOwner2: SignerWithAddress
-  let otherAccount: SignerWithAddress
+  let owner: HardhatEthersSigner
+  let poolOwner1: HardhatEthersSigner
+  let poolOwner2: HardhatEthersSigner
+  let otherAccount: HardhatEthersSigner
 
   const defaultPoolParams = {
     maxLoanAmount: ethers.parseEther('10'),
@@ -146,7 +146,7 @@ describe('PoolFactory', function () {
       const pool = await ethers.getContractAt('LendingPool', (await poolFactory.getPoolInfo(1)).poolAddress)
 
       expect((await pool.poolConfig()).requiresMembership).to.be.false
-      await expect(pool.connect(otherAccount).depositFunds({ value: ethers.parseEther('1') })).to.not.be.reverted
+      await expect(pool.connect(otherAccount).depositFunds({ value: ethers.parseEther('1') })).to.not.be.revert(ethers)
     })
 
     it('Should create multiple pools', async function () {
@@ -195,7 +195,7 @@ describe('PoolFactory', function () {
       await expect(poolFactory.connect(otherAccount).createPool(params)).to.be.revertedWithCustomError(poolFactory, 'UnauthorizedCreator')
 
       // Owner can always create pools
-      await expect(poolFactory.connect(owner).createPool(params)).to.not.be.reverted
+      await expect(poolFactory.connect(owner).createPool(params)).to.not.be.revert(ethers)
       const poolInfo = await poolFactory.getPoolInfo(1)
       expect(poolInfo.poolOwner).to.equal(owner.address)
     })
@@ -215,7 +215,7 @@ describe('PoolFactory', function () {
       await poolFactory.connect(owner).setCreatorAuthorization(poolOwner1.address, true)
 
       // Now poolOwner1 can create pools
-      await expect(poolFactory.connect(poolOwner1).createPool(params)).to.not.be.reverted
+      await expect(poolFactory.connect(poolOwner1).createPool(params)).to.not.be.revert(ethers)
 
       // Verify the creator became the pool owner
       const poolInfo = await poolFactory.getPoolInfo(1)
@@ -462,7 +462,7 @@ describe('PoolFactory', function () {
     it('Should be upgradeable by owner', async function () {
       const PoolFactoryV2 = await ethers.getContractFactory('PoolFactory')
 
-      await expect(upgrades.upgradeProxy(await poolFactory.getAddress(), PoolFactoryV2)).to.not.be.reverted
+      await expect(upgrades.upgradeProxy(await poolFactory.getAddress(), PoolFactoryV2)).to.not.be.revert(ethers)
     })
   })
 
@@ -551,7 +551,7 @@ describe('PoolFactory', function () {
   })
 
   describe('Ownable2Step Functionality', function () {
-    let newOwner: SignerWithAddress
+    let newOwner: HardhatEthersSigner
 
     beforeEach(function () {
       newOwner = otherAccount
@@ -681,7 +681,7 @@ describe('PoolFactory', function () {
           ...defaultPoolParams,
         }
 
-        await expect(poolFactory.connect(owner).createPool(params)).to.not.be.reverted
+        await expect(poolFactory.connect(owner).createPool(params)).to.not.be.revert(ethers)
         expect(await poolFactory.getPoolCount()).to.equal(1)
 
         // Pending owner cannot create pools (not whitelisted)
@@ -727,7 +727,7 @@ describe('PoolFactory', function () {
         expect(await poolFactory.paused()).to.be.true
 
         // Emergency pause when already paused should not revert
-        await expect(poolFactory.connect(owner).emergencyPause()).to.not.be.reverted
+        await expect(poolFactory.connect(owner).emergencyPause()).to.not.be.revert(ethers)
         expect(await poolFactory.paused()).to.be.true
       })
 
@@ -735,7 +735,7 @@ describe('PoolFactory', function () {
         expect(await poolFactory.paused()).to.be.false
 
         // Emergency unpause when not paused should not revert
-        await expect(poolFactory.connect(owner).emergencyUnpause()).to.not.be.reverted
+        await expect(poolFactory.connect(owner).emergencyUnpause()).to.not.be.revert(ethers)
         expect(await poolFactory.paused()).to.be.false
       })
     })
@@ -779,7 +779,7 @@ describe('PoolFactory', function () {
             ...defaultPoolParams,
             name: 'Pool 2',
           })
-        ).to.not.be.reverted
+        ).to.not.be.revert(ethers)
 
         // Old owner can no longer create pools (not the owner anymore, and not whitelisted)
         await expect(poolFactory.connect(owner).createPool(params)).to.be.revertedWithCustomError(poolFactory, 'UnauthorizedCreator')

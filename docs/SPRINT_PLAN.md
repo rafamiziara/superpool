@@ -849,11 +849,19 @@ SDK 53.
   list**: `hardhat-verify` picks its API from the _shape_ of `etherscan.apiKey`,
   and the per-network map the config used selects the **v1** API that was
   switched off in May 2025 — so verification on the Amoy deploy would have
-  failed against a dead endpoint. One string selects v2. Left as migrations:
-  Hardhat 3, Solidity 0.8.30, Ignition.
+  failed against a dead endpoint. One string selects v2.
 - ~~**Zod validation**~~ — shipped 2026-08-19. It was already in the app and the
   agent; the chore only ever meant the backend, whose 28 endpoints hand-rolled
   their checks. See [`CLAUDE.md` → Request validation](../CLAUDE.md#request-validation).
+- ~~**Toolchain migrations**~~ — all three settled 2026-08-19. Solidity went to
+  **0.8.36** (not the 0.8.30 the list named, which carries four known compiler
+  bugs to 0.8.24's two); **Hardhat 3** followed the same day, brought forward
+  from "after Amoy" because its one irreversible step — moving the
+  `.openzeppelin/` manifest — is free only while no persistent network has been
+  deployed to. Ignition was refused. `solidity-coverage`, `hardhat-gas-reporter`,
+  `ts-node` and `cross-env` were removed rather than replaced. 332 tests
+  unchanged and the ABIs byte-identical, so nothing in the backend or the app
+  moved. See [`.dev/contracts/TOOLCHAIN_MIGRATIONS.md`](../.dev/contracts/TOOLCHAIN_MIGRATIONS.md).
 - **Chores** ([`.dev/todo.md`](../.dev/todo.md)): Maestro + EAS workflows for
   E2E, an environments document, the 'Empty' illustration and a hero
   background.

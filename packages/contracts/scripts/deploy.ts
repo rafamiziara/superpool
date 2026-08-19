@@ -1,6 +1,6 @@
+import { ethers, network, upgrades } from '../hardhat.connection'
 import * as dotenv from 'dotenv'
 import { mkdirSync, writeFileSync } from 'fs'
-import { ethers, network, upgrades } from 'hardhat'
 import { join } from 'path'
 import { isLocalNetwork, verifyContract } from './lib/verification'
 
@@ -214,7 +214,7 @@ async function main() {
       },
     }
 
-    const deploymentsDir = join(__dirname, '..', 'deployments')
+    const deploymentsDir = join(import.meta.dirname, '..', 'deployments')
     mkdirSync(deploymentsDir, { recursive: true })
     const deploymentPath = join(deploymentsDir, `${network.name}.json`)
     writeFileSync(

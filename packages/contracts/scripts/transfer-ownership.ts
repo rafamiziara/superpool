@@ -1,7 +1,9 @@
+import { isMain } from './lib/main'
+import { isLocalNetwork } from './lib/verification'
+import { ethers, network } from '../hardhat.connection'
 import Safe from '@safe-global/protocol-kit'
 import { MetaTransactionData } from '@safe-global/types-kit'
 import * as dotenv from 'dotenv'
-import { ethers, network } from 'hardhat'
 import { PoolFactory } from '../typechain-types'
 
 dotenv.config()
@@ -25,7 +27,7 @@ dotenv.config()
  * @dev WARNING: Contains hardcoded test keys - DEVELOPMENT ONLY
  */
 function getSignerPrivateKey(networkName: string, signerAddress: string): string {
-  if (networkName === 'localhost' || networkName === 'hardhat') {
+  if (isLocalNetwork(networkName)) {
     // Hardhat's deterministic accounts (safe for local development only)
     const hardhatAccounts: { [address: string]: string } = {
       '0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266': '0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80',
@@ -199,7 +201,7 @@ async function completeOwnershipTransfer(config: OwnershipTransferConfig): Promi
 
     // Get RPC URL for the current network
     let rpcUrl: string
-    if (network.name === 'localhost' || network.name === 'hardhat') {
+    if (isLocalNetwork()) {
       rpcUrl = 'http://127.0.0.1:8545'
     } else if (network.name === 'polygonAmoy') {
       rpcUrl = process.env.POLYGON_AMOY_RPC_URL || 'https://rpc-amoy.polygon.technology/'
@@ -489,7 +491,7 @@ async function main() {
 }
 
 // Only run if this file is executed directly
-if (require.main === module) {
+if (isMain(import.meta.url)) {
   main()
     .then(() => process.exit(0))
     .catch((error) => {

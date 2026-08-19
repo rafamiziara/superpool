@@ -1,5 +1,5 @@
+import { artifacts } from '../hardhat.connection'
 import * as fs from 'fs'
-import { artifacts } from 'hardhat'
 import * as path from 'path'
 import { ABI_CONTRACTS, ABI_OUTPUT_FILES, renderAbiModule, RenderedAbi, REPO_ROOT } from './abi-codegen'
 

@@ -1,6 +1,6 @@
+import { artifacts } from '../hardhat.connection'
 import { expect } from 'chai'
 import * as fs from 'fs'
-import { artifacts } from 'hardhat'
 import * as path from 'path'
 import { ABI_CONTRACTS, ABI_OUTPUT_FILES, REGENERATE_COMMAND, renderAbiModule, RenderedAbi, REPO_ROOT } from '../scripts/abi-codegen'
 

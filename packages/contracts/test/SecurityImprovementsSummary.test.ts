@@ -1,15 +1,17 @@
-import { SignerWithAddress } from '@nomicfoundation/hardhat-ethers/signers'
+import { ethers } from '../hardhat.connection'
+import * as fs from 'fs'
+import * as path from 'path'
+import type { HardhatEthersSigner } from '@nomicfoundation/hardhat-ethers/types'
 import { expect } from 'chai'
-import { ethers } from 'hardhat'
 import { LendingPool, PoolFactory } from '../typechain-types'
 
 describe('Security Improvements Summary', function () {
   let poolFactory: PoolFactory
   let lendingPoolImplementation: LendingPool
-  let owner: SignerWithAddress
-  let addr1: SignerWithAddress
-  let addr2: SignerWithAddress
-  let addr3: SignerWithAddress
+  let owner: HardhatEthersSigner
+  let addr1: HardhatEthersSigner
+  let addr2: HardhatEthersSigner
+  let addr3: HardhatEthersSigner
 
   beforeEach(async function () {
     ;[owner, addr1, addr2, addr3] = await ethers.getSigners()
@@ -86,7 +88,7 @@ describe('Security Improvements Summary', function () {
       await pool.depositFunds({ value: ethers.parseEther('2') })
 
       // Create a large loan (should handle safely)
-      await expect(pool.createLoan(ethers.parseEther('1'))).to.not.be.reverted
+      await expect(pool.createLoan(ethers.parseEther('1'))).to.not.be.revert(ethers)
 
       // Verify loan was created with correct interest calculation
       const loan = await pool.loans(1)
@@ -126,7 +128,7 @@ describe('Security Improvements Summary', function () {
 
       // Should handle zero interest correctly
       await pool.depositFunds({ value: ethers.parseEther('2') })
-      await expect(pool.createLoan(ethers.parseEther('1'))).to.not.be.reverted
+      await expect(pool.createLoan(ethers.parseEther('1'))).to.not.be.revert(ethers)
 
       const loan = await pool.loans(1)
       expect(loan.interestRate).to.equal(0)
@@ -179,7 +181,7 @@ describe('Security Improvements Summary', function () {
       }
 
       // Normal accounts can create pools (they become the owner)
-      await expect(poolFactory.connect(owner).createPool(poolParams)).to.not.be.reverted
+      await expect(poolFactory.connect(owner).createPool(poolParams)).to.not.be.revert(ethers)
 
       const poolInfo = await poolFactory.getPoolInfo(1)
       expect(poolInfo.poolOwner).to.equal(owner.address)
@@ -210,7 +212,7 @@ describe('Security Improvements Summary', function () {
       expect(await poolFactory.isAuthorizedCreator(addr1.address)).to.be.true
 
       // Now authorized user can create pools
-      await expect(poolFactory.connect(addr1).createPool(poolParams)).to.not.be.reverted
+      await expect(poolFactory.connect(addr1).createPool(poolParams)).to.not.be.revert(ethers)
       expect(await poolFactory.getPoolCount()).to.equal(1)
 
       // Non-authorized users still cannot create (whitelist enforced)
@@ -222,10 +224,7 @@ describe('Security Improvements Summary', function () {
       // The actual warnings are in the script files
 
       // Check that the scripts directory contains our secured scripts
-      const fs = require('fs')
-      const path = require('path')
-
-      const scriptsDir = path.join(__dirname, '..', 'scripts')
+      const scriptsDir = path.join(import.meta.dirname, '..', 'scripts')
       const deploySafeScript = fs.readFileSync(path.join(scriptsDir, 'deploy-safe.ts'), 'utf8')
       const transferOwnershipScript = fs.readFileSync(path.join(scriptsDir, 'transfer-ownership.ts'), 'utf8')
 
@@ -236,10 +235,7 @@ describe('Security Improvements Summary', function () {
 
     it('Should have comprehensive security documentation', async function () {
       // Verify security documentation exists
-      const fs = require('fs')
-      const path = require('path')
-
-      const docsDir = path.join(__dirname, '..', 'docs')
+      const docsDir = path.join(import.meta.dirname, '..', 'docs')
       const securityDoc = fs.readFileSync(path.join(docsDir, 'SECURITY_CONSIDERATIONS.md'), 'utf8')
 
       // Verify key security topics are documented

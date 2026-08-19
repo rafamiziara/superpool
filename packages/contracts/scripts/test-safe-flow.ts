@@ -1,5 +1,6 @@
+import { isMain } from './lib/main'
+import { ethers, isSimulatedNetwork, network } from '../hardhat.connection'
 import * as dotenv from 'dotenv'
-import { ethers, network } from 'hardhat'
 import { PoolFactory } from '../typechain-types'
 import { deploySafe } from './deploy-safe'
 import { simulateAcceptOwnership } from './simulate-multisig'
@@ -14,7 +15,9 @@ async function testSafeFlow() {
   console.log('ℹ️  Requires forked network with Safe contracts pre-deployed')
 
   // Verify we're on a supported network
-  if (network.name === 'localhost' || network.name === 'hardhat') {
+  // Not `isLocalNetwork()`: the fork networks are local too, and a fork is
+  // precisely what this script is asking for.
+  if (network.name === 'localhost' || isSimulatedNetwork) {
     console.log('❌ This test requires a forked network with Safe contracts')
     console.log('💡 Use: pnpm node:fork && pnpm test:safe')
     process.exit(1)
@@ -260,7 +263,7 @@ async function main() {
 }
 
 // Only run if this file is executed directly
-if (require.main === module) {
+if (isMain(import.meta.url)) {
   main()
     .then(() => process.exit(0))
     .catch((error) => {

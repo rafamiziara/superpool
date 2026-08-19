@@ -1,7 +1,6 @@
-import { time } from '@nomicfoundation/hardhat-network-helpers'
-import { SignerWithAddress } from '@nomicfoundation/hardhat-ethers/signers'
+import { ethers, time, upgrades } from '../hardhat.connection'
+import type { HardhatEthersSigner } from '@nomicfoundation/hardhat-ethers/types'
 import { expect } from 'chai'
-import { ethers, upgrades } from 'hardhat'
 import { LendingPool, PoolFactory, TestERC20, TestFeeOnTransferERC20, TestNoReturnERC20 } from '../typechain-types'
 
 /**
@@ -50,7 +49,7 @@ async function deployPoolBehindBeacon(args: unknown[]): Promise<LendingPool> {
  * because the pool pulls what is owed at execution time and leaves the rest in
  * the borrower's wallet.
  */
-async function repayInFull(pool: LendingPool, token: TestERC20, borrower: SignerWithAddress, loanId: number) {
+async function repayInFull(pool: LendingPool, token: TestERC20, borrower: HardhatEthersSigner, loanId: number) {
   const quote = await pool.outstandingBalanceAt(loanId, (await time.latest()) + 3600)
 
   await token.connect(borrower).approve(await pool.getAddress(), quote)
@@ -59,10 +58,10 @@ async function repayInFull(pool: LendingPool, token: TestERC20, borrower: Signer
 }
 
 describe('Token pools', function () {
-  let owner: SignerWithAddress
-  let borrower: SignerWithAddress
-  let lender: SignerWithAddress
-  let otherLender: SignerWithAddress
+  let owner: HardhatEthersSigner
+  let borrower: HardhatEthersSigner
+  let lender: HardhatEthersSigner
+  let otherLender: HardhatEthersSigner
 
   beforeEach(async function () {
     ;[owner, borrower, lender, otherLender] = await ethers.getSigners()
@@ -445,7 +444,7 @@ describe('Token pools', function () {
       // would pass whether the pool guarded the case or not.
       await token.setRejectsZeroTransfers(true)
 
-      await expect(pool.connect(lender).createLoan(0)).to.not.be.reverted
+      await expect(pool.connect(lender).createLoan(0)).to.not.be.revert(ethers)
     })
   })
 
@@ -486,7 +485,7 @@ describe('Token pools', function () {
 
     it('allows a native pool without anyone allowing anything', async function () {
       // `address(0)` is the absence of a token, not a token to be permitted.
-      await expect(poolFactory.connect(owner).createPool(defaultPoolParams)).to.not.be.reverted
+      await expect(poolFactory.connect(owner).createPool(defaultPoolParams)).to.not.be.revert(ethers)
       expect(await poolFactory.isAuthorizedLoanToken(ethers.ZeroAddress)).to.be.true
     })
 
@@ -565,7 +564,7 @@ describe('Token pools', function () {
       await token.mint(lender.address, units('100'))
       await token.connect(lender).approve(await pool.getAddress(), units('100'))
 
-      await expect(pool.connect(lender).depositTokens(units('100'))).to.not.be.reverted
+      await expect(pool.connect(lender).depositTokens(units('100'))).to.not.be.revert(ethers)
     })
   })
 })

@@ -1,7 +1,6 @@
-import { time } from '@nomicfoundation/hardhat-network-helpers'
+import { ethers, time, upgrades } from '../hardhat.connection'
 import { expect } from 'chai'
-import { ethers, upgrades } from 'hardhat'
-import { SignerWithAddress } from '@nomicfoundation/hardhat-ethers/signers'
+import type { HardhatEthersSigner } from '@nomicfoundation/hardhat-ethers/types'
 import { LendingPool } from '../typechain-types'
 
 /**
@@ -31,10 +30,10 @@ async function findLoanSlot(poolAddress: string, loanId: number, borrower: strin
  * exact moment or the assertions drift by a block. `setNextBlockTimestamp`
  * pins it; `increaseTo` would leave the repayment a second late.
  */
-async function atEndOfTerm(pool: LendingPool, loanId: number): Promise<void> {
+async function atEndOfTerm(pool: LendingPool, loanId: number, offsetSeconds = 0n): Promise<void> {
   const { startTime, duration } = await pool.getLoan(loanId)
 
-  await time.setNextBlockTimestamp(startTime + duration)
+  await time.setNextBlockTimestamp(startTime + duration + offsetSeconds)
 }
 
 /**
@@ -45,7 +44,7 @@ async function atEndOfTerm(pool: LendingPool, loanId: number): Promise<void> {
  * while the block is being mined, so sending today's `outstandingBalance`
  * exactly would leave a few seconds of interest behind and quietly not settle.
  */
-async function repayInFull(pool: LendingPool, borrower: SignerWithAddress, loanId: number) {
+async function repayInFull(pool: LendingPool, borrower: HardhatEthersSigner, loanId: number) {
   const quote = await pool.outstandingBalanceAt(loanId, (await time.latest()) + 3600)
 
   return pool.connect(borrower).repayLoan(loanId, { value: quote })
@@ -72,10 +71,10 @@ async function deployPoolBehindBeacon(args: unknown[]): Promise<LendingPool> {
 
 describe('LendingPool', function () {
   let lendingPool: LendingPool
-  let owner: SignerWithAddress
-  let borrower: SignerWithAddress
-  let lender: SignerWithAddress
-  let otherAccount: SignerWithAddress
+  let owner: HardhatEthersSigner
+  let borrower: HardhatEthersSigner
+  let lender: HardhatEthersSigner
+  let otherAccount: HardhatEthersSigner
 
   const maxLoanAmount = ethers.parseEther('10')
   const interestRate = 500 // 5%
@@ -243,7 +242,7 @@ describe('LendingPool', function () {
       await expect(lendingPool.connect(lender).withdraw(depositAmount)).to.be.revertedWithCustomError(lendingPool, 'InsufficientLiquidity')
 
       // The free liquidity is still withdrawable.
-      await expect(lendingPool.connect(lender).withdraw(ethers.parseEther('2'))).to.not.be.reverted
+      await expect(lendingPool.connect(lender).withdraw(ethers.parseEther('2'))).to.not.be.revert(ethers)
     })
 
     it('Should reject withdrawals while paused', async function () {
@@ -357,7 +356,7 @@ describe('LendingPool', function () {
 
       expect(await lendingPool.activeLoanId(borrower.address)).to.equal(0)
 
-      await expect(lendingPool.connect(borrower).createLoan(ethers.parseEther('5'))).to.not.be.reverted
+      await expect(lendingPool.connect(borrower).createLoan(ethers.parseEther('5'))).to.not.be.revert(ethers)
       expect(await lendingPool.activeLoanId(borrower.address)).to.equal(2)
     })
 
@@ -372,7 +371,7 @@ describe('LendingPool', function () {
       const repayment = await lendingPool.calculateRepaymentAmount(1)
       await lendingPool.connect(borrower).repayLoan(1, { value: repayment })
 
-      await expect(lendingPool.connect(borrower).withdraw(ethers.parseEther('1'))).to.not.be.reverted
+      await expect(lendingPool.connect(borrower).withdraw(ethers.parseEther('1'))).to.not.be.revert(ethers)
     })
 
     it('Should cap one borrower at maxLoanAmount rather than the whole pool', async function () {
@@ -1098,7 +1097,7 @@ describe('LendingPool', function () {
       expect(await lendingPool.paused()).to.be.false
 
       // Should allow operations when unpaused
-      await expect(lendingPool.connect(lender).depositFunds({ value: ethers.parseEther('1') })).to.not.be.reverted
+      await expect(lendingPool.connect(lender).depositFunds({ value: ethers.parseEther('1') })).to.not.be.revert(ethers)
     })
   })
 
@@ -1166,7 +1165,7 @@ describe('LendingPool', function () {
       // by accident would be a silent behaviour change.
       expect((await lendingPool.poolConfig()).requiresApproval).to.be.false
 
-      await expect(lendingPool.connect(borrower).createLoan(requested)).to.not.be.reverted
+      await expect(lendingPool.connect(borrower).createLoan(requested)).to.not.be.revert(ethers)
     })
 
     it('closes the side door once approval is on', async function () {
@@ -1176,7 +1175,7 @@ describe('LendingPool', function () {
     })
 
     it('only lets the owner change the requirement', async function () {
-      await expect(lendingPool.connect(borrower).setRequiresApproval(true)).to.be.reverted
+      await expect(lendingPool.connect(borrower).setRequiresApproval(true)).to.be.revert(ethers)
     })
 
     it('records a request without moving any funds', async function () {
@@ -1201,7 +1200,7 @@ describe('LendingPool', function () {
       const requestedAt = (await lendingPool.getLoan(1)).startTime
 
       await ethers.provider.send('evm_increaseTime', [3600])
-      await expect(lendingPool.connect(owner).approveLoan(1)).to.changeEtherBalance(borrower, requested)
+      await expect(lendingPool.connect(owner).approveLoan(1)).to.changeEtherBalance(ethers, borrower, requested)
 
       const loan = await lendingPool.getLoan(1)
       expect(loan.status).to.equal(0) // Disbursed
@@ -1228,7 +1227,7 @@ describe('LendingPool', function () {
       await lendingPool.connect(owner).setRequiresApproval(true)
       await lendingPool.connect(borrower).requestLoan(requested)
 
-      await expect(lendingPool.connect(borrower).approveLoan(1)).to.be.reverted
+      await expect(lendingPool.connect(borrower).approveLoan(1)).to.be.revert(ethers)
     })
 
     it('frees the borrower when a request is rejected', async function () {
@@ -1239,7 +1238,7 @@ describe('LendingPool', function () {
 
       expect((await lendingPool.getLoan(1)).status).to.equal(2) // Rejected
       expect(await lendingPool.activeLoanId(borrower.address)).to.equal(0)
-      await expect(lendingPool.connect(borrower).requestLoan(requested)).to.not.be.reverted
+      await expect(lendingPool.connect(borrower).requestLoan(requested)).to.not.be.revert(ethers)
     })
 
     it('lets a borrower withdraw their own request', async function () {
@@ -1346,7 +1345,7 @@ describe('LendingPool', function () {
     })
 
     it('only lets the owner set the grace period', async function () {
-      await expect(lendingPool.connect(borrower).setDefaultGracePeriod(1)).to.be.reverted
+      await expect(lendingPool.connect(borrower).setDefaultGracePeriod(1)).to.be.revert(ethers)
 
       await expect(lendingPool.connect(owner).setDefaultGracePeriod(86400))
         .to.emit(lendingPool, 'DefaultGracePeriodChanged')
@@ -1358,8 +1357,8 @@ describe('LendingPool', function () {
     it('only lets the owner declare a default', async function () {
       const loanId = await overdueLoan()
 
-      await expect(lendingPool.connect(borrower).markDefaulted(loanId)).to.be.reverted
-      await expect(lendingPool.connect(lender).markDefaulted(loanId)).to.be.reverted
+      await expect(lendingPool.connect(borrower).markDefaulted(loanId)).to.be.revert(ethers)
+      await expect(lendingPool.connect(lender).markDefaulted(loanId)).to.be.revert(ethers)
     })
 
     it('refuses a loan still inside its term', async function () {
@@ -1376,6 +1375,12 @@ describe('LendingPool', function () {
       await atEndOfTerm(lendingPool, loanId)
       await expect(lendingPool.connect(owner).markDefaulted(loanId)).to.be.revertedWithCustomError(lendingPool, 'LoanNotOverdue')
 
+      // A second later, stated rather than assumed. Under Hardhat 2 the failed
+      // call above still mined a block, which moved the clock on by one second
+      // and made this line pass by side effect; Hardhat 3 rejects it during gas
+      // estimation and mines nothing, so the second attempt was landing on the
+      // same timestamp as the first.
+      await atEndOfTerm(lendingPool, loanId, 1n)
       await expect(lendingPool.connect(owner).markDefaulted(loanId)).to.emit(lendingPool, 'LoanDefaulted')
     })
 
@@ -1456,7 +1461,7 @@ describe('LendingPool', function () {
       const loanId = await overdueLoan()
       await lendingPool.connect(owner).pause()
 
-      await expect(lendingPool.connect(owner).markDefaulted(loanId)).to.be.reverted
+      await expect(lendingPool.connect(owner).markDefaulted(loanId)).to.be.revert(ethers)
     })
 
     it('reads zero on a loan nobody declared', async function () {
@@ -1539,7 +1544,7 @@ describe('LendingPool', function () {
         await repayInFull(lendingPool, borrower, loanId)
 
         expect(await lendingPool.activeLoanId(borrower.address)).to.equal(0)
-        await expect(lendingPool.connect(borrower).createLoan(ethers.parseEther('1'))).to.not.be.reverted
+        await expect(lendingPool.connect(borrower).createLoan(ethers.parseEther('1'))).to.not.be.revert(ethers)
       })
 
       it('still pays the lenders what the recovery earned', async function () {
@@ -1674,7 +1679,7 @@ describe('LendingPool', function () {
         await lendingPool.connect(lender).requestMembership()
         await lendingPool.connect(owner).approveMember(lender.address)
 
-        await expect(lendingPool.connect(lender).depositFunds({ value: deposit })).to.not.be.reverted
+        await expect(lendingPool.connect(lender).depositFunds({ value: deposit })).to.not.be.revert(ethers)
       })
 
       it('strands nobody when the owner closes an open pool', async function () {
@@ -1684,11 +1689,11 @@ describe('LendingPool', function () {
         await lendingPool.connect(lender).depositFunds({ value: deposit })
         await lendingPool.connect(owner).setRequiresMembership(true)
 
-        await expect(lendingPool.connect(lender).depositFunds({ value: deposit })).to.not.be.reverted
+        await expect(lendingPool.connect(lender).depositFunds({ value: deposit })).to.not.be.revert(ethers)
       })
 
       it('only lets the owner change the requirement', async function () {
-        await expect(lendingPool.connect(borrower).setRequiresMembership(false)).to.be.reverted
+        await expect(lendingPool.connect(borrower).setRequiresMembership(false)).to.be.revert(ethers)
       })
     })
 
@@ -1741,7 +1746,7 @@ describe('LendingPool', function () {
         await lendingPool.connect(otherAccount).requestMembership()
         await lendingPool.connect(owner).rejectMember(otherAccount.address)
 
-        await expect(lendingPool.connect(otherAccount).requestMembership()).to.not.be.reverted
+        await expect(lendingPool.connect(otherAccount).requestMembership()).to.not.be.revert(ethers)
       })
 
       it('cannot decide the same request twice', async function () {
@@ -1764,7 +1769,7 @@ describe('LendingPool', function () {
       it('only lets the owner decide', async function () {
         await lendingPool.connect(otherAccount).requestMembership()
 
-        await expect(lendingPool.connect(borrower).approveMember(otherAccount.address)).to.be.reverted
+        await expect(lendingPool.connect(borrower).approveMember(otherAccount.address)).to.be.revert(ethers)
       })
 
       it('queues two applicants independently', async function () {
@@ -1804,7 +1809,7 @@ describe('LendingPool', function () {
       })
 
       it('only lets the owner remove', async function () {
-        await expect(lendingPool.connect(borrower).removeMember(lender.address)).to.be.reverted
+        await expect(lendingPool.connect(borrower).removeMember(lender.address)).to.be.revert(ethers)
       })
 
       it('leaves a removed member able to withdraw everything', async function () {
@@ -1812,14 +1817,14 @@ describe('LendingPool', function () {
         // you may do next, never what you already put in.
         await lendingPool.connect(owner).removeMember(lender.address)
 
-        await expect(lendingPool.connect(lender).withdraw(deposit)).to.changeEtherBalance(lender, deposit)
+        await expect(lendingPool.connect(lender).withdraw(deposit)).to.changeEtherBalance(ethers, lender, deposit)
         expect(await lendingPool.contributions(lender.address)).to.equal(0)
       })
 
       it('leaves a departed member able to withdraw everything', async function () {
         await lendingPool.connect(lender).leavePool()
 
-        await expect(lendingPool.connect(lender).withdraw(deposit)).to.changeEtherBalance(lender, deposit)
+        await expect(lendingPool.connect(lender).withdraw(deposit)).to.changeEtherBalance(ethers, lender, deposit)
       })
 
       it('leaves a removed borrower able to repay', async function () {
@@ -1852,14 +1857,14 @@ describe('LendingPool', function () {
       it('lets the owner fund a permissioned pool', async function () {
         await lendingPool.connect(owner).setRequiresMembership(true)
 
-        await expect(lendingPool.connect(owner).depositFunds({ value: deposit })).to.not.be.reverted
+        await expect(lendingPool.connect(owner).depositFunds({ value: deposit })).to.not.be.revert(ethers)
       })
 
       it('lets the owner borrow from it', async function () {
         await lendingPool.connect(owner).setRequiresMembership(true)
         await lendingPool.connect(owner).depositFunds({ value: ethers.parseEther('50') })
 
-        await expect(lendingPool.connect(owner).createLoan(ethers.parseEther('5'))).to.not.be.reverted
+        await expect(lendingPool.connect(owner).createLoan(ethers.parseEther('5'))).to.not.be.revert(ethers)
       })
 
       it('does not enrol the owner twice when they deposit', async function () {
@@ -1936,7 +1941,7 @@ describe('LendingPool', function () {
         await lendingPool.connect(owner).approveMember(borrower.address)
 
         expect(await lendingPool.contributions(borrower.address)).to.equal(0)
-        await expect(lendingPool.connect(borrower).createLoan(ethers.parseEther('5'))).to.not.be.reverted
+        await expect(lendingPool.connect(borrower).createLoan(ethers.parseEther('5'))).to.not.be.revert(ethers)
       })
 
       it('refuses a non-member asking on a reviewing pool', async function () {
@@ -1961,7 +1966,7 @@ describe('LendingPool', function () {
      * full term is what makes the interest exactly the pool's stated rate,
      * which is the figure these tests are written against.
      */
-    async function borrowAndRepay(who: SignerWithAddress, amount: bigint): Promise<bigint> {
+    async function borrowAndRepay(who: HardhatEthersSigner, amount: bigint): Promise<bigint> {
       await lendingPool.connect(who).createLoan(amount)
       const loanId = (await lendingPool.nextLoanId()) - 1n
       const due = await lendingPool.calculateRepaymentAmount(loanId)

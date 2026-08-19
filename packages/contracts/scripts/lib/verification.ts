@@ -1,4 +1,4 @@
-import { network, run } from 'hardhat'
+import { hre, network } from '../../hardhat.connection'
 
 /**
  * Explorer verification, in one place.
@@ -19,8 +19,16 @@ import { network, run } from 'hardhat'
  * chain's id: `polygonAmoyFork` answers on 127.0.0.1 and nothing it deploys
  * exists on Amoy. Verifying against them burned three retries and printed a
  * manual command that could never work.
+ *
+ * `default` is Hardhat 3's name for the in-process chain that Hardhat 2 called
+ * `hardhat` — a hardcoded constant with no config override, and what you get
+ * whenever `--network` is omitted. Both are listed because the configured
+ * `hardhat` entry is still reachable by naming it. Leaving `default` out is not
+ * a cosmetic miss: it makes `isLocalNetwork()` false for the commonest local
+ * run of all, which is exactly how a deploy script ends up asking an explorer
+ * to verify a contract that only ever existed in memory.
  */
-const LOCAL_NETWORKS = new Set(['hardhat', 'localhost', 'hardhatFork', 'polygonAmoyFork', 'polygonMainnetFork'])
+const LOCAL_NETWORKS = new Set(['default', 'hardhat', 'localhost', 'hardhatFork', 'polygonAmoyFork', 'polygonMainnetFork'])
 
 export function isLocalNetwork(name: string = network.name): boolean {
   return LOCAL_NETWORKS.has(name)
@@ -90,7 +98,14 @@ export async function verifyWithRetry(target: VerifyTarget, maxRetries: number =
         await new Promise((resolve) => setTimeout(resolve, Math.pow(2, attempt) * 1000))
       }
 
-      await run('verify:verify', { address: target.address, constructorArguments })
+      /*
+       * Hardhat 3 removed the ambient `run`. A task is reached through the task
+       * manager instead, and `verify:verify` split into one subtask per
+       * provider — `verify` alone would now also attempt Sourcify and
+       * Blockscout, which is a different thing from what this function
+       * promises its callers.
+       */
+      await hre.tasks.getTask(['verify', 'etherscan']).run({ address: target.address, constructorArgs: constructorArguments })
 
       return 'verified'
     } catch (error: unknown) {

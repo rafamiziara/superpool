@@ -31,7 +31,7 @@ export const ABI_CONTRACTS: readonly AbiContract[] = [
 ]
 
 /** Repo root, resolved from this file's location in `packages/contracts/scripts`. */
-export const REPO_ROOT = path.resolve(__dirname, '../../..')
+export const REPO_ROOT = path.resolve(import.meta.dirname, '../../..')
 
 /** Every consumer that receives a copy of the generated module, repo-relative. */
 export const ABI_OUTPUT_FILES: readonly string[] = [
@@ -45,7 +45,9 @@ export const REGENERATE_COMMAND = 'pnpm --filter contracts abis:generate'
 /** A contract's ABI as read from its compiled artifact. */
 export interface RenderedAbi {
   exportName: string
-  abi: unknown[]
+  // `readonly` because that is how Hardhat 3 types an artifact's `abi`, and this
+  // module only ever serialises it.
+  abi: readonly unknown[]
 }
 
 const HEADER = `// AUTO-GENERATED FILE — DO NOT EDIT.

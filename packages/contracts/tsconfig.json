@@ -1,8 +1,18 @@
 {
   "compilerOptions": {
-    "target": "es2020",
-    "module": "commonjs",
-    "lib": ["es2020"],
+    "target": "es2023",
+    // Hardhat 3 requires the package to be an ES module, which clears the
+    // `moduleResolution: "node"` TODO that stood here — it was waiting on
+    // exactly this move, being blocked on chai 5 shipping ESM-only (TS1479).
+    //
+    // `preserve`/`bundler` rather than `node20`, because that is what actually
+    // loads these files: Hardhat 3 runs TypeScript through its own esbuild-based
+    // loader, which resolves extensionless relative specifiers. `node20` would
+    // demand a `.js` suffix on every relative import in the package to describe
+    // a resolver that never runs here.
+    "module": "preserve",
+    "moduleResolution": "bundler",
+    "lib": ["es2023"],
     "outDir": "./dist",
     "rootDir": "./",
     "strict": true,
@@ -10,10 +20,6 @@
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
     "resolveJsonModule": true,
-    // TODO: migrate to moduleResolution "node16" — blocked on chai 5 being ESM-only
-    // (TS1479) and on stale scripts/tests still passing the removed `poolOwner` param.
-    "moduleResolution": "node",
-    "ignoreDeprecations": "6.0",
     "allowSyntheticDefaultImports": true,
     "composite": true,
     "declaration": true,
@@ -22,10 +28,6 @@
     "tsBuildInfoFile": "./.tsbuildinfo",
     "types": ["node", "mocha"]
   },
-  "include": ["./hardhat.config.ts", "./scripts/**/*.ts", "./test/**/*.ts", "./typechain-types/**/*.ts"],
-  "exclude": ["node_modules", "dist", "cache", "artifacts", "coverage"],
-  "ts-node": {
-    "transpileOnly": true,
-    "files": true
-  }
+  "include": ["./hardhat.config.ts", "./hardhat.connection.ts", "./scripts/**/*.ts", "./test/**/*.ts", "./typechain-types/**/*.ts"],
+  "exclude": ["node_modules", "dist", "cache", "artifacts", "coverage"]
 }

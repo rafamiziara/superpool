@@ -1,5 +1,5 @@
+import { ethers, hre, network, upgrades } from '../hardhat.connection'
 import * as dotenv from 'dotenv'
-import { ethers, network, run, upgrades } from 'hardhat'
 import { manualVerifyCommand, verificationBlocker, verifyWithRetry } from './lib/verification'
 
 dotenv.config()
@@ -90,7 +90,7 @@ async function main() {
     // Step 3: Verify with OpenZeppelin's method
     console.log('\n4️⃣ Attempting OpenZeppelin proxy verification...')
     try {
-      await run('verify:sourcify', { address: proxyAddress })
+      await hre.tasks.getTask(['verify', 'sourcify']).run({ address: proxyAddress })
       console.log('   ✅ Sourcify verification completed')
     } catch {
       console.log(`   ⚠️ Sourcify verification not available or failed`)

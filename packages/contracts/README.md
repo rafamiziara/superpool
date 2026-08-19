@@ -6,30 +6,57 @@ This package contains the smart contracts for the SuperPool decentralized micro-
 
 - 🔐 **Upgradeable Contracts** - Using OpenZeppelin's UUPS proxy pattern
 - 🛡️ **Security** - Comprehensive access control, pausability, and reentrancy protection
-- ⚡ **Modern Solidity** - Built with Solidity ^0.8.22 for optimal compatibility
+- ⚡ **Modern Solidity** - Built with Solidity 0.8.36, the only release with no known compiler bugs
 - 🧪 **Full Test Coverage** - Comprehensive test suite with gas reporting
 - 📊 **Gas Optimization** - Optimized contracts with detailed gas reporting
 - 🌍 **Multi-Network** - Configured for Polygon mainnet and Amoy testnet
-- 🔧 **Modern Tooling** - Hardhat v2.22.18 with latest plugins and TypeScript support
+- 🔧 **Modern Tooling** - Hardhat v3 with TypeScript support and ESM
 
 ## Hardhat Version Notes
 
-Currently using **Hardhat v2.22.18** for maximum stability and plugin compatibility. While Hardhat v3 is available, it's still in beta and some plugins (like OpenZeppelin Upgrades, gas reporter, and coverage tools) haven't been updated for full compatibility yet.
+On **Hardhat 3** since 2026-08-19. The three conditions this section used to list
+were all met: OpenZeppelin Upgrades ships Hardhat 3 support (v4), the ecosystem
+settled, and the ESM move is done and covered by the suite.
 
-**Migration to Hardhat v3 will be done when:**
+Two plugins were **removed rather than upgraded**, because Hardhat 3 has their
+jobs built in:
 
-- All essential plugins support Hardhat v3
-- The ecosystem is fully stable
-- ESM migration is properly tested
+| Was                    | Now                                                      |
+| ---------------------- | -------------------------------------------------------- |
+| `hardhat-gas-reporter` | `hardhat test --gas-stats`, or `--gas-stats-json <path>` |
+| `solidity-coverage`    | `hardhat test --coverage`                                |
+
+`ts-node` and `cross-env` went too — Node strips TypeScript natively, and the
+env vars they wrapped became CLI flags.
+
+What this changes for anyone working here:
+
+- **The package is an ES module.** No `require`, no `__dirname` (use
+  `import.meta.dirname`).
+- **There are no ambient `ethers` / `network` / `upgrades` objects.** Import them
+  from [`hardhat.connection.ts`](hardhat.connection.ts), which owns the one
+  shared network connection and explains why it is shared.
+- **`hardhat run` is unchanged**, so every script and npm script is invoked
+  exactly as before. Scripts cannot take positional arguments (they never
+  could — see `simulate-multisig.ts`); they read environment variables.
+- **The in-process chain is called `default`, not `hardhat`.** Anything asking
+  "am I on a local chain" should use `isLocalNetwork()` from
+  [`scripts/lib/verification.ts`](scripts/lib/verification.ts), or
+  `isSimulatedNetwork` for the narrower question.
+
+The reasoning for each decision is in `.dev/contracts/TOOLCHAIN_MIGRATIONS.md` §4.
 
 ## Solidity Version Configuration
 
-The project uses **Solidity 0.8.22** throughout for:
+The project uses **Solidity 0.8.36** throughout:
 
+- ✅ **No known compiler bugs** — the only release of which that is true. 0.8.30,
+  the obvious target, carries four
 - ✅ **Full compatibility** with latest OpenZeppelin contracts (v5.4.0)
-- ✅ **Simplified configuration** - single compiler version
-- ✅ **Modern language features** with excellent stability
-- ✅ **Hardhat support** - fully supported with all tooling
+- ✅ **Simplified configuration** - single compiler version, one bytecode
+- ✅ **`evmVersion` pinned to `cancun`** — 0.8.30 moved the default to `prague`,
+  and Polygon's fork support lags Ethereum's. The pin is not redundant beside
+  the version; see the comment in `hardhat.config.ts` before touching it
 
 ## Prerequisites
 

@@ -1,7 +1,8 @@
+import { isMain } from './lib/main'
+import { artifacts, ethers, network } from '../hardhat.connection'
 import Safe from '@safe-global/protocol-kit'
 import { MetaTransactionData } from '@safe-global/types-kit'
 import * as dotenv from 'dotenv'
-import { artifacts, ethers, network } from 'hardhat'
 
 dotenv.config()
 
@@ -239,17 +240,27 @@ async function runDemo(): Promise<void> {
   console.log('🎭 Multi-Sig Simulation Demo')
   console.log('============================')
 
-  // Parse command line arguments
-  const args = process.argv.slice(2)
-  const command = args[0]
-  const safeAddress = args[1]
-  const targetAddress = args[2]
+  /*
+   * Arguments come from the environment, not from `process.argv`.
+   *
+   * `hardhat run` does not forward positional arguments to the script it runs.
+   * Under Hardhat 2 and 3 alike `process.argv.slice(2)` is *Hardhat's* own
+   * command line — `run`, the script path, `--network`, the network — so
+   * `args[0]` has always been the literal string `run` and this switch has
+   * never once been reached. It failed with `Unknown command: run`, which reads
+   * like a bad argument rather than a script that cannot take arguments at all.
+   *
+   * The sibling `upgrade.ts` already takes `UPGRADE_TARGET` this way.
+   */
+  const command = process.env.SIMULATION
+  const safeAddress = process.env.SAFE_ADDRESS
+  const targetAddress = process.env.TARGET_ADDRESS
 
   if (!command || !safeAddress) {
-    console.log('Usage:')
-    console.log('  pnpm simulate-multisig acceptOwnership <safeAddress> <poolFactoryAddress>')
-    console.log('  pnpm simulate-multisig pause <safeAddress> <poolFactoryAddress>')
-    console.log('  pnpm simulate-multisig createPool <safeAddress> <poolFactoryAddress>')
+    console.log('Usage — arguments are environment variables:')
+    console.log('  SIMULATION=acceptOwnership SAFE_ADDRESS=0x… TARGET_ADDRESS=0x… pnpm simulate-multisig')
+    console.log('  SIMULATION=pause           SAFE_ADDRESS=0x… TARGET_ADDRESS=0x… pnpm simulate-multisig')
+    console.log('  SIMULATION=createPool      SAFE_ADDRESS=0x… TARGET_ADDRESS=0x… pnpm simulate-multisig')
     process.exit(1)
   }
 
@@ -304,7 +315,7 @@ async function runDemo(): Promise<void> {
 export { simulateAcceptOwnership, simulateEmergencyPause, simulateMultiSigApproval, simulatePoolCreation }
 
 // Run demo if executed directly
-if (require.main === module) {
+if (isMain(import.meta.url)) {
   runDemo()
     .then(() => process.exit(0))
     .catch((error) => {

@@ -1,14 +1,14 @@
-import { SignerWithAddress } from '@nomicfoundation/hardhat-ethers/signers'
+import { ethers } from '../hardhat.connection'
+import type { HardhatEthersSigner } from '@nomicfoundation/hardhat-ethers/types'
 import { expect } from 'chai'
-import { ethers } from 'hardhat'
 import { LendingPool, PoolFactory } from '../typechain-types'
 
 describe('PoolFactory Ownable2Step', function () {
   let poolFactory: PoolFactory
   let lendingPoolImplementation: LendingPool
-  let owner: SignerWithAddress
-  let newOwner: SignerWithAddress
-  let otherAccount: SignerWithAddress
+  let owner: HardhatEthersSigner
+  let newOwner: HardhatEthersSigner
+  let otherAccount: HardhatEthersSigner
 
   beforeEach(async function () {
     // Get signers
@@ -157,7 +157,7 @@ describe('PoolFactory Ownable2Step', function () {
         loanToken: ethers.ZeroAddress,
       }
 
-      await expect(poolFactory.connect(owner).createPool(params)).to.not.be.reverted
+      await expect(poolFactory.connect(owner).createPool(params)).to.not.be.revert(ethers)
       expect(await poolFactory.getPoolCount()).to.equal(1)
 
       // Pending owner should not be able to perform owner functions
@@ -200,7 +200,7 @@ describe('PoolFactory Ownable2Step', function () {
       expect(await poolFactory.paused()).to.be.true
 
       // Emergency pause when already paused should not revert
-      await expect(poolFactory.connect(owner).emergencyPause()).to.not.be.reverted
+      await expect(poolFactory.connect(owner).emergencyPause()).to.not.be.revert(ethers)
       expect(await poolFactory.paused()).to.be.true
     })
 
@@ -208,7 +208,7 @@ describe('PoolFactory Ownable2Step', function () {
       expect(await poolFactory.paused()).to.be.false
 
       // Emergency unpause when not paused should not revert
-      await expect(poolFactory.connect(owner).emergencyUnpause()).to.not.be.reverted
+      await expect(poolFactory.connect(owner).emergencyUnpause()).to.not.be.revert(ethers)
       expect(await poolFactory.paused()).to.be.false
     })
   })
@@ -264,7 +264,7 @@ describe('PoolFactory Ownable2Step', function () {
           requiresMembership: false,
           loanToken: ethers.ZeroAddress,
         })
-      ).to.not.be.reverted
+      ).to.not.be.revert(ethers)
 
       await expect(poolFactory.connect(owner).createPool(params)).to.be.revertedWithCustomError(poolFactory, 'UnauthorizedCreator')
 

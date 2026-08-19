@@ -1,15 +1,15 @@
-import { SignerWithAddress } from '@nomicfoundation/hardhat-ethers/signers'
+import { ethers } from '../hardhat.connection'
+import type { HardhatEthersSigner } from '@nomicfoundation/hardhat-ethers/types'
 import { expect } from 'chai'
-import { ethers } from 'hardhat'
 import { LendingPool, PoolFactory } from '../typechain-types'
 
 describe('Whitelist System', function () {
   let poolFactory: PoolFactory
   let lendingPoolImplementation: LendingPool
-  let owner: SignerWithAddress
-  let addr1: SignerWithAddress
-  let addr2: SignerWithAddress
-  let addr3: SignerWithAddress
+  let owner: HardhatEthersSigner
+  let addr1: HardhatEthersSigner
+  let addr2: HardhatEthersSigner
+  let addr3: HardhatEthersSigner
 
   beforeEach(async function () {
     ;[owner, addr1, addr2, addr3] = await ethers.getSigners()
@@ -132,7 +132,7 @@ describe('Whitelist System', function () {
 
     it('Should allow owner to create pools (owner always authorized)', async function () {
       // Owner can create without explicit authorization
-      await expect(poolFactory.connect(owner).createPool(poolParams)).to.not.be.reverted
+      await expect(poolFactory.connect(owner).createPool(poolParams)).to.not.be.revert(ethers)
 
       // Verify owner becomes pool owner
       const poolInfo = await poolFactory.getPoolInfo(1)
@@ -147,7 +147,7 @@ describe('Whitelist System', function () {
       await expect(poolFactory.connect(addr1).createPool(poolParams)).to.be.revertedWithCustomError(poolFactory, 'UnauthorizedCreator')
 
       // Owner can always create
-      await expect(poolFactory.connect(owner).createPool(poolParams)).to.not.be.reverted
+      await expect(poolFactory.connect(owner).createPool(poolParams)).to.not.be.revert(ethers)
       expect(await poolFactory.getPoolCount()).to.equal(1)
     })
 
@@ -164,7 +164,7 @@ describe('Whitelist System', function () {
       await poolFactory.setCreatorAuthorization(addr1.address, true)
 
       // Now addr1 can create pools
-      await expect(poolFactory.connect(addr1).createPool(poolParams)).to.not.be.reverted
+      await expect(poolFactory.connect(addr1).createPool(poolParams)).to.not.be.revert(ethers)
 
       // Verify creator became pool owner
       const poolInfo = await poolFactory.getPoolInfo(1)
@@ -178,7 +178,7 @@ describe('Whitelist System', function () {
       await poolFactory.setCreatorAuthorization(addr1.address, true)
 
       // addr1 can create (authorized)
-      await expect(poolFactory.connect(addr1).createPool(poolParams)).to.not.be.reverted
+      await expect(poolFactory.connect(addr1).createPool(poolParams)).to.not.be.revert(ethers)
 
       // addr2 cannot create (not authorized)
       await expect(poolFactory.connect(addr2).createPool(poolParams)).to.be.revertedWithCustomError(poolFactory, 'UnauthorizedCreator')
@@ -209,8 +209,8 @@ describe('Whitelist System', function () {
       const params1 = { ...testPoolParams, name: 'Pool 1' }
       const params2 = { ...testPoolParams, name: 'Pool 2' }
 
-      await expect(poolFactory.connect(addr1).createPool(params1)).to.not.be.reverted
-      await expect(poolFactory.connect(addr2).createPool(params2)).to.not.be.reverted
+      await expect(poolFactory.connect(addr1).createPool(params1)).to.not.be.revert(ethers)
+      await expect(poolFactory.connect(addr2).createPool(params2)).to.not.be.revert(ethers)
 
       // Non-authorized cannot create (whitelist enforced)
       const params3 = { ...testPoolParams, name: 'Pool 3' }
@@ -235,7 +235,7 @@ describe('Whitelist System', function () {
 
       // addr2 can still create pools (still authorized)
       const params2 = { ...testPoolParams, name: 'Pool 2' }
-      await expect(poolFactory.connect(addr2).createPool(params2)).to.not.be.reverted
+      await expect(poolFactory.connect(addr2).createPool(params2)).to.not.be.revert(ethers)
 
       expect(await poolFactory.getPoolCount()).to.equal(1)
     })

@@ -1,6 +1,6 @@
+import { ethers, network, upgrades } from '../hardhat.connection'
 import * as dotenv from 'dotenv'
 import { existsSync, readFileSync, writeFileSync } from 'fs'
-import { ethers, network, upgrades } from 'hardhat'
 import { join } from 'path'
 
 dotenv.config()
@@ -47,7 +47,7 @@ interface DeploymentRecord {
 }
 
 function deploymentPath(): string {
-  return join(__dirname, '..', 'deployments', `${network.name}.json`)
+  return join(import.meta.dirname, '..', 'deployments', `${network.name}.json`)
 }
 
 function readDeployment(): DeploymentRecord {
@@ -83,7 +83,13 @@ async function upgradePoolImplementation(record: DeploymentRecord): Promise<void
 
   // Catches constructors, immutables, delegatecall and selfdestruct — anything
   // that makes a contract unusable behind a proxy — before it is deployed.
-  await upgrades.validateImplementation(LendingPool, { kind: 'uups' })
+  //
+  // `beacon`, not `uups`: LendingPool sits behind an UpgradeableBeacon, and only
+  // PoolFactory below is a real UUPS proxy. The wrong kind was here from the
+  // start and went unnoticed because OpenZeppelin upgrades 3.x did not act on
+  // it; 4.x does, and refuses the contract for missing the `upgradeTo` that a
+  // beacon implementation is not supposed to have.
+  await upgrades.validateImplementation(LendingPool, { kind: 'beacon' })
   console.log('   ✅ Safe to use behind a proxy')
 
   console.log('\n2️⃣ Deploying the new implementation...')

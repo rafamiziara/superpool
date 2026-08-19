@@ -1,7 +1,6 @@
-import { time } from '@nomicfoundation/hardhat-network-helpers'
-import { SignerWithAddress } from '@nomicfoundation/hardhat-ethers/signers'
+import { ethers, time, upgrades } from '../hardhat.connection'
+import type { HardhatEthersSigner } from '@nomicfoundation/hardhat-ethers/types'
 import { expect } from 'chai'
-import { ethers, upgrades } from 'hardhat'
 import { LendingPool } from '../typechain-types'
 
 /**
@@ -25,9 +24,9 @@ async function deployPoolBehindBeacon(args: unknown[]): Promise<LendingPool> {
 
 describe('Security Tests', function () {
   let lendingPool: LendingPool
-  let owner: SignerWithAddress
-  let borrower: SignerWithAddress
-  let lender: SignerWithAddress
+  let owner: HardhatEthersSigner
+  let borrower: HardhatEthersSigner
+  let lender: HardhatEthersSigner
 
   const maxLoanAmount = ethers.parseEther('10')
   const interestRate = 500 // 5%
@@ -259,7 +258,7 @@ describe('Security Tests', function () {
 
       // Even if borrower is a gas-consuming contract, repayment should work
       // (though it might consume more gas)
-      await expect(lendingPool.connect(borrower).repayLoan(1, { value: repaymentAmount })).to.not.be.reverted
+      await expect(lendingPool.connect(borrower).repayLoan(1, { value: repaymentAmount })).to.not.be.revert(ethers)
     })
   })
 
@@ -286,7 +285,7 @@ describe('Security Tests', function () {
       expect(repaymentAmount).to.equal(loanAmount)
 
       // Repayment should work
-      await expect(zeroPool.connect(borrower).repayLoan(1, { value: loanAmount })).to.not.be.reverted
+      await expect(zeroPool.connect(borrower).repayLoan(1, { value: loanAmount })).to.not.be.revert(ethers)
     })
 
     it('Should handle minimum loan amounts', async function () {
