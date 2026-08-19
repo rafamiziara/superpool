@@ -10,12 +10,23 @@ dotenv.config()
 
 const config: HardhatUserConfig = {
   solidity: {
-    version: '0.8.24',
+    version: '0.8.36',
     settings: {
       optimizer: {
         enabled: true,
         runs: 200,
       },
+      /*
+        Pinned, and **not** redundant beside the version above.
+
+        Solidity 0.8.30 moved the default from `cancun` to `prague` for Pectra.
+        Polygon's fork support lags Ethereum's, so compiling without this pin
+        would emit opcodes Amoy may not have — and the failure arrives at
+        deploy time on a public chain rather than at compile time here.
+
+        Moving it forward is a decision that needs evidence about what the
+        target chain actually supports. It is not a tidy-up.
+      */
       evmVersion: 'cancun',
     },
   },
