@@ -93,7 +93,7 @@ describe('indexWithdrawalHandler', () => {
       ['a hash with non-hex characters', { txHash: '0x' + 'z'.repeat(64) }],
     ])('should reject %s', async (_label, data) => {
       // Act & Assert
-      await expect(indexWithdrawalHandler(buildRequest({ data }) as never)).rejects.toThrow(/Invalid transaction hash format/)
+      await expect(indexWithdrawalHandler(buildRequest({ data }) as never)).rejects.toThrow(/txHash/)
       expect(indexWithdrawalsByTxHash).not.toHaveBeenCalled()
     })
 

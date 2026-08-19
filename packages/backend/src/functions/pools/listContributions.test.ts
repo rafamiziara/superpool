@@ -225,16 +225,16 @@ describe('listContributionsHandler', () => {
     expect(query.limit).toHaveBeenCalledWith(100)
   })
 
-  it('should floor the limit at 1', async () => {
-    // Arrange
+  it('should refuse a negative limit rather than reinterpret it', async () => {
+    // Arrange — it used to be floored at 1, which answered a request nobody
+    // made. A page of minus three rows is a mistake, and saying so is the
+    // whole point of validating the payload.
     const query = createMockQuery([], 0)
     firestore.collection.mockReturnValue(query)
 
-    // Act
-    await listContributionsHandler(buildRequest({ data: { limit: -3 } }))
-
-    // Assert
-    expect(query.limit).toHaveBeenCalledWith(1)
+    // Act & Assert
+    await expect(listContributionsHandler(buildRequest({ data: { limit: -3 } }))).rejects.toThrow(/limit/i)
+    expect(query.limit).not.toHaveBeenCalled()
   })
 
   // -------------------------------------------------------------------------

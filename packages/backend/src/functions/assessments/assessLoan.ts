@@ -3,6 +3,7 @@ import { Contract } from 'ethers'
 import { logger } from 'firebase-functions/v2'
 import { CallableRequest, HttpsError, onCall } from 'firebase-functions/v2/https'
 import { DEFAULT_CHAIN_ID, LendingPoolABI } from '../../constants'
+import { assessLoanSchema } from '../../schemas'
 import { firestore } from '../../services'
 import { assessLoanWithAgent } from '../../services/agentClient'
 import {
@@ -15,6 +16,7 @@ import {
   saveAssessment,
   toWholeUnits,
 } from '../../services/assessments'
+import { parseRequest } from '../../utils/validation'
 import { getProvider } from '../../utils/blockchain'
 
 export const assessLoanHandler = async (request: CallableRequest<AssessLoanRequest>): Promise<AssessLoanResponse> => {
@@ -22,11 +24,7 @@ export const assessLoanHandler = async (request: CallableRequest<AssessLoanReque
     throw new HttpsError('unauthenticated', 'User must be authenticated to ask for an assessment')
   }
 
-  const loanDocId = request.data?.loanId
-
-  if (!loanDocId) {
-    throw new HttpsError('invalid-argument', 'A loan id is required')
-  }
+  const { loanId: loanDocId, refresh, chainId: requestedChainId } = parseRequest(assessLoanSchema, request.data)
 
   const caller = request.auth.uid.toLowerCase()
 
@@ -53,7 +51,7 @@ export const assessLoanHandler = async (request: CallableRequest<AssessLoanReque
   }
 
   try {
-    const provider = getProvider(request.data?.chainId || ownership.chainId || DEFAULT_CHAIN_ID)
+    const provider = getProvider(requestedChainId ?? ownership.chainId ?? DEFAULT_CHAIN_ID)
     const pool = new Contract(ownership.poolAddress, [...LendingPoolABI], provider)
 
     // What the pool can actually lend right now, from the chain. `approveLoan`
@@ -64,7 +62,7 @@ export const assessLoanHandler = async (request: CallableRequest<AssessLoanReque
 
     const stored = await assessmentFor(loanDocId, firestore)
 
-    if (stored && !request.data?.refresh && !isStale(stored, liquidityNow)) {
+    if (stored && !refresh && !isStale(stored, liquidityNow)) {
       // Read back rather than recomputed. An LLM judgement is not
       // reproducible, and a decision surface that says something different
       // each time it is opened is worse than useless.

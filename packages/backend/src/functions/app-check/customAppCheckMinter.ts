@@ -3,9 +3,11 @@ import 'firebase-functions/v2/https'
 import * as express from 'express'
 import { logger } from 'firebase-functions/v2'
 import { onRequest, Request } from 'firebase-functions/v2/https'
-import { CustomAppCheckMinterRequest, CustomAppCheckMinterResponse } from '@superpool/types'
+import { CustomAppCheckMinterResponse } from '@superpool/types'
+import { customAppCheckMinterSchema } from '../../schemas'
 import { appCheck } from '../../services'
 import { DeviceVerificationService } from '../../services/deviceVerification'
+import { parseBody } from '../../utils/validation'
 
 export const customAppCheckMinterHandler = async (req: Request, res: express.Response) => {
   // Check that the App ID is configured
@@ -23,14 +25,20 @@ export const customAppCheckMinterHandler = async (req: Request, res: express.Res
     return
   }
 
-  // Validate the Request Body
-  const body = req.body as CustomAppCheckMinterRequest
-  const { deviceId } = body
+  // Validate the Request Body.
+  //
+  // The only endpoint here reachable without a Firebase token at all, so its
+  // body is the one least worth trusting. `parseBody` rather than
+  // `parseRequest` because this answers in status codes: an `HttpsError` means
+  // nothing to a plain `onRequest`.
+  const parsed = parseBody(customAppCheckMinterSchema, req.body)
 
-  if (!deviceId || typeof deviceId !== 'string') {
-    res.status(400).send('Bad Request: deviceId is required and must be a string.')
+  if (!parsed.ok) {
+    res.status(400).send(`Bad Request: ${parsed.message}`)
     return
   }
+
+  const { deviceId } = parsed.data
 
   // Verify that the device is approved before minting App Check token
   try {

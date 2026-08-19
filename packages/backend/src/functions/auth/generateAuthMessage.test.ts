@@ -70,7 +70,7 @@ describe('generateAuthMessage', () => {
     const request = { data: {} }
 
     // Act & Assert
-    await expect(generateAuthMessageHandler(request)).rejects.toThrow('The function must be called with one argument: walletAddress.')
+    await expect(generateAuthMessageHandler(request)).rejects.toThrow(/walletAddress/)
     await expect(generateAuthMessageHandler(request)).rejects.toHaveProperty('code', 'invalid-argument')
     expect(isAddress).not.toHaveBeenCalled()
   })
@@ -83,7 +83,7 @@ describe('generateAuthMessage', () => {
     ;(isAddress as jest.MockedFunction<typeof isAddress>).mockReturnValue(false)
 
     // Act & Assert
-    await expect(generateAuthMessageHandler(request)).rejects.toThrow('Invalid Ethereum wallet address format.')
+    await expect(generateAuthMessageHandler(request)).rejects.toThrow(/walletAddress: must be an Ethereum address/)
     await expect(generateAuthMessageHandler(request)).rejects.toHaveProperty('code', 'invalid-argument')
     expect(isAddress).toHaveBeenCalledWith(invalidAddress)
   })

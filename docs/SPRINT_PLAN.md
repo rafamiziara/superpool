@@ -830,9 +830,12 @@ SDK 53.
   switched off in May 2025 — so verification on the Amoy deploy would have
   failed against a dead endpoint. One string selects v2. Left as migrations:
   Hardhat 3, Solidity 0.8.30, Ignition.
-- **Chores** ([`.dev/todo.md`](../.dev/todo.md)): Zod validation, Maestro + EAS
-  workflows for E2E, an environments document, the 'Empty' illustration and a
-  hero background.
+- ~~**Zod validation**~~ — shipped 2026-08-19. It was already in the app and the
+  agent; the chore only ever meant the backend, whose 28 endpoints hand-rolled
+  their checks. See [`CLAUDE.md` → Request validation](../CLAUDE.md#request-validation).
+- **Chores** ([`.dev/todo.md`](../.dev/todo.md)): Maestro + EAS workflows for
+  E2E, an environments document, the 'Empty' illustration and a hero
+  background.
 
 ### Deliberately not built, so it is not re-proposed
 

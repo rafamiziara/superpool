@@ -78,10 +78,10 @@ describe('useNotes', () => {
     const { result } = renderHook(() => useNotes(1))
 
     await act(async () => {
-      await result.current.writeNote({ kind: 'loan_purpose', txHash: '0xdead', text: 'School fees.' })
+      await result.current.writeNote({ kind: 'loan_purpose', txHash: `0x${'de'.repeat(32)}`, text: 'School fees.' })
     })
 
-    expect(save).toHaveBeenCalledWith({ kind: 'loan_purpose', txHash: '0xdead', text: 'School fees.', chainId: 31337 })
+    expect(save).toHaveBeenCalledWith({ kind: 'loan_purpose', txHash: `0x${'de'.repeat(32)}`, text: 'School fees.', chainId: 31337 })
     expect(result.current.noteFor('31337-1-5', 'loan_purpose')).toEqual(NOTE)
   })
 

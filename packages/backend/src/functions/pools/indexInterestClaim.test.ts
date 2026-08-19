@@ -93,7 +93,7 @@ describe('indexInterestClaimHandler', () => {
       ['a hash with non-hex characters', { txHash: '0x' + 'z'.repeat(64) }],
     ])('should reject %s', async (_label, data) => {
       // Act & Assert
-      await expect(indexInterestClaimHandler(buildRequest({ data }) as never)).rejects.toThrow(/Invalid transaction hash format/)
+      await expect(indexInterestClaimHandler(buildRequest({ data }) as never)).rejects.toThrow(/txHash/)
       expect(indexInterestClaimsByTxHash).not.toHaveBeenCalled()
     })
 

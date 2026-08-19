@@ -2,12 +2,12 @@ import { IndexPoolRequest, IndexPoolResponse } from '@superpool/types'
 import { logger } from 'firebase-functions/v2'
 import { CallableRequest, HttpsError, onCall } from 'firebase-functions/v2/https'
 import { DEFAULT_CHAIN_ID, getChainConfig } from '../../constants'
+import { indexByTransactionSchema } from '../../schemas'
 import { firestore } from '../../services'
 import { indexPoolByTxHash } from '../../services/eventIndexer'
 import { indexMembershipsByTxHash } from '../../services/membershipIndexer'
+import { parseRequest } from '../../utils/validation'
 import { getProvider } from '../../utils/blockchain'
-
-const TX_HASH_REGEX = /^0x[a-fA-F0-9]{64}$/
 
 export const indexPoolHandler = async (request: CallableRequest<IndexPoolRequest>): Promise<IndexPoolResponse> => {
   // 1. Require auth
@@ -16,14 +16,10 @@ export const indexPoolHandler = async (request: CallableRequest<IndexPoolRequest
   }
 
   // 2. Validate txHash format
-  const { txHash, chainId: requestedChainId } = request.data
-
-  if (!txHash || !TX_HASH_REGEX.test(txHash)) {
-    throw new HttpsError('invalid-argument', 'Invalid transaction hash format')
-  }
+  const { txHash, chainId: requestedChainId } = parseRequest(indexByTransactionSchema, request.data)
 
   // 3. Resolve chainId
-  const chainId = requestedChainId || DEFAULT_CHAIN_ID
+  const chainId = requestedChainId ?? DEFAULT_CHAIN_ID
 
   // 4. Validate chain is supported
   const chainConfig = getChainConfig(chainId)

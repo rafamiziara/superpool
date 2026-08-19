@@ -2,7 +2,9 @@ import { ListNotesRequest, ListNotesResponse } from '@superpool/types'
 import { logger } from 'firebase-functions/v2'
 import { CallableRequest, HttpsError, onCall } from 'firebase-functions/v2/https'
 import { DEFAULT_CHAIN_ID } from '../../constants'
+import { listNotesSchema } from '../../schemas'
 import { firestore } from '../../services'
+import { parseRequest } from '../../utils/validation'
 import { listNotes as list } from '../../services/notes'
 
 /** Mirrors the cap the other feeds use. Notes are the sparsest of them. */
@@ -14,9 +16,13 @@ export const listNotesHandler = async (request: CallableRequest<ListNotesRequest
     throw new HttpsError('unauthenticated', 'User must be authenticated to read notes')
   }
 
+  // Outside the `try`: the catch below reports everything as `internal`, and a
+  // malformed request is the caller's to fix rather than something to retry.
+  const data = parseRequest(listNotesSchema, request.data)
+
   try {
-    const limit = Math.min(MAX_LIMIT, Math.max(1, request.data?.limit || DEFAULT_LIMIT))
-    const chainId = request.data?.chainId || DEFAULT_CHAIN_ID
+    const limit = Math.min(MAX_LIMIT, data.limit ?? DEFAULT_LIMIT)
+    const chainId = data.chainId ?? DEFAULT_CHAIN_ID
 
     const { notes, totalCount } = await list(
       {
@@ -24,20 +30,20 @@ export const listNotesHandler = async (request: CallableRequest<ListNotesRequest
         // could name the wallet could read anybody's notes.
         caller: request.auth.uid,
         chainId,
-        poolId: request.data?.poolId,
-        recordId: request.data?.recordId,
+        poolId: data.poolId,
+        recordId: data.recordId,
         limit,
       },
       firestore
     )
 
-    logger.info(`Retrieved ${notes.length} notes`, { totalCount, chainId, poolId: request.data?.poolId, limit })
+    logger.info(`Retrieved ${notes.length} notes`, { totalCount, chainId, poolId: data.poolId, limit })
 
     return { notes, totalCount, limit }
   } catch (error) {
     logger.error('Error listing notes', {
       error: error instanceof Error ? error.message : String(error),
-      params: request.data,
+      params: data,
     })
 
     throw new HttpsError('internal', 'Failed to list notes. Please try again.')

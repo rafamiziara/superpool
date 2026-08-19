@@ -68,7 +68,7 @@ describe('listBorrowerHistories', () => {
 
   it('refuses a call that names no wallet', async () => {
     await expect(listBorrowerHistoriesHandler(buildRequest({ data: { borrowers: [] } }))).rejects.toThrow(/at least one borrower/i)
-    await expect(listBorrowerHistoriesHandler(buildRequest({ data: {} }))).rejects.toThrow(/at least one borrower/i)
+    await expect(listBorrowerHistoriesHandler(buildRequest({ data: {} }))).rejects.toThrow(/borrowers/i)
   })
 
   it('refuses more wallets than one call may summarise', async () => {

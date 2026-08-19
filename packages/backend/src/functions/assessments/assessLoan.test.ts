@@ -122,7 +122,7 @@ describe('assessLoan', () => {
   })
 
   it('refuses a call that names no loan', async () => {
-    await expect(assessLoanHandler(buildRequest({ data: {} }))).rejects.toThrow(/loan id is required/i)
+    await expect(assessLoanHandler(buildRequest({ data: {} }))).rejects.toThrow(/loanId/i)
   })
 
   // Guessing an exponent here would be the only place in the project that did,

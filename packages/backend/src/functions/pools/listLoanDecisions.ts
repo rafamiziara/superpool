@@ -2,7 +2,9 @@ import { ListLoanDecisionsRequest, ListLoanDecisionsResponse } from '@superpool/
 import { logger } from 'firebase-functions/v2'
 import { CallableRequest, HttpsError, onCall } from 'firebase-functions/v2/https'
 import { DEFAULT_CHAIN_ID, LOAN_DECISIONS_COLLECTION } from '../../constants'
+import { listLoanDecisionsSchema } from '../../schemas'
 import { firestore } from '../../services'
+import { parseRequest } from '../../utils/validation'
 
 /** Mirrors the cap in the Firestore rules, which reject a larger `list`. */
 const MAX_LIMIT = 100
@@ -16,24 +18,28 @@ export const listLoanDecisionsHandler = async (request: CallableRequest<ListLoan
     throw new HttpsError('unauthenticated', 'User must be authenticated to list loan decisions')
   }
 
+  // Outside the `try`: the catch below reports everything as `internal`, and a
+  // malformed request is the caller's to fix rather than something to retry.
+  const data = parseRequest(listLoanDecisionsSchema, request.data)
+
   try {
-    const limit = Math.min(MAX_LIMIT, Math.max(1, request.data.limit || DEFAULT_LIMIT))
-    const chainId = request.data.chainId || DEFAULT_CHAIN_ID
+    const limit = Math.min(MAX_LIMIT, data.limit ?? DEFAULT_LIMIT)
+    const chainId = data.chainId ?? DEFAULT_CHAIN_ID
     // The indexer lowercases both addresses, so the filters must too — wallets
     // report them checksummed and would otherwise match nothing.
-    const borrower = request.data.borrower?.toLowerCase()
-    const decidedBy = request.data.decidedBy?.toLowerCase()
+    const borrower = data.borrower?.toLowerCase()
+    const decidedBy = data.decidedBy?.toLowerCase()
 
     let query = firestore.collection(LOAN_DECISIONS_COLLECTION).where('chainId', '==', chainId)
 
-    if (request.data.poolId !== undefined) {
-      query = query.where('poolId', '==', request.data.poolId)
+    if (data.poolId !== undefined) {
+      query = query.where('poolId', '==', data.poolId)
     }
 
     // Only meaningful alongside a pool: loan ids restart at 1 in every pool
     // clone, so this on its own would match one loan per pool on the chain.
-    if (request.data.loanId !== undefined) {
-      query = query.where('loanId', '==', request.data.loanId)
+    if (data.loanId !== undefined) {
+      query = query.where('loanId', '==', data.loanId)
     }
 
     if (borrower) {
@@ -46,8 +52,8 @@ export const listLoanDecisionsHandler = async (request: CallableRequest<ListLoan
       query = query.where('decidedBy', '==', decidedBy)
     }
 
-    if (request.data.outcome) {
-      query = query.where('outcome', '==', request.data.outcome)
+    if (data.outcome) {
+      query = query.where('outcome', '==', data.outcome)
     }
 
     const totalSnapshot = await query.count().get()
@@ -81,7 +87,7 @@ export const listLoanDecisionsHandler = async (request: CallableRequest<ListLoan
   } catch (error) {
     logger.error('Error listing loan decisions', {
       error: error instanceof Error ? error.message : String(error),
-      params: request.data,
+      params: data,
     })
 
     throw new HttpsError('internal', 'Failed to list loan decisions. Please try again.')

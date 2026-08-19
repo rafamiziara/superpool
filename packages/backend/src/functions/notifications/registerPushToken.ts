@@ -1,35 +1,23 @@
 import { RegisterPushTokenRequest, RegisterPushTokenResponse } from '@superpool/types'
 import { logger } from 'firebase-functions/v2'
 import { CallableRequest, HttpsError, onCall } from 'firebase-functions/v2/https'
+import { registerPushTokenSchema } from '../../schemas'
 import { firestore } from '../../services'
-import { isExpoPushToken, savePushToken } from '../../services/pushTokens'
-
-const PLATFORMS = ['android', 'ios', 'web'] as const
+import { savePushToken } from '../../services/pushTokens'
+import { parseRequest } from '../../utils/validation'
 
 export const registerPushTokenHandler = async (request: CallableRequest<RegisterPushTokenRequest>): Promise<RegisterPushTokenResponse> => {
   if (!request.auth) {
     throw new HttpsError('unauthenticated', 'User must be authenticated to register a push token')
   }
 
-  const { token, deviceId, platform } = request.data ?? {}
+  const { token, deviceId, platform } = parseRequest(registerPushTokenSchema, request.data)
 
   // Deliberately not taken from the request. `verifySignatureAndLogin` mints a
   // token whose UID *is* the wallet address, so the caller cannot register a
   // token against somebody else's wallet and start receiving their
   // notifications.
   const walletAddress = request.auth.uid
-
-  if (!token || !isExpoPushToken(token)) {
-    throw new HttpsError('invalid-argument', 'Invalid Expo push token')
-  }
-
-  if (!deviceId) {
-    throw new HttpsError('invalid-argument', 'deviceId is required')
-  }
-
-  if (!platform || !(PLATFORMS as readonly string[]).includes(platform)) {
-    throw new HttpsError('invalid-argument', `platform must be one of: ${PLATFORMS.join(', ')}`)
-  }
 
   try {
     const stored = await savePushToken(token, walletAddress, deviceId, platform, firestore)

@@ -151,10 +151,10 @@ describe('listMembersHandler', () => {
     expect(mockQuery.limit).toHaveBeenCalledWith(100)
   })
 
-  it('should floor a nonsensical limit at one rather than query for none', async () => {
-    await listMembersHandler(buildRequest({ data: { limit: -1 } }) as never)
+  it('should refuse a nonsensical limit rather than reinterpret it', async () => {
+    await expect(listMembersHandler(buildRequest({ data: { limit: -1 } }) as never)).rejects.toThrow(/limit/i)
 
-    expect(mockQuery.limit).toHaveBeenCalledWith(1)
+    expect(mockQuery.limit).not.toHaveBeenCalled()
   })
 
   it('should fall back to the default limit when none is given', async () => {

@@ -20,9 +20,12 @@ packages/backend/
 │   │   └── dev/           # Development/testing functions
 │   ├── services/          # Business logic services
 │   │   └── eventIndexer.ts # Shared pool indexing, used by both indexing paths
+│   ├── schemas/           # What each endpoint will accept, one schema per endpoint
+│   │   └── primitives.ts  # Addresses, hashes, ids, and the `optional()` wrapper
 │   ├── utils/             # Shared utilities
 │   │   ├── auth.ts        # Authentication helpers
-│   │   └── blockchain.ts  # Blockchain interaction utilities
+│   │   ├── blockchain.ts  # Blockchain interaction utilities
+│   │   └── validation.ts  # `parseRequest` / `parseBody` — payloads, before a handler reads them
 │   ├── config/            # Firebase configuration
 │   ├── constants/         # ABIs, chain configs, Firestore collections
 │   │   ├── abis.ts        # Import surface for the contract ABIs
@@ -403,6 +406,35 @@ Located in `utils/blockchain.ts`:
 - Backend wallet private key securely stored
 - Whitelist mode enforcement for pool creation
 - Dev-only functions blocked in production
+- Every payload parsed before a handler reads it (see below)
+
+### Request validation
+
+`request.data` is JSON from the network; `CallableRequest<T>` is a compile-time
+claim about it and nothing more. Every endpoint therefore parses its payload
+through a schema in [`src/schemas/`](src/schemas/) before reading a field:
+
+```ts
+const data = parseRequest(listLoansSchema, request.data)
+```
+
+Each schema is annotated `satisfies z.ZodType<TheRequest>` against the
+interface in `@superpool/types`, so the two cannot drift — a field that changes
+type there stops compiling here. Unknown keys are stripped, so a handler cannot
+read a field nobody declared.
+
+Two things to get right when adding an endpoint:
+
+- **Parse outside the `try`.** The catch blocks report what they catch as
+  `internal`; a refusal raised inside one comes back as a server error the
+  caller is invited to retry.
+- **Import `parseRequest` from `../../utils/validation`, not from
+  `../../utils`.** Several handler tests mock the barrel wholesale.
+
+Domain rules stay in the handlers — whether a chain is configured, whether a
+page size is over the cap. A schema says what a request _is_, not what this
+backend can do about it. `customAppCheckMinter` is an `onRequest` rather than a
+callable and uses `parseBody`, which returns the failure instead of throwing.
 
 ## Dependencies
 
@@ -412,3 +444,4 @@ Located in `utils/blockchain.ts`:
 - `@superpool/types` - Shared TypeScript types
 - `dotenv` - Environment variable management
 - `uuid` - Unique identifier generation
+- `zod` - Request payload validation (see [Request validation](#request-validation))

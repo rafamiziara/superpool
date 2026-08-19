@@ -1,8 +1,10 @@
 import { NOTE_MAX_LENGTH, SaveNoteRequest, SaveNoteResponse } from '@superpool/types'
 import { CallableRequest, HttpsError, onCall } from 'firebase-functions/v2/https'
 import { DEFAULT_CHAIN_ID } from '../../constants'
+import { saveNoteSchema } from '../../schemas'
 import { firestore } from '../../services'
-import { entitlementFor, isNoteKind, normaliseNoteText, saveNote as save, stagedRecordId, stageNote } from '../../services/notes'
+import { entitlementFor, normaliseNoteText, saveNote as save, stagedRecordId, stageNote } from '../../services/notes'
+import { parseRequest } from '../../utils/validation'
 
 export const saveNoteHandler = async (request: CallableRequest<SaveNoteRequest>): Promise<SaveNoteResponse> => {
   if (!request.auth) {
@@ -14,13 +16,13 @@ export const saveNoteHandler = async (request: CallableRequest<SaveNoteRequest>)
   // — which is what stops a note being written in somebody else's name.
   const author = request.auth.uid.toLowerCase()
 
-  const { kind, recordId, txHash, chainId } = request.data ?? {}
+  const { kind, recordId, txHash, chainId, text: rawText } = parseRequest(saveNoteSchema, request.data)
 
-  if (!kind || !isNoteKind(kind)) {
-    throw new HttpsError('invalid-argument', 'A note needs a valid kind')
-  }
-
-  const text = normaliseNoteText(request.data?.text)
+  // The kind is the schema's; the length is not. `normaliseNoteText` is what
+  // the staging path and the indexer's resolution both go through, so stating
+  // the same rule twice would be two places that could disagree about a
+  // 281-character reason with a trailing space.
+  const text = normaliseNoteText(rawText)
 
   if (!text) {
     throw new HttpsError('invalid-argument', `A note must say something, in at most ${NOTE_MAX_LENGTH} characters`)

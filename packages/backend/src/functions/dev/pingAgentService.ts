@@ -1,6 +1,8 @@
 import { logger } from 'firebase-functions/v2'
 import { CallableRequest, HttpsError, onCall } from 'firebase-functions/v2/https'
+import { pingAgentServiceSchema } from '../../schemas'
 import { type AgentPingResult, pingAgentService as ping } from '../../services/agentClient'
+import { parseRequest } from '../../utils/validation'
 
 export const pingAgentServiceHandler = async (request: CallableRequest<{ echo?: string }>): Promise<AgentPingResult> => {
   // Emulator only, like every other function in this folder. The production
@@ -9,7 +11,9 @@ export const pingAgentServiceHandler = async (request: CallableRequest<{ echo?: 
     throw new HttpsError('permission-denied', 'This function is only available in the emulator')
   }
 
-  const result = await ping(request.data?.echo || 'ping')
+  const { echo } = parseRequest(pingAgentServiceSchema, request.data)
+
+  const result = await ping(echo || 'ping')
 
   logger.info('Agent service probe', result)
 

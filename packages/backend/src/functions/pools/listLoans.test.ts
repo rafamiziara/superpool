@@ -241,12 +241,10 @@ describe('listLoansHandler', () => {
     expect(mockQuery.limit).toHaveBeenCalledWith(100)
   })
 
-  it('should floor a nonsensical limit at one rather than query for none', async () => {
-    // A negative limit is truthy, so it reaches the clamp rather than the
-    // default — which floors it to 1 instead of asking Firestore for -1 docs.
-    await listLoansHandler(buildRequest({ data: { limit: -1 } }) as never)
+  it('should refuse a nonsensical limit rather than reinterpret it', async () => {
+    await expect(listLoansHandler(buildRequest({ data: { limit: -1 } }) as never)).rejects.toThrow(/limit/i)
 
-    expect(mockQuery.limit).toHaveBeenCalledWith(1)
+    expect(mockQuery.limit).not.toHaveBeenCalled()
   })
 
   it('should fall back to the default limit when none is given', async () => {

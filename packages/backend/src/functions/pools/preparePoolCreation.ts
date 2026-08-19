@@ -3,8 +3,10 @@ import { isAddress } from 'ethers'
 import { logger } from 'firebase-functions/v2'
 import { CallableRequest, HttpsError, onCall } from 'firebase-functions/v2/https'
 import { DEFAULT_CHAIN_ID, WHITELISTING_LOGS_COLLECTION } from '../../constants'
+import { preparePoolCreationSchema } from '../../schemas'
 import { firestore } from '../../services'
 import { isWalletWhitelisted, isWhitelistModeEnabled, whitelistWallet } from '../../utils'
+import { parseRequest } from '../../utils/validation'
 
 export const preparePoolCreationHandler = async (
   request: CallableRequest<PreparePoolCreationRequest>
@@ -14,12 +16,14 @@ export const preparePoolCreationHandler = async (
     throw new HttpsError('unauthenticated', 'User must be authenticated to create pools')
   }
 
+  const data = parseRequest(preparePoolCreationSchema, request.data)
+
   // Extract wallet address from authenticated user
   const walletAddress = request.auth.uid
 
   logger.info('Preparing pool creation', {
     walletAddress,
-    chainId: request.data.chainId,
+    chainId: data.chainId,
   })
 
   // 2. Validate wallet address format
@@ -28,7 +32,7 @@ export const preparePoolCreationHandler = async (
   }
 
   // 3. Get chain ID (default to configured chain)
-  const chainId = request.data.chainId || DEFAULT_CHAIN_ID
+  const chainId = data.chainId ?? DEFAULT_CHAIN_ID
 
   try {
     // 4. Check if whitelist mode is enabled

@@ -1036,6 +1036,54 @@ attached. No chat: the `questions` field exists so the owner asks the
 cross-chain reading. And no dataset of decisions fed back into the model, which
 is how an advisory feature quietly becomes a scoring system nobody chose.
 
+## Request validation
+
+Every endpoint's payload is parsed by a zod schema before a handler reads a
+word of it. Schemas live in `packages/backend/src/schemas/`, one per endpoint,
+each annotated `satisfies z.ZodType<TheRequest>` against the interface in
+`@superpool/types` — which is what stops the two drifting, since a field that
+changes type there fails to compile here rather than being checked against last
+month's shape.
+
+`CallableRequest<T>` was a compile-time claim about JSON arriving from the
+network. The cost of not checking it was never a security hole — Firestore
+rejects the junk a malformed filter forwards — but an **error taxonomy that
+lied**: a `borrower` sent as a number threw a `TypeError` inside the handler's
+own `try`, which reported `internal` and "please try again" for a request that
+could never succeed.
+
+Five rules that are easy to break:
+
+- **Parse outside the `try`.** Every list callable's catch reports what it
+  caught as `internal`; a refusal raised inside one is swallowed and comes back
+  as a server error the caller is invited to retry forever.
+- **Import from `utils/validation`, never from `../../utils`.** Several handler
+  tests mock the barrel wholesale, and a validator a test can replace with
+  `undefined` is not one the handler can rely on.
+- **`null` is absence.** The callable SDK encodes an `undefined` property as
+  `null` on the wire, so `saveNote({ ...params, chainId })` with an unset
+  `txHash` arrives as an explicit null. That is what `optional()` in
+  `schemas/primitives.ts` is for; a plain `.optional()` refuses requests the app
+  already makes.
+- **A schema says what a request _is_, not what the backend can do about it.**
+  Whether a chain is configured, whether a note is short enough, whether a page
+  size is over the cap: all still the handlers', where the messages that help
+  are already written. `MAX_BORROWERS_PER_CALL` is the one exception, because
+  an oversized batch was always refused rather than trimmed.
+- **Use the parsed value.** `z.object` strips keys the schema does not name, so
+  a handler physically cannot read a field nobody declared — but only if it
+  stops reading `request.data`.
+
+**`limit: 0` and `limit: -5` are now refused, where they used to be
+reinterpreted** as fifty and one. Same for `page: 0`. Nothing sends them; the
+tests that pinned that behaviour were describing `||` and `Math.max`, not a
+decision.
+
+`customAppCheckMinter` is the one endpoint that is not a callable — an
+`onRequest`, and the only one reachable with no Firebase token at all. It uses
+`parseBody`, which returns the failure instead of throwing, because an
+`HttpsError` means nothing to a plain HTTP handler.
+
 ## Activity feeds
 
 `ActivityRow` takes a `perspective`, and picking the wrong one marks money the

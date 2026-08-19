@@ -2,11 +2,11 @@ import { IndexMembershipRequest, IndexMembershipResponse, MemberInfo } from '@su
 import { logger } from 'firebase-functions/v2'
 import { CallableRequest, HttpsError, onCall } from 'firebase-functions/v2/https'
 import { DEFAULT_CHAIN_ID, getChainConfig } from '../../constants'
+import { indexByTransactionSchema } from '../../schemas'
 import { firestore } from '../../services'
 import { indexMembershipsByTxHash, membershipDocId, ParsedMembership } from '../../services/membershipIndexer'
+import { parseRequest } from '../../utils/validation'
 import { getProvider } from '../../utils/blockchain'
-
-const TX_HASH_REGEX = /^0x[a-fA-F0-9]{64}$/
 
 /** Firestore's Date becomes an ISO string on the wire; see MemberInfo. */
 function toMemberInfo(membership: ParsedMembership): MemberInfo {
@@ -28,13 +28,9 @@ export const indexMembershipHandler = async (request: CallableRequest<IndexMembe
     throw new HttpsError('unauthenticated', 'User must be authenticated to index memberships')
   }
 
-  const { txHash, chainId: requestedChainId } = request.data
+  const { txHash, chainId: requestedChainId } = parseRequest(indexByTransactionSchema, request.data)
 
-  if (!txHash || !TX_HASH_REGEX.test(txHash)) {
-    throw new HttpsError('invalid-argument', 'Invalid transaction hash format')
-  }
-
-  const chainId = requestedChainId || DEFAULT_CHAIN_ID
+  const chainId = requestedChainId ?? DEFAULT_CHAIN_ID
   const chainConfig = getChainConfig(chainId)
 
   if (!chainConfig) {

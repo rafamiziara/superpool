@@ -2,7 +2,9 @@ import { ListContributionsRequest, ListContributionsResponse } from '@superpool/
 import { logger } from 'firebase-functions/v2'
 import { CallableRequest, HttpsError, onCall } from 'firebase-functions/v2/https'
 import { CONTRIBUTIONS_COLLECTION, DEFAULT_CHAIN_ID } from '../../constants'
+import { listContributionsSchema } from '../../schemas'
 import { firestore } from '../../services'
+import { parseRequest } from '../../utils/validation'
 
 /** Mirrors the cap in the Firestore rules, which reject a larger `list`. */
 const MAX_LIMIT = 100
@@ -16,17 +18,21 @@ export const listContributionsHandler = async (request: CallableRequest<ListCont
     throw new HttpsError('unauthenticated', 'User must be authenticated to list contributions')
   }
 
+  // Outside the `try`: the catch below reports everything as `internal`, and a
+  // malformed request is the caller's to fix rather than something to retry.
+  const data = parseRequest(listContributionsSchema, request.data)
+
   try {
-    const limit = Math.min(MAX_LIMIT, Math.max(1, request.data.limit || DEFAULT_LIMIT))
-    const chainId = request.data.chainId || DEFAULT_CHAIN_ID
+    const limit = Math.min(MAX_LIMIT, data.limit ?? DEFAULT_LIMIT)
+    const chainId = data.chainId ?? DEFAULT_CHAIN_ID
     // The indexer lowercases what it stores, so the filter must lowercase too —
     // wallets report addresses checksummed and would otherwise match nothing.
-    const contributor = request.data.contributor?.toLowerCase()
+    const contributor = data.contributor?.toLowerCase()
 
     let query = firestore.collection(CONTRIBUTIONS_COLLECTION).where('chainId', '==', chainId)
 
-    if (request.data.poolId !== undefined) {
-      query = query.where('poolId', '==', request.data.poolId)
+    if (data.poolId !== undefined) {
+      query = query.where('poolId', '==', data.poolId)
     }
 
     if (contributor) {
@@ -61,7 +67,7 @@ export const listContributionsHandler = async (request: CallableRequest<ListCont
   } catch (error) {
     logger.error('Error listing contributions', {
       error: error instanceof Error ? error.message : String(error),
-      params: request.data,
+      params: data,
     })
 
     throw new HttpsError('internal', 'Failed to list contributions. Please try again.')

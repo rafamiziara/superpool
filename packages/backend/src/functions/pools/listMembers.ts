@@ -2,7 +2,9 @@ import { ListMembersRequest, ListMembersResponse } from '@superpool/types'
 import { logger } from 'firebase-functions/v2'
 import { CallableRequest, HttpsError, onCall } from 'firebase-functions/v2/https'
 import { DEFAULT_CHAIN_ID, MEMBERSHIPS_COLLECTION } from '../../constants'
+import { listMembersSchema } from '../../schemas'
 import { firestore } from '../../services'
+import { parseRequest } from '../../utils/validation'
 
 /** Mirrors the cap in the Firestore rules, which reject a larger `list`. */
 const MAX_LIMIT = 100
@@ -15,17 +17,21 @@ export const listMembersHandler = async (request: CallableRequest<ListMembersReq
     throw new HttpsError('unauthenticated', 'User must be authenticated to list members')
   }
 
+  // Outside the `try`: the catch below reports everything as `internal`, and a
+  // malformed request is the caller's to fix rather than something to retry.
+  const data = parseRequest(listMembersSchema, request.data)
+
   try {
-    const limit = Math.min(MAX_LIMIT, Math.max(1, request.data.limit || DEFAULT_LIMIT))
-    const chainId = request.data.chainId || DEFAULT_CHAIN_ID
+    const limit = Math.min(MAX_LIMIT, data.limit ?? DEFAULT_LIMIT)
+    const chainId = data.chainId ?? DEFAULT_CHAIN_ID
     // The indexer lowercases what it stores, so the filter must too — wallets
     // report addresses checksummed and would otherwise match nothing.
-    const account = request.data.account?.toLowerCase()
+    const account = data.account?.toLowerCase()
 
     let query = firestore.collection(MEMBERSHIPS_COLLECTION).where('chainId', '==', chainId)
 
-    if (request.data.poolId !== undefined) {
-      query = query.where('poolId', '==', request.data.poolId)
+    if (data.poolId !== undefined) {
+      query = query.where('poolId', '==', data.poolId)
     }
 
     if (account) {
@@ -35,12 +41,12 @@ export const listMembersHandler = async (request: CallableRequest<ListMembersReq
     // Who is in the pool right now. Rejected, removed and departed addresses
     // keep their records as history, which is what lets the app tell "never
     // asked" from "asked and turned down".
-    if (request.data.activeOnly) {
+    if (data.activeOnly) {
       query = query.where('status', '==', 'active')
     }
 
     // What a pool owner has to decide on.
-    if (request.data.pendingOnly) {
+    if (data.pendingOnly) {
       query = query.where('status', '==', 'requested')
     }
 
@@ -71,7 +77,7 @@ export const listMembersHandler = async (request: CallableRequest<ListMembersReq
   } catch (error) {
     logger.error('Error listing members', {
       error: error instanceof Error ? error.message : String(error),
-      params: request.data,
+      params: data,
     })
 
     throw new HttpsError('internal', 'Failed to list members. Please try again.')

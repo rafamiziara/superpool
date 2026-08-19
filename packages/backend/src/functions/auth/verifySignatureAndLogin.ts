@@ -1,30 +1,27 @@
 import { AuthNonce, User, VerifySignatureAndLoginRequest, VerifySignatureAndLoginResponse } from '@superpool/types'
-import { isAddress, verifyMessage, verifyTypedData } from 'ethers'
+import { verifyMessage, verifyTypedData } from 'ethers'
 import { logger } from 'firebase-functions/v2'
 import { CallableRequest, HttpsError, onCall } from 'firebase-functions/v2/https'
 import { AUTH_NONCES_COLLECTION, USERS_COLLECTION } from '../../constants'
+import { verifySignatureAndLoginSchema } from '../../schemas'
 import { auth, firestore } from '../../services'
 import { DeviceVerificationService } from '../../services/deviceVerification'
 import { createAuthMessage } from '../../utils'
+import { parseRequest } from '../../utils/validation'
 
 export const verifySignatureAndLoginHandler = async (request: CallableRequest<VerifySignatureAndLoginRequest>) => {
-  const { walletAddress, signature, deviceId, platform, chainId, signatureType = 'personal-sign' } = request.data
-
-  // Input Validation
-  if (!walletAddress || !signature || !isAddress(walletAddress)) {
-    throw new HttpsError('invalid-argument', 'The function must be called with a valid walletAddress and signature.')
-  }
-
-  // Validate signature format (Ethereum signatures are 65 bytes = 130 hex chars + 0x prefix = 132 total)
-  if (!signature.startsWith('0x') || signature.length !== 132) {
-    throw new HttpsError('invalid-argument', 'Invalid signature format. It must be a hex string prefixed with "0x".')
-  }
-
-  // Additional validation: ensure it's valid hex
-  const hexPattern = /^0x[0-9a-fA-F]*$/
-  if (!hexPattern.test(signature)) {
-    throw new HttpsError('invalid-argument', 'Invalid signature format. Signature must contain only hexadecimal characters.')
-  }
+  // The address and the signature's shape — prefix, length and alphabet — are
+  // the schema's now. `personal-sign` stays the default here rather than in the
+  // schema: it is what a wallet that names nothing did, which is a fact about
+  // this backend's history rather than about the request.
+  const {
+    walletAddress,
+    signature,
+    deviceId,
+    platform,
+    chainId,
+    signatureType = 'personal-sign',
+  } = parseRequest(verifySignatureAndLoginSchema, request.data)
 
   // Retrieve Nonce from Firestore
   const nonceRef = firestore.collection(AUTH_NONCES_COLLECTION).doc(walletAddress)

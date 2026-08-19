@@ -2,6 +2,8 @@ import { SyncPoolEventsRequest, SyncPoolEventsResponse } from '@superpool/types'
 import { logger } from 'firebase-functions/v2'
 import { CallableRequest, HttpsError, onCall } from 'firebase-functions/v2/https'
 import { DEFAULT_CHAIN_ID, getChainConfig, SUPPORTED_CHAIN_IDS } from '../../constants'
+import { syncPoolEventsSchema } from '../../schemas'
+import { parseRequest } from '../../utils/validation'
 import { syncPoolEventsHandler } from './syncPoolEvents'
 
 export const syncPoolEventsNowHandler = async (request: CallableRequest<SyncPoolEventsRequest>): Promise<SyncPoolEventsResponse> => {
@@ -16,7 +18,7 @@ export const syncPoolEventsNowHandler = async (request: CallableRequest<SyncPool
     throw new HttpsError('unauthenticated', 'User must be authenticated to trigger an event sync')
   }
 
-  const { chainId: requestedChainId, fromBlock } = request.data ?? {}
+  const { chainId: requestedChainId, fromBlock } = parseRequest(syncPoolEventsSchema, request.data)
 
   const chainId = requestedChainId ?? DEFAULT_CHAIN_ID
 
@@ -25,10 +27,6 @@ export const syncPoolEventsNowHandler = async (request: CallableRequest<SyncPool
   // one, which is what sweeping the default would be.
   if (!getChainConfig(chainId)) {
     throw new HttpsError('invalid-argument', `Unsupported chain ID: ${chainId}. Configured: ${SUPPORTED_CHAIN_IDS.join(', ')}`)
-  }
-
-  if (fromBlock !== undefined && (!Number.isInteger(fromBlock) || fromBlock < 0)) {
-    throw new HttpsError('invalid-argument', 'fromBlock must be a non-negative integer')
   }
 
   logger.info('Manual event sync requested', { chainId, fromBlock })

@@ -157,13 +157,13 @@ describe('verifySignatureAndLoginHandler', () => {
 
   // Test Case: Invalid Argument - Missing walletAddress or signature
   it('should throw an invalid-argument error if walletAddress or signature is missing', async () => {
-    // Arrange
+    // Arrange — the suite mocks `isAddress` true for the happy path, so the
+    // one case being exercised here has to say what real ethers would.
+    mockedIsAddress.mockReturnValue(false)
     const request = { data: { walletAddress: '', signature } }
 
     // Act & Assert
-    await expect(verifySignatureAndLoginHandler(request)).rejects.toThrow(
-      'The function must be called with a valid walletAddress and signature.'
-    )
+    await expect(verifySignatureAndLoginHandler(request)).rejects.toThrow(/walletAddress/)
     await expect(verifySignatureAndLoginHandler(request)).rejects.toHaveProperty('code', 'invalid-argument')
   })
 
@@ -173,9 +173,7 @@ describe('verifySignatureAndLoginHandler', () => {
     const request = { data: { walletAddress, signature: 'invalid-signature' } }
 
     // Act & Assert
-    await expect(verifySignatureAndLoginHandler(request)).rejects.toThrow(
-      'Invalid signature format. It must be a hex string prefixed with "0x".'
-    )
+    await expect(verifySignatureAndLoginHandler(request)).rejects.toThrow(/signature: must be a 65-byte hex signature/)
     await expect(verifySignatureAndLoginHandler(request)).rejects.toHaveProperty('code', 'invalid-argument')
   })
 
@@ -186,9 +184,7 @@ describe('verifySignatureAndLoginHandler', () => {
     const request = { data: { walletAddress, signature: invalidHexSignature } }
 
     // Act & Assert
-    await expect(verifySignatureAndLoginHandler(request)).rejects.toThrow(
-      'Invalid signature format. Signature must contain only hexadecimal characters.'
-    )
+    await expect(verifySignatureAndLoginHandler(request)).rejects.toThrow(/signature: must be a 65-byte hex signature/)
     await expect(verifySignatureAndLoginHandler(request)).rejects.toHaveProperty('code', 'invalid-argument')
   })
 
@@ -199,9 +195,7 @@ describe('verifySignatureAndLoginHandler', () => {
     const request = { data: { walletAddress, signature: shortSignature } }
 
     // Act & Assert
-    await expect(verifySignatureAndLoginHandler(request)).rejects.toThrow(
-      'Invalid signature format. It must be a hex string prefixed with "0x".'
-    )
+    await expect(verifySignatureAndLoginHandler(request)).rejects.toThrow(/signature: must be a 65-byte hex signature/)
     await expect(verifySignatureAndLoginHandler(request)).rejects.toHaveProperty('code', 'invalid-argument')
   })
 
@@ -212,9 +206,7 @@ describe('verifySignatureAndLoginHandler', () => {
     const request = { data: { walletAddress, signature: longSignature } }
 
     // Act & Assert
-    await expect(verifySignatureAndLoginHandler(request)).rejects.toThrow(
-      'Invalid signature format. It must be a hex string prefixed with "0x".'
-    )
+    await expect(verifySignatureAndLoginHandler(request)).rejects.toThrow(/signature: must be a 65-byte hex signature/)
     await expect(verifySignatureAndLoginHandler(request)).rejects.toHaveProperty('code', 'invalid-argument')
   })
 

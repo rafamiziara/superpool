@@ -2,7 +2,9 @@ import { SignMessageRequest, SignMessageResponse } from '@superpool/types'
 import { Wallet } from 'ethers'
 import { logger } from 'firebase-functions/v2'
 import { CallableRequest, HttpsError, onCall } from 'firebase-functions/v2/https'
+import { signMessageSchema } from '../../schemas'
 import { createAuthMessage } from '../../utils'
+import { parseRequest } from '../../utils/validation'
 
 export const signMessageForTestingHandler = async (request: CallableRequest<SignMessageRequest>): Promise<SignMessageResponse> => {
   // Only allow in development/emulator
@@ -10,11 +12,7 @@ export const signMessageForTestingHandler = async (request: CallableRequest<Sign
     throw new HttpsError('permission-denied', 'This function is only available in the emulator')
   }
 
-  const { nonce, timestamp } = request.data
-
-  if (!nonce || !timestamp) {
-    throw new HttpsError('invalid-argument', 'Nonce and timestamp are required')
-  }
+  const { nonce, timestamp } = parseRequest(signMessageSchema, request.data)
 
   // Use test private key from environment or hardcoded for local testing
   // Default: Hardhat test account #1 (not the owner/deployer)

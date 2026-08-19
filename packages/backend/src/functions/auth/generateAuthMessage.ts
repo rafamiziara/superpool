@@ -1,24 +1,17 @@
 import { AuthMessageRequest, AuthMessageResponse } from '@superpool/types'
-import { isAddress } from 'ethers'
 import { logger } from 'firebase-functions/v2'
 import { CallableRequest, HttpsError, onCall } from 'firebase-functions/v2/https'
 import { v4 as uuidv4 } from 'uuid'
 import { AUTH_NONCES_COLLECTION } from '../../constants'
+import { authMessageSchema } from '../../schemas'
 import { firestore } from '../../services'
 import { createAuthMessage } from '../../utils'
+import { parseRequest } from '../../utils/validation'
 
 export const generateAuthMessageHandler = async (request: CallableRequest<AuthMessageRequest>) => {
-  const { walletAddress } = request.data
-
-  // Validate that the required properties exist
-  if (!walletAddress) {
-    throw new HttpsError('invalid-argument', 'The function must be called with one argument: walletAddress.')
-  }
-
-  // Check if the walletAddress is a valid Ethereum address format.
-  if (!isAddress(walletAddress)) {
-    throw new HttpsError('invalid-argument', 'Invalid Ethereum wallet address format.')
-  }
+  // Present, a string, and a real address: three checks the schema now makes,
+  // which is also what stops a non-address becoming an `auth_nonces` document id.
+  const { walletAddress } = parseRequest(authMessageSchema, request.data)
 
   // Generate a unique, random nonce
   const nonce = uuidv4()

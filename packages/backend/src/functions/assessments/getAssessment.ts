@@ -1,19 +1,17 @@
 import { GetAssessmentRequest, GetAssessmentResponse } from '@superpool/types'
 import { logger } from 'firebase-functions/v2'
 import { CallableRequest, HttpsError, onCall } from 'firebase-functions/v2/https'
+import { getAssessmentSchema } from '../../schemas'
 import { firestore } from '../../services'
 import { assessmentFor, ownershipOf } from '../../services/assessments'
+import { parseRequest } from '../../utils/validation'
 
 export const getAssessmentHandler = async (request: CallableRequest<GetAssessmentRequest>): Promise<GetAssessmentResponse> => {
   if (!request.auth) {
     throw new HttpsError('unauthenticated', 'User must be authenticated to read an assessment')
   }
 
-  const loanDocId = request.data?.loanId
-
-  if (!loanDocId) {
-    throw new HttpsError('invalid-argument', 'A loan id is required')
-  }
+  const { loanId: loanDocId } = parseRequest(getAssessmentSchema, request.data)
 
   try {
     const ownership = await ownershipOf(loanDocId, firestore)

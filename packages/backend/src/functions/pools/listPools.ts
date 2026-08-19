@@ -2,20 +2,26 @@ import { ListPoolsRequest, ListPoolsResponse } from '@superpool/types'
 import { ZeroAddress } from 'ethers'
 import { logger } from 'firebase-functions/v2'
 import { CallableRequest, HttpsError, onCall } from 'firebase-functions/v2/https'
+import { listPoolsSchema } from '../../schemas'
 import { firestore } from '../../services'
+import { parseRequest } from '../../utils/validation'
 
 export const listPoolsHandler = async (request: CallableRequest<ListPoolsRequest>): Promise<ListPoolsResponse> => {
+  // Outside the `try`: the catch below reports everything as `internal`, and a
+  // malformed request is the caller's to fix rather than something to retry.
+  const data = parseRequest(listPoolsSchema, request.data)
+
   logger.info('Listing pools', {
-    params: request.data,
+    params: data,
   })
 
   try {
-    // 1. Parse and validate parameters
-    const page = Math.max(1, request.data.page || 1)
-    const limit = Math.min(100, Math.max(1, request.data.limit || 20)) // Max 100 pools per page
-    const ownerAddress = request.data.ownerAddress?.toLowerCase()
-    const chainId = request.data.chainId || 80002 // Default to Polygon Amoy
-    const activeOnly = request.data.activeOnly !== false // Default to true
+    // 1. Apply the defaults the schema deliberately leaves off
+    const page = data.page ?? 1
+    const limit = Math.min(100, data.limit ?? 20) // Max 100 pools per page
+    const ownerAddress = data.ownerAddress?.toLowerCase()
+    const chainId = data.chainId ?? 80002 // Default to Polygon Amoy
+    const activeOnly = data.activeOnly !== false // Default to true
 
     // 2. Build Firestore query
     let query = firestore.collection('pools').where('chainId', '==', chainId)
@@ -92,7 +98,7 @@ export const listPoolsHandler = async (request: CallableRequest<ListPoolsRequest
   } catch (error) {
     logger.error('Error listing pools', {
       error: error instanceof Error ? error.message : String(error),
-      params: request.data,
+      params: data,
     })
 
     throw new HttpsError('internal', 'Failed to list pools. Please try again.')

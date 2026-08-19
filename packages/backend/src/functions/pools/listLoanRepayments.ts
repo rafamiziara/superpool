@@ -2,7 +2,9 @@ import { ListLoanRepaymentsRequest, ListLoanRepaymentsResponse } from '@superpoo
 import { logger } from 'firebase-functions/v2'
 import { CallableRequest, HttpsError, onCall } from 'firebase-functions/v2/https'
 import { DEFAULT_CHAIN_ID, LOAN_REPAYMENTS_COLLECTION } from '../../constants'
+import { listLoanRepaymentsSchema } from '../../schemas'
 import { firestore } from '../../services'
+import { parseRequest } from '../../utils/validation'
 
 /** Mirrors the cap in the Firestore rules, which reject a larger `list`. */
 const MAX_LIMIT = 100
@@ -18,23 +20,27 @@ export const listLoanRepaymentsHandler = async (
     throw new HttpsError('unauthenticated', 'User must be authenticated to list loan repayments')
   }
 
+  // Outside the `try`: the catch below reports everything as `internal`, and a
+  // malformed request is the caller's to fix rather than something to retry.
+  const data = parseRequest(listLoanRepaymentsSchema, request.data)
+
   try {
-    const limit = Math.min(MAX_LIMIT, Math.max(1, request.data.limit || DEFAULT_LIMIT))
-    const chainId = request.data.chainId || DEFAULT_CHAIN_ID
+    const limit = Math.min(MAX_LIMIT, data.limit ?? DEFAULT_LIMIT)
+    const chainId = data.chainId ?? DEFAULT_CHAIN_ID
     // The indexer lowercases what it stores, so the filter must too — wallets
     // report addresses checksummed and would otherwise match nothing.
-    const borrower = request.data.borrower?.toLowerCase()
+    const borrower = data.borrower?.toLowerCase()
 
     let query = firestore.collection(LOAN_REPAYMENTS_COLLECTION).where('chainId', '==', chainId)
 
-    if (request.data.poolId !== undefined) {
-      query = query.where('poolId', '==', request.data.poolId)
+    if (data.poolId !== undefined) {
+      query = query.where('poolId', '==', data.poolId)
     }
 
     // Only meaningful alongside a pool: loan ids restart at 1 in every pool
     // clone, so this on its own would match one loan per pool on the chain.
-    if (request.data.loanId !== undefined) {
-      query = query.where('loanId', '==', request.data.loanId)
+    if (data.loanId !== undefined) {
+      query = query.where('loanId', '==', data.loanId)
     }
 
     if (borrower) {
@@ -70,7 +76,7 @@ export const listLoanRepaymentsHandler = async (
   } catch (error) {
     logger.error('Error listing loan repayments', {
       error: error instanceof Error ? error.message : String(error),
-      params: request.data,
+      params: data,
     })
 
     throw new HttpsError('internal', 'Failed to list loan repayments. Please try again.')

@@ -74,7 +74,7 @@ describe('saveNote', () => {
 
   it('refuses a kind it does not recognise', async () => {
     await expect(saveNoteHandler(buildRequest({ data: { kind: 'loan_requested', recordId: LOAN_ID, text: 'hi' } }))).rejects.toThrow(
-      /valid kind/i
+      /kind/i
     )
   })
 
@@ -93,13 +93,16 @@ describe('saveNote', () => {
 })
 
 describe('saveNote, staged under a transaction', () => {
-  const staged = { kind: 'loan_purpose', txHash: '0xdead', chainId: 31337, text: 'School fees.' }
+  // A real 32-byte hash. It was '0xdead', which the schema now refuses — and
+  // which would have keyed a staged note under something no log could produce.
+  const TX_HASH = '0xdededededededededededededededededededededededededededededededede'
+  const staged = { kind: 'loan_purpose', txHash: TX_HASH, chainId: 31337, text: 'School fees.' }
 
   it('parks a purpose under the transaction that asked for the loan', async () => {
     await saveNoteHandler(buildRequest({ auth: { uid: BORROWER }, data: staged }))
 
     expect(stageNote).toHaveBeenCalledWith(
-      expect.objectContaining({ recordId: 'tx:31337:0xdead', author: BORROWER.toLowerCase(), subject: BORROWER.toLowerCase() }),
+      expect.objectContaining({ recordId: `tx:31337:${TX_HASH}`, author: BORROWER.toLowerCase(), subject: BORROWER.toLowerCase() }),
       expect.anything()
     )
   })
@@ -114,7 +117,7 @@ describe('saveNote, staged under a transaction', () => {
 
   it('refuses to stage anything but a purpose', async () => {
     await expect(
-      saveNoteHandler(buildRequest({ data: { kind: 'loan_rejected', txHash: '0xdead', text: 'Not this month.' } }))
+      saveNoteHandler(buildRequest({ data: { kind: 'loan_rejected', txHash: TX_HASH, text: 'Not this month.' } }))
     ).rejects.toThrow(/only a loan purpose/i)
   })
 

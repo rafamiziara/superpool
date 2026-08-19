@@ -2,7 +2,9 @@ import { ListLoansRequest, ListLoansResponse } from '@superpool/types'
 import { logger } from 'firebase-functions/v2'
 import { CallableRequest, HttpsError, onCall } from 'firebase-functions/v2/https'
 import { DEFAULT_CHAIN_ID, LOANS_COLLECTION } from '../../constants'
+import { listLoansSchema } from '../../schemas'
 import { firestore } from '../../services'
+import { parseRequest } from '../../utils/validation'
 
 /** Mirrors the cap in the Firestore rules, which reject a larger `list`. */
 const MAX_LIMIT = 100
@@ -19,17 +21,21 @@ export const listLoansHandler = async (request: CallableRequest<ListLoansRequest
     throw new HttpsError('unauthenticated', 'User must be authenticated to list loans')
   }
 
+  // Outside the `try`: the catch below reports everything as `internal`, and a
+  // malformed request is the caller's to fix rather than something to retry.
+  const data = parseRequest(listLoansSchema, request.data)
+
   try {
-    const limit = Math.min(MAX_LIMIT, Math.max(1, request.data.limit || DEFAULT_LIMIT))
-    const chainId = request.data.chainId || DEFAULT_CHAIN_ID
+    const limit = Math.min(MAX_LIMIT, data.limit ?? DEFAULT_LIMIT)
+    const chainId = data.chainId ?? DEFAULT_CHAIN_ID
     // The indexer lowercases what it stores, so the filter must too — wallets
     // report addresses checksummed and would otherwise match nothing.
-    const borrower = request.data.borrower?.toLowerCase()
+    const borrower = data.borrower?.toLowerCase()
 
     let query = firestore.collection(LOANS_COLLECTION).where('chainId', '==', chainId)
 
-    if (request.data.poolId !== undefined) {
-      query = query.where('poolId', '==', request.data.poolId)
+    if (data.poolId !== undefined) {
+      query = query.where('poolId', '==', data.poolId)
     }
 
     if (borrower) {
@@ -44,18 +50,18 @@ export const listLoansHandler = async (request: CallableRequest<ListLoansRequest
     // a settlement of one: narrowing this to `disbursed` alone would drop the
     // loans most worth chasing, and would take a borrower's own debt off their
     // repay screen at the exact moment it was declared.
-    if (request.data.activeOnly) {
+    if (data.activeOnly) {
       query = query.where('status', 'in', OPEN_STATUSES).where('isRepaid', '==', false)
     }
 
     // What a pool owner has to decide on.
-    if (request.data.pendingOnly) {
+    if (data.pendingOnly) {
       query = query.where('status', '==', 'requested')
     }
 
     // Narrower than "overdue", which needs no query: a due date is
     // `startedAt + duration` and any reader can work it out.
-    if (request.data.defaultedOnly) {
+    if (data.defaultedOnly) {
       query = query.where('status', '==', 'defaulted')
     }
 
@@ -113,7 +119,7 @@ export const listLoansHandler = async (request: CallableRequest<ListLoansRequest
   } catch (error) {
     logger.error('Error listing loans', {
       error: error instanceof Error ? error.message : String(error),
-      params: request.data,
+      params: data,
     })
 
     throw new HttpsError('internal', 'Failed to list loans. Please try again.')

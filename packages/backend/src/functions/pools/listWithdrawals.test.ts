@@ -177,23 +177,18 @@ describe('listWithdrawalsHandler', () => {
     expect(mockQuery.limit).toHaveBeenCalledWith(100)
   })
 
-  it('should raise a negative limit to one rather than the default', async () => {
-    // Arrange — a negative number is truthy, so it survives the `|| DEFAULT`
-    // and is clamped by the Math.max instead. Matches listContributions.
-    // Act
-    await listWithdrawalsHandler(buildRequest({ data: { limit: -5 } }) as never)
-
-    // Assert
-    expect(mockQuery.limit).toHaveBeenCalledWith(1)
+  it('should refuse a negative limit rather than reinterpret it', async () => {
+    // Act & Assert
+    await expect(listWithdrawalsHandler(buildRequest({ data: { limit: -5 } }) as never)).rejects.toThrow(/limit/i)
+    expect(mockQuery.limit).not.toHaveBeenCalled()
   })
 
-  it('should use the default limit when given zero', async () => {
-    // Arrange — zero is falsy, so it falls through to the default.
-    // Act
-    await listWithdrawalsHandler(buildRequest({ data: { limit: 0 } }) as never)
-
-    // Assert
-    expect(mockQuery.limit).toHaveBeenCalledWith(50)
+  it('should refuse a limit of zero rather than read it as absent', async () => {
+    // Arrange — zero used to be falsy enough to fall through to the default,
+    // so a caller asking for no rows was answered with fifty.
+    // Act & Assert
+    await expect(listWithdrawalsHandler(buildRequest({ data: { limit: 0 } }) as never)).rejects.toThrow(/limit/i)
+    expect(mockQuery.limit).not.toHaveBeenCalled()
   })
 
   it('should report an empty collection rather than failing', async () => {

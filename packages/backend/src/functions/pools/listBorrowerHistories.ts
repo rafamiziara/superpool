@@ -2,8 +2,10 @@ import { ListBorrowerHistoriesRequest, ListBorrowerHistoriesResponse } from '@su
 import { logger } from 'firebase-functions/v2'
 import { CallableRequest, HttpsError, onCall } from 'firebase-functions/v2/https'
 import { DEFAULT_CHAIN_ID } from '../../constants'
+import { listBorrowerHistoriesSchema } from '../../schemas'
 import { firestore } from '../../services'
-import { borrowerHistoriesFor, MAX_BORROWERS_PER_CALL } from '../../services/borrowerHistory'
+import { borrowerHistoriesFor } from '../../services/borrowerHistory'
+import { parseRequest } from '../../utils/validation'
 import { getProvider } from '../../utils/blockchain'
 
 export const listBorrowerHistoriesHandler = async (
@@ -16,17 +18,12 @@ export const listBorrowerHistoriesHandler = async (
     throw new HttpsError('unauthenticated', 'User must be authenticated to read borrowing histories')
   }
 
-  const borrowers = request.data?.borrowers
+  // The list and its cap are both in the schema, which is why neither is
+  // restated here: an oversized batch was already refused by name rather than
+  // trimmed, unlike a page size.
+  const { borrowers, chainId: requestedChainId } = parseRequest(listBorrowerHistoriesSchema, request.data)
 
-  if (!Array.isArray(borrowers) || borrowers.length === 0) {
-    throw new HttpsError('invalid-argument', 'At least one borrower address is required')
-  }
-
-  if (borrowers.length > MAX_BORROWERS_PER_CALL) {
-    throw new HttpsError('invalid-argument', `At most ${MAX_BORROWERS_PER_CALL} borrowers can be summarised in one call`)
-  }
-
-  const chainId = request.data?.chainId || DEFAULT_CHAIN_ID
+  const chainId = requestedChainId ?? DEFAULT_CHAIN_ID
 
   try {
     /*
@@ -51,7 +48,7 @@ export const listBorrowerHistoriesHandler = async (
   } catch (error) {
     logger.error('Error listing borrower histories', {
       error: error instanceof Error ? error.message : String(error),
-      params: request.data,
+      params: { borrowers, chainId },
     })
 
     throw new HttpsError('internal', 'Failed to read borrowing histories. Please try again.')

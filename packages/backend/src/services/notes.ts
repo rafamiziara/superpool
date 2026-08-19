@@ -352,7 +352,7 @@ async function ownsPool(caller: string, chainId: number, poolId: number, firesto
  * body would let anyone invent a kind and park text under a key no reader will
  * ever ask for.
  */
-const NOTE_KINDS: readonly NoteKind[] = [
+export const NOTE_KINDS = [
   'loan_purpose',
   'loan_approved',
   'loan_rejected',
@@ -360,7 +360,17 @@ const NOTE_KINDS: readonly NoteKind[] = [
   'membership_approved',
   'membership_rejected',
   'membership_removed',
-]
+] as const satisfies readonly NoteKind[]
+
+/**
+ * Fails to compile if a `NoteKind` is added and not listed above.
+ *
+ * `as const satisfies readonly NoteKind[]` only checks that each entry *is* a
+ * kind, not that every kind is an entry — and an unlisted one is refused by
+ * `saveNote` in silence, which reads as the feature being broken rather than
+ * as this list being short.
+ */
+const _everyKindIsListed: Exclude<NoteKind, (typeof NOTE_KINDS)[number]> extends never ? true : never = true
 
 export function isNoteKind(kind: string): kind is NoteKind {
   return (NOTE_KINDS as readonly string[]).includes(kind)

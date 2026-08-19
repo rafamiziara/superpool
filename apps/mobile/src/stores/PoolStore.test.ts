@@ -256,9 +256,14 @@ describe('PoolStore against listPools', () => {
   })
 
   it('lets the caller override the defaults', async () => {
-    await store.fetchPools({ activeOnly: false, limit: 10, ownerAddress: '0xabc' })
+    await store.fetchPools({ activeOnly: false, limit: 10, ownerAddress: '0x70997970C51812dc3A010C7d01b50e0d17dc79C8' })
 
-    expect(listPoolsCallable).toHaveBeenCalledWith({ chainId: 31337, activeOnly: false, limit: 10, ownerAddress: '0xabc' })
+    expect(listPoolsCallable).toHaveBeenCalledWith({
+      chainId: 31337,
+      activeOnly: false,
+      limit: 10,
+      ownerAddress: '0x70997970C51812dc3A010C7d01b50e0d17dc79C8',
+    })
   })
 
   it('stores what the backend returned', async () => {

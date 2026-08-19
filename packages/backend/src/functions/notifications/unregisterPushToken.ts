@@ -1,8 +1,10 @@
 import { UnregisterPushTokenRequest, UnregisterPushTokenResponse } from '@superpool/types'
 import { logger } from 'firebase-functions/v2'
 import { CallableRequest, HttpsError, onCall } from 'firebase-functions/v2/https'
+import { unregisterPushTokenSchema } from '../../schemas'
 import { firestore } from '../../services'
-import { deletePushToken, isExpoPushToken } from '../../services/pushTokens'
+import { deletePushToken } from '../../services/pushTokens'
+import { parseRequest } from '../../utils/validation'
 
 export const unregisterPushTokenHandler = async (
   request: CallableRequest<UnregisterPushTokenRequest>
@@ -11,11 +13,7 @@ export const unregisterPushTokenHandler = async (
     throw new HttpsError('unauthenticated', 'User must be authenticated to unregister a push token')
   }
 
-  const { token } = request.data ?? {}
-
-  if (!token || !isExpoPushToken(token)) {
-    throw new HttpsError('invalid-argument', 'Invalid Expo push token')
-  }
+  const { token } = parseRequest(unregisterPushTokenSchema, request.data)
 
   try {
     // Not checked against the caller's wallet on purpose. The call that matters
