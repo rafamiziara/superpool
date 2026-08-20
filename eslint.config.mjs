@@ -3,6 +3,7 @@ import tseslint from '@typescript-eslint/eslint-plugin'
 import tsparser from '@typescript-eslint/parser'
 import prettier from 'eslint-config-prettier'
 import eslintPluginPrettierRecommended from 'eslint-plugin-prettier/recommended'
+import reactHooks from 'eslint-plugin-react-hooks'
 import globals from 'globals'
 import customPrettier from './prettier.config.mjs'
 
@@ -126,6 +127,35 @@ export default [
           allowSeparatedGroups: true,
         },
       ],
+    },
+  },
+
+  /*
+   * React apps: the hooks rules.
+   *
+   * Registered because two files already carried
+   * `eslint-disable-next-line react-hooks/exhaustive-deps`, and with the plugin
+   * absent ESLint errored on the *disable comment* — "Definition for rule was
+   * not found". So the rule was suppressed in two places and enforced in none,
+   * which is the worst of the three available states.
+   *
+   * `rules-of-hooks` is an error: it catches a hook called conditionally, which
+   * is never intentional.
+   *
+   * `exhaustive-deps` is a **warning**, because it is wrong about this codebase
+   * often enough to be advice rather than law. It does not know MobX: reading
+   * `authStore.chainId` during the render of an `observer` component *does*
+   * re-render when it changes, so the rule's "outer scope values aren't valid
+   * dependencies" is false here — and `CLAUDE.md` records that dropping that
+   * exact dependency left the store serving the chain the user had just left.
+   * The three sites it flags carry a disable and a reason.
+   */
+  {
+    files: ['apps/mobile/**/*.{ts,tsx}', 'apps/landing/**/*.{ts,tsx}'],
+    plugins: { 'react-hooks': reactHooks },
+    rules: {
+      'react-hooks/rules-of-hooks': 'error',
+      'react-hooks/exhaustive-deps': 'warn',
     },
   },
 

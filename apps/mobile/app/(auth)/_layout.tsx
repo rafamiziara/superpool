@@ -27,6 +27,14 @@ export default observer(function AuthLayout() {
     if (isAuthenticated) {
       poolStore.fetchPools()
     }
+    /*
+      eslint-disable-next-line react-hooks/exhaustive-deps --
+      `authStore.chainId` is a MobX observable read inside an `observer`
+      component, so the read subscribes and a change *does* re-render — which
+      is the opposite of the rule's "outer scope values aren't valid
+      dependencies". Dropping it is the documented bug: the store went on
+      serving the chain the user had just left. See CLAUDE.md → Chains.
+    */
   }, [isAuthenticated, authStore.chainId])
 
   // Redirect protection - this should not happen due to NavigationStore

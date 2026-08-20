@@ -119,6 +119,13 @@ export const useAutoAuth = (): void => {
 
     // Only run when wallet connection state changes or error is cleared
     autoAuthenticate()
+    /*
+      eslint-disable-next-line react-hooks/exhaustive-deps --
+      MobX observables, not plain outer-scope values: read inside an `observer`
+      the access subscribes, so a change re-renders and re-runs this. Connecting
+      a wallet, switching accounts and clearing an error are exactly the three
+      events this effect exists to answer.
+    */
   }, [authStore.isWalletConnected, authStore.walletAddress, authStore.error, messageGeneration, signatureHandling, firebaseAuth])
 
   // Auto-reset on wallet disconnect
@@ -128,5 +135,10 @@ export const useAutoAuth = (): void => {
       authStore.reset()
       messageGeneration.clearState()
     }
+    /*
+      eslint-disable-next-line react-hooks/exhaustive-deps --
+      A MobX observable, as above. Without this dependency a disconnect never
+      resets the auth state, and the next wallet inherits the previous one's.
+    */
   }, [authStore.isWalletConnected, messageGeneration])
 }
