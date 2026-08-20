@@ -3,6 +3,8 @@ import { CallableRequest, HttpsError, onCall } from 'firebase-functions/v2/https
 import { onSchedule } from 'firebase-functions/v2/scheduler'
 import { firestore } from '../../services'
 import { collectReceipts, CollectResult } from '../../services/pushReceipts'
+import { requireAdmin } from '../../utils/admin'
+import { enforceAppCheck } from '../../utils/appCheck'
 
 /**
  * Ask Expo what became of the messages it accepted.
@@ -57,12 +59,8 @@ export const collectPushReceipts = onSchedule(
 export const collectPushReceiptsNowHandler = async (request: CallableRequest<void>): Promise<CollectResult> => {
   // Same rule as `sendDueRemindersNow` and `syncPoolEventsNow`: open in the
   // emulator, where schedules never fire and there is no signed-in user, and
-  // behind authentication everywhere else.
-  const isEmulator = process.env.FUNCTIONS_EMULATOR === 'true'
-
-  if (!isEmulator && !request.auth) {
-    throw new HttpsError('unauthenticated', 'User must be authenticated to collect push receipts')
-  }
+  // operators only everywhere else.
+  requireAdmin(request, 'collect push receipts')
 
   try {
     return await collectPushReceiptsHandler()
@@ -92,6 +90,8 @@ export const collectPushReceiptsNow = onCall<void>(
     memory: '256MiB',
     timeoutSeconds: 300,
     cors: true,
+    // See `enforceAppCheck`: off unless ENFORCE_APP_CHECK=true.
+    enforceAppCheck: enforceAppCheck(),
   },
   collectPushReceiptsNowHandler
 )

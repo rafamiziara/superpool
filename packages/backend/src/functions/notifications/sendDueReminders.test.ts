@@ -14,6 +14,8 @@ const { getProvider } = require('../../utils/blockchain')
 
 const CHAIN_ID = 31337
 const AUTH = { uid: '0x9965507D1a55bcC2695C58ba16FB37d819B0A4dc' }
+/** A signed-in caller who is not an operator. Trivial to become — see `requireAdmin`. */
+const STRANGER = { uid: '0x14dC79964da2C08b23698B3D3cc7Ca32193d9955' }
 
 const RESULT = { chainId: CHAIN_ID, scanned: 3, dueSoon: 1, overdue: 1 }
 
@@ -24,6 +26,10 @@ function buildRequest(auth: object | null = AUTH) {
 
 beforeEach(() => {
   process.env.FUNCTIONS_EMULATOR = 'false'
+  // These are operator endpoints now. `request.auth` alone was never a gate
+  // here: authentication in this project is deliberately cheap, so any wallet
+  // could start an unbounded run on the project's RPC and Functions budget.
+  process.env.ADMIN_WALLETS = AUTH.uid
   remindChain.mockReset()
   remindChain.mockResolvedValue(RESULT)
   getProvider.mockReturnValue({})
@@ -31,6 +37,7 @@ beforeEach(() => {
 
 afterAll(() => {
   delete process.env.FUNCTIONS_EMULATOR
+  delete process.env.ADMIN_WALLETS
 })
 
 describe('sendDueRemindersHandler', () => {
@@ -68,8 +75,15 @@ describe('sendDueRemindersNowHandler', () => {
     await expect(sendDueRemindersNowHandler(buildRequest(null))).resolves.toEqual([RESULT])
   })
 
-  it('runs for an authenticated caller', async () => {
+  it('runs for an operator', async () => {
     await expect(sendDueRemindersNowHandler(buildRequest())).resolves.toEqual([RESULT])
+  })
+
+  it('refuses a signed-in caller who is not an operator', async () => {
+    // An unbounded run of reads and sends across every configured chain.
+    // `notifications_sent` stops a second run telling anybody anything twice;
+    // it does not stop the reads being paid for.
+    await expect(sendDueRemindersNowHandler(buildRequest(STRANGER))).rejects.toMatchObject({ code: 'permission-denied' })
   })
 
   it('reports a failure as an internal error', async () => {

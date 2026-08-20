@@ -12,6 +12,8 @@ const { syncPoolEventsHandler } = require('./syncPoolEvents')
 const CHAIN_ID = 31337 // the default chain, and the only one configured here
 const SUPPORTED_CHAIN_ID = CHAIN_ID
 const AUTH = { uid: '0x9965507D1a55bcC2695C58ba16FB37d819B0A4dc' }
+/** A signed-in caller who is not an operator. Trivial to become — see `requireAdmin`. */
+const STRANGER = { uid: '0x14dC79964da2C08b23698B3D3cc7Ca32193d9955' }
 
 const SWEEP_RESULT = {
   chainId: CHAIN_ID,
@@ -36,11 +38,16 @@ function buildRequest(data: object = {}, auth: object | null = AUTH) {
 
 beforeEach(() => {
   process.env.FUNCTIONS_EMULATOR = 'false'
+  // These are operator endpoints now. `request.auth` alone was never a gate
+  // here: authentication in this project is deliberately cheap, so any wallet
+  // could start an unbounded run on the project's RPC and Functions budget.
+  process.env.ADMIN_WALLETS = AUTH.uid
   syncPoolEventsHandler.mockResolvedValue(SWEEP_RESULT)
 })
 
 afterAll(() => {
   delete process.env.FUNCTIONS_EMULATOR
+  delete process.env.ADMIN_WALLETS
 })
 
 // ---------------------------------------------------------------------------
@@ -72,12 +79,31 @@ describe('syncPoolEventsNowHandler', () => {
       expect(response).toEqual(SWEEP_RESULT)
     })
 
-    it('should allow an authenticated call outside the emulator', async () => {
+    it('should allow an operator call outside the emulator', async () => {
       // Act
       const response = await syncPoolEventsNowHandler(buildRequest())
 
       // Assert
       expect(response).toEqual(SWEEP_RESULT)
+    })
+
+    it('should refuse a signed-in caller who is not an operator', async () => {
+      // The hole this closes: `fromBlock: 0` is a five-minute whole-history
+      // re-scan of every configured chain, and a stranger with a throwaway
+      // wallet could ask for one as often as they liked.
+      await expect(syncPoolEventsNowHandler(buildRequest({ fromBlock: 0 }, STRANGER))).rejects.toMatchObject({
+        code: 'permission-denied',
+      })
+      expect(syncPoolEventsHandler).not.toHaveBeenCalled()
+    })
+
+    it('should refuse everyone when no operators are configured', async () => {
+      // Empty means nobody, not everybody. An unset `ADMIN_WALLETS` in
+      // production must fail closed.
+      delete process.env.ADMIN_WALLETS
+
+      await expect(syncPoolEventsNowHandler(buildRequest())).rejects.toMatchObject({ code: 'permission-denied' })
+      expect(syncPoolEventsHandler).not.toHaveBeenCalled()
     })
   })
 

@@ -5,6 +5,8 @@ import { SUPPORTED_CHAINS } from '../../constants'
 import { firestore } from '../../services'
 import { DueReminderResult, remindChain } from '../../services/dueReminders'
 import { getProvider } from '../../utils/blockchain'
+import { requireAdmin } from '../../utils/admin'
+import { enforceAppCheck } from '../../utils/appCheck'
 
 /**
  * Remind every chain's borrowers about the dates on their loans.
@@ -68,13 +70,10 @@ export const sendDueReminders = onSchedule(
 export const sendDueRemindersNowHandler = async (request: CallableRequest<void>): Promise<DueReminderResult[]> => {
   // Same rule as `syncPoolEventsNow`: open in the emulator, where there is no
   // signed-in user and this is the only way to exercise the scan at all;
-  // authenticated everywhere else, because it is an unbounded run of reads and
-  // sends that a stranger should not be able to start.
-  const isEmulator = process.env.FUNCTIONS_EMULATOR === 'true'
-
-  if (!isEmulator && !request.auth) {
-    throw new HttpsError('unauthenticated', 'User must be authenticated to trigger due reminders')
-  }
+  // operators only everywhere else, because it is an unbounded run of reads
+  // and sends. `notifications_sent` stops a second run telling anybody
+  // anything twice — it does not stop the reads being paid for.
+  requireAdmin(request, 'trigger due reminders')
 
   try {
     return await sendDueRemindersHandler()
@@ -104,6 +103,8 @@ export const sendDueRemindersNow = onCall<void>(
     memory: '256MiB',
     timeoutSeconds: 300,
     cors: true,
+    // See `enforceAppCheck`: off unless ENFORCE_APP_CHECK=true.
+    enforceAppCheck: enforceAppCheck(),
   },
   sendDueRemindersNowHandler
 )

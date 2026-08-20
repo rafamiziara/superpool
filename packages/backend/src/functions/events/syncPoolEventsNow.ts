@@ -5,18 +5,19 @@ import { DEFAULT_CHAIN_ID, getChainConfig, SUPPORTED_CHAIN_IDS } from '../../con
 import { syncPoolEventsSchema } from '../../schemas'
 import { parseRequest } from '../../utils/validation'
 import { syncPoolEventsHandler } from './syncPoolEvents'
+import { requireAdmin } from '../../utils/admin'
+import { enforceAppCheck } from '../../utils/appCheck'
 
 export const syncPoolEventsNowHandler = async (request: CallableRequest<SyncPoolEventsRequest>): Promise<SyncPoolEventsResponse> => {
   // Scheduled functions do not fire in the emulator, so this callable is the
   // only way to exercise the sweep locally — where there is no signed-in user
-  // to require. In deployed environments it stays behind authentication: the
-  // sweep writes only what the chain already says, but it is an unbounded run
-  // of RPC calls that a stranger should not be able to start.
-  const isEmulator = process.env.FUNCTIONS_EMULATOR === 'true'
-
-  if (!isEmulator && !request.auth) {
-    throw new HttpsError('unauthenticated', 'User must be authenticated to trigger an event sync')
-  }
+  // to require. Everywhere else it is operators only.
+  //
+  // It used to ask for `request.auth` alone, which is not a gate in this
+  // project: any wallet can sign a nonce and get a token. `fromBlock: 0` then
+  // starts a five-minute whole-history re-scan of every configured chain, on
+  // this project's RPC quota, as often as a stranger cares to ask.
+  requireAdmin(request, 'trigger an event sync')
 
   const { chainId: requestedChainId, fromBlock } = parseRequest(syncPoolEventsSchema, request.data)
 
@@ -62,6 +63,8 @@ export const syncPoolEventsNow = onCall<SyncPoolEventsRequest>(
     memory: '256MiB',
     timeoutSeconds: 300,
     cors: true,
+    // See `enforceAppCheck`: off unless ENFORCE_APP_CHECK=true.
+    enforceAppCheck: enforceAppCheck(),
   },
   syncPoolEventsNowHandler
 )

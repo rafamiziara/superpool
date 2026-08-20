@@ -7,6 +7,8 @@ const { collectPushReceiptsHandler, collectPushReceiptsNowHandler } = require('.
 const { collectReceipts } = require('../../services/pushReceipts')
 
 const AUTH = { uid: '0x9965507D1a55bcC2695C58ba16FB37d819B0A4dc' }
+/** A signed-in caller who is not an operator. Trivial to become — see `requireAdmin`. */
+const STRANGER = { uid: '0x14dC79964da2C08b23698B3D3cc7Ca32193d9955' }
 const RESULT = { checked: 4, pruned: 1, failed: 0, expired: 0, pending: 2 }
 
 /** Pass `null` for an anonymous caller — an explicit `undefined` would take the default. */
@@ -17,11 +19,16 @@ function buildRequest(auth: object | null = AUTH) {
 beforeEach(() => {
   jest.clearAllMocks()
   process.env.FUNCTIONS_EMULATOR = 'false'
+  // These are operator endpoints now. `request.auth` alone was never a gate
+  // here: authentication in this project is deliberately cheap, so any wallet
+  // could start an unbounded run on the project's RPC and Functions budget.
+  process.env.ADMIN_WALLETS = AUTH.uid
   collectReceipts.mockResolvedValue(RESULT)
 })
 
 afterAll(() => {
   delete process.env.FUNCTIONS_EMULATOR
+  delete process.env.ADMIN_WALLETS
 })
 
 describe('collectPushReceiptsHandler', () => {
@@ -67,8 +74,13 @@ describe('collectPushReceiptsNowHandler', () => {
     await expect(collectPushReceiptsNowHandler(buildRequest(null))).resolves.toEqual(RESULT)
   })
 
-  it('serves an authenticated caller', async () => {
+  it('serves an operator', async () => {
     await expect(collectPushReceiptsNowHandler(buildRequest())).resolves.toEqual(RESULT)
+  })
+
+  it('refuses a signed-in caller who is not an operator', async () => {
+    // Drains the whole receipt queue and prunes tokens off the back of it.
+    await expect(collectPushReceiptsNowHandler(buildRequest(STRANGER))).rejects.toMatchObject({ code: 'permission-denied' })
   })
 
   it('reports a failure as internal rather than leaking the cause', async () => {
