@@ -424,11 +424,18 @@ describe('Token pools', function () {
   })
 
   describe('Zero-value transfers', function () {
-    it('disburses a zero loan without asking the token to move nothing', async function () {
-      // Some ERC-20s revert on a zero-value transfer, and `createLoan` does not
-      // refuse a zero amount anywhere — `requestLoan` does, but this path never
-      // has. A native pool was unbothered, so a token pool must be too, or the
-      // two denominations diverge on an edge nothing else guards.
+    it('refuses a zero loan rather than locking the borrower out of their own money', async function () {
+      // This test used to assert the opposite — that a zero loan was disbursed
+      // quietly — on the grounds that a native pool tolerated one and the two
+      // denominations should not diverge. They did not diverge in the way that
+      // mattered: a native borrower could escape by paying a single wei, and a
+      // token borrower could not escape at all.
+      //
+      // A zero loan takes `activeLoanId`. Repaying it needs `_repay`, which
+      // prices the payment at `min(offered, outstanding) == 0`, hands 0 to
+      // `_pullIn`, and reverts `InvalidAmount`. There is no other way to clear
+      // the slot, so `withdraw` refuses the borrower's entire contribution on
+      // `LoanOutstanding` for the life of the pool.
       const TestERC20 = await ethers.getContractFactory('TestERC20')
       const token = await TestERC20.deploy('Test USD', 'TUSD', DECIMALS)
       await token.waitForDeployment()
@@ -439,12 +446,11 @@ describe('Token pools', function () {
       await token.connect(lender).approve(await pool.getAddress(), units('100'))
       await pool.connect(lender).depositTokens(units('100'))
 
-      // Switched on only now: the deposit above has to go through untaxed, and
-      // OpenZeppelin's own ERC-20 moves zero happily, so without this the test
-      // would pass whether the pool guarded the case or not.
-      await token.setRejectsZeroTransfers(true)
+      await expect(pool.connect(lender).createLoan(0)).to.be.revertedWithCustomError(pool, 'InvalidAmount')
 
-      await expect(pool.connect(lender).createLoan(0)).to.not.be.revert(ethers)
+      // The point of refusing it: the money stays reachable.
+      expect(await pool.activeLoanId(lender.address)).to.equal(0n)
+      await expect(pool.connect(lender).withdraw(units('100'))).to.not.be.revert(ethers)
     })
   })
 
@@ -468,9 +474,13 @@ describe('Token pools', function () {
       await lendingPoolImplementation.waitForDeployment()
 
       const PoolFactory = await ethers.getContractFactory('PoolFactory')
-      poolFactory = await PoolFactory.deploy()
+      // Behind its UUPS proxy: the implementation locks itself in its
+      // constructor, so it cannot be initialized directly any more.
+      poolFactory = (await upgrades.deployProxy(PoolFactory, [owner.address, await lendingPoolImplementation.getAddress()], {
+        initializer: 'initialize',
+        kind: 'uups',
+      })) as unknown as PoolFactory
       await poolFactory.waitForDeployment()
-      await poolFactory.initialize(owner.address, await lendingPoolImplementation.getAddress())
 
       const TestERC20 = await ethers.getContractFactory('TestERC20')
       token = await TestERC20.deploy('Test USD', 'TUSD', DECIMALS)

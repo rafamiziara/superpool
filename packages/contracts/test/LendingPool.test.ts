@@ -245,10 +245,26 @@ describe('LendingPool', function () {
       await expect(lendingPool.connect(lender).withdraw(ethers.parseEther('2'))).to.not.be.revert(ethers)
     })
 
-    it('Should reject withdrawals while paused', async function () {
+    it('Should still allow withdrawals while paused', async function () {
+      // This used to assert the opposite. The pause belongs to the pool's
+      // owner, who is an ordinary user here rather than an operator, so a
+      // pause that stopped withdrawals let one member hold everybody else's
+      // money indefinitely with one transaction. A pause now stops the pool
+      // doing anything new and leaves the exits open.
       await lendingPool.connect(owner).pause()
 
-      await expect(lendingPool.connect(lender).withdraw(ethers.parseEther('1'))).to.be.revertedWithCustomError(lendingPool, 'EnforcedPause')
+      await expect(lendingPool.connect(lender).withdraw(ethers.parseEther('1'))).to.not.be.revert(ethers)
+    })
+
+    it('Should still refuse deposits while paused', async function () {
+      // The other half of the same rule: what a pause stops is new money and
+      // new commitments, not the return of money already in.
+      await lendingPool.connect(owner).pause()
+
+      await expect(lendingPool.connect(lender).depositFunds({ value: ethers.parseEther('1') })).to.be.revertedWithCustomError(
+        lendingPool,
+        'EnforcedPause'
+      )
     })
 
     it('Should not let interest earned by the pool be withdrawn as contribution', async function () {
@@ -1877,10 +1893,25 @@ describe('LendingPool', function () {
         await expect(lendingPool.connect(owner).requestMembership()).to.be.revertedWithCustomError(lendingPool, 'AlreadyMember')
       })
 
-      it('enrols a new owner on transfer', async function () {
+      it('grants nothing until the new owner accepts', async function () {
+        // Two-step now: `transferOwnership` only nominates. Until the
+        // nomination is accepted the pool has not changed hands, so nothing
+        // about membership may move either — otherwise a mistyped address
+        // would be enrolled in a pool it can never own.
+        await lendingPool.connect(owner).transferOwnership(otherAccount.address)
+
+        expect(await lendingPool.owner()).to.equal(owner.address)
+        expect(await lendingPool.pendingOwner()).to.equal(otherAccount.address)
+        expect(await lendingPool.membership(otherAccount.address)).to.equal(NONE)
+        expect(await lendingPool.memberCount()).to.equal(OWNER_ONLY)
+      })
+
+      it('enrols a new owner when they accept', async function () {
         // Otherwise handing the pool over recreates the lockout for its new
         // owner, on a pool that may already be permissioned.
-        await expect(lendingPool.connect(owner).transferOwnership(otherAccount.address))
+        await lendingPool.connect(owner).transferOwnership(otherAccount.address)
+
+        await expect(lendingPool.connect(otherAccount).acceptOwnership())
           .to.emit(lendingPool, 'MemberJoined')
           .withArgs(otherAccount.address)
 
@@ -1892,6 +1923,7 @@ describe('LendingPool', function () {
         // They may still hold a contribution, and being demoted is not being
         // turned out.
         await lendingPool.connect(owner).transferOwnership(otherAccount.address)
+        await lendingPool.connect(otherAccount).acceptOwnership()
 
         expect(await lendingPool.membership(owner.address)).to.equal(ACTIVE)
       })
@@ -1900,14 +1932,28 @@ describe('LendingPool', function () {
         await lendingPool.connect(lender).depositFunds({ value: deposit })
 
         await lendingPool.connect(owner).transferOwnership(lender.address)
+        await lendingPool.connect(lender).acceptOwnership()
 
         expect(await lendingPool.memberCount()).to.equal(OWNER_ONLY + 1n)
       })
 
-      it('lets the new owner leave once they are only a member again', async function () {
+      it('lets the outgoing owner leave once they are only a member again', async function () {
         await lendingPool.connect(owner).transferOwnership(otherAccount.address)
+        await lendingPool.connect(otherAccount).acceptOwnership()
 
         await expect(lendingPool.connect(owner).leavePool()).to.emit(lendingPool, 'MembershipLeft').withArgs(owner.address)
+      })
+
+      it('refuses to be left without an owner', async function () {
+        // A pool with no owner can never approve a loan, admit a member or be
+        // unpaused. `Ownable2Step` covers transferring to an address that
+        // cannot accept; this covers transferring to nobody.
+        await expect(lendingPool.connect(owner).renounceOwnership()).to.be.revertedWithCustomError(
+          lendingPool,
+          'OwnershipCannotBeRenounced'
+        )
+
+        expect(await lendingPool.owner()).to.equal(owner.address)
       })
     })
 
@@ -2309,11 +2355,13 @@ describe('LendingPool', function () {
         await expect(lendingPool.connect(borrower).claimInterest()).to.emit(lendingPool, 'InterestClaimed')
       })
 
-      it('refuses claims while paused', async function () {
+      it('still allows claims while paused', async function () {
+        // One of the three exits a pause leaves open, beside `withdraw` and
+        // `repayLoan`. Interest is money already earned.
         await borrowAndRepay(borrower, ethers.parseEther('10'))
         await lendingPool.connect(owner).pause()
 
-        await expect(lendingPool.connect(lender).claimInterest()).to.be.revertedWithCustomError(lendingPool, 'EnforcedPause')
+        await expect(lendingPool.connect(lender).claimInterest()).to.emit(lendingPool, 'InterestClaimed')
       })
 
       it('never pays out more than the pool earned', async function () {
@@ -2326,6 +2374,66 @@ describe('LendingPool', function () {
         expect(await lendingPool.totalFunds()).to.be.gte(ethers.parseEther('21'))
         expect(await lendingPool.totalFunds()).to.be.closeTo(ethers.parseEther('21'), 100n)
       })
+    })
+  })
+
+  /**
+   * Things that were reachable and should not have been.
+   *
+   * Each of these was proved against a chain before it was fixed, and each is
+   * the kind of bug a suite of happy paths never trips over: they all need
+   * somebody to ask for something nobody would mean to ask for.
+   */
+  describe('Refusals that keep money reachable', function () {
+    it('refuses a loan of nothing', async function () {
+      // `requestLoan` always refused a zero; `createLoan` did not. The damage
+      // is that a zero loan takes `activeLoanId` — so until it is repaid the
+      // borrower can neither borrow again nor withdraw a wei of their own
+      // contribution.
+      await lendingPool.connect(lender).depositFunds({ value: ethers.parseEther('10') })
+
+      await expect(lendingPool.connect(lender).createLoan(0)).to.be.revertedWithCustomError(lendingPool, 'InvalidAmount')
+
+      expect(await lendingPool.activeLoanId(lender.address)).to.equal(0n)
+      await expect(lendingPool.connect(lender).withdraw(ethers.parseEther('10'))).to.not.be.revert(ethers)
+    })
+
+    it('refuses to declare a default on a loan that does not exist', async function () {
+      // An unissued loan id reads as a zeroed struct, which is `Disbursed`
+      // with a `startTime` of 0 — so every date check passed and the owner
+      // could declare a default against `address(0)`. The indexer writes what
+      // the chain tells it, so that became a loan document for nobody.
+      await expect(lendingPool.connect(owner).markDefaulted(9999)).to.be.revertedWithCustomError(lendingPool, 'LoanNotDisbursed')
+    })
+
+    it('lets a borrower repay while the pool is paused', async function () {
+      // The one where a pause did real harm: interest accrues against the
+      // clock, so refusing repayment grew the debt for exactly as long as the
+      // borrower was denied any way to stop it.
+      await lendingPool.connect(lender).depositFunds({ value: ethers.parseEther('50') })
+      await lendingPool.connect(borrower).depositFunds({ value: ethers.parseEther('1') })
+      await lendingPool.connect(borrower).createLoan(ethers.parseEther('5'))
+
+      await lendingPool.connect(owner).pause()
+
+      const quote = await lendingPool.outstandingBalanceAt(1, (await time.latest()) + 3600)
+
+      await expect(lendingPool.connect(borrower).repayLoan(1, { value: quote })).to.emit(lendingPool, 'LoanRepaid')
+    })
+
+    it('leaves no uninitialized implementation lying about', async function () {
+      // The implementation is deployed on its own and pools delegate to it.
+      // Uninitialized, anyone could call `initialize` on it and own a live
+      // contract carrying this contract's name.
+      const LendingPool = await ethers.getContractFactory('LendingPool')
+      const implementation = await LendingPool.deploy()
+      await implementation.waitForDeployment()
+
+      await expect(
+        implementation
+          .connect(otherAccount)
+          .initialize(otherAccount.address, maxLoanAmount, interestRate, loanDuration, false, ethers.ZeroAddress)
+      ).to.be.revertedWithCustomError(implementation, 'InvalidInitialization')
     })
   })
 })

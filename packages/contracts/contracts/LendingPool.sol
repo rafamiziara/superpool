@@ -2,8 +2,8 @@
 pragma solidity ^0.8.36;
 
 import {
-    OwnableUpgradeable
-} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+    Ownable2StepUpgradeable
+} from "@openzeppelin/contracts-upgradeable/access/Ownable2StepUpgradeable.sol";
 import {
     PausableUpgradeable
 } from "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
@@ -27,7 +27,7 @@ import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
  */
 contract LendingPool is
     Initializable,
-    OwnableUpgradeable,
+    Ownable2StepUpgradeable,
     PausableUpgradeable,
     ReentrancyGuardTransient
 {
@@ -643,6 +643,34 @@ contract LendingPool is
      * member deposits 100 and is credited 0.
      */
     error NativePoolOnly();
+    /**
+     * @dev `renounceOwnership`, which a pool does not allow.
+     *
+     * A pool with no owner can never approve a loan, admit a member, declare a
+     * default or be unpaused again. Nothing recovers from it, and the
+     * `_transferOwnership` hook below would have to special-case an owner who
+     * is nobody. Handing the pool over is `transferOwnership`, which the new
+     * owner then has to accept.
+     */
+    error OwnershipCannotBeRenounced();
+
+    /**
+     * @notice Locks the implementation contract against initialization
+     * @dev Runs when the *implementation* is deployed, and never through a
+     * beacon proxy — constructor code is not part of the runtime bytecode a
+     * proxy delegates to, which is why `initialize` exists at all.
+     *
+     * Without it the implementation sits on chain uninitialized and anyone can
+     * call `initialize` on it and own it. No pool's storage is reachable that
+     * way, and there is no `delegatecall` here to turn it into one — but an
+     * unowned live contract carrying this contract's name is a thing nobody
+     * should have to explain, and closing it costs one constructor.
+     *
+     * @custom:oz-upgrades-unsafe-allow constructor
+     */
+    constructor() {
+        _disableInitializers();
+    }
 
     /**
      * @notice Initialize the contract (replaces constructor for upgradeable contracts)
@@ -666,6 +694,12 @@ contract LendingPool is
         address _loanToken
     ) public initializer {
         __Ownable_init(_owner);
+        // Handing a pool over is now two steps: the new owner has to accept.
+        // A pool owner is an ordinary person rather than a deployer, the
+        // address they type is not checked against anything, and the mistake is
+        // irreversible — it takes with it every approval, every membership
+        // decision and the pause on other people's money.
+        __Ownable2Step_init();
         __Pausable_init();
 
         poolConfig = PoolConfig({
@@ -811,10 +845,15 @@ contract LendingPool is
      * **This is never gated on membership, and must not become so.** Removing a
      * member takes away what they may do next, not what they already put in;
      * gating here would let an owner strand someone else's money.
+     *
+     * **Nor on `whenNotPaused`, for the same reason.** The pause belongs to the
+     * pool's owner, who is an ordinary member of this product rather than an
+     * operator, and a pause that stopped withdrawals would let one user hold
+     * everybody else's money indefinitely with a single transaction. A pause
+     * stops the pool doing anything *new* — deposits, lending, decisions — and
+     * leaves the three exits open: this, `claimInterest` and `repayLoan`.
      */
-    function withdraw(
-        uint256 _amount
-    ) external whenNotPaused nonReentrant {
+    function withdraw(uint256 _amount) external nonReentrant {
         if (_amount == 0) revert InvalidAmount();
         if (activeLoanId[msg.sender] != 0) revert LoanOutstanding();
 
@@ -880,8 +919,11 @@ contract LendingPool is
      * Interest is earned money rather than the stake that borrowing locks, and
      * it is owed for the same reason a removed member's contribution is: it was
      * earned while the money was in the pool.
+     *
+     * Nor on `whenNotPaused` — one of the three exits a pause leaves open. See
+     * `withdraw`.
      */
-    function claimInterest() external whenNotPaused nonReentrant {
+    function claimInterest() external nonReentrant {
         _settle(msg.sender);
 
         uint256 amount = unclaimedInterest[msg.sender];
@@ -963,6 +1005,15 @@ contract LendingPool is
         }
 
         if (activeLoanId[msg.sender] != 0) revert LoanOutstanding();
+
+        // `requestLoan` has always refused a zero, and this is why it matters
+        // more here: a zero loan takes the borrower's `activeLoanId` slot and,
+        // in a token pool, there is no way to give it back. `_repay` prices the
+        // payment at `min(offered, 0)`, `_pullIn` delivers nothing, and the
+        // call reverts `InvalidAmount` for ever — so the borrower can never
+        // repay, never borrow again, and `withdraw` refuses their whole
+        // contribution on `LoanOutstanding` permanently.
+        if (_amount == 0) revert InvalidAmount();
 
         if (_amount > poolConfig.maxLoanAmount) {
             revert ExceedsMaxLoanAmount();
@@ -1361,6 +1412,13 @@ contract LendingPool is
     ) external onlyOwner whenNotPaused {
         Loan storage loan = loans[_loanId];
 
+        // A loan id nobody has issued reads as a zeroed struct, which is
+        // `Disbursed` with a zero `startTime` — so every date check below
+        // passed and the owner could declare a default on a loan that does not
+        // exist. It emitted `LoanDefaulted(id, address(0), 0)`, and the indexer
+        // writes what it is told: a loan document for a borrower who is nobody.
+        if (loan.borrower == address(0)) revert LoanNotDisbursed();
+
         if (loan.status == LoanStatus.Defaulted) {
             revert LoanAlreadyDefaulted();
         }
@@ -1448,10 +1506,15 @@ contract LendingPool is
      * A pool with no contributions left at all — every member having withdrawn
      * while the loan was out — has no one to share with, and that payment's
      * interest stays in the contract as it did before distribution existed.
+     *
+     * **Not `whenNotPaused`, and this is the one where it would do real harm.**
+     * Interest accrues against the clock, so a paused pool that refused
+     * repayment would grow a borrower's debt for exactly as long as it denied
+     * them any way to stop it — the pool's owner charging someone for time
+     * they were not allowed to buy back. The same applies to
+     * `repayLoanWithTokens`.
      */
-    function repayLoan(
-        uint256 _loanId
-    ) external payable whenNotPaused nonReentrant {
+    function repayLoan(uint256 _loanId) external payable nonReentrant {
         if (poolConfig.loanToken != address(0)) revert TokenPoolOnly();
 
         _repay(_loanId, msg.value, true);
@@ -1488,7 +1551,7 @@ contract LendingPool is
     function repayLoanWithTokens(
         uint256 _loanId,
         uint256 _amount
-    ) external whenNotPaused nonReentrant {
+    ) external nonReentrant {
         if (poolConfig.loanToken == address(0)) revert NativePoolOnly();
 
         _repay(_loanId, _amount, false);
@@ -1632,10 +1695,12 @@ contract LendingPool is
      * keeps a token with a transfer callback from re-entering mid-update.
      */
     function _payOut(address _to, uint256 _amount) private {
-        // Some ERC-20s revert on a zero-value transfer, and at least one caller
-        // can reach here with nothing to send: `createLoan(0)` is not refused
-        // anywhere above. Native pools were unbothered by this, so guarding
-        // here keeps the two denominations behaving the same.
+        // Some ERC-20s revert on a zero-value transfer. No caller can reach
+        // here with nothing to send any more — `createLoan` refuses a zero
+        // amount as `requestLoan` always did — so this is now belt and braces
+        // rather than the load-bearing guard it was. Kept because the cost is
+        // one comparison and the failure it prevents is a transfer reverting
+        // inside a function that has already written its state.
         if (_amount == 0) return;
 
         address token = poolConfig.loanToken;
@@ -2036,6 +2101,27 @@ contract LendingPool is
         (uint256 principal, uint256 interest) = _balanceAt(loan, _at);
 
         return principal + interest;
+    }
+
+    /**
+     * @notice Disabled. A pool cannot be left without an owner.
+     * @dev Everything this pool does that needs a decision needs *this*
+     * address: approving a request to borrow, admitting a member, declaring a
+     * default, changing the terms, pausing. An owner of `address(0)` ends all
+     * of them permanently, and a permissioned pool becomes one nobody can ever
+     * join. There is no recovery — a beacon upgrade could not restore an owner
+     * without inventing one.
+     *
+     * The money is never trapped by it: `withdraw`, `claimInterest` and
+     * `repayLoan` need no owner and no pause. But a pool frozen half way
+     * through its life, with requests pending that nobody can answer, is not a
+     * state worth being one mis-click from.
+     *
+     * `Ownable2Step` covers the other half — handing the pool to an address
+     * that cannot accept it. This covers handing it to nobody.
+     */
+    function renounceOwnership() public view override onlyOwner {
+        revert OwnershipCannotBeRenounced();
     }
 
     /**

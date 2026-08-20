@@ -12,6 +12,11 @@
 
 export const PoolFactoryABI = [
   {
+    "inputs": [],
+    "stateMutability": "nonpayable",
+    "type": "constructor"
+  },
+  {
     "inputs": [
       {
         "internalType": "address",
@@ -128,6 +133,11 @@ export const PoolFactoryABI = [
       }
     ],
     "name": "OwnableUnauthorizedAccount",
+    "type": "error"
+  },
+  {
+    "inputs": [],
+    "name": "OwnershipCannotBeRenounced",
     "type": "error"
   },
   {
@@ -344,6 +354,19 @@ export const PoolFactoryABI = [
       }
     ],
     "name": "PoolCreated",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "admin",
+        "type": "address"
+      }
+    ],
+    "name": "PoolCreatorAdminChanged",
     "type": "event"
   },
   {
@@ -1095,6 +1118,19 @@ export const PoolFactoryABI = [
     "type": "function"
   },
   {
+    "inputs": [],
+    "name": "poolCreatorAdmin",
+    "outputs": [
+      {
+        "internalType": "address",
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
     "inputs": [
       {
         "internalType": "uint256",
@@ -1188,7 +1224,7 @@ export const PoolFactoryABI = [
     "inputs": [],
     "name": "renounceOwnership",
     "outputs": [],
-    "stateMutability": "nonpayable",
+    "stateMutability": "view",
     "type": "function"
   },
   {
@@ -1223,6 +1259,19 @@ export const PoolFactoryABI = [
       }
     ],
     "name": "setLoanTokenAuthorization",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "_admin",
+        "type": "address"
+      }
+    ],
+    "name": "setPoolCreatorAdmin",
     "outputs": [],
     "stateMutability": "nonpayable",
     "type": "function"
@@ -1307,6 +1356,11 @@ export const PoolFactoryABI = [
 ] as const
 
 export const LendingPoolABI = [
+  {
+    "inputs": [],
+    "stateMutability": "nonpayable",
+    "type": "constructor"
+  },
   {
     "inputs": [],
     "name": "AlreadyMember",
@@ -1452,6 +1506,11 @@ export const LendingPoolABI = [
   {
     "inputs": [],
     "name": "OwnerIsAlwaysAMember",
+    "type": "error"
+  },
+  {
+    "inputs": [],
+    "name": "OwnershipCannotBeRenounced",
     "type": "error"
   },
   {
@@ -1908,6 +1967,25 @@ export const LendingPoolABI = [
         "type": "address"
       }
     ],
+    "name": "OwnershipTransferStarted",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "previousOwner",
+        "type": "address"
+      },
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "newOwner",
+        "type": "address"
+      }
+    ],
     "name": "OwnershipTransferred",
     "type": "event"
   },
@@ -1973,6 +2051,13 @@ export const LendingPoolABI = [
       }
     ],
     "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "acceptOwnership",
+    "outputs": [],
+    "stateMutability": "nonpayable",
     "type": "function"
   },
   {
@@ -2557,6 +2642,19 @@ export const LendingPoolABI = [
   },
   {
     "inputs": [],
+    "name": "pendingOwner",
+    "outputs": [
+      {
+        "internalType": "address",
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
     "name": "poolConfig",
     "outputs": [
       {
@@ -2641,7 +2739,7 @@ export const LendingPoolABI = [
     "inputs": [],
     "name": "renounceOwnership",
     "outputs": [],
-    "stateMutability": "nonpayable",
+    "stateMutability": "view",
     "type": "function"
   },
   {

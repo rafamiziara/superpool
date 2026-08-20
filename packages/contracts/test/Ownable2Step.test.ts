@@ -1,4 +1,4 @@
-import { ethers } from '../hardhat.connection'
+import { ethers, upgrades } from '../hardhat.connection'
 import type { HardhatEthersSigner } from '@nomicfoundation/hardhat-ethers/types'
 import { expect } from 'chai'
 import { LendingPool, PoolFactory } from '../typechain-types'
@@ -19,14 +19,16 @@ describe('PoolFactory Ownable2Step', function () {
     lendingPoolImplementation = await LendingPool.deploy()
     await lendingPoolImplementation.waitForDeployment()
 
-    // Deploy PoolFactory using direct deployment instead of proxy for testing
     const PoolFactory = await ethers.getContractFactory('PoolFactory')
-    const poolFactoryImpl = await PoolFactory.deploy()
-    await poolFactoryImpl.waitForDeployment()
-
-    // Initialize manually
-    await poolFactoryImpl.initialize(owner.address, await lendingPoolImplementation.getAddress())
-    poolFactory = poolFactoryImpl
+    // Behind its UUPS proxy, which is how the factory actually runs. These
+    // tests used to deploy the implementation and call `initialize` on it
+    // directly; the implementation now locks itself in its constructor, so
+    // that shortcut is gone — which is the point of the constructor.
+    poolFactory = (await upgrades.deployProxy(PoolFactory, [owner.address, await lendingPoolImplementation.getAddress()], {
+      initializer: 'initialize',
+      kind: 'uups',
+    })) as unknown as PoolFactory
+    await poolFactory.waitForDeployment()
   })
 
   describe('Ownership Status', function () {

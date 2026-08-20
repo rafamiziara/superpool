@@ -1,4 +1,4 @@
-import { ethers, isSimulatedNetwork, network } from '../hardhat.connection'
+import { ethers, isSimulatedNetwork, network, upgrades } from '../hardhat.connection'
 import type { HardhatEthersSigner } from '@nomicfoundation/hardhat-ethers/types'
 import { expect, use } from 'chai'
 import chaiAsPromised from 'chai-as-promised'
@@ -39,12 +39,15 @@ describe('Safe Integration Tests', function () {
 
     // Deploy PoolFactory
     const PoolFactory = await ethers.getContractFactory('PoolFactory')
-    const poolFactoryImpl = await PoolFactory.deploy()
-    await poolFactoryImpl.waitForDeployment()
-
-    // Initialize manually
-    await poolFactoryImpl.initialize(deployer.address, await lendingPoolImplementation.getAddress())
-    poolFactory = poolFactoryImpl
+    // Behind its UUPS proxy, which is how the factory actually runs. These
+    // tests used to deploy the implementation and call `initialize` on it
+    // directly; the implementation now locks itself in its constructor, so
+    // that shortcut is gone — which is the point of the constructor.
+    poolFactory = (await upgrades.deployProxy(PoolFactory, [deployer.address, await lendingPoolImplementation.getAddress()], {
+      initializer: 'initialize',
+      kind: 'uups',
+    })) as unknown as PoolFactory
+    await poolFactory.waitForDeployment()
   })
 
   describe('Safe Deployment', function () {

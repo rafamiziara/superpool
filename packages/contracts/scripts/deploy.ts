@@ -82,8 +82,55 @@ async function main() {
     // Verify PoolFactory proxy (this might fail, but that's normal for proxies)
     await verifyContract('PoolFactory Proxy', factoryAddress, [])
 
-    // Step 3: Create a sample pool through the factory
-    console.log('\n3️⃣ Creating sample pool through factory...')
+    /*
+     * Step 3: turn the whitelist on, and hand the key to it to the backend.
+     *
+     * Neither of these was here, and the deployment did not work without them.
+     *
+     * `setWhitelistMode(true)` is what `deploy-local.ts` has always done and
+     * this script never did — and with it off, `onlyAuthorizedCreator` admits
+     * the owner and nobody else. So `preparePoolCreation` refuses every user
+     * with "pool creation is currently restricted to administrators", and the
+     * app's main flow is dead on arrival.
+     *
+     * `setPoolCreatorAdmin` is what lets the Safe own this factory afterwards.
+     * The backend adds a wallet to the creator list on demand and pays the gas,
+     * so it has to be able to call `setCreatorAuthorization` — which used to be
+     * `onlyOwner`, and therefore required the backend's hot key to *be* the
+     * owner: the key that authorises a UUPS upgrade and can repoint the beacon
+     * at new pool logic for every pool at once. Appointing the narrow role
+     * first means `transfer:ownership:amoy` no longer breaks pool creation.
+     */
+    console.log('\n3️⃣ Configuring pool creation...')
+
+    const backendWallet = process.env.BACKEND_WALLET_ADDRESS
+
+    const whitelistTx = await poolFactory.setWhitelistMode(true)
+    await whitelistTx.wait()
+    console.log('✅ Whitelist mode enabled (lazy whitelisting via the backend)')
+
+    if (backendWallet) {
+      if (!ethers.isAddress(backendWallet)) {
+        throw new Error(`BACKEND_WALLET_ADDRESS is not an address: ${backendWallet}`)
+      }
+
+      const adminTx = await poolFactory.setPoolCreatorAdmin(backendWallet)
+      await adminTx.wait()
+      console.log('✅ Pool creator admin set to:', backendWallet)
+    } else {
+      console.warn(
+        [
+          '⚠️  BACKEND_WALLET_ADDRESS is not set, so no pool creator admin was appointed.',
+          '   Until one is, only the factory owner can whitelist creators — which means',
+          '   `preparePoolCreation` will fail as soon as ownership moves to the Safe.',
+          '   Set it and re-run, or call setPoolCreatorAdmin(<backend wallet>) before',
+          '   transferring ownership.',
+        ].join('\n')
+      )
+    }
+
+    // Step 4: Create a sample pool through the factory
+    console.log('\n4️⃣ Creating sample pool through factory...')
 
     const samplePoolParams = {
       poolOwner: deployer.address,
@@ -115,8 +162,8 @@ async function main() {
       console.log('✅ Sample pool created at:', samplePoolAddress)
     }
 
-    // Step 4: Verify deployments
-    console.log('\n4️⃣ Verifying deployments...')
+    // Step 5: Verify deployments
+    console.log('\n5️⃣ Verifying deployments...')
 
     // Verify factory
     console.log('Factory verification:')
@@ -166,7 +213,8 @@ async function main() {
     console.log('2. Create additional pools using PoolFactory.createPool()')
     console.log('3. Fund pools by calling depositFunds() with ETH')
     console.log('4. Test loan creation with createLoan()')
-    console.log('5. Set up multi-sig Safe for production ownership transfer')
+    console.log('5. Appoint the backend wallet: setPoolCreatorAdmin(<backend wallet>) — before the next step')
+    console.log('6. Transfer ownership to the multi-sig Safe: pnpm transfer:ownership:amoy')
 
     /*
      * Persist the deployment record.

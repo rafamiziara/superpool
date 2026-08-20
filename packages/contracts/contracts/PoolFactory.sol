@@ -158,6 +158,30 @@ contract PoolFactory is
      */
     mapping(address => bool) public authorizedLoanTokens;
 
+    /**
+     * @notice The address allowed to whitelist pool creators, besides the owner
+     * @dev Appended after `authorizedLoanTokens`, for the reason everything
+     * here is appended: this factory sits behind a UUPS proxy.
+     *
+     * **This exists to keep one key out of the other's job.** `createPool` is
+     * gated on `authorizedCreators`, and the backend adds a wallet to that list
+     * on demand and pays the gas — so the wallet that does it must be able to
+     * call `setCreatorAuthorization`. That was `onlyOwner`, which made the
+     * backend's hot key the factory *owner*: the same key that authorises a
+     * UUPS upgrade and that can point the beacon at new pool logic. One write
+     * there replaces the implementation of every pool at once, so a key living
+     * in a server's environment held every member's money.
+     *
+     * The two powers are now separable. Ownership goes to the Safe — upgrades,
+     * pause, the token allowlist, and the right to appoint this role. This
+     * address may do exactly one thing: add and remove pool creators. Losing it
+     * costs a spam list, not the protocol.
+     *
+     * Zero by default, which is the world before this existed: only the owner
+     * may authorise creators. Nothing has to be migrated.
+     */
+    address public poolCreatorAdmin;
+
     /// @notice Events
     /**
      * @notice Emitted when a new lending pool is created
@@ -225,6 +249,14 @@ contract PoolFactory is
      * This gate is on creation only.
      */
     event LoanTokenAuthorized(address indexed token, bool indexed authorized);
+    /**
+     * @notice Emitted when the owner appoints or clears the pool-creator admin
+     * @param admin The address that may now whitelist creators, or `address(0)`
+     * @dev On the public record because it is a delegation of the owner's
+     * authority: anyone reading the chain can see which key was trusted with
+     * it, and when it changed.
+     */
+    event PoolCreatorAdminChanged(address indexed admin);
 
     /// @notice Custom errors for gas optimization
     error InvalidPoolOwner();
@@ -251,6 +283,34 @@ contract PoolFactory is
      * on its first deposit.
      */
     error InvalidLoanToken();
+    /**
+     * @dev `renounceOwnership`, which this contract does not allow.
+     *
+     * An unowned factory can never be upgraded, can never appoint a
+     * `poolCreatorAdmin`, and — with the whitelist off — can never create
+     * another pool. Nothing recovers from it.
+     */
+    error OwnershipCannotBeRenounced();
+
+    /**
+     * @notice Locks the implementation contract against initialization
+     * @dev Runs at deployment of the *implementation*, never through the proxy
+     * — a constructor's code is not part of the runtime bytecode a proxy
+     * delegates to, which is why upgradeable contracts have `initialize` at
+     * all.
+     *
+     * Without this the implementation sits on chain uninitialized, and anyone
+     * can call `initialize` on it directly and own it. It is not a route into
+     * the proxy's storage, and `upgradeToAndCall` is `onlyProxy` so it cannot
+     * be driven from there either — but "no exploit we can currently name" is
+     * not a security property, and the whole cost of closing it is this
+     * constructor.
+     *
+     * @custom:oz-upgrades-unsafe-allow constructor
+     */
+    constructor() {
+        _disableInitializers();
+    }
 
     /// @notice Modifier to check if pool exists
     modifier poolExists(uint256 _poolId) {
@@ -591,6 +651,23 @@ contract PoolFactory is
     }
 
     /**
+     * @notice Disabled. This factory cannot be left without an owner.
+     * @dev Inherited from `Ownable`, where it exists for contracts that are
+     * meant to become autonomous. This one is the opposite: the owner
+     * authorises every UUPS upgrade, owns the beacon that every pool's logic
+     * hangs from, appoints `poolCreatorAdmin`, and is the only address that can
+     * create a pool while the whitelist is off. An owner of `address(0)` ends
+     * all of that permanently, and there is no recovery — not even an upgrade,
+     * because authorising one is itself `onlyOwner`.
+     *
+     * `Ownable2Step` already makes *transferring* safe by requiring the new
+     * owner to accept. This closes the one path that transfers to nobody.
+     */
+    function renounceOwnership() public view override onlyOwner {
+        revert OwnershipCannotBeRenounced();
+    }
+
+    /**
      * @notice Get contract version
      * @return version Version string of the contract
      */
@@ -660,15 +737,48 @@ contract PoolFactory is
      * @notice Authorize or revoke pool creation permission for an address
      * @param _creator Address to authorize or revoke
      * @param _authorized Whether to authorize (true) or revoke (false)
+     * @dev The owner **or** `poolCreatorAdmin`. Deliberately no longer
+     * `onlyOwner`: the backend whitelists a wallet on demand and pays the gas,
+     * so requiring ownership here meant the backend's hot key had to be the
+     * factory owner — and therefore had to hold the upgrade authority over
+     * every pool. See `poolCreatorAdmin`.
      */
     function setCreatorAuthorization(
         address _creator,
         bool _authorized
-    ) external onlyOwner {
+    ) external {
+        // The owner, or the one address it has delegated this single power to.
+        // See `poolCreatorAdmin` for why the two are not the same key.
+        if (msg.sender != owner() && msg.sender != poolCreatorAdmin) {
+            revert UnauthorizedCreator();
+        }
+
         if (_creator == address(0)) revert InvalidPoolOwner();
 
         authorizedCreators[_creator] = _authorized;
         emit CreatorAuthorized(_creator, _authorized);
+    }
+
+    /**
+     * @notice Appoint the address that may whitelist pool creators (only owner)
+     * @param _admin The backend's wallet, or `address(0)` to withdraw the role
+     * @dev The point of the whole arrangement: this is the only power the
+     * owner can hand out, and it is the only one the backend needs. Set it to
+     * the backend wallet, then transfer ownership to the Safe — after that a
+     * compromised backend key can add a spam creator and nothing else.
+     *
+     * One address rather than a mapping, because one backend calls this. A
+     * second would be a list, and a list of keys that can each be lost is a
+     * worse thing to own than one that can be replaced in a single
+     * transaction.
+     *
+     * Clearing it is `address(0)`, which is also the default — so "no
+     * delegate" is the zero value and needs no migration.
+     */
+    function setPoolCreatorAdmin(address _admin) external onlyOwner {
+        poolCreatorAdmin = _admin;
+
+        emit PoolCreatorAdminChanged(_admin);
     }
 
     /**
