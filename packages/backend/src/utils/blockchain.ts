@@ -1,6 +1,7 @@
 import { Contract, JsonRpcProvider, Wallet } from 'ethers'
 import { logger } from 'firebase-functions/v2'
 import { HttpsError } from 'firebase-functions/v2/https'
+import { defineSecret } from 'firebase-functions/params'
 import { getChainConfig, PoolFactoryABI } from '../constants'
 
 /**
@@ -20,10 +21,35 @@ export const getProvider = (chainId: number): JsonRpcProvider => {
 }
 
 /**
+ * The backend's signing key, declared as a Secret Manager secret.
+ *
+ * `defineSecret` rather than a bare `process.env` read, because the two are
+ * stored in different places and only one of them is a secret store. A `.env`
+ * shipped with a Functions deployment becomes part of the function's
+ * configuration: readable by anyone with project Viewer, visible in the
+ * console, and captured in deployment history — for the key that owns the one
+ * funded wallet this project has.
+ *
+ * Set it with `firebase functions:secrets:set BACKEND_WALLET_PRIVATE_KEY`. The
+ * value is then mounted into the process at runtime, so `.value()` reads the
+ * same way the old code did and every caller is unchanged.
+ *
+ * Functions that sign must list this in their `secrets` option — see
+ * `preparePoolCreation`. A function that does not is simply not given the
+ * value, which is the point: the blast radius of the key is now the list of
+ * endpoints that name it.
+ */
+export const backendWalletPrivateKey = defineSecret('BACKEND_WALLET_PRIVATE_KEY')
+
+/**
  * Get backend wallet instance for signing transactions
  */
 export const getBackendWallet = (chainId: number): Wallet => {
-  const privateKey = process.env.BACKEND_WALLET_PRIVATE_KEY
+  // `.value()` falls back to `process.env` when the secret is not mounted,
+  // which is what keeps the emulator and the live scripts in `scripts/`
+  // working from a local `.env` exactly as before.
+  const privateKey = backendWalletPrivateKey.value() || process.env.BACKEND_WALLET_PRIVATE_KEY
+
   if (!privateKey) {
     throw new HttpsError('internal', 'Backend wallet private key not configured')
   }

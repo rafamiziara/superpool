@@ -260,6 +260,18 @@ service cloud.firestore {
       allow read, write: if false; // backend-only (saveNote / loan indexer)
     }
 
+    // --- wallet_budget -----------------------------------------------------
+    // How much gas the backend wallet has spent whitelisting pool creators
+    // today, and the short lease that stops two invocations building
+    // transactions on the same nonce. Closed in both directions and not
+    // negotiable: a client that could write the counter could lift its own
+    // ceiling on the project's money, and one that could write the lease could
+    // hold the wallet indefinitely.
+
+    match /wallet_budget/{docId} {
+      allow read, write: if false; // backend-only
+    }
+
     // --- event_sync_state --------------------------------------------------
     // Per-chain indexer cursors (last processed block). Tampering with these
     // would let an attacker skip or replay blockchain event ranges.

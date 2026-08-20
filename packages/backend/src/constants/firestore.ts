@@ -222,3 +222,26 @@ export const ASSESSMENTS_COLLECTION = 'assessments'
  * their queue would exhaust it looking at answers they already had.
  */
 export const ASSESSMENT_QUOTA_COLLECTION = 'assessment_quota'
+
+/**
+ * The name of the Firestore collection that bounds and serialises the backend
+ * wallet's own spending.
+ *
+ * Two kinds of document, one collection, because they are one concern — the
+ * project has exactly one funded hot wallet and both of these are about not
+ * losing control of it:
+ *
+ * - `budget-<chainId>-<UTC day>` counts the whitelisting transactions paid for
+ *   today. `preparePoolCreation` sends `setCreatorAuthorization` and **the
+ *   backend pays the gas**, for any authenticated caller — and authentication
+ *   is deliberately cheap here, so a stranger with a script of throwaway
+ *   wallets could drain the wallet a transaction at a time. Nothing bounded it
+ *   before; a comment claimed lazy whitelisting "prevents spam", which it does
+ *   for the factory and not for the wallet.
+ * - `lock-<chainId>` is a short lease serialising those sends. Every one of
+ *   them signs from the same address, so two concurrent calls build two
+ *   transactions on the same nonce and one is dropped. The handler already
+ *   caught the error message and told the user to try again; the lease is what
+ *   stops it happening.
+ */
+export const WALLET_BUDGET_COLLECTION = 'wallet_budget'
