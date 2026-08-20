@@ -8,10 +8,17 @@ jest.mock('ethers', () => ({
   verifyTypedData: jest.fn(),
 }))
 
-// Mock the createAuthMessage utility
+// Mock by module path, not through the barrel: the handler imports from
+// `utils/auth`, so a barrel mock would leave the real functions in place. See
+// CLAUDE.md, "Import from `utils/validation`, never from `../../utils`".
 const mockCreateAuthMessage = jest.fn()
-jest.mock('../../utils', () => ({
+const mockClaimAuthNonce = jest.fn()
+jest.mock('../../utils/auth', () => ({
   createAuthMessage: mockCreateAuthMessage,
+  claimAuthNonce: mockClaimAuthNonce,
+  // The real class: the handler catches it by `instanceof`, so a stand-in
+  // would make the expiry path untestable rather than merely mocked.
+  NonceExpiredError: jest.requireActual('../../utils/auth').NonceExpiredError,
 }))
 
 // Mock the DeviceVerificationService
@@ -61,6 +68,7 @@ describe('verifySignatureAndLoginHandler', () => {
 
     // Configure utility function mocks
     mockCreateAuthMessage.mockReturnValue(mockMessage)
+    mockClaimAuthNonce.mockResolvedValue({ nonce, timestamp, expiresAt: mockNow + 10 * 60 * 1000 })
 
     // Configure Firestore mocks for the happy path
     const mockNonceDoc = {
@@ -109,7 +117,9 @@ describe('verifySignatureAndLoginHandler', () => {
 
     // Assert
     expect(mockedIsAddress).toHaveBeenCalledWith(walletAddress)
-    expect(firestore.collection).toHaveBeenCalledWith(AUTH_NONCES_COLLECTION)
+    // The handler no longer touches `auth_nonces` itself — `claimAuthNonce`
+    // does, inside a transaction, which is the point of it existing.
+    expect(mockClaimAuthNonce).toHaveBeenCalledWith(walletAddress, firestore)
     expect(firestore.collection).toHaveBeenCalledWith(USERS_COLLECTION)
     expect(mockCreateAuthMessage).toHaveBeenCalledWith(walletAddress, nonce, timestamp)
     expect(mockedVerifyMessage).toHaveBeenCalledWith(mockMessage, signature)
@@ -211,30 +221,10 @@ describe('verifySignatureAndLoginHandler', () => {
   })
 
   // Test Case: Not Found - Nonce does not exist
-  it('should throw a not-found error if the nonce document does not exist', async () => {
+  it('should throw a not-found error when there is no challenge to claim', async () => {
     // Arrange
     const request = { data: { walletAddress, signature } }
-
-    firestore.collection.mockImplementation((collectionName: string) => {
-      const docMock = jest.fn((_docId: string) => {
-        if (collectionName === AUTH_NONCES_COLLECTION) {
-          return {
-            get: jest.fn().mockResolvedValue({ exists: false }),
-            delete: jest.fn().mockResolvedValue(undefined),
-          }
-        } else {
-          return {
-            get: jest.fn().mockResolvedValue({
-              exists: true,
-              data: () => ({ walletAddress, createdAt: timestamp }),
-            }),
-            set: jest.fn().mockResolvedValue(undefined),
-            update: jest.fn().mockResolvedValue(undefined),
-          }
-        }
-      })
-      return { doc: docMock }
-    })
+    mockClaimAuthNonce.mockResolvedValue(null)
 
     // Act & Assert
     await expect(verifySignatureAndLoginHandler(request)).rejects.toThrow(
@@ -244,43 +234,18 @@ describe('verifySignatureAndLoginHandler', () => {
   })
 
   // Test Case: Deadline Exceeded - Nonce has expired
-  it('should throw a deadline-exceeded error if the nonce has expired and clean up the expired nonce', async () => {
+  it('should throw a deadline-exceeded error when the challenge has lapsed', async () => {
     // Arrange
     const request = { data: { walletAddress, signature } }
-    const expiredTimestamp = mockNow - 20 * 60 * 1000
-    const expiredExpiresAt = expiredTimestamp + 10 * 60 * 1000
-    const mockDeleteFn = jest.fn().mockResolvedValue(undefined)
+    const { NonceExpiredError } = jest.requireActual('../../utils/auth')
+    mockClaimAuthNonce.mockRejectedValue(new NonceExpiredError())
 
-    firestore.collection.mockImplementation((collectionName: string) => {
-      const docMock = jest.fn((_docId: string) => {
-        if (collectionName === AUTH_NONCES_COLLECTION) {
-          return {
-            get: jest.fn().mockResolvedValue({
-              exists: true,
-              data: () => ({ nonce, timestamp: expiredTimestamp, expiresAt: expiredExpiresAt }),
-            }),
-            delete: mockDeleteFn,
-          }
-        } else {
-          return {
-            get: jest.fn().mockResolvedValue({
-              exists: true,
-              data: () => ({ walletAddress, createdAt: timestamp }),
-            }),
-            set: jest.fn().mockResolvedValue(undefined),
-            update: jest.fn().mockResolvedValue(undefined),
-          }
-        }
-      })
-      return { doc: docMock }
-    })
-
-    // Act & Assert
+    // Act & Assert — the claim consumes an expired challenge on its way out,
+    // so there is nothing left for a second attempt to find.
     await expect(verifySignatureAndLoginHandler(request)).rejects.toThrow(
       'Authentication message has expired. Please generate a new message.'
     )
     await expect(verifySignatureAndLoginHandler(request)).rejects.toHaveProperty('code', 'deadline-exceeded')
-    expect(mockDeleteFn).toHaveBeenCalled()
   })
 
   // Test Case: Unauthenticated - Signature verification fails
@@ -339,40 +304,32 @@ describe('verifySignatureAndLoginHandler', () => {
   })
 
   // Test Case: SECURITY - Nonce deletion fails (must fail authentication to prevent replay attacks)
-  it('should fail authentication if nonce deletion fails to prevent replay attacks', async () => {
+  it('should claim the challenge before verifying anything, so a race cannot mint two tokens', async () => {
     // Arrange
+    // This replaces a test that asserted the *old* shape — read the nonce
+    // first, delete it at the very end, and fail the login if the delete
+    // failed. That ordering left the whole handler as a window in which two
+    // requests both saw the document and both got a token, and no arrangement
+    // of a trailing delete could close it. The claim is atomic now, so the
+    // property to pin is that nothing happens before it.
     const request = { data: { walletAddress, signature } }
-    const mockDeleteFn = jest.fn().mockRejectedValue(new Error('Firestore delete error'))
-
-    firestore.collection.mockImplementation((collectionName: string) => {
-      const docMock = jest.fn((_docId: string) => {
-        if (collectionName === AUTH_NONCES_COLLECTION) {
-          return {
-            get: jest.fn().mockResolvedValue({
-              exists: true,
-              data: () => ({ nonce, timestamp, expiresAt: mockNow + 10 * 60 * 1000 }),
-            }),
-            delete: mockDeleteFn,
-          }
-        } else {
-          return {
-            get: jest.fn().mockResolvedValue({
-              exists: true,
-              data: () => ({ walletAddress, createdAt: timestamp }),
-            }),
-            set: jest.fn().mockResolvedValue(undefined),
-            update: jest.fn().mockResolvedValue(undefined),
-          }
-        }
-      })
-      return { doc: docMock }
-    })
+    mockClaimAuthNonce.mockRejectedValue(new Error('Firestore transaction error'))
 
     // Act & Assert
-    // SECURITY - must fail authentication to prevent replay attacks
-    await expect(verifySignatureAndLoginHandler(request)).rejects.toThrow('Firestore delete error')
-    expect(mockDeleteFn).toHaveBeenCalled()
+    await expect(verifySignatureAndLoginHandler(request)).rejects.toThrow('Firestore transaction error')
+    expect(mockedVerifyMessage).not.toHaveBeenCalled()
     expect(auth.createCustomToken).not.toHaveBeenCalled()
+  })
+
+  it('should accept a wallet signing on a chain this backend does not serve', async () => {
+    // Logging in is not a per-chain act. A wallet sitting on Ethereum mainnet
+    // is entitled to authenticate against a backend that only serves Amoy and
+    // switch afterwards — refusing it here was tried during review and is a
+    // live bug, not a hardening. `chainId` is a domain separator: a wrong one
+    // recovers a different address and the equality check refuses the login.
+    const request = { data: { walletAddress, signature, signatureType: 'typed-data', chainId: 1 } }
+
+    await expect(verifySignatureAndLoginHandler(request)).resolves.toMatchObject({ firebaseToken })
   })
 
   // Test Case: Unauthenticated - Custom token creation fails
