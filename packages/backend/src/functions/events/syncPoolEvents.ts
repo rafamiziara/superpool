@@ -30,6 +30,42 @@ const DEFAULT_LOOKBACK_BLOCKS = 1000
 /** Hardhat's chain id. A local node is short and disposable, so it is swept whole. */
 const LOCAL_CHAIN_ID = 31337
 
+/**
+ * How far behind the head a sweep stops, in blocks.
+ *
+ * The sweep used to index up to `getBlockNumber()` and move its cursor past it.
+ * That is correct on a Hardhat node, where the chain never reorganises, and
+ * wrong on every real one: a log read from a block that is later orphaned is
+ * written to Firestore, the cursor advances beyond it, and **the range is never
+ * looked at again**. The document survives as a contribution, a loan or a
+ * membership that no chain agrees happened — and since balances here are summed
+ * from events rather than stored, one of those quietly inflates somebody's
+ * position for ever.
+ *
+ * Polygon PoS reorganises a few blocks deep routinely. 128 is comfortably past
+ * that and costs only latency in the sweep, which is not the path a user waits
+ * on: the app indexes its own transaction the moment it has a receipt, through
+ * `indexPool` / `indexLoan` and friends. Those are idempotent and keyed on the
+ * log, so anything the sweep re-reads later is a no-op — the immediate path
+ * buys responsiveness and this one buys correctness.
+ *
+ * Zero on a local chain, where there is no reorg to wait out and a 128-block
+ * lag would simply mean nothing is ever indexed.
+ */
+const CONFIRMATIONS = 128
+
+/**
+ * The newest block a sweep of this chain may safely index.
+ *
+ * Never negative: a chain shorter than the confirmation depth has nothing
+ * settled yet, and `fromBlock > safeHead` then short-circuits the run.
+ */
+export function safeHeadFor(currentBlock: number, chainId: number): number {
+  if (chainId === LOCAL_CHAIN_ID) return currentBlock
+
+  return Math.max(0, currentBlock - CONFIRMATIONS)
+}
+
 export interface SyncPoolEventsResult extends SweepCounts {
   chainId: number
   fromBlock: number
@@ -112,6 +148,11 @@ export const syncPoolEventsHandler = async (options: SyncPoolEventsOptions = {})
   const provider = getProvider(chainId)
   const currentBlock = await provider.getBlockNumber()
 
+  // Everything below sweeps to `safeHead`, not to the head. See `CONFIRMATIONS`:
+  // a log read from a block that is later orphaned would be written once and
+  // never revisited, because the cursor moves past it.
+  const safeHead = safeHeadFor(currentBlock, chainId)
+
   const syncStateRef = firestore.collection(EVENT_SYNC_STATE_COLLECTION).doc(chainId.toString())
   const syncStateDoc = await syncStateRef.get()
   const lastProcessedBlock = syncStateDoc.exists ? (syncStateDoc.data()!.lastProcessedBlock as number) : undefined
@@ -137,20 +178,22 @@ export const syncPoolEventsHandler = async (options: SyncPoolEventsOptions = {})
     statusUpdates: 0,
   }
 
-  if (fromBlock > currentBlock) {
-    logger.info('Already synced up to current block, nothing to do', { chainId, lastProcessedBlock, currentBlock })
+  if (fromBlock > safeHead) {
+    // Includes the ordinary case on a quiet chain: the head has moved but not
+    // yet by a confirmation depth, so there is nothing newly settled to read.
+    logger.info('Already synced up to the confirmed head, nothing to do', { chainId, lastProcessedBlock, currentBlock, safeHead })
 
-    return { chainId, fromBlock, toBlock: currentBlock, currentBlock, caughtUp: true, ...totals }
+    return { chainId, fromBlock, toBlock: safeHead, currentBlock, caughtUp: true, ...totals }
   }
 
-  logger.info('Starting event sync', { chainId, fromBlock, currentBlock })
+  logger.info('Starting event sync', { chainId, fromBlock, currentBlock, safeHead })
 
   let cursor = fromBlock
   let lastSweptBlock = fromBlock - 1
   let ranges = 0
 
-  while (cursor <= currentBlock && ranges < MAX_RANGES_PER_RUN) {
-    const toBlock = Math.min(currentBlock, cursor + MAX_BLOCK_RANGE - 1)
+  while (cursor <= safeHead && ranges < MAX_RANGES_PER_RUN) {
+    const toBlock = Math.min(safeHead, cursor + MAX_BLOCK_RANGE - 1)
 
     let counts: SweepCounts
     try {
@@ -216,13 +259,18 @@ export const syncPoolEventsHandler = async (options: SyncPoolEventsOptions = {})
     ranges++
   }
 
-  const caughtUp = lastSweptBlock >= currentBlock
+  // Against `safeHead` rather than `currentBlock`: "caught up" means this run
+  // read everything it was allowed to read. Measuring it against the head would
+  // report `false` on every successful run, since the last 128 blocks are
+  // deliberately left alone.
+  const caughtUp = lastSweptBlock >= safeHead
 
   logger.info('Event sync completed', {
     chainId,
     fromBlock,
     toBlock: lastSweptBlock,
     currentBlock,
+    safeHead,
     caughtUp,
     ranges,
     ...totals,

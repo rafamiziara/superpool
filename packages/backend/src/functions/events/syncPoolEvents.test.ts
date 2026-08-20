@@ -29,6 +29,15 @@ const CURRENT_BLOCK = 5000
 const LAST_PROCESSED_BLOCK = 4900
 const MAX_BLOCK_RANGE = 500
 
+/**
+ * Mirrors `CONFIRMATIONS` in the handler. A sweep of a real chain stops this
+ * far short of the head, because a log read from a block that is later
+ * orphaned is written once and never revisited — the cursor has moved past it.
+ * A local chain has no reorgs and is swept to the head.
+ */
+const CONFIRMATIONS = 128
+const SAFE_HEAD = CURRENT_BLOCK - CONFIRMATIONS
+
 const NO_COUNTS = { pools: 0, contributions: 0, withdrawals: 0, statusUpdates: 0 }
 
 // ---------------------------------------------------------------------------
@@ -408,13 +417,37 @@ describe('syncPoolEventsHandler', () => {
 
   describe('a named chain', () => {
     it('is swept instead of the default', async () => {
-      setupFirestore()
+      // A cursor far enough back that there is confirmed work to do: chain
+      // 80002 is not local, so the sweep stops `CONFIRMATIONS` short of the
+      // head and the default cursor of 4900 is already past that.
+      setupFirestore({ lastProcessedBlock: CURRENT_BLOCK - 500 })
 
       await syncPoolEventsHandler({ chainId: SECOND_CHAIN_ID })
 
       expect(sweepBlockRange).toHaveBeenCalledWith(
         expect.objectContaining({ chainId: SECOND_CHAIN_ID, factoryAddress: SECOND_FACTORY_ADDRESS })
       )
+    })
+
+    it('stops short of the head, leaving the unconfirmed tail alone', async () => {
+      setupFirestore({ lastProcessedBlock: CURRENT_BLOCK - 500 })
+
+      const result = await syncPoolEventsHandler({ chainId: SECOND_CHAIN_ID })
+
+      expect(result.toBlock).toBe(SAFE_HEAD)
+      expect(result.currentBlock).toBe(CURRENT_BLOCK)
+      expect(result.caughtUp).toBe(true)
+    })
+
+    it('does nothing when the head has not moved a confirmation depth yet', async () => {
+      // The ordinary case on a quiet chain, and the one that must not be
+      // mistaken for an error: everything settled has already been read.
+      setupFirestore({ lastProcessedBlock: SAFE_HEAD })
+
+      const result = await syncPoolEventsHandler({ chainId: SECOND_CHAIN_ID })
+
+      expect(result).toMatchObject({ caughtUp: true })
+      expect(sweepBlockRange).not.toHaveBeenCalled()
     })
 
     it('keeps its own cursor', async () => {
