@@ -277,6 +277,42 @@ in the `secrets` option of the one deployed function that signs. A function that
 does not name it cannot read it, which is what makes the key's blast radius a
 list you can read.
 
+### Two `isActive` flags, one word apart
+
+**`PoolFactory.deactivatePool` is moderation, not a kill switch.** It writes a
+flag on the _registry entry_, which is what `listPools` filters on — so the pool
+stops being discoverable and nothing else. The pool contract is untouched and
+goes on taking deposits, lending and accepting repayments from anyone holding
+its address, because nothing in `LendingPool` reads it.
+
+**`LendingPool.togglePoolStatus` is the binding one.** `createLoan`,
+`requestLoan` and `requestMembership` all check `poolConfig.isActive`, and it
+belongs to the pool's owner rather than to the factory's. It emits
+`PoolStatusChanged`; nothing indexes it yet, like `DefaultGracePeriodChanged`,
+so it is on the public record and indexing it later needs no upgrade.
+
+There is deliberately **no path from the factory's flag to the pool's**. A
+protocol operator who could close somebody's pool could strand its members
+mid-loan, and the pools are other people's. So the honest answer to "can we shut
+a bad pool down" is: we can stop showing it to people who have not found it yet.
+
+### Logging in
+
+**The nonce is claimed atomically and spent on the attempt, not on the
+success.** `claimAuthNonce` reads and deletes in one transaction; a signature
+that fails afterwards has still consumed the challenge. A challenge that
+survives a wrong answer can be answered any number of times, and the cost of
+this is one regenerated message on a flow that regenerates anyway.
+
+**`chainId` on the EIP-712 path comes from the caller, and must.** Refusing a
+chain the backend does not serve is a _bug_, not a hardening — it was tried and
+reverted. Logging in is not a per-chain act: a wallet on Ethereum mainnet is
+entitled to authenticate against a backend serving only Amoy and switch after.
+The number only has to reproduce the domain the wallet signed with, and
+controlling it buys nothing, since a wrong value recovers a different address
+and the equality check refuses the login. There is no `verifyingContract`
+because nothing on chain verifies this.
+
 ### Indexing a chain that can change its mind
 
 The sweep stops **128 blocks short of the head**. It used to read to
