@@ -1096,6 +1096,15 @@ describe('LendingPool', function () {
       await lendingPool.connect(owner).togglePoolStatus()
       expect((await lendingPool.poolConfig()).isActive).to.be.true
     })
+
+    it('Should announce a status change in both directions', async function () {
+      // This was the one owner action that left no trace at all. The flag it
+      // flips is what `createLoan`, `requestLoan` and `requestMembership`
+      // check, so a closed pool went on looking open to everything off chain.
+      await expect(lendingPool.connect(owner).togglePoolStatus()).to.emit(lendingPool, 'PoolStatusChanged').withArgs(false)
+
+      await expect(lendingPool.connect(owner).togglePoolStatus()).to.emit(lendingPool, 'PoolStatusChanged').withArgs(true)
+    })
   })
 
   describe('Pausable', function () {

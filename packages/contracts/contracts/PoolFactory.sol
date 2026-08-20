@@ -565,8 +565,24 @@ contract PoolFactory is
     }
 
     /**
-     * @notice Deactivate a pool (only owner)
-     * @param _poolId The pool ID to deactivate
+     * @notice Hide a pool from discovery (only owner)
+     * @param _poolId The pool ID to hide
+     * @dev **This is moderation, not a kill switch, and reading it as one is
+     * the mistake worth guarding against.** It writes a flag on the *registry
+     * entry*, which is what `listPools` filters on — so the pool stops being
+     * discoverable. The pool contract itself is untouched: it goes on taking
+     * deposits, lending and accepting repayments from anyone who holds its
+     * address, because nothing in `LendingPool` reads this.
+     *
+     * The pool's own switch is `LendingPool.togglePoolStatus`, which *is*
+     * binding — `createLoan`, `requestLoan` and `requestMembership` all check
+     * it — and belongs to the pool's owner rather than to this factory's. There
+     * is deliberately no path from here to there: a protocol operator who could
+     * close somebody's pool could strand its members mid-loan, and the pools
+     * are other people's.
+     *
+     * So the honest description of what this can do about a bad pool is: stop
+     * showing it to people who have not found it yet.
      */
     function deactivatePool(
         uint256 _poolId
@@ -857,33 +873,29 @@ contract PoolFactory is
     }
 
     /**
-     * @notice Internal function to validate pool owner address
+     * @notice Refuse the two addresses that cannot coherently own a pool
      * @param _poolOwner Address to validate as pool owner
-     * @dev Performs enhanced validation beyond zero address check
+     * @dev Contracts are allowed on purpose — a Safe owning a pool is a
+     * feature, not something to guard against. Only two addresses are refused,
+     * and both because owning a pool would mean something circular: this
+     * factory, and the shared implementation every pool delegates to.
+     *
+     * It used to read `extcodesize` into a local and never look at it, under a
+     * comment about a "soft check" that flagged contracts for review. Nothing
+     * reviewed anything; the value was written and dropped, so the only effect
+     * was the gas. Deleting it changes no behaviour — which is exactly why it
+     * was worth checking before deleting rather than after.
      */
     function _validatePoolOwner(address _poolOwner) internal view {
-        // Check if address is a contract
-        // Using inline assembly for gas-efficient contract size check
-        uint256 codeSize;
-        // solhint-disable-next-line no-inline-assembly
-        assembly {
-            codeSize := extcodesize(_poolOwner)
-        }
-
-        // Allow EOA addresses and certain contract addresses
-        // Reject if it's this factory contract (prevent circular ownership)
+        // Circular: the factory would own a pool it created.
         if (_poolOwner == address(this)) {
             revert InvalidPoolOwnerAddress();
         }
 
-        // Reject if it's the lending pool implementation
+        // Circular in the other direction: the implementation every pool
+        // delegates to would own one of them.
         if (_poolOwner == lendingPoolImplementation) {
             revert InvalidPoolOwnerAddress();
         }
-
-        // Additional validation: contracts are allowed but flagged for review
-        // This is a soft check - contracts are allowed but documented as a consideration
-        // Future versions could implement a whitelist for known contract types
-        // For now, we allow all non-blacklisted addresses (EOA and contracts)
     }
 }

@@ -2031,6 +2031,19 @@ export const LendingPoolABI = [
     "anonymous": false,
     "inputs": [
       {
+        "indexed": true,
+        "internalType": "bool",
+        "name": "isActive",
+        "type": "bool"
+      }
+    ],
+    "name": "PoolStatusChanged",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
         "indexed": false,
         "internalType": "address",
         "name": "account",

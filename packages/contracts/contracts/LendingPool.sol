@@ -564,6 +564,14 @@ contract LendingPool is
      * chain. It exists so the change is on the public record.
      */
     event DefaultGracePeriodChanged(uint256 indexed gracePeriod);
+    /**
+     * @notice Emitted when the pool owner opens or closes the pool
+     * @param isActive Whether the pool now takes new loans and applications
+     * @dev The **pool's own** flag, not the factory registry's — see
+     * `togglePoolStatus` for why confusing the two matters. Indexed and `data`
+     * empty, like every other event here.
+     */
+    event PoolStatusChanged(bool indexed isActive);
 
     /// @notice Errors
     error InsufficientFunds();
@@ -1974,10 +1982,30 @@ contract LendingPool is
     }
 
     /**
-     * @notice Toggle pool active status (only owner)
+     * @notice Open or close this pool to new business (only owner)
+     * @dev **Not the same flag as `PoolFactory.deactivatePool`, and the two are
+     * not substitutes.** This one is the pool owner's and is the one that
+     * *binds*: `createLoan`, `requestLoan` and `requestMembership` all check
+     * `poolConfig.isActive`. The factory's is the protocol operator's and only
+     * decides whether `listPools` shows the pool — a pool hidden there still
+     * takes deposits from anyone holding its address.
+     *
+     * Closing a pool stops new business and nothing else. Deposits, loans and
+     * memberships already in place are untouched, and the three exits stay open
+     * for the same reason a pause leaves them open — see `withdraw`.
+     *
+     * The event was missing entirely, which made this the one owner action that
+     * left no trace: the flag it flips is invisible to the index, so a closed
+     * pool went on looking open everywhere off chain. Nothing indexes it yet,
+     * like `DefaultGracePeriodChanged` — it is here so the change is on the
+     * public record and so indexing it later needs no upgrade.
      */
     function togglePoolStatus() external onlyOwner {
-        poolConfig.isActive = !poolConfig.isActive;
+        bool isActive = !poolConfig.isActive;
+
+        poolConfig.isActive = isActive;
+
+        emit PoolStatusChanged(isActive);
     }
 
     /**
