@@ -18,6 +18,7 @@ import {
 } from '../../services/assessments'
 import { parseRequest } from '../../utils/validation'
 import { getProvider } from '../../utils/blockchain'
+import { enforceAppCheck } from '../../utils/appCheck'
 
 export const assessLoanHandler = async (request: CallableRequest<AssessLoanRequest>): Promise<AssessLoanResponse> => {
   if (!request.auth) {
@@ -178,6 +179,8 @@ export const assessLoan = onCall<AssessLoanRequest>(
     // is the outer bound rather than the one that fires.
     timeoutSeconds: 120,
     cors: true,
+    // See `enforceAppCheck`: off unless ENFORCE_APP_CHECK=true.
+    enforceAppCheck: enforceAppCheck(),
   },
   assessLoanHandler
 )

@@ -5,6 +5,7 @@ import { registerPushTokenSchema } from '../../schemas'
 import { firestore } from '../../services'
 import { savePushToken } from '../../services/pushTokens'
 import { parseRequest } from '../../utils/validation'
+import { enforceAppCheck } from '../../utils/appCheck'
 
 export const registerPushTokenHandler = async (request: CallableRequest<RegisterPushTokenRequest>): Promise<RegisterPushTokenResponse> => {
   if (!request.auth) {
@@ -50,6 +51,8 @@ export const registerPushToken = onCall<RegisterPushTokenRequest>(
     memory: '256MiB',
     timeoutSeconds: 30,
     cors: true,
+    // See `enforceAppCheck`: off unless ENFORCE_APP_CHECK=true.
+    enforceAppCheck: enforceAppCheck(),
   },
   registerPushTokenHandler
 )

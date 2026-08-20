@@ -5,6 +5,7 @@ import { saveNoteSchema } from '../../schemas'
 import { firestore } from '../../services'
 import { entitlementFor, normaliseNoteText, saveNote as save, stagedRecordId, stageNote } from '../../services/notes'
 import { parseRequest } from '../../utils/validation'
+import { enforceAppCheck } from '../../utils/appCheck'
 
 export const saveNoteHandler = async (request: CallableRequest<SaveNoteRequest>): Promise<SaveNoteResponse> => {
   if (!request.auth) {
@@ -133,6 +134,8 @@ export const saveNote = onCall<SaveNoteRequest>(
     memory: '256MiB',
     timeoutSeconds: 30,
     cors: true,
+    // See `enforceAppCheck`: off unless ENFORCE_APP_CHECK=true.
+    enforceAppCheck: enforceAppCheck(),
   },
   saveNoteHandler
 )
