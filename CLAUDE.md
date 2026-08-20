@@ -220,11 +220,72 @@ pnpm test:safe     # Complete Safe multi-sig testing
 4. Upon successful wallet auth → device automatically approved
 5. Future App Check tokens issued for approved devices only
 
+**Step 1 is conditional, and was fiction until 2026-08-20.** `enforceAppCheck`
+appeared in no function at all: the whole chain ran and minted 24-hour tokens
+that nothing ever asked for. It is now declared on the endpoints that spend
+money or act on somebody's behalf, behind `ENFORCE_APP_CHECK` — **off by
+default**, because turning it on without a build whose App Check provider works
+end to end locks out every client. That build is the one push is waiting on.
+
+Two things not to mistake it for:
+
+- **Not an identity boundary.** `verifySignatureAndLogin` approves whatever
+  `deviceId` string it is handed once a signature checks out, so anybody with
+  any wallet can have an approved device of their choosing. It raises the cost
+  of automated abuse and does not establish who anyone is.
+- **Not a spend limit.** What bounds a caller who does get through is
+  `WHITELIST_DAILY_CAP`, `ASSESSMENT_DAILY_CAP` and `requireAdmin`.
+
+**Authentication here is cheap, deliberately** — any wallet can sign a nonce and
+get a token, which is why `firestore.rules` treats a signed-in caller as barely
+more than the public. Anything that costs the project money therefore needs its
+own gate, never `request.auth` alone:
+
+- `requireAdmin` (`ADMIN_WALLETS`) for the manual twins of the schedules —
+  `syncPoolEventsNow`, `sendDueRemindersNow`, `collectPushReceiptsNow`. **Empty
+  means nobody**, not everybody: an unset variable in production must fail
+  closed.
+- `claimWhitelisting` / `withWalletLock` for `preparePoolCreation`, the only
+  endpoint that spends the project's own gas for an arbitrary caller. Global per
+  chain per day, not per wallet — a per-wallet limit bounds an accident, not a
+  script with a thousand fresh wallets.
+
 **Collections:**
 
 - `approved_devices` - Stores device-to-wallet mappings with approval timestamps
 - `auth_nonces` - Time-limited nonces for wallet authentication (10 min expiry)
 - `users` - User profiles linked to wallet addresses
+- `wallet_budget` - The backend wallet's daily gas budget, and the lease that
+  serialises its sends
+
+### Keys and roles
+
+**The factory owner and the backend wallet are different addresses, and keeping
+them different is the point.** `PoolFactory` owner — the Safe — authorises UUPS
+upgrades, owns the beacon every pool's logic hangs from, pauses, curates the
+token allowlist, and appoints the role below. One beacon write replaces the
+implementation of every pool at once, so that authority never belongs in a
+server's environment.
+
+`poolCreatorAdmin` is the backend's wallet and may do exactly one thing: call
+`setCreatorAuthorization`. That is all lazy whitelisting needs. Appoint it
+**before** transferring ownership to the Safe — afterwards it takes a Safe
+transaction. See [`docs/POOL_CREATION.md`](docs/POOL_CREATION.md).
+
+`BACKEND_WALLET_PRIVATE_KEY` is a Secret Manager secret (`defineSecret`), named
+in the `secrets` option of the one deployed function that signs. A function that
+does not name it cannot read it, which is what makes the key's blast radius a
+list you can read.
+
+### Indexing a chain that can change its mind
+
+The sweep stops **128 blocks short of the head**. It used to read to
+`getBlockNumber()` and move its cursor past it — correct on a Hardhat node,
+wrong on any real chain: a log from a block that is later orphaned is written
+once and its range is never revisited, leaving a contribution or a loan that no
+chain agrees happened. Balances are summed from events, so one of those inflates
+somebody's position permanently. The app still indexes its own transaction the
+moment it has a receipt, so nothing a user waits on got slower.
 
 ## Environment Setup
 
@@ -479,6 +540,23 @@ it. Without that, the owner of a permissioned pool could not fund their own
 pool. `removeMember` and `leavePool` refuse the owner for the same reason, and
 `memberCount` therefore starts at 1.
 
+**Handing a pool over takes two steps.** `LendingPool` is `Ownable2Step`, like
+the factory: `transferOwnership` only nominates, and nothing moves — not
+ownership, not membership — until the nominee calls `acceptOwnership`. A pool
+owner is an ordinary user, the address they type is checked against nothing, and
+the mistake takes with it every approval, every membership decision and the
+pause over other people's money. `renounceOwnership` reverts on both contracts
+for the same reason: an unowned pool can never approve a loan, admit a member or
+be unpaused again, and nothing recovers from it.
+
+**A pause never traps anybody.** `withdraw`, `claimInterest` and `repayLoan` are
+deliberately _not_ `whenNotPaused` — a pause stops the pool doing anything new
+and leaves the three exits open. The lever belongs to the pool's owner, who is a
+member here rather than an operator, so a pause that stopped withdrawals would
+let one user hold everybody else's money with a single transaction. Repayment
+matters most: interest accrues against the clock, so refusing it would grow a
+borrower's debt for exactly as long as they were denied any way to stop it.
+
 Two rules that are easy to break and hard to notice:
 
 - **Never gate `withdraw` or `repayLoan` on membership.** Removal takes away
@@ -512,6 +590,19 @@ indexes it.
 Borrowing is gated on **membership**, not on having contributed: a member the
 owner admitted can borrow without having lent first. See
 [`docs/MEMBERSHIP.md`](docs/MEMBERSHIP.md).
+
+**A loan of zero is refused, on both paths.** `requestLoan` always did;
+`createLoan` did not, and in a token pool that was a permanent lock rather than
+an oddity — the zero loan takes `activeLoanId`, `_repay` prices the payment at
+`min(offered, 0)`, `_pullIn` delivers nothing and reverts, so the loan can never
+be closed and `withdraw` refuses the borrower's whole contribution on
+`LoanOutstanding` for ever. A native borrower escaped by paying one wei. Any
+future amount check belongs on both entry points or neither.
+
+**`markDefaulted` refuses a loan id nobody issued.** An unissued id reads as a
+zeroed struct, which is `Disbursed` with a `startTime` of 0 — so every date
+check passed and the owner could declare a default against `address(0)`, which
+the indexer then wrote down as a loan document for nobody.
 
 `isRepaid` is meaningless unless `status` is `disbursed`: it is `false` on a
 pending request too, so anything that reads it without checking `status` first

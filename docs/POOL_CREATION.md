@@ -30,13 +30,55 @@ a new user cannot create anything. Two ways out: whitelist everyone up front
 
 The app calls `preparePoolCreation` before opening the wallet. The backend checks
 `isAuthorizedCreator(wallet)` and, if the answer is no, sends
-`setCreatorAuthorization(wallet, true)` itself. **The backend pays that gas**, and
-`setCreatorAuthorization` is `onlyOwner`, so the backend wallet must be the
-factory owner — locally that is Hardhat account #0.
+`setCreatorAuthorization(wallet, true)` itself. **The backend pays that gas.**
 
 The user still signs and pays for their own `createPool` transaction, so the pool
 is theirs: `poolOwner` is set to `msg.sender` by the contract, and there is no
 parameter that could make it anything else.
+
+### Who the backend has to be
+
+**`poolCreatorAdmin`, and nothing more.** This used to read "the backend wallet
+must be the factory owner", because `setCreatorAuthorization` was `onlyOwner` —
+and that sentence was in direct conflict with the deployment plan, which hands
+ownership to a Safe. Both could not be true:
+
+- Safe owns it → `preparePoolCreation` refuses every user and the main flow is
+  dead;
+- backend owns it → a key in a Cloud Functions environment variable authorises
+  UUPS upgrades and can repoint the beacon, and **one write replaces the logic
+  of every pool at once**.
+
+So the factory has a narrow role. `setPoolCreatorAdmin` is `onlyOwner`;
+`setCreatorAuthorization` accepts the owner _or_ that one address. The Safe owns
+the factory and keeps upgrades, pause and the token allowlist; the backend can
+add and remove pool creators and do nothing else. A compromised backend key
+costs a spam list.
+
+Appoint it **before** transferring ownership — afterwards it takes a Safe
+transaction. `pnpm deploy:amoy` does it from `BACKEND_WALLET_ADDRESS`, and warns
+loudly if that is unset.
+
+Locally the deployer is also the backend wallet, so the role is not load-bearing
+on a Hardhat node — which is exactly why the conflict survived this long.
+
+### Two things the Amoy deploy needs that local did not
+
+`deploy.ts` never called `setWhitelistMode(true)`, though `deploy-local.ts`
+always has. With it off, `onlyAuthorizedCreator` admits the owner and nobody
+else, so `preparePoolCreation` refuses every user with _"restricted to
+administrators"_. Both that and the role appointment are now steps in the deploy
+script.
+
+### The backend's gas is budgeted
+
+`WHITELIST_DAILY_CAP` (100, per chain per day) bounds what the backend will pay
+for, and `withWalletLock` serialises the sends so two callers cannot build two
+transactions on one nonce. Authentication in this project is deliberately cheap —
+any wallet can sign a nonce and get a token — so without a cap a script with a
+thousand fresh wallets is a thousand transactions off the backend's balance.
+The whitelist is spam protection for the **factory**; it never protected the
+wallet that pays.
 
 ## The flow
 
