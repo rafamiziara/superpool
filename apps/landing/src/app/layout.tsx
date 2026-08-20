@@ -21,12 +21,12 @@ const spaceMono = Space_Mono({
 })
 
 export const metadata: Metadata = {
-  title: 'SuperPool — Lending pools for circles that trust each other',
+  title: 'SuperPool | Lending pools for circles that trust each other',
   description:
     'Open-source, multi-chain micro-lending. Turn any trusted group into a lending pool on any EVM chain: pooled liquidity, member loans, multi-sig governance.',
   keywords: ['DeFi', 'micro-lending', 'lending pool', 'multi-chain', 'EVM', 'open source', 'Polygon', 'multi-sig'],
   openGraph: {
-    title: 'SuperPool — Decentralized micro-lending pools',
+    title: 'SuperPool | Decentralized micro-lending pools',
     description: 'Turn any trusted group into a lending pool on any EVM chain. Open source, multi-sig governed, mobile first.',
     url: 'https://superpool.rm30.dev',
     siteName: 'SuperPool',
@@ -34,7 +34,7 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'SuperPool — Decentralized micro-lending pools',
+    title: 'SuperPool | Decentralized micro-lending pools',
     description: 'Turn any trusted group into a lending pool on any EVM chain. Open source, multi-sig governed, mobile first.',
   },
 }
