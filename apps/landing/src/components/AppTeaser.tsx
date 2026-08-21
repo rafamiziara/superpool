@@ -2,6 +2,7 @@
 
 import Image from 'next/image'
 import { SectionHeading } from '@/components/SectionHeading'
+import { DEPLOYMENT } from '@/config/deployment'
 
 export function AppTeaser() {
   return (
@@ -18,7 +19,7 @@ export function AppTeaser() {
             <SectionHeading
               eyebrow="Mobile app"
               title="Your pool, in your pocket."
-              description="The SuperPool app is being rebuilt from the ground up — wallet connection, pool management and loan requests, all mobile first."
+              description="The app is built — wallet connection, pools, membership, lending, repayment and the owner’s queue, all mobile first. What is left is getting it onto phones."
             />
 
             <div data-reveal className="mt-10 flex flex-col gap-3.5 sm:flex-row">
@@ -36,8 +37,22 @@ export function AppTeaser() {
               />
             </div>
 
+            {DEPLOYMENT.appBuild && (
+              <a
+                data-reveal
+                href={DEPLOYMENT.appBuild}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="mt-6 inline-flex items-center gap-2.5 rounded-full bg-brand px-7 py-3.5 font-display text-sm font-semibold text-white transition-colors duration-300 hover:bg-brand-soft"
+              >
+                Install the test build
+              </a>
+            )}
+
             <p data-reveal className="mt-6 font-mono text-[0.6875rem] tracking-wider text-mist-dim">
-              // Building in the open — watch the repo for the release.
+              {DEPLOYMENT.appBuild
+                ? '// Unsigned test build — install it on a device you own.'
+                : '// Building in the open — watch the repo for the release.'}
             </p>
           </div>
 
@@ -66,7 +81,7 @@ export function AppTeaser() {
                     {[
                       { who: 'AL', what: 'repaid 60 POL', when: '2h' },
                       { who: 'SK', what: 'contributed 100 POL', when: '1d' },
-                      { who: 'JT', what: 'loan approved · 3/3', when: '3d' },
+                      { who: 'JT', what: 'loan approved · 180 POL', when: '3d' },
                     ].map((row) => (
                       <div
                         key={row.who + row.when}

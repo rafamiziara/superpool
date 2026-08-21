@@ -8,23 +8,23 @@ import { PoolVisual } from '@/components/PoolVisual'
 const steps = [
   {
     title: 'Create a pool',
-    body: 'Name it, set the max loan and interest rate, pick a chain. The PoolFactory deploys your pool contract — the on-chain home for your circle.',
+    body: 'Name it, set the maximum loan, the rate and the term, choose what it lends — the chain’s coin or a stablecoin. The PoolFactory deploys the contract, and you own it.',
   },
   {
-    title: 'Approve your members',
-    body: 'Membership is permissioned. Only people the pool admins approve can join, so the pool stays inside the circle you actually trust.',
+    title: 'Decide who is in',
+    body: 'Turn approval on and only people you admit can join. Leave it off and anyone who funds the pool is enrolled. Either way the register is on-chain, so belonging is never a question of whose list you trust.',
   },
   {
     title: 'Contribute liquidity',
-    body: 'Members deposit native or ERC-20 tokens into the shared pool. Every contribution is recorded on-chain, visible to everyone in the circle.',
+    body: 'Members deposit the pool’s asset. Every contribution is an event on-chain, and the pool’s balances are summed from those events — so what the app shows and what the chain holds cannot drift apart.',
   },
   {
     title: 'Request a loan',
-    body: 'A member asks for an amount. An AI agent screens the request, then pool admins sign off through the Safe multi-sig — no single gatekeeper.',
+    body: 'A member asks for an amount and says why. The owner sees the request, the borrower’s record and the assistant’s reading of it, then decides — and the reason reaches the borrower with the answer.',
   },
   {
     title: 'Repay and grow',
-    body: 'Repayments plus interest flow straight back into the pool, growing what the circle can lend next time around.',
+    body: 'Interest accrues per second on what is still out. Repay in one go or in instalments; what comes back is shared pro rata with everyone whose money is in the pool.',
   },
 ]
 
@@ -55,7 +55,7 @@ export function HowItWorks() {
       <SectionHeading
         eyebrow="How a pool works"
         title="From a group chat to a lending pool, in five moves."
-        description="No banks in the loop and no anonymous counterparties. Just the mechanics of trust, written into a contract."
+        description="No bank in the loop, and no committee. The pool’s owner decides, the contract enforces, and the chain keeps the record."
       />
 
       <div className="mt-16 grid gap-12 lg:mt-20 lg:grid-cols-2 lg:gap-20">

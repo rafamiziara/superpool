@@ -4,7 +4,9 @@ Next.js marketing website for SuperPool — a dark, animated single page whose v
 
 ## Overview
 
-Built with Next.js 16, React 19, Tailwind CSS v4 and GSAP. The page has two jobs: send visitors to the public GitHub repo and tease the upcoming mobile app.
+Built with Next.js 16, React 19, Tailwind CSS v4 and GSAP. The page has three jobs: say accurately what the protocol does, send visitors to the public repo and the deployed contracts, and tease the mobile app.
+
+**Every claim on this page has to be traceable** to a section of the root [`CLAUDE.md`](../../CLAUDE.md) or a file in [`docs/`](../../docs/). The copy went stale once already — between the 2026-07-02 redesign and 2026-08-20 it came to describe a Safe that approved members and loans, an AI agent that gated approvals, and two packages that had been deleted. None of those were ever true of the code; they were true of an earlier intention.
 
 ## Features
 
@@ -14,6 +16,7 @@ Built with Next.js 16, React 19, Tailwind CSS v4 and GSAP. The page has two jobs
 - 📱 **CSS phone mockup** — app teaser with disabled "coming soon" store badges
 - ♿ **Quality floor** — responsive to mobile, visible keyboard focus, `prefers-reduced-motion` respected (static wave frame, no entrance animations)
 - 🔤 **Typography** — Space Grotesk (display), Plus Jakarta Sans (body), Space Mono (labels/data) via `next/font`
+- ⛓️ **Deploy-aware copy** — `src/config/deployment.ts` holds the contract addresses, chain, app-build link and demo video. Each is `string | null`, and `null` **omits** the thing rather than explaining its absence: the on-chain address block does not render until there is an address. Fill the values from `packages/contracts/deployments/<network>.json`, never from terminal scrollback.
 
 ## Development
 
@@ -40,6 +43,8 @@ pnpm lint
 apps/landing/
 ├── src/
 │   ├── app/                  # App Router: layout, page, globals.css (design tokens)
+│   ├── config/
+│   │   └── deployment.ts     # Every deploy-dependent fact: addresses, chain, build link
 │   ├── components/
 │   │   ├── WaveField.tsx     # Canvas wave signature (hero background)
 │   │   ├── Hero.tsx          # Headline + CTAs (CSS entrance animation)

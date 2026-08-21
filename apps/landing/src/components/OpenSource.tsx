@@ -1,5 +1,6 @@
 import { SectionHeading } from '@/components/SectionHeading'
 import { GitHubIcon } from '@/components/Navigation'
+import { DEPLOYMENT, explorerAddressUrl, shortAddress } from '@/config/deployment'
 
 interface RepoStats {
   stars: number
@@ -28,7 +29,8 @@ const treeLines = [
   '└── packages/',
   '    ├── contracts/   # Solidity · Hardhat',
   '    ├── backend/     # Firebase Functions',
-  '    └── ui, types, design, assets',
+  '    ├── agents/      # Mastra · the assistant',
+  '    └── types, assets',
 ]
 
 export async function OpenSource() {
@@ -42,7 +44,7 @@ export async function OpenSource() {
             <SectionHeading
               eyebrow="Open source"
               title="Every line of it, in the open."
-              description="Contracts, backend, mobile app and this page live in one public monorepo under the MIT license. Read it, fork it, break it on testnet."
+              description="Contracts, backend, agent service, mobile app and this page live in one public monorepo under the MIT license. Read it, fork it, break it on testnet."
             />
 
             <dl data-reveal className="mt-9 flex flex-wrap gap-x-10 gap-y-4">
@@ -73,7 +75,8 @@ export async function OpenSource() {
           </div>
 
           {/* Terminal card */}
-          <div data-reveal className="relative">
+          {/* min-w-0 so the tree below can scroll instead of widening the grid column */}
+          <div data-reveal className="relative min-w-0">
             <div className="absolute -inset-6 rounded-[2rem] bg-lumen/5 blur-2xl" aria-hidden="true" />
             <div className="relative overflow-hidden rounded-2xl border border-hairline bg-deep shadow-2xl">
               <div className="flex items-center gap-1.5 border-b border-hairline-soft px-5 py-3.5">
@@ -89,7 +92,8 @@ export async function OpenSource() {
                 <p className="text-mist">
                   <span className="text-lumen">$</span> pnpm install
                 </p>
-                <div className="pt-3 text-mist-dim">
+                {/* `whitespace-pre` cannot wrap, so the tree gets its own scroller rather than clipping */}
+                <div className="overflow-x-auto pt-3 text-mist-dim">
                   {treeLines.map((line) => (
                     <p key={line} className="whitespace-pre">
                       {line}
@@ -102,9 +106,47 @@ export async function OpenSource() {
                 </p>
               </div>
             </div>
+
+            <OnChain />
           </div>
         </div>
       </div>
     </section>
+  )
+}
+
+/**
+ * The cheapest credibility on the page: an address a reader can open. Renders
+ * nothing at all until there is one — an empty block says less than no block.
+ */
+function OnChain() {
+  const contracts = [
+    { label: 'PoolFactory', address: DEPLOYMENT.poolFactory },
+    { label: 'Safe (factory owner)', address: DEPLOYMENT.safe },
+  ].filter((entry): entry is { label: string; address: string } => entry.address !== null)
+
+  if (contracts.length === 0) return null
+
+  return (
+    <div className="mt-5 rounded-2xl border border-hairline-soft bg-abyss/60 p-5">
+      <p className="font-mono text-[0.625rem] tracking-[0.28em] text-mist-dim uppercase">On {DEPLOYMENT.chain.name}</p>
+      <dl className="mt-4 space-y-3">
+        {contracts.map(({ label, address }) => (
+          <div key={label} className="flex items-baseline justify-between gap-4">
+            <dt className="font-mono text-[0.6875rem] text-mist-dim">{label}</dt>
+            <dd className="font-mono text-xs">
+              <a
+                href={explorerAddressUrl(address)}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-mist transition-colors hover:text-lumen-bright"
+              >
+                {shortAddress(address)}
+              </a>
+            </dd>
+          </div>
+        ))}
+      </dl>
+    </div>
   )
 }
