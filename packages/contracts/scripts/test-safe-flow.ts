@@ -1,5 +1,6 @@
+import { isMain } from './lib/main'
+import { ethers, isSimulatedNetwork, network } from '../hardhat.connection'
 import * as dotenv from 'dotenv'
-import { ethers, network } from 'hardhat'
 import { PoolFactory } from '../typechain-types'
 import { deploySafe } from './deploy-safe'
 import { simulateAcceptOwnership } from './simulate-multisig'
@@ -14,7 +15,9 @@ async function testSafeFlow() {
   console.log('ℹ️  Requires forked network with Safe contracts pre-deployed')
 
   // Verify we're on a supported network
-  if (network.name === 'localhost' || network.name === 'hardhat') {
+  // Not `isLocalNetwork()`: the fork networks are local too, and a fork is
+  // precisely what this script is asking for.
+  if (network.name === 'localhost' || isSimulatedNetwork) {
     console.log('❌ This test requires a forked network with Safe contracts')
     console.log('💡 Use: pnpm node:fork && pnpm test:safe')
     process.exit(1)
@@ -28,9 +31,9 @@ async function testSafeFlow() {
 
   try {
     // Step 1: Deploy implementation
-    console.log('\n1️⃣ Deploying SampleLendingPool implementation...')
-    const SampleLendingPool = await ethers.getContractFactory('SampleLendingPool')
-    const lendingPoolImplementation = await SampleLendingPool.deploy()
+    console.log('\n1️⃣ Deploying LendingPool implementation...')
+    const LendingPool = await ethers.getContractFactory('LendingPool')
+    const lendingPoolImplementation = await LendingPool.deploy()
     await lendingPoolImplementation.waitForDeployment()
     const implementationAddress = await lendingPoolImplementation.getAddress()
     console.log(`✅ Implementation deployed: ${implementationAddress}`)
@@ -69,6 +72,8 @@ async function testSafeFlow() {
       loanDuration: 30 * 24 * 60 * 60, // 30 days
       name: 'Test Pool',
       description: 'A test lending pool for Safe ownership testing',
+      requiresMembership: false,
+      loanToken: ethers.ZeroAddress,
     }
 
     const createTx = await poolFactory.connect(deployer).createPool(poolParams)
@@ -122,7 +127,8 @@ async function testSafeFlow() {
       ...poolParams,
       name: 'Pending Phase Pool',
       description: 'Pool created during pending transfer phase',
-      poolOwner: poolOwner2.address,
+      requiresMembership: false,
+      loanToken: ethers.ZeroAddress,
     })
     const poolCount2 = await poolFactory.getPoolCount()
     console.log(`✅ Original owner can still create pools. Total pools: ${poolCount2}`)
@@ -257,7 +263,7 @@ async function main() {
 }
 
 // Only run if this file is executed directly
-if (require.main === module) {
+if (isMain(import.meta.url)) {
   main()
     .then(() => process.exit(0))
     .catch((error) => {

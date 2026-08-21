@@ -2,6 +2,8 @@ import { makeAutoObservable } from 'mobx'
 import type { User } from '@superpool/types'
 import type { AuthStep } from '../types/auth'
 import { AUTH_STEPS } from '../constants/authSteps'
+import { sameAddress } from '../utils/format'
+import { logger } from '../utils/logger'
 
 export class AuthStore {
   // Lock mechanism
@@ -55,7 +57,7 @@ export class AuthStore {
   // Lock methods
   acquireAuthLock = (walletAddress: string, requestId?: string): boolean => {
     if (this.authLock.isLocked) {
-      console.log('🔒 Auth lock already held, skipping authentication')
+      logger.debug('🔒 Auth lock already held, skipping authentication')
       return false
     }
 
@@ -66,7 +68,7 @@ export class AuthStore {
       requestId: requestId || null,
     }
 
-    console.log('🔒 Auth lock acquired for:', walletAddress, requestId ? `(Request: ${requestId})` : '')
+    logger.debug('🔒 Auth lock acquired for:', walletAddress, requestId ? `(Request: ${requestId})` : '')
     return true
   }
 
@@ -77,19 +79,19 @@ export class AuthStore {
       startTime: 0,
       requestId: null,
     }
-    console.log('🔓 Auth lock released')
+    logger.debug('🔓 Auth lock released')
   }
 
   // Step management
   startStep = (step: AuthStep): void => {
-    console.log(`📍 Starting step: ${step}`)
+    logger.debug(`📍 Starting step: ${step}`)
     this.currentStep = step
     this.failedStep = null
     this.error = null
   }
 
   completeStep = (step: AuthStep): void => {
-    console.log(`✅ Completed step: ${step}`)
+    logger.debug(`✅ Completed step: ${step}`)
     this.completedSteps.add(step)
 
     // If this is the last step, clear current step
@@ -99,7 +101,7 @@ export class AuthStore {
   }
 
   failStep = (step: AuthStep, error: string): void => {
-    console.log(`❌ Failed step: ${step} - ${error}`)
+    logger.debug(`❌ Failed step: ${step} - ${error}`)
     this.currentStep = null
     this.failedStep = step
     this.error = error
@@ -126,9 +128,9 @@ export class AuthStore {
     // Log wallet state changes
     if (prevConnected !== state.isConnected) {
       if (state.isConnected && state.address) {
-        console.log('✅ Wallet connected:', state.address)
+        logger.debug('✅ Wallet connected:', state.address)
       } else {
-        console.log('❌ Wallet disconnected')
+        logger.debug('❌ Wallet disconnected')
       }
     }
   }
@@ -137,14 +139,14 @@ export class AuthStore {
   initializeWalletState = (): void => {
     if (!this.hasInitializedWallet) {
       this.hasInitializedWallet = true
-      console.log('🔄 Wallet state initialized')
+      logger.debug('🔄 Wallet state initialized')
     }
   }
 
   initializeFirebaseState = (): void => {
     if (!this.hasInitializedFirebase) {
       this.hasInitializedFirebase = true
-      console.log('🔥 Firebase state initialized')
+      logger.debug('🔥 Firebase state initialized')
     }
   }
 
@@ -177,12 +179,12 @@ export class AuthStore {
   resetInitialization = (): void => {
     this.hasInitializedWallet = false
     this.hasInitializedFirebase = false
-    console.log('🔄 Initialization state reset')
+    logger.debug('🔄 Initialization state reset')
   }
 
   // Helper methods
   isAuthenticatingForWallet = (walletAddress: string): boolean => {
-    return this.isAuthenticating && this.authLock.walletAddress?.toLowerCase() === walletAddress.toLowerCase()
+    return this.isAuthenticating && sameAddress(this.authLock.walletAddress, walletAddress)
   }
 
   getStepStatus = (step: AuthStep): 'completed' | 'current' | 'failed' | 'pending' => {

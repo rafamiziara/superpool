@@ -1,4 +1,6 @@
-import { createAuthMessage } from './auth'
+import { Firestore } from 'firebase-admin/firestore'
+import { AUTH_NONCES_COLLECTION } from '../constants'
+import { claimAuthNonce, createAuthMessage, NonceExpiredError } from './auth'
 
 describe('createAuthMessage', () => {
   const walletAddress = '0x1234567890123456789012345678901234567890'
@@ -241,5 +243,90 @@ describe('createAuthMessage', () => {
     // Assert
     expect(result.length).toBeGreaterThan(100)
     expect(result.length).toBeLessThan(500)
+  })
+})
+
+/**
+ * A Firestore stand-in whose `runTransaction` actually runs, serialised the way
+ * the real one is — a second transaction waits for the first to finish.
+ *
+ * The point of these tests is that a challenge can be taken exactly once, and a
+ * mock that resolved `undefined` would agree with any implementation at all.
+ */
+function buildFirestore(initial?: Record<string, unknown>) {
+  const docs = new Map<string, Record<string, unknown>>()
+
+  if (initial) docs.set(WALLET, initial)
+
+  let queue: Promise<unknown> = Promise.resolve()
+
+  const firestore = {
+    collection: jest.fn(() => ({ doc: (id: string) => ({ id }) })),
+    runTransaction: jest.fn(<T>(work: (transaction: unknown) => Promise<T>): Promise<T> => {
+      const run = queue.then(() =>
+        work({
+          get: async (ref: { id: string }) => ({ exists: docs.has(ref.id), data: () => docs.get(ref.id) }),
+          delete: (ref: { id: string }) => docs.delete(ref.id),
+        })
+      )
+
+      // Keep the chain alive whichever way `run` settles, so one rejection does
+      // not strand every transaction after it.
+      queue = run.catch(() => undefined)
+
+      return run
+    }),
+  }
+
+  return { firestore: firestore as unknown as Firestore, docs }
+}
+
+const WALLET = '0x1234567890123456789012345678901234567890'
+
+function challenge(expiresInMs = 10 * 60 * 1000) {
+  return { nonce: 'a-nonce', timestamp: Date.now(), expiresAt: Date.now() + expiresInMs }
+}
+
+describe('claimAuthNonce', () => {
+  it('returns the challenge and consumes it', async () => {
+    const { firestore, docs } = buildFirestore(challenge())
+
+    await expect(claimAuthNonce(WALLET, firestore)).resolves.toMatchObject({ nonce: 'a-nonce' })
+    expect(docs.has(WALLET)).toBe(false)
+  })
+
+  it('lets exactly one of two simultaneous claims win', async () => {
+    // The whole reason this function exists. The read and the delete used to be
+    // separate awaits with signature verification, a profile write and a device
+    // approval in between — so two requests arriving together both saw the
+    // document, both passed, and both got a token.
+    const { firestore } = buildFirestore(challenge())
+
+    const results = await Promise.all([claimAuthNonce(WALLET, firestore), claimAuthNonce(WALLET, firestore)])
+
+    expect(results.filter(Boolean)).toHaveLength(1)
+  })
+
+  it('returns null when there is no challenge', async () => {
+    const { firestore } = buildFirestore()
+
+    await expect(claimAuthNonce(WALLET, firestore)).resolves.toBeNull()
+  })
+
+  it('refuses a lapsed challenge and consumes it anyway', async () => {
+    // Leaving it would keep a document nothing will ever accept, and a second
+    // attempt would get the same answer more slowly.
+    const { firestore, docs } = buildFirestore(challenge(-1))
+
+    await expect(claimAuthNonce(WALLET, firestore)).rejects.toBeInstanceOf(NonceExpiredError)
+    expect(docs.has(WALLET)).toBe(false)
+  })
+
+  it('keys the challenge on the wallet', async () => {
+    const { firestore } = buildFirestore(challenge())
+
+    await claimAuthNonce(WALLET, firestore)
+
+    expect(firestore.collection).toHaveBeenCalledWith(AUTH_NONCES_COLLECTION)
   })
 })

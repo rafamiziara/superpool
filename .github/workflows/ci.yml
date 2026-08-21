@@ -1,0 +1,111 @@
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+  workflow_dispatch:
+
+# A new push to the same branch supersedes any run still in flight.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # packages/backend declares engines.node = 22; keep every job on it.
+  NODE_VERSION: '22'
+
+jobs:
+  quality:
+    name: Format, lint & type-check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4 # version comes from package.json#packageManager
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # packages/*/dist and packages/contracts/typechain-types are gitignored,
+      # so a fresh checkout has to generate them before anything type-checks.
+      - name: Build shared packages
+        run: pnpm --filter @superpool/types build
+
+      - name: Compile contracts (generates typechain-types)
+        run: pnpm --filter contracts compile
+
+      - name: Check formatting
+        run: pnpm format:check
+
+      - name: Lint TypeScript
+        run: pnpm lint:ts
+
+      - name: Lint Solidity
+        run: pnpm lint:sol
+
+      - name: Type-check all packages
+        run: |
+          pnpm --filter @superpool/types type-check
+          pnpm --filter backend type-check
+          pnpm --filter contracts type-check
+          pnpm --filter mobile type-check
+          pnpm --filter @superpool/landing type-check
+
+  test:
+    name: Test (${{ matrix.package }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false # one package failing shouldn't hide the others' results
+      matrix:
+        package: [backend, contracts, mobile]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build shared packages
+        run: pnpm --filter @superpool/types build
+
+      # No .env is provisioned: hardhat.config.ts falls back to public RPC URLs,
+      # and neither the backend nor the mobile jest setup reads the environment.
+      # Safe multi-sig tests need a forked network and live in `pnpm test:safe`,
+      # which is deliberately not part of this job.
+      - name: Run tests
+        run: pnpm --filter ${{ matrix.package }} test
+
+  build:
+    name: Build landing
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build shared packages
+        run: pnpm --filter @superpool/types build
+
+      - name: Build landing page
+        run: pnpm --filter @superpool/landing build

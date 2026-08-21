@@ -1,0 +1,262 @@
+import { LoanInfo } from '@superpool/types'
+import { mockLogger } from '../../__tests__/setup'
+
+/**
+ * A loan as Firestore stores it, which is not what the callable returns:
+ * `startedAt` is a Timestamp there and an ISO string on the wire, and `id` is
+ * the document key rather than a field.
+ */
+type StoredLoan = Omit<LoanInfo, 'startedAt' | 'repaidAt' | 'id'> & { id: string; startedAt: Date; repaidAt?: Date }
+
+const { firestore } = require('../../services')
+const { listLoansHandler } = require('./listLoans')
+
+const CHAIN_ID = 31337 // matches ACTIVE_CHAIN_CONFIG default
+const BORROWER = '0x9965507d1a55bcc2695c58ba16fb37d819b0a4dc'
+
+describe('listLoansHandler', () => {
+  const mockLoans: StoredLoan[] = [
+    {
+      id: `${CHAIN_ID}-1-1`,
+      loanId: 1,
+      poolId: 1,
+      poolAddress: '0xPoolAddress1',
+      borrower: BORROWER,
+      amount: '5000000000000000000',
+      interestRate: 500,
+      duration: 2_592_000,
+      isRepaid: false,
+      amountRepaid: '0',
+      principalOutstanding: '5000000000000000000',
+      interestOutstanding: '0',
+      status: 'disbursed',
+      chainId: CHAIN_ID,
+      transactionHash: '0xaaa',
+      blockNumber: 100,
+      startedAt: new Date('2026-08-01T00:00:00.000Z'),
+    },
+    {
+      id: `${CHAIN_ID}-2-1`,
+      loanId: 1,
+      poolId: 2,
+      poolAddress: '0xPoolAddress2',
+      borrower: '0xanotherwallet',
+      amount: '1000000000000000000',
+      interestRate: 750,
+      duration: 1_209_600,
+      isRepaid: true,
+      amountRepaid: '1075000000000000000',
+      principalOutstanding: '0',
+      interestOutstanding: '0',
+      status: 'disbursed',
+      chainId: CHAIN_ID,
+      transactionHash: '0xbbb',
+      blockNumber: 101,
+      startedAt: new Date('2026-08-02T00:00:00.000Z'),
+      repaidAt: new Date('2026-08-09T00:00:00.000Z'),
+    },
+  ]
+
+  const createMockQuery = (docs: StoredLoan[], totalCount: number) => {
+    const mockDocs = docs.map((loan) => ({
+      id: loan.id,
+      data: () => ({
+        ...loan,
+        startedAt: { toDate: () => loan.startedAt },
+        ...(loan.repaidAt ? { repaidAt: { toDate: () => loan.repaidAt } } : {}),
+      }),
+    }))
+
+    return {
+      where: jest.fn().mockReturnThis(),
+      orderBy: jest.fn().mockReturnThis(),
+      limit: jest.fn().mockReturnThis(),
+      get: jest.fn().mockResolvedValue({ docs: mockDocs }),
+      count: jest.fn().mockReturnValue({
+        get: jest.fn().mockResolvedValue({ data: () => ({ count: totalCount }) }),
+      }),
+    }
+  }
+
+  function buildRequest(overrides: Partial<{ auth: object | null; data: Record<string, unknown> }> = {}) {
+    return {
+      auth: overrides.auth !== undefined ? overrides.auth : { uid: 'user-123', token: {} },
+      data: overrides.data !== undefined ? overrides.data : {},
+    }
+  }
+
+  let mockQuery: ReturnType<typeof createMockQuery>
+
+  beforeEach(() => {
+    jest.clearAllMocks()
+    mockQuery = createMockQuery(mockLoans, mockLoans.length)
+    ;(firestore.collection as jest.Mock).mockReturnValue(mockQuery)
+  })
+
+  it('should reject an unauthenticated caller', async () => {
+    // This ties a wallet to a debt; serving it anonymously would make the
+    // collection trivially scrapeable in one request.
+    await expect(listLoansHandler(buildRequest({ auth: null }) as never)).rejects.toThrow(/must be authenticated to list loans/)
+  })
+
+  it('should read from the loans collection', async () => {
+    await listLoansHandler(buildRequest() as never)
+
+    expect(firestore.collection).toHaveBeenCalledWith('loans')
+  })
+
+  it('should return the stored loans with ISO dates', async () => {
+    const result = await listLoansHandler(buildRequest() as never)
+
+    expect(result.loans).toHaveLength(2)
+    expect(result.totalCount).toBe(2)
+    expect(result.loans[0].id).toBe(`${CHAIN_ID}-1-1`)
+    // A Date cannot cross a callable — the encoder turns one into `{}`.
+    expect(result.loans[0].startedAt).toBe('2026-08-01T00:00:00.000Z')
+  })
+
+  it('should keep repaid loans in the list', async () => {
+    // A record is the loan's state, not an event, so a settled loan stays as
+    // history; `activeOnly` is how a caller asks for outstanding debt only.
+    const result = await listLoansHandler(buildRequest() as never)
+
+    expect(result.loans.some((loan: LoanInfo) => loan.isRepaid)).toBe(true)
+  })
+
+  it('should send the repayment date as an ISO string too', async () => {
+    const result = await listLoansHandler(buildRequest() as never)
+
+    expect(result.loans[1].repaidAt).toBe('2026-08-09T00:00:00.000Z')
+  })
+
+  it('should omit the repayment date on an outstanding loan', async () => {
+    // Not null, and above all not the epoch: "settled at this moment" has no
+    // answer for a loan nobody has settled, and a date invented here is one a
+    // borrower's history would go on to read as a repayment.
+    const result = await listLoansHandler(buildRequest() as never)
+
+    expect(result.loans[0].repaidAt).toBeUndefined()
+  })
+
+  it('should order by when the loan started, newest first', async () => {
+    await listLoansHandler(buildRequest() as never)
+
+    expect(mockQuery.orderBy).toHaveBeenCalledWith('startedAt', 'desc')
+  })
+
+  it('should always filter by chain', async () => {
+    await listLoansHandler(buildRequest() as never)
+
+    expect(mockQuery.where).toHaveBeenCalledWith('chainId', '==', CHAIN_ID)
+  })
+
+  it('should filter by pool when asked', async () => {
+    await listLoansHandler(buildRequest({ data: { poolId: 3 } }) as never)
+
+    expect(mockQuery.where).toHaveBeenCalledWith('poolId', '==', 3)
+  })
+
+  it('should lowercase the borrower filter', async () => {
+    // The indexer lowercases what it stores, and wallets report addresses
+    // checksummed — a raw filter would match nothing.
+    await listLoansHandler(buildRequest({ data: { borrower: '0x9965507D1a55bcC2695C58ba16FB37d819B0A4dc' } }) as never)
+
+    expect(mockQuery.where).toHaveBeenCalledWith('borrower', '==', BORROWER)
+  })
+
+  it('should restrict to outstanding loans when activeOnly is set', async () => {
+    // Both halves: a pending request is not repaid either, so filtering on
+    // `isRepaid` alone would report unfunded requests as active debt.
+    await listLoansHandler(buildRequest({ data: { activeOnly: true } }) as never)
+
+    // A declared default is still a debt, so `activeOnly` has to admit it —
+    // narrowing to `disbursed` alone drops exactly the loans worth chasing.
+    expect(mockQuery.where).toHaveBeenCalledWith('status', 'in', ['disbursed', 'defaulted'])
+    expect(mockQuery.where).toHaveBeenCalledWith('isRepaid', '==', false)
+  })
+
+  it('should restrict to requests awaiting the owner when pendingOnly is set', async () => {
+    await listLoansHandler(buildRequest({ data: { pendingOnly: true } }) as never)
+
+    expect(mockQuery.where).toHaveBeenCalledWith('status', '==', 'requested')
+  })
+
+  it('should restrict to declared defaults when defaultedOnly is set', async () => {
+    // Narrower than "overdue", which needs no query at all: a due date is
+    // `startedAt + duration` and any reader can work it out.
+    await listLoansHandler(buildRequest({ data: { defaultedOnly: true } }) as never)
+
+    expect(mockQuery.where).toHaveBeenCalledWith('status', '==', 'defaulted')
+  })
+
+  it('should pass the declaration date through as an ISO string', async () => {
+    const declaredAt = new Date('2026-08-14T10:00:00.000Z')
+    mockQuery.get.mockResolvedValue({
+      docs: [
+        {
+          id: '31337-1-1',
+          data: () => ({
+            ...mockLoans[0],
+            status: 'defaulted',
+            startedAt: { toDate: () => new Date() },
+            defaultedAt: { toDate: () => declaredAt },
+          }),
+        },
+      ],
+    })
+
+    const result = await listLoansHandler(buildRequest() as never)
+
+    expect(result.loans[0].defaultedAt).toBe(declaredAt.toISOString())
+    expect(result.loans[0].status).toBe('defaulted')
+  })
+
+  it('should leave the declaration date off a loan nobody declared', async () => {
+    // Absent rather than null, like `repaidAt`: absent is the statement.
+    const result = await listLoansHandler(buildRequest() as never)
+
+    expect(result.loans[0]).not.toHaveProperty('defaultedAt')
+  })
+
+  it('should read a record stored before the approval step as disbursed', async () => {
+    // Those loans have no `status` field at all, and every one was disbursed.
+    mockQuery.get.mockResolvedValue({
+      docs: [{ id: '31337-1-1', data: () => ({ ...mockLoans[0], status: undefined, startedAt: { toDate: () => new Date() } }) }],
+    })
+
+    const result = await listLoansHandler(buildRequest() as never)
+
+    expect(result.loans[0].status).toBe('disbursed')
+  })
+
+  it('should not filter on isRepaid when activeOnly is absent', async () => {
+    await listLoansHandler(buildRequest() as never)
+
+    expect(mockQuery.where).not.toHaveBeenCalledWith('isRepaid', '==', false)
+  })
+
+  it('should cap the limit at what the security rules allow', async () => {
+    await listLoansHandler(buildRequest({ data: { limit: 5000 } }) as never)
+
+    expect(mockQuery.limit).toHaveBeenCalledWith(100)
+  })
+
+  it('should refuse a nonsensical limit rather than reinterpret it', async () => {
+    await expect(listLoansHandler(buildRequest({ data: { limit: -1 } }) as never)).rejects.toThrow(/limit/i)
+
+    expect(mockQuery.limit).not.toHaveBeenCalled()
+  })
+
+  it('should fall back to the default limit when none is given', async () => {
+    await listLoansHandler(buildRequest() as never)
+
+    expect(mockQuery.limit).toHaveBeenCalledWith(50)
+  })
+
+  it('should report a failure as internal rather than leaking the query error', async () => {
+    mockQuery.get.mockRejectedValue(new Error('FAILED_PRECONDITION: index required'))
+
+    await expect(listLoansHandler(buildRequest() as never)).rejects.toMatchObject({ code: 'internal' })
+    expect(mockLogger.error).toHaveBeenCalledWith('Error listing loans', expect.objectContaining({ error: expect.any(String) }))
+  })
+})

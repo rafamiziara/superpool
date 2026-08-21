@@ -88,12 +88,19 @@ describe('useMessageGeneration', () => {
 
     const { result } = renderHook(() => useMessageGeneration())
 
+    // Keep a handle on the in-flight promise: it rejects after the assertion
+    // (empty response data) and must be drained before the test ends
+    let pending!: Promise<unknown>
     act(() => {
-      result.current.generateMessage('0x123456789')
+      pending = result.current.generateMessage('0x123456789').catch(() => null)
     })
 
     expect(result.current.isGenerating).toBe(true)
     expect(result.current.error).toBe(null)
+
+    await act(async () => {
+      await pending
+    })
   })
 
   it('should clear state when clearState is called', async () => {

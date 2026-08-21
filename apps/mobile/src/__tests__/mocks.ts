@@ -15,6 +15,52 @@ export const mockWagmiUseSignMessage = jest.fn(() => ({
   isPending: false,
 }))
 
+export const mockWriteContractAsync = jest.fn()
+export const mockEstimateContractGas = jest.fn()
+export const mockWaitForTransactionReceipt = jest.fn()
+export const mockGetTransactionReceipt = jest.fn()
+/** `publicClient.readContract` — the allowance read, and anything else a hook reads directly. */
+export const mockReadContract = jest.fn()
+
+export const mockWagmiUseWriteContract = jest.fn(() => ({
+  writeContractAsync: mockWriteContractAsync,
+  isPending: false,
+}))
+
+export const mockWagmiUseBalance = jest.fn((): { data?: { value: bigint } } => ({ data: { value: 1_000_000_000_000_000_000n } }))
+
+/**
+ * `useReadContract`, which callers use for several different reads on one
+ * screen. Tests dispatch on `functionName` rather than on call order, so adding
+ * a read does not shift what an existing assertion sees.
+ */
+export const mockWagmiUseReadContract = jest.fn(
+  (_config?: { functionName?: string }): { data?: unknown; isLoading?: boolean; refetch: jest.Mock } => ({
+    data: undefined,
+    // Declared so a screen can distinguish "still reading" from "read, and the
+    // answer is nothing" — the two mean different things wherever a contract
+    // getter can legitimately fail to decode.
+    isLoading: false,
+    refetch: jest.fn().mockResolvedValue({ data: undefined }),
+  })
+)
+
+export type MockPublicClient = {
+  chain?: { id: number }
+  estimateContractGas: jest.Mock
+  waitForTransactionReceipt: jest.Mock
+  getTransactionReceipt: jest.Mock
+  readContract: jest.Mock
+}
+
+export const mockWagmiUsePublicClient = jest.fn((): MockPublicClient | undefined => ({
+  chain: { id: 31337 },
+  estimateContractGas: mockEstimateContractGas,
+  waitForTransactionReceipt: mockWaitForTransactionReceipt,
+  getTransactionReceipt: mockGetTransactionReceipt,
+  readContract: mockReadContract,
+}))
+
 // Firebase service mocks
 export const mockFirebaseAuth = {
   getReactNativePersistence: jest.fn(() => ({})),
@@ -29,7 +75,14 @@ export const mockFirebaseAuth = {
   authStateReady: jest.fn().mockResolvedValue(undefined),
 }
 
-export const mockFirebaseCallable = jest.fn(() =>
+/**
+ * Stands in for `httpsCallable(functions, name)`.
+ *
+ * The parameters are declared even though the default factory ignores them: a
+ * screen that calls two different functions needs `mockImplementation` to answer
+ * by name, and a zero-argument factory makes that a type error.
+ */
+export const mockFirebaseCallable = jest.fn((_functions?: unknown, _name?: string) =>
   jest.fn().mockResolvedValue({
     data: { message: 'test', nonce: '123', timestamp: Date.now(), expiresAt: new Date().toISOString() },
   })
@@ -47,7 +100,11 @@ export const mockWagmiProvider = ({ children }: { children: React.ReactNode }) =
 
 jest.mock('wagmi', () => ({
   useAccount: mockWagmiUseAccount,
+  useBalance: mockWagmiUseBalance,
   useSignMessage: mockWagmiUseSignMessage,
+  usePublicClient: mockWagmiUsePublicClient,
+  useWriteContract: mockWagmiUseWriteContract,
+  useReadContract: mockWagmiUseReadContract,
   WagmiProvider: mockWagmiProvider,
 }))
 

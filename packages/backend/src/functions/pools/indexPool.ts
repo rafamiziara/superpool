@@ -2,11 +2,12 @@ import { IndexPoolRequest, IndexPoolResponse } from '@superpool/types'
 import { logger } from 'firebase-functions/v2'
 import { CallableRequest, HttpsError, onCall } from 'firebase-functions/v2/https'
 import { DEFAULT_CHAIN_ID, getChainConfig } from '../../constants'
+import { indexByTransactionSchema } from '../../schemas'
 import { firestore } from '../../services'
 import { indexPoolByTxHash } from '../../services/eventIndexer'
+import { indexMembershipsByTxHash } from '../../services/membershipIndexer'
+import { parseRequest } from '../../utils/validation'
 import { getProvider } from '../../utils/blockchain'
-
-const TX_HASH_REGEX = /^0x[a-fA-F0-9]{64}$/
 
 export const indexPoolHandler = async (request: CallableRequest<IndexPoolRequest>): Promise<IndexPoolResponse> => {
   // 1. Require auth
@@ -15,17 +16,15 @@ export const indexPoolHandler = async (request: CallableRequest<IndexPoolRequest
   }
 
   // 2. Validate txHash format
-  const { txHash, chainId: requestedChainId } = request.data
-
-  if (!txHash || !TX_HASH_REGEX.test(txHash)) {
-    throw new HttpsError('invalid-argument', 'Invalid transaction hash format')
-  }
+  const { txHash, chainId: requestedChainId } = parseRequest(indexByTransactionSchema, request.data)
 
   // 3. Resolve chainId
-  const chainId = requestedChainId || DEFAULT_CHAIN_ID
+  const chainId = requestedChainId ?? DEFAULT_CHAIN_ID
 
   // 4. Validate chain is supported
-  if (!getChainConfig(chainId)) {
+  const chainConfig = getChainConfig(chainId)
+
+  if (!chainConfig) {
     throw new HttpsError('invalid-argument', `Unsupported chain ID: ${chainId}`)
   }
 
@@ -45,6 +44,26 @@ export const indexPoolHandler = async (request: CallableRequest<IndexPoolRequest
       alreadyIndexed: result.alreadyIndexed,
       stored: result.stored,
     })
+
+    // 6b. The same transaction enrols the creator: the pool grants membership
+    // to whoever owns it, so `initialize` emits `MemberJoined` alongside
+    // `PoolCreated`. Indexed here rather than left to the sweep, so the owner's
+    // own pool does not spend five minutes telling them they are not in it.
+    //
+    // Best effort on purpose, and after the pool is stored: the register is
+    // read back from the chain by `membership(address)` and the sweep covers
+    // this range regardless, so a failure here costs latency and nothing else.
+    if (chainConfig.poolFactoryAddress) {
+      try {
+        await indexMembershipsByTxHash(txHash, chainId, chainConfig.poolFactoryAddress, provider, firestore)
+      } catch (error) {
+        logger.warn('Could not index the pool creator’s membership; the scheduled sync will', {
+          txHash,
+          chainId,
+          error: error instanceof Error ? error.message : String(error),
+        })
+      }
+    }
 
     // 7. Return response
     return {

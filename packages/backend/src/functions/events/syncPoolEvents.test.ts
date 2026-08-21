@@ -1,483 +1,502 @@
+// The chain registry reads the environment once, at module load, and the
+// handler refuses to run without a factory address — so these must be set
+// before the first require below. Two chains, because sweeping more than one is
+// the behaviour that matters most here.
+process.env.POOL_FACTORY_ADDRESS = '0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512'
+process.env.POOL_FACTORY_ADDRESS_80002 = '0x0Aa731eD9C24B6f8E3d15C97a40Fb2D6E8391B55'
+process.env.RPC_URL_80002 = 'https://rpc-amoy.example/'
+
 import { mockLogger } from '../../__tests__/setup'
 
 jest.mock('../../utils/blockchain')
 jest.mock('../../services')
-jest.mock('../../services/eventIndexer')
-jest.mock('ethers', () => {
-  const actual = jest.requireActual('ethers')
-  return {
-    ...actual,
-    Contract: jest.fn(),
-  }
-})
+jest.mock('../../services/eventSweeper')
 
-const { syncPoolEventsHandler } = require('./syncPoolEvents')
+const { syncPoolEventsHandler, syncAllChainsHandler, resolveInitialFromBlock } = require('./syncPoolEvents')
 const { getProvider } = require('../../utils/blockchain')
-const { indexPoolEvent, parsePoolCreatedLog } = require('../../services/eventIndexer')
+const { sweepBlockRange } = require('../../services/eventSweeper')
 const { firestore } = require('../../services')
-const { Contract } = require('ethers')
 
 // ---------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------
 
-const CHAIN_ID = 31337 // default from ACTIVE_CHAIN_CONFIG
+const CHAIN_ID = 31337 // DEFAULT_CHAIN_ID
+const SECOND_CHAIN_ID = 80002
+const SECOND_FACTORY_ADDRESS = '0x0Aa731eD9C24B6f8E3d15C97a40Fb2D6E8391B55'
+const FACTORY_ADDRESS = '0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512'
 const CURRENT_BLOCK = 5000
 const LAST_PROCESSED_BLOCK = 4900
-const FROM_BLOCK = LAST_PROCESSED_BLOCK + 1
-// toBlock = min(CURRENT_BLOCK, FROM_BLOCK + 500) = min(5000, 5401) = 5000
-const TO_BLOCK = Math.min(CURRENT_BLOCK, FROM_BLOCK + 500)
+const MAX_BLOCK_RANGE = 500
+
+/**
+ * Mirrors `CONFIRMATIONS` in the handler. A sweep of a real chain stops this
+ * far short of the head, because a log read from a block that is later
+ * orphaned is written once and never revisited — the cursor has moved past it.
+ * A local chain has no reorgs and is swept to the head.
+ */
+const CONFIRMATIONS = 128
+const SAFE_HEAD = CURRENT_BLOCK - CONFIRMATIONS
+
+const NO_COUNTS = { pools: 0, contributions: 0, withdrawals: 0, statusUpdates: 0 }
 
 // ---------------------------------------------------------------------------
-// Mock builder helpers
+// Helpers
 // ---------------------------------------------------------------------------
 
-function buildMockProvider(
-  overrides: Partial<{
-    getBlockNumberError: Error | null
-    currentBlock: number
-    blockData: object | null
-  }> = {}
-) {
-  const { getBlockNumberError, currentBlock = CURRENT_BLOCK, blockData } = overrides
-  return {
-    getBlockNumber: getBlockNumberError ? jest.fn().mockRejectedValue(getBlockNumberError) : jest.fn().mockResolvedValue(currentBlock),
-    getBlock: jest.fn().mockResolvedValue(blockData !== undefined ? blockData : { timestamp: 1700000000, number: CURRENT_BLOCK }),
-  }
+function buildMockProvider(currentBlock: number = CURRENT_BLOCK) {
+  return { getBlockNumber: jest.fn().mockResolvedValue(currentBlock) }
 }
 
-function buildMockSyncStateRef(docExists: boolean, lastProcessedBlock: number = LAST_PROCESSED_BLOCK) {
-  const mockSet = jest.fn().mockResolvedValue(undefined)
-  const mockGet = jest
-    .fn()
-    .mockResolvedValue(docExists ? { exists: true, data: () => ({ lastProcessedBlock }) } : { exists: false, data: () => null })
-
-  return {
-    get: mockGet,
-    set: mockSet,
-  }
-}
-
-interface SetupFirestoreOptions {
-  syncStateDocExists?: boolean
+interface FirestoreOptions {
+  syncStateExists?: boolean
   lastProcessedBlock?: number
-  syncStateSetError?: Error | null
+  setError?: Error
 }
 
-function setupFirestore(options: SetupFirestoreOptions = {}) {
-  const { syncStateDocExists = true, lastProcessedBlock = LAST_PROCESSED_BLOCK, syncStateSetError = null } = options
+function setupFirestore(options: FirestoreOptions = {}) {
+  const { syncStateExists = true, lastProcessedBlock = LAST_PROCESSED_BLOCK, setError } = options
 
-  const syncStateRef = buildMockSyncStateRef(syncStateDocExists, lastProcessedBlock)
-
-  if (syncStateSetError) {
-    syncStateRef.set.mockRejectedValue(syncStateSetError)
-  }
-
-  const poolsCollection = {
-    doc: jest.fn().mockReturnValue({
-      get: jest.fn().mockResolvedValue({ exists: false, data: () => null }),
-      set: jest.fn().mockResolvedValue(undefined),
+  const syncStateRef = {
+    get: jest.fn().mockResolvedValue({
+      exists: syncStateExists,
+      data: () => (syncStateExists ? { lastProcessedBlock } : null),
     }),
+    set: setError ? jest.fn().mockRejectedValue(setError) : jest.fn().mockResolvedValue(undefined),
   }
 
-  firestore.collection.mockImplementation((name: string) => {
-    if (name === 'event_sync_state') {
-      return { doc: jest.fn().mockReturnValue(syncStateRef) }
-    }
-    return poolsCollection
-  })
+  const doc = jest.fn().mockReturnValue(syncStateRef)
 
-  return { syncStateRef, poolsCollection }
+  firestore.collection.mockReturnValue({ doc })
+
+  return { syncStateRef, doc }
 }
 
-function buildMockContract(events: object[] = []) {
-  const mockQueryFilter = jest.fn().mockResolvedValue(events)
-  const mockFilters = { PoolCreated: jest.fn().mockReturnValue({}) }
-  const contractInstance = {
-    queryFilter: mockQueryFilter,
-    filters: mockFilters,
-  }
-
-  ;(Contract as jest.Mock).mockImplementation(() => contractInstance)
-
-  return { contractInstance, mockQueryFilter, mockFilters }
+/** The ranges `sweepBlockRange` was asked for, in order. */
+function sweptRanges(): [number, number][] {
+  return sweepBlockRange.mock.calls.map(([options]: [{ fromBlock: number; toBlock: number }]) => [options.fromBlock, options.toBlock])
 }
 
-function buildMockEvent(blockNumber: number = CURRENT_BLOCK) {
-  return {
-    blockNumber,
-    data: '0xlogdata',
-    topics: ['0xPOOL_CREATED_TOPIC'],
-    transactionHash: '0x' + 'a'.repeat(64),
-  }
-}
-
-function buildParsedPool(poolId: number = 1) {
-  return {
-    poolId,
-    poolAddress: '0xPoolAddress',
-    poolOwner: '0xOwner',
-    name: 'Test Pool',
-    description: '',
-    maxLoanAmount: '1000000000000000000',
-    interestRate: 500,
-    loanDuration: 2592000,
-    chainId: CHAIN_ID,
-    transactionHash: '0x' + 'a'.repeat(64),
-    blockNumber: CURRENT_BLOCK,
-    createdAt: new Date(),
-    isActive: true,
-  }
-}
+beforeEach(() => {
+  delete process.env.START_BLOCK
+  getProvider.mockReturnValue(buildMockProvider())
+  sweepBlockRange.mockResolvedValue({ ...NO_COUNTS })
+})
 
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
 
+describe('resolveInitialFromBlock', () => {
+  it('should honour START_BLOCK when it is set', async () => {
+    // Arrange
+    process.env.START_BLOCK = '12345'
+
+    // Act
+    const fromBlock = resolveInitialFromBlock(CURRENT_BLOCK, 80002)
+
+    // Assert
+    expect(fromBlock).toBe(12345)
+  })
+
+  it('should sweep a local chain from genesis', async () => {
+    // Arrange
+    // A Hardhat node is a few dozen blocks deep and every block is ours; a
+    // lookback window would leave the seeded pools permanently invisible.
+
+    // Act
+    const fromBlock = resolveInitialFromBlock(CURRENT_BLOCK, 31337)
+
+    // Assert
+    expect(fromBlock).toBe(0)
+  })
+
+  it('should fall back to a short lookback on other chains and warn about it', async () => {
+    // Act
+    const fromBlock = resolveInitialFromBlock(CURRENT_BLOCK, 80002)
+
+    // Assert
+    expect(fromBlock).toBe(CURRENT_BLOCK - 1000)
+    expect(mockLogger.warn).toHaveBeenCalledWith(expect.stringContaining('START_BLOCK'), expect.objectContaining({ chainId: 80002 }))
+  })
+
+  it('should not return a negative block on a chain shorter than the lookback', async () => {
+    // Act
+    const fromBlock = resolveInitialFromBlock(10, 80002)
+
+    // Assert
+    expect(fromBlock).toBe(0)
+  })
+})
+
 describe('syncPoolEventsHandler', () => {
-  beforeEach(() => {
-    jest.clearAllMocks()
-  })
+  describe('where the sweep starts', () => {
+    it('should resume from the block after the stored cursor', async () => {
+      // Arrange
+      setupFirestore({ lastProcessedBlock: LAST_PROCESSED_BLOCK })
 
-  // -------------------------------------------------------------------------
-  // Provider failure
-  // -------------------------------------------------------------------------
+      // Act
+      const result = await syncPoolEventsHandler()
 
-  it('should log error and return early when getProvider throws', async () => {
-    // Arrange
-    getProvider.mockImplementation(() => {
-      throw new Error('provider init failed')
+      // Assert
+      expect(result.fromBlock).toBe(LAST_PROCESSED_BLOCK + 1)
+      expect(sweptRanges()).toEqual([[LAST_PROCESSED_BLOCK + 1, CURRENT_BLOCK]])
     })
-    setupFirestore()
-    buildMockContract()
 
-    // Act
-    await syncPoolEventsHandler()
+    it('should sweep a local chain from genesis when there is no stored cursor', async () => {
+      // Arrange
+      setupFirestore({ syncStateExists: false })
 
-    // Assert
-    expect(mockLogger.error).toHaveBeenCalledWith(
-      'Failed to get provider for sync',
-      expect.objectContaining({ chainId: CHAIN_ID, error: 'provider init failed' })
-    )
-    expect(firestore.collection).not.toHaveBeenCalled()
+      // Act
+      const result = await syncPoolEventsHandler()
+
+      // Assert
+      expect(result.fromBlock).toBe(0)
+    })
+
+    it('should let an explicit fromBlock override the stored cursor', async () => {
+      // Arrange
+      // This is how a backfill is run without deleting the sync state; every
+      // indexer keys on the log, so re-scanning writes nothing twice.
+      setupFirestore({ lastProcessedBlock: LAST_PROCESSED_BLOCK })
+
+      // Act
+      const result = await syncPoolEventsHandler({ fromBlock: 0 })
+
+      // Assert
+      expect(result.fromBlock).toBe(0)
+      expect(sweptRanges()[0]).toEqual([0, MAX_BLOCK_RANGE - 1])
+    })
+
+    it('should clamp a negative fromBlock to genesis', async () => {
+      // Arrange
+      setupFirestore()
+
+      // Act
+      const result = await syncPoolEventsHandler({ fromBlock: -50 })
+
+      // Assert
+      expect(result.fromBlock).toBe(0)
+    })
+
+    it('should do nothing when the cursor is already at the chain head', async () => {
+      // Arrange
+      setupFirestore({ lastProcessedBlock: CURRENT_BLOCK })
+
+      // Act
+      const result = await syncPoolEventsHandler()
+
+      // Assert
+      expect(sweepBlockRange).not.toHaveBeenCalled()
+      expect(result).toMatchObject({ caughtUp: true, toBlock: CURRENT_BLOCK, ...NO_COUNTS })
+    })
   })
 
-  // -------------------------------------------------------------------------
-  // getBlockNumber failure
-  // -------------------------------------------------------------------------
+  describe('chunking', () => {
+    it('should split a long gap into ranges of at most MAX_BLOCK_RANGE blocks', async () => {
+      // Arrange
+      // Public RPCs cap the span of a single `getLogs`, so the gap has to be
+      // walked rather than asked for in one query.
+      setupFirestore({ lastProcessedBlock: -1 })
+      getProvider.mockReturnValue(buildMockProvider(1200))
 
-  it('should log error and return early when getBlockNumber rejects', async () => {
-    // Arrange
-    const mockProvider = buildMockProvider({ getBlockNumberError: new Error('network timeout') })
-    getProvider.mockReturnValue(mockProvider)
-    setupFirestore()
-    buildMockContract()
+      // Act
+      await syncPoolEventsHandler({ fromBlock: 0 })
 
-    // Act
-    await syncPoolEventsHandler()
+      // Assert
+      expect(sweptRanges()).toEqual([
+        [0, 499],
+        [500, 999],
+        [1000, 1200],
+      ])
+    })
 
-    // Assert
-    expect(mockLogger.error).toHaveBeenCalledWith(
-      'Failed to get current block number',
-      expect.objectContaining({ chainId: CHAIN_ID, error: 'network timeout' })
-    )
-    expect(firestore.collection).not.toHaveBeenCalled()
+    it('should stop at the chain head rather than sweeping past it', async () => {
+      // Arrange
+      setupFirestore({ lastProcessedBlock: CURRENT_BLOCK - 10 })
+
+      // Act
+      await syncPoolEventsHandler()
+
+      // Assert
+      expect(sweptRanges()).toEqual([[CURRENT_BLOCK - 9, CURRENT_BLOCK]])
+    })
+
+    it('should stop on its range budget and report that it has not caught up', async () => {
+      // Arrange
+      // 100 ranges of 500 blocks. A first run on a long chain must return
+      // rather than run past the function timeout; the next run continues.
+      setupFirestore({ syncStateExists: false })
+      getProvider.mockReturnValue(buildMockProvider(1_000_000))
+
+      // Act
+      const result = await syncPoolEventsHandler({ fromBlock: 0 })
+
+      // Assert
+      expect(sweepBlockRange).toHaveBeenCalledTimes(100)
+      expect(result.toBlock).toBe(49_999)
+      expect(result.caughtUp).toBe(false)
+    })
+
+    it('should accumulate counts across every range it sweeps', async () => {
+      // Arrange
+      setupFirestore({ lastProcessedBlock: -1 })
+      getProvider.mockReturnValue(buildMockProvider(600))
+      sweepBlockRange
+        .mockResolvedValueOnce({ pools: 2, contributions: 3, withdrawals: 1, statusUpdates: 1 })
+        .mockResolvedValueOnce({ pools: 1, contributions: 0, withdrawals: 4, statusUpdates: 2 })
+
+      // Act
+      const result = await syncPoolEventsHandler({ fromBlock: 0 })
+
+      // Assert
+      expect(result).toMatchObject({ pools: 3, contributions: 3, withdrawals: 5, statusUpdates: 3, caughtUp: true })
+    })
   })
 
-  // -------------------------------------------------------------------------
-  // Already synced
-  // -------------------------------------------------------------------------
+  describe('sync state', () => {
+    it('should persist the cursor after every range, not once at the end', async () => {
+      // Arrange
+      // A run that dies mid-backfill must keep what it has already indexed.
+      const { syncStateRef } = setupFirestore({ lastProcessedBlock: -1 })
+      getProvider.mockReturnValue(buildMockProvider(1200))
 
-  it('should log "nothing to do" and return early when already synced to current block', async () => {
-    // Arrange
-    // lastProcessedBlock === currentBlock → fromBlock > currentBlock → nothing to do
-    const mockProvider = buildMockProvider({ currentBlock: CURRENT_BLOCK })
-    getProvider.mockReturnValue(mockProvider)
-    setupFirestore({ syncStateDocExists: true, lastProcessedBlock: CURRENT_BLOCK })
-    buildMockContract()
+      // Act
+      await syncPoolEventsHandler({ fromBlock: 0 })
 
-    // Act
-    await syncPoolEventsHandler()
+      // Assert
+      expect(syncStateRef.set).toHaveBeenCalledTimes(3)
+      expect(syncStateRef.set).toHaveBeenLastCalledWith(expect.objectContaining({ lastProcessedBlock: 1200 }), { merge: true })
+    })
 
-    // Assert
-    expect(mockLogger.info).toHaveBeenCalledWith(
-      'Already synced up to current block, nothing to do',
-      expect.objectContaining({ chainId: CHAIN_ID })
-    )
+    it('should increment a counter per feed', async () => {
+      // Arrange
+      const { syncStateRef } = setupFirestore()
+      sweepBlockRange.mockResolvedValue({ pools: 1, contributions: 2, withdrawals: 3, statusUpdates: 4 })
+
+      // Act
+      await syncPoolEventsHandler()
+
+      // Assert
+      expect(syncStateRef.set).toHaveBeenCalledWith(
+        expect.objectContaining({
+          chainId: CHAIN_ID,
+          totalPoolsIndexed: expect.anything(),
+          totalContributionsIndexed: expect.anything(),
+          totalWithdrawalsIndexed: expect.anything(),
+          totalPoolStatusUpdates: expect.anything(),
+        }),
+        { merge: true }
+      )
+    })
+
+    it('should not rewind the stored cursor when re-scanning older blocks', async () => {
+      // Arrange
+      // A `fromBlock: 0` backfill is idempotent, but letting it move the cursor
+      // backwards would make the scheduled sweep redo everything in between.
+      const { syncStateRef } = setupFirestore({ lastProcessedBlock: 4900 })
+
+      // Act
+      await syncPoolEventsHandler({ fromBlock: 0 })
+
+      // Assert
+      const written = syncStateRef.set.mock.calls.map(([data]: [{ lastProcessedBlock: number }]) => data.lastProcessedBlock)
+      expect(Math.min(...written)).toBe(4900)
+    })
+
+    it('should keep sweeping when the cursor cannot be written', async () => {
+      // Arrange
+      // The events are indexed either way; a repeated range costs nothing.
+      setupFirestore({ lastProcessedBlock: -1, setError: new Error('Firestore unavailable') })
+      getProvider.mockReturnValue(buildMockProvider(1200))
+
+      // Act
+      const result = await syncPoolEventsHandler({ fromBlock: 0 })
+
+      // Assert
+      expect(sweepBlockRange).toHaveBeenCalledTimes(3)
+      expect(result.caughtUp).toBe(true)
+      expect(mockLogger.error).toHaveBeenCalledWith('Failed to update sync state', expect.objectContaining({ chainId: CHAIN_ID }))
+    })
   })
 
-  // -------------------------------------------------------------------------
-  // First run (no sync state doc)
-  // -------------------------------------------------------------------------
+  describe('failures', () => {
+    it('should throw when no factory address is configured', async () => {
+      // Arrange
+      // Without it there is no way to tell a pool of ours from any other
+      // contract, so sweeping would index strangers' events.
+      jest.resetModules()
+      const previous = process.env.POOL_FACTORY_ADDRESS
+      delete process.env.POOL_FACTORY_ADDRESS
 
-  it('should use fallback startBlock = currentBlock - 1000 when no sync state doc exists', async () => {
-    // Arrange
-    const mockProvider = buildMockProvider({ currentBlock: CURRENT_BLOCK })
-    getProvider.mockReturnValue(mockProvider)
-    // No sync state doc → lastProcessedBlock = CURRENT_BLOCK - 1000 → fromBlock = CURRENT_BLOCK - 999
-    setupFirestore({ syncStateDocExists: false })
-    const { mockQueryFilter } = buildMockContract([])
+      // Act & Assert
+      try {
+        const { syncPoolEventsHandler: handler } = require('./syncPoolEvents')
+        await expect(handler()).rejects.toThrow('PoolFactory address not configured')
+      } finally {
+        process.env.POOL_FACTORY_ADDRESS = previous
+      }
+    })
 
-    // Act
-    await syncPoolEventsHandler()
-
-    // Assert
-    // fromBlock = (CURRENT_BLOCK - 1000) + 1 = CURRENT_BLOCK - 999
-    expect(mockQueryFilter).toHaveBeenCalledWith(expect.anything(), CURRENT_BLOCK - 999, expect.any(Number))
-  })
-
-  // -------------------------------------------------------------------------
-  // queryFilter failure
-  // -------------------------------------------------------------------------
-
-  it('should log error and return early without updating sync state when queryFilter fails', async () => {
-    // Arrange
-    const mockProvider = buildMockProvider()
-    getProvider.mockReturnValue(mockProvider)
-    const { syncStateRef } = setupFirestore()
-    buildMockContract()
-
-    const contractInstance = {
-      queryFilter: jest.fn().mockRejectedValue(new Error('eth_getLogs timeout')),
-      filters: { PoolCreated: jest.fn().mockReturnValue({}) },
-    }
-    ;(Contract as jest.Mock).mockImplementation(() => contractInstance)
-
-    // Act
-    await syncPoolEventsHandler()
-
-    // Assert
-    expect(mockLogger.error).toHaveBeenCalledWith(
-      'Failed to query PoolCreated events',
-      expect.objectContaining({ error: 'eth_getLogs timeout' })
-    )
-    expect(syncStateRef.set).not.toHaveBeenCalled()
-  })
-
-  // -------------------------------------------------------------------------
-  // Normal sync with events
-  // -------------------------------------------------------------------------
-
-  it('should index all new events and update sync state', async () => {
-    // Arrange
-    const mockProvider = buildMockProvider()
-    getProvider.mockReturnValue(mockProvider)
-    const { syncStateRef } = setupFirestore()
-
-    const event1 = buildMockEvent(CURRENT_BLOCK - 1)
-    const event2 = buildMockEvent(CURRENT_BLOCK)
-    buildMockContract([event1, event2])
-
-    const parsedPool1 = buildParsedPool(1)
-    const parsedPool2 = buildParsedPool(2)
-    parsePoolCreatedLog.mockReturnValueOnce(parsedPool1).mockReturnValueOnce(parsedPool2)
-
-    indexPoolEvent
-      .mockResolvedValueOnce({ poolId: 1, alreadyIndexed: false, stored: true })
-      .mockResolvedValueOnce({ poolId: 2, alreadyIndexed: false, stored: true })
-
-    // Act
-    await syncPoolEventsHandler()
-
-    // Assert
-    expect(indexPoolEvent).toHaveBeenCalledTimes(2)
-    expect(syncStateRef.set).toHaveBeenCalledWith(
-      expect.objectContaining({
-        chainId: CHAIN_ID,
-        lastProcessedBlock: TO_BLOCK,
-      }),
-      { merge: true }
-    )
-  })
-
-  it('should log "Indexed new pool from sync" for each stored pool', async () => {
-    // Arrange
-    const mockProvider = buildMockProvider()
-    getProvider.mockReturnValue(mockProvider)
-    setupFirestore()
-
-    const event = buildMockEvent()
-    buildMockContract([event])
-    parsePoolCreatedLog.mockReturnValue(buildParsedPool(1))
-    indexPoolEvent.mockResolvedValue({ poolId: 1, alreadyIndexed: false, stored: true })
-
-    // Act
-    await syncPoolEventsHandler()
-
-    // Assert
-    expect(mockLogger.info).toHaveBeenCalledWith('Indexed new pool from sync', expect.objectContaining({ poolId: 1, chainId: CHAIN_ID }))
-  })
-
-  // -------------------------------------------------------------------------
-  // Per-event errors
-  // -------------------------------------------------------------------------
-
-  it('should continue processing remaining events when one event fails', async () => {
-    // Arrange
-    const mockProvider = buildMockProvider()
-    getProvider.mockReturnValue(mockProvider)
-    const { syncStateRef } = setupFirestore()
-
-    const event1 = buildMockEvent(CURRENT_BLOCK - 1)
-    const event2 = buildMockEvent(CURRENT_BLOCK)
-    buildMockContract([event1, event2])
-
-    parsePoolCreatedLog
-      .mockImplementationOnce(() => {
-        throw new Error('bad decode')
+    it('should throw when the provider cannot be built', async () => {
+      // Arrange
+      getProvider.mockImplementation(() => {
+        throw new Error('Unsupported chain ID: 31337')
       })
-      .mockReturnValueOnce(buildParsedPool(2))
 
-    indexPoolEvent.mockResolvedValue({ poolId: 2, alreadyIndexed: false, stored: true })
+      // Act & Assert
+      await expect(syncPoolEventsHandler()).rejects.toThrow('Unsupported chain ID')
+    })
 
-    // Act
-    await syncPoolEventsHandler()
+    it('should throw when the chain head cannot be read', async () => {
+      // Arrange
+      getProvider.mockReturnValue({ getBlockNumber: jest.fn().mockRejectedValue(new Error('network timeout')) })
 
-    // Assert
-    expect(mockLogger.error).toHaveBeenCalledWith('Failed to process event during sync', expect.objectContaining({ error: 'bad decode' }))
-    // Second event still processed
-    expect(indexPoolEvent).toHaveBeenCalledTimes(1)
-    // Sync state still updated
-    expect(syncStateRef.set).toHaveBeenCalled()
+      // Act & Assert
+      await expect(syncPoolEventsHandler()).rejects.toThrow('network timeout')
+    })
+
+    it('should stop at the failed range and keep the cursor behind it', async () => {
+      // Arrange
+      // Advancing past blocks that were never read would lose their events for
+      // good — nothing revisits them.
+      const { syncStateRef } = setupFirestore({ lastProcessedBlock: -1 })
+      getProvider.mockReturnValue(buildMockProvider(1200))
+      sweepBlockRange
+        .mockResolvedValueOnce({ pools: 1, contributions: 0, withdrawals: 0, statusUpdates: 0 })
+        .mockRejectedValueOnce(new Error('RPC down'))
+
+      // Act
+      const result = await syncPoolEventsHandler({ fromBlock: 0 })
+
+      // Assert
+      expect(sweepBlockRange).toHaveBeenCalledTimes(2)
+      expect(result.toBlock).toBe(499)
+      expect(result.caughtUp).toBe(false)
+      expect(syncStateRef.set).toHaveBeenCalledTimes(1)
+      expect(mockLogger.error).toHaveBeenCalledWith(
+        'Failed to sweep block range; stopping this run',
+        expect.objectContaining({ fromBlock: 500, toBlock: 999 })
+      )
+    })
+
+    it('should report what it indexed before the failure', async () => {
+      // Arrange
+      setupFirestore({ lastProcessedBlock: -1 })
+      getProvider.mockReturnValue(buildMockProvider(1200))
+      sweepBlockRange
+        .mockResolvedValueOnce({ pools: 2, contributions: 1, withdrawals: 0, statusUpdates: 0 })
+        .mockRejectedValueOnce(new Error('RPC down'))
+
+      // Act
+      const result = await syncPoolEventsHandler({ fromBlock: 0 })
+
+      // Assert
+      expect(result).toMatchObject({ pools: 2, contributions: 1, withdrawals: 0 })
+    })
   })
 
-  it('should log error per failing event and not crash the whole run', async () => {
+  it('should pass the chain and factory through to every sweep', async () => {
     // Arrange
-    const mockProvider = buildMockProvider()
-    getProvider.mockReturnValue(mockProvider)
     setupFirestore()
 
-    const event = buildMockEvent()
-    buildMockContract([event])
-
-    // getBlock returns null to trigger an error path inside the event loop
-    mockProvider.getBlock.mockResolvedValue(null)
-
     // Act
     await syncPoolEventsHandler()
 
     // Assert
-    expect(mockLogger.error).toHaveBeenCalledWith(
-      'Failed to fetch block for event',
-      expect.objectContaining({ blockNumber: event.blockNumber, chainId: CHAIN_ID })
-    )
-    expect(indexPoolEvent).not.toHaveBeenCalled()
+    expect(sweepBlockRange).toHaveBeenCalledWith(expect.objectContaining({ chainId: CHAIN_ID, factoryAddress: FACTORY_ADDRESS }))
   })
 
   // -------------------------------------------------------------------------
-  // Block range capping
+  // More than one chain.
+  //
+  // The backend used to sweep exactly one: `getChainConfig` matched only the
+  // configured chain, so localhost and Amoy could not be served at once and the
+  // app's network picker was presentational.
   // -------------------------------------------------------------------------
 
-  it('should cap the block range at MAX_BLOCK_RANGE (500) when range would exceed it', async () => {
-    // Arrange
-    // lastProcessedBlock is far behind so range = currentBlock - fromBlock > 500
-    const farBehindBlock = 1000
-    const bigCurrentBlock = 10000
-    const mockProvider = buildMockProvider({ currentBlock: bigCurrentBlock })
-    getProvider.mockReturnValue(mockProvider)
-    setupFirestore({ syncStateDocExists: true, lastProcessedBlock: farBehindBlock })
-    const { mockQueryFilter } = buildMockContract([])
+  describe('a named chain', () => {
+    it('is swept instead of the default', async () => {
+      // A cursor far enough back that there is confirmed work to do: chain
+      // 80002 is not local, so the sweep stops `CONFIRMATIONS` short of the
+      // head and the default cursor of 4900 is already past that.
+      setupFirestore({ lastProcessedBlock: CURRENT_BLOCK - 500 })
 
-    // Act
-    await syncPoolEventsHandler()
+      await syncPoolEventsHandler({ chainId: SECOND_CHAIN_ID })
 
-    // Assert
-    // fromBlock = farBehindBlock + 1 = 1001
-    // toBlock should be capped at 1001 + 500 = 1501, not 10000
-    expect(mockQueryFilter).toHaveBeenCalledWith(expect.anything(), farBehindBlock + 1, farBehindBlock + 1 + 500)
+      expect(sweepBlockRange).toHaveBeenCalledWith(
+        expect.objectContaining({ chainId: SECOND_CHAIN_ID, factoryAddress: SECOND_FACTORY_ADDRESS })
+      )
+    })
+
+    it('stops short of the head, leaving the unconfirmed tail alone', async () => {
+      setupFirestore({ lastProcessedBlock: CURRENT_BLOCK - 500 })
+
+      const result = await syncPoolEventsHandler({ chainId: SECOND_CHAIN_ID })
+
+      expect(result.toBlock).toBe(SAFE_HEAD)
+      expect(result.currentBlock).toBe(CURRENT_BLOCK)
+      expect(result.caughtUp).toBe(true)
+    })
+
+    it('does nothing when the head has not moved a confirmation depth yet', async () => {
+      // The ordinary case on a quiet chain, and the one that must not be
+      // mistaken for an error: everything settled has already been read.
+      setupFirestore({ lastProcessedBlock: SAFE_HEAD })
+
+      const result = await syncPoolEventsHandler({ chainId: SECOND_CHAIN_ID })
+
+      expect(result).toMatchObject({ caughtUp: true })
+      expect(sweepBlockRange).not.toHaveBeenCalled()
+    })
+
+    it('keeps its own cursor', async () => {
+      // The sync state is keyed by chain id, so two chains cannot advance each
+      // other's position — one lagging chain would otherwise skip the other's
+      // history wholesale.
+      const { doc } = setupFirestore()
+
+      await syncPoolEventsHandler({ chainId: SECOND_CHAIN_ID })
+
+      expect(firestore.collection).toHaveBeenCalledWith('event_sync_state')
+      expect(doc).toHaveBeenCalledWith(String(SECOND_CHAIN_ID))
+    })
+
+    it('is refused when this backend does not serve it', async () => {
+      setupFirestore()
+
+      await expect(syncPoolEventsHandler({ chainId: 999 })).rejects.toThrow('Unsupported chain ID: 999')
+      expect(sweepBlockRange).not.toHaveBeenCalled()
+    })
   })
 
-  // -------------------------------------------------------------------------
-  // Already indexed pools
-  // -------------------------------------------------------------------------
+  describe('syncAllChainsHandler', () => {
+    it('sweeps every configured chain', async () => {
+      setupFirestore()
 
-  it('should log "Pool already indexed, skipped during sync" for already-indexed pools', async () => {
-    // Arrange
-    const mockProvider = buildMockProvider()
-    getProvider.mockReturnValue(mockProvider)
-    setupFirestore()
+      const results = await syncAllChainsHandler()
 
-    const event = buildMockEvent()
-    buildMockContract([event])
-    parsePoolCreatedLog.mockReturnValue(buildParsedPool(5))
-    indexPoolEvent.mockResolvedValue({ poolId: 5, alreadyIndexed: true, stored: false })
+      expect(results.map((result: { chainId: number }) => result.chainId).sort()).toEqual([SECOND_CHAIN_ID, CHAIN_ID].sort())
+    })
 
-    // Act
-    await syncPoolEventsHandler()
+    // An unreachable RPC is the ordinary case on a public testnet. Letting it
+    // abort the run would mean a flaky Amoy endpoint silently stopping
+    // localhost indexing too.
+    it('carries on after one chain fails', async () => {
+      setupFirestore()
+      getProvider.mockImplementation((chainId: number) => {
+        if (chainId === SECOND_CHAIN_ID) throw new Error('amoy unreachable')
 
-    // Assert
-    expect(mockLogger.info).toHaveBeenCalledWith(
-      'Pool already indexed, skipped during sync',
-      expect.objectContaining({ poolId: 5, chainId: CHAIN_ID })
-    )
-  })
+        return buildMockProvider()
+      })
 
-  it('should not count already-indexed pools toward newPoolsCount', async () => {
-    // Arrange
-    const mockProvider = buildMockProvider()
-    getProvider.mockReturnValue(mockProvider)
-    const { syncStateRef } = setupFirestore()
+      const results = await syncAllChainsHandler()
 
-    const event = buildMockEvent()
-    buildMockContract([event])
-    parsePoolCreatedLog.mockReturnValue(buildParsedPool(5))
-    indexPoolEvent.mockResolvedValue({ poolId: 5, alreadyIndexed: true, stored: false })
-
-    // Act
-    await syncPoolEventsHandler()
-
-    // Assert — totalPoolsIndexed should be incremented by 0, not 1
-    expect(syncStateRef.set).toHaveBeenCalledWith(
-      expect.objectContaining({
-        totalPoolsIndexed: expect.anything(), // FieldValue.increment(0)
-      }),
-      { merge: true }
-    )
-  })
-
-  // -------------------------------------------------------------------------
-  // Sync state update failure
-  // -------------------------------------------------------------------------
-
-  it('should log error when sync state update fails but not throw', async () => {
-    // Arrange
-    const mockProvider = buildMockProvider()
-    getProvider.mockReturnValue(mockProvider)
-    setupFirestore({ syncStateSetError: new Error('Firestore write failed') })
-    buildMockContract([])
-
-    // Act
-    await expect(syncPoolEventsHandler()).resolves.toBeUndefined()
-
-    // Assert
-    expect(mockLogger.error).toHaveBeenCalledWith(
-      'Failed to update sync state',
-      expect.objectContaining({ error: 'Firestore write failed' })
-    )
-  })
-
-  // -------------------------------------------------------------------------
-  // Sync completion log
-  // -------------------------------------------------------------------------
-
-  it('should log sync completion with correct block range and pool count', async () => {
-    // Arrange
-    const mockProvider = buildMockProvider()
-    getProvider.mockReturnValue(mockProvider)
-    setupFirestore()
-
-    const event = buildMockEvent()
-    buildMockContract([event])
-    parsePoolCreatedLog.mockReturnValue(buildParsedPool(1))
-    indexPoolEvent.mockResolvedValue({ poolId: 1, alreadyIndexed: false, stored: true })
-
-    // Act
-    await syncPoolEventsHandler()
-
-    // Assert
-    expect(mockLogger.info).toHaveBeenCalledWith(
-      expect.stringContaining('Sync completed'),
-      expect.objectContaining({ chainId: CHAIN_ID, fromBlock: FROM_BLOCK, toBlock: TO_BLOCK, newPoolsCount: 1 })
-    )
+      expect(results.map((result: { chainId: number }) => result.chainId)).toEqual([CHAIN_ID])
+      expect(mockLogger.error).toHaveBeenCalledWith(
+        'Event sync failed for chain; continuing with the rest',
+        expect.objectContaining({ chainId: SECOND_CHAIN_ID })
+      )
+    })
   })
 })

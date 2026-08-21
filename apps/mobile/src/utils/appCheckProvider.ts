@@ -2,6 +2,7 @@ import 'react-native-get-random-values'
 
 import { AppCheckToken, CustomProvider } from 'firebase/app-check'
 import { getUniqueDeviceId } from './deviceId'
+import { logger } from './logger'
 
 const APP_CHECK_MINTER_URL = process.env.EXPO_PUBLIC_CLOUD_FUNCTIONS_BASE_URL + 'customAppCheckMinter'
 
@@ -34,7 +35,7 @@ export const appCheckProvider = (): CustomProvider => {
           expireTimeMillis: data.expireTimeMillis,
         }
       } catch (error) {
-        console.error('Error fetching App Check token:', error)
+        logger.error('Error fetching App Check token:', error)
         // Return a dummy token to allow Firebase operations to proceed
         // This will fail server-side validation but won't block client operations
         return {

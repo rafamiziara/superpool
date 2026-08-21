@@ -1,31 +1,13 @@
 // Lending pool and transaction types
-
-export interface LendingPool {
-  id: string
-  name: string
-  description: string
-  contractAddress: string
-  creator: string
-  members: string[]
-  admins: string[]
-
-  // Pool parameters
-  maxMembers: number
-  minimumContribution: bigint
-  interestRate: number // basis points (e.g., 500 = 5%)
-  loanDuration: number // seconds
-
-  // Pool state
-  totalLiquidity: bigint
-  availableLiquidity: bigint
-  totalBorrowed: bigint
-  isActive: boolean
-  isPaused: boolean
-
-  // Timestamps
-  createdAt: Date
-  updatedAt: Date
-}
+//
+// A pool as the app sees it is `PoolInfo` in `api.ts` — the shape `listPools`
+// returns. There was a second, richer `LendingPool` interface here that no
+// code ever built or read: it predated the indexed record and described a
+// backend that was never written, with `createPool` and `getPools` callables
+// that do not exist. It was deleted on 2026-08-17 along with its request and
+// response types, because two of its fields — `maxMembers` and
+// `minimumContribution` — were promises of enforcement nothing anywhere made
+// good. See `.dev/contracts/CONTRACTS_BACKLOG.md` §2.
 
 export interface PoolMember {
   walletAddress: string
@@ -37,9 +19,17 @@ export interface PoolMember {
   status: MemberStatus
 }
 
+/**
+ * Where an address stands with a pool.
+ *
+ * Mirrors `LendingPool.Membership`, whose `None` has no counterpart here:
+ * an address the register has never heard of has no record to carry a status.
+ * `SUSPENDED` is the wire name for the contract's `Removed`.
+ */
 export enum MemberStatus {
   PENDING = 'pending',
   ACTIVE = 'active',
+  REJECTED = 'rejected',
   SUSPENDED = 'suspended',
   LEFT = 'left',
 }
@@ -63,6 +53,68 @@ export interface Loan {
   disbursedAt?: Date
   dueDate?: Date
   repaidAt?: Date
+  /**
+   * When the pool's owner declared this loan in default.
+   *
+   * Beside `repaidAt` and independent of `status`, exactly as the two are on
+   * chain. A loan can carry this **and** be `REPAID`: paying does not undo the
+   * declaration, and the pair is what says the borrower recovered — which is a
+   * different fact from never having been late, and a more useful one than
+   * either half alone.
+   */
+  defaultedAt?: Date
+}
+
+/**
+ * What one wallet has done with money it borrowed before.
+ *
+ * Counts rather than a score, and deliberately: the formula for a score would
+ * be wrong the first time and want retuning, and there is nothing yet to check
+ * one against. These are the facts a pool owner deciding on a request actually
+ * asks for, and every one of them is derived from the loans on read — nothing
+ * about a borrower is stored, so nothing about a borrower can go stale.
+ *
+ * Only funded loans are counted. A request is not borrowing and a rejected one
+ * is a decision that was already made, so neither says anything about whether
+ * this wallet gives money back.
+ */
+export interface BorrowerHistory {
+  /** Loans that were actually disbursed. */
+  total: number
+  /** Of those, the ones settled — whenever that happened. */
+  repaid: number
+  /** Settled on or before `startedAt + duration`. */
+  onTime: number
+  /** Settled after it. Nothing on chain prevents this; the term is unenforced. */
+  late: number
+  /**
+   * Settled, but with no date recorded — loans repaid before the contract
+   * stamped one. Counted in `repaid` and in neither `onTime` nor `late`,
+   * because the honest answer to when they were settled is that nobody knows.
+   */
+  undated: number
+  /** Still owed. */
+  outstanding: number
+  /** Still owed and past the due date, which is a subset of `outstanding`. */
+  overdue: number
+  /**
+   * Loans a pool owner declared in default, settled or not.
+   *
+   * Counted over the wallet's whole history rather than only its open loans,
+   * because that is the question being asked: `overdue` says a borrower is
+   * late today, and this says somebody once judged them to have stopped
+   * paying. A loan counted here can also be counted in `repaid` — see
+   * `Loan.defaultedAt`.
+   */
+  defaulted: number
+  /**
+   * True when this wallet has never borrowed.
+   *
+   * The distinction the whole shape exists for: zero repayments out of zero
+   * loans is a new borrower, not the worst kind of one, and a lending product
+   * that confuses the two is unusable for the people it is meant for.
+   */
+  isNew: boolean
 }
 
 export enum LoanStatus {

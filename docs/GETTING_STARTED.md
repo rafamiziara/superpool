@@ -74,6 +74,7 @@ pnpm dev
 ```
 
 This starts:
+
 - Firebase emulators (auth, functions, firestore)
 - Ngrok tunnels for mobile device access
 - Expo development server
@@ -84,31 +85,35 @@ This starts:
 Detailed setup and usage for each package:
 
 ### Applications
+
 - **[Mobile App](../apps/mobile/README.md)** - React Native/Expo with wallet integration
 - **[Landing Page](../apps/landing/README.md)** - Next.js marketing website
 
 ### Core Services
+
 - **[Smart Contracts](../packages/contracts/README.md)** - Solidity contracts and deployment
 - **[Backend](../packages/backend/README.md)** - Firebase Cloud Functions
 
 ### Shared Packages
-- **[UI Components](../packages/ui/README.md)** - React component library
+
 - **[TypeScript Types](../packages/types/README.md)** - Shared type definitions
-- **[Design System](../packages/design/README.md)** - Design tokens and configuration
 - **[Assets](../packages/assets/README.md)** - Brand assets and illustrations
 
 ## Common Issues
 
 **Firebase Emulators Won't Start**
+
 - Check that port 9099 (auth), 5001 (functions), and 8080 (firestore) are available
 - Ensure service account key is in `packages/backend/service-account-key.json`
 
 **Mobile App Can't Connect to Localhost**
+
 - Verify local blockchain is running (`pnpm node:local` in contracts package)
 - Check contract addresses are updated in mobile `.env`
 - Ensure you're on same network for device testing
 
 **Contract Deployment Fails**
+
 - Verify `.env` has valid private key and RPC URL
 - Check you have sufficient testnet tokens
 - Confirm Etherscan API key is set for verification
@@ -117,8 +122,8 @@ Detailed setup and usage for each package:
 
 - **[CLAUDE.md](../CLAUDE.md)** - AI development guidelines and commands
 - **[Architecture Overview](../README.md#-architecture-overview)** - Project structure
+- **[Pool Creation](POOL_CREATION.md)** - How pool creation and indexing work end to end
 - **[Sprint Planning](SPRINT_PLAN.md)** - Development roadmap
-- **[Design Guidelines](SUPERDESIGN.md)** - UI/UX specifications
 
 ## Need Help?
 

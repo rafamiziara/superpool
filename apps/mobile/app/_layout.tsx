@@ -1,12 +1,20 @@
+import '../global.css'
+
 import { AppKit } from '@reown/appkit-wagmi-react-native'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { Stack } from 'expo-router'
+import { Stack, ThemeProvider } from 'expo-router'
 import { StatusBar } from 'expo-status-bar'
+import { SafeAreaListener } from 'react-native-safe-area-context'
 import Toast from 'react-native-toast-message'
+import { Uniwind } from 'uniwind'
 import { WagmiProvider } from 'wagmi'
 import { FirebaseInitializer } from '../src/components/FirebaseInitializer'
+import { NotificationListener } from '../src/components/NotificationListener'
+import { PendingTransactionsInitializer } from '../src/components/PendingTransactionsInitializer'
 import { WalletListener } from '../src/components/WalletListener'
 import { wagmiConfig } from '../src/config'
+import { navigationTheme } from '../src/constants/navigation'
+import { palette } from '../src/constants/palette'
 import '../src/stores/NavigationStore'
 
 const queryClient = new QueryClient()
@@ -17,8 +25,10 @@ function AppContent() {
       {/* Global state initialization */}
       <FirebaseInitializer />
       <WalletListener />
+      <NotificationListener />
+      <PendingTransactionsInitializer />
 
-      <Stack screenOptions={{ headerShown: false }}>
+      <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: palette.abyss } }}>
         {/* Navigation screens */}
         <Stack.Screen name="index" />
         <Stack.Screen name="onboarding" />
@@ -36,12 +46,17 @@ function AppContent() {
 
 export default function RootLayout() {
   return (
-    <WagmiProvider config={wagmiConfig}>
-      <QueryClientProvider client={queryClient}>
-        <AppContent />
-        <StatusBar style="auto" />
-        <AppKit />
-      </QueryClientProvider>
-    </WagmiProvider>
+    <SafeAreaListener onChange={({ insets }) => Uniwind.updateInsets(insets)}>
+      <WagmiProvider config={wagmiConfig}>
+        <QueryClientProvider client={queryClient}>
+          <ThemeProvider value={navigationTheme}>
+            <AppContent />
+            {/* The app is dark-only; "auto" would follow the system scheme. */}
+            <StatusBar style="light" />
+            <AppKit />
+          </ThemeProvider>
+        </QueryClientProvider>
+      </WagmiProvider>
+    </SafeAreaListener>
   )
 }

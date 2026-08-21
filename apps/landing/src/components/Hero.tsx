@@ -1,5 +1,6 @@
 import { WaveField } from '@/components/WaveField'
 import { GitHubIcon } from '@/components/Navigation'
+import { DEPLOYMENT } from '@/config/deployment'
 
 function riseDelay(seconds: number): React.CSSProperties {
   return { '--rise-delay': `${seconds}s` } as React.CSSProperties
@@ -14,7 +15,7 @@ export function Hero() {
 
       <div className="relative mx-auto w-full max-w-6xl px-5 pt-28 pb-20 sm:px-8">
         <p className="eyebrow rise mb-7" style={riseDelay(0.1)}>
-          Open source · Proof of concept · Testnet only
+          Open source · Proof of concept · Live on {DEPLOYMENT.chain.name}
         </p>
 
         <h1 className="max-w-4xl font-display text-[2.6rem] leading-[1.04] font-semibold tracking-tight text-foam sm:text-6xl lg:text-7xl">
@@ -31,8 +32,8 @@ export function Hero() {
         </h1>
 
         <p className="rise mt-7 max-w-xl text-lg text-mist" style={riseDelay(0.65)}>
-          SuperPool turns any trusted group into a lending pool on any EVM chain — pooled liquidity, member loans, and rules the circle
-          governs together through multi-sig.
+          SuperPool turns any trusted group into a lending pool on any EVM chain — pooled liquidity, member loans, and interest that accrues
+          by the second.
         </p>
 
         <div className="mt-10 flex flex-col gap-4 sm:flex-row sm:items-center">
@@ -47,12 +48,13 @@ export function Hero() {
             Explore the code
           </a>
           <a
-            href="#app"
+            href={DEPLOYMENT.appBuild ?? '#app'}
+            {...(DEPLOYMENT.appBuild ? { target: '_blank', rel: 'noopener noreferrer' } : {})}
             className="rise inline-flex items-center justify-center gap-2 rounded-full border border-hairline px-7 py-3.5 font-display text-sm font-semibold text-foam transition-[border-color,background-color] duration-300 hover:border-lumen/40 hover:bg-depth"
             style={riseDelay(0.9)}
           >
             Get the app
-            <span className="font-mono text-[0.625rem] tracking-widest text-lumen uppercase">soon</span>
+            {!DEPLOYMENT.appBuild && <span className="font-mono text-[0.625rem] tracking-widest text-lumen uppercase">soon</span>}
           </a>
         </div>
       </div>

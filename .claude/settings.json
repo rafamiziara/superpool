@@ -1,9 +1,5 @@
 {
-  "hooks": {
-    "Stop": [
-      {
-        "hooks": []
-      }
-    ]
+  "enabledPlugins": {
+    "rm-common@rm30": true
   }
 }

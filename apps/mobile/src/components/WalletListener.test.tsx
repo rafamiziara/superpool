@@ -1,8 +1,22 @@
 import { render } from '@testing-library/react-native'
 import React from 'react'
 import { mockWagmiUseAccount } from '../__tests__/mocks'
+import { unregisterForPushNotifications } from '../services/pushNotifications'
 import { authStore } from '../stores/AuthStore'
 import { WalletListener } from './WalletListener'
+
+jest.mock('../services/pushNotifications', () => ({ unregisterForPushNotifications: jest.fn(async () => undefined) }))
+
+const mockUnregister = unregisterForPushNotifications as jest.Mock
+
+const WALLET_A = '0x1234567890abcdef1234567890abcdef12345678' as `0x${string}`
+const WALLET_B = '0x0000000000000000000000000000000000000042' as `0x${string}`
+
+function connected(address: `0x${string}`) {
+  return { address, chainId: 1, isConnected: true, isConnecting: false }
+}
+
+const DISCONNECTED = { address: undefined, chainId: undefined, isConnected: false, isConnecting: false }
 
 // Mock AuthStore (not covered by global mocks)
 jest.mock('../stores/AuthStore', () => ({
@@ -328,6 +342,62 @@ describe('WalletListener', () => {
       })
 
       expect(mockUpdateWalletState).toHaveBeenCalledTimes(2)
+    })
+  })
+
+  // -------------------------------------------------------------------------
+  // Giving the push token back.
+  //
+  // A token left registered to the outgoing wallet delivers its join and loan
+  // requests to whoever uses the device next — a privacy leak, not an
+  // annoyance. Re-registration happens after the new wallet authenticates.
+  // -------------------------------------------------------------------------
+
+  describe('push token handover', () => {
+    it('gives the token back when the wallet disconnects', () => {
+      mockWagmiUseAccount.mockReturnValue(connected(WALLET_A))
+      const { rerender } = render(<WalletListener />)
+
+      mockWagmiUseAccount.mockReturnValue(DISCONNECTED)
+      rerender(<WalletListener />)
+
+      expect(mockUnregister).toHaveBeenCalledTimes(1)
+    })
+
+    it('gives it back when the wallet is switched without disconnecting', () => {
+      mockWagmiUseAccount.mockReturnValue(connected(WALLET_A))
+      const { rerender } = render(<WalletListener />)
+
+      mockWagmiUseAccount.mockReturnValue(connected(WALLET_B))
+      rerender(<WalletListener />)
+
+      expect(mockUnregister).toHaveBeenCalledTimes(1)
+    })
+
+    it('does nothing on the first render, where nothing is registered yet', () => {
+      mockWagmiUseAccount.mockReturnValue(connected(WALLET_A))
+
+      render(<WalletListener />)
+
+      expect(mockUnregister).not.toHaveBeenCalled()
+    })
+
+    it('does nothing when the same wallet stays connected', () => {
+      mockWagmiUseAccount.mockReturnValue(connected(WALLET_A))
+      const { rerender } = render(<WalletListener />)
+
+      rerender(<WalletListener />)
+
+      expect(mockUnregister).not.toHaveBeenCalled()
+    })
+
+    it('does nothing while no wallet has ever connected', () => {
+      mockWagmiUseAccount.mockReturnValue(DISCONNECTED)
+      const { rerender } = render(<WalletListener />)
+
+      rerender(<WalletListener />)
+
+      expect(mockUnregister).not.toHaveBeenCalled()
     })
   })
 })

@@ -1,22 +1,30 @@
 {
   "name": "contracts",
   "version": "1.0.0",
+  "type": "module",
   "description": "Smart contracts for SuperPool decentralized lending platform",
   "scripts": {
     "compile": "hardhat compile",
+    "abis:generate": "hardhat run scripts/generate-abis.ts",
+    "type-check": "tsc --noEmit",
     "test": "hardhat test",
-    "test:gas": "cross-env REPORT_GAS=true hardhat test",
+    "test:gas": "hardhat test --gas-stats",
+    "test:integration": "hardhat test test/SafeIntegration.test.ts --network polygonAmoyFork",
     "test:fork": "hardhat test --network polygonAmoyFork",
-    "coverage": "cross-env COVERAGE=true hardhat coverage --testfiles \"test/!(SafeIntegration).test.ts\" || true && npm run coverage:copy",
+    "coverage": "hardhat test --coverage --grep-exclude \"Safe Integration\" || true && npm run coverage:copy",
     "coverage:copy": "cpx \"coverage/**\" \"../../coverage/contracts/\" && echo \"✅ Contracts coverage copied to root directory\"",
     "deploy:amoy": "hardhat run scripts/deploy.ts --network polygonAmoy",
     "deploy:local": "hardhat run scripts/deploy-local.ts --network localhost",
     "deploy:fork": "hardhat run scripts/deploy.ts --network polygonAmoyFork",
+    "env:print": "node scripts/print-env.ts",
     "node:local": "hardhat node",
     "node:fork": "hardhat node --fork $POLYGON_AMOY_RPC_URL",
     "node:fork:mainnet": "hardhat node --fork https://polygon-mainnet.g.alchemy.com/v2/demo",
     "console:local": "hardhat console --network localhost",
     "console:fork": "hardhat console --network polygonAmoyFork",
+    "upgrade:local": "hardhat run scripts/upgrade.ts --network localhost",
+    "upgrade:fork": "hardhat run scripts/upgrade.ts --network polygonAmoyFork",
+    "upgrade:amoy": "hardhat run scripts/upgrade.ts --network polygonAmoy",
     "verify": "hardhat verify --network polygonAmoy",
     "verify:contracts": "hardhat run scripts/verify-contracts.ts --network polygonAmoy",
     "verify:proxy": "hardhat run scripts/verify-proxy.ts --network polygonAmoy",
@@ -39,7 +47,8 @@
     "test:full": "npm run test:local && npm run test:safe",
     "lint": "solhint contracts/*.sol && cd ../.. && npx eslint packages/contracts/**/*.ts --config eslint.config.mjs",
     "clean": "hardhat clean",
-    "format": "prettier --write ."
+    "format": "prettier --write . --ignore-path ../../.prettierignore",
+    "test:gas:json": "hardhat test --gas-stats-json gas-stats.json"
   },
   "keywords": [
     "solidity",
@@ -49,7 +58,7 @@
     "lending"
   ],
   "author": "",
-  "license": "ISC",
+  "license": "MIT",
   "packageManager": "pnpm@10.12.4",
   "dependencies": {
     "@openzeppelin/contracts": "^5.4.0",
@@ -59,9 +68,18 @@
     "@safe-global/types-kit": "^3.0.0"
   },
   "devDependencies": {
-    "@nomicfoundation/hardhat-toolbox": "^5.0.0",
-    "@nomicfoundation/hardhat-verify": "^2.0.11",
-    "@openzeppelin/hardhat-upgrades": "^3.5.0",
+    "@nomicfoundation/hardhat-ethers": "^4.0.15",
+    "@nomicfoundation/hardhat-ethers-chai-matchers": "^3.0.11",
+    "@nomicfoundation/hardhat-ignition": "^3.1.8",
+    "@nomicfoundation/hardhat-ignition-ethers": "^3.1.6",
+    "@nomicfoundation/hardhat-keystore": "^3.0.13",
+    "@nomicfoundation/hardhat-mocha": "^3.1.0",
+    "@nomicfoundation/hardhat-network-helpers": "^3.0.11",
+    "@nomicfoundation/hardhat-toolbox-mocha-ethers": "^3.0.7",
+    "@nomicfoundation/hardhat-typechain": "^3.1.1",
+    "@nomicfoundation/hardhat-verify": "^3.0.22",
+    "@nomicfoundation/ignition-core": "^3.1.9",
+    "@openzeppelin/hardhat-upgrades": "^4.1.0",
     "@types/chai": "^5.0.0",
     "@types/chai-as-promised": "^8.0.2",
     "@types/mocha": "^10.0.10",
@@ -69,15 +87,12 @@
     "chai": "^5.1.2",
     "chai-as-promised": "^8.0.1",
     "cpx": "^1.5.0",
-    "cross-env": "^7.0.3",
     "dotenv": "^17.2.1",
     "ethers": "^6.15.0",
-    "hardhat": "^2.22.18",
-    "hardhat-gas-reporter": "^2.3.0",
+    "hardhat": "^3.13.0",
+    "mocha": "^11.8.0",
     "solhint": "^6.0.1",
-    "solidity-coverage": "^0.8.15",
-    "ts-node": "^10.9.2",
-    "typescript": "^5.7.3"
+    "typescript": "~6.0.3"
   },
   "private": true
 }

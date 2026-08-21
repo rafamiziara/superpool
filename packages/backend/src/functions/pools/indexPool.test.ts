@@ -3,10 +3,18 @@ import { mockLogger } from '../../__tests__/setup'
 jest.mock('../../utils/blockchain')
 jest.mock('../../services')
 jest.mock('../../services/eventIndexer')
+jest.mock('../../services/membershipIndexer')
+
+// The chain config reads the environment once, at module load, and the factory
+// address is what proves an event came from a pool of ours — without this the
+// creator's membership is skipped rather than indexed. Set before the requires.
+const FACTORY_ADDRESS = '0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512'
+process.env.POOL_FACTORY_ADDRESS = FACTORY_ADDRESS
 
 const { indexPoolHandler } = require('./indexPool')
 const { getProvider } = require('../../utils/blockchain')
 const { indexPoolByTxHash } = require('../../services/eventIndexer')
+const { indexMembershipsByTxHash } = require('../../services/membershipIndexer')
 const { firestore } = require('../../services')
 const { HttpsError } = require('firebase-functions/v2/https')
 
@@ -45,6 +53,10 @@ describe('indexPoolHandler', () => {
 
     // Default: indexPoolByTxHash resolves with a new pool result
     indexPoolByTxHash.mockResolvedValue({ poolId: 1, alreadyIndexed: false, stored: true })
+
+    // The creation transaction carries the owner's `MemberJoined` alongside
+    // `PoolCreated`, because the pool grants membership to whoever owns it.
+    indexMembershipsByTxHash.mockResolvedValue({ members: [], results: [] })
   })
 
   // -------------------------------------------------------------------------
@@ -250,5 +262,51 @@ describe('indexPoolHandler', () => {
 
     // Assert
     expect(indexPoolByTxHash).toHaveBeenCalledWith(VALID_TX_HASH, SUPPORTED_CHAIN_ID, expect.anything(), firestore)
+  })
+
+  // -------------------------------------------------------------------------
+  // The creator's membership, which the same transaction produces.
+  //
+  // A pool grants membership to whoever owns it, so `initialize` emits
+  // `MemberJoined` beside `PoolCreated`. Left to the sweep, the owner's own
+  // pool would spend five minutes telling them they are not in it.
+  // -------------------------------------------------------------------------
+
+  it('should index the creator’s membership from the same transaction', async () => {
+    // Arrange
+    const request = buildRequest({ data: { txHash: VALID_TX_HASH, chainId: SUPPORTED_CHAIN_ID } })
+
+    // Act
+    await indexPoolHandler(request)
+
+    // Assert
+    expect(indexMembershipsByTxHash).toHaveBeenCalledWith(VALID_TX_HASH, SUPPORTED_CHAIN_ID, FACTORY_ADDRESS, expect.anything(), firestore)
+  })
+
+  it('should index the pool before the membership that points at it', async () => {
+    // Arrange
+    const request = buildRequest({ data: { txHash: VALID_TX_HASH } })
+
+    // Act
+    await indexPoolHandler(request)
+
+    // Assert
+    expect(indexPoolByTxHash.mock.invocationCallOrder[0]).toBeLessThan(indexMembershipsByTxHash.mock.invocationCallOrder[0])
+  })
+
+  it('should still report the pool when the membership cannot be indexed', async () => {
+    // The pool is the job here; the register is read back from the chain and
+    // the sweep covers the range regardless, so this costs latency and nothing
+    // else.
+    // Arrange
+    const request = buildRequest({ data: { txHash: VALID_TX_HASH } })
+    indexMembershipsByTxHash.mockRejectedValue(new HttpsError('not-found', 'No membership event found'))
+
+    // Act
+    const result = await indexPoolHandler(request)
+
+    // Assert
+    expect(result).toEqual({ poolId: 1, alreadyIndexed: false, stored: true })
+    expect(mockLogger.warn).toHaveBeenCalledWith(expect.stringContaining('membership'), expect.objectContaining({ txHash: VALID_TX_HASH }))
   })
 })

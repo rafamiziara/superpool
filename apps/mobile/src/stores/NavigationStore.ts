@@ -4,7 +4,38 @@ import { signOut } from 'firebase/auth'
 import { makeAutoObservable, reaction } from 'mobx'
 import Toast from 'react-native-toast-message'
 import { FIREBASE_AUTH } from '../config/firebase'
+import { logger } from '../utils/logger'
 import { authStore } from './AuthStore'
+
+export type AppRoute = '/onboarding' | '/connecting' | '/(auth)/dashboard'
+
+interface NavigationState {
+  user: { walletAddress: string } | null
+  isAuthenticating: boolean
+  isWalletConnected: boolean
+  walletAddress: string | null
+  isFullyInitialized: boolean
+}
+
+/**
+ * Where a given auth state belongs, with the reason for the log line. A null
+ * route means the answer is not yet knowable — still initializing, or an
+ * authentication in flight that will decide it shortly.
+ *
+ * Priority: no wallet → onboarding; wallet but no user → connecting; both →
+ * dashboard.
+ */
+function resolveRoute(state: NavigationState): { route: AppRoute | null; reason: string } {
+  if (!state.isFullyInitialized) return { route: null, reason: 'waiting for initialization' }
+
+  if (state.isAuthenticating) return { route: null, reason: 'auth in progress' }
+
+  if (!state.isWalletConnected) return { route: '/onboarding', reason: 'wallet disconnected' }
+
+  if (!state.user) return { route: '/connecting', reason: 'wallet connected, needs authentication' }
+
+  return { route: '/(auth)/dashboard', reason: `wallet connected and user authenticated: ${state.walletAddress}` }
+}
 
 export class NavigationStore {
   // Current state tracking
@@ -28,7 +59,7 @@ export class NavigationStore {
         isFullyInitialized: authStore.isFullyInitialized,
       }),
       (currentState, previousState) => {
-        console.log('🧭 NavigationStore: State changed', {
+        logger.debug('🧭 NavigationStore: State changed', {
           hasUser: !!currentState.user,
           userWallet: currentState.user?.walletAddress,
           isAuthenticating: currentState.isAuthenticating,
@@ -50,61 +81,52 @@ export class NavigationStore {
       { fireImmediately: true }
     )
 
-    console.log('🧭 NavigationStore: Reactive navigation initialized')
+    logger.debug('🧭 NavigationStore: Reactive navigation initialized')
   }
 
-  private navigateBasedOnCurrentState(currentState: {
-    user: { walletAddress: string } | null
-    isAuthenticating: boolean
-    isWalletConnected: boolean
-    walletAddress: string | null
-    isFullyInitialized: boolean
-  }) {
-    // Wait for both wallet and Firebase to initialize before making navigation decisions
-    if (!currentState.isFullyInitialized) {
-      console.log('🧭 NavigationStore: Waiting for initialization...', {
-        walletInit: authStore.hasInitializedWallet,
-        firebaseInit: authStore.hasInitializedFirebase,
-      })
+  /**
+   * The route the current state calls for, or null while it cannot be decided.
+   *
+   * Exposed because a screen change is not always preceded by a state change:
+   * the wallet returns to the app through a bare `superpool://` deep link,
+   * which lands on `/` with the wallet still connected and the user still
+   * authenticated. The reaction below only fires on change, so the index screen
+   * would sit there forever unless it can ask where it should be.
+   */
+  get targetRoute(): AppRoute | null {
+    return resolveRoute({
+      user: authStore.user,
+      isAuthenticating: authStore.isAuthenticating,
+      isWalletConnected: authStore.isWalletConnected,
+      walletAddress: authStore.walletAddress,
+      isFullyInitialized: authStore.isFullyInitialized,
+    }).route
+  }
+
+  private navigateBasedOnCurrentState(currentState: NavigationState) {
+    const { route: targetRoute, reason } = resolveRoute(currentState)
+
+    if (!targetRoute) {
+      // Wait for both wallet and Firebase to initialize before making navigation decisions
+      if (!currentState.isFullyInitialized) {
+        logger.debug('🧭 NavigationStore: Waiting for initialization...', {
+          walletInit: authStore.hasInitializedWallet,
+          firebaseInit: authStore.hasInitializedFirebase,
+        })
+      } else {
+        logger.debug('🧭 NavigationStore: Skipping navigation - auth in progress')
+      }
       return
     }
 
-    // Don't navigate while authentication is in progress
-    if (currentState.isAuthenticating) {
-      console.log('🧭 NavigationStore: Skipping navigation - auth in progress')
-      return
-    }
-
-    // Navigation priority logic:
-    // 1. No wallet connected → onboarding
-    // 2. Wallet connected + no user → connecting
-    // 3. Wallet connected + user exists → dashboard
-
-    let targetRoute: string
-    let reason: string
-
-    if (!currentState.isWalletConnected) {
-      // No wallet connected → onboarding
-      targetRoute = '/onboarding'
-      reason = 'wallet disconnected'
-    } else if (!currentState.user) {
-      // Wallet connected but no authenticated user → connecting
-      targetRoute = '/connecting'
-      reason = 'wallet connected, needs authentication'
-    } else {
-      // Wallet connected and user authenticated → dashboard
-      targetRoute = '/(auth)/dashboard'
-      reason = `wallet connected and user authenticated: ${currentState.walletAddress}`
-    }
-
-    console.log(`🧭 NavigationStore: Navigating to ${targetRoute} - ${reason}`)
+    logger.debug(`🧭 NavigationStore: Navigating to ${targetRoute} - ${reason}`)
 
     // Navigate with a small delay to ensure state updates complete
     setTimeout(() => {
       try {
-        router.replace(targetRoute as '/onboarding' | '/connecting' | '/(auth)/dashboard')
+        router.replace(targetRoute)
       } catch (error) {
-        console.error('❌ NavigationStore: Navigation failed:', error)
+        logger.error('❌ NavigationStore: Navigation failed:', error)
       }
     }, 50)
   }
@@ -121,7 +143,7 @@ export class NavigationStore {
 
     // Toast: Authentication successful
     if (!previousState.user && currentState.user) {
-      console.log('🎉 NavigationStore: Authentication successful')
+      logger.debug('🎉 NavigationStore: Authentication successful')
 
       // Show toast notification
       Toast.show({
@@ -154,7 +176,7 @@ export class NavigationStore {
   }
 
   private async handleWalletDisconnection() {
-    console.log('🔌 NavigationStore: Handling wallet disconnection')
+    logger.debug('🔌 NavigationStore: Handling wallet disconnection')
 
     // Reset auth store (but not wallet state - that's already updated)
     authStore.reset()
@@ -163,10 +185,10 @@ export class NavigationStore {
     try {
       if (FIREBASE_AUTH.currentUser) {
         await signOut(FIREBASE_AUTH)
-        console.log('✅ NavigationStore: Firebase user signed out')
+        logger.debug('✅ NavigationStore: Firebase user signed out')
       }
     } catch (error) {
-      console.error('❌ NavigationStore: Firebase signout failed:', error)
+      logger.error('❌ NavigationStore: Firebase signout failed:', error)
     }
 
     // Show toast notification
@@ -179,7 +201,7 @@ export class NavigationStore {
   }
 
   private handleWalletConnection() {
-    console.log('🔗 NavigationStore: Handling wallet connection')
+    logger.debug('🔗 NavigationStore: Handling wallet connection')
 
     // Show toast notification
     Toast.show({

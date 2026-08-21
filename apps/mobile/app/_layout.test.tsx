@@ -16,8 +16,9 @@ jest.mock('@tanstack/react-query', () => ({
 // Mock Expo Router Stack
 jest.mock('expo-router', () => {
   const MockStack = ({ children, screenOptions }: { children?: React.ReactNode; screenOptions?: Record<string, unknown> }) => {
-    // Verify screenOptions prop
-    expect(screenOptions).toEqual({ headerShown: false })
+    // Verify screenOptions prop. The dark content background is what keeps a
+    // freshly pushed screen from flashing the white window behind it.
+    expect(screenOptions).toEqual({ headerShown: false, contentStyle: { backgroundColor: '#060b16' } })
     return <>{children}</>
   }
   MockStack.Screen = ({ name, options }: { name: string; options?: Record<string, unknown> }) => {
@@ -33,6 +34,9 @@ jest.mock('expo-router', () => {
 
   return {
     Stack: MockStack,
+    // The root layout builds the app's navigation theme by extending this one.
+    DarkTheme: { dark: true, colors: {}, fonts: {} },
+    ThemeProvider: ({ children }: { children?: React.ReactNode }) => <>{children}</>,
   }
 })
 
@@ -82,6 +86,8 @@ jest.mock('wagmi', () => ({
     signMessageAsync: jest.fn().mockResolvedValue('0xsignature'),
     isPending: false,
   })),
+  // PendingTransactionsInitializer resolves stored transactions against this.
+  usePublicClient: jest.fn(() => undefined),
 }))
 
 // Mock config imports
@@ -128,11 +134,12 @@ describe('RootLayout', () => {
     expect(authScreenOptions.children[0]).toContain('fade')
   })
 
-  it('should render StatusBar with auto style', () => {
+  it('should render StatusBar pinned to the dark theme', () => {
     const { getByTestId } = render(<RootLayout />)
 
     expect(getByTestId('status-bar')).toBeTruthy()
-    expect(getByTestId('status-bar-style')).toBeTruthy()
+    // Not "auto": the app never follows the device colour scheme.
+    expect(getByTestId('status-bar-style').children[0]).toBe('light')
   })
 
   it('should render AppKit component', () => {

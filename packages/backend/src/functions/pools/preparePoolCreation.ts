@@ -3,8 +3,13 @@ import { isAddress } from 'ethers'
 import { logger } from 'firebase-functions/v2'
 import { CallableRequest, HttpsError, onCall } from 'firebase-functions/v2/https'
 import { DEFAULT_CHAIN_ID, WHITELISTING_LOGS_COLLECTION } from '../../constants'
+import { preparePoolCreationSchema } from '../../schemas'
 import { firestore } from '../../services'
 import { isWalletWhitelisted, isWhitelistModeEnabled, whitelistWallet } from '../../utils'
+import { backendWalletPrivateKey } from '../../utils/blockchain'
+import { parseRequest } from '../../utils/validation'
+import { claimWhitelisting, releaseWhitelisting, WalletBusyError, withWalletLock } from '../../services/walletBudget'
+import { enforceAppCheck } from '../../utils/appCheck'
 
 export const preparePoolCreationHandler = async (
   request: CallableRequest<PreparePoolCreationRequest>
@@ -14,12 +19,14 @@ export const preparePoolCreationHandler = async (
     throw new HttpsError('unauthenticated', 'User must be authenticated to create pools')
   }
 
+  const data = parseRequest(preparePoolCreationSchema, request.data)
+
   // Extract wallet address from authenticated user
   const walletAddress = request.auth.uid
 
   logger.info('Preparing pool creation', {
     walletAddress,
-    chainId: request.data.chainId,
+    chainId: data.chainId,
   })
 
   // 2. Validate wallet address format
@@ -28,7 +35,7 @@ export const preparePoolCreationHandler = async (
   }
 
   // 3. Get chain ID (default to configured chain)
-  const chainId = request.data.chainId || DEFAULT_CHAIN_ID
+  const chainId = data.chainId ?? DEFAULT_CHAIN_ID
 
   try {
     // 4. Check if whitelist mode is enabled
@@ -59,9 +66,53 @@ export const preparePoolCreationHandler = async (
       }
     }
 
-    // 6. Whitelist the user (backend pays gas)
-    logger.info('Whitelisting wallet', { walletAddress, chainId })
-    const { transactionHash, gasCost } = await whitelistWallet(walletAddress, chainId)
+    /*
+     * 6. Whitelist the user (backend pays gas)
+     *
+     * Bounded and serialised, neither of which it was.
+     *
+     * **Bounded**: this is the only endpoint in the backend that spends the
+     * project's own money for an arbitrary caller, and authentication here is
+     * cheap by design — `firestore.rules` says so outright, *any wallet can
+     * sign a nonce and get a token*. So a script with a thousand fresh wallets
+     * was a thousand transactions off the backend's balance. The cap is global
+     * per chain per day rather than per wallet, because a per-wallet limit
+     * bounds an accident and not this.
+     *
+     * **Serialised**: every send signs from the same address, so two
+     * concurrent calls collided on a nonce and one was dropped. The catch
+     * below has always matched the word "nonce" and told the user to try
+     * again; the lease is what stops it arising.
+     *
+     * The claim is taken before the send and given back if nothing was sent,
+     * the shape `claimAssessment` uses — counting afterwards lets two calls
+     * that started together both pass the check.
+     */
+    const budget = await claimWhitelisting(chainId, firestore)
+
+    if (!budget.granted) {
+      throw new HttpsError('resource-exhausted', 'Pool creation is temporarily unavailable while we top up. Please try again later.')
+    }
+
+    logger.info('Whitelisting wallet', { walletAddress, chainId, budgetUsed: budget.used, budgetCap: budget.cap })
+
+    let transactionHash: string
+    let gasCost: string
+
+    try {
+      ;({ transactionHash, gasCost } = await withWalletLock(chainId, firestore, () => whitelistWallet(walletAddress, chainId)))
+    } catch (error) {
+      // Nothing reached the chain, so nothing should have been charged to the
+      // day. Released before the rethrow so the outer catch's logging and
+      // error mapping are unchanged.
+      await releaseWhitelisting(chainId, firestore)
+
+      if (error instanceof WalletBusyError) {
+        throw new HttpsError('unavailable', 'Another pool is being set up right now. Please try again in a moment.')
+      }
+
+      throw error
+    }
 
     // 7. Log the whitelisting operation for audit trail
     try {
@@ -129,8 +180,14 @@ export const preparePoolCreationHandler = async (
  * Cloud Function to prepare pool creation by whitelisting authenticated users
  *
  * This function implements "lazy whitelisting" - users are automatically whitelisted
- * when they first attempt to create a pool. This prevents spam while maintaining
- * a smooth user experience.
+ * when they first attempt to create a pool, so a new user is not made to wait on
+ * an operator before they can do the first thing the app invites them to do.
+ *
+ * What it protects, and what it does not: the whitelist keeps unknown wallets
+ * out of `PoolFactory.createPool`, which is spam protection for the *factory*.
+ * It was never spam protection for the **backend wallet**, which pays for every
+ * one of these transactions on behalf of whoever asks. That is what
+ * `claimWhitelisting` is for; see the block around the send.
  *
  * @param {CallableRequest<PreparePoolCreationRequest>} request The callable request with optional chainId
  * @returns {Promise<PreparePoolCreationResponse>} Whitelist status and transaction details
@@ -141,6 +198,12 @@ export const preparePoolCreation = onCall<PreparePoolCreationRequest>(
     memory: '256MiB',
     timeoutSeconds: 60,
     cors: true,
+    // See `enforceAppCheck`: off unless ENFORCE_APP_CHECK=true.
+    enforceAppCheck: enforceAppCheck(),
+    // The only deployed function that signs a transaction, and therefore the
+    // only one given the key. Naming it here is what mounts it; a function
+    // that does not name it cannot read it at all.
+    secrets: [backendWalletPrivateKey],
   },
   preparePoolCreationHandler
 )

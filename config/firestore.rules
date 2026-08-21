@@ -1,18 +1,291 @@
-rules_version='2'
+rules_version = '2';
+
+// SuperPool Firestore security rules.
+//
+// Posture: DEFAULT DENY. Every document in this database is written by the
+// backend Cloud Functions through the Firebase Admin SDK, which bypasses these
+// rules entirely. Clients therefore never need write access, and the few reads
+// they may legitimately perform are allow-listed one collection at a time.
+//
+// Auth model: `verifySignatureAndLogin` mints a Firebase custom token whose UID
+// is the user's wallet address (see packages/backend/src/functions/auth). So
+// `request.auth.uid` IS the wallet address, and document IDs in `users` and
+// `auth_nonces` are wallet addresses too. Address casing is not guaranteed to
+// be consistent between clients (checksummed vs. lowercase), so ownership
+// checks compare case-insensitively.
 
 service cloud.firestore {
   match /databases/{database}/documents {
+
+    // --- Helpers -----------------------------------------------------------
+
+    function isSignedIn() {
+      return request.auth != null && request.auth.uid != null;
+    }
+
+    // The signed-in wallet address, normalised for comparison.
+    function callerWallet() {
+      return request.auth.uid.lower();
+    }
+
+    function isWallet(walletAddress) {
+      return isSignedIn() && callerWallet() == walletAddress.lower();
+    }
+
+    // --- users -------------------------------------------------------------
+    // Profile documents keyed by wallet address. A user may read their own
+    // profile; profiles are created and updated only by the auth function.
+
+    match /users/{walletAddress} {
+      allow get: if isWallet(walletAddress);
+      allow list: if false; // no enumerating the user base
+      allow write: if false; // backend-only (Admin SDK)
+    }
+
+    // --- pools -------------------------------------------------------------
+    // Lending pools indexed from on-chain events. The data is public by nature
+    // (it mirrors the blockchain), but reads are gated on authentication so the
+    // database cannot be scraped anonymously. Writes come from the indexer.
+
+    // Note: authentication is cheap here — any wallet can sign a nonce and get
+    // a token — so this is close to public read. That is acceptable because the
+    // data mirrors public chain state, but queries are capped so a session
+    // cannot be used to drain the collection (and the read quota) in bulk.
+
+    match /pools/{poolId} {
+      allow get: if isSignedIn();
+      allow list: if isSignedIn() && request.query.limit <= 100; // mirrors listPools' own cap
+      allow write: if false; // backend-only (event indexer)
+    }
+
+    // --- contributions -----------------------------------------------------
+    // Liquidity deposits indexed from on-chain FundsDeposited events. Same
+    // reasoning as pools: the data mirrors public chain state, so reads are
+    // gated on authentication rather than ownership — a contributor is not the
+    // only party with a legitimate interest in a pool's liquidity. Writes come
+    // from the indexer.
+
+    match /contributions/{contributionId} {
+      allow get: if isSignedIn();
+      allow list: if isSignedIn() && request.query.limit <= 100; // mirrors listContributions' own cap
+      allow write: if false; // backend-only (contribution indexer)
+    }
+
+    // --- withdrawals -------------------------------------------------------
+    // Liquidity withdrawals indexed from on-chain FundsWithdrawn events. The
+    // counterpart to contributions — a position is one minus the other — and
+    // governed identically: public chain state, gated on authentication, capped
+    // queries, writes from the indexer only.
+
+    match /withdrawals/{withdrawalId} {
+      allow get: if isSignedIn();
+      allow list: if isSignedIn() && request.query.limit <= 100; // mirrors listWithdrawals' own cap
+      allow write: if false; // backend-only (withdrawal indexer)
+    }
+
+    // --- interest_claims ---------------------------------------------------
+    // Interest taken out of a pool, indexed from on-chain InterestClaimed
+    // events. Append-only like contributions and withdrawals — a claim is an
+    // event and never changes — and governed identically.
+
+    match /interest_claims/{claimId} {
+      allow get: if isSignedIn();
+      allow list: if isSignedIn() && request.query.limit <= 100; // mirrors listInterestClaims' own cap
+      allow write: if false; // backend-only (interest claim indexer)
+    }
+
+    // --- loans -------------------------------------------------------------
+    // Loans indexed from on-chain LoanCreated / LoanRepaid events. Unlike the
+    // other feeds a document here is mutable — it is rewritten when the loan is
+    // repaid — but only ever by the indexer, so the client rules are the same:
+    // public chain state, gated on authentication, capped queries, no writes.
+
+    match /loans/{loanId} {
+      allow get: if isSignedIn();
+      allow list: if isSignedIn() && request.query.limit <= 100; // mirrors listLoans' own cap
+      allow write: if false; // backend-only (loan indexer)
+    }
+
+    // --- loan_repayments ---------------------------------------------------
+    // Payments towards loans, indexed from on-chain LoanRepaymentMade events.
+    // Append-only like contributions rather than mutable like the loan itself:
+    // a loan can be paid in instalments, and each payment is one immutable log
+    // with a date and a transaction of its own. Governed identically.
+
+    match /loan_repayments/{repaymentId} {
+      allow get: if isSignedIn();
+      allow list: if isSignedIn() && request.query.limit <= 100; // mirrors listLoanRepayments' own cap
+      allow write: if false; // backend-only (loan repayment indexer)
+    }
+
+    // --- loan_decisions ----------------------------------------------------
+    // What a pool owner decided about a loan, indexed from LoanApproved,
+    // LoanRejected and LoanDefaulted events. Append-only like repayments: each
+    // is one immutable log, and the loan document keeps only the state it left.
+    //
+    // Readable by any signed-in caller like every other mirror of the chain —
+    // these events are public there. The reason *behind* a decision is not: it
+    // lives in `notes`, which is backend-only in both directions.
+
+    match /loan_decisions/{decisionId} {
+      allow get: if isSignedIn();
+      allow list: if isSignedIn() && request.query.limit <= 100; // mirrors listLoanDecisions' own cap
+      allow write: if false; // backend-only (loan decision indexer)
+    }
+
+    // --- memberships -------------------------------------------------------
+    // Pool memberships indexed from the on-chain register. Mutable like loans —
+    // one document per pool and address, rewritten by every decision — and
+    // written only by the indexer.
+    //
+    // Note this is the membership *register*, not a private list: the events it
+    // mirrors are public on chain, so a permissioned pool's roster is
+    // discoverable there regardless. Gating on authentication and capping
+    // queries is therefore the same trade the other feeds make, not weaker.
+
+    match /memberships/{membershipId} {
+      allow get: if isSignedIn();
+      allow list: if isSignedIn() && request.query.limit <= 100; // mirrors listMembers' own cap
+      allow write: if false; // backend-only (membership indexer)
+    }
+
+    // --- auth_nonces -------------------------------------------------------
+    // Single-use login challenges. Readable nonces would let an attacker who
+    // has any authenticated session harvest challenges for other wallets, and
+    // writable nonces would break replay protection outright. Never exposed.
+
+    match /auth_nonces/{walletAddress} {
+      allow read, write: if false; // backend-only
+    }
+
+    // --- approved_devices --------------------------------------------------
+    // Device-to-wallet mappings backing App Check custom token minting. Client
+    // write access here would let anyone self-approve a device.
+
+    match /approved_devices/{deviceId} {
+      allow read, write: if false; // backend-only
+    }
+
+    // --- whitelisting_logs -------------------------------------------------
+    // Audit trail for backend-paid pool-creator whitelisting. Internal only.
+
+    match /whitelisting_logs/{logId} {
+      allow read, write: if false; // backend-only
+    }
+
+    // --- push_tokens -------------------------------------------------------
+    // Expo push tokens, keyed by the token itself and holding the wallet they
+    // belong to. Closed in both directions: readable tokens would let any
+    // authenticated session enumerate every device in the system and send to
+    // them directly through Expo, which needs no credential beyond the token.
+    // Registration goes through the `registerPushToken` callable, which takes
+    // the wallet from `request.auth.uid` rather than from the request body.
+
+    match /push_tokens/{token} {
+      allow read, write: if false; // backend-only
+    }
+
+    // --- notifications_sent ------------------------------------------------
+    // One marker per (record, transition) that has already been pushed. These
+    // are what stop a re-scan of history from notifying twice, so client write
+    // access would let anyone either silence a pool's owner or replay a
+    // thousand notifications at them.
+
+    match /notifications_sent/{markerId} {
+      allow read, write: if false; // backend-only
+    }
+
+    // --- push_receipts -----------------------------------------------------
+    // Tickets Expo accepted whose delivery verdict has not been collected yet.
+    // Closed for the same reason push_tokens is, and harder: each row carries a
+    // token *and* the wallet it belongs to, so a readable one would hand over
+    // the send capability and the identity behind it in a single document.
+
+    match /push_receipts/{ticketId} {
+      allow read, write: if false; // backend-only
+    }
+
+    // --- notes -------------------------------------------------------------
+    // Why a loan was wanted, and why a decision went the way it did. The one
+    // collection here that does not mirror the chain: these are sentences
+    // people wrote about each other, so "public because the chain is public"
+    // — the reasoning behind every read rule above — does not apply.
+    //
+    // Closed in both directions. Reads go through `listNotes`, which returns
+    // only what the caller is entitled to: a pool's owner sees the notes on
+    // their pool, and everybody else sees the notes about themselves. Writes
+    // go through `saveNote`, which takes the author from `request.auth.uid`
+    // rather than from the request body and refuses a second note under the
+    // same key.
+
+    match /notes/{noteId} {
+      allow read, write: if false; // backend-only (saveNote / listNotes)
+    }
+
+    // --- assessments -------------------------------------------------------
+    // What the assistant made of a loan request. Closed in both directions and
+    // read through `getAssessment` by the **pool's owner alone** — narrower
+    // than notes, deliberately. A note is a sentence a person wrote and stood
+    // behind, so the person it is about deserves to read it; this is a
+    // machine's reading of somebody's record, and showing it to them turns a
+    // lending decision into an argument with a model nobody can answer for.
+    //
+    // Nothing in the protocol, the indexer or an eligibility check may read
+    // one either. It is advice for one person, and never a gate.
+
+    match /assessments/{loanId} {
+      allow read, write: if false; // backend-only (assessLoan / getAssessment)
+    }
+
+    // --- assessment_quota --------------------------------------------------
+    // How many assessments a wallet has paid for today, one document per
+    // (wallet, UTC day). Closed in both directions: this is the counter that
+    // stops one caller spending the provider key, so a client that could write
+    // it could lift its own ceiling, and a client that could read it learns
+    // what everyone else has been doing.
+
+    match /assessment_quota/{claimId} {
+      allow read, write: if false; // backend-only (assessLoan)
+    }
+
+    // --- staged_notes ------------------------------------------------------
+    // A loan purpose waiting for its loan to exist. Written by `saveNote`,
+    // moved onto the loan by the indexer and deleted in the same pass. Closed
+    // like `notes`, and for the same reason plus one of its own: entitlement
+    // cannot be checked at staging time — the loan does not exist yet — so
+    // these are claims, honoured only if the transaction turns out to have
+    // produced the claimant's own loan.
+
+    match /staged_notes/{noteId} {
+      allow read, write: if false; // backend-only (saveNote / loan indexer)
+    }
+
+    // --- wallet_budget -----------------------------------------------------
+    // How much gas the backend wallet has spent whitelisting pool creators
+    // today, and the short lease that stops two invocations building
+    // transactions on the same nonce. Closed in both directions and not
+    // negotiable: a client that could write the counter could lift its own
+    // ceiling on the project's money, and one that could write the lease could
+    // hold the wallet indefinitely.
+
+    match /wallet_budget/{docId} {
+      allow read, write: if false; // backend-only
+    }
+
+    // --- event_sync_state --------------------------------------------------
+    // Per-chain indexer cursors (last processed block). Tampering with these
+    // would let an attacker skip or replay blockchain event ranges.
+
+    match /event_sync_state/{chainId} {
+      allow read, write: if false; // backend-only
+    }
+
+    // --- Catch-all ---------------------------------------------------------
+    // Any collection not named above (including future ones) is closed to
+    // clients. Add an explicit `match` block above to open one deliberately.
+
     match /{document=**} {
-      // This rule allows anyone with your database reference to view, edit,
-      // and delete all data in your database. It is useful for getting
-      // started, but it is configured to expire after 30 days because it
-      // leaves your app open to attackers. At that time, all client
-      // requests to your database will be denied.
-      //
-      // Make sure to write security rules for your app before that time, or
-      // else all client requests to your database will be denied until you
-      // update your rules.
-      allow read, write: if request.time < timestamp.date(2025, 8, 30);
+      allow read, write: if false;
     }
   }
 }

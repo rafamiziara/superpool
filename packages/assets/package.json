@@ -16,7 +16,7 @@
   "scripts": {
     "copy-to-landing": "cpy 'images/illustrations/*' '../../apps/landing/public/images/illustrations'",
     "build": "pnpm run copy-to-landing",
-    "format": "prettier --write ."
+    "format": "prettier --write . --ignore-path ../../.prettierignore"
   },
   "devDependencies": {
     "cpy-cli": "^5.0.0"

@@ -11,7 +11,8 @@ Cross-platform mobile app supporting 500+ wallets via WalletConnect with MobX st
 - 🔐 Wallet-based authentication (MetaMask, Coinbase, WalletConnect, etc.)
 - 🌐 Multi-chain support (Ethereum, Polygon, Arbitrum, Base, BSC, Polygon Amoy)
 - 🏊 Lending pool creation and management
-- 💰 Liquidity contributions and loan requests
+- 💰 Liquidity contributions, withdrawals, borrowing and repayment
+- 🔔 Push notifications telling a pool owner somebody asked to join or borrow
 - 📱 Onboarding flow with feature showcase
 - 🔄 Real-time blockchain synchronization
 
@@ -63,20 +64,112 @@ pnpm test
 
 ## State Management
 
-MobX stores configured in `src/stores/`:
+MobX singleton stores configured in `src/stores/`:
 
-- **`AuthenticationStore`** - User authentication and session
-- **`WalletConnectionStore`** - Blockchain wallet connections
-- **`PoolManagementStore`** - Lending pool operations
-- **`RootStore`** - Store composition and context provider
-
-Access via React Context:
+- **`AuthStore`** - User authentication, wallet state and session
+- **`NavigationStore`** - Auth-driven routing decisions
+- **`PoolStore`** - Pools, contributions, withdrawals and loans come from Cloud Functions in one snapshot. Memberships, positions and liquidity are derived on read rather than stored, so nothing can fall out of step with the chain. Set `EXPO_PUBLIC_USE_MOCK_POOLS=true` to run the whole screen on mocks without the Functions emulator.
+- **`PendingTransactionsStore`** - Every wallet transaction that is submitted but not yet confirmed and indexed — pool creations, contributions, withdrawals and the six loan actions — persisted to AsyncStorage so they survive an app restart. Discriminated on `type`; `isDismissable` decides what the user may clear by hand
 
 ```typescript
-import { useStores } from './stores/RootStore'
-
-const { authStore, walletStore } = useStores()
+import { authStore, poolStore } from '../src/stores'
 ```
+
+## Transaction Flows
+
+`src/hooks/pools/` drives every write, one hook per stage:
+
+- **`usePoolCreation`** - lazy whitelisting via `preparePoolCreation`, gas estimate and balance check, then the `createPool` transaction
+- **`useTransactionMonitoring`** - waits for the receipt and decodes the event for the transaction's type
+- **`usePoolIndexing`** - hands confirmed transactions to the backend; `indexConfirmed()` drains whatever startup recovery resolved
+
+The same three stages carry every other write: `useContribution`, `useWithdrawal`
+and `useLoan` — which covers borrowing, repaying, requesting, approving,
+rejecting and cancelling in one hook, because the contract holds a single
+`activeLoanId` per member per pool. `usePoolSettings` is the exception and sits
+outside the pending-transaction machinery entirely: nothing indexes a pool
+setting, so there is nothing to recover and it waits for its own receipt.
+
+Pending work is visible while it is in flight: `PendingPoolCard` on the pools
+list, `PendingTransactionBanner` on the dashboard, and `TransactionStatusModal`
+behind both.
+
+**Read [`docs/POOL_CREATION.md`](../../docs/POOL_CREATION.md) before changing any
+of this** — it covers the three indexing paths and the chain-shaped traps that
+the mocked tests do not catch. For anything touching loans, read
+[`docs/LOANS.md`](../../docs/LOANS.md) too: a loan is not an event like a
+contribution, its state is re-read from `getLoan` rather than inferred from which
+log arrived, and `isRepaid` means nothing until `status` is `disbursed`. That
+document also covers borrowing history — counts rather than a score, derived on
+read by `PoolStore.borrowerHistory` and shown by `BorrowerHistoryPanel`, where a
+wallet with no loans reads as **new** and never as bad.
+
+## Notifications
+
+`src/services/pushNotifications.ts` obtains an Expo push token and registers it
+with the backend; `src/components/NotificationListener.tsx` turns an arriving
+notification into a toast and a tap into a deep link. The two owner-facing kinds
+open the queue to act on (`pool/approvals`, `pool/members`); every
+borrower-facing kind opens `pool/[id]`, deliberately and not a deeper screen —
+what a borrower does next depends on the news, and the pool page is where all of
+those start.
+
+Three things not to change without reading the Notifications section in
+[`CLAUDE.md`](../../CLAUDE.md):
+
+- **Permission is asked in exactly one place** — after a pool is created. It is
+  a one-shot on iOS, and it is asked where the user has just built an
+  expectation of being told something; prompting an asker would spend it before
+  they have any reason to want it.
+- **The token is given back on disconnect _and_ on a wallet switch**
+  (`WalletListener`), or the next wallet on the device receives the previous
+  one's requests.
+- **None of it works in Expo Go on Android**, which has been unable to receive
+  remote push since SDK 53. A development build is required, and the delivery
+  path is unverified until one exists.
+
+## UI
+
+Dark-only "Abyss & Aurora" theme defined in `global.css` (Tailwind v4 `@theme` tokens: `abyss`/`surface`/`raised` depth scale, `mint`/`amber`/`iris`/`coral` accents), used by every screen including the pre-login ones (`index`, `onboarding`, `connecting`).
+
+The app never follows the device colour scheme. Three things pin it, and all three are needed — dropping any one leaves a white flash or a light system bar:
+
+- `userInterfaceStyle: "dark"` in `app.json` resolves native chrome (status bar, tab bar, sheets) dark, and the splash background matches `abyss`.
+- Every navigator sets `contentStyle.backgroundColor` to `abyss`, so a screen has the right background before it renders.
+- `createAppKit({ themeMode: 'dark' })` pins the wallet modal, which would otherwise follow the system. Its accent stays AppKit's own indigo: their buttons hardcode white label text, which `mint` cannot carry.
+
+Post-login screens live under `app/(auth)/`:
+
+- **`(tabs)/dashboard`** - Balance hero, horizontal pool macro-cards, active loan, quick actions,
+  pending-transaction banner, and a card per pool with loan requests waiting on you
+- **`(tabs)/pools`** - Pool list with pending/syncing cards, loading/empty/error states, and a
+  pull-to-refresh that sweeps the chain before reloading, so pools created outside this app appear
+- **`(tabs)/discover`** - Pools the user has no standing in, searchable by name or description and
+  sortable by age, liquidity, rate or loan size. The complement of the Pools tab, so the two
+  partition the chain and nothing appears in both
+- **`(tabs)/activity`** - The connected wallet's own transactions, grouped by day
+- **`pool/[id]`** - Pool detail with stats, your position, the pool's own activity, thumb-zone
+  action bar, and the owner's entry points to approvals and settings
+- **`pool/create`** - Create-pool form and submission flow
+- **`pool/contribute`** / **`pool/withdraw`** - Depositing into a pool and taking it back out
+- **`pool/borrow`** - Three states in one screen, mutually exclusive because the contract holds a
+  single `activeLoanId` per member per pool: repay an outstanding loan, withdraw a request waiting
+  on the owner, or borrow — sent as `createLoan` or `requestLoan` depending on the pool
+- **`pool/approvals`** - Owner only. The queue of loan requests, approved or declined one at a
+  time, since two signature prompts from one wallet race for a nonce
+- **`pool/overdue`** - Owner only. Every loan past its due date, longest-overdue first, with what
+  is owed read from the chain per card. Marking one in default sits behind a confirmation whose
+  copy is a list of things it does _not_ do — the debt stays, interest keeps accruing, nothing is
+  seized. **Being late and being in default are different questions**, and the screen keeps them
+  apart in as many words; see
+  [`docs/LOANS.md`](../../docs/LOANS.md#late-and-in-default-are-different-questions)
+- **`pool/settings`** - Owner only. Whether this pool reviews requests before lending
+
+The activity feed is signed from the pool's side on `pool/[id]` and from the
+wallet's on the dashboard and activity tab — see
+[`docs/LOANS.md`](../../docs/LOANS.md#the-sign-depends-on-whose-feed-it-is).
+
+Navigation uses Expo Router **NativeTabs** (SF Symbols on iOS, Material icons on Android) with a per-tab native **Stack**. All four tabs share one header — SuperPool logo left, `AppKitButton` right, no per-tab title, since the tab bar already names the screen. Pool detail pushes over the tabs with a native back button. The shared header and its styling are `brandHeader` / `darkHeader` in `src/constants/navigation.tsx`.
 
 ## Network Configuration
 
@@ -116,7 +209,15 @@ Configured in `src/config/wagmi.ts`:
 - **Reown AppKit** - Wallet connection UI
 - **Wagmi/Viem** - Ethereum interactions
 - **MobX** - Reactive state management
-- **NativeWind** - Tailwind CSS for React Native
-- **@superpool/ui** - Shared components
-- **@superpool/design** - Design tokens
-- **@superpool/types** - TypeScript types
+- **Uniwind** - Tailwind CSS v4 for React Native
+- **@superpool/types** - Shared TypeScript types
+- **@superpool/assets** - Shared logos and onboarding illustrations
+
+> There is no shared UI or design-token package in this repo. The app's theme
+> lives in `global.css` — see [UI](#ui).
+
+> **Jest stays on 29 here while `packages/backend` is on 30.** This is a
+> toolchain constraint, not drift: `jest-expo` builds on jest 29 internals
+> (`@jest/globals`, `babel-jest`, `jest-snapshot`, `jest-environment-jsdom` are
+> all pinned to `^29.2.1`), and that is still true of `jest-expo@57`. Mobile can
+> move to jest 30 only when Expo's preset does.

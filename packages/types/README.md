@@ -41,24 +41,24 @@ const user: User = {
 Core business logic types for pools, loans, and transactions:
 
 ```typescript
-import { LendingPool, Loan, MemberStatus } from '@superpool/types'
+import { Loan, MemberStatus, PoolInfo } from '@superpool/types'
 
-const pool: LendingPool = {
-  id: 'pool-123',
+const pool: PoolInfo = {
+  poolId: 12,
+  poolAddress: '0x456...',
+  poolOwner: '0x789...',
   name: 'Community Pool',
-  contractAddress: '0x456...',
-  creator: '0x789...',
-  members: ['0x123...', '0x456...'],
-  maxMembers: 50,
-  minimumContribution: 100n * 10n ** 18n, // 100 POL
+  description: 'A neighbourhood lending circle',
+  maxLoanAmount: '1000000000000000000000', // wei as a string; JSON has no bigint
   interestRate: 500, // 5% (500 basis points)
+  chainId: 80002,
   // ...other properties
 }
 ```
 
 **Key Types:**
 
-- `LendingPool` - Pool configuration and state
+- `PoolInfo` (in `api.ts`) - A pool as the indexer records it
 - `PoolMember` - Member information and status
 - `Loan` - Loan requests and repayment tracking
 - `Transaction` - All transaction types and status
@@ -97,51 +97,51 @@ const polygonAmoy: Chain = {
 HTTP API request/response interfaces for backend communication:
 
 ```typescript
-import { ApiResponse, CreatePoolRequest, GetPoolsResponse } from '@superpool/types'
+import { ListPoolsRequest, ListPoolsResponse } from '@superpool/types'
 
-const createPoolRequest: CreatePoolRequest = {
-  name: 'My Pool',
-  description: 'Community lending pool',
-  maxMembers: 20,
-  minimumContribution: '100000000000000000000', // 100 POL as string
-  interestRate: 750, // 7.5%
-  loanDuration: 30 * 24 * 60 * 60, // 30 days in seconds
+const request: ListPoolsRequest = {
+  chainId: 80002,
+  activeOnly: true,
+  limit: 50,
 }
 
-const response: ApiResponse<CreatePoolResponse> = {
-  success: true,
-  data: {
-    poolId: 'pool-456',
-    contractAddress: '0x789...',
-    transactionHash: '0xabc...',
-  },
-  timestamp: '2024-12-01T12:00:00Z',
+const response: ListPoolsResponse = {
+  pools: [],
+  totalCount: 0,
+  limit: 50,
 }
 ```
+
+Pools are **not** created through the backend: the wallet calls `createPool` on
+`PoolFactory` directly, and `indexPool` records the result. `preparePoolCreation`
+is the callable that supports that flow.
 
 **Key Types:**
 
 - `ApiResponse<T>` - Standardized API response wrapper
 - `ApiError` - Error information structure
 - Authentication: `GenerateAuthMessageRequest/Response`, `VerifySignatureRequest/Response`
-- Pool management: `CreatePoolRequest/Response`, `GetPoolsRequest/Response`
-- Loan management: `RequestLoanRequest/Response`, `GetLoansRequest/Response`
-- Transaction history: `GetTransactionsRequest/Response`
+- Pool management: `ListPoolsRequest/Response`, `IndexPoolRequest/Response`
+- Loan management: `ListLoansRequest/Response`, `IndexLoanRequest/Response`
+- Per-event feeds: `ListContributionsRequest/Response`,
+  `ListWithdrawalsRequest/Response`, `ListInterestClaimsRequest/Response`
 
 ## 🛠️ Usage Examples
 
 ### Type-Safe API Calls
 
-```typescript
-import { ApiResponse, CreatePoolRequest, LendingPool } from '@superpool/types'
+The backend is Firebase callables, not REST — so a call goes through
+`httpsCallable` with the request and response types on either side:
 
-async function createPool(data: CreatePoolRequest): Promise<ApiResponse<LendingPool>> {
-  const response = await fetch('/api/pools', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(data),
-  })
-  return response.json()
+```typescript
+import { ListPoolsRequest, ListPoolsResponse } from '@superpool/types'
+import { httpsCallable } from 'firebase/functions'
+
+async function listPools(request: ListPoolsRequest): Promise<ListPoolsResponse> {
+  const callable = httpsCallable<ListPoolsRequest, ListPoolsResponse>(functions, 'listPools')
+  const response = await callable(request)
+
+  return response.data
 }
 ```
 
@@ -160,12 +160,12 @@ function handlePoolCreated(event: PoolCreatedEvent) {
 ### State Management
 
 ```typescript
-import { User, LendingPool, WalletConnection } from '@superpool/types'
+import { PoolInfo, User, WalletConnection } from '@superpool/types'
 
 interface AppState {
   user: User | null
   wallet: WalletConnection
-  pools: LendingPool[]
+  pools: PoolInfo[]
   isLoading: boolean
 }
 ```
@@ -202,4 +202,4 @@ These types work across all SuperPool applications:
 
 ---
 
-**Related**: See `packages/design/README.md` for design system documentation
+**Related**: See the [root README](../../README.md) for how the packages fit together.

@@ -1,50 +1,60 @@
 import { AuthNonce, User, VerifySignatureAndLoginRequest, VerifySignatureAndLoginResponse } from '@superpool/types'
-import { isAddress, verifyMessage, verifyTypedData } from 'ethers'
+import { verifyMessage, verifyTypedData } from 'ethers'
 import { logger } from 'firebase-functions/v2'
 import { CallableRequest, HttpsError, onCall } from 'firebase-functions/v2/https'
-import { AUTH_NONCES_COLLECTION, USERS_COLLECTION } from '../../constants'
+import { USERS_COLLECTION } from '../../constants'
+import { verifySignatureAndLoginSchema } from '../../schemas'
 import { auth, firestore } from '../../services'
 import { DeviceVerificationService } from '../../services/deviceVerification'
-import { createAuthMessage } from '../../utils'
+import { claimAuthNonce, createAuthMessage, NonceExpiredError } from '../../utils/auth'
+import { parseRequest } from '../../utils/validation'
 
 export const verifySignatureAndLoginHandler = async (request: CallableRequest<VerifySignatureAndLoginRequest>) => {
-  const { walletAddress, signature, deviceId, platform, chainId, signatureType = 'personal-sign' } = request.data
+  // The address and the signature's shape — prefix, length and alphabet — are
+  // the schema's now. `personal-sign` stays the default here rather than in the
+  // schema: it is what a wallet that names nothing did, which is a fact about
+  // this backend's history rather than about the request.
+  const {
+    walletAddress,
+    signature,
+    deviceId,
+    platform,
+    chainId,
+    signatureType = 'personal-sign',
+  } = parseRequest(verifySignatureAndLoginSchema, request.data)
 
-  // Input Validation
-  if (!walletAddress || !signature || !isAddress(walletAddress)) {
-    throw new HttpsError('invalid-argument', 'The function must be called with a valid walletAddress and signature.')
+  /*
+   * Claim the nonce, atomically, before anything else.
+   *
+   * This used to read the document here and delete it at the very end, with
+   * signature verification, a profile write and a device approval in between —
+   * so two requests arriving together both saw it, both passed, and both got a
+   * token. "Single-use" described the intent rather than the behaviour, and the
+   * window was the whole handler.
+   *
+   * It is now spent on the attempt rather than on the success: a signature that
+   * fails below has still consumed the challenge. That is the right way round —
+   * a challenge that survives a wrong answer can be answered any number of
+   * times — and it costs one regenerated message on a flow that regenerates
+   * anyway.
+   */
+  let nonceData: AuthNonce | null
+
+  try {
+    nonceData = await claimAuthNonce(walletAddress, firestore)
+  } catch (error) {
+    if (error instanceof NonceExpiredError) {
+      throw new HttpsError('deadline-exceeded', 'Authentication message has expired. Please generate a new message.')
+    }
+
+    throw error
   }
 
-  // Validate signature format (Ethereum signatures are 65 bytes = 130 hex chars + 0x prefix = 132 total)
-  if (!signature.startsWith('0x') || signature.length !== 132) {
-    throw new HttpsError('invalid-argument', 'Invalid signature format. It must be a hex string prefixed with "0x".')
-  }
-
-  // Additional validation: ensure it's valid hex
-  const hexPattern = /^0x[0-9a-fA-F]*$/
-  if (!hexPattern.test(signature)) {
-    throw new HttpsError('invalid-argument', 'Invalid signature format. Signature must contain only hexadecimal characters.')
-  }
-
-  // Retrieve Nonce from Firestore
-  const nonceRef = firestore.collection(AUTH_NONCES_COLLECTION).doc(walletAddress)
-  const nonceDoc = await nonceRef.get()
-
-  if (!nonceDoc.exists) {
+  if (!nonceData) {
     throw new HttpsError('not-found', 'No authentication message found for this wallet address. Please generate a new message.')
   }
 
-  // Cast the data to the AuthNonce interface for type safety
-  const nonceData = nonceDoc.data() as AuthNonce
-  const { nonce, timestamp, expiresAt } = nonceData
-
-  // Check if the nonce has expired
-  const currentTime = new Date().getTime()
-  if (currentTime > expiresAt) {
-    // Clean up expired nonce
-    await nonceRef.delete()
-    throw new HttpsError('deadline-exceeded', 'Authentication message has expired. Please generate a new message.')
-  }
+  const { nonce, timestamp } = nonceData
 
   // Reconstruct the signed message
   const message = createAuthMessage(walletAddress, nonce, timestamp)
@@ -62,7 +72,28 @@ export const verifySignatureAndLoginHandler = async (request: CallableRequest<Ve
     })
 
     if (signatureType === 'typed-data') {
-      // EIP-712 typed data verification
+      /*
+       * EIP-712 typed data verification.
+       *
+       * **`chainId` comes from the caller, and has to.** It was queried in
+       * review as unvalidated input; it is not a hole, and refusing a chain
+       * this backend does not serve — which was tried here and reverted — is a
+       * live bug rather than a hardening. Logging in is not a per-chain act: a
+       * wallet sitting on Ethereum mainnet is entitled to authenticate against
+       * a backend that only serves Amoy, and will switch afterwards. The number
+       * only has to reproduce the domain the wallet actually signed with.
+       *
+       * Nor does controlling it buy anything. It is a domain separator, so a
+       * wrong value recovers a different address, and the equality check below
+       * then refuses the login. The thing that makes this signature
+       * unforgeable is the single-use nonce claimed above, which is a uuid this
+       * backend generated moments ago.
+       *
+       * **No `verifyingContract`, deliberately.** The field names the contract
+       * that will check the signature on chain, and nothing here ever will —
+       * this is an off-chain login. Naming an address would be a claim that is
+       * not true.
+       */
       const domain = {
         name: 'SuperPool Authentication',
         version: '1',
@@ -150,12 +181,6 @@ export const verifySignatureAndLoginHandler = async (request: CallableRequest<Ve
       walletAddress,
     })
   }
-
-  // Delete the nonce to prevent replay attacks
-  // SECURITY: If nonce deletion fails, authentication must fail to prevent replay attacks
-  logger.info('Deleting nonce document', { walletAddress })
-  await nonceRef.delete()
-  logger.info('Nonce document deleted successfully', { walletAddress })
 
   // Issue a Firebase Custom Token
   // Use the walletAddress as the user's unique UID in Firebase Auth.

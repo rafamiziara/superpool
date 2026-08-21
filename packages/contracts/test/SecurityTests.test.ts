@@ -1,13 +1,32 @@
-import { SignerWithAddress } from '@nomicfoundation/hardhat-ethers/signers'
+import { ethers, time, upgrades } from '../hardhat.connection'
+import type { HardhatEthersSigner } from '@nomicfoundation/hardhat-ethers/types'
 import { expect } from 'chai'
-import { ethers, upgrades } from 'hardhat'
-import { SampleLendingPool } from '../typechain-types'
+import { LendingPool } from '../typechain-types'
+
+/**
+ * Deploys a pool the way the factory does: behind a beacon proxy.
+ *
+ * Not `deployProxy`/UUPS any more — pools are beacon proxies now, and the
+ * implementation deliberately no longer inherits `UUPSUpgradeable`, so a UUPS
+ * deployment is rejected outright. Testing through a beacon is also the only
+ * way these tests exercise the delegation path production actually uses.
+ */
+async function deployPoolBehindBeacon(args: unknown[]): Promise<LendingPool> {
+  const LendingPool = await ethers.getContractFactory('LendingPool')
+  const beacon = await upgrades.deployBeacon(LendingPool)
+  await beacon.waitForDeployment()
+
+  const pool = (await upgrades.deployBeaconProxy(beacon, LendingPool, args)) as unknown as LendingPool
+  await pool.waitForDeployment()
+
+  return pool
+}
 
 describe('Security Tests', function () {
-  let lendingPool: SampleLendingPool
-  let owner: SignerWithAddress
-  let borrower: SignerWithAddress
-  let lender: SignerWithAddress
+  let lendingPool: LendingPool
+  let owner: HardhatEthersSigner
+  let borrower: HardhatEthersSigner
+  let lender: HardhatEthersSigner
 
   const maxLoanAmount = ethers.parseEther('10')
   const interestRate = 500 // 5%
@@ -16,17 +35,15 @@ describe('Security Tests', function () {
   beforeEach(async function () {
     ;[owner, borrower, lender] = await ethers.getSigners()
 
-    const SampleLendingPool = await ethers.getContractFactory('SampleLendingPool')
-    lendingPool = (await upgrades.deployProxy(SampleLendingPool, [owner.address, maxLoanAmount, interestRate, loanDuration], {
-      initializer: 'initialize',
-      kind: 'uups',
-      unsafeAllowCustomTypes: true,
-    })) as unknown as SampleLendingPool
+    lendingPool = await deployPoolBehindBeacon([owner.address, maxLoanAmount, interestRate, loanDuration, false, ethers.ZeroAddress])
 
     await lendingPool.waitForDeployment()
 
     // Add some initial funds to the pool
     await lendingPool.connect(lender).depositFunds({ value: ethers.parseEther('20') })
+
+    // Borrowing is members-only, so the borrower needs a contribution of their own
+    await lendingPool.connect(borrower).depositFunds({ value: ethers.parseEther('1') })
   })
 
   describe('Reentrancy Attack Protection', function () {
@@ -41,6 +58,9 @@ describe('Security Tests', function () {
 
       // Fund the malicious contract
       await maliciousContract.fund({ value: ethers.parseEther('2') })
+
+      // Borrowing is members-only, so the attacker has to contribute first
+      await maliciousContract.joinPool({ value: ethers.parseEther('1') })
 
       // Since our CEI pattern prevents reentrancy by design (external call at end),
       // the attack should either fail or not cause any damage
@@ -62,33 +82,40 @@ describe('Security Tests', function () {
       const loanAmount = ethers.parseEther('1')
       await lendingPool.connect(borrower).createLoan(loanAmount)
 
-      // Calculate repayment amount
-      const repaymentAmount = await lendingPool.calculateRepaymentAmount(2)
+      // Quoted an hour ahead: interest accrues per second now, so a figure
+      // read for *this* block would leave the loan a few seconds short of
+      // settled. The excess comes back either way.
+      const quoted = await lendingPool.outstandingBalanceAt(1, (await time.latest()) + 3600)
 
       // Test that the borrower can repay normally (our CEI pattern works)
       const initialPoolFunds = await lendingPool.totalFunds()
 
       // Borrower repays with excess to test refund mechanism
       const excessPayment = ethers.parseEther('0.5')
-      await lendingPool.connect(borrower).repayLoan(2, {
-        value: repaymentAmount + excessPayment,
+      await lendingPool.connect(borrower).repayLoan(1, {
+        value: quoted + excessPayment,
       })
 
       // Verify loan is properly repaid and funds are correct
-      const loan = await lendingPool.getLoan(2)
+      const loan = await lendingPool.getLoan(1)
       expect(loan.isRepaid).to.be.true
 
+      // The pool kept the debt and not a wei of the excess.
       const finalPoolFunds = await lendingPool.totalFunds()
-      expect(finalPoolFunds).to.equal(initialPoolFunds + repaymentAmount)
+      expect(finalPoolFunds - initialPoolFunds).to.equal(loan.amountRepaid)
+      expect(finalPoolFunds - initialPoolFunds).to.be.lt(quoted + excessPayment)
     })
 
     it('Should properly handle legitimate high-frequency transactions', async function () {
       const loanAmount = ethers.parseEther('0.1')
 
-      // Multiple rapid legitimate transactions should work
-      await lendingPool.connect(borrower).createLoan(loanAmount)
-      await lendingPool.connect(borrower).createLoan(loanAmount)
-      await lendingPool.connect(borrower).createLoan(loanAmount)
+      // Multiple rapid legitimate borrow/repay cycles should work. A borrower
+      // is capped at one open loan, so the cycle is the legitimate pattern.
+      for (let loanId = 1; loanId <= 3; loanId++) {
+        await lendingPool.connect(borrower).createLoan(loanAmount)
+        const repayment = await lendingPool.calculateRepaymentAmount(loanId)
+        await lendingPool.connect(borrower).repayLoan(loanId, { value: repayment })
+      }
 
       expect(await lendingPool.nextLoanId()).to.equal(4)
     })
@@ -100,16 +127,14 @@ describe('Security Tests', function () {
       const largeLoanAmount = ethers.parseEther('1000') // 1000 tokens
       const highInterestRate = 9999 // 99.99%
 
-      const LargeLendingPool = await ethers.getContractFactory('SampleLendingPool')
-      const largeLendingPool = (await upgrades.deployProxy(
-        LargeLendingPool,
-        [owner.address, largeLoanAmount, highInterestRate, loanDuration],
-        {
-          initializer: 'initialize',
-          kind: 'uups',
-          unsafeAllowCustomTypes: true,
-        }
-      )) as unknown as SampleLendingPool
+      const largeLendingPool = await deployPoolBehindBeacon([
+        owner.address,
+        largeLoanAmount,
+        highInterestRate,
+        loanDuration,
+        false,
+        ethers.ZeroAddress,
+      ])
 
       await largeLendingPool.waitForDeployment()
 
@@ -117,13 +142,16 @@ describe('Security Tests', function () {
       await largeLendingPool.connect(lender).depositFunds({
         value: ethers.parseEther('2000'),
       })
+      await largeLendingPool.connect(borrower).depositFunds({
+        value: ethers.parseEther('1'),
+      })
 
       // Create a large loan
       const largeAmount = ethers.parseEther('999')
       await largeLendingPool.connect(borrower).createLoan(largeAmount)
 
       // Calculate repayment - should not overflow
-      const repaymentAmount = await largeLendingPool.calculateRepaymentAmount(2)
+      const repaymentAmount = await largeLendingPool.calculateRepaymentAmount(1)
 
       // Verify the calculation is correct (amount + 99.99% interest)
       const expectedInterest = (largeAmount * BigInt(highInterestRate)) / BigInt(10000)
@@ -137,21 +165,24 @@ describe('Security Tests', function () {
       const maxSafeAmount = ethers.parseEther('100') // 100 tokens
       const maxInterestRate = 10000 // 100%
 
-      const TestPool = await ethers.getContractFactory('SampleLendingPool')
-      const testPool = (await upgrades.deployProxy(TestPool, [owner.address, maxSafeAmount, maxInterestRate, loanDuration], {
-        initializer: 'initialize',
-        kind: 'uups',
-        unsafeAllowCustomTypes: true,
-      })) as unknown as SampleLendingPool
+      const testPool = await deployPoolBehindBeacon([
+        owner.address,
+        maxSafeAmount,
+        maxInterestRate,
+        loanDuration,
+        false,
+        ethers.ZeroAddress,
+      ])
 
       await testPool.waitForDeployment()
       await testPool.connect(lender).depositFunds({ value: ethers.parseEther('200') })
+      await testPool.connect(borrower).depositFunds({ value: ethers.parseEther('1') })
 
       // Create loan with maximum amount
       await testPool.connect(borrower).createLoan(maxSafeAmount)
 
       // This should not overflow
-      const repaymentAmount = await testPool.calculateRepaymentAmount(2)
+      const repaymentAmount = await testPool.calculateRepaymentAmount(1)
       expect(repaymentAmount).to.equal(maxSafeAmount * BigInt(2)) // 100% interest = double
     })
 
@@ -165,20 +196,23 @@ describe('Security Tests', function () {
       ]
 
       for (const testCase of testCases) {
-        const TestPool = await ethers.getContractFactory('SampleLendingPool')
-        const testPool = (await upgrades.deployProxy(TestPool, [owner.address, ethers.parseEther('10'), testCase.rate, loanDuration], {
-          initializer: 'initialize',
-          kind: 'uups',
-          unsafeAllowCustomTypes: true,
-        })) as unknown as SampleLendingPool
+        const testPool = await deployPoolBehindBeacon([
+          owner.address,
+          ethers.parseEther('10'),
+          testCase.rate,
+          loanDuration,
+          false,
+          ethers.ZeroAddress,
+        ])
 
         await testPool.waitForDeployment()
         await testPool.connect(lender).depositFunds({ value: ethers.parseEther('20') })
+        await testPool.connect(borrower).depositFunds({ value: ethers.parseEther('1') })
 
         const loanAmount = ethers.parseEther('1')
         await testPool.connect(borrower).createLoan(loanAmount)
 
-        const repaymentAmount = await testPool.calculateRepaymentAmount(2)
+        const repaymentAmount = await testPool.calculateRepaymentAmount(1)
         const expectedInterest = (loanAmount * BigInt(testCase.rate)) / BigInt(10000)
         const expectedRepayment = loanAmount + expectedInterest
 
@@ -196,6 +230,11 @@ describe('Security Tests', function () {
 
       // Fund the rejecting contract using the fundMe function
       await rejectingContract.fundMe({ value: ethers.parseEther('5') })
+
+      // Borrowing is members-only, so it has to contribute before it can borrow
+      await rejectingContract.depositFunds(await lendingPool.getAddress(), {
+        value: ethers.parseEther('1'),
+      })
 
       // Try to create a loan from the rejecting contract
       // This should fail because the loan transfer will be rejected
@@ -215,51 +254,45 @@ describe('Security Tests', function () {
       const loanAmount = ethers.parseEther('1')
       await lendingPool.connect(borrower).createLoan(loanAmount)
 
-      const repaymentAmount = await lendingPool.calculateRepaymentAmount(2)
+      const repaymentAmount = await lendingPool.calculateRepaymentAmount(1)
 
       // Even if borrower is a gas-consuming contract, repayment should work
       // (though it might consume more gas)
-      await expect(lendingPool.connect(borrower).repayLoan(2, { value: repaymentAmount })).to.not.be.reverted
+      await expect(lendingPool.connect(borrower).repayLoan(1, { value: repaymentAmount })).to.not.be.revert(ethers)
     })
   })
 
   describe('Edge Cases and Boundary Testing', function () {
     it('Should handle zero interest rate correctly', async function () {
-      const ZeroInterestPool = await ethers.getContractFactory('SampleLendingPool')
-      const zeroPool = (await upgrades.deployProxy(
-        ZeroInterestPool,
-        [
-          owner.address,
-          ethers.parseEther('10'),
-          0, // 0% interest
-          loanDuration,
-        ],
-        {
-          initializer: 'initialize',
-          kind: 'uups',
-          unsafeAllowCustomTypes: true,
-        }
-      )) as unknown as SampleLendingPool
+      const zeroPool = await deployPoolBehindBeacon([
+        owner.address,
+        ethers.parseEther('10'),
+        0, // 0% interest
+        loanDuration,
+        false,
+        ethers.ZeroAddress,
+      ])
 
       await zeroPool.waitForDeployment()
       await zeroPool.connect(lender).depositFunds({ value: ethers.parseEther('20') })
+      await zeroPool.connect(borrower).depositFunds({ value: ethers.parseEther('1') })
 
       const loanAmount = ethers.parseEther('1')
       await zeroPool.connect(borrower).createLoan(loanAmount)
 
       // With 0% interest, repayment should equal loan amount
-      const repaymentAmount = await zeroPool.calculateRepaymentAmount(2)
+      const repaymentAmount = await zeroPool.calculateRepaymentAmount(1)
       expect(repaymentAmount).to.equal(loanAmount)
 
       // Repayment should work
-      await expect(zeroPool.connect(borrower).repayLoan(2, { value: loanAmount })).to.not.be.reverted
+      await expect(zeroPool.connect(borrower).repayLoan(1, { value: loanAmount })).to.not.be.revert(ethers)
     })
 
     it('Should handle minimum loan amounts', async function () {
       const minAmount = 1000 // 1000 wei (larger amount for meaningful interest)
       await lendingPool.connect(borrower).createLoan(minAmount)
 
-      const repaymentAmount = await lendingPool.calculateRepaymentAmount(2)
+      const repaymentAmount = await lendingPool.calculateRepaymentAmount(1)
       // With 5% interest: 1000 + (1000 * 500 / 10000) = 1000 + 50 = 1050
       const expectedInterest = (BigInt(minAmount) * BigInt(interestRate)) / BigInt(10000)
       const expectedRepayment = BigInt(minAmount) + expectedInterest
@@ -272,22 +305,24 @@ describe('Security Tests', function () {
       const loanAmount = ethers.parseEther('1')
       await lendingPool.connect(borrower).createLoan(loanAmount)
 
-      const repaymentAmount = await lendingPool.calculateRepaymentAmount(2)
+      const quoted = await lendingPool.outstandingBalanceAt(1, (await time.latest()) + 3600)
       const excessPayment = ethers.parseEther('5') // Much more than needed
 
       const initialBalance = await ethers.provider.getBalance(borrower.address)
 
-      const tx = await lendingPool.connect(borrower).repayLoan(2, {
-        value: repaymentAmount + excessPayment,
+      const tx = await lendingPool.connect(borrower).repayLoan(1, {
+        value: quoted + excessPayment,
       })
       const receipt = await tx.wait()
       const gasUsed = receipt!.gasUsed * tx.gasPrice!
 
       const finalBalance = await ethers.provider.getBalance(borrower.address)
 
-      // Borrower should get excess back (minus gas)
-      const expectedBalance = initialBalance - repaymentAmount - gasUsed
-      expect(finalBalance).to.equal(expectedBalance)
+      // The wallet is down by the debt and the gas, and by nothing else —
+      // measured against what the loan actually took rather than what was
+      // sent, since the debt grew by a block on the way in.
+      const credited = (await lendingPool.getLoan(1)).amountRepaid
+      expect(finalBalance).to.equal(initialBalance - credited - gasUsed)
     })
   })
 })

@@ -1,5 +1,6 @@
 import { ERROR_MESSAGES, ERROR_SUGGESTIONS } from '../constants'
 import { ErrorContext, ErrorDetails, ErrorType } from '../types/errors'
+import { logger } from './logger'
 
 export const createErrorDetails = (type: ErrorType, originalError?: unknown, context?: ErrorContext): ErrorDetails => ({
   type,
@@ -14,7 +15,7 @@ export const getErrorSuggestions = (errorDetails: ErrorDetails): string[] => {
 }
 
 export const logError = (errorDetails: ErrorDetails): void => {
-  console.error('[SuperPool Error]', {
+  logger.error('[SuperPool Error]', {
     type: errorDetails.type,
     message: errorDetails.message,
     timestamp: new Date(errorDetails.timestamp).toISOString(),

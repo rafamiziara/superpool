@@ -8,11 +8,10 @@ This comprehensive guide covers all the ways to interact with your SuperPool sma
 2. [Method 1: Hardhat Console (Recommended)](#method-1-hardhat-console-recommended)
 3. [Method 2: Custom Scripts](#method-2-custom-scripts)
 4. [Method 3: Mobile App Integration](#method-3-mobile-app-integration)
-5. [Method 4: Test Utilities](#method-4-test-utilities)
-6. [Method 5: Frontend Integration](#method-5-frontend-integration)
-7. [Common Workflows](#common-workflows)
-8. [Monitoring & Debugging](#monitoring--debugging)
-9. [Reference](#reference)
+5. [Method 4: Frontend Integration](#method-4-frontend-integration)
+6. [Common Workflows](#common-workflows)
+7. [Monitoring & Debugging](#monitoring--debugging)
+8. [Reference](#reference)
 
 ---
 
@@ -57,7 +56,7 @@ const factory = await ethers.getContractAt('PoolFactory', factoryAddress)
 
 // Get first pool address
 const poolAddress = await factory.getPoolAddress(1)
-const pool = await ethers.getContractAt('SampleLendingPool', poolAddress)
+const pool = await ethers.getContractAt('LendingPool', poolAddress)
 ```
 
 ### 🏭 PoolFactory Interactions
@@ -267,7 +266,7 @@ async function main() {
   }
 
   const [funder] = await ethers.getSigners()
-  const pool = await ethers.getContractAt('SampleLendingPool', poolAddress)
+  const pool = await ethers.getContractAt('LendingPool', poolAddress)
 
   const fundAmount = ethers.parseEther(amount)
   console.log(`Funding pool ${poolAddress} with ${amount} ETH...`)
@@ -304,7 +303,7 @@ async function main() {
 
   for (let i = 1; i <= poolCount; i++) {
     const info = await factory.getPoolInfo(i)
-    const pool = await ethers.getContractAt('SampleLendingPool', info.poolAddress)
+    const pool = await ethers.getContractAt('LendingPool', info.poolAddress)
     const totalFunds = await pool.totalFunds()
     const nextLoanId = await pool.nextLoanId()
 
@@ -439,89 +438,7 @@ EXPO_PUBLIC_LOCALHOST_RPC_URL=http://127.0.0.1:8545
 
 ---
 
-## Method 4: Test Utilities
-
-Use our custom test utility functions for comprehensive testing.
-
-### 🛠️ Available Utilities
-
-```javascript
-// In Hardhat console
-const utils = require('./scripts/test-utils.ts')
-
-// === ACCOUNT MANAGEMENT ===
-// Display all test accounts with roles and balances
-await utils.printTestAccounts()
-
-// Fund all test accounts with ETH
-await utils.fundTestAccounts('100') // 100 ETH each
-
-// === ENVIRONMENT SETUP ===
-// Setup complete test environment
-const env = await utils.setupTestEnvironment(
-  'FACTORY_ADDRESS',
-  true, // createPools
-  true // fundAccounts
-)
-
-console.log(`Setup complete! Created ${env.pools.length} pools`)
-console.log(`Available accounts: ${env.accounts.length}`)
-
-// === POOL INFORMATION ===
-// Get detailed pool information
-await utils.printPoolInfo('POOL_ADDRESS')
-
-// Get pool data programmatically
-const poolInfo = await utils.getPoolInfo('POOL_ADDRESS')
-if (poolInfo) {
-  console.log(`Pool has ${poolInfo.totalFunds} ETH available`)
-  console.log(`Next loan ID will be: ${poolInfo.nextLoanId}`)
-}
-
-// === LOAN CREATION ===
-// Create sample loans for testing
-const borrowers = env.accounts.slice(4, 7).map((acc) => acc.signer) // Get borrower accounts
-await utils.createSampleLoans('POOL_ADDRESS', borrowers)
-
-// === DEVELOPMENT HELP ===
-// Show available commands
-utils.printDevHelp()
-```
-
-### 🔄 Complete Test Workflow
-
-```javascript
-// 1. Setup environment
-const env = await utils.setupTestEnvironment('FACTORY_ADDRESS')
-
-// 2. Get a pool to work with
-const testPool = env.pools[0]
-console.log(`Working with pool: ${testPool.name} at ${testPool.address}`)
-
-// 3. Fund the pool
-const pool = await ethers.getContractAt('SampleLendingPool', testPool.address)
-const lender = env.accounts[6].signer // Get lender account
-await pool.connect(lender).depositFunds({ value: ethers.parseEther('100') })
-
-// 4. Create loans
-const borrowers = env.accounts.slice(4, 6).map((acc) => acc.signer)
-await utils.createSampleLoans(testPool.address, borrowers)
-
-// 5. Check pool status
-await utils.printPoolInfo(testPool.address)
-
-// 6. Repay a loan
-const borrower = borrowers[0]
-const loanId = 1 // First loan
-const repaymentAmount = await pool.calculateRepaymentAmount(loanId)
-await pool.connect(borrower).repayLoan(loanId, { value: repaymentAmount })
-
-console.log('✅ Complete workflow executed!')
-```
-
----
-
-## Method 5: Frontend Integration
+## Method 4: Frontend Integration
 
 ### 🌐 Web Integration with ethers.js
 
@@ -648,7 +565,7 @@ const poolParams = {
 const createTx = await factory.createPool(poolParams);
 const createReceipt = await createTx.wait();
 const poolAddress = /* extract from event */;
-const pool = await ethers.getContractAt("SampleLendingPool", poolAddress);
+const pool = await ethers.getContractAt("LendingPool", poolAddress);
 
 // === 2. POOL FUNDING ===
 // Multiple lenders fund the pool
@@ -702,7 +619,7 @@ async function manageMutiplePools() {
 
   for (let i = 1; i <= poolCount; i++) {
     const poolInfo = await factory.getPoolInfo(i)
-    const pool = await ethers.getContractAt('SampleLendingPool', poolInfo.poolAddress)
+    const pool = await ethers.getContractAt('LendingPool', poolInfo.poolAddress)
 
     // Get pool statistics
     const totalFunds = await pool.totalFunds()
@@ -725,7 +642,7 @@ async function manageMutiplePools() {
 // === LOAN MONITORING ===
 async function monitorLoans() {
   const poolAddress = '0x...'
-  const pool = await ethers.getContractAt('SampleLendingPool', poolAddress)
+  const pool = await ethers.getContractAt('LendingPool', poolAddress)
 
   // Listen for new loans
   pool.on('LoanCreated', async (loanId, borrower, amount, event) => {
@@ -844,7 +761,7 @@ async function generatePoolAnalytics() {
 
   for (let i = 1; i <= poolCount; i++) {
     const info = await factory.getPoolInfo(i)
-    const pool = await ethers.getContractAt('SampleLendingPool', info.poolAddress)
+    const pool = await ethers.getContractAt('LendingPool', info.poolAddress)
 
     const totalFunds = await pool.totalFunds()
     const nextLoanId = await pool.nextLoanId()
@@ -915,7 +832,7 @@ function deactivatePool(uint256 _poolId) external
 function reactivatePool(uint256 _poolId) external
 ```
 
-**SampleLendingPool Key Functions:**
+**LendingPool Key Functions:**
 
 ```solidity
 function depositFunds() external payable
@@ -941,7 +858,7 @@ event PoolReactivated(uint256 indexed poolId, address indexed poolAddress)
 event ImplementationUpdated(address indexed oldImplementation, address indexed newImplementation)
 ```
 
-**SampleLendingPool Events:**
+**LendingPool Events:**
 
 ```solidity
 event PoolConfigured(uint256 maxLoanAmount, uint256 interestRate, uint256 loanDuration)
@@ -962,7 +879,7 @@ event LoanRepaid(uint256 indexed loanId, address indexed borrower, uint256 amoun
 - `EmptyName()` - Pool name is empty
 - `ImplementationNotSet()` - Implementation address is zero
 
-**SampleLendingPool Errors:**
+**LendingPool Errors:**
 
 - `InsufficientFunds()` - Pool doesn't have enough liquidity
 - `LoanAlreadyRepaid()` - Attempting to repay already repaid loan
@@ -979,7 +896,7 @@ pnpm console:local                 # Interactive console
 
 # Common console commands
 const factory = await ethers.getContractAt("PoolFactory", "FACTORY_ADDRESS")
-const pool = await ethers.getContractAt("SampleLendingPool", "POOL_ADDRESS")
+const pool = await ethers.getContractAt("LendingPool", "POOL_ADDRESS")
 const [deployer, owner, borrower, lender] = await ethers.getSigners()
 
 # Quick operations

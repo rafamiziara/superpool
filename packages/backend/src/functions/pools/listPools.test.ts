@@ -1,6 +1,21 @@
 import { PoolInfo } from '@superpool/types'
 import { mockLogger } from '../../__tests__/setup'
 
+/**
+ * A pool as Firestore stores it, which is not what the callable returns:
+ * `createdAt` is a Timestamp there and an ISO string on the wire.
+ *
+ * `loanToken` is optional here and required on the wire, which is the whole
+ * point of the retrofit: a document written before pools had a denomination
+ * simply has no such field, and the handler answers "native" for it.
+ */
+type StoredPool = Omit<PoolInfo, 'createdAt' | 'loanToken'> & {
+  createdAt: Date
+  loanToken?: string
+}
+
+const NATIVE = '0x0000000000000000000000000000000000000000'
+
 // Import mocked services (already mocked in setup.ts)
 const { firestore } = require('../../services')
 
@@ -8,7 +23,7 @@ const { firestore } = require('../../services')
 const { listPoolsHandler } = require('./listPools')
 
 describe('listPoolsHandler', () => {
-  const mockPools: PoolInfo[] = [
+  const mockPools: StoredPool[] = [
     {
       poolId: 1,
       poolAddress: '0xPoolAddress1',
@@ -23,6 +38,7 @@ describe('listPoolsHandler', () => {
       createdAt: new Date('2024-01-01'),
       transactionHash: '0xTxHash1',
       isActive: true,
+      loanToken: NATIVE,
     },
     {
       poolId: 2,
@@ -38,11 +54,14 @@ describe('listPoolsHandler', () => {
       createdAt: new Date('2024-01-02'),
       transactionHash: '0xTxHash2',
       isActive: true,
+      loanToken: '0xstablecoin',
+      tokenSymbol: 'USDC',
+      tokenDecimals: 6,
     },
   ]
 
   // Helper to create mock query chain
-  const createMockQuery = (docs: PoolInfo[], totalCount: number) => {
+  const createMockQuery = (docs: StoredPool[], totalCount: number) => {
     const mockDocs = docs.map((pool) => ({
       data: () => ({
         ...pool,
@@ -88,7 +107,9 @@ describe('listPoolsHandler', () => {
     expect(mockQuery.offset).toHaveBeenCalledWith(0)
     expect(mockQuery.limit).toHaveBeenCalledWith(20)
     expect(result).toEqual({
-      pools: mockPools,
+      // createdAt crosses the wire as an ISO string, so the fixtures' Dates are
+      // not what the handler returns.
+      pools: mockPools.map((pool) => ({ ...pool, createdAt: pool.createdAt.toISOString() })),
       totalCount: 2,
       page: 1,
       limit: 20,
@@ -96,6 +117,58 @@ describe('listPoolsHandler', () => {
       hasPreviousPage: false,
     })
     expect(mockLogger.info).toHaveBeenCalledWith('Listing pools', { params: {} })
+  })
+
+  describe('denomination', () => {
+    it('reports a pool indexed before denominations existed as native', async () => {
+      // The retrofit. Nothing could have created a token pool before the field
+      // existed, so an absent one is not missing information — it is the answer.
+      const { loanToken: _omitted, ...legacyPool } = mockPools[0]
+      firestore.collection.mockReturnValue(createMockQuery([legacyPool], 1))
+
+      const result = await listPoolsHandler({ data: {} })
+
+      expect(result.pools[0].loanToken).toBe(NATIVE)
+      expect(result.pools[0].tokenSymbol).toBeUndefined()
+      expect(result.pools[0].tokenDecimals).toBeUndefined()
+    })
+
+    it('gives a native pool no symbol of its own', async () => {
+      // The native symbol is POL on Polygon and ETH on Base — a fact about the
+      // chain, which the app already knows, not about the pool. Answering 'POL'
+      // here would put it on a Base pool.
+      firestore.collection.mockReturnValue(createMockQuery([mockPools[0]], 1))
+
+      const result = await listPoolsHandler({ data: {} })
+
+      expect(result.pools[0].loanToken).toBe(NATIVE)
+      expect(result.pools[0].tokenSymbol).toBeUndefined()
+    })
+
+    it('carries a token pool’s symbol and decimals through', async () => {
+      firestore.collection.mockReturnValue(createMockQuery([mockPools[1]], 1))
+
+      const result = await listPoolsHandler({ data: {} })
+
+      expect(result.pools[0]).toMatchObject({
+        loanToken: '0xstablecoin',
+        tokenSymbol: 'USDC',
+        tokenDecimals: 6,
+      })
+    })
+
+    it('leaves decimals absent when the token was never read, rather than defaulting to 18', async () => {
+      // The sharpest rule in the feature. A token pool whose metadata could not
+      // be read has to reach the app as unsupported; 18 decimals against a
+      // 6-decimal token renders 5 USDC as 5,000,000,000,000.
+      const { tokenSymbol: _symbol, tokenDecimals: _decimals, ...unreadable } = mockPools[1]
+      firestore.collection.mockReturnValue(createMockQuery([unreadable], 1))
+
+      const result = await listPoolsHandler({ data: {} })
+
+      expect(result.pools[0].loanToken).toBe('0xstablecoin')
+      expect(result.pools[0].tokenDecimals).toBeUndefined()
+    })
   })
 
   // Test Case: Pagination - Page 2
@@ -120,7 +193,10 @@ describe('listPoolsHandler', () => {
   // Test Case: Filter by owner address
   it('should filter pools by owner address', async () => {
     // Arrange
-    const ownerAddress = '0xOWNER1' // Uppercase to test lowercasing
+    // A real address, in mixed case, to exercise the lowercasing. It used to
+    // be '0xOWNER1', which is not an address at all — a filter that could only
+    // ever match nothing, passing as though it had been applied.
+    const ownerAddress = '0x70997970C51812dc3A010C7d01b50e0d17dc79C8'
     const request = { data: { ownerAddress } }
     const mockQuery = createMockQuery([mockPools[0]], 1)
     firestore.collection.mockReturnValue(mockQuery)
@@ -132,6 +208,65 @@ describe('listPoolsHandler', () => {
     expect(mockQuery.where).toHaveBeenCalledWith('poolOwner', '==', ownerAddress.toLowerCase())
     expect(result.pools).toHaveLength(1)
     expect(result.totalCount).toBe(1)
+  })
+
+  describe('searching by name and description', () => {
+    it('narrows on the most selective term, normalised', async () => {
+      // The longest word, because it is the one that cuts the chain down most.
+      // Normalised on this side of the wire so there is one implementation of
+      // "what counts as the same word" rather than two that can drift.
+      const mockQuery = createMockQuery([mockPools[0]], 1)
+      firestore.collection.mockReturnValue(mockQuery)
+
+      await listPoolsHandler({ data: { searchTerm: 'East Side LENDING' } })
+
+      expect(mockQuery.where).toHaveBeenCalledWith('searchTokens', 'array-contains', 'lending')
+    })
+
+    it('truncates a term longer than the stored prefixes', async () => {
+      // The array holds prefixes up to a cap, so a longer query has to be cut
+      // to the same length or it matches nothing at all.
+      const mockQuery = createMockQuery([], 0)
+      firestore.collection.mockReturnValue(mockQuery)
+
+      await listPoolsHandler({ data: { searchTerm: 'neighbourhood' } })
+
+      expect(mockQuery.where).toHaveBeenCalledWith('searchTokens', 'array-contains', 'neighbourhoo')
+    })
+
+    it('does not query on a term too short to narrow anything', async () => {
+      // One letter matches most of the chain. The caller already has a page it
+      // can filter, so this is no search rather than a bad one.
+      const mockQuery = createMockQuery(mockPools, 2)
+      firestore.collection.mockReturnValue(mockQuery)
+
+      await listPoolsHandler({ data: { searchTerm: 'a' } })
+
+      expect(mockQuery.where).not.toHaveBeenCalledWith('searchTokens', 'array-contains', expect.anything())
+    })
+
+    it('ignores an empty search rather than matching nothing', async () => {
+      const mockQuery = createMockQuery(mockPools, 2)
+      firestore.collection.mockReturnValue(mockQuery)
+
+      const result = await listPoolsHandler({ data: { searchTerm: '   ' } })
+
+      expect(mockQuery.where).not.toHaveBeenCalledWith('searchTokens', 'array-contains', expect.anything())
+      expect(result.pools).toHaveLength(2)
+    })
+
+    it('searches within the chain and the active filter, not instead of them', async () => {
+      // Every feed is per chain by construction. A search that dropped the
+      // chain filter would show pools from a network the user is not on.
+      const mockQuery = createMockQuery([mockPools[0]], 1)
+      firestore.collection.mockReturnValue(mockQuery)
+
+      await listPoolsHandler({ data: { chainId: 80002, searchTerm: 'guild' } })
+
+      expect(mockQuery.where).toHaveBeenCalledWith('chainId', '==', 80002)
+      expect(mockQuery.where).toHaveBeenCalledWith('isActive', '==', true)
+      expect(mockQuery.where).toHaveBeenCalledWith('searchTokens', 'array-contains', 'guild')
+    })
   })
 
   // Test Case: Filter by chainId
@@ -181,33 +316,28 @@ describe('listPoolsHandler', () => {
   })
 
   // Test Case: Minimum limit (at least 1)
-  it('should enforce minimum limit of 1 for negative values', async () => {
+  it('should refuse a negative limit rather than floor it', async () => {
     // Arrange
     const request = { data: { limit: -5 } }
     const mockQuery = createMockQuery(mockPools, 2)
     firestore.collection.mockReturnValue(mockQuery)
 
-    // Act
-    const result = await listPoolsHandler(request)
-
-    // Assert
-    expect(mockQuery.limit).toHaveBeenCalledWith(1)
-    expect(result.limit).toBe(1)
+    // Act & Assert
+    await expect(listPoolsHandler(request)).rejects.toThrow(/limit/i)
+    expect(mockQuery.limit).not.toHaveBeenCalled()
   })
 
   // Test Case: Minimum page (at least 1)
-  it('should enforce minimum page of 1', async () => {
-    // Arrange
+  it('should refuse page zero rather than read it as the first page', async () => {
+    // Arrange — pages are one-based, so a zeroth page is a caller's off-by-one
+    // and answering it with the first hides that.
     const request = { data: { page: 0 } }
     const mockQuery = createMockQuery(mockPools, 2)
     firestore.collection.mockReturnValue(mockQuery)
 
-    // Act
-    const result = await listPoolsHandler(request)
-
-    // Assert
-    expect(mockQuery.offset).toHaveBeenCalledWith(0)
-    expect(result.page).toBe(1)
+    // Act & Assert
+    await expect(listPoolsHandler(request)).rejects.toThrow(/page/i)
+    expect(mockQuery.offset).not.toHaveBeenCalled()
   })
 
   // Test Case: Empty results
@@ -232,7 +362,7 @@ describe('listPoolsHandler', () => {
     // Arrange
     const request = {
       data: {
-        ownerAddress: '0xOwner1',
+        ownerAddress: '0x70997970C51812dc3A010C7d01b50e0d17dc79C8',
         chainId: 80002,
         activeOnly: true,
         page: 1,
@@ -247,7 +377,7 @@ describe('listPoolsHandler', () => {
 
     // Assert
     expect(mockQuery.where).toHaveBeenCalledWith('chainId', '==', 80002)
-    expect(mockQuery.where).toHaveBeenCalledWith('poolOwner', '==', '0xowner1')
+    expect(mockQuery.where).toHaveBeenCalledWith('poolOwner', '==', '0x70997970c51812dc3a010c7d01b50e0d17dc79c8')
     expect(mockQuery.where).toHaveBeenCalledWith('isActive', '==', true)
     expect(result.pools).toHaveLength(1)
   })
@@ -332,7 +462,9 @@ describe('listPoolsHandler', () => {
     const result = await listPoolsHandler(request)
 
     // Assert
-    expect(result.pools[0].createdAt).toBeInstanceOf(Date)
+    // An ISO string, not a Date: a Date returned from a callable is encoded to `{}`.
+    expect(typeof result.pools[0].createdAt).toBe('string')
+    expect(new Date(result.pools[0].createdAt).getTime()).not.toBeNaN()
   })
 
   // Test Case: Error handling - Non-Error object thrown

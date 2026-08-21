@@ -1,15 +1,16 @@
-import { Firestore } from 'firebase-admin/firestore'
-import { Interface, JsonRpcProvider, Log } from 'ethers'
+import { DocumentReference, Firestore } from 'firebase-admin/firestore'
+import { Contract, Interface, JsonRpcProvider, Log, Provider, ZeroAddress } from 'ethers'
 import { logger } from 'firebase-functions/v2'
 import { HttpsError } from 'firebase-functions/v2/https'
-import { PoolFactoryABI, POOLS_COLLECTION } from '../constants'
+import { ERC20MetadataABI, PoolFactoryABI, POOLS_COLLECTION } from '../constants'
+import { buildSearchTokens, mergeSearchTokens } from '../utils/searchTokens'
 
 export interface ParsedPoolEvent {
   poolId: number
   poolAddress: string
   poolOwner: string
   name: string
-  description: string // empty string for MVP — not emitted in PoolCreated event
+  description: string // not in the event — read back from the factory, see fetchPoolMetadata
   maxLoanAmount: string // bigint as string
   interestRate: number
   loanDuration: number
@@ -18,7 +19,23 @@ export interface ParsedPoolEvent {
   blockNumber: number
   createdAt: Date // derived from block timestamp
   isActive: boolean // always true at creation
+  /**
+   * What the pool is denominated in — the zero address for native.
+   *
+   * Not in the event either. `PoolCreated` was deliberately left alone when
+   * pools gained a denomination: adding a field changes the event's topic hash
+   * and breaks every indexer at once, including this one mid-upgrade.
+   * `requiresMembership` is absent from it for the same reason.
+   */
+  loanToken: string
+  /** Absent on a native pool, and absent when the token could not be read. */
+  tokenSymbol?: string
+  /** Absent on a native pool, and absent when the token could not be read. */
+  tokenDecimals?: number
 }
+
+/** The parts of a pool that have to be read back rather than decoded from its log. */
+export type PoolMetadata = Pick<ParsedPoolEvent, 'description' | 'loanToken' | 'tokenSymbol' | 'tokenDecimals'>
 
 export interface IndexPoolResult {
   poolId: number
@@ -46,42 +63,267 @@ export function parsePoolCreatedLog(log: Log, chainId: number, blockTimestamp: n
       blockNumber: log.blockNumber,
       createdAt: new Date(blockTimestamp * 1000),
       isActive: true,
+      // Native until the factory says otherwise. The log cannot carry this, so
+      // this is the pre-`fetchPoolMetadata` default and it is the right one:
+      // every pool was native before the field existed.
+      loanToken: ZeroAddress,
     }
   } catch (error) {
     throw new Error(`Failed to decode PoolCreated log: ${error instanceof Error ? error.message : String(error)}`)
   }
 }
 
+/**
+ * Read back the parts of a pool that its log does not carry.
+ *
+ * Two facts, one `getPoolInfo` call. Neither is in `PoolCreated`: the
+ * description because it was never emitted, and the denomination because the
+ * event was deliberately left unchanged when pools gained one — adding a field
+ * changes the topic hash and breaks every reader at once. The log's own
+ * `address` is the factory that emitted it, so no chain configuration is needed
+ * here.
+ *
+ * **The two facts degrade differently, and that difference is the point.**
+ *
+ * A description is cosmetic, so a failed read stores an empty string rather
+ * than losing the pool. Decimals are not: rendering a 6-decimal balance as an
+ * 18-decimal one is a factor of a trillion, so a token whose metadata cannot be
+ * read leaves `tokenSymbol` and `tokenDecimals` **absent** — which the app is
+ * required to treat as "unsupported", never as "assume 18". The pool is still
+ * stored either way; losing it would be worse than showing it as unreadable.
+ *
+ * A failed `getPoolInfo` falls back to native, which is what every pool was
+ * before denominations existed and what all but the token pools still are.
+ */
+export async function fetchPoolMetadata(poolId: number, factoryAddress: string, provider: Provider): Promise<PoolMetadata> {
+  let description = ''
+  let loanToken = ZeroAddress
+
+  try {
+    const factory = new Contract(factoryAddress, [...PoolFactoryABI], provider)
+    const poolInfo = await factory.getPoolInfo(poolId)
+
+    description = (poolInfo.description as string) ?? ''
+    loanToken = (poolInfo.loanToken as string) ?? ZeroAddress
+  } catch (error) {
+    logger.warn('Failed to read pool info from factory; indexing as a native pool without a description', {
+      poolId,
+      factoryAddress,
+      error: error instanceof Error ? error.message : String(error),
+    })
+
+    return { description, loanToken }
+  }
+
+  if (loanToken === ZeroAddress) return { description, loanToken }
+
+  return { description, loanToken, ...(await fetchTokenMetadata(loanToken, provider)) }
+}
+
+/**
+ * Read a token's symbol and decimals.
+ *
+ * Safe to store, unlike most things read from a contract: both are immutable
+ * for the life of an ERC-20. `requiresMembership` is the counter-example the
+ * codebase already has — the owner can change it at any moment, so it must
+ * always be read from the chain and never from an indexed record.
+ *
+ * Returns nothing at all on failure rather than a guess. See
+ * `fetchPoolMetadata`.
+ */
+async function fetchTokenMetadata(
+  tokenAddress: string,
+  provider: Provider
+): Promise<Pick<ParsedPoolEvent, 'tokenSymbol' | 'tokenDecimals'>> {
+  try {
+    const token = new Contract(tokenAddress, [...ERC20MetadataABI], provider)
+
+    const [symbol, decimals] = await Promise.all([token.symbol() as Promise<string>, token.decimals() as Promise<bigint>])
+
+    return { tokenSymbol: symbol, tokenDecimals: Number(decimals) }
+  } catch (error) {
+    logger.warn('Failed to read token metadata; the pool will be indexed as unsupported rather than guessed at', {
+      tokenAddress,
+      error: error instanceof Error ? error.message : String(error),
+    })
+
+    return {}
+  }
+}
+
+/**
+ * Read a pool's active flag from the factory.
+ *
+ * `PoolDeactivated` and `PoolReactivated` carry no state — only the pool they
+ * concern — so the sweep asks the chain what the flag is *now* rather than
+ * replaying the events in order. Two things fall out of that: the result does
+ * not depend on the order logs happen to be processed in, and re-scanning old
+ * blocks is harmless, because it writes today's truth rather than the truth as
+ * of some block in the past.
+ */
+export async function fetchPoolActive(poolId: number, factoryAddress: string, provider: Provider): Promise<boolean> {
+  const factory = new Contract(factoryAddress, [...PoolFactoryABI], provider)
+
+  return (await factory.isPoolActive(poolId)) as boolean
+}
+
+/**
+ * Apply a pool's active flag to its Firestore document.
+ *
+ * `isActive` is written `true` when a pool is first indexed and was, until this
+ * existed, never touched again — so a pool deactivated on chain kept appearing
+ * in `listPools` forever. This is what reconciles it.
+ *
+ * Returns true only when the stored value actually changed, so a sweep over
+ * settled history reports no work — the same guarantee `create()` gives the
+ * other indexers.
+ *
+ * A missing document is skipped rather than created. It means the pool's own
+ * creation was never indexed, and a status-only document would put a pool with
+ * no name, owner or terms in front of the user.
+ */
+export async function updatePoolActive(poolId: number, chainId: number, isActive: boolean, firestore: Firestore): Promise<boolean> {
+  const docId = `${chainId}-${poolId}`
+  const docRef = firestore.collection(POOLS_COLLECTION).doc(docId)
+  const doc = await docRef.get()
+
+  if (!doc.exists) {
+    logger.warn('Pool status changed for a pool that was never indexed; skipping', { poolId, chainId, docId })
+
+    return false
+  }
+
+  if (doc.data()!.isActive === isActive) return false
+
+  await docRef.update({ isActive })
+
+  logger.info('Pool active flag updated', { poolId, chainId, docId, isActive })
+
+  return true
+}
+
+/** Firestore's gRPC status for a `create()` against a document that exists. */
+const ALREADY_EXISTS = 6
+
+/**
+ * Fill in token metadata on a pool that was indexed without it.
+ *
+ * The narrow exception to "a pool document is written once". `create()` is what
+ * makes the racing indexing paths safe, but it also means a pool stored while
+ * the token read was failing keeps that gap for ever — and the gap is not
+ * cosmetic. A pool with a denomination but no decimals is unsupported in the
+ * app, permanently, because of one RPC hiccup at the moment it was created.
+ *
+ * The sweep re-scans ranges deliberately and re-scanning genesis is supported,
+ * so this is a path that actually runs. It repairs in one direction only —
+ * absent to known — so it cannot overwrite a good value with a later failed
+ * read, and it never touches anything else on the document.
+ *
+ * Not a general backfill: pools indexed before denominations existed have no
+ * `loanToken` and are native, which is what they are, so there is nothing to
+ * repair on them.
+ */
+async function repairPool(docRef: DocumentReference, parsedPool: ParsedPoolEvent): Promise<boolean> {
+  const doc = await docRef.get()
+
+  if (!doc.exists) return false
+
+  const stored = doc.data()!
+  const repairs: Record<string, unknown> = {}
+
+  // Token metadata: absent to known, one direction only, so a later failed read
+  // cannot undo a good value. A pool with no `loanToken` predates denominations
+  // and is native, which is what it is — nothing to repair.
+  if (parsedPool.loanToken !== ZeroAddress && parsedPool.tokenDecimals !== undefined && stored.tokenDecimals == null) {
+    repairs.loanToken = parsedPool.loanToken.toLowerCase()
+    repairs.tokenDecimals = parsedPool.tokenDecimals
+
+    // Never written as `undefined`: Firestore rejects it outright. In practice
+    // the symbol is always there when the decimals are — they are read in one
+    // `Promise.all`, so either both arrive or neither does.
+    if (parsedPool.tokenSymbol !== undefined) repairs.tokenSymbol = parsedPool.tokenSymbol
+  }
+
+  // Search tokens: added, never replaced. This is what backfills every pool
+  // indexed before Discover could search past its first page — re-run the sweep
+  // from the factory's deployment block and they all gain one.
+  const merged = mergeSearchTokens(
+    Array.isArray(stored.searchTokens) ? (stored.searchTokens as string[]) : [],
+    buildSearchTokens(parsedPool.name, parsedPool.description)
+  )
+
+  if (merged) repairs.searchTokens = merged
+
+  if (Object.keys(repairs).length === 0) return false
+
+  await docRef.update(repairs)
+
+  logger.info('Filled in fields on a pool indexed without them', {
+    poolId: parsedPool.poolId,
+    chainId: parsedPool.chainId,
+    repaired: Object.keys(repairs),
+  })
+
+  return true
+}
+
 export async function indexPoolEvent(parsedPool: ParsedPoolEvent, firestore: Firestore): Promise<IndexPoolResult> {
   const docId = `${parsedPool.chainId}-${parsedPool.poolId}`
   const docRef = firestore.collection(POOLS_COLLECTION).doc(docId)
 
-  const existingDoc = await docRef.get()
+  // `create()` rather than read-then-`set()`: the indexing paths race. The
+  // create screen indexes the transaction it just saw confirmed while the pools
+  // screen drains the same hash, and the scheduled sync can arrive on top. A
+  // read-then-write lets every caller observe "absent" and write, so each one
+  // reports a first-time store and a doc written elsewhere in between is lost.
+  // Rejection on an existing document is what makes the guarantee atomic.
+  try {
+    await docRef.create({
+      poolId: parsedPool.poolId,
+      poolAddress: parsedPool.poolAddress,
+      // Lowercased on write: `listPools` lowercases the ownerAddress it filters
+      // by, so storing the checksummed form would make that filter match nothing.
+      poolOwner: parsedPool.poolOwner.toLowerCase(),
+      name: parsedPool.name,
+      description: parsedPool.description,
+      maxLoanAmount: parsedPool.maxLoanAmount,
+      interestRate: parsedPool.interestRate,
+      loanDuration: parsedPool.loanDuration,
+      chainId: parsedPool.chainId,
+      createdBy: parsedPool.poolOwner.toLowerCase(), // poolOwner === msg.sender at creation time
+      createdAt: parsedPool.createdAt,
+      transactionHash: parsedPool.transactionHash,
+      isActive: parsedPool.isActive,
+      // Lowercased like the addresses above, so a comparison against a
+      // wallet-supplied or config-supplied token address cannot miss on case.
+      loanToken: parsedPool.loanToken.toLowerCase(),
+      // Written only when they mean something. A native pool has no symbol of
+      // its own — the chain does — and a token whose metadata could not be read
+      // must stay absent rather than acquire a plausible default.
+      ...(parsedPool.tokenSymbol === undefined ? {} : { tokenSymbol: parsedPool.tokenSymbol }),
+      ...(parsedPool.tokenDecimals === undefined ? {} : { tokenDecimals: parsedPool.tokenDecimals }),
+      // Every prefix of every word in the name and description, so `listPools`
+      // can narrow the whole chain rather than the app filtering one page of
+      // fifty. Safe to store for the same reason the token's decimals are:
+      // neither field has a setter on `PoolFactory`.
+      searchTokens: buildSearchTokens(parsedPool.name, parsedPool.description),
+    })
+  } catch (error) {
+    const alreadyExists = typeof error === 'object' && error !== null && 'code' in error && error.code === ALREADY_EXISTS
 
-  if (existingDoc.exists) {
+    if (!alreadyExists) throw error
+
+    const repaired = await repairPool(docRef, parsedPool)
+
     logger.info('Pool already indexed, skipping', {
       poolId: parsedPool.poolId,
       chainId: parsedPool.chainId,
       docId,
+      repaired,
     })
+
     return { poolId: parsedPool.poolId, alreadyIndexed: true, stored: false }
   }
-
-  await docRef.set({
-    poolId: parsedPool.poolId,
-    poolAddress: parsedPool.poolAddress,
-    poolOwner: parsedPool.poolOwner,
-    name: parsedPool.name,
-    description: parsedPool.description,
-    maxLoanAmount: parsedPool.maxLoanAmount,
-    interestRate: parsedPool.interestRate,
-    loanDuration: parsedPool.loanDuration,
-    chainId: parsedPool.chainId,
-    createdBy: parsedPool.poolOwner, // poolOwner === msg.sender at creation time
-    createdAt: parsedPool.createdAt,
-    transactionHash: parsedPool.transactionHash,
-    isActive: parsedPool.isActive,
-  })
 
   logger.info('Pool indexed successfully', {
     poolId: parsedPool.poolId,
@@ -123,6 +365,7 @@ export async function indexPoolByTxHash(
   }
 
   const parsedPool = parsePoolCreatedLog(matchingLogs[0], chainId, block.timestamp)
+  Object.assign(parsedPool, await fetchPoolMetadata(parsedPool.poolId, matchingLogs[0].address, provider))
 
   return indexPoolEvent(parsedPool, firestore)
 }

@@ -1,5 +1,6 @@
+import { isMain } from './lib/main'
+import { ethers, network } from '../hardhat.connection'
 import * as dotenv from 'dotenv'
-import { ethers, network } from 'hardhat'
 import { PoolFactory } from '../typechain-types'
 
 dotenv.config()
@@ -19,9 +20,9 @@ async function testLocalFlow() {
 
   try {
     // Step 1: Deploy implementation
-    console.log('\n1️⃣ Deploying SampleLendingPool implementation...')
-    const SampleLendingPool = await ethers.getContractFactory('SampleLendingPool')
-    const lendingPoolImplementation = await SampleLendingPool.deploy()
+    console.log('\n1️⃣ Deploying LendingPool implementation...')
+    const LendingPool = await ethers.getContractFactory('LendingPool')
+    const lendingPoolImplementation = await LendingPool.deploy()
     await lendingPoolImplementation.waitForDeployment()
     const implementationAddress = await lendingPoolImplementation.getAddress()
     console.log(`✅ Implementation deployed: ${implementationAddress}`)
@@ -60,6 +61,8 @@ async function testLocalFlow() {
       loanDuration: 30 * 24 * 60 * 60, // 30 days
       name: 'Test Pool',
       description: 'A test lending pool for ownership transfer testing',
+      requiresMembership: false,
+      loanToken: ethers.ZeroAddress,
     }
 
     const createTx = await poolFactory.connect(deployer).createPool(poolParams)
@@ -114,18 +117,23 @@ async function testLocalFlow() {
       ...poolParams,
       name: 'Test Pool 2',
       description: 'Second test pool',
+      requiresMembership: false,
+      loanToken: ethers.ZeroAddress,
     })
     const poolCount2 = await poolFactory.getPoolCount()
     console.log(`✅ Original owner can still create pools. Total pools: ${poolCount2}`)
 
-    // Test that pending owner cannot perform owner functions yet
+    // Test that pending owner cannot perform owner functions yet.
+    //
+    // `pause` rather than `createPool`: creating a pool is not an owner
+    // function. It is gated on creator authorization, so with whitelist mode on
+    // — which `deploy:local` enables — it reverts with `UnauthorizedCreator`
+    // before ownership is ever consulted, and this step passed for a reason
+    // that had nothing to do with the transfer it is checking.
     console.log('Testing pending owner cannot perform owner functions yet...')
     try {
-      await poolFactory.connect(newOwner).createPool({
-        ...poolParams,
-        name: 'Should Fail',
-      })
-      throw new Error('Pending owner should not be able to create pools')
+      await poolFactory.connect(newOwner).pause()
+      throw new Error('Pending owner should not be able to pause the factory')
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error'
       if (errorMessage.includes('OwnableUnauthorizedAccount')) {
@@ -164,16 +172,17 @@ async function testLocalFlow() {
       ...poolParams,
       name: 'New Owner Pool',
       description: 'Pool created by new owner',
+      requiresMembership: false,
+      loanToken: ethers.ZeroAddress,
     })
     const finalPoolCount = await poolFactory.getPoolCount()
     console.log(`✅ New owner can create pools. Total pools: ${finalPoolCount}`)
 
-    // Original owner should no longer have access
+    // Original owner should no longer have access. `pause` for the same reason
+    // as above — `createPool` would revert on creator authorization instead,
+    // which is a different question with a different answer.
     try {
-      await poolFactory.connect(deployer).createPool({
-        ...poolParams,
-        name: 'Should Fail 2',
-      })
+      await poolFactory.connect(deployer).pause()
       throw new Error('Original owner should no longer have access')
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error'
@@ -251,7 +260,7 @@ async function main() {
 }
 
 // Only run if this file is executed directly
-if (require.main === module) {
+if (isMain(import.meta.url)) {
   main()
     .then(() => process.exit(0))
     .catch((error) => {

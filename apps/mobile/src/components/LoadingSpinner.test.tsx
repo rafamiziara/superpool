@@ -1,5 +1,6 @@
 import { render } from '@testing-library/react-native'
 import React from 'react'
+import { palette } from '../constants/palette'
 import { LoadingSpinner, LoadingSpinnerVariants } from './LoadingSpinner'
 
 describe('LoadingSpinner', () => {
@@ -83,13 +84,13 @@ describe('LoadingSpinner', () => {
     it('should render primary variant', () => {
       const { getByTestId } = render(LoadingSpinnerVariants.primary())
       const indicator = getByTestId('loading-spinner-indicator')
-      expect(indicator.props.color).toBe('#2563eb')
+      expect(indicator.props.color).toBe(palette.mint)
     })
 
     it('should render muted variant', () => {
       const { getByTestId } = render(LoadingSpinnerVariants.muted())
       const indicator = getByTestId('loading-spinner-indicator')
-      expect(indicator.props.color).toBe('#64748b')
+      expect(indicator.props.color).toBe(palette.mist)
     })
 
     it('should accept additional props', () => {

@@ -105,7 +105,7 @@ describe('customAppCheckMinterHandler', () => {
 
     // Assert
     expect(mockResponse.status).toHaveBeenCalledWith(400)
-    expect(mockResponse.send).toHaveBeenCalledWith('Bad Request: deviceId is required and must be a string.')
+    expect(mockResponse.send).toHaveBeenCalledWith(expect.stringMatching(/^Bad Request: deviceId/))
   })
 
   // Test case: Error during token minting

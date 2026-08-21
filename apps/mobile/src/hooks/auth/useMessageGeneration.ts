@@ -4,6 +4,7 @@ import { httpsCallable } from 'firebase/functions'
 import { useCallback, useState } from 'react'
 import { FIREBASE_FUNCTIONS } from '../../config/firebase'
 import { MessageGenerationHook, MessageGenerationState } from '../../types/auth'
+import { logger } from '../../utils/logger'
 
 export const useMessageGeneration = (): MessageGenerationHook => {
   const [state, setState] = useState<MessageGenerationState>({
@@ -22,7 +23,7 @@ export const useMessageGeneration = (): MessageGenerationHook => {
 
       setState((s) => ({ ...s, isGenerating: true, error: null }))
 
-      console.log('🔄 Generating auth message for:', walletAddress)
+      logger.debug('🔄 Generating auth message for:', walletAddress)
 
       const generateAuthMessage = httpsCallable(FIREBASE_FUNCTIONS, 'generateAuthMessage')
       const response = await generateAuthMessage({ walletAddress })
@@ -45,11 +46,11 @@ export const useMessageGeneration = (): MessageGenerationHook => {
         isGenerating: false,
       }))
 
-      console.log('✅ Auth message generated successfully')
+      logger.debug('✅ Auth message generated successfully')
       return { message, nonce, timestamp }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Failed to generate message'
-      console.error('❌ Message generation failed:', errorMessage)
+      logger.error('❌ Message generation failed:', errorMessage)
 
       setState((s) => ({
         ...s,

@@ -70,10 +70,10 @@ export default function OnboardingScreen() {
 
       {/* Title and Description */}
       <View className="items-center mb-2" testID={`slide-${item.id}-content`}>
-        <Text className="text-2xl font-bold text-foreground text-center mb-4" testID={`slide-${item.id}-title`} accessibilityRole="header">
+        <Text className="text-2xl font-bold text-snow text-center mb-4" testID={`slide-${item.id}-title`} accessibilityRole="header">
           {item.title}
         </Text>
-        <Text className="text-base text-muted-foreground text-center leading-6" testID={`slide-${item.id}-description`}>
+        <Text className="text-base text-fog text-center leading-6" testID={`slide-${item.id}-description`}>
           {item.description}
         </Text>
       </View>
@@ -81,11 +81,11 @@ export default function OnboardingScreen() {
   )
 
   return (
-    <View className="flex-1 bg-white" testID="onboarding-screen">
+    <View className="flex-1 bg-abyss" testID="onboarding-screen">
       {/* Fixed Header - Logo */}
       <View className="pt-20 pb-8 mt-12 items-center" testID="onboarding-header">
         <Image
-          source={require('@superpool/assets/images/logos/no_bg_color.png')}
+          source={require('@superpool/assets/images/logos/no_bg_white.png')}
           className="h-12 w-64"
           resizeMode="contain"
           testID="superpool-logo"
@@ -133,7 +133,7 @@ export default function OnboardingScreen() {
         />
       </View>
 
-      <StatusBar style="auto" />
+      <StatusBar style="light" />
     </View>
   )
 }

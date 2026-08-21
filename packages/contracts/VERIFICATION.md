@@ -32,7 +32,7 @@ If automatic verification fails or you need to verify specific contracts:
 
 ```bash
 # Verify a specific contract
-pnpm verify:contracts SampleLendingPool 0x123... [constructorArgs...]
+pnpm verify:contracts LendingPool 0x123... [constructorArgs...]
 
 # Verify a proxy contract
 pnpm verify:proxy 0x123...
@@ -75,10 +75,10 @@ Deploy Contract → Wait for Confirmations → Verify Implementation → Verify 
 pnpm verify:contracts <contractName> <address>
 
 # Contract with constructor arguments
-pnpm verify:contracts SampleLendingPool 0x123... 0xOwnerAddress 1000000000000000000 500 604800
+pnpm verify:contracts LendingPool 0x123... 0xOwnerAddress 1000000000000000000 500 604800
 
 # Examples:
-pnpm verify:contracts SampleLendingPool 0x742d35Cc6634C0532925a3b8D45b9F73F9d9432A
+pnpm verify:contracts LendingPool 0x742d35Cc6634C0532925a3b8D45b9F73F9d9432A
 pnpm verify:contracts PoolFactory 0x5F4eC3Df9cbd43714FE2740f5E3616155c5b8419 0xOwnerAddress 0xImplementationAddress
 ```
 
@@ -107,11 +107,11 @@ pnpm hardhat verify --network polygonAmoy 0x123... "arg1" "arg2" "arg3"
 
 ### Constructor Arguments
 
-#### SampleLendingPool Implementation
+#### LendingPool Implementation
 
 ```bash
 # No constructor arguments (uses initialize instead)
-pnpm verify:contracts SampleLendingPool 0x123...
+pnpm verify:contracts LendingPool 0x123...
 ```
 
 #### PoolFactory Implementation
@@ -241,22 +241,20 @@ Verification is configured in `hardhat.config.ts`:
 
 ```typescript
 etherscan: {
-  apiKey: {
-    polygonAmoy: process.env.ETHERSCAN_API_KEY || '',
-    polygon: process.env.ETHERSCAN_API_KEY || '',
-  },
-  customChains: [
-    {
-      network: 'polygonAmoy',
-      chainId: 80002,
-      urls: {
-        apiURL: 'https://api-amoy.polygonscan.com/api',
-        browserURL: 'https://amoy.polygonscan.com',
-      },
-    },
-  ],
+  apiKey: process.env.ETHERSCAN_API_KEY || '',
 }
 ```
+
+**A single string, not a per-network map, and the difference is load-bearing.**
+`hardhat-verify` reads the shape of `apiKey` to decide which API it talks to: a
+map means explorer-specific keys and selects each chain's **v1** API, which was
+switched off on 31 May 2025; a string selects Etherscan **v2**, one endpoint
+that routes by chain id. The map form also printed a deprecation warning on
+every run.
+
+`customChains` went with it. v2 ignores the per-explorer `apiURL`, and
+`polygonAmoy` is in the plugin's builtin chain list, so the override said
+nothing the plugin did not already know.
 
 ## API Keys
 

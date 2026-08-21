@@ -1,15 +1,15 @@
-import { SignerWithAddress } from '@nomicfoundation/hardhat-ethers/signers'
+import { ethers, upgrades } from '../hardhat.connection'
+import type { HardhatEthersSigner } from '@nomicfoundation/hardhat-ethers/types'
 import { expect } from 'chai'
-import { ethers, upgrades } from 'hardhat'
-import { PoolFactory, SampleLendingPool } from '../typechain-types'
+import { LendingPool, PoolFactory } from '../typechain-types'
 
 describe('PoolFactory', function () {
   let poolFactory: PoolFactory
-  let lendingPoolImplementation: SampleLendingPool
-  let owner: SignerWithAddress
-  let poolOwner1: SignerWithAddress
-  let poolOwner2: SignerWithAddress
-  let otherAccount: SignerWithAddress
+  let lendingPoolImplementation: LendingPool
+  let owner: HardhatEthersSigner
+  let poolOwner1: HardhatEthersSigner
+  let poolOwner2: HardhatEthersSigner
+  let otherAccount: HardhatEthersSigner
 
   const defaultPoolParams = {
     maxLoanAmount: ethers.parseEther('10'),
@@ -17,6 +17,8 @@ describe('PoolFactory', function () {
     loanDuration: 30 * 24 * 60 * 60, // 30 days
     name: 'Test Pool',
     description: 'A test lending pool',
+    requiresMembership: false,
+    loanToken: ethers.ZeroAddress,
   }
 
   beforeEach(async function () {
@@ -24,8 +26,8 @@ describe('PoolFactory', function () {
     ;[owner, poolOwner1, poolOwner2, otherAccount] = await ethers.getSigners()
 
     // Deploy lending pool implementation
-    const SampleLendingPool = await ethers.getContractFactory('SampleLendingPool')
-    lendingPoolImplementation = await SampleLendingPool.deploy()
+    const LendingPool = await ethers.getContractFactory('LendingPool')
+    lendingPoolImplementation = await LendingPool.deploy()
     await lendingPoolImplementation.waitForDeployment()
 
     // Deploy PoolFactory
@@ -122,6 +124,31 @@ describe('PoolFactory', function () {
       expect(poolInfo.isActive).to.be.true
     })
 
+    it('Should create a private pool when the creator asks for one', async function () {
+      // The choice has to survive the trip through `PoolParams` into
+      // `initialize` — nothing else carries it, and `PoolCreated` does not
+      // report it, so this is the only place the wiring is checked.
+      const tx = await poolFactory.connect(owner).createPool({ ...defaultPoolParams, requiresMembership: true })
+      await tx.wait()
+
+      const pool = await ethers.getContractAt('LendingPool', (await poolFactory.getPoolInfo(1)).poolAddress)
+
+      expect((await pool.poolConfig()).requiresMembership).to.be.true
+      await expect(pool.connect(otherAccount).depositFunds({ value: ethers.parseEther('1') })).to.be.revertedWithCustomError(
+        pool,
+        'NotAMember'
+      )
+    })
+
+    it('Should create an open pool by default', async function () {
+      await (await poolFactory.connect(owner).createPool({ ...defaultPoolParams })).wait()
+
+      const pool = await ethers.getContractAt('LendingPool', (await poolFactory.getPoolInfo(1)).poolAddress)
+
+      expect((await pool.poolConfig()).requiresMembership).to.be.false
+      await expect(pool.connect(otherAccount).depositFunds({ value: ethers.parseEther('1') })).to.not.be.revert(ethers)
+    })
+
     it('Should create multiple pools', async function () {
       const params1 = {
         ...defaultPoolParams,
@@ -133,6 +160,8 @@ describe('PoolFactory', function () {
         loanDuration: 60 * 24 * 60 * 60, // 60 days
         name: 'Test Pool 2',
         description: 'Second test pool',
+        requiresMembership: false,
+        loanToken: ethers.ZeroAddress,
       }
 
       // Enable whitelist and authorize users (simulating lazy whitelisting)
@@ -166,7 +195,7 @@ describe('PoolFactory', function () {
       await expect(poolFactory.connect(otherAccount).createPool(params)).to.be.revertedWithCustomError(poolFactory, 'UnauthorizedCreator')
 
       // Owner can always create pools
-      await expect(poolFactory.connect(owner).createPool(params)).to.not.be.reverted
+      await expect(poolFactory.connect(owner).createPool(params)).to.not.be.revert(ethers)
       const poolInfo = await poolFactory.getPoolInfo(1)
       expect(poolInfo.poolOwner).to.equal(owner.address)
     })
@@ -186,7 +215,7 @@ describe('PoolFactory', function () {
       await poolFactory.connect(owner).setCreatorAuthorization(poolOwner1.address, true)
 
       // Now poolOwner1 can create pools
-      await expect(poolFactory.connect(poolOwner1).createPool(params)).to.not.be.reverted
+      await expect(poolFactory.connect(poolOwner1).createPool(params)).to.not.be.revert(ethers)
 
       // Verify the creator became the pool owner
       const poolInfo = await poolFactory.getPoolInfo(1)
@@ -202,6 +231,8 @@ describe('PoolFactory', function () {
           loanDuration: defaultPoolParams.loanDuration,
           name: defaultPoolParams.name,
           description: defaultPoolParams.description,
+          requiresMembership: false,
+          loanToken: ethers.ZeroAddress,
         })
       ).to.be.revertedWithCustomError(poolFactory, 'InvalidMaxLoanAmount')
 
@@ -213,6 +244,8 @@ describe('PoolFactory', function () {
           loanDuration: defaultPoolParams.loanDuration,
           name: defaultPoolParams.name,
           description: defaultPoolParams.description,
+          requiresMembership: false,
+          loanToken: ethers.ZeroAddress,
         })
       ).to.be.revertedWithCustomError(poolFactory, 'InvalidInterestRate')
 
@@ -224,6 +257,8 @@ describe('PoolFactory', function () {
           loanDuration: 0,
           name: defaultPoolParams.name,
           description: defaultPoolParams.description,
+          requiresMembership: false,
+          loanToken: ethers.ZeroAddress,
         })
       ).to.be.revertedWithCustomError(poolFactory, 'InvalidLoanDuration')
 
@@ -235,6 +270,8 @@ describe('PoolFactory', function () {
           loanDuration: defaultPoolParams.loanDuration,
           name: '',
           description: defaultPoolParams.description,
+          requiresMembership: false,
+          loanToken: ethers.ZeroAddress,
         })
       ).to.be.revertedWithCustomError(poolFactory, 'EmptyName')
     })
@@ -268,6 +305,8 @@ describe('PoolFactory', function () {
         loanDuration: 60 * 24 * 60 * 60,
         name: 'Pool 2',
         description: 'Second pool',
+        requiresMembership: false,
+        loanToken: ethers.ZeroAddress,
       })
     })
 
@@ -276,7 +315,7 @@ describe('PoolFactory', function () {
       expect(poolAddress).to.not.equal(ethers.ZeroAddress)
 
       // Verify it's a valid pool by checking it has the expected owner
-      const pool = await ethers.getContractAt('SampleLendingPool', poolAddress)
+      const pool = await ethers.getContractAt('LendingPool', poolAddress)
       expect(await pool.owner()).to.equal(poolOwner1.address)
     })
 
@@ -372,8 +411,8 @@ describe('PoolFactory', function () {
   describe('Implementation Management', function () {
     it('Should update implementation address', async function () {
       // Deploy new implementation
-      const SampleLendingPool = await ethers.getContractFactory('SampleLendingPool')
-      const newImplementation = await SampleLendingPool.deploy()
+      const LendingPool = await ethers.getContractFactory('LendingPool')
+      const newImplementation = await LendingPool.deploy()
       await newImplementation.waitForDeployment()
 
       const oldImplementation = await poolFactory.lendingPoolImplementation()
@@ -393,8 +432,8 @@ describe('PoolFactory', function () {
     })
 
     it('Should reject implementation update from non-owner', async function () {
-      const SampleLendingPool = await ethers.getContractFactory('SampleLendingPool')
-      const newImplementation = await SampleLendingPool.deploy()
+      const LendingPool = await ethers.getContractFactory('LendingPool')
+      const newImplementation = await LendingPool.deploy()
       await newImplementation.waitForDeployment()
 
       await expect(
@@ -423,7 +462,7 @@ describe('PoolFactory', function () {
     it('Should be upgradeable by owner', async function () {
       const PoolFactoryV2 = await ethers.getContractFactory('PoolFactory')
 
-      await expect(upgrades.upgradeProxy(await poolFactory.getAddress(), PoolFactoryV2)).to.not.be.reverted
+      await expect(upgrades.upgradeProxy(await poolFactory.getAddress(), PoolFactoryV2)).to.not.be.revert(ethers)
     })
   })
 
@@ -442,7 +481,7 @@ describe('PoolFactory', function () {
 
       // Get pool address and interact with it
       const poolAddress = await poolFactory.getPoolAddress(1)
-      const pool = await ethers.getContractAt('SampleLendingPool', poolAddress)
+      const pool = await ethers.getContractAt('LendingPool', poolAddress)
 
       // Verify pool is properly initialized
       expect(await pool.owner()).to.equal(poolOwner1.address)
@@ -472,6 +511,8 @@ describe('PoolFactory', function () {
         loanDuration: 30 * 24 * 60 * 60,
         name: 'Pool 1',
         description: 'First pool',
+        requiresMembership: false,
+        loanToken: ethers.ZeroAddress,
       })
 
       await poolFactory.connect(poolOwner2).createPool({
@@ -480,14 +521,16 @@ describe('PoolFactory', function () {
         loanDuration: 60 * 24 * 60 * 60,
         name: 'Pool 2',
         description: 'Second pool',
+        requiresMembership: false,
+        loanToken: ethers.ZeroAddress,
       })
 
       // Get both pools
       const pool1Address = await poolFactory.getPoolAddress(1)
       const pool2Address = await poolFactory.getPoolAddress(2)
 
-      const pool1 = await ethers.getContractAt('SampleLendingPool', pool1Address)
-      const pool2 = await ethers.getContractAt('SampleLendingPool', pool2Address)
+      const pool1 = await ethers.getContractAt('LendingPool', pool1Address)
+      const pool2 = await ethers.getContractAt('LendingPool', pool2Address)
 
       // Verify different configurations
       const config1 = await pool1.poolConfig()
@@ -508,7 +551,7 @@ describe('PoolFactory', function () {
   })
 
   describe('Ownable2Step Functionality', function () {
-    let newOwner: SignerWithAddress
+    let newOwner: HardhatEthersSigner
 
     beforeEach(function () {
       newOwner = otherAccount
@@ -638,7 +681,7 @@ describe('PoolFactory', function () {
           ...defaultPoolParams,
         }
 
-        await expect(poolFactory.connect(owner).createPool(params)).to.not.be.reverted
+        await expect(poolFactory.connect(owner).createPool(params)).to.not.be.revert(ethers)
         expect(await poolFactory.getPoolCount()).to.equal(1)
 
         // Pending owner cannot create pools (not whitelisted)
@@ -684,7 +727,7 @@ describe('PoolFactory', function () {
         expect(await poolFactory.paused()).to.be.true
 
         // Emergency pause when already paused should not revert
-        await expect(poolFactory.connect(owner).emergencyPause()).to.not.be.reverted
+        await expect(poolFactory.connect(owner).emergencyPause()).to.not.be.revert(ethers)
         expect(await poolFactory.paused()).to.be.true
       })
 
@@ -692,7 +735,7 @@ describe('PoolFactory', function () {
         expect(await poolFactory.paused()).to.be.false
 
         // Emergency unpause when not paused should not revert
-        await expect(poolFactory.connect(owner).emergencyUnpause()).to.not.be.reverted
+        await expect(poolFactory.connect(owner).emergencyUnpause()).to.not.be.revert(ethers)
         expect(await poolFactory.paused()).to.be.false
       })
     })
@@ -736,7 +779,7 @@ describe('PoolFactory', function () {
             ...defaultPoolParams,
             name: 'Pool 2',
           })
-        ).to.not.be.reverted
+        ).to.not.be.revert(ethers)
 
         // Old owner can no longer create pools (not the owner anymore, and not whitelisted)
         await expect(poolFactory.connect(owner).createPool(params)).to.be.revertedWithCustomError(poolFactory, 'UnauthorizedCreator')

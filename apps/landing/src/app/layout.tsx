@@ -21,21 +21,21 @@ const spaceMono = Space_Mono({
 })
 
 export const metadata: Metadata = {
-  title: 'SuperPool — Lending pools for circles that trust each other',
+  title: 'SuperPool | Lending pools for circles that trust each other',
   description:
-    'Open-source, multi-chain micro-lending. Turn any trusted group into a lending pool on any EVM chain: pooled liquidity, member loans, multi-sig governance.',
-  keywords: ['DeFi', 'micro-lending', 'lending pool', 'multi-chain', 'EVM', 'open source', 'Polygon', 'multi-sig'],
+    'Open-source, multi-chain micro-lending. Turn any trusted group into a lending pool on any EVM chain: pooled liquidity, member loans, interest that accrues by the second, and a ledger every member can read.',
+  keywords: ['DeFi', 'micro-lending', 'lending pool', 'multi-chain', 'EVM', 'open source', 'Polygon', 'ERC-20'],
   openGraph: {
-    title: 'SuperPool — Decentralized micro-lending pools',
-    description: 'Turn any trusted group into a lending pool on any EVM chain. Open source, multi-sig governed, mobile first.',
+    title: 'SuperPool | Decentralized micro-lending pools',
+    description: 'Turn any trusted group into a lending pool on any EVM chain. Open source, on-chain, mobile first.',
     url: 'https://superpool.rm30.dev',
     siteName: 'SuperPool',
     type: 'website',
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'SuperPool — Decentralized micro-lending pools',
-    description: 'Turn any trusted group into a lending pool on any EVM chain. Open source, multi-sig governed, mobile first.',
+    title: 'SuperPool | Decentralized micro-lending pools',
+    description: 'Turn any trusted group into a lending pool on any EVM chain. Open source, on-chain, mobile first.',
   },
 }
 

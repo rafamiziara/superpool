@@ -20,7 +20,7 @@ export default observer(function ConnectingScreen() {
 
     if (status === 'failed') {
       return (
-        <Text className="text-red-500 text-lg" testID={`step-${stepIndex}-error-icon`}>
+        <Text className="text-coral text-lg" testID={`step-${stepIndex}-error-icon`}>
           ✗
         </Text>
       )
@@ -28,7 +28,7 @@ export default observer(function ConnectingScreen() {
 
     if (status === 'completed') {
       return (
-        <Text className="text-success text-lg" testID={`step-${stepIndex}-success-icon`}>
+        <Text className="text-mint text-lg" testID={`step-${stepIndex}-success-icon`}>
           ✓
         </Text>
       )
@@ -38,34 +38,34 @@ export default observer(function ConnectingScreen() {
       return <LoadingSpinner size="small" testID={`step-${stepIndex}-loading`} />
     }
 
-    return <View className="w-4 h-4 rounded-full bg-muted-foreground/30" testID={`step-${stepIndex}-pending-dot`} />
+    return <View className="w-4 h-4 rounded-full bg-veil" testID={`step-${stepIndex}-pending-dot`} />
   }
 
   const getStepTextColor = (stepIndex: number) => {
     const step = AUTH_STEPS[stepIndex]
     const status = authStore.getStepStatus(step)
 
-    if (status === 'failed') return 'text-destructive'
-    if (status === 'current' && isAuthenticating) return 'text-primary'
-    if (status === 'completed') return 'text-muted-foreground'
-    return 'text-muted-foreground/50'
+    if (status === 'failed') return 'text-coral'
+    if (status === 'current' && isAuthenticating) return 'text-mint'
+    if (status === 'completed') return 'text-fog'
+    return 'text-mist'
   }
 
   const getStepDescriptionColor = (stepIndex: number) => {
     const step = AUTH_STEPS[stepIndex]
     const status = authStore.getStepStatus(step)
 
-    if (status === 'failed') return 'text-destructive/70'
-    if (status === 'current' && isAuthenticating) return 'text-primary/70'
-    return 'text-muted-foreground/70'
+    if (status === 'failed') return 'text-coral/70'
+    if (status === 'current' && isAuthenticating) return 'text-mint/70'
+    return 'text-mist/70'
   }
 
   return (
-    <View className="flex-1 bg-white" testID="connecting-screen">
+    <View className="flex-1 bg-abyss" testID="connecting-screen">
       {/* Fixed Header */}
       <View className="pt-12 mt-24 items-center" testID="connecting-header">
         <Image
-          source={require('@superpool/assets/images/logos/no_bg_color.png')}
+          source={require('@superpool/assets/images/logos/no_bg_white.png')}
           className="h-12 w-64"
           resizeMode="contain"
           testID="superpool-logo"
@@ -79,9 +79,6 @@ export default observer(function ConnectingScreen() {
             label=""
             connectStyle={{
               borderRadius: 10,
-              backgroundColor: '#f8f9fa',
-              borderWidth: 1,
-              borderColor: '#e9ecef',
             }}
           />
         </View>
@@ -93,12 +90,12 @@ export default observer(function ConnectingScreen() {
         <View className="mb-8 w-full max-w-sm" testID="main-status">
           {error ? (
             <View className="items-center" testID="error-status">
-              <Text className="text-destructive font-medium text-lg text-center">Authentication Failed</Text>
+              <Text className="text-coral font-medium text-lg text-center">Authentication Failed</Text>
             </View>
           ) : (
-            <View className="bg-gray-50 p-2 rounded-xl items-center" testID="authenticating-status">
+            <View className="bg-surface border-hairline border-veil p-2 rounded-xl items-center" testID="authenticating-status">
               <LoadingSpinner size="large" testID="main-loading-spinner" />
-              <Text className="text-foreground font-medium text-lg mt-4 text-center">Authenticating...</Text>
+              <Text className="text-snow font-medium text-lg mt-4 text-center">Authenticating...</Text>
             </View>
           )}
         </View>
@@ -128,17 +125,17 @@ export default observer(function ConnectingScreen() {
 
       {/* Status Message Area */}
       <View className="px-8 pb-8 mb-8" testID="status-message-area">
-        <View className="bg-gray-50 p-4 rounded-xl">
+        <View className="bg-surface border-hairline border-veil p-4 rounded-xl">
           {error ? (
-            <Text className="text-muted-foreground text-center text-sm" testID="error-message">
+            <Text className="text-fog text-center text-sm" testID="error-message">
               {error}
             </Text>
           ) : currentStep === 'request-signature' ? (
-            <Text className="text-muted-foreground text-center text-sm" testID="signature-prompt">
+            <Text className="text-fog text-center text-sm" testID="signature-prompt">
               Please check your wallet app and sign the authentication message.
             </Text>
           ) : isAuthenticating ? (
-            <Text className="text-muted-foreground text-center text-sm" testID="progress-message">
+            <Text className="text-fog text-center text-sm" testID="progress-message">
               Authenticating your wallet connection... ({Math.round(progress)}%)
             </Text>
           ) : (
@@ -148,13 +145,13 @@ export default observer(function ConnectingScreen() {
 
         {/* Help Message */}
         {error && (
-          <Text className="text-xs text-muted-foreground text-center mt-3" testID="wallet-help-text">
+          <Text className="text-xs text-mist text-center mt-3" testID="wallet-help-text">
             Having trouble? Use the wallet button above to check your connection or try a different wallet or network.
           </Text>
         )}
       </View>
 
-      <StatusBar style="auto" />
+      <StatusBar style="light" />
     </View>
   )
 })

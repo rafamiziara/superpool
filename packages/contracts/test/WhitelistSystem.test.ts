@@ -1,31 +1,35 @@
-import { SignerWithAddress } from '@nomicfoundation/hardhat-ethers/signers'
+import { ethers, upgrades } from '../hardhat.connection'
+import type { HardhatEthersSigner } from '@nomicfoundation/hardhat-ethers/types'
 import { expect } from 'chai'
-import { ethers } from 'hardhat'
-import { PoolFactory, SampleLendingPool } from '../typechain-types'
+import { LendingPool, PoolFactory } from '../typechain-types'
 
 describe('Whitelist System', function () {
   let poolFactory: PoolFactory
-  let lendingPoolImplementation: SampleLendingPool
-  let owner: SignerWithAddress
-  let addr1: SignerWithAddress
-  let addr2: SignerWithAddress
-  let addr3: SignerWithAddress
+  let lendingPoolImplementation: LendingPool
+  let owner: HardhatEthersSigner
+  let addr1: HardhatEthersSigner
+  let addr2: HardhatEthersSigner
+  let addr3: HardhatEthersSigner
 
   beforeEach(async function () {
     ;[owner, addr1, addr2, addr3] = await ethers.getSigners()
 
     // Deploy lending pool implementation
-    const SampleLendingPool = await ethers.getContractFactory('SampleLendingPool')
-    lendingPoolImplementation = await SampleLendingPool.deploy()
+    const LendingPool = await ethers.getContractFactory('LendingPool')
+    lendingPoolImplementation = await LendingPool.deploy()
     await lendingPoolImplementation.waitForDeployment()
 
     // Deploy pool factory
     const PoolFactory = await ethers.getContractFactory('PoolFactory')
-    poolFactory = await PoolFactory.deploy()
+    // Behind its UUPS proxy, which is how the factory actually runs. These
+    // tests used to deploy the implementation and call `initialize` on it
+    // directly; the implementation now locks itself in its constructor, so
+    // that shortcut is gone — which is the point of the constructor.
+    poolFactory = (await upgrades.deployProxy(PoolFactory, [owner.address, await lendingPoolImplementation.getAddress()], {
+      initializer: 'initialize',
+      kind: 'uups',
+    })) as unknown as PoolFactory
     await poolFactory.waitForDeployment()
-
-    // Initialize factory
-    await poolFactory.initialize(owner.address, await lendingPoolImplementation.getAddress())
   })
 
   describe('Whitelist Management', function () {
@@ -52,10 +56,13 @@ describe('Whitelist System', function () {
       expect(await poolFactory.authorizedCreators(addr1.address)).to.be.false
     })
 
-    it('Should not allow non-owner to authorize creators', async function () {
+    it('Should not allow a stranger to authorize creators', async function () {
+      // `UnauthorizedCreator` rather than `OwnableUnauthorizedAccount`: this is
+      // no longer `onlyOwner`, because the owner is not the only address
+      // entitled to it. See the `poolCreatorAdmin` block below.
       await expect(poolFactory.connect(addr1).setCreatorAuthorization(addr2.address, true)).to.be.revertedWithCustomError(
         poolFactory,
-        'OwnableUnauthorizedAccount'
+        'UnauthorizedCreator'
       )
     })
 
@@ -126,11 +133,13 @@ describe('Whitelist System', function () {
       loanDuration: 30 * 24 * 60 * 60, // 30 days
       name: 'Test Pool',
       description: 'Test pool description',
+      requiresMembership: false,
+      loanToken: ethers.ZeroAddress,
     }
 
     it('Should allow owner to create pools (owner always authorized)', async function () {
       // Owner can create without explicit authorization
-      await expect(poolFactory.connect(owner).createPool(poolParams)).to.not.be.reverted
+      await expect(poolFactory.connect(owner).createPool(poolParams)).to.not.be.revert(ethers)
 
       // Verify owner becomes pool owner
       const poolInfo = await poolFactory.getPoolInfo(1)
@@ -145,7 +154,7 @@ describe('Whitelist System', function () {
       await expect(poolFactory.connect(addr1).createPool(poolParams)).to.be.revertedWithCustomError(poolFactory, 'UnauthorizedCreator')
 
       // Owner can always create
-      await expect(poolFactory.connect(owner).createPool(poolParams)).to.not.be.reverted
+      await expect(poolFactory.connect(owner).createPool(poolParams)).to.not.be.revert(ethers)
       expect(await poolFactory.getPoolCount()).to.equal(1)
     })
 
@@ -162,7 +171,7 @@ describe('Whitelist System', function () {
       await poolFactory.setCreatorAuthorization(addr1.address, true)
 
       // Now addr1 can create pools
-      await expect(poolFactory.connect(addr1).createPool(poolParams)).to.not.be.reverted
+      await expect(poolFactory.connect(addr1).createPool(poolParams)).to.not.be.revert(ethers)
 
       // Verify creator became pool owner
       const poolInfo = await poolFactory.getPoolInfo(1)
@@ -176,7 +185,7 @@ describe('Whitelist System', function () {
       await poolFactory.setCreatorAuthorization(addr1.address, true)
 
       // addr1 can create (authorized)
-      await expect(poolFactory.connect(addr1).createPool(poolParams)).to.not.be.reverted
+      await expect(poolFactory.connect(addr1).createPool(poolParams)).to.not.be.revert(ethers)
 
       // addr2 cannot create (not authorized)
       await expect(poolFactory.connect(addr2).createPool(poolParams)).to.be.revertedWithCustomError(poolFactory, 'UnauthorizedCreator')
@@ -192,6 +201,8 @@ describe('Whitelist System', function () {
       loanDuration: 30 * 24 * 60 * 60, // 30 days
       name: 'Test Pool',
       description: 'Test pool description',
+      requiresMembership: false,
+      loanToken: ethers.ZeroAddress,
     }
 
     it('Should allow multiple authorized creators when whitelisted', async function () {
@@ -205,8 +216,8 @@ describe('Whitelist System', function () {
       const params1 = { ...testPoolParams, name: 'Pool 1' }
       const params2 = { ...testPoolParams, name: 'Pool 2' }
 
-      await expect(poolFactory.connect(addr1).createPool(params1)).to.not.be.reverted
-      await expect(poolFactory.connect(addr2).createPool(params2)).to.not.be.reverted
+      await expect(poolFactory.connect(addr1).createPool(params1)).to.not.be.revert(ethers)
+      await expect(poolFactory.connect(addr2).createPool(params2)).to.not.be.revert(ethers)
 
       // Non-authorized cannot create (whitelist enforced)
       const params3 = { ...testPoolParams, name: 'Pool 3' }
@@ -231,9 +242,81 @@ describe('Whitelist System', function () {
 
       // addr2 can still create pools (still authorized)
       const params2 = { ...testPoolParams, name: 'Pool 2' }
-      await expect(poolFactory.connect(addr2).createPool(params2)).to.not.be.reverted
+      await expect(poolFactory.connect(addr2).createPool(params2)).to.not.be.revert(ethers)
 
       expect(await poolFactory.getPoolCount()).to.equal(1)
+    })
+  })
+
+  /**
+   * The role that lets the Safe own the factory without breaking pool creation.
+   *
+   * `createPool` is gated on `authorizedCreators`, and the backend adds a
+   * wallet to that list on demand and pays the gas — so the backend's key had
+   * to be able to call `setCreatorAuthorization`. While that was `onlyOwner`,
+   * the backend's key had to be the factory *owner*: the key that authorises a
+   * UUPS upgrade and can point the beacon at new pool logic for every pool at
+   * once. A server environment variable held every member's money.
+   */
+  describe('The pool creator admin', function () {
+    it('is nobody by default, which is the world before it existed', async function () {
+      expect(await poolFactory.poolCreatorAdmin()).to.equal(ethers.ZeroAddress)
+    })
+
+    it('lets the appointed admin authorize creators', async function () {
+      await expect(poolFactory.connect(owner).setPoolCreatorAdmin(addr1.address))
+        .to.emit(poolFactory, 'PoolCreatorAdminChanged')
+        .withArgs(addr1.address)
+
+      await poolFactory.connect(addr1).setCreatorAuthorization(addr2.address, true)
+
+      expect(await poolFactory.authorizedCreators(addr2.address)).to.be.true
+    })
+
+    it('does not let the admin do anything else', async function () {
+      // The whole point: a compromised backend key can add a spam creator and
+      // nothing more. It cannot upgrade, cannot pause, cannot re-appoint
+      // itself, and cannot touch the token allowlist.
+      await poolFactory.connect(owner).setPoolCreatorAdmin(addr1.address)
+
+      await expect(poolFactory.connect(addr1).setPoolCreatorAdmin(addr2.address)).to.be.revertedWithCustomError(
+        poolFactory,
+        'OwnableUnauthorizedAccount'
+      )
+      await expect(poolFactory.connect(addr1).pause()).to.be.revertedWithCustomError(poolFactory, 'OwnableUnauthorizedAccount')
+      await expect(poolFactory.connect(addr1).setWhitelistMode(true)).to.be.revertedWithCustomError(
+        poolFactory,
+        'OwnableUnauthorizedAccount'
+      )
+      await expect(poolFactory.connect(addr1).updateImplementation(addr3.address)).to.be.revertedWithCustomError(
+        poolFactory,
+        'OwnableUnauthorizedAccount'
+      )
+    })
+
+    it('can be withdrawn by the owner', async function () {
+      await poolFactory.connect(owner).setPoolCreatorAdmin(addr1.address)
+      await poolFactory.connect(owner).setPoolCreatorAdmin(ethers.ZeroAddress)
+
+      await expect(poolFactory.connect(addr1).setCreatorAuthorization(addr2.address, true)).to.be.revertedWithCustomError(
+        poolFactory,
+        'UnauthorizedCreator'
+      )
+    })
+
+    it('is not something a stranger can appoint themselves to', async function () {
+      await expect(poolFactory.connect(addr1).setPoolCreatorAdmin(addr1.address)).to.be.revertedWithCustomError(
+        poolFactory,
+        'OwnableUnauthorizedAccount'
+      )
+    })
+
+    it('refuses to let the factory be left without an owner', async function () {
+      // An unowned factory can never be upgraded, can never appoint an admin,
+      // and — with the whitelist off — can never create another pool.
+      await expect(poolFactory.connect(owner).renounceOwnership()).to.be.revertedWithCustomError(poolFactory, 'OwnershipCannotBeRenounced')
+
+      expect(await poolFactory.owner()).to.equal(owner.address)
     })
   })
 })

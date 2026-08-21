@@ -1,5 +1,7 @@
 'use client'
 
+import { DEPLOYMENT } from '@/config/deployment'
+
 const members = [
   { initials: 'RM', tone: 'bg-brand/80' },
   { initials: 'AL', tone: 'bg-lumen/70' },
@@ -25,7 +27,7 @@ export function PoolVisual({ active }: { active: number }) {
         {/* Header — exists from step 0 */}
         <div className="flex items-center justify-between">
           <div>
-            <p className="font-mono text-[0.625rem] tracking-[0.25em] text-mist-dim uppercase">Pool · Polygon Amoy</p>
+            <p className="font-mono text-[0.625rem] tracking-[0.25em] text-mist-dim uppercase">Pool · {DEPLOYMENT.chain.name}</p>
             <p className="mt-1.5 font-display text-lg font-semibold text-foam">Rooftop Circle</p>
           </div>
           <span className="rounded-full border border-lumen/25 bg-lumen/10 px-3 py-1 font-mono text-[0.625rem] tracking-widest text-lumen-bright uppercase">
@@ -53,7 +55,7 @@ export function PoolVisual({ active }: { active: number }) {
                 {m.initials}
               </span>
             ))}
-            <span className="ml-1 font-mono text-[0.625rem] text-mist-dim">+ admin-approved only</span>
+            <span className="ml-1 font-mono text-[0.625rem] text-mist-dim">+ approval required</span>
           </div>
         </StepBlock>
 
@@ -80,12 +82,12 @@ export function PoolVisual({ active }: { active: number }) {
               </span>
               <div>
                 <p className="text-sm font-semibold text-foam">180 POL · 30 days</p>
-                <p className="font-mono text-[0.625rem] text-mist-dim">AI screen: pass</p>
+                <p className="font-mono text-[0.625rem] text-mist-dim">assistant · low</p>
               </div>
             </div>
             <div className="text-right">
-              <p className="font-mono text-[0.625rem] tracking-widest text-lumen uppercase">{repaid ? 'Repaying' : 'Multi-sig'}</p>
-              <p className="mt-0.5 font-mono text-xs text-mist">{repaid ? 'on time' : '2 / 3 signed'}</p>
+              <p className="font-mono text-[0.625rem] tracking-widest text-lumen uppercase">{repaid ? 'Repaying' : 'Owner'}</p>
+              <p className="mt-0.5 font-mono text-xs text-mist">{repaid ? 'on time' : 'deciding'}</p>
             </div>
           </div>
         </StepBlock>

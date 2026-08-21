@@ -1,28 +1,14 @@
 import '@walletconnect/react-native-compat'
 
 import { createAppKit, defaultWagmiConfig } from '@reown/appkit-wagmi-react-native'
-import { arbitrum, base, bsc, localhost, mainnet, polygon, polygonAmoy } from 'wagmi/chains'
+import { arbitrum, base, bsc, mainnet, polygon, polygonAmoy } from 'wagmi/chains'
+import { localhostChain } from './chains'
 
 // Get environment variables with validation
 const projectId = process.env.EXPO_PUBLIC_REOWN_PROJECT_ID
 if (!projectId) {
   throw new Error('EXPO_PUBLIC_REOWN_PROJECT_ID is required')
 }
-
-// Create localhost chain for development
-const localhostChain = {
-  ...localhost,
-  name: 'Localhost',
-  nativeCurrency: {
-    name: 'Ether',
-    symbol: 'ETH',
-    decimals: 18,
-  },
-  rpcUrls: {
-    default: { http: ['http://127.0.0.1:8545'] },
-    public: { http: ['http://127.0.0.1:8545'] },
-  },
-} as const
 
 // App metadata
 const metadata = {
@@ -50,4 +36,8 @@ createAppKit({
   wagmiConfig,
   defaultChain: polygon,
   enableAnalytics: true,
+  // The app is dark-only, so pin the modal rather than let it follow the system
+  // scheme. The accent is deliberately left at AppKit's own indigo: its buttons
+  // hardcode white label text, which our mint would leave unreadable.
+  themeMode: 'dark',
 })

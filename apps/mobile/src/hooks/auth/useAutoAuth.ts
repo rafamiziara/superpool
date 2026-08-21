@@ -2,8 +2,10 @@ import { AuthenticationData } from '@superpool/types'
 import { useEffect } from 'react'
 import { Platform } from 'react-native'
 import { FIREBASE_AUTH } from '../../config/firebase'
+import { registerForPushNotifications } from '../../services/pushNotifications'
 import { authStore } from '../../stores/AuthStore'
 import { getUniqueDeviceId } from '../../utils/deviceId'
+import { logger } from '../../utils/logger'
 import { useFirebaseAuth } from './useFirebaseAuth'
 import { useMessageGeneration } from './useMessageGeneration'
 import { useSignatureHandling } from './useSignatureHandling'
@@ -27,11 +29,11 @@ export const useAutoAuth = (): void => {
         return
       }
 
-      console.log('🚀 Auto-authenticating for:', authStore.walletAddress)
+      logger.debug('🚀 Auto-authenticating for:', authStore.walletAddress)
 
       // Try to acquire auth lock
       if (!authStore.acquireAuthLock(authStore.walletAddress)) {
-        console.log('🔒 Authentication already in progress, skipping')
+        logger.debug('🔒 Authentication already in progress, skipping')
         return
       }
 
@@ -46,13 +48,13 @@ export const useAutoAuth = (): void => {
 
         // Step 3: Generate auth message
         authStore.startStep('generate-message')
-        console.log('📝 Step 3: Generating auth message...')
+        logger.debug('📝 Step 3: Generating auth message...')
         const authMessage = await messageGeneration.generateMessage(authStore.walletAddress!)
         authStore.completeStep('generate-message')
 
         // Step 4: Request signature
         authStore.startStep('request-signature')
-        console.log('✍️ Step 4: Requesting wallet signature...')
+        logger.debug('✍️ Step 4: Requesting wallet signature...')
         const signature = await signatureHandling.requestSignature(authMessage.message)
         authStore.completeStep('request-signature')
 
@@ -62,7 +64,7 @@ export const useAutoAuth = (): void => {
 
         // Step 6: Firebase authentication
         authStore.startStep('firebase-auth')
-        console.log('🔥 Step 6: Authenticating with Firebase...')
+        logger.debug('🔥 Step 6: Authenticating with Firebase...')
 
         // Get device info for device approval (optional)
         let deviceId: string | undefined
@@ -75,7 +77,7 @@ export const useAutoAuth = (): void => {
             platform = Platform.OS === 'android' ? 'android' : Platform.OS === 'ios' ? 'ios' : 'web'
           }
         } catch (error) {
-          console.warn('Could not get device ID, continuing without device approval:', error)
+          logger.warn('Could not get device ID, continuing without device approval:', error)
         }
 
         const authData: AuthenticationData = {
@@ -92,10 +94,18 @@ export const useAutoAuth = (): void => {
         authStore.completeStep('firebase-auth')
         authStore.setUser(user)
 
-        console.log('✅ Auto-authentication complete!')
+        logger.debug('✅ Auto-authentication complete!')
+
+        // Deliberately after the step is reported complete, and deliberately
+        // not awaited into the auth result: this needs a signed-in caller (the
+        // callable takes the wallet from `request.auth.uid`), but a sign-in
+        // that worked must not be reported as failed because a push token
+        // could not be arranged. It prompts for nothing — with no permission
+        // granted there is simply no token to register.
+        void registerForPushNotifications()
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : 'Auto-authentication failed'
-        console.error('❌ Auto-authentication failed:', errorMessage)
+        logger.error('❌ Auto-authentication failed:', errorMessage)
 
         if (authStore.currentStep) {
           authStore.failStep(authStore.currentStep, errorMessage)
@@ -109,14 +119,26 @@ export const useAutoAuth = (): void => {
 
     // Only run when wallet connection state changes or error is cleared
     autoAuthenticate()
+    /*
+      eslint-disable-next-line react-hooks/exhaustive-deps --
+      MobX observables, not plain outer-scope values: read inside an `observer`
+      the access subscribes, so a change re-renders and re-runs this. Connecting
+      a wallet, switching accounts and clearing an error are exactly the three
+      events this effect exists to answer.
+    */
   }, [authStore.isWalletConnected, authStore.walletAddress, authStore.error, messageGeneration, signatureHandling, firebaseAuth])
 
   // Auto-reset on wallet disconnect
   useEffect(() => {
     if (!authStore.isWalletConnected) {
-      console.log('🔌 Wallet disconnected - resetting auth state')
+      logger.debug('🔌 Wallet disconnected - resetting auth state')
       authStore.reset()
       messageGeneration.clearState()
     }
+    /*
+      eslint-disable-next-line react-hooks/exhaustive-deps --
+      A MobX observable, as above. Without this dependency a disconnect never
+      resets the auth state, and the next wallet inherits the previous one's.
+    */
   }, [authStore.isWalletConnected, messageGeneration])
 }

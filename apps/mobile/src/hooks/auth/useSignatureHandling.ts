@@ -1,6 +1,7 @@
 import { useCallback, useState } from 'react'
 import { useSignMessage } from 'wagmi'
 import { SignatureHandlingHook, SignatureHandlingState } from '../../types/auth'
+import { logger } from '../../utils/logger'
 
 export const useSignatureHandling = (): SignatureHandlingHook => {
   const { signMessageAsync, isPending } = useSignMessage()
@@ -19,7 +20,7 @@ export const useSignatureHandling = (): SignatureHandlingHook => {
 
         setState((s) => ({ ...s, error: null, isSigning: true }))
 
-        console.log('✍️ Requesting wallet signature...')
+        logger.debug('✍️ Requesting wallet signature...')
 
         const signature = await signMessageAsync({ message })
 
@@ -28,12 +29,12 @@ export const useSignatureHandling = (): SignatureHandlingHook => {
         }
 
         setState((s) => ({ ...s, signature, isSigning: false }))
-        console.log('✅ Signature obtained successfully')
+        logger.debug('✅ Signature obtained successfully')
 
         return signature
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : 'Signature request failed'
-        console.error('❌ Signature request failed:', errorMessage)
+        logger.error('❌ Signature request failed:', errorMessage)
 
         setState((s) => ({
           ...s,

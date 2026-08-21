@@ -1,23 +1,31 @@
-import { SignerWithAddress } from '@nomicfoundation/hardhat-ethers/signers'
-import { expect } from 'chai'
+import { ethers, isSimulatedNetwork, network, upgrades } from '../hardhat.connection'
+import type { HardhatEthersSigner } from '@nomicfoundation/hardhat-ethers/types'
+import { expect, use } from 'chai'
 import chaiAsPromised from 'chai-as-promised'
-import { ethers } from 'hardhat'
 
-// Use chai-as-promised for async testing
-import chai from 'chai'
 import { deploySafe, SafeConfig } from '../scripts/deploy-safe'
 import { completeOwnershipTransfer, initiateOwnershipTransfer, verifyOwnershipStatus } from '../scripts/transfer-ownership'
-import { PoolFactory, SampleLendingPool } from '../typechain-types'
-chai.use(chaiAsPromised)
+import { LendingPool, PoolFactory } from '../typechain-types'
+// chai-as-promised, for the async assertions below.
+use(chaiAsPromised)
 
 describe('Safe Integration Tests', function () {
+  // The Safe SDK deploys via a live JSON-RPC node and the canonical Safe
+  // singletons, neither of which exist on the ephemeral in-process network.
+  // Run against a node: `pnpm test:integration` (fork) or --network localhost.
+  before(function () {
+    if (isSimulatedNetwork) {
+      this.skip()
+    }
+  })
+
   let poolFactory: PoolFactory
-  let lendingPoolImplementation: SampleLendingPool
-  let deployer: SignerWithAddress
-  let safeOwner1: SignerWithAddress
-  let safeOwner2: SignerWithAddress
-  let safeOwner3: SignerWithAddress
-  let otherAccount: SignerWithAddress
+  let lendingPoolImplementation: LendingPool
+  let deployer: HardhatEthersSigner
+  let safeOwner1: HardhatEthersSigner
+  let safeOwner2: HardhatEthersSigner
+  let safeOwner3: HardhatEthersSigner
+  let otherAccount: HardhatEthersSigner
   let safeAddress: string
 
   beforeEach(async function () {
@@ -25,18 +33,21 @@ describe('Safe Integration Tests', function () {
     ;[deployer, safeOwner1, safeOwner2, safeOwner3, otherAccount] = await ethers.getSigners()
 
     // Deploy lending pool implementation
-    const SampleLendingPool = await ethers.getContractFactory('SampleLendingPool')
-    lendingPoolImplementation = await SampleLendingPool.deploy()
+    const LendingPool = await ethers.getContractFactory('LendingPool')
+    lendingPoolImplementation = await LendingPool.deploy()
     await lendingPoolImplementation.waitForDeployment()
 
     // Deploy PoolFactory
     const PoolFactory = await ethers.getContractFactory('PoolFactory')
-    const poolFactoryImpl = await PoolFactory.deploy()
-    await poolFactoryImpl.waitForDeployment()
-
-    // Initialize manually
-    await poolFactoryImpl.initialize(deployer.address, await lendingPoolImplementation.getAddress())
-    poolFactory = poolFactoryImpl
+    // Behind its UUPS proxy, which is how the factory actually runs. These
+    // tests used to deploy the implementation and call `initialize` on it
+    // directly; the implementation now locks itself in its constructor, so
+    // that shortcut is gone — which is the point of the constructor.
+    poolFactory = (await upgrades.deployProxy(PoolFactory, [deployer.address, await lendingPoolImplementation.getAddress()], {
+      initializer: 'initialize',
+      kind: 'uups',
+    })) as unknown as PoolFactory
+    await poolFactory.waitForDeployment()
   })
 
   describe('Safe Deployment', function () {
@@ -52,7 +63,10 @@ describe('Safe Integration Tests', function () {
       expect(deploymentResult.safeAddress).to.not.equal(ethers.ZeroAddress)
       expect(deploymentResult.owners).to.deep.equal(safeConfig.owners)
       expect(deploymentResult.threshold).to.equal(safeConfig.threshold)
-      expect(deploymentResult.networkName).to.equal('hardhat')
+      // Whatever node this suite was pointed at. It cannot be the simulated
+      // chain — the `before` hook skips that — so the old literal 'hardhat'
+      // was a value this assertion could never legitimately see.
+      expect(deploymentResult.networkName).to.equal(network.name)
 
       // Verify Safe deployment by checking code at address
       const code = await ethers.provider.getCode(deploymentResult.safeAddress)

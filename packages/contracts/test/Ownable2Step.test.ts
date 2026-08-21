@@ -1,32 +1,34 @@
-import { SignerWithAddress } from '@nomicfoundation/hardhat-ethers/signers'
+import { ethers, upgrades } from '../hardhat.connection'
+import type { HardhatEthersSigner } from '@nomicfoundation/hardhat-ethers/types'
 import { expect } from 'chai'
-import { ethers } from 'hardhat'
-import { PoolFactory, SampleLendingPool } from '../typechain-types'
+import { LendingPool, PoolFactory } from '../typechain-types'
 
 describe('PoolFactory Ownable2Step', function () {
   let poolFactory: PoolFactory
-  let lendingPoolImplementation: SampleLendingPool
-  let owner: SignerWithAddress
-  let newOwner: SignerWithAddress
-  let otherAccount: SignerWithAddress
+  let lendingPoolImplementation: LendingPool
+  let owner: HardhatEthersSigner
+  let newOwner: HardhatEthersSigner
+  let otherAccount: HardhatEthersSigner
 
   beforeEach(async function () {
     // Get signers
     ;[owner, newOwner, otherAccount] = await ethers.getSigners()
 
     // Deploy lending pool implementation
-    const SampleLendingPool = await ethers.getContractFactory('SampleLendingPool')
-    lendingPoolImplementation = await SampleLendingPool.deploy()
+    const LendingPool = await ethers.getContractFactory('LendingPool')
+    lendingPoolImplementation = await LendingPool.deploy()
     await lendingPoolImplementation.waitForDeployment()
 
-    // Deploy PoolFactory using direct deployment instead of proxy for testing
     const PoolFactory = await ethers.getContractFactory('PoolFactory')
-    const poolFactoryImpl = await PoolFactory.deploy()
-    await poolFactoryImpl.waitForDeployment()
-
-    // Initialize manually
-    await poolFactoryImpl.initialize(owner.address, await lendingPoolImplementation.getAddress())
-    poolFactory = poolFactoryImpl
+    // Behind its UUPS proxy, which is how the factory actually runs. These
+    // tests used to deploy the implementation and call `initialize` on it
+    // directly; the implementation now locks itself in its constructor, so
+    // that shortcut is gone — which is the point of the constructor.
+    poolFactory = (await upgrades.deployProxy(PoolFactory, [owner.address, await lendingPoolImplementation.getAddress()], {
+      initializer: 'initialize',
+      kind: 'uups',
+    })) as unknown as PoolFactory
+    await poolFactory.waitForDeployment()
   })
 
   describe('Ownership Status', function () {
@@ -153,9 +155,11 @@ describe('PoolFactory Ownable2Step', function () {
         loanDuration: 30 * 24 * 60 * 60,
         name: 'Test Pool',
         description: 'A test lending pool',
+        requiresMembership: false,
+        loanToken: ethers.ZeroAddress,
       }
 
-      await expect(poolFactory.connect(owner).createPool(params)).to.not.be.reverted
+      await expect(poolFactory.connect(owner).createPool(params)).to.not.be.revert(ethers)
       expect(await poolFactory.getPoolCount()).to.equal(1)
 
       // Pending owner should not be able to perform owner functions
@@ -198,7 +202,7 @@ describe('PoolFactory Ownable2Step', function () {
       expect(await poolFactory.paused()).to.be.true
 
       // Emergency pause when already paused should not revert
-      await expect(poolFactory.connect(owner).emergencyPause()).to.not.be.reverted
+      await expect(poolFactory.connect(owner).emergencyPause()).to.not.be.revert(ethers)
       expect(await poolFactory.paused()).to.be.true
     })
 
@@ -206,7 +210,7 @@ describe('PoolFactory Ownable2Step', function () {
       expect(await poolFactory.paused()).to.be.false
 
       // Emergency unpause when not paused should not revert
-      await expect(poolFactory.connect(owner).emergencyUnpause()).to.not.be.reverted
+      await expect(poolFactory.connect(owner).emergencyUnpause()).to.not.be.revert(ethers)
       expect(await poolFactory.paused()).to.be.false
     })
   })
@@ -234,6 +238,8 @@ describe('PoolFactory Ownable2Step', function () {
         loanDuration: 30 * 24 * 60 * 60,
         name: 'Test Pool',
         description: 'A test lending pool',
+        requiresMembership: false,
+        loanToken: ethers.ZeroAddress,
       }
       await poolFactory.connect(owner).createPool(params)
       expect(await poolFactory.getPoolCount()).to.equal(1)
@@ -252,14 +258,15 @@ describe('PoolFactory Ownable2Step', function () {
       // Step 5: New owner can operate, old owner cannot
       await expect(
         poolFactory.connect(newOwner).createPool({
-          poolOwner: otherAccount.address,
           maxLoanAmount: ethers.parseEther('5'),
           interestRate: 750,
           loanDuration: 60 * 24 * 60 * 60,
           name: 'Pool 2',
           description: 'Second pool',
+          requiresMembership: false,
+          loanToken: ethers.ZeroAddress,
         })
-      ).to.not.be.reverted
+      ).to.not.be.revert(ethers)
 
       await expect(poolFactory.connect(owner).createPool(params)).to.be.revertedWithCustomError(poolFactory, 'UnauthorizedCreator')
 

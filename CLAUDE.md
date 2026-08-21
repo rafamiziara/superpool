@@ -8,7 +8,7 @@ SuperPool is a proof-of-concept multi-chain decentralized micro-lending platform
 
 ### Applications
 
-- **Landing Page** (`apps/landing/`) - Next.js 15.5.0 marketing website
+- **Landing Page** (`apps/landing/`) - Next.js 16 marketing website
 - **Mobile App** (`apps/mobile/`) - React Native/Expo app with wallet integration
 
 ### Core Services
@@ -18,10 +18,11 @@ SuperPool is a proof-of-concept multi-chain decentralized micro-lending platform
 
 ### Shared Packages
 
-- **Design System** (`packages/design/`) - Design tokens, colors, typography, Tailwind config
 - **Assets** (`packages/assets/`) - Brand assets, illustrations, onboarding images
-- **UI Components** (`packages/ui/`) - Reusable React components (Button, Card, Input)
 - **Types** (`packages/types/`) - Shared TypeScript interfaces for all applications
+
+There is no shared UI or design-token package: each app owns its own theme (see
+[UI & Frontend Interface Design](#ui--frontend-interface-design) below).
 
 ## Common Commands
 
@@ -88,27 +89,11 @@ pnpm web             # Run on web
 
 ### Shared Packages
 
-#### Design System (`packages/design/`)
-
-```bash
-# No build needed - contains CSS tokens and Tailwind config
-# Used by importing: @superpool/design/tokens.css
-```
-
 #### Assets (`packages/assets/`)
 
 ```bash
 # No build needed - contains static assets
 # Used by importing: @superpool/assets/images/...
-```
-
-#### UI Components (`packages/ui/`)
-
-```bash
-pnpm build           # Build components library
-pnpm dev             # Watch mode for development
-pnpm type-check      # TypeScript type checking
-pnpm lint            # ESLint
 ```
 
 #### Types (`packages/types/`)
@@ -125,7 +110,7 @@ For project structure overview, see the [Architecture section in README.md](READ
 
 - [Mobile App](apps/mobile/README.md) | [Landing Page](apps/landing/README.md)
 - [Smart Contracts](packages/contracts/README.md) | [Backend](packages/backend/README.md)
-- [UI Components](packages/ui/README.md) | [Types](packages/types/README.md) | [Design System](packages/design/README.md) | [Assets](packages/assets/README.md)
+- [Types](packages/types/README.md) | [Assets](packages/assets/README.md)
 
 **IMPORTANT**: When making structural changes to a package, always update its README to reflect the changes.
 
@@ -155,28 +140,26 @@ For project structure overview, see the [Architecture section in README.md](READ
 
 **Shared Package System:**
 
-- **Design System** (`@superpool/design`): DeFi Blue palette, Contemporary Tech typography, Tailwind configuration
 - **Assets** (`@superpool/assets`): Onboarding illustrations, brand assets, shared media
-- **UI Components** (`@superpool/ui`): Button, Card, Input components with TypeScript support
 - **Types** (`@superpool/types`): Authentication, lending, blockchain, and API interfaces
 
-**Landing Page** (Next.js 15.5.0):
+**Landing Page** (Next.js 16):
 
 - **Framework**: Next.js with App Router and React 19 support
-- **Styling**: Tailwind CSS v4 with shared design system integration
-- **Components**: Uses shared UI components from `@superpool/ui`
+- **Styling**: Tailwind CSS v4, theme tokens in `src/app/globals.css`
+- **Components**: Local components under `src/components/`
 - **Features**: Responsive design showcasing SuperPool's 4 core features
 
 **Mobile Application:**
 
 - **Wallet Integration**: Reown AppKit with WalletConnect for multi-wallet support (500+ wallets)
 - **State Management**: MobX reactive stores with centralized state management
-- **Styling**: NativeWind for Tailwind CSS compatibility with shared design tokens
+- **Styling**: Uniwind (Tailwind CSS v4) with theme tokens in global.css
 - **Icons**: FontAwesome via `@expo/vector-icons` (wallet, users, shield, etc.)
 - **Chain Support**: Ethereum Mainnet, Polygon, Arbitrum, Base, BSC, Polygon Amoy, Localhost (dev mode)
 - **Firebase Integration**: Authentication, Firestore, Cloud Functions
 - **Architecture**: Expo Router with TypeScript and shared type definitions
-- **Store Architecture**: AuthenticationStore, WalletConnectionStore, PoolManagementStore, RootStore pattern
+- **Store Architecture**: AuthStore, NavigationStore, PoolStore, PendingTransactionsStore singletons in `src/stores/`
 - **React Integration**: mobx-react-lite with observer components and React Context
 - **Configuration**: React Native batching, development mode validation
 - **Assets**: References shared onboarding illustrations and brand assets
@@ -237,11 +220,108 @@ pnpm test:safe     # Complete Safe multi-sig testing
 4. Upon successful wallet auth → device automatically approved
 5. Future App Check tokens issued for approved devices only
 
+**Step 1 is conditional, and was fiction until 2026-08-20.** `enforceAppCheck`
+appeared in no function at all: the whole chain ran and minted 24-hour tokens
+that nothing ever asked for. It is now declared on the endpoints that spend
+money or act on somebody's behalf, behind `ENFORCE_APP_CHECK` — **off by
+default**, because turning it on without a build whose App Check provider works
+end to end locks out every client. That build is the one push is waiting on.
+
+Two things not to mistake it for:
+
+- **Not an identity boundary.** `verifySignatureAndLogin` approves whatever
+  `deviceId` string it is handed once a signature checks out, so anybody with
+  any wallet can have an approved device of their choosing. It raises the cost
+  of automated abuse and does not establish who anyone is.
+- **Not a spend limit.** What bounds a caller who does get through is
+  `WHITELIST_DAILY_CAP`, `ASSESSMENT_DAILY_CAP` and `requireAdmin`.
+
+**Authentication here is cheap, deliberately** — any wallet can sign a nonce and
+get a token, which is why `firestore.rules` treats a signed-in caller as barely
+more than the public. Anything that costs the project money therefore needs its
+own gate, never `request.auth` alone:
+
+- `requireAdmin` (`ADMIN_WALLETS`) for the manual twins of the schedules —
+  `syncPoolEventsNow`, `sendDueRemindersNow`, `collectPushReceiptsNow`. **Empty
+  means nobody**, not everybody: an unset variable in production must fail
+  closed.
+- `claimWhitelisting` / `withWalletLock` for `preparePoolCreation`, the only
+  endpoint that spends the project's own gas for an arbitrary caller. Global per
+  chain per day, not per wallet — a per-wallet limit bounds an accident, not a
+  script with a thousand fresh wallets.
+
 **Collections:**
 
 - `approved_devices` - Stores device-to-wallet mappings with approval timestamps
 - `auth_nonces` - Time-limited nonces for wallet authentication (10 min expiry)
 - `users` - User profiles linked to wallet addresses
+- `wallet_budget` - The backend wallet's daily gas budget, and the lease that
+  serialises its sends
+
+### Keys and roles
+
+**The factory owner and the backend wallet are different addresses, and keeping
+them different is the point.** `PoolFactory` owner — the Safe — authorises UUPS
+upgrades, owns the beacon every pool's logic hangs from, pauses, curates the
+token allowlist, and appoints the role below. One beacon write replaces the
+implementation of every pool at once, so that authority never belongs in a
+server's environment.
+
+`poolCreatorAdmin` is the backend's wallet and may do exactly one thing: call
+`setCreatorAuthorization`. That is all lazy whitelisting needs. Appoint it
+**before** transferring ownership to the Safe — afterwards it takes a Safe
+transaction. See [`docs/POOL_CREATION.md`](docs/POOL_CREATION.md).
+
+`BACKEND_WALLET_PRIVATE_KEY` is a Secret Manager secret (`defineSecret`), named
+in the `secrets` option of the one deployed function that signs. A function that
+does not name it cannot read it, which is what makes the key's blast radius a
+list you can read.
+
+### Two `isActive` flags, one word apart
+
+**`PoolFactory.deactivatePool` is moderation, not a kill switch.** It writes a
+flag on the _registry entry_, which is what `listPools` filters on — so the pool
+stops being discoverable and nothing else. The pool contract is untouched and
+goes on taking deposits, lending and accepting repayments from anyone holding
+its address, because nothing in `LendingPool` reads it.
+
+**`LendingPool.togglePoolStatus` is the binding one.** `createLoan`,
+`requestLoan` and `requestMembership` all check `poolConfig.isActive`, and it
+belongs to the pool's owner rather than to the factory's. It emits
+`PoolStatusChanged`; nothing indexes it yet, like `DefaultGracePeriodChanged`,
+so it is on the public record and indexing it later needs no upgrade.
+
+There is deliberately **no path from the factory's flag to the pool's**. A
+protocol operator who could close somebody's pool could strand its members
+mid-loan, and the pools are other people's. So the honest answer to "can we shut
+a bad pool down" is: we can stop showing it to people who have not found it yet.
+
+### Logging in
+
+**The nonce is claimed atomically and spent on the attempt, not on the
+success.** `claimAuthNonce` reads and deletes in one transaction; a signature
+that fails afterwards has still consumed the challenge. A challenge that
+survives a wrong answer can be answered any number of times, and the cost of
+this is one regenerated message on a flow that regenerates anyway.
+
+**`chainId` on the EIP-712 path comes from the caller, and must.** Refusing a
+chain the backend does not serve is a _bug_, not a hardening — it was tried and
+reverted. Logging in is not a per-chain act: a wallet on Ethereum mainnet is
+entitled to authenticate against a backend serving only Amoy and switch after.
+The number only has to reproduce the domain the wallet signed with, and
+controlling it buys nothing, since a wrong value recovers a different address
+and the equality check refuses the login. There is no `verifyingContract`
+because nothing on chain verifies this.
+
+### Indexing a chain that can change its mind
+
+The sweep stops **128 blocks short of the head**. It used to read to
+`getBlockNumber()` and move its cursor past it — correct on a Hardhat node,
+wrong on any real chain: a log from a block that is later orphaned is written
+once and its range is never revisited, leaving a contribution or a loan that no
+chain agrees happened. Balances are summed from events, so one of those inflates
+somebody's position permanently. The app still indexes its own transaction the
+moment it has a receipt, so nothing a user waits on got slower.
 
 ## Environment Setup
 
@@ -316,7 +396,6 @@ The mobile app automatically includes localhost (chain ID 31337) in development 
 
 #### Advanced Local Development Features
 
-- **Test Utilities**: Use `scripts/test-utils.ts` for comprehensive testing helpers
 - **Pre-funded Accounts**: 10 accounts with defined roles (deployer, pool owners, borrowers, lenders)
 - **Sample Data**: 3 pools automatically created with different configurations
 - **Interactive Guide**: Complete `INTERACTION_GUIDE.md` with examples for all interaction methods
@@ -390,24 +469,6 @@ pnpm transfer:ownership:amoy  # Transfer PoolFactory ownership to Safe
 
 ## Shared Package Development
 
-### Design System (`@superpool/design`)
-
-Contains the core design tokens and configurations:
-
-- **Colors**: DeFi Blue palette (#2563eb primary, #06b6d4 accent, #0f172a secondary)
-- **Typography**: Plus Jakarta Sans (primary), Space Mono (monospace), Geist (accent)
-- **Tailwind Config**: Shared configuration extending base design tokens
-- **Usage**: Import `@superpool/design/tokens.css` and extend Tailwind config
-
-### UI Components (`@superpool/ui`)
-
-Reusable React components with consistent styling:
-
-- **Button**: Multiple variants (primary, secondary, ghost), sizes, loading states
-- **Card**: Container component with header, content, footer sub-components
-- **Input**: Form inputs with validation states and addon support
-- **Usage**: `import { Button, Card, Input } from '@superpool/ui'`
-
 ### Shared Assets (`@superpool/assets`)
 
 Brand assets and media files:
@@ -429,9 +490,9 @@ Comprehensive interfaces for type safety:
 
 - **Blockchain**: Solidity, Hardhat, OpenZeppelin, Multi-chain (Polygon, Ethereum, Arbitrum, Base, BSC)
 - **Backend**: Firebase Cloud Functions, TypeScript, Ethers.js
-- **Frontend**: Next.js 15.5.0, React Native, Expo, Wagmi, Viem, Reown AppKit
+- **Frontend**: Next.js 16, React Native, Expo, Wagmi, Viem, Reown AppKit
 - **State Management**: MobX, mobx-react-lite for reactive state management
-- **Styling**: Tailwind CSS v4, NativeWind, shared design system
+- **Styling**: Tailwind CSS v4 (web + mobile via Uniwind), shared design system
 - **Icons**: FontAwesome (@expo/vector-icons for mobile)
 - **Development**: pnpm workspaces, TypeScript project references, Jest
 
@@ -486,27 +547,765 @@ When users request code examples, setup instructions, configuration steps, or li
 
 For sprint planning, feature prioritization, and development roadmap tasks, refer to [`docs/SPRINT_PLAN.md`](docs/SPRINT_PLAN.md).
 
+## Pool Creation
+
+For anything touching pool creation, indexing or pending transactions, read
+[`docs/POOL_CREATION.md`](docs/POOL_CREATION.md) first. It documents the three
+indexing paths, the idempotency guarantees, and the chain-shaped traps that
+mocked tests do not catch.
+
+## Contributions
+
+For anything touching deposits or pool liquidity, read
+[`docs/CONTRIBUTIONS.md`](docs/CONTRIBUTIONS.md). Note especially that liquidity
+and balances are summed from events rather than stored, so nothing can fall out
+of step with the chain.
+
+## Membership
+
+For anything touching who belongs to a pool, read
+[`docs/MEMBERSHIP.md`](docs/MEMBERSHIP.md). The register is on chain now and is
+**written on every deposit in both modes** — an open pool enrols whoever funds
+it, a permissioned one requires `Active` first. That is what keeps one answer to
+"is this address a member", and why an owner can close an open pool without
+stranding anyone.
+
+**The pool's owner is `Active` from the moment they own it** — granted in
+`_transferOwnership`, so `initialize` and every later transfer both go through
+it. Without that, the owner of a permissioned pool could not fund their own
+pool. `removeMember` and `leavePool` refuse the owner for the same reason, and
+`memberCount` therefore starts at 1.
+
+**Handing a pool over takes two steps.** `LendingPool` is `Ownable2Step`, like
+the factory: `transferOwnership` only nominates, and nothing moves — not
+ownership, not membership — until the nominee calls `acceptOwnership`. A pool
+owner is an ordinary user, the address they type is checked against nothing, and
+the mistake takes with it every approval, every membership decision and the
+pause over other people's money. `renounceOwnership` reverts on both contracts
+for the same reason: an unowned pool can never approve a loan, admit a member or
+be unpaused again, and nothing recovers from it.
+
+**A pause never traps anybody.** `withdraw`, `claimInterest` and `repayLoan` are
+deliberately _not_ `whenNotPaused` — a pause stops the pool doing anything new
+and leaves the three exits open. The lever belongs to the pool's owner, who is a
+member here rather than an operator, so a pause that stopped withdrawals would
+let one user hold everybody else's money with a single transaction. Repayment
+matters most: interest accrues against the clock, so refusing it would grow a
+borrower's debt for exactly as long as they were denied any way to stop it.
+
+Two rules that are easy to break and hard to notice:
+
+- **Never gate `withdraw` or `repayLoan` on membership.** Removal takes away
+  what you may do next, not what you already put in. `PoolStore.activeMemberships`
+  follows the same rule and keeps a removed member's position.
+- **`memberships` and `memberRecords` are not interchangeable.** The first
+  merges the register with the events and defaults an unswept contributor to
+  active — right for showing someone their own position. The second is the
+  register alone — right for anything the owner acts on, and the only one that
+  can tell a rejected applicant from a stranger.
+
+`requiresMembership` is `poolConfig[5]`. Read it from the chain, never from an
+indexed pool record — the owner can change it at any moment and nothing indexes it.
+
+## Loans
+
+For anything touching borrowing, repayment, loan approval or the `loans`
+collection, read [`docs/LOANS.md`](docs/LOANS.md). Note especially that a loan is
+**not** an event like a contribution: one document is rewritten by every event
+that touches it, and its state is read back from `getLoan` rather than inferred
+from which log arrived — so re-indexing an old transaction reports the loan as it
+is _now_.
+
+Each pool chooses whether to review requests before lending
+(`setRequiresApproval`, owner-only, **off by default**). With it on, `createLoan`
+reverts and the flow is `requestLoan` → `approveLoan` / `rejectLoan`, plus
+`cancelLoanRequest` for the borrower. Read that flag from the chain, never from
+an indexed pool record — the owner can change it at any moment and nothing
+indexes it.
+
+Borrowing is gated on **membership**, not on having contributed: a member the
+owner admitted can borrow without having lent first. See
+[`docs/MEMBERSHIP.md`](docs/MEMBERSHIP.md).
+
+**A loan of zero is refused, on both paths.** `requestLoan` always did;
+`createLoan` did not, and in a token pool that was a permanent lock rather than
+an oddity — the zero loan takes `activeLoanId`, `_repay` prices the payment at
+`min(offered, 0)`, `_pullIn` delivers nothing and reverts, so the loan can never
+be closed and `withdraw` refuses the borrower's whole contribution on
+`LoanOutstanding` for ever. A native borrower escaped by paying one wei. Any
+future amount check belongs on both entry points or neither.
+
+**`markDefaulted` refuses a loan id nobody issued.** An unissued id reads as a
+zeroed struct, which is `Disbursed` with a `startTime` of 0 — so every date
+check passed and the owner could declare a default against `address(0)`, which
+the indexer then wrote down as a loan document for nobody.
+
+`isRepaid` is meaningless unless `status` is `disbursed`: it is `false` on a
+pending request too, so anything that reads it without checking `status` first
+treats a request as an outstanding debt.
+
+**A loan can be paid down in instalments.** `repayLoan` takes any amount above
+zero, credits it against `amount + interest` and refunds the rest; `amountRepaid`
+is the running total and `isRepaid` still means the debt is closed. Three things
+follow and are easy to break:
+
+- **The loan closes on the payment that finishes it, and not before** — that one
+  write sets `isRepaid`, stamps `repaidAt` and releases `activeLoanId`. Freeing
+  the slot earlier would let a borrower who paid a wei open a second loan.
+- **Each payment is its own record**, in `loan_repayments`, keyed on the log like
+  a contribution. The loan holds a running total and one `repaidAt` dating only
+  the payment that settled it, so a debt returned in four transactions has three
+  dates that live nowhere else. The activity feed reads the payments, not the
+  loan.
+- **Interest is distributed pro rata to what has been paid**, as a difference of
+  cumulative shares. Taking `payment × rate` instead would let a borrower change
+  what lenders earn by choosing how to split.
+
+**Interest accrues per second**, on the principal still out, at
+`rate × elapsed / duration`. `interestRate` still means the price of one full
+term — so no pool, screen or stored figure had to be reinterpreted — but the
+price is now charged by the second. Four things follow:
+
+- **The clock does not stop at the due date.** Twice the term costs twice the
+  rate, uncapped. Not a penalty: the same price applied to more time. Capping
+  would be the invented rule, and it would make time free once a loan is late.
+- **Paying principal down makes the rest cheaper**, which is the point.
+  A payment settles accrued interest first, then principal.
+- **Three figures, not one.** `calculateRepaymentAmount` is the term's price and
+  never moves; `outstandingBalance` is what is owed now; `loanBalance` splits
+  that into principal and interest. Only the first is a quote.
+- **Sending exactly `outstandingBalance` does not settle a loan** — a block
+  passes and a sliver more accrues, so the payment succeeds and the debt
+  survives. Quote ahead with `outstandingBalanceAt` and let the refund return
+  the difference; the app uses an hour.
+
+A loan made before accrual reads its new fields as zero and is converted on
+first touch, on the flat terms it was made under, with accrual starting from the
+conversion rather than from `startTime`. In the index that shows up as an
+**absent** `accruedAt`, which means "these figures are static", not "unknown".
+
+`PoolStore.accruedInterestNow` projects the indexed snapshot for display and
+runs on the device clock. Anything about to send money reads the chain.
+
+**Late and in default are different questions, and conflating them is the bug.**
+_Overdue_ is `startedAt + duration` against a clock — arithmetic, true of plenty
+of loans nobody minds about, and **stored nowhere**, because anyone can work it
+out. _In default_ is the owner saying so: `markDefaulted`, owner-only, stamped
+with `defaultedAt`. The chain records what only the chain can witness.
+
+A declaration is a **label, not an ending**, and five things follow that are
+each their own silent bug if missed:
+
+- **A defaulted loan is still an open debt.** `outstandingBalance`,
+  `loanBalance`, `_repay`, `listLoans`'s `activeOnly` and
+  `PoolStore.activeLoanFor` all admit it. Gating any of them on `Disbursed`
+  alone reports the debt as **zero** and takes it off the borrower's repay
+  screen at the moment it was declared.
+- **Interest keeps accruing**, at the same uncapped rate. There is no penalty
+  rate and no liquidation; nothing is seized, because there is no collateral.
+- **The borrower's `activeLoanId` is not released.** `rejectLoan` frees it
+  because a request took nothing; this has money out, and freeing it would let a
+  defaulter borrow again from the pool they are in default to.
+- **There is no `unmarkDefaulted`.** A loan paid off afterwards keeps
+  `Defaulted` and gains `isRepaid` — that pair is what "recovered" means, and it
+  is a different fact from never having been late.
+- **`defaultGracePeriod` is `poolConfig`-shaped in spirit: read it from the
+  chain, never from an indexed record.** Owner-settable, zero by default, and
+  `defaultableAt(loanId)` is the date a screen should quote.
+
+`sendDueReminders` is the only scheduled notification in the project — a term
+lapsing emits no event — and it **judges on chain time, not server time**. One
+`getBlock('latest')` per chain per run; comparing a block timestamp against
+`Date.now()` reports every loan on a local node as comfortably inside its term.
+At most one due-soon and one overdue reminder per loan, ever.
+
+Borrowing history — what this project has instead of a reputation score — is in
+the same document. `repaidAt` is the fact it is made of, and **zero means "no
+date", never 1970**: on a loan that is still running, and on one settled before
+the field existed. Two rules follow from it and are easy to get wrong: a
+repayment with no date is neither on time nor late, and a wallet with no loans
+is a **new** borrower rather than the worst kind. There is no score, deliberately. `BorrowerHistory.defaulted` counts declarations
+over a wallet's whole record, settled or not; **nothing gates on it**, and the
+enforcing half stays unbuilt on purpose.
+
+## Decisions
+
+For anything touching what an owner decided — approvals, refusals, withdrawn
+requests, declarations of default — read the `loan_decisions` collection.
+**The contribution shape, not the loan shape**, and that split is the whole
+point: a loan document is rewritten by every event and holds only the state
+left behind, so three facts live here and nowhere else.
+
+- **When a decision was made.** `approveLoan` restamps `startTime`, so an
+  approval overwrites the moment the request was made; and a loan approved in
+  March and declared in default in August is one record reading `defaulted`.
+- **Who made it.** No loan event carries a decider — all three parameters are
+  the loan, the borrower and the amount — so only the transaction's sender
+  says who acted.
+- **Which of two identical outcomes it was.** `cancelLoanRequest` emits
+  `LoanRejected` and leaves the loan exactly as `rejectLoan` does, so the
+  record cannot tell a refusal from a withdrawal. `outcome` can, because it is
+  derived from the sender at the moment it happened — `rejected` when somebody
+  else sent it, `cancelled` when the borrower did.
+
+Four rules that are easy to break:
+
+- **Derived from the logs, never from a transition.** The loan indexer's
+  `transition` is a comparison against what is stored, so it is empty on a
+  re-scan; every field here comes from the log, the block and the transaction.
+  That is what makes re-sweeping idempotent **and** what makes backfilling
+  possible — decisions made before the collection existed are recovered by
+  re-running the sweep from the factory's deployment block.
+- **The sender is never guessed.** An unreadable one skips the log for a later
+  re-scan rather than defaulting to the borrower or the owner: the guess would
+  be written once and read as history forever, and on a `LoanRejected` the two
+  available guesses are opposite claims about a person.
+- **A decision is not its reason.** The reason lives in
+  [Notes](#notes) — backend-only, visible to the two parties. This collection
+  says that a decision happened and is readable by any signed-in caller, like
+  every other mirror of the chain.
+- **`decidedBy` is the transaction's sender, not "the owner".** A pool owned
+  by a Safe reports whichever address relayed the execution, and a pool can
+  change hands — so the wallet that decided is not always the wallet that owns
+  it now.
+
+### In the app
+
+`pool/portfolio` is the owner's view of it: what is out on loan, what the pool
+holds, how much is working, the loans split into running / overdue / in
+default / settled, and the decisions counted by outcome with the last ten
+listed. Every figure is derived on read; only `totalFunds` comes from the
+chain, because no amount of indexed history can reconstruct it.
+
+Two things that screen keeps apart, and a third the queue does:
+
+- **Overdue is not in default**, as everywhere else.
+- **A refusal is not a withdrawal.** Counting them together would credit an
+  owner with declining requests nobody put to them, which is why `answered`
+  excludes withdrawals.
+- **The queue is ordered by facts about the request**, never by assessment
+  band or borrowing history. `pendingLoansFor` answers the longest wait first;
+  `sortLoanQueue` adds the two orders by amount. A band cannot be sorted by
+  design, and "fewest defaults first" is a score with the arithmetic hidden.
+  Nor by what the pool can afford — liquidity moves with every approval, so
+  the queue would reshuffle under the owner's finger.
+
+## Interest
+
+For anything touching what a member has earned, read
+[`docs/INTEREST.md`](docs/INTEREST.md). Interest is distributed by an
+accumulator rather than a loop — the pool keeps no member list to walk.
+
+Three things that are easy to break:
+
+- **The denominator is `totalContributions`, never `totalFunds`.** `totalFunds`
+  falls when money is lent out, which is exactly when interest is earned, so
+  using it pays roughly double on any pool with a loan outstanding — and no test
+  where nothing is borrowed will notice.
+- **Settle before any change to a stake, restamp after it.** That is what stops a
+  deposit made after a repayment from earning a share of it.
+- **Never gate `claimInterest` on membership or on an outstanding loan.**
+  Interest is earned money, not the stake that borrowing locks. Removal and
+  withdrawal both leave the accrual claimable.
+
+`claimable(address)` is deliberately **not** capped by free liquidity, unlike
+`withdrawableAmount` — an outstanding loan must not make an earnings figure
+appear to shrink. The bound is applied by `claimInterest` at payout.
+
+`PoolStore.totalEarned` is claims **plus** what `claimable` reports, added rather
+than chosen between: claiming moves an amount from one to the other. Claims are
+indexed; accrual is not an event at all and has to be read from the chain per
+pool per wallet.
+
+## Denominations
+
+A pool lends **one asset**, chosen at creation and never changed —
+`PoolConfig.loanToken`, where **`address(0)` means native POL**. That is the
+zero value, so every pool made before the field existed is native with no
+migration: the same retrofit as `LoanStatus.Disbursed = 0` and
+`requiresApproval = false`. There is no setter, deliberately; re-denominating a
+pool would reinterpret every `contributions` entry and every outstanding debt as
+a quantity of something else.
+
+Plan and the reasoning behind each decision:
+[`.dev/contracts/ERC20_PLAN.md`](.dev/contracts/ERC20_PLAN.md). All five phases
+are built and verified against a live node with
+`pnpm --filter backend testErc20`.
+
+**Formatting is three-way, and collapsing it to two is a factor-of-10¹² bug.**
+`PoolInfo` carries `loanToken`, `tokenSymbol` and `tokenDecimals`:
+
+- `loanToken` is the zero address → **native**. 18 decimals, and the symbol
+  comes from the app's own chain config — POL on Polygon, ETH on Base, BNB on
+  BSC. A native pool deliberately carries **no `tokenSymbol`**, because the
+  native symbol belongs to the chain and writing one would put POL on a Base
+  pool.
+- `loanToken` is set and `tokenDecimals` is a number → **a token pool.**
+- `loanToken` is set and `tokenDecimals` is **absent** → the backend could not
+  read the token. Show the pool as **unsupported**. Never fall back to 18, which
+  renders 5 USDC as 5,000,000,000,000.
+
+Four more rules that are easy to break:
+
+- **The token entry points are `depositTokens` and `repayLoanWithTokens`, not
+  overloads of `depositFunds` / `repayLoan`.** Solidity accepts the overloads,
+  but ethers then refuses to resolve either bare name — _ambiguous function
+  description_ — breaking every existing native call site in the backend, the
+  scripts and the tests. Do not "tidy" them back into overloads.
+- **Credit the balance delta, never the requested amount.** A fee-on-transfer
+  token delivers less than it was asked for, and crediting the request inflates
+  `totalContributions` — the denominator every interest distribution divides by
+  — diluting every other lender for the life of the pool, invisibly.
+- **A token repayment needs no refund and no settlement buffer**, unlike the
+  native one. The pool pulls `min(_amount, outstanding)` priced at execution
+  time, so `_amount` only has to be _big enough_; the head-room moved to the
+  allowance, where it costs the borrower nothing. Keep `_amount` explicit —
+  inferring it from the allowance would let a leftover approval decide how much
+  a later repayment took.
+- **`tokenDecimals` is safe to store; almost nothing else read from a contract
+  is.** Decimals and symbol are immutable for a token's lifetime. Contrast
+  `requiresMembership`, which the owner can change at any moment and which must
+  therefore always be read from the chain.
+
+`PoolFactory` gates creation on an owner-curated allowlist
+(`setLoanTokenAuthorization`); `address(0)` is never on it and never needs to
+be — `isAuthorizedLoanToken` answers `true` for it, so a caller checking before
+creating need not special-case the one denomination that needs no permission.
+Disallowing a token does **not** reach back to pools already holding balances in
+it — that would strand both sides of a live loan.
+
+### In the app
+
+`utils/denomination.ts` is the single place a `PoolInfo` becomes a symbol and an
+exponent. `formatToken(amount, decimals)` and `parseToken(value, decimals)`
+both **require** the exponent; `formatAmount(amount, denomination)` adds the
+symbol and renders a dash where the denomination is unknown, so the three-way
+rule is applied once rather than at every call site.
+
+Four rules that are easy to break:
+
+- **Funding or repaying a token pool is two transactions.** The approval is a
+  stage in the screen's own state machine (`useTokenApproval`), not a pending
+  transaction: it displays nothing and has nothing to recover into. The
+  allowance is read on submit, so a flow abandoned between the two resumes at
+  the second. **Never approve `type(uint256).max`** — a bug in the pool would
+  reach the member's whole balance.
+- **Never sum balances across pools.** `PoolStore.balancesByDenomination`
+  reports one figure per unit; `totalBalance` and `totalEarned` are native-only
+  because the dashboard's headline is. Adding a USDC balance to a POL one is
+  wrong by whatever the rate happens to be, and wrong silently — the app has no
+  price oracle, deliberately.
+- **The wallet-balance check reads the pool's asset.** `useBalance` returns the
+  chain's coin only, so a token pool reads `balanceOf` itself; otherwise a
+  wallet holding POL and no USDC is told it can fund a USDC pool.
+- **The token allowlist is per chain and configured**
+  (`config/tokens.ts`, from `EXPO_PUBLIC_USDC_ADDRESS_*`). Empty is normal: the
+  create form then offers native alone, with no picker. `deploy:local` deploys a
+  six-decimal mock and prints its address, and its address changes on every
+  redeploy exactly as the factory's does.
+
+## Chains
+
+The backend serves **every chain configured**, not one at a time. Configuration
+is per chain, keyed by chain id in the variable name
+(`POOL_FACTORY_ADDRESS_80002`, `RPC_URL_80002`, `START_BLOCK_80002`); the
+factory address is what makes a chain servable. The legacy single-chain
+`CHAIN_ID` / `RPC_URL` / `POOL_FACTORY_ADDRESS` triple still configures one
+chain, because `pnpm deploy:local` prints those lines to paste after every
+redeploy — the suffixed form wins for the same id.
+
+This was `getChainConfig` matching a single `ACTIVE_CHAIN_CONFIG` until
+2026-08-12, which is why the app's network picker was presentational: switching
+networks made every callable answer `Unsupported chain ID`.
+
+Two consequences worth holding on to:
+
+- **Every feed is per chain, by construction.** Documents are keyed
+  `${chainId}-…`, `listPools` and friends filter on it, and the sweep keeps a
+  cursor per chain in `event_sync_state`. So a wallet on Amoy sees Amoy's pools
+  and nothing else — including in Discover. A cross-chain view would be a
+  deliberate feature, not a filter that was forgotten.
+- **`NetworkBadge` goes one per screen, never one per card.** It follows from
+  the line above: every list is already narrowed to the connected chain, so a
+  badge on each card would repeat one fact as many times as there are pools.
+  It sits on the Pools and Discover headers and beside the dashboard balance —
+  which is a per-chain figure that reads as everything the user owns without
+  it. The empty states name the chain for the same reason: with several
+  networks configured, "no circles" is as likely to mean the wrong network as
+  it is to mean nothing is there.
+- **Anything that loads per chain must re-run when the chain changes.**
+  `AuthLayout` depends on `authStore.chainId` as well as authentication;
+  without that the store kept serving the chain the user had just left. Note
+  `observer` wraps a component in `React.memo`, so a test that mocks a store as
+  a plain object cannot exercise this — the mock has to be observable or the
+  test passes either way.
+- **The sweep walks the chains in turn and one failure does not stop the rest.**
+  An unreachable public RPC is ordinary and must not silently stop localhost
+  indexing too.
+
+`ACTIVE_CHAIN_CONFIG` still exists for callers that have not moved; anything
+reading it is by definition unable to serve a second chain.
+
+## Notifications
+
+Push goes through **Expo's push service**, not FCM: `firebase/messaging` in the
+JS SDK is web-only, so the alternative was a second, native Firebase SDK beside
+the one the app already uses. The backend gains no messaging dependency — it
+POSTs to `exp.host`. `messagingSenderId` in the mobile Firebase config is inert.
+
+Notifications come in three groups. Two are **owner-facing** — somebody asked to
+join, somebody asked to borrow — and they are the reason the feature exists: they
+cost the asker nothing to make and the owner everything to miss. Five are
+**borrower-facing** answers to those questions (`loan_approved`,
+`loan_rejected`, `loan_defaulted`, `membership_approved`,
+`membership_rejected`). Two more come from the **clock** rather than from anyone
+(`loan_due_soon`, `loan_overdue`); see [Loans](#loans). Plan and the reasoning
+for what is left out:
+[`.dev/old/NOTIFICATIONS_PLAN.md`](.dev/old/NOTIFICATIONS_PLAN.md).
+
+Deliberately absent: being **removed** from a pool, which is not a decision on
+anything the member asked for, and **leaving**, which is self-authored.
+
+Five rules that are easy to break:
+
+- **`stored` is not news.** The loan indexer rewrites a document when only its
+  transaction reference moved to an earlier block, so triggering on `stored`
+  would announce a request every time a sweep tidied up a hash. Notify on the
+  `transition` the indexers now report, which is `null` for exactly that write.
+- **Send at most once per (record, transition).** `syncPoolEvents` re-scans
+  ranges deliberately and re-scanning genesis is supported, so `notifyOnce`
+  claims a marker in `notifications_sent` with `create()` **before** sending.
+  A thrown send releases the claim; a per-device rejection keeps it.
+- **A token belongs to a device, a recipient is a wallet.** Send to every token
+  for the wallet, and give the token back on disconnect _and_ on a wallet
+  switch — otherwise the next wallet on that phone receives the previous one's
+  requests. `push_tokens` is its own collection because
+  `DeviceVerificationService.approveDevice` writes `approved_devices` with
+  `set()` and no merge, which happens on every cold start.
+- **A ticket is not a delivery.** Expo answers `/push/send` with a _ticket_
+  meaning "queued"; the verdict comes minutes later from `/push/getReceipts`,
+  and **`DeviceNotRegistered` is written into the receipt, not the ticket** —
+  at ticket time Expo has not spoken to Apple or Google yet. So the pruning the
+  send path can do is a small fraction of what is needed, and the rest happens
+  in `collectPushReceipts`, a 15-minute schedule over the `push_receipts`
+  queue. Rows leave the queue on any answer (delivered, failed, or expired at
+  24 hours, when Expo has discarded the receipt); only "no receipt yet" keeps
+  one.
+- **Only `DeviceNotRegistered` prunes a token.** `MismatchSenderId` and
+  `InvalidCredentials` are faults in the project's own FCM or APNs setup: they
+  arrive on _every_ message at once, so pruning on them would empty
+  `push_tokens` — every device, every wallet — because somebody uploaded the
+  wrong key. They get a loud log instead, because nothing else in the system
+  would report that push is entirely broken.
+- **The permission prompt is spent once.** Asked only after a pool is created,
+  where the user has just built an expectation of being told something. Not
+  when joining or borrowing: those askers have no notifications yet, so the
+  prompt would buy a channel that delivers them nothing.
+
+- **A rejection and a cancellation are the same state.** `cancelLoanRequest`
+  emits `LoanRejected` and leaves the loan exactly as `rejectLoan` does, so the
+  record cannot tell them apart and the **transaction's sender** has to —
+  `notifyLoanDecided` reads it, on the rejected path only, and fails closed. A
+  borrower told they were declined when they withdrew it themselves is worse
+  than silence. For the same reason the loan indexer reports `approved` and
+  `disbursed` as different transitions: both end at `disbursed`, but only one is
+  an answer to somebody.
+
+Dispatch is wired into `indexLoanFromLog` / `indexMembershipFromLog` rather than
+the callables, so the sweep notifies too — a request made while the app was
+closed is exactly the one the owner needs. Failures there are swallowed:
+indexing is the job, push is an enhancement. The two clock-driven reminders are
+the exception: they come from `sendDueReminders`, a schedule, because nothing on
+chain fires when a term lapses.
+
+**Not verified end to end.** The emulator does not deliver push; the last mile
+needs a dev build, an APNs key and an FCM v1 service account uploaded to EAS.
+The receipt queue _is_ verified against a real Firestore
+(`pnpm --filter backend testReceipts`, 23 checks including one live call to
+Expo's endpoint), which covers everything up to the point a phone is involved.
+
+## Notes
+
+Why a loan was wanted, and why a decision went the way it did. Three
+deferrals — a membership reason (Sprint 4), a loan purpose (Sprint 6), a
+decision reason (Sprint 10) — were one missing mechanism, built together on
+2026-08-18. Plan and the reasoning for each decision:
+[`.dev/old/NOTES_PLAN.md`](.dev/old/NOTES_PLAN.md). Verified live
+with `pnpm --filter backend testNotes` (26 checks).
+
+**A note is never load-bearing.** Nothing in the protocol, the indexer or an
+eligibility check may read one to decide anything. The indexer moves one and
+the notification service quotes one; neither branches on what it says. If a
+note ever gates a transaction, this design is wrong.
+
+Nothing here is on chain, and that is the point rather than a saving: free
+text costs gas forever on a product whose amounts are small by definition, and
+**permanence is a misfeature** for a sentence about a person — on chain a
+rejection reason is public and unretractable to everyone, where in Firestore
+it is visible to the two parties and can be deleted if it turns out to be
+abusive.
+
+Six rules that are easy to break:
+
+- **Keyed on (record id, outcome), never on a transaction hash.**
+  `notes/${recordId}:${kind}`, mirroring `notificationKey`. `indexLoan` moves
+  a loan's `transactionHash` to the earliest event that dates it, and
+  `approveLoan` rewrites `startTime` — so a purpose keyed to the requesting
+  transaction attaches correctly right up until the loan is approved, then
+  **silently** detaches. Keying on the outcome rather than on "a decision" is
+  what also makes a stale reason invisible: the owner types theirs _before_
+  sending, so one they thought better of sits under a key nobody asks for.
+- **Written before the transaction, so the push can carry it.** That ordering
+  is the whole value of the feature — a refusal with a reason is a different
+  thing from a refusal. It is also why a decision note keys on a record that
+  already exists, and why a _purpose_ cannot: the contract assigns the loan id
+  when the transaction is mined. A purpose is therefore **staged** in
+  `staged_notes` under `tx:${chainId}:${txHash}` and moved by
+  `indexLoanFromLog`, on the two transitions that create a loan and nowhere
+  else. That also means the sweep attaches it, so a phone that dies mid-flow
+  still gets its purpose across.
+- **Write-once, through `create()`.** A reason that can be rewritten after the
+  borrower has read it is a draft, not a record of what was said. There is no
+  edit and no delete; deletion is an operator action through the console,
+  which is the right weight for the one case that justifies it.
+- **Backend-only in both directions, unlike every other collection here.**
+  `notes` is the first one that does not mirror the chain, so "public because
+  the chain is public" — the reasoning behind every other read rule — does not
+  apply. Reads go through `listNotes`: a pool's owner sees the notes on their
+  pool, everybody else sees the notes about themselves, and an unentitled
+  caller gets an **empty list rather than an error**, because refusing would
+  confirm a note exists. Other members of a pool are excluded deliberately;
+  widening that later is a one-line change, narrowing it after people have
+  written things is not.
+- **A staged note's entitlement cannot be checked when it is written**, because
+  its loan does not exist. What is stored is a claim on a transaction hash,
+  honoured by `resolveStagedNote` only if that transaction turns out to have
+  produced the claimant's own loan. Every other kind is checked against the
+  indexed record, and the author always comes from `request.auth.uid`.
+- **Nothing is ever required.** A mandatory purpose turns a working borrow flow
+  into a form; a mandatory reason has owners typing "no" to get past it, which
+  is worse than the silence it replaced.
+
+**A removal reason reaches nobody by push**, and that is not an oversight:
+being removed is not a decision on anything the member asked for, so it has no
+notification (see [Notifications](#notifications)). It waits on `pool/[id]`
+until they next open it — still more than the nothing they were told before.
+
+Deliberately absent, so it is not re-proposed: no editing, no deletion, no
+threads or replies, no notes on contributions, withdrawals or repayments, no
+moderation, and no note anywhere in the protocol.
+
+## Assessment
+
+The assistant's reading of a loan request, for the pool owner deciding on it.
+Sprint 6's AI half and the two blocked parts of Sprint 10, built 2026-08-18 on
+[Mastra](https://mastra.ai). Plan and the reasoning for every decision:
+[`.dev/old/AI_ASSESSMENT_PLAN.md`](.dev/old/AI_ASSESSMENT_PLAN.md).
+Verified with `pnpm --filter backend testAssessment` (17 checks, real model
+calls) and `pnpm --filter agents eval` (7 cases, 4 gates).
+
+**An assessment is never load-bearing** — the same rule notes ship under, and
+for a stronger reason. Nothing in the protocol, the indexer or an eligibility
+check may read one. There is no auto-approval and no setting that would add
+one. If an assessment ever gates a transaction, this design is wrong.
+
+**It is not there to reveal a fact.** The owner can already see the amount, the
+term price, the record and the purpose — all four are on the card. It exists to
+do the reading nobody has time for with six requests waiting.
+
+### Where it runs
+
+`packages/agents` is a Mastra service, packaged and deployed like
+`superwallet/packages/agents` — but **its only client is `packages/backend`,
+never the app**. The backend gathers the facts, checks the caller owns the
+pool, and calls the agent over HTTP with a short-lived HS256 service token
+(`MastraJwtAuth`, shared `MASTRA_JWT_SECRET`). So `packages/agents` reads no
+Firestore, no chain, and nothing about a pool or a wallet — if it ever needs
+to, the entitlement rules have leaked into a second place.
+
+`ANTHROPIC_API_KEY` lives with the agent and nowhere else: exactly one thing
+can spend it.
+
+Seven rules that are easy to break:
+
+- **Bands, never a score.** `low | medium | high`, which cannot be averaged,
+  sorted or thresholded into a gate. A 0–100 number would read as a credit
+  rating, which is the product [`REPUTATION_PLAN`](.dev/old/REPUTATION_PLAN.md)
+  §7 refused to build — a model producing it does not make it a different
+  thing.
+- **No recommendation field, ever.** It says what it notices; the button is the
+  owner's. A `recommendation: 'approve'` is one product decision away from
+  being the button.
+- **A first-time borrower is new, not risky.** `isNew` must never on its own
+  produce `high`. Stated in the instructions _and_ in the facts prose, and
+  gated by an eval — it is the one failure that would make the app unusable for
+  exactly the people it exists for.
+- **Nothing is said about the person.** Only the request, the pool and the
+  wallet's counts. A purpose like "rent is due" invites a reading of somebody's
+  life, and the model knows nothing of it. An LLM judge gates this, because the
+  failure is a tone rather than a word.
+- **The owner alone may read one.** Narrower than a note, deliberately: a note
+  is a sentence a person stood behind, so its subject deserves it; this is a
+  machine's reading of somebody's record, and showing it to them turns a
+  lending decision into an argument with a model nobody can answer for.
+  `getAssessment` answers _nothing_ rather than refusing — an error would
+  confirm one exists.
+- **Stored once, read back.** An LLM judgement is not reproducible, so a
+  decision surface that recomputed on every open would say something different
+  each time. Recomputed only on the owner's explicit ask, or when liquidity has
+  drifted 25% — `approveLoan` checks liquidity at approval, not at request
+  time, so that is the figure that moves under a stored reading.
+- **Capped per wallet per day**, `ASSESSMENT_DAILY_CAP` (50). This is the only
+  callable in the backend that **spends money on somebody else's behalf**, and
+  the queue asks for a reading per undecided request the first time it opens.
+  The claim is taken _before_ the model is asked and given back if it never
+  answered — the shape `notifyOnce` uses, because the queue asks in parallel
+  and counting afterwards lets two calls both pass the check. Reading a stored
+  one back costs nothing and must never consume a day.
+- **Do not put character caps on model prose.** A `.max(140)` per observation
+  cost a whole reading the first time a model wrote 141: structured-output
+  validation rejects the _entire_ response, and the owner sees nothing for a
+  reading that was fine. Brevity belongs in the instructions. Array counts are
+  fine — those are structural.
+
+Every figure reaches the agent in **whole units, formatted by the backend** —
+never wei, and never with the exponent left for it to apply. A pool whose token
+the backend could not read is refused outright rather than defaulting to 18.
+
+### Deliberately not built
+
+No score. No recommendation. Nothing shown to the borrower. No assessment of
+membership requests — that is a judgement about a person with no transaction
+attached. No chat: the `questions` field exists so the owner asks the
+**borrower**, which is the conversation that should be happening. No
+cross-chain reading. And no dataset of decisions fed back into the model, which
+is how an advisory feature quietly becomes a scoring system nobody chose.
+
+## Request validation
+
+Every endpoint's payload is parsed by a zod schema before a handler reads a
+word of it. Schemas live in `packages/backend/src/schemas/`, one per endpoint,
+each annotated `satisfies z.ZodType<TheRequest>` against the interface in
+`@superpool/types` — which is what stops the two drifting, since a field that
+changes type there fails to compile here rather than being checked against last
+month's shape.
+
+`CallableRequest<T>` was a compile-time claim about JSON arriving from the
+network. The cost of not checking it was never a security hole — Firestore
+rejects the junk a malformed filter forwards — but an **error taxonomy that
+lied**: a `borrower` sent as a number threw a `TypeError` inside the handler's
+own `try`, which reported `internal` and "please try again" for a request that
+could never succeed.
+
+Five rules that are easy to break:
+
+- **Parse outside the `try`.** Every list callable's catch reports what it
+  caught as `internal`; a refusal raised inside one is swallowed and comes back
+  as a server error the caller is invited to retry forever.
+- **Import from `utils/validation`, never from `../../utils`.** Several handler
+  tests mock the barrel wholesale, and a validator a test can replace with
+  `undefined` is not one the handler can rely on.
+- **`null` is absence.** The callable SDK encodes an `undefined` property as
+  `null` on the wire, so `saveNote({ ...params, chainId })` with an unset
+  `txHash` arrives as an explicit null. That is what `optional()` in
+  `schemas/primitives.ts` is for; a plain `.optional()` refuses requests the app
+  already makes.
+- **A schema says what a request _is_, not what the backend can do about it.**
+  Whether a chain is configured, whether a note is short enough, whether a page
+  size is over the cap: all still the handlers', where the messages that help
+  are already written. `MAX_BORROWERS_PER_CALL` is the one exception, because
+  an oversized batch was always refused rather than trimmed.
+- **Use the parsed value.** `z.object` strips keys the schema does not name, so
+  a handler physically cannot read a field nobody declared — but only if it
+  stops reading `request.data`.
+
+**`limit: 0` and `limit: -5` are now refused, where they used to be
+reinterpreted** as fifty and one. Same for `page: 0`. Nothing sends them; the
+tests that pinned that behaviour were describing `||` and `Math.max`, not a
+decision.
+
+`customAppCheckMinter` is the one endpoint that is not a callable — an
+`onRequest`, and the only one reachable with no Firebase token at all. It uses
+`parseBody`, which returns the failure instead of throwing, because an
+`HttpsError` means nothing to a plain HTTP handler.
+
+## Activity feeds
+
+`ActivityRow` takes a `perspective`, and picking the wrong one marks money the
+user received as negative. It follows from **who the feed is about**:
+
+- **`pool`** (the default) for `pool/[id]`, which lists everything that happened
+  to that pool including other members' — so "did this leave my wallet" is a
+  question most of its rows cannot answer.
+- **`wallet`** for the dashboard and activity tab, which are narrowed to the
+  connected wallet by `PoolStore.myActivity`.
+
+A feed that has not been narrowed must use `pool`. `PoolStore.recentTransactions`
+is pool-wide by construction, because every source it merges covers all members.
+
+Repayment rows come from `PoolStore.loanRepaymentActivity` — the indexed
+`LoanRepaymentMade` logs — and **not** from the loan record. Deriving them there
+gave one row per settled loan carrying the whole debt, which stopped being true
+the moment a loan could be paid in parts.
+
+## Discovery
+
+The Pools and Discover tabs **partition** the chain's pools:
+`PoolStore.discoverablePools` is defined as the complement of `myPools`, so one
+rule decides both and nothing appears in both lists. That deliberately covers
+more than membership — a pool the user has asked to join, been rejected from or
+been removed from has a record, and all of them belong on the tab that can say
+what happened rather than in a list of strangers.
+
+Two things to keep in mind:
+
+- **Search is two halves, and both are load-bearing.** The indexer writes
+  `searchTokens` — every prefix of every word in a pool's name and description —
+  and `listPools` narrows the whole chain with one `array-contains`. Firestore
+  allows only one per query, so a multi-word search matches on its **longest**
+  term server-side and `filterPools` applies the rest on the device. That is
+  correct rather than merely convenient: the server answer is a **superset** of
+  a full match, never a subset. The cached page stays in the candidates, so the
+  first characters filter what is already there while the query is in flight.
+- **Matching is per-word prefix, not mid-word substring.** "guild" finds
+  "Builders Guild"; "uild" no longer does. `String.includes` matching inside a
+  word was a property of the old client-side filter rather than a decision.
+- **`searchTokens` is written once and backfilled additively.** A pool document
+  is created once, so every pool older than the feature depends on the repair
+  path in `indexPoolEvent` — re-run the sweep from the factory's block and they
+  all gain one. The repair takes the **union**, never a rebuild: a failed
+  `fetchPoolMetadata` returns an empty description, which is indistinguishable
+  from a pool that legitimately has none, so rebuilding would let one RPC hiccup
+  delete a pool's description from the index. Safe because `name` and
+  `description` have **no setter** on `PoolFactory`. If either becomes editable,
+  `mergeSearchTokens` is what has to change.
+- **Discover shows no open/private badge on purpose.** `requiresMembership` is
+  `poolConfig[5]` and has to be read from the chain (see
+  [Membership](#membership)) — one RPC call per card is not a price a scrolling
+  list should pay. `pool/[id]` reads it and shows the right action there.
+
+`DiscoverPoolCard` is separate from `PoolCard` because a non-member has no
+position to report: its footer carries the pool's own size (liquidity and
+`memberCountFor`) where `PoolCard` carries "your balance".
+
 ## UI & Frontend Interface Design
 
-For UI & frontend interface design tasks, refer to the comprehensive guidelines in [`docs/SUPERDESIGN.md`](docs/SUPERDESIGN.md).
+There is **no shared design package**. Each app owns its theme, and the two are
+not interchangeable — they reuse some token names with different values, so
+never copy a value across:
+
+- **Mobile** ships the dark "Abyss & Aurora" theme. Tokens are in
+  `apps/mobile/global.css` (Tailwind v4 `@theme`, applied via uniwind classNames)
+  with raw values mirrored in `apps/mobile/src/constants/palette.ts` for props
+  that cannot take a className. Match the surrounding screens.
+- **Landing** has its own darker palette in `apps/landing/src/app/globals.css`
+  (Tailwind v4, plain classNames).
+
+Reconciling the two is the job of the workspace-level design overhaul
+(`../DESIGN_OVERHAUL.md`); until then, follow whichever applies to the app you
+are in rather than introducing a third.
 
 ## EXTREMELY IMPORTANT: Testing & Code Quality Requirements
-
-### **MANDATORY: Test-Writer-Fixer Agent Usage**
-
-**ALWAYS use the test-writer-fixer agent for ALL testing-related work:**
-
-- **Creating tests** - New test files, test suites, or test cases
-- **Updating tests** - Modifying existing tests or test configurations
-- **Fixing tests** - Resolving test failures or debugging test issues
-- **Improving tests** - Enhancing test coverage, performance, or reliability
-- **Refactoring tests** - Restructuring test code or test organization
-- **Cleaning up tests** - Removing deprecated tests or consolidating test files
-- **Any other testing work** - Test utilities, mocks, test setup, etc.
-
-The test-writer-fixer agent has comprehensive knowledge of all project-specific testing standards, mock systems, and documentation. It ensures consistency across all packages and applications.
-
-**Usage**: Use the `Task` tool with `subagent_type: "test-writer-fixer"` for any testing task.
 
 ### **Code Quality Checks**
 

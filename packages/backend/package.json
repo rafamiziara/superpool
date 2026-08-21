@@ -12,8 +12,21 @@
     "generateKey": "ts-node scripts/generateKey.ts",
     "signMessage": "ts-node scripts/signMessage.ts",
     "testIndexer": "ts-node scripts/testEventIndexer.ts",
+    "testSweep": "ts-node scripts/testEventSweep.ts",
+    "testInterest": "ts-node scripts/testInterestClaims.ts",
+    "testHistory": "ts-node scripts/testBorrowerHistory.ts",
+    "testPartial": "ts-node scripts/testPartialRepayment.ts",
+    "testAccrual": "ts-node scripts/testAccruedInterest.ts",
+    "testErc20": "ts-node scripts/testErc20Pools.ts",
+    "testDecisions": "ts-node scripts/testDecisions.ts",
+    "testSearch": "ts-node scripts/testSearch.ts",
+    "testReceipts": "ts-node scripts/testReceipts.ts",
+    "testDefaults": "ts-node scripts/testDefaults.ts",
+    "testNotes": "ts-node scripts/testNotes.ts",
+    "testAgentSeam": "ts-node scripts/testAgentSeam.ts",
+    "testAssessment": "ts-node scripts/testAssessment.ts",
     "test": "jest",
-    "format": "prettier --write .",
+    "format": "prettier --write . --ignore-path ../../.prettierignore",
     "type-check": "tsc --noEmit",
     "type-check:prod": "tsc --noEmit -p tsconfig.build.json"
   },
@@ -22,21 +35,25 @@
   },
   "main": "lib/index.js",
   "dependencies": {
+    "@mastra/client-js": "^1.40.0",
     "@superpool/types": "workspace:*",
     "dotenv": "^17.2.1",
     "ethers": "^6.15.0",
     "firebase-admin": "^12.7.0",
     "firebase-functions": "^6.4.0",
-    "uuid": "^11.1.0"
+    "jsonwebtoken": "^9.0.3",
+    "uuid": "^11.1.0",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "@types/jest": "^30.0.0",
+    "@types/jsonwebtoken": "^9.0.10",
     "firebase-functions-test": "^3.4.1",
     "jest": "^30.0.5",
     "minimatch": "^10.0.3",
     "ts-jest": "^29.4.1",
     "ts-node": "^10.9.2",
-    "typescript": "^5.7.3"
+    "typescript": "~6.0.3"
   },
   "private": true
 }

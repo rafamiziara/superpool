@@ -1,4 +1,5 @@
-import { ethers } from 'hardhat'
+import { isMain } from './lib/main'
+import { ethers } from '../hardhat.connection'
 
 /**
  * Demonstration script showing how Safe multi-sig workflow would work
@@ -135,7 +136,7 @@ async function demoSafeWorkflow() {
 }
 
 // Run the demonstration
-if (require.main === module) {
+if (isMain(import.meta.url)) {
   demoSafeWorkflow()
     .then(() => process.exit(0))
     .catch((error) => {

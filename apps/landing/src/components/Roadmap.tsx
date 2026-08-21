@@ -3,6 +3,7 @@
 import { useEffect, useRef } from 'react'
 import { getGsap } from '@/lib/gsap'
 import { SectionHeading } from '@/components/SectionHeading'
+import { DEPLOYMENT } from '@/config/deployment'
 
 type Status = 'shipped' | 'building' | 'exploring'
 
@@ -14,33 +15,43 @@ const statusStyles: Record<Status, string> = {
 
 const items: { title: string; body: string; status: Status }[] = [
   {
-    title: 'Pool factory & multi-sig core',
-    body: 'Upgradeable PoolFactory and LendingPool contracts, governed by a Safe multi-sig.',
+    title: 'Pools and their contracts',
+    body: 'Upgradeable factory and pool contracts, owned by a Safe multi-sig at the top and by whoever created them at the pool. Open or approval-gated membership, denominated in the chain’s coin or an allowlisted stablecoin.',
     status: 'shipped',
   },
   {
-    title: 'Wallet auth & device security',
-    body: 'Signature-based login with device verification through Firebase App Check.',
+    title: 'Lending, end to end',
+    body: 'Request, decide, disburse, accrue by the second, repay in instalments, declare a default — with the reason behind each decision delivered to the borrower.',
     status: 'shipped',
   },
   {
-    title: 'Mobile app & event indexing',
-    body: 'The React Native app is being rebuilt around on-chain event indexing for live pool state.',
+    title: 'Interest and earnings',
+    body: 'Shared pro rata by an accumulator rather than a loop, and claimable without touching the stake that earned it.',
+    status: 'shipped',
+  },
+  {
+    title: 'The app, wired to the chain',
+    body: 'Wallet sign-in, per-chain event indexing that survives a reorg, pool discovery and search, and notifications for everything somebody is waiting on.',
+    status: 'shipped',
+  },
+  {
+    title: 'The app in your hands',
+    body: 'An installable build, then the stores. The app itself is complete; what is missing is distribution and push credentials.',
     status: 'building',
   },
   {
     title: 'Collateral management',
-    body: 'Secured loans with on-chain collateral: deposit, withdrawal and automated liquidation.',
+    body: 'Secured loans with on-chain collateral: deposit, withdrawal and liquidation. Nothing is seized today, because nothing is pledged.',
     status: 'exploring',
   },
   {
-    title: 'Flexible repayment & dynamic rates',
-    body: 'Partial repayments on weekly or monthly schedules, with oracle-based rates that track pool utilization.',
+    title: 'Dynamic rates',
+    body: 'Oracle-based rates that track pool utilization. Repayment already flexes; the price of borrowing does not yet.',
     status: 'exploring',
   },
   {
     title: 'DAO governance & insurance fund',
-    body: 'Protocol decisions moving to token-holder votes, with interest feeding an insurance pool against defaults.',
+    body: 'Protocol decisions moving to token-holder votes, with interest feeding a pool that absorbs defaults.',
     status: 'exploring',
   },
 ]
@@ -74,9 +85,9 @@ export function Roadmap() {
     <section ref={sectionRef} id="roadmap" className="relative border-t border-hairline-soft bg-deep py-28 sm:py-36">
       <div className="mx-auto max-w-6xl px-5 sm:px-8">
         <SectionHeading
-          eyebrow="What's next"
-          title="A protocol that gets more decentralized, not less."
-          description="The roadmap moves one direction: from multi-sig stewardship toward full community governance."
+          eyebrow="Where it stands"
+          title="Most of it is built. The rest is worth arguing about."
+          description={`The contracts, the backend and the app are complete and running on ${DEPLOYMENT.chain.name}. What is left is getting it onto phones, and three ideas that are not decided yet.`}
         />
 
         <div className="relative mt-16 max-w-3xl">

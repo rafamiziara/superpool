@@ -1,4 +1,9 @@
-const chains = ['Polygon', 'Ethereum', 'Arbitrum', 'Base', 'BNB Chain', 'Polygon Amoy', 'Any EVM chain']
+/**
+ * The chains the app is configured for. Amoy leads because it is the one the
+ * contracts are deployed to — the rest are configuration the backend already
+ * supports, not addresses anyone can visit yet.
+ */
+const chains = ['Polygon Amoy', 'Polygon', 'Ethereum', 'Arbitrum', 'Base', 'BNB Chain', 'Any EVM chain']
 
 export function ChainTicker() {
   const row = [...chains, ...chains]
