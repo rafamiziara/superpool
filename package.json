@@ -27,7 +27,7 @@
   },
   "keywords": [],
   "author": "",
-  "license": "ISC",
+  "license": "MIT",
   "packageManager": "pnpm@10.12.4",
   "devDependencies": {
     "@eslint/js": "^9.15.0",
