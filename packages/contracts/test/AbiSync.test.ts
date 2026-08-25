@@ -15,6 +15,25 @@ import { ABI_CONTRACTS, ABI_OUTPUT_FILES, REGENERATE_COMMAND, renderAbiModule, R
  * backend decode a pool incorrectly.
  */
 /**
+ * The same text, however the checkout spells a line ending.
+ *
+ * `renderAbiModule` joins with `\n`, and git hands these files to a Windows
+ * working tree with `\r\n` — so the two differed on **every** line of a 1900-line
+ * module, on every Windows checkout, for a reason that has nothing to do with
+ * ABI drift. The failure was maximally confusing on top of being wrong: the
+ * report below prints the first differing line, and the invisible half of the
+ * difference made the two look identical.
+ *
+ * Normalising here rather than in the generator is deliberate. What this test
+ * guards is the ABI, and a line ending is a property of the checkout — pinning
+ * it would make the test enforce something no consumer of these files cares
+ * about, and `pnpm abis:generate` would then "fix" a file it had not changed.
+ */
+function normalizeLineEndings(source: string): string {
+  return source.replace(/\r\n/g, '\n')
+}
+
+/**
  * Chai truncates its diff of a ~1900-line module to an ellipsis, which says
  * nothing about what changed. Report the first differing line instead.
  */
@@ -41,7 +60,7 @@ describe('ABI sync', function () {
       abis.push({ exportName, abi: artifact.abi })
     }
 
-    expectedModule = renderAbiModule(abis)
+    expectedModule = normalizeLineEndings(renderAbiModule(abis))
   })
 
   for (const outputFile of ABI_OUTPUT_FILES) {
@@ -51,7 +70,7 @@ describe('ABI sync', function () {
       })
 
       it('matches the compiled artifacts', function () {
-        const actual = fs.readFileSync(path.join(REPO_ROOT, outputFile), 'utf8')
+        const actual = normalizeLineEndings(fs.readFileSync(path.join(REPO_ROOT, outputFile), 'utf8'))
 
         if (actual !== expectedModule) {
           expect.fail(
