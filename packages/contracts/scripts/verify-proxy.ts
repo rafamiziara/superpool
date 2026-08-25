@@ -1,4 +1,5 @@
 import { ethers, hre, network, upgrades } from '../hardhat.connection'
+import { requiredArgument } from './lib/args'
 import * as dotenv from 'dotenv'
 import { manualVerifyCommand, verificationBlocker, verifyWithRetry } from './lib/verification'
 
@@ -20,18 +21,14 @@ async function main() {
     return
   }
 
-  // Get proxy address from command line
-  const args = process.argv.slice(2)
-  if (args.length < 1) {
-    console.log('❌ Usage: pnpm verify:proxy <proxyAddress>')
-    console.log('   Example: pnpm verify:proxy 0x1234567890123456789012345678901234567890')
-    process.exit(1)
-  }
-
-  const proxyAddress = args[0]
+  // From the environment, not `process.argv` — `hardhat run` fills that with
+  // its own command line, so this refused `run` as an invalid address on every
+  // run there has been. See `lib/args.ts`.
+  const usage = ['PROXY_ADDRESS=0x1234567890123456789012345678901234567890 pnpm verify:proxy']
+  const proxyAddress = requiredArgument('PROXY_ADDRESS', usage)
 
   if (!ethers.isAddress(proxyAddress)) {
-    console.log('❌ Invalid proxy address provided')
+    console.log(`❌ PROXY_ADDRESS is not an address: ${proxyAddress}`)
     process.exit(1)
   }
 

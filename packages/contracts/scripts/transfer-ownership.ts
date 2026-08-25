@@ -1,4 +1,5 @@
 import { isMain } from './lib/main'
+import { exitWithUsage, optionalArgument, requiredArgument } from './lib/args'
 import { isLocalNetwork } from './lib/verification'
 import { safeContractNetworks, safeRpcUrl } from './lib/safe'
 import { signerKeyFor } from './lib/accounts'
@@ -398,46 +399,28 @@ async function emergencyRollback(poolFactoryAddress: string): Promise<void> {
   console.log('💡 To rollback: Call transferOwnership to current owner or wait for natural expiry')
 }
 
+const USAGE = [
+  'TRANSFER=initiate POOL_FACTORY_ADDRESS=0x… SAFE_ADDRESS=0x… pnpm transfer:ownership:amoy',
+  'TRANSFER=complete POOL_FACTORY_ADDRESS=0x… SAFE_ADDRESS=0x… EXECUTE=true pnpm transfer:ownership:amoy',
+  'TRANSFER=verify   POOL_FACTORY_ADDRESS=0x… [SAFE_ADDRESS=0x…] pnpm transfer:ownership:amoy',
+  'TRANSFER=rollback POOL_FACTORY_ADDRESS=0x… pnpm transfer:ownership:amoy',
+]
+
 async function main() {
   console.log('🔄 PoolFactory Ownership Transfer Script')
   console.log('======================================')
 
-  /*
-   * Arguments come from the environment, not from `process.argv` — the same
-   * correction `simulate-multisig.ts` carries, for the same reason.
-   *
-   * `hardhat run` does not forward positional arguments. `process.argv.slice(2)`
-   * is *Hardhat's* command line, so `args[0]` was the literal string `run` and
-   * every one of these commands exited on `Unknown command: run`. That includes
-   * `pnpm transfer:ownership:amoy`, which is a step on the Amoy checklist: the
-   * script for the least reversible action in the project could not be started.
-   */
-  const command = process.env.TRANSFER
-  const poolFactoryAddress = process.env.POOL_FACTORY_ADDRESS
-  const safeAddress = process.env.SAFE_ADDRESS
-  const executeImmediately = process.env.EXECUTE === 'true'
-
-  if (!command) {
-    console.log('Usage — arguments are environment variables:')
-    console.log('  TRANSFER=initiate POOL_FACTORY_ADDRESS=0x… SAFE_ADDRESS=0x… pnpm transfer:ownership:amoy')
-    console.log('  TRANSFER=complete POOL_FACTORY_ADDRESS=0x… SAFE_ADDRESS=0x… EXECUTE=true pnpm transfer:ownership:amoy')
-    console.log('  TRANSFER=verify   POOL_FACTORY_ADDRESS=0x… [SAFE_ADDRESS=0x…] pnpm transfer:ownership:amoy')
-    console.log('  TRANSFER=rollback POOL_FACTORY_ADDRESS=0x… pnpm transfer:ownership:amoy')
-    process.exit(1)
-  }
+  // Arguments come from the environment; `hardhat run` does not forward
+  // positional ones, and this script exiting on `Unknown command: run` is one
+  // of the three discoveries `lib/args.ts` records.
+  const command = requiredArgument('TRANSFER', USAGE)
+  const poolFactoryAddress = optionalArgument('POOL_FACTORY_ADDRESS')
+  const safeAddress = optionalArgument('SAFE_ADDRESS')
+  const executeImmediately = optionalArgument('EXECUTE') === 'true'
 
   try {
-    const requireFactory = (): string => {
-      if (!poolFactoryAddress) throw new Error('POOL_FACTORY_ADDRESS is required')
-
-      return poolFactoryAddress
-    }
-
-    const requireSafe = (): string => {
-      if (!safeAddress) throw new Error('SAFE_ADDRESS is required')
-
-      return safeAddress
-    }
+    const requireFactory = (): string => poolFactoryAddress ?? exitWithUsage(USAGE)
+    const requireSafe = (): string => safeAddress ?? exitWithUsage(USAGE)
 
     switch (command) {
       case 'initiate': {

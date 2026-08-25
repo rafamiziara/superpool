@@ -1,6 +1,7 @@
 import { network } from '../hardhat.connection'
 import * as dotenv from 'dotenv'
 import { manualVerifyCommand, verificationBlocker, verifyAllWithRetry, VerifyTarget } from './lib/verification'
+import { argumentList, requiredArgument } from './lib/args'
 
 dotenv.config()
 
@@ -29,7 +30,7 @@ async function main() {
   }
 
   // Get contracts to verify from command line args or use defaults
-  const contractsToVerify = await getContractsToVerify()
+  const contractsToVerify = getContractsToVerify()
 
   console.log(`\n📋 Found ${contractsToVerify.length} contracts to verify:`)
   contractsToVerify.forEach((contract, index) => {
@@ -91,42 +92,26 @@ async function verifyContract(contractInfo: ContractInfo): Promise<void> {
   await verifyAllWithRetry(targets)
 }
 
+const USAGE = [
+  'VERIFY_CONTRACT=LendingPool VERIFY_ADDRESS=0x… pnpm verify:contracts',
+  'VERIFY_CONTRACT=LendingPool VERIFY_ADDRESS=0x… VERIFY_ARGS=0xOwner,1000000000000000000,500,604800 pnpm verify:contracts',
+]
+
 /**
- * Get contracts to verify from various sources
+ * Which contract to verify.
+ *
+ * This read `process.argv`, which `hardhat run` fills with its own command
+ * line — so the name was always the literal `run` and the address was always
+ * this file's path. It never once verified what it was asked to, and being
+ * silent about it was the worst part: the pair looked like arguments somebody
+ * had passed. See `lib/args.ts`.
  */
-async function getContractsToVerify(): Promise<ContractInfo[]> {
-  const contracts: ContractInfo[] = []
+function getContractsToVerify(): ContractInfo[] {
+  const name = requiredArgument('VERIFY_CONTRACT', USAGE)
+  const address = requiredArgument('VERIFY_ADDRESS', USAGE)
+  const constructorArgs = argumentList('VERIFY_ARGS')
 
-  // Check command line arguments
-  const args = process.argv.slice(2)
-
-  if (args.length >= 2) {
-    // Format: pnpm verify:contracts <contractName> <address> [constructorArgs...]
-    const [contractName, address, ...constructorArgs] = args
-    contracts.push({
-      name: contractName,
-      address: address,
-      constructorArgs: constructorArgs.length > 0 ? constructorArgs : undefined,
-    })
-    return contracts
-  }
-
-  // If no command line args, try to find deployed contracts
-  // This would typically read from deployment artifacts or a deployments file
-  // For now, we'll provide instructions for manual specification
-
-  if (contracts.length === 0) {
-    console.log(`\n📝 No contracts specified. Usage options:`)
-    console.log(`   1. Verify specific contract: pnpm verify:contracts <contractName> <address> [constructorArgs...]`)
-    console.log(`   2. Use verify:all script to verify from deployment artifacts`)
-    console.log(`   3. Use individual verification scripts like verify:implementation or verify:proxy`)
-    console.log(`\nExample:`)
-    console.log(`   pnpm verify:contracts LendingPool 0x123... 0xOwnerAddress 1000000000000000000 500 604800`)
-
-    process.exit(0)
-  }
-
-  return contracts
+  return [{ name, address, constructorArgs: constructorArgs.length > 0 ? constructorArgs : undefined }]
 }
 
 // Handle errors

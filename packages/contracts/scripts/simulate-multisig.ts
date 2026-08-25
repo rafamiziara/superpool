@@ -1,5 +1,6 @@
 import { isMain } from './lib/main'
 import { signerKeyFor } from './lib/accounts'
+import { optionalArgument, requiredArgument } from './lib/args'
 import { safeContractNetworks, safeRpcUrl } from './lib/safe'
 import { artifacts, ethers, network } from '../hardhat.connection'
 import Safe from '@safe-global/protocol-kit'
@@ -223,29 +224,17 @@ async function runDemo(): Promise<void> {
   console.log('🎭 Multi-Sig Simulation Demo')
   console.log('============================')
 
-  /*
-   * Arguments come from the environment, not from `process.argv`.
-   *
-   * `hardhat run` does not forward positional arguments to the script it runs.
-   * Under Hardhat 2 and 3 alike `process.argv.slice(2)` is *Hardhat's* own
-   * command line — `run`, the script path, `--network`, the network — so
-   * `args[0]` has always been the literal string `run` and this switch has
-   * never once been reached. It failed with `Unknown command: run`, which reads
-   * like a bad argument rather than a script that cannot take arguments at all.
-   *
-   * The sibling `upgrade.ts` already takes `UPGRADE_TARGET` this way.
-   */
-  const command = process.env.SIMULATION
-  const safeAddress = process.env.SAFE_ADDRESS
-  const targetAddress = process.env.TARGET_ADDRESS
-
-  if (!command || !safeAddress) {
-    console.log('Usage — arguments are environment variables:')
-    console.log('  SIMULATION=acceptOwnership SAFE_ADDRESS=0x… TARGET_ADDRESS=0x… pnpm simulate-multisig')
-    console.log('  SIMULATION=pause           SAFE_ADDRESS=0x… TARGET_ADDRESS=0x… pnpm simulate-multisig')
-    console.log('  SIMULATION=createPool      SAFE_ADDRESS=0x… TARGET_ADDRESS=0x… pnpm simulate-multisig')
-    process.exit(1)
-  }
+  // Arguments come from the environment; see `lib/args.ts` for why a script
+  // started by `hardhat run` cannot read positional ones. The sibling
+  // `upgrade.ts` already takes `UPGRADE_TARGET` this way.
+  const usage = [
+    'SIMULATION=acceptOwnership SAFE_ADDRESS=0x… TARGET_ADDRESS=0x… pnpm simulate-multisig',
+    'SIMULATION=pause           SAFE_ADDRESS=0x… TARGET_ADDRESS=0x… pnpm simulate-multisig',
+    'SIMULATION=createPool      SAFE_ADDRESS=0x… TARGET_ADDRESS=0x… pnpm simulate-multisig',
+  ]
+  const command = requiredArgument('SIMULATION', usage)
+  const safeAddress = requiredArgument('SAFE_ADDRESS', usage)
+  const targetAddress = optionalArgument('TARGET_ADDRESS')
 
   try {
     switch (command) {
