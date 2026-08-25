@@ -456,7 +456,7 @@ pnpm transfer:ownership:local complete <FACTORY> <SAFE>
 pnpm transfer:ownership:local verify <FACTORY> [SAFE]
 
 # Test complete flow
-npx hardhat run scripts/test-local-flow.ts --network localhost
+npx hardhat run scripts/smoke-local.ts --network localhost
 ```
 
 ### Contract Addresses

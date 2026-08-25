@@ -1,16 +1,24 @@
 import { isMain } from './lib/main'
-import { ethers, network } from '../hardhat.connection'
+import { ethers, network, upgrades } from '../hardhat.connection'
 import * as dotenv from 'dotenv'
 import { PoolFactory } from '../typechain-types'
 
 dotenv.config()
 
+/**
+ * A smoke test of the core contract flow, driven through a running node.
+ *
+ * Named `test-local-flow.ts` until 2026-08-25, which put it in the same
+ * namespace as `test/` and `pnpm test` while being neither: mocha never
+ * collects it, and it needs a node that `pnpm test` does not have. Run through
+ * `pnpm test:local`, which is unchanged.
+ */
 async function testLocalFlow() {
   console.log('🧪 Testing Local Flow (Core Contract Logic)')
   console.log('==========================================')
   console.log(`Network: ${network.name}`)
   console.log('ℹ️  Note: This tests core contract functionality without Safe integration')
-  console.log('ℹ️  For full Safe multi-sig testing, use test-safe-flow.ts on forked network')
+  console.log('ℹ️  For full Safe multi-sig testing, use smoke-safe.ts on forked network')
 
   // Get signers
   const [deployer, newOwner, poolOwner1] = await ethers.getSigners()
@@ -28,17 +36,24 @@ async function testLocalFlow() {
     console.log(`✅ Implementation deployed: ${implementationAddress}`)
 
     // Step 2: Deploy PoolFactory
+    //
+    // Behind its UUPS proxy, which is how the factory runs. This used to deploy
+    // the implementation and call `initialize` on it directly — the shortcut
+    // that `_disableInitializers()` closed on 2026-08-20 (`676da0d`), so every
+    // run since has reverted with `InvalidInitialization()` before reaching a
+    // single assertion. `test/SafeIntegration.test.ts` was corrected in that
+    // same commit; this script was not, because nothing runs it.
     console.log('\n2️⃣ Deploying PoolFactory...')
     const PoolFactory = await ethers.getContractFactory('PoolFactory')
-    const poolFactoryImpl = await PoolFactory.deploy()
-    await poolFactoryImpl.waitForDeployment()
-
-    // Initialize the factory
-    await poolFactoryImpl.initialize(deployer.address, implementationAddress)
-    const factoryAddress = await poolFactoryImpl.getAddress()
+    const poolFactoryProxy = await upgrades.deployProxy(PoolFactory, [deployer.address, implementationAddress], {
+      initializer: 'initialize',
+      kind: 'uups',
+    })
+    await poolFactoryProxy.waitForDeployment()
+    const factoryAddress = await poolFactoryProxy.getAddress()
     console.log(`✅ PoolFactory deployed and initialized: ${factoryAddress}`)
 
-    const poolFactory = poolFactoryImpl as PoolFactory
+    const poolFactory = poolFactoryProxy as unknown as PoolFactory
 
     // Step 3: Verify initial ownership
     console.log('\n3️⃣ Verifying initial ownership...')

@@ -7,6 +7,13 @@ import { simulateAcceptOwnership } from './simulate-multisig'
 
 dotenv.config()
 
+/**
+ * The same smoke test as `smoke-local.ts`, with the Safe half.
+ *
+ * `pnpm test:safe`, against a fork. For the assertions rather than the walk
+ * through, `pnpm test:safe:local` runs `test/SafeIntegration.test.ts` on a bare
+ * local node — see `lib/safe.ts`.
+ */
 async function testSafeFlow() {
   console.log('🛡️  Testing Safe Multi-Sig Flow')
   console.log('================================')

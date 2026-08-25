@@ -34,7 +34,7 @@ We use a **hybrid testing strategy** that provides:
 - Unit testing of contract logic
 - CI/CD pipeline testing
 
-**Script**: `scripts/test-local-flow.ts`
+**Script**: `scripts/smoke-local.ts`
 
 ```typescript
 // Example: Direct contract interaction without Safe
@@ -62,7 +62,7 @@ await poolFactory.createPool(poolParams) // Direct call, no multi-sig
 - Documentation and presentations
 - Client demonstrations
 
-**Script**: `scripts/demo-safe-workflow.ts`
+**Script**: `scripts/demo-safe.ts`
 
 ### 3. Production-Ready Safe Testing (Future)
 
@@ -113,8 +113,8 @@ polygonAmoyFork: {
 
 ### Core Testing Scripts
 
-1. **`test-local-flow.ts`** - Fast local contract testing
-2. **`demo-safe-workflow.ts`** - Safe workflow demonstration
+1. **`smoke-local.ts`** - Fast local contract testing
+2. **`demo-safe.ts`** - Safe workflow demonstration
 3. **`deploy-safe.ts`** - Safe wallet deployment (when network supports it)
 4. **`transfer-ownership.ts`** - Ownership transfer utilities
 
@@ -122,8 +122,8 @@ polygonAmoyFork: {
 
 ```json
 {
-  "test:local": "hardhat run scripts/test-local-flow.ts --network localhost",
-  "demo:safe": "hardhat run scripts/demo-safe-workflow.ts --network localhost",
+  "test:local": "hardhat run scripts/smoke-local.ts --network localhost",
+  "demo:safe": "hardhat run scripts/demo-safe.ts --network localhost",
   "safe:deploy": "hardhat run scripts/deploy-safe.ts",
   "safe:deploy:local": "hardhat run scripts/deploy-safe.ts --network localhost",
   "test:full": "npm run test:local && npm run demo:safe"

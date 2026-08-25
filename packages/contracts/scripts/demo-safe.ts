@@ -7,6 +7,15 @@ import { ethers } from '../hardhat.connection'
  * without requiring actual Safe contracts to be deployed.
  */
 
+/**
+ * `pnpm demo:safe`. Prints nothing to a chain: it explains the multi-sig
+ * workflow in the terminal, and deploys and signs nothing.
+ *
+ * Kept separate from `smoke-safe.ts` on purpose — one is an explanation, the
+ * other actually sends transactions, and the old name
+ * (`demo-safe-workflow.ts`, beside `test-safe-flow.ts`) did not say which was
+ * which.
+ */
 async function demoSafeWorkflow() {
   console.log('🛡️  Safe Multi-Sig Workflow Demonstration')
   console.log('==========================================')
