@@ -1,53 +1,12 @@
 import { isMain } from './lib/main'
 import { isLocalNetwork } from './lib/verification'
+import { safeContractNetworks, safeRpcUrl } from './lib/safe'
+import { signerKeyFor } from './lib/accounts'
 import { ethers, network } from '../hardhat.connection'
 import Safe, { PredictedSafeProps, SafeAccountConfig } from '@safe-global/protocol-kit'
 import * as dotenv from 'dotenv'
 
 dotenv.config()
-
-// ⚠️  SECURITY WARNING: DEVELOPMENT ONLY SCRIPT ⚠️
-//
-// This script contains hardcoded Hardhat private keys that are:
-// - PUBLICLY KNOWN test keys from Hardhat documentation
-// - NEVER to be used on mainnet or with real funds
-// - ONLY safe for localhost/testnet development
-//
-// For production deployments:
-// - Use environment variables for private keys
-// - Use hardware wallets or secure key management
-// - Never commit private keys to version control
-//
-// These test keys are widely known and funds can be stolen!
-
-/**
- * Get signer private key for different environments
- * @dev WARNING: Contains hardcoded test keys - DEVELOPMENT ONLY
- */
-function getSignerPrivateKey(networkName: string, signerAddress: string): string {
-  if (isLocalNetwork(networkName)) {
-    // Hardhat's deterministic accounts (safe for local development only)
-    const hardhatAccounts: { [address: string]: string } = {
-      '0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266': '0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80',
-      '0x70997970C51812dc3A010C7d01b50e0d17dc79C8': '0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d',
-      '0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC': '0x5de4111afa1a4b94908f83103eb1f1706367c2e68ca870fc3fb9a804cdab365a',
-    }
-
-    const privateKey = hardhatAccounts[signerAddress]
-    if (!privateKey) {
-      // Fallback to first account if address not found
-      return hardhatAccounts['0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266']
-    }
-    return privateKey
-  }
-
-  // For testnet/mainnet, require environment variable
-  const privateKey = process.env.PRIVATE_KEY
-  if (!privateKey) {
-    throw new Error(`PRIVATE_KEY environment variable required for ${networkName} network`)
-  }
-  return privateKey
-}
 
 interface SafeConfig {
   owners: string[]
@@ -121,22 +80,16 @@ async function deploySafe(config: SafeConfig): Promise<DeploymentResult> {
     // Initialize Safe SDK with predicted Safe
     console.log('\n🚀 Initializing Safe SDK...')
 
-    // Get RPC URL for the current network
-    let rpcUrl: string
-    if (isLocalNetwork()) {
-      rpcUrl = 'http://127.0.0.1:8545'
-    } else if (network.name === 'polygonAmoy') {
-      rpcUrl = process.env.POLYGON_AMOY_RPC_URL || 'https://rpc-amoy.polygon.technology/'
-    } else if (network.name === 'polygon') {
-      rpcUrl = process.env.POLYGON_RPC_URL || 'https://polygon-rpc.com'
-    } else {
-      throw new Error(`Unsupported network: ${network.name}`)
-    }
+    // On a chain the Safe registry does not know — a bare local node — this
+    // deploys Safe onto it first and returns where. Elsewhere it is `undefined`
+    // and the SDK resolves the canonical addresses itself. See `lib/safe.ts`.
+    const contractNetworks = await safeContractNetworks(deployer)
 
     const safeSdk = await Safe.init({
-      provider: rpcUrl,
-      signer: getSignerPrivateKey(network.name, deployer.address),
+      provider: safeRpcUrl(),
+      signer: signerKeyFor(deployer.address),
       predictedSafe,
+      contractNetworks,
     })
 
     // Get predicted Safe address

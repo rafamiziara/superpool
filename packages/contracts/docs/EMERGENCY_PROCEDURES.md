@@ -38,10 +38,10 @@ This is a single-maintainer proof-of-concept; there is no on-call rotation.
 
 ```bash
 # 1. Emergency pause
-pnpm transfer:ownership:amoy complete <FACTORY> <SAFE> "emergencyPause()"
+TRANSFER=complete POOL_FACTORY_ADDRESS=<FACTORY> SAFE_ADDRESS=<SAFE> EXECUTE=true pnpm transfer:ownership:amoy
 
 # 2. Verify pause status
-pnpm transfer:ownership verify <FACTORY_ADDRESS>
+TRANSFER=verify POOL_FACTORY_ADDRESS=<FACTORY> pnpm transfer:ownership:amoy
 ```
 
 **Follow-up:**
@@ -77,10 +77,10 @@ pnpm transfer:ownership verify <FACTORY_ADDRESS>
 
 ```bash
 # Check status
-pnpm transfer:ownership verify <FACTORY> <SAFE>
+TRANSFER=verify POOL_FACTORY_ADDRESS=<FACTORY> SAFE_ADDRESS=<SAFE> pnpm transfer:ownership:amoy
 
 # Reset transfer if needed
-pnpm transfer:ownership:amoy initiate <FACTORY> <SAFE>
+TRANSFER=initiate POOL_FACTORY_ADDRESS=<FACTORY> SAFE_ADDRESS=<SAFE> pnpm transfer:ownership:amoy
 ```
 
 ### 4. Contract Upgrade Failure
@@ -105,7 +105,7 @@ pnpm transfer:ownership:amoy initiate <FACTORY> <SAFE>
 
 ```bash
 # Ownership status
-pnpm transfer:ownership verify <FACTORY_ADDRESS>
+TRANSFER=verify POOL_FACTORY_ADDRESS=<FACTORY> pnpm transfer:ownership:amoy
 
 # Contract state
 npx hardhat console --network <NETWORK>
@@ -232,13 +232,13 @@ safe-cli owners <SAFE_ADDRESS>
 
 ## 🔗 Quick Links
 
-| Resource              | URL/Command                                |
-| --------------------- | ------------------------------------------ |
-| Safe Web Interface    | https://app.safe.global/                   |
-| Polygon Amoy Explorer | https://amoy.polygonscan.com/              |
-| Contract Verification | `pnpm transfer:ownership verify <ADDRESS>` |
-| Emergency Pause       | `emergencyPause()` through Safe            |
-| Emergency Unpause     | `emergencyUnpause()` through Safe          |
+| Resource              | URL/Command                                                                   |
+| --------------------- | ----------------------------------------------------------------------------- |
+| Safe Web Interface    | https://app.safe.global/                                                      |
+| Polygon Amoy Explorer | https://amoy.polygonscan.com/                                                 |
+| Contract Verification | `TRANSFER=verify POOL_FACTORY_ADDRESS=<ADDRESS> pnpm transfer:ownership:amoy` |
+| Emergency Pause       | `emergencyPause()` through Safe                                               |
+| Emergency Unpause     | `emergencyUnpause()` through Safe                                             |
 
 ## 📱 Mobile Response
 

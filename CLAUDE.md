@@ -178,11 +178,24 @@ For project structure overview, see the [Architecture section in README.md](READ
 
 **Comprehensive Safe Integration** (Multi-Sig Testing):
 
-1. **Forked Network**: Use `pnpm node:fork` for realistic network conditions
-2. **Safe Testing**: Use `pnpm test:safe` for complete multi-sig workflow
-3. **Real Safe Contracts**: Test with actual Safe SDK and contracts
-4. **Multi-Sig Simulation**: Full signature collection and execution process
-5. **Emergency Procedures**: Test emergency functions through Safe multi-sig
+`pnpm test:safe:local` is the one to run: start `pnpm node:local`, and it
+deploys Safe onto that node, hands the factory over in both `Ownable2Step`
+steps, and checks the roles that are left. 17 checks.
+
+**A bare local node has no Safe contracts on it, and no entry in Safe's own
+registry for chain 31337.** That is why this was impossible until 2026-08-25 and
+why the 14 tests in `SafeIntegration.test.ts` were *pending* in every recorded
+run — not passing, not failing, never executed. The answer is the SDK's
+`contractNetworks` option, which nothing was passing: `scripts/lib/safe.ts`
+deploys Safe 1.4.1 from `@safe-global/safe-contracts` build artifacts and hands
+the SDK the addresses. On a fork it points at the canonical ones instead, and on
+a public chain it returns `undefined` and refuses to deploy anything.
+
+**The threshold can only be met locally**, where every Safe owner is a Hardhat
+account whose key is derivable. On Amoy the script signs once and stops at
+`prepared`; the co-signers finish it in the Safe UI. So the local run is the
+only place the *accepting* half of the handover is ever exercised before it
+happens for real, once, irreversibly.
 
 **Combined Testing**:
 
@@ -191,8 +204,9 @@ For project structure overview, see the [Architecture section in README.md](READ
 pnpm test:full
 
 # Individual test scenarios
-pnpm test:local    # Fast core contract testing
-pnpm test:safe     # Complete Safe multi-sig testing
+pnpm test:local       # Fast core contract testing
+pnpm test:safe:local  # The Safe handover, on a plain local node
+pnpm test:safe        # The same flow against a fork of Amoy
 ```
 
 **Benefits of Hybrid Approach**:

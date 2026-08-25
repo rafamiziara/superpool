@@ -1,55 +1,14 @@
 import { isMain } from './lib/main'
 import { isLocalNetwork } from './lib/verification'
+import { safeContractNetworks, safeRpcUrl } from './lib/safe'
+import { signerKeyFor } from './lib/accounts'
 import { ethers, network } from '../hardhat.connection'
 import Safe from '@safe-global/protocol-kit'
-import { MetaTransactionData } from '@safe-global/types-kit'
+import { MetaTransactionData, SafeTransaction } from '@safe-global/types-kit'
 import * as dotenv from 'dotenv'
 import { PoolFactory } from '../typechain-types'
 
 dotenv.config()
-
-// ⚠️  SECURITY WARNING: DEVELOPMENT ONLY SCRIPT ⚠️
-//
-// This script contains hardcoded Hardhat private keys that are:
-// - PUBLICLY KNOWN test keys from Hardhat documentation
-// - NEVER to be used on mainnet or with real funds
-// - ONLY safe for localhost/testnet development
-//
-// For production deployments:
-// - Use environment variables for private keys
-// - Use hardware wallets or secure key management
-// - Never commit private keys to version control
-//
-// These test keys are widely known and funds can be stolen!
-
-/**
- * Get signer private key for different environments
- * @dev WARNING: Contains hardcoded test keys - DEVELOPMENT ONLY
- */
-function getSignerPrivateKey(networkName: string, signerAddress: string): string {
-  if (isLocalNetwork(networkName)) {
-    // Hardhat's deterministic accounts (safe for local development only)
-    const hardhatAccounts: { [address: string]: string } = {
-      '0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266': '0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80',
-      '0x70997970C51812dc3A010C7d01b50e0d17dc79C8': '0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d',
-      '0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC': '0x5de4111afa1a4b94908f83103eb1f1706367c2e68ca870fc3fb9a804cdab365a',
-    }
-
-    const privateKey = hardhatAccounts[signerAddress]
-    if (!privateKey) {
-      // Fallback to first account if address not found
-      return hardhatAccounts['0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266']
-    }
-    return privateKey
-  }
-
-  // For testnet/mainnet, require environment variable
-  const privateKey = process.env.PRIVATE_KEY
-  if (!privateKey) {
-    throw new Error(`PRIVATE_KEY environment variable required for ${networkName} network`)
-  }
-  return privateKey
-}
 
 interface OwnershipTransferConfig {
   poolFactoryAddress: string
@@ -164,6 +123,51 @@ async function initiateOwnershipTransfer(config: OwnershipTransferConfig): Promi
 }
 
 /**
+ * Sign the Safe transaction, and locally keep signing until the threshold is met.
+ *
+ * On a public network there is one key. It signs, and if the Safe needs a second
+ * signature that second signature belongs to another person — so the script
+ * stops, reports the hash, and the co-signers do their part in the Safe UI.
+ * That is the real workflow and this does not try to automate it.
+ *
+ * On a local node every Safe owner is a Hardhat account whose key is derivable,
+ * so the threshold can genuinely be reached. That is the whole difference
+ * between rehearsing this step and merely preparing it: the accepting half of
+ * `Ownable2Step` only actually runs when the Safe executes.
+ *
+ * The executor is returned alongside because it has to be one of the SDK
+ * instances that signed — `executeTransaction` sends from its own signer, and
+ * the caller's default signer is not necessarily an owner at all.
+ */
+async function collectSignatures(
+  safeSdk: Safe,
+  transaction: SafeTransaction,
+  threshold: number
+): Promise<{ transaction: SafeTransaction; executor: Safe }> {
+  const owners = await safeSdk.getOwners()
+  const signerAddress = await (await safeSdk.getSafeProvider()).getSignerAddress()
+  const isOwner = owners.some((owner) => owner.toLowerCase() === signerAddress?.toLowerCase())
+
+  // A non-owner's signature is worth nothing, and on a local node the owners
+  // are test accounts — so sign as one of them rather than failing.
+  let executor = isOwner || !isLocalNetwork() ? safeSdk : await safeSdk.connect({ signer: signerKeyFor(owners[0]) })
+  let signed = await executor.signTransaction(transaction)
+
+  if (!isLocalNetwork()) return { transaction: signed, executor }
+
+  for (const owner of owners) {
+    if (signed.signatures.size >= threshold) break
+    if (signed.signatures.has(owner.toLowerCase())) continue
+
+    const asOwner = await safeSdk.connect({ signer: signerKeyFor(owner) })
+    signed = await asOwner.signTransaction(signed)
+    executor = asOwner
+  }
+
+  return { transaction: signed, executor }
+}
+
+/**
  * Complete ownership transfer by accepting ownership from Safe wallet
  */
 async function completeOwnershipTransfer(config: OwnershipTransferConfig): Promise<TransferResult> {
@@ -199,22 +203,13 @@ async function completeOwnershipTransfer(config: OwnershipTransferConfig): Promi
     // Initialize Safe SDK
     console.log('\n🛡️  Initializing Safe SDK...')
 
-    // Get RPC URL for the current network
-    let rpcUrl: string
-    if (isLocalNetwork()) {
-      rpcUrl = 'http://127.0.0.1:8545'
-    } else if (network.name === 'polygonAmoy') {
-      rpcUrl = process.env.POLYGON_AMOY_RPC_URL || 'https://rpc-amoy.polygon.technology/'
-    } else if (network.name === 'polygon') {
-      rpcUrl = process.env.POLYGON_RPC_URL || 'https://polygon-rpc.com'
-    } else {
-      throw new Error(`Unsupported network: ${network.name}`)
-    }
+    const contractNetworks = await safeContractNetworks()
 
     const safeSdk = await Safe.init({
-      provider: rpcUrl,
-      signer: getSignerPrivateKey(network.name, signer.address),
+      provider: safeRpcUrl(),
+      signer: signerKeyFor(signer.address),
       safeAddress: config.safeAddress,
+      contractNetworks,
     })
 
     console.log('Safe address:', await safeSdk.getAddress())
@@ -245,19 +240,21 @@ async function completeOwnershipTransfer(config: OwnershipTransferConfig): Promi
     if (config.executeImmediately) {
       // Sign and execute the transaction
       console.log('\n🔐 Signing Safe transaction...')
-      const signedSafeTransaction = await safeSdk.signTransaction(safeTransactionData)
+      const threshold = await safeSdk.getThreshold()
+      const { transaction: signedSafeTransaction, executor } = await collectSignatures(safeSdk, safeTransactionData, threshold)
       console.log('Transaction signed')
 
-      // Check if we have enough signatures to execute
-      const threshold = await safeSdk.getThreshold()
-      const signatures = signedSafeTransaction.signatures
-      const signatureCount = signatures ? Object.keys(signatures).length : 0
+      // `signatures` is a Map. `Object.keys(map).length` — which this read
+      // before — is 0 for every Map there has ever been, so the count never
+      // reached the threshold and the branch below was unreachable even on a
+      // 1-of-1 Safe.
+      const signatureCount = signedSafeTransaction.signatures.size
 
       console.log(`Signatures: ${signatureCount}/${threshold}`)
 
       if (signatureCount >= threshold) {
         console.log('\n🚀 Executing Safe transaction...')
-        const executeTxResponse = await safeSdk.executeTransaction(signedSafeTransaction)
+        const executeTxResponse = await executor.executeTransaction(signedSafeTransaction)
         console.log('Execution transaction hash:', executeTxResponse.hash)
 
         // Wait for confirmation
@@ -405,32 +402,48 @@ async function main() {
   console.log('🔄 PoolFactory Ownership Transfer Script')
   console.log('======================================')
 
-  // Parse command line arguments
-  const args = process.argv.slice(2)
-  const command = args[0]
+  /*
+   * Arguments come from the environment, not from `process.argv` — the same
+   * correction `simulate-multisig.ts` carries, for the same reason.
+   *
+   * `hardhat run` does not forward positional arguments. `process.argv.slice(2)`
+   * is *Hardhat's* command line, so `args[0]` was the literal string `run` and
+   * every one of these commands exited on `Unknown command: run`. That includes
+   * `pnpm transfer:ownership:amoy`, which is a step on the Amoy checklist: the
+   * script for the least reversible action in the project could not be started.
+   */
+  const command = process.env.TRANSFER
+  const poolFactoryAddress = process.env.POOL_FACTORY_ADDRESS
+  const safeAddress = process.env.SAFE_ADDRESS
+  const executeImmediately = process.env.EXECUTE === 'true'
 
   if (!command) {
-    console.log('Usage:')
-    console.log('  pnpm transfer-ownership initiate <poolFactoryAddress> <safeAddress>')
-    console.log('  pnpm transfer-ownership complete <poolFactoryAddress> <safeAddress> [--execute]')
-    console.log('  pnpm transfer-ownership verify <poolFactoryAddress> [safeAddress]')
-    console.log('  pnpm transfer-ownership rollback <poolFactoryAddress>')
+    console.log('Usage — arguments are environment variables:')
+    console.log('  TRANSFER=initiate POOL_FACTORY_ADDRESS=0x… SAFE_ADDRESS=0x… pnpm transfer:ownership:amoy')
+    console.log('  TRANSFER=complete POOL_FACTORY_ADDRESS=0x… SAFE_ADDRESS=0x… EXECUTE=true pnpm transfer:ownership:amoy')
+    console.log('  TRANSFER=verify   POOL_FACTORY_ADDRESS=0x… [SAFE_ADDRESS=0x…] pnpm transfer:ownership:amoy')
+    console.log('  TRANSFER=rollback POOL_FACTORY_ADDRESS=0x… pnpm transfer:ownership:amoy')
     process.exit(1)
   }
 
   try {
+    const requireFactory = (): string => {
+      if (!poolFactoryAddress) throw new Error('POOL_FACTORY_ADDRESS is required')
+
+      return poolFactoryAddress
+    }
+
+    const requireSafe = (): string => {
+      if (!safeAddress) throw new Error('SAFE_ADDRESS is required')
+
+      return safeAddress
+    }
+
     switch (command) {
       case 'initiate': {
-        const poolFactoryAddress = args[1]
-        const safeAddress = args[2]
-
-        if (!poolFactoryAddress || !safeAddress) {
-          throw new Error('Both poolFactoryAddress and safeAddress are required')
-        }
-
         const result = await initiateOwnershipTransfer({
-          poolFactoryAddress,
-          safeAddress,
+          poolFactoryAddress: requireFactory(),
+          safeAddress: requireSafe(),
         })
 
         console.log('\n📋 Transfer Initiated:')
@@ -439,17 +452,9 @@ async function main() {
       }
 
       case 'complete': {
-        const poolFactoryAddress = args[1]
-        const safeAddress = args[2]
-        const executeImmediately = args.includes('--execute')
-
-        if (!poolFactoryAddress || !safeAddress) {
-          throw new Error('Both poolFactoryAddress and safeAddress are required')
-        }
-
         const result = await completeOwnershipTransfer({
-          poolFactoryAddress,
-          safeAddress,
+          poolFactoryAddress: requireFactory(),
+          safeAddress: requireSafe(),
           executeImmediately,
         })
 
@@ -459,25 +464,12 @@ async function main() {
       }
 
       case 'verify': {
-        const poolFactoryAddress = args[1]
-        const expectedSafeAddress = args[2]
-
-        if (!poolFactoryAddress) {
-          throw new Error('poolFactoryAddress is required')
-        }
-
-        await verifyOwnershipStatus(poolFactoryAddress, expectedSafeAddress)
+        await verifyOwnershipStatus(requireFactory(), safeAddress)
         break
       }
 
       case 'rollback': {
-        const poolFactoryAddress = args[1]
-
-        if (!poolFactoryAddress) {
-          throw new Error('poolFactoryAddress is required')
-        }
-
-        await emergencyRollback(poolFactoryAddress)
+        await emergencyRollback(requireFactory())
         break
       }
 

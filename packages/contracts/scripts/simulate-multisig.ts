@@ -1,34 +1,12 @@
 import { isMain } from './lib/main'
+import { signerKeyFor } from './lib/accounts'
+import { safeContractNetworks, safeRpcUrl } from './lib/safe'
 import { artifacts, ethers, network } from '../hardhat.connection'
 import Safe from '@safe-global/protocol-kit'
 import { MetaTransactionData } from '@safe-global/types-kit'
 import * as dotenv from 'dotenv'
 
 dotenv.config()
-
-// ⚠️  SECURITY WARNING: DEVELOPMENT ONLY SCRIPT ⚠️
-//
-// This script contains hardcoded Hardhat private keys that are:
-// - PUBLICLY KNOWN test keys from Hardhat documentation
-// - NEVER to be used on mainnet or with real funds
-// - ONLY safe for localhost/testnet development
-//
-// For production deployments:
-// - Use environment variables for private keys
-// - Use hardware wallets or secure key management
-// - Never commit private keys to version control
-//
-// These test keys are widely known and funds can be stolen!
-
-/**
- * Hardhat's deterministic accounts for local development
- * @dev WARNING: Contains hardcoded test keys - DEVELOPMENT ONLY
- */
-const HARDHAT_ACCOUNTS = {
-  '0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266': '0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80', // Account 0
-  '0x70997970C51812dc3A010C7d01b50e0d17dc79C8': '0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d', // Account 1
-  '0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC': '0x5de4111afa1a4b94908f83103eb1f1706367c2e68ca870fc3fb9a804cdab365a', // Account 2
-}
 
 interface MultiSigSimulationConfig {
   safeAddress: string
@@ -64,16 +42,19 @@ async function simulateMultiSigApproval(config: MultiSigSimulationConfig): Promi
     console.log('ℹ️  Current network:', network.name)
   }
 
-  const rpcUrl = 'http://127.0.0.1:8545'
+  const rpcUrl = safeRpcUrl()
+  // A local node has no Safe contracts on it until this puts them there.
+  const contractNetworks = await safeContractNetworks()
 
   // Step 1: Initialize Safe with first owner
   console.log('\n📋 Step 1: Initialize Safe and prepare transaction')
-  const owner1PrivateKey = HARDHAT_ACCOUNTS['0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266']
+  const owner1PrivateKey = signerKeyFor((await ethers.getSigners())[0].address)
 
   const safeSdk1 = await Safe.init({
     provider: rpcUrl,
     signer: owner1PrivateKey,
     safeAddress: config.safeAddress,
+    contractNetworks,
   })
 
   const safeInfo = {
@@ -127,10 +108,11 @@ async function simulateMultiSigApproval(config: MultiSigSimulationConfig): Promi
 
   for (let i = 0; i < ownersToSign.length; i++) {
     const ownerAddress = ownersToSign[i]
-    const privateKey = HARDHAT_ACCOUNTS[ownerAddress as keyof typeof HARDHAT_ACCOUNTS]
-
-    if (!privateKey) {
-      console.log(`⚠️  Warning: No private key found for owner ${ownerAddress}`)
+    let privateKey: string
+    try {
+      privateKey = signerKeyFor(ownerAddress)
+    } catch {
+      console.log(`⚠️  Warning: No private key available for owner ${ownerAddress}`)
       continue
     }
 
@@ -140,19 +122,20 @@ async function simulateMultiSigApproval(config: MultiSigSimulationConfig): Promi
       provider: rpcUrl,
       signer: privateKey,
       safeAddress: config.safeAddress,
+      contractNetworks,
     })
 
     signedTransaction = await ownerSafeSdk.signTransaction(signedTransaction)
 
-    const signatures = signedTransaction.signatures
-    const signatureCount = signatures ? Object.keys(signatures).length : 0
-    console.log(`✅ Signature collected (${signatureCount}/${safeInfo.threshold})`)
+    // `.size`, not `Object.keys(...).length` — `signatures` is a Map, so the
+    // old count was 0 however many owners had signed, and step 5 below then
+    // reported "insufficient signatures" and returned on every run.
+    console.log(`✅ Signature collected (${signedTransaction.signatures.size}/${safeInfo.threshold})`)
   }
 
   // Step 5: Verify signatures
   console.log('\n🔍 Step 5: Verify signatures')
-  const finalSignatures = signedTransaction.signatures
-  const finalSignatureCount = finalSignatures ? Object.keys(finalSignatures).length : 0
+  const finalSignatureCount = signedTransaction.signatures.size
 
   console.log(`Total signatures: ${finalSignatureCount}`)
   console.log(`Required threshold: ${safeInfo.threshold}`)

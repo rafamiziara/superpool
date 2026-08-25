@@ -385,6 +385,9 @@ importers:
       '@openzeppelin/hardhat-upgrades':
         specifier: ^4.1.0
         version: 4.1.0(@nomicfoundation/hardhat-ethers@4.0.15(bufferutil@4.1.0)(hardhat@3.13.0(bufferutil@4.1.0)(utf-8-validate@6.0.6))(utf-8-validate@6.0.6))(@nomicfoundation/hardhat-verify@3.0.22(hardhat@3.13.0(bufferutil@4.1.0)(utf-8-validate@6.0.6)))(ethers@6.16.0(bufferutil@4.1.0)(utf-8-validate@6.0.6))(hardhat@3.13.0(bufferutil@4.1.0)(utf-8-validate@6.0.6))(viem@2.47.0(bufferutil@4.1.0)(typescript@6.0.3)(utf-8-validate@6.0.6)(zod@3.25.76))
+      '@safe-global/safe-contracts':
+        specifier: 1.4.1
+        version: 1.4.1(ethers@6.16.0(bufferutil@4.1.0)(utf-8-validate@6.0.6))
       '@types/chai':
         specifier: ^5.0.0
         version: 5.2.3
@@ -3994,6 +3997,11 @@ packages:
   '@safe-global/safe-apps-sdk@9.1.0':
     resolution: {integrity: sha512-N5p/ulfnnA2Pi2M3YeWjULeWbjo7ei22JwU/IXnhoHzKq3pYCN6ynL9mJBOlvDVv892EgLPCWCOwQk/uBT2v0Q==}
 
+  '@safe-global/safe-contracts@1.4.1':
+    resolution: {integrity: sha512-fP1jewywSwsIniM04NsqPyVRFKPMAuirC3ftA/TA4X3Zc5EnwQp/UCJUU2PL/37/z/jMo8UUaJ+pnFNWmMU7dQ==}
+    peerDependencies:
+      ethers: 5.4.0
+
   '@safe-global/safe-deployments@1.37.52':
     resolution: {integrity: sha512-BFwJWY7L4nB2T7grHmcPp/DNtwz3L1Iuydra1iaRg+WbqPTgsrS2Buf5bkKWD3AG5MdwuqqdTnClBfzQJs+6GA==}
 
@@ -7135,6 +7143,7 @@ packages:
   eslint@9.39.3:
     resolution: {integrity: sha512-VmQ+sifHUbI/IcSopBCF/HO3YiHQx/AVd3UVyYL6weuwW+HvON9VYn5l6Zl1WZzPWXPNZrSQpxwkkZ/VuvJZzg==}
     engines: {node: ^18.18.0 || ^20.9.0 || >=21.1.0}
+    deprecated: This version is no longer supported. Please see https://eslint.org/version-support for other options.
     hasBin: true
     peerDependencies:
       jiti: '*'
@@ -17847,6 +17856,10 @@ snapshots:
       - typescript
       - utf-8-validate
       - zod
+
+  '@safe-global/safe-contracts@1.4.1(ethers@6.16.0(bufferutil@4.1.0)(utf-8-validate@6.0.6))':
+    dependencies:
+      ethers: 6.16.0(bufferutil@4.1.0)(utf-8-validate@6.0.6)
 
   '@safe-global/safe-deployments@1.37.52':
     dependencies:

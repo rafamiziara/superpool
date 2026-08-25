@@ -223,18 +223,25 @@ describe('Security Improvements Summary', function () {
       await expect(poolFactory.connect(addr2).createPool(poolParams)).to.be.revertedWithCustomError(poolFactory, 'UnauthorizedCreator')
     })
 
-    it('Should have security warnings in deployment scripts', async function () {
-      // This test verifies the security improvements exist
-      // The actual warnings are in the script files
-
-      // Check that the scripts directory contains our secured scripts
+    it('Should keep publicly-known test keys in one place, and say so', async function () {
+      // This used to assert that `deploy-safe.ts` and `transfer-ownership.ts`
+      // each carried a warning banner — which they did, above a copy each of the
+      // same three hardcoded Hardhat private keys. The keys are now derived once
+      // in `lib/accounts.ts`, so the warning belongs there and the assertion
+      // worth making about the scripts is that they contain no key at all.
       const scriptsDir = path.join(import.meta.dirname, '..', 'scripts')
-      const deploySafeScript = fs.readFileSync(path.join(scriptsDir, 'deploy-safe.ts'), 'utf8')
-      const transferOwnershipScript = fs.readFileSync(path.join(scriptsDir, 'transfer-ownership.ts'), 'utf8')
+      const accountsLib = fs.readFileSync(path.join(scriptsDir, 'lib', 'accounts.ts'), 'utf8')
 
-      // Verify security warnings are present
-      expect(deploySafeScript).to.include('⚠️  SECURITY WARNING: DEVELOPMENT ONLY SCRIPT ⚠️')
-      expect(transferOwnershipScript).to.include('⚠️  SECURITY WARNING: DEVELOPMENT ONLY SCRIPT ⚠️')
+      expect(accountsLib).to.include('⚠️  SECURITY WARNING: DEVELOPMENT ONLY KEYS ⚠️')
+
+      // A 32-byte hex literal in a script is a private key. There is no other
+      // thing of that shape here, and a paste of one is exactly what the banner
+      // was trying to prevent.
+      const privateKeyLiteral = /0x[0-9a-fA-F]{64}/
+      for (const script of fs.readdirSync(scriptsDir).filter((name) => name.endsWith('.ts'))) {
+        const source = fs.readFileSync(path.join(scriptsDir, script), 'utf8')
+        expect(privateKeyLiteral.test(source), `${script} contains what looks like a private key`).to.equal(false)
+      }
     })
 
     it('Should have comprehensive security documentation', async function () {

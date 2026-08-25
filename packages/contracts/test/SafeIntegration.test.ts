@@ -10,9 +10,15 @@ import { LendingPool, PoolFactory } from '../typechain-types'
 use(chaiAsPromised)
 
 describe('Safe Integration Tests', function () {
-  // The Safe SDK deploys via a live JSON-RPC node and the canonical Safe
-  // singletons, neither of which exist on the ephemeral in-process network.
-  // Run against a node: `pnpm test:integration` (fork) or --network localhost.
+  // The Safe SDK talks to a live JSON-RPC node, which the ephemeral in-process
+  // network is not — so these skip under a plain `pnpm test` and have to be run
+  // against a node: `pnpm test:safe:local` (bare Hardhat node) or
+  // `pnpm test:integration` (Amoy fork).
+  //
+  // They also needed the canonical Safe singletons, which no local node has.
+  // That is what kept these 14 skipped in every run this project has recorded,
+  // and it is now `lib/safe.ts`'s job: it puts Safe on the node in front of it
+  // and hands the SDK the addresses. See `safeContractNetworks`.
   before(function () {
     if (isSimulatedNetwork) {
       this.skip()
@@ -26,11 +32,12 @@ describe('Safe Integration Tests', function () {
   let safeOwner2: HardhatEthersSigner
   let safeOwner3: HardhatEthersSigner
   let otherAccount: HardhatEthersSigner
+  let backendWallet: HardhatEthersSigner
   let safeAddress: string
 
   beforeEach(async function () {
     // Get signers
-    ;[deployer, safeOwner1, safeOwner2, safeOwner3, otherAccount] = await ethers.getSigners()
+    ;[deployer, safeOwner1, safeOwner2, safeOwner3, otherAccount, backendWallet] = await ethers.getSigners()
 
     // Deploy lending pool implementation
     const LendingPool = await ethers.getContractFactory('LendingPool')
@@ -180,26 +187,26 @@ describe('Safe Integration Tests', function () {
         safeAddress: safeAddress,
       })
 
-      // For testing purposes, we'll simulate the Safe accepting ownership
-      // In reality, this would require multi-sig transaction execution
       const result = await completeOwnershipTransfer({
         poolFactoryAddress: await poolFactory.getAddress(),
         safeAddress: safeAddress,
-        executeImmediately: true, // This will attempt immediate execution
+        executeImmediately: true,
       })
 
-      // The result step will depend on whether we have enough signatures
-      expect(['prepared', 'completed']).to.include(result.step)
+      // `completed`, not `['prepared', 'completed']`. This used to accept either
+      // because one key cannot meet a 2-of-3 threshold — but on a local node
+      // every Safe owner is a Hardhat account, so the signatures can actually be
+      // collected and the second half of `Ownable2Step` actually runs. Accepting
+      // `prepared` here meant the test passed without the accepting transaction
+      // ever being sent, which is the only part of this that is irreversible on
+      // a real chain.
+      expect(result.step).to.equal('completed')
       expect(result.safeTransactionHash).to.not.be.undefined
+      expect(result.newOwner).to.equal(safeAddress)
 
-      if (result.step === 'completed') {
-        expect(result.newOwner).to.equal(safeAddress)
-
-        // Verify ownership was transferred
-        const status = await poolFactory.getOwnershipStatus()
-        expect(status.currentOwner).to.equal(safeAddress)
-        expect(status.hasPendingTransfer).to.be.false
-      }
+      const status = await poolFactory.getOwnershipStatus()
+      expect(status.currentOwner).to.equal(safeAddress)
+      expect(status.hasPendingTransfer).to.be.false
     })
 
     it('Should handle ownership verification correctly', async function () {
@@ -258,27 +265,66 @@ describe('Safe Integration Tests', function () {
       const deploymentResult = await deploySafe(safeConfig)
       safeAddress = deploymentResult.safeAddress
 
-      // Initiate transfer
+      // Appointed *before* ownership moves, which is the ordering the Amoy
+      // checklist is emphatic about: afterwards it takes a Safe transaction.
+      await (await poolFactory.setPoolCreatorAdmin(backendWallet.address)).wait()
+
+      // Both halves, so these tests run against a factory the Safe actually
+      // owns. This used to stop after `initiate` — it asked Hardhat for a
+      // `Safe` artifact this project does not compile, threw, and left a
+      // describe block named "Post-Transfer" asserting that the transfer had
+      // *not* happened. Nothing noticed, because the whole file was skipped.
       await initiateOwnershipTransfer({
         poolFactoryAddress: await poolFactory.getAddress(),
         safeAddress: safeAddress,
       })
 
-      // For testing, manually complete the transfer by calling acceptOwnership directly
-      // In production, this would go through the Safe multi-sig process
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      const safeContract = await ethers.getContractAt('Safe', safeAddress)
-      // We'll simulate by having the Safe call acceptOwnership (this is simplified for testing)
+      await completeOwnershipTransfer({
+        poolFactoryAddress: await poolFactory.getAddress(),
+        safeAddress: safeAddress,
+        executeImmediately: true,
+      })
     })
 
     it('Should verify Safe ownership after transfer', async function () {
-      // Verify current ownership status
       const status = await poolFactory.getOwnershipStatus()
 
-      // Should have pending transfer to Safe
-      expect(status.currentOwner).to.equal(deployer.address)
-      expect(status.pendingOwnerAddress).to.equal(safeAddress)
-      expect(status.hasPendingTransfer).to.be.true
+      expect(status.currentOwner).to.equal(safeAddress)
+      expect(status.hasPendingTransfer).to.be.false
+    })
+
+    // Why the handover is shaped this way: one write to the beacon replaces the
+    // logic of every pool at once, so that authority belongs to the Safe — while
+    // the backend keeps the single power lazy whitelisting needs, and no other.
+    // See `CLAUDE.md` → Keys and roles.
+    it('Should leave the backend wallet able to whitelist', async function () {
+      await (await poolFactory.connect(backendWallet).setCreatorAuthorization(otherAccount.address, true)).wait()
+
+      expect(await poolFactory.authorizedCreators(otherAccount.address)).to.be.true
+    })
+
+    it('Should refuse everything else to the backend wallet', async function () {
+      await expect(poolFactory.connect(backendWallet).pause())
+        .to.be.revertedWithCustomError(poolFactory, 'OwnableUnauthorizedAccount')
+        .withArgs(backendWallet.address)
+
+      await expect(poolFactory.connect(backendWallet).setPoolCreatorAdmin(backendWallet.address))
+        .to.be.revertedWithCustomError(poolFactory, 'OwnableUnauthorizedAccount')
+        .withArgs(backendWallet.address)
+
+      await expect(poolFactory.connect(backendWallet).setLoanTokenAuthorization(otherAccount.address, true))
+        .to.be.revertedWithCustomError(poolFactory, 'OwnableUnauthorizedAccount')
+        .withArgs(backendWallet.address)
+    })
+
+    it('Should refuse owner-only calls from the address that deployed it', async function () {
+      await expect(poolFactory.connect(deployer).pause())
+        .to.be.revertedWithCustomError(poolFactory, 'OwnableUnauthorizedAccount')
+        .withArgs(deployer.address)
+
+      await expect(poolFactory.connect(deployer).setPoolCreatorAdmin(otherAccount.address))
+        .to.be.revertedWithCustomError(poolFactory, 'OwnableUnauthorizedAccount')
+        .withArgs(deployer.address)
     })
 
     it('Should verify Safe configuration remains intact', async function () {

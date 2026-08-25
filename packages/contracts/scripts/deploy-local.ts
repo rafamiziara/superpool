@@ -3,15 +3,15 @@ import * as dotenv from 'dotenv'
 import { mkdirSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { verifyContract } from './lib/verification'
+import { localAccountKey } from './lib/accounts'
 
 dotenv.config()
 
-/**
- * Hardhat's first default account. This key is published in Hardhat's own docs
- * and funded only on throwaway local chains — it is printed here so local
- * backend setup is copy-pasteable. Never use it on a live network.
- */
-const HARDHAT_ACCOUNT_0_PRIVATE_KEY = '0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80'
+// The deployer's own key is printed below so local backend setup is
+// copy-pasteable. It comes from `lib/accounts.ts` rather than being pasted here
+// — it is published in Hardhat's own docs either way, but a script that holds
+// no key literal is one a grep for key literals can keep honest. See
+// `SecurityImprovementsSummary`.
 
 async function main() {
   console.log('🚀 Starting LOCAL deployment...')
@@ -348,7 +348,7 @@ async function main() {
     console.log(`   CHAIN_NAME=Localhost`)
     console.log(`   RPC_URL=${deploymentInfo.network.rpcUrl}`)
     console.log(`   POOL_FACTORY_ADDRESS=${factoryAddress}`)
-    console.log(`   BACKEND_WALLET_PRIVATE_KEY=${HARDHAT_ACCOUNT_0_PRIVATE_KEY}`)
+    console.log(`   BACKEND_WALLET_PRIVATE_KEY=${localAccountKey(deployer.address)}`)
     console.log('')
     console.log('🔑 Mobile configuration (apps/mobile/.env):')
     console.log(`   EXPO_PUBLIC_POOL_FACTORY_ADDRESS_LOCALHOST=${factoryAddress}`)
