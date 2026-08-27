@@ -3,15 +3,10 @@ import { render, screen } from '@testing-library/react-native'
 import OnboardingScreen from './onboarding'
 
 // Mock dependencies to avoid module resolution issues
+// The footer button is ours now; AppKit only owns the modal it opens.
+// `ConnectWalletButton` has its own test for the press itself.
 jest.mock('@reown/appkit-wagmi-react-native', () => ({
-  AppKitButton: ({ label, ...props }: { label: string; [key: string]: unknown }) => {
-    const { Text, TouchableOpacity } = require('react-native')
-    return (
-      <TouchableOpacity testID="connect-wallet-button" {...props}>
-        <Text>{label}</Text>
-      </TouchableOpacity>
-    )
-  },
+  useAppKit: () => ({ open: jest.fn(), close: jest.fn() }),
 }))
 
 jest.mock('expo-status-bar', () => ({
@@ -30,10 +25,10 @@ jest.mock('../src/components/ProgressIndicator', () => ({
 }))
 
 // Mock the assets
-jest.mock('@superpool/assets/images/illustrations/feature_1.png', () => 'feature_1.png')
-jest.mock('@superpool/assets/images/illustrations/feature_2.png', () => 'feature_2.png')
-jest.mock('@superpool/assets/images/illustrations/feature_3.png', () => 'feature_3.png')
-jest.mock('@superpool/assets/images/illustrations/feature_4.png', () => 'feature_4.png')
+jest.mock('../assets/images/illustrations/feature_1.png', () => 'feature_1.png')
+jest.mock('../assets/images/illustrations/feature_2.png', () => 'feature_2.png')
+jest.mock('../assets/images/illustrations/feature_3.png', () => 'feature_3.png')
+jest.mock('../assets/images/illustrations/feature_4.png', () => 'feature_4.png')
 
 describe('OnboardingScreen', () => {
   beforeEach(() => {
