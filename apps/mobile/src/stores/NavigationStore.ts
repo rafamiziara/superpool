@@ -40,6 +40,17 @@ export class NavigationStore {
   // Current state tracking
   private hasInitialized = false
 
+  /**
+   * The last route this store sent the user to.
+   *
+   * Not "where the user is" — expo-router only exposes that through hooks, and
+   * this is a store. It is enough for the one thing it guards: not replacing a
+   * route with itself. `index.tsx` redirects declaratively without going
+   * through here, so this can be stale after a deep link; the cost of that is
+   * one redundant replace, never a missed navigation.
+   */
+  private lastRoute: AppRoute | null = null
+
   constructor() {
     makeAutoObservable(this)
 
@@ -118,13 +129,38 @@ export class NavigationStore {
       return
     }
 
+    /*
+      Never replace a route with itself.
+
+      `router.replace` re-mounts the screen, so sending the user to where they
+      already are is a visible flicker rather than a no-op — and the reaction
+      fires more often than the route actually changes. Closing the AppKit
+      modal is one such moment: it flips wagmi's `isConnecting`, which runs
+      `WalletListener`'s effect and rewrites the wallet state this reaction
+      watches.
+
+      It also stops the store dragging someone off a sub-screen. Standing on
+      `pool/[id]`, an unrelated state change still resolves to
+      `/(auth)/dashboard` — which was correct as a *destination* and wrong as
+      an instruction.
+    */
+    if (targetRoute === this.lastRoute) {
+      logger.debug(`🧭 NavigationStore: Already at ${targetRoute}, not replacing it`)
+      return
+    }
+
     logger.debug(`🧭 NavigationStore: Navigating to ${targetRoute} - ${reason}`)
+
+    // Claimed before the timer, so two fires in the same tick cannot both queue.
+    this.lastRoute = targetRoute
 
     // Navigate with a small delay to ensure state updates complete
     setTimeout(() => {
       try {
         router.replace(targetRoute)
       } catch (error) {
+        // Give the claim back, or a failed navigation is never retried.
+        this.lastRoute = null
         logger.error('❌ NavigationStore: Navigation failed:', error)
       }
     }, 50)

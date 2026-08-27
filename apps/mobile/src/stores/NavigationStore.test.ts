@@ -169,6 +169,74 @@ describe('NavigationStore', () => {
       expect(mockRouterReplace).toHaveBeenCalledWith('/(auth)/dashboard')
     })
 
+    it('should not replace a route with itself', () => {
+      const connected = {
+        user: null,
+        isAuthenticating: false,
+        isWalletConnected: true,
+        walletAddress: '0x123',
+        isFullyInitialized: true,
+      }
+
+      navigationStore['navigateBasedOnCurrentState'](connected)
+      jest.advanceTimersByTime(50)
+      expect(mockRouterReplace).toHaveBeenCalledTimes(1)
+
+      // The reaction fires more often than the route changes — closing the
+      // AppKit modal is one such moment. Replacing here would re-mount the
+      // screen, which is the flicker.
+      navigationStore['navigateBasedOnCurrentState'](connected)
+      jest.advanceTimersByTime(50)
+
+      expect(mockRouterReplace).toHaveBeenCalledTimes(1)
+      expect(mockConsoleLog).toHaveBeenCalledWith('🧭 NavigationStore: Already at /connecting, not replacing it')
+    })
+
+    it('should still navigate when the route genuinely changes', () => {
+      navigationStore['navigateBasedOnCurrentState']({
+        user: null,
+        isAuthenticating: false,
+        isWalletConnected: true,
+        walletAddress: '0x123',
+        isFullyInitialized: true,
+      })
+      jest.advanceTimersByTime(50)
+
+      navigationStore['navigateBasedOnCurrentState']({
+        user: { walletAddress: '0x123' },
+        isAuthenticating: false,
+        isWalletConnected: true,
+        walletAddress: '0x123',
+        isFullyInitialized: true,
+      })
+      jest.advanceTimersByTime(50)
+
+      expect(mockRouterReplace).toHaveBeenNthCalledWith(1, '/connecting')
+      expect(mockRouterReplace).toHaveBeenNthCalledWith(2, '/(auth)/dashboard')
+    })
+
+    it('should retry after a failed navigation rather than believing it arrived', () => {
+      mockRouterReplace.mockImplementationOnce(() => {
+        throw new Error('Navigation failed')
+      })
+
+      const disconnected = {
+        user: null,
+        isAuthenticating: false,
+        isWalletConnected: false,
+        walletAddress: null,
+        isFullyInitialized: true,
+      }
+
+      navigationStore['navigateBasedOnCurrentState'](disconnected)
+      jest.advanceTimersByTime(50)
+
+      navigationStore['navigateBasedOnCurrentState'](disconnected)
+      jest.advanceTimersByTime(50)
+
+      expect(mockRouterReplace).toHaveBeenCalledTimes(2)
+    })
+
     it('should handle navigation errors gracefully', () => {
       mockRouterReplace.mockImplementationOnce(() => {
         throw new Error('Navigation failed')
