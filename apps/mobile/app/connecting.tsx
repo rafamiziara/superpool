@@ -65,7 +65,7 @@ export default observer(function ConnectingScreen() {
       {/* Fixed Header */}
       <View className="pt-12 mt-24 items-center" testID="connecting-header">
         <Image
-          source={require('@superpool/assets/images/logos/no_bg_white.png')}
+          source={require('../assets/images/logos/no_bg_white.png')}
           className="h-12 w-64"
           resizeMode="contain"
           testID="superpool-logo"
@@ -86,19 +86,23 @@ export default observer(function ConnectingScreen() {
 
       {/* Content Area */}
       <View className="flex-1 items-center justify-center px-8" testID="connecting-content">
-        {/* Main Status Display */}
-        <View className="mb-8 w-full max-w-sm" testID="main-status">
-          {error ? (
+        {/*
+          Failure gets a headline; progress does not.
+
+          The step list below already says what is happening and which step it
+          is happening on, so a spinner card above it repeated one fact in a
+          less specific form — and, being taller than the space left for it,
+          overlapped the wallet pill in the header. A refusal is the one state
+          the list cannot state plainly, because a failed step reads as a red
+          cross among five others.
+        */}
+        {error && (
+          <View className="mb-8 w-full max-w-sm" testID="main-status">
             <View className="items-center" testID="error-status">
               <Text className="text-coral font-medium text-lg text-center">Authentication Failed</Text>
             </View>
-          ) : (
-            <View className="bg-surface border-hairline border-veil p-2 rounded-xl items-center" testID="authenticating-status">
-              <LoadingSpinner size="large" testID="main-loading-spinner" />
-              <Text className="text-snow font-medium text-lg mt-4 text-center">Authenticating...</Text>
-            </View>
-          )}
-        </View>
+          </View>
+        )}
 
         {/* Step Progress List */}
         <View className="w-full max-w-sm" testID="steps-container">

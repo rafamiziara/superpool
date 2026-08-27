@@ -57,12 +57,16 @@ describe('ConnectingScreen', () => {
     expect(logo.props.accessibilityLabel).toBe('SuperPool Logo')
   })
 
-  it('should show authenticating status when active', () => {
-    const { getByTestId, getByText } = render(<ConnectingScreen />)
+  it('should report progress through the step list, not a card above it', () => {
+    const { getByTestId, queryByTestId } = render(<ConnectingScreen />)
 
-    expect(getByTestId('authenticating-status')).toBeTruthy()
-    expect(getByTestId('main-loading-spinner')).toBeTruthy()
-    expect(getByText('Authenticating...')).toBeTruthy()
+    // The spinner card said less than the list below it and overlapped the
+    // wallet pill above it. Progress is the list's job now.
+    expect(queryByTestId('authenticating-status')).toBeNull()
+    expect(queryByTestId('main-loading-spinner')).toBeNull()
+    expect(queryByTestId('main-status')).toBeNull()
+
+    expect(getByTestId('steps-container')).toBeTruthy()
   })
 
   it('should show error status when error occurs', () => {
