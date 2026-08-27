@@ -1,3 +1,6 @@
+export { ConnectWalletButton } from './ConnectWalletButton'
+export type { ConnectWalletButtonProps } from './ConnectWalletButton'
+
 export { FirebaseInitializer } from './FirebaseInitializer'
 
 export { LoadingSpinner, LoadingSpinnerVariants } from './LoadingSpinner'
