@@ -34,6 +34,9 @@ export default [
       '**/coverage/**',
       '**/lcov-report/**',
 
+      // Gitignored working notes and their throwaway helper scripts
+      '.dev/**',
+
       // Config files that don't need linting
       '**/merge-coverage.js',
       'packages/backend/scripts/**',
@@ -43,9 +46,6 @@ export default [
       '**/tailwind.config.js',
       '**/jest.config.ts',
       '**/jest.config.js',
-
-      // Packages without TypeScript files
-      'packages/assets/**',
     ],
   },
 

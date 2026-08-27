@@ -15,7 +15,7 @@ const metadata = {
   name: 'SuperPool',
   description: 'Decentralized Micro-Lending Platform',
   url: 'https://superpool.app',
-  icons: [require('@superpool/assets/images/logos/symbol.png')],
+  icons: [require('../../assets/images/logos/symbol.png')],
   redirect: {
     native: 'superpool://',
     universal: 'https://superpool.app',

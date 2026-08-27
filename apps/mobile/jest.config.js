@@ -12,7 +12,6 @@ module.exports = {
   moduleNameMapper: {
     '\\.css$': '<rootDir>/src/__tests__/styleMock.js',
     '^@/(.*)$': '<rootDir>/src/$1',
-    '^@superpool/assets/(.*)$': '<rootDir>/../../packages/assets/$1',
     '^@superpool/(.*)$': '<rootDir>/../../packages/$1/src',
   },
 

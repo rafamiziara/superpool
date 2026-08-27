@@ -97,7 +97,6 @@ Detailed setup and usage for each package:
 ### Shared Packages
 
 - **[TypeScript Types](../packages/types/README.md)** - Shared type definitions
-- **[Assets](../packages/assets/README.md)** - Brand assets and illustrations
 
 ## Common Issues
 

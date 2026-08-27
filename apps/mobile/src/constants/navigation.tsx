@@ -45,7 +45,7 @@ export const brandHeader = {
   ...darkHeader,
   headerTitle: () => (
     <Image
-      source={require('@superpool/assets/images/logos/no_bg_white.png')}
+      source={require('../../assets/images/logos/no_bg_white.png')}
       className="h-7 w-32"
       resizeMode="contain"
       accessibilityLabel="SuperPool"

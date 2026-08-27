@@ -87,4 +87,6 @@ pnpm build
 - **React 19** - UI library
 - **Tailwind CSS v4** - Styling
 - **GSAP** - Scroll animations (ScrollTrigger)
-- **@superpool/assets** - Brand assets
+
+Brand images are this app's own, under `public/images/`, referenced by URL
+(`/images/logos/no_bg_white.svg`). There is no shared asset package.

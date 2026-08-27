@@ -18,7 +18,7 @@ export default observer(function NavigationController() {
   return (
     <View className="flex-1 bg-abyss items-center justify-center" testID="splash-screen">
       <Image
-        source={require('@superpool/assets/images/logos/no_bg_white.png')}
+        source={require('../assets/images/logos/no_bg_white.png')}
         className="h-12 w-64"
         resizeMode="contain"
         accessibilityLabel="SuperPool"

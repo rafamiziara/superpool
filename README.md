@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="packages/assets/images/logos/with_padding.png" alt="SuperPool Logo" height="auto" />
+  <img src="apps/landing/public/images/logos/with_padding.png" alt="SuperPool Logo" height="auto" />
 </div>
 
 # 🚀 **SuperPool: Decentralized Micro-Lending Pools**
@@ -62,7 +62,7 @@ Designed and partly scaffolded, but **not** functional yet — the mobile screen
 - **Wallet Integration:** Reown AppKit with WalletConnect protocol supporting 500+ wallets
 - **Blockchain Interaction:** Wagmi hooks, Viem, Typechain for type-safe contract bindings
 - **Backend:** Firebase Cloud Functions, Firestore, wallet-based authentication
-- **Shared Packages:** TypeScript types (`@superpool/types`), brand assets (`@superpool/assets`)
+- **Shared Packages:** TypeScript types (`@superpool/types`)
 - **Monorepo Management:** pnpm workspaces, TypeScript project references
 - **Testing:** Jest, Hardhat test suite with local/forked network support
 
@@ -110,7 +110,6 @@ Detailed documentation for each component:
 **Shared Packages:**
 
 - [TypeScript Types](packages/types/README.md) - Shared type definitions
-- [Assets](packages/assets/README.md) - Brand assets and illustrations
 
 **Guides:**
 

@@ -18,11 +18,11 @@ SuperPool is a proof-of-concept multi-chain decentralized micro-lending platform
 
 ### Shared Packages
 
-- **Assets** (`packages/assets/`) - Brand assets, illustrations, onboarding images
 - **Types** (`packages/types/`) - Shared TypeScript interfaces for all applications
 
-There is no shared UI or design-token package: each app owns its own theme (see
-[UI & Frontend Interface Design](#ui--frontend-interface-design) below).
+There is no shared UI, design-token **or asset** package: each app owns its own
+theme (see [UI & Frontend Interface Design](#ui--frontend-interface-design)) and
+its own images (see [Assets](#assets)).
 
 ## Common Commands
 
@@ -89,13 +89,6 @@ pnpm web             # Run on web
 
 ### Shared Packages
 
-#### Assets (`packages/assets/`)
-
-```bash
-# No build needed - contains static assets
-# Used by importing: @superpool/assets/images/...
-```
-
 #### Types (`packages/types/`)
 
 ```bash
@@ -110,7 +103,7 @@ For project structure overview, see the [Architecture section in README.md](READ
 
 - [Mobile App](apps/mobile/README.md) | [Landing Page](apps/landing/README.md)
 - [Smart Contracts](packages/contracts/README.md) | [Backend](packages/backend/README.md)
-- [Types](packages/types/README.md) | [Assets](packages/assets/README.md)
+- [Types](packages/types/README.md)
 
 **IMPORTANT**: When making structural changes to a package, always update its README to reflect the changes.
 
@@ -140,7 +133,6 @@ For project structure overview, see the [Architecture section in README.md](READ
 
 **Shared Package System:**
 
-- **Assets** (`@superpool/assets`): Onboarding illustrations, brand assets, shared media
 - **Types** (`@superpool/types`): Authentication, lending, blockchain, and API interfaces
 
 **Landing Page** (Next.js 16):
@@ -184,7 +176,7 @@ steps, and checks the roles that are left. 17 checks.
 
 **A bare local node has no Safe contracts on it, and no entry in Safe's own
 registry for chain 31337.** That is why this was impossible until 2026-08-25 and
-why the 14 tests in `SafeIntegration.test.ts` were *pending* in every recorded
+why the 14 tests in `SafeIntegration.test.ts` were _pending_ in every recorded
 run — not passing, not failing, never executed. The answer is the SDK's
 `contractNetworks` option, which nothing was passing: `scripts/lib/safe.ts`
 deploys Safe 1.4.1 from `@safe-global/safe-contracts` build artifacts and hands
@@ -194,7 +186,7 @@ a public chain it returns `undefined` and refuses to deploy anything.
 **The threshold can only be met locally**, where every Safe owner is a Hardhat
 account whose key is derivable. On Amoy the script signs once and stops at
 `prepared`; the co-signers finish it in the Safe UI. So the local run is the
-only place the *accepting* half of the handover is ever exercised before it
+only place the _accepting_ half of the handover is ever exercised before it
 happens for real, once, irreversibly.
 
 **Combined Testing**:
@@ -482,14 +474,6 @@ pnpm transfer:ownership:amoy  # Transfer PoolFactory ownership to Safe
 - **Security**: Transfer ownership to multi-sig Safe post-deployment
 
 ## Shared Package Development
-
-### Shared Assets (`@superpool/assets`)
-
-Brand assets and media files:
-
-- **Onboarding**: 4 illustration files showcasing core SuperPool features
-- **Organization**: Structured directories (logos/, icons/, illustrations/, onboarding/)
-- **Usage**: Direct imports or via `@superpool/assets/images/...` paths
 
 ### TypeScript Types (`@superpool/types`)
 
@@ -1318,6 +1302,33 @@ never copy a value across:
 Reconciling the two is the job of the workspace-level design overhaul
 (`../DESIGN_OVERHAUL.md`); until then, follow whichever applies to the app you
 are in rather than introducing a third.
+
+## Assets
+
+**Each app owns its images.** There is no `@superpool/assets` package — it was
+deleted on 2026-08-27, having turned out to serve one consumer:
+
+- **Mobile**: `apps/mobile/assets/images/{logos,illustrations}/`, reached by
+  relative `require()` from the file that uses it, exactly like the app icons
+  that already lived in `apps/mobile/assets/`.
+- **Landing**: `apps/landing/public/images/{logos,illustrations}/`, reached by
+  URL (`/images/logos/no_bg_white.svg`) as Next.js serves it.
+
+The package never actually shared anything. Landing had its **own** copy of
+every file under `public/` and referenced those, never the package; the
+package's `build` script was a `cpy` that wrote the illustrations into
+`public/` for it. So the dependency, the workspace protocol and a step in
+`prebuild` bought a file copy that git could do. Its `index.js` was
+unreachable — `.` was missing from the `exports` map — and
+`apps/mobile/src/assets/index.ts` re-exported four `onboarding_*.png` files
+that had not existed for as long as git remembers.
+
+**The duplication is the point, not a regression.** Two apps, four
+illustrations and a couple of logos. A brand file changing in one and not the
+other is a smaller problem than a package whose only job is to be copied.
+
+**Adding an image**: put it in the app that needs it. If both need it, put it
+in both.
 
 ## EXTREMELY IMPORTANT: Testing & Code Quality Requirements
 

@@ -211,10 +211,11 @@ Configured in `src/config/wagmi.ts`:
 - **MobX** - Reactive state management
 - **Uniwind** - Tailwind CSS v4 for React Native
 - **@superpool/types** - Shared TypeScript types
-- **@superpool/assets** - Shared logos and onboarding illustrations
 
-> There is no shared UI or design-token package in this repo. The app's theme
-> lives in `global.css` — see [UI](#ui).
+> There is no shared UI, design-token or asset package in this repo. The app's
+> theme lives in `global.css` — see [UI](#ui), and its images live in
+> `assets/images/`, reached by relative `require()` from the file that uses
+> them.
 
 > **Jest stays on 29 here while `packages/backend` is on 30.** This is a
 > toolchain constraint, not drift: `jest-expo` builds on jest 29 internals

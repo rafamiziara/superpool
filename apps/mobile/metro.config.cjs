@@ -6,7 +6,6 @@ const config = getDefaultConfig(__dirname)
 
 // Configure workspace aliases
 config.resolver.alias = {
-  '@superpool/assets': path.resolve(__dirname, '../../packages/assets'),
   '@superpool/types': path.resolve(__dirname, '../../packages/types'),
 }
 
@@ -23,11 +22,7 @@ config.resolver.blockList = [
 config.resolver.platforms = ['ios', 'android', 'native', 'web']
 
 // Add workspace directories to watchFolders
-config.watchFolders = [
-  ...config.watchFolders,
-  path.resolve(__dirname, '../../packages/assets'),
-  path.resolve(__dirname, '../../packages/types'),
-]
+config.watchFolders = [...config.watchFolders, path.resolve(__dirname, '../../packages/types')]
 
 // withUniwindConfig must be the outermost wrapper
 module.exports = withUniwindConfig(config, {
