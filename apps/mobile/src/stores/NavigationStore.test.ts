@@ -187,8 +187,8 @@ describe('NavigationStore', () => {
     })
   })
 
-  describe('Toast Notifications', () => {
-    it('should show authentication successful toast', () => {
+  describe('Authentication transition', () => {
+    it('should log the moment authentication succeeds', () => {
       const mockUser = {
         walletAddress: '0x123',
         createdAt: Date.now(),
@@ -197,17 +197,16 @@ describe('NavigationStore', () => {
       }
 
       // First initialize
-      navigationStore['handleToastNotifications']({ user: null, isAuthenticating: false }, undefined)
+      navigationStore['handleAuthTransition']({ user: null, isAuthenticating: false }, undefined)
 
       // Then simulate authentication success
-      navigationStore['handleToastNotifications']({ user: mockUser, isAuthenticating: false }, { user: null, isAuthenticating: false })
+      navigationStore['handleAuthTransition']({ user: mockUser, isAuthenticating: false }, { user: null, isAuthenticating: false })
 
       expect(mockConsoleLog).toHaveBeenCalledWith('🎉 NavigationStore: Authentication successful')
-      // Toast is called via real implementation - we just verify no errors
     })
 
-    it('should not show toast on initial render', () => {
-      navigationStore['handleToastNotifications']({ user: null, isAuthenticating: false }, undefined)
+    it('should stay quiet on the initial reaction', () => {
+      navigationStore['handleAuthTransition']({ user: null, isAuthenticating: false }, undefined)
 
       // Should complete without errors - no assertion needed
     })
@@ -222,7 +221,6 @@ describe('NavigationStore', () => {
       expect(authStore.reset).toHaveBeenCalled()
       expect(mockSignOut).toHaveBeenCalledWith(FIREBASE_AUTH)
       expect(mockConsoleLog).toHaveBeenCalledWith('✅ NavigationStore: Firebase user signed out')
-      // Toast is called via real implementation - we just verify no errors
     })
 
     it('should handle wallet disconnection without Firebase user', async () => {
@@ -232,7 +230,6 @@ describe('NavigationStore', () => {
 
       expect(authStore.reset).toHaveBeenCalled()
       expect(mockSignOut).not.toHaveBeenCalled()
-      // Toast is called via real implementation - we just verify no errors
     })
 
     it('should handle Firebase signout errors during wallet disconnection', async () => {
@@ -243,14 +240,12 @@ describe('NavigationStore', () => {
 
       expect(mockConsoleError).toHaveBeenCalledWith('❌ NavigationStore: Firebase signout failed:', expect.any(Error))
       expect(authStore.reset).toHaveBeenCalled()
-      // Toast is called via real implementation - we just verify no errors
     })
 
     it('should handle wallet connection', () => {
       navigationStore['handleWalletConnection']()
 
       expect(mockConsoleLog).toHaveBeenCalledWith('🔗 NavigationStore: Handling wallet connection')
-      // Toast is called via real implementation - we just verify no errors
     })
 
     it('should detect wallet disconnection state change', () => {

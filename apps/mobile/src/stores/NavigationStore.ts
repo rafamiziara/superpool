@@ -2,7 +2,6 @@ import type { User } from '@superpool/types'
 import { router } from 'expo-router'
 import { signOut } from 'firebase/auth'
 import { makeAutoObservable, reaction } from 'mobx'
-import Toast from 'react-native-toast-message'
 import { FIREBASE_AUTH } from '../config/firebase'
 import { logger } from '../utils/logger'
 import { authStore } from './AuthStore'
@@ -72,8 +71,8 @@ export class NavigationStore {
         // Navigate based on current state
         this.navigateBasedOnCurrentState(currentState)
 
-        // Handle toast notifications
-        this.handleToastNotifications(currentState, previousState)
+        // Note the authentication transition (logged, never toasted)
+        this.handleAuthTransition(currentState, previousState)
 
         // Handle wallet disconnection if needed
         this.handleWalletStateChanges(currentState, previousState)
@@ -131,31 +130,49 @@ export class NavigationStore {
     }, 50)
   }
 
-  private handleToastNotifications(
+  /**
+   * Notice the moment authentication succeeds, and log it.
+   *
+   * **No toast.** Connecting, authenticating and being logged out are all
+   * announced by the screen the user lands on — `connecting` narrates itself
+   * step by step, the dashboard is what being signed in looks like, and
+   * `onboarding` is what being signed out looks like. A toast on top of any of
+   * them restated a navigation the user was already watching.
+   *
+   * The transition is still worth a line in the log: it is the boundary
+   * everything else in this store keys off, and it is the first thing to check
+   * when a session ends up on the wrong screen.
+   */
+  private handleAuthTransition(
     currentState: { user: User | null; isAuthenticating: boolean },
     previousState: { user: User | null; isAuthenticating: boolean } | undefined
   ) {
-    // Skip toasts on initial render
+    // The first reaction fires with `fireImmediately`, so it is not a transition.
     if (!previousState || !this.hasInitialized) {
       this.hasInitialized = true
       return
     }
 
-    // Toast: Authentication successful
     if (!previousState.user && currentState.user) {
       logger.debug('🎉 NavigationStore: Authentication successful')
-
-      // Show toast notification
-      Toast.show({
-        type: 'info',
-        text1: 'Authentication Successful!',
-        text2: 'Welcome to SuperPool 🎉',
-        topOffset: 60,
-      })
     }
   }
 
-  // Handle wallet state changes from AuthStore reaction
+  /**
+   * Handle wallet state changes from the AuthStore reaction.
+   *
+   * **Connecting and disconnecting are announced by the screen change, not by a
+   * toast.** Both are acts the user just performed, and both move them
+   * immediately — connect lands on `connecting`, which says what is happening
+   * step by step; disconnect lands on `onboarding`, which is what being logged
+   * out looks like. A toast on top of either restated the navigation the user
+   * was already watching.
+   *
+   * Authentication succeeding is silent for the same reason — see
+   * `handleAuthTransition`. This store raises no toasts at all; the only ones
+   * left in the app come from `NotificationListener`, where they carry news the
+   * user could not otherwise have seen.
+   */
   private handleWalletStateChanges(
     currentState: { isWalletConnected: boolean; walletAddress: string | null },
     previousState: { isWalletConnected: boolean; walletAddress: string | null } | undefined
@@ -190,26 +207,10 @@ export class NavigationStore {
     } catch (error) {
       logger.error('❌ NavigationStore: Firebase signout failed:', error)
     }
-
-    // Show toast notification
-    Toast.show({
-      type: 'info',
-      text1: 'Wallet Disconnected',
-      text2: 'You have been logged out',
-      topOffset: 60,
-    })
   }
 
   private handleWalletConnection() {
     logger.debug('🔗 NavigationStore: Handling wallet connection')
-
-    // Show toast notification
-    Toast.show({
-      type: 'success',
-      text1: 'Wallet Connected!',
-      text2: 'Starting authentication...',
-      topOffset: 60,
-    })
   }
 }
 
