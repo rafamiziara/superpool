@@ -331,6 +331,13 @@ moment it has a receipt, so nothing a user waits on got slower.
 
 ## Environment Setup
 
+For which environments exist and what configures each, read
+[`docs/ENVIRONMENTS.md`](docs/ENVIRONMENTS.md). Note especially that there are
+**two, plus CI** — one Firebase project with no aliases, and nothing deployed
+yet — and that the backend environment and the chain environment are
+independent axes: a local backend can serve Amoy, and the app's wallet defaults
+to Polygon mainnet, which nothing serves.
+
 **Critical Security Notes:**
 
 - Never commit `.env` files or service account keys
