@@ -1199,7 +1199,12 @@ Five rules that are easy to break:
 
 - **Parse outside the `try`.** Every list callable's catch reports what it
   caught as `internal`; a refusal raised inside one is swallowed and comes back
-  as a server error the caller is invited to retry forever.
+  as a server error the caller is invited to retry forever. **And guard the
+  catch anyway** — `if (error instanceof HttpsError) throw error`, as
+  `assessLoan`, `preparePoolCreation` and `listBorrowerHistories` do. Hoisting
+  protects the throws you moved; the guard protects the next one somebody adds
+  inside the block. `listBorrowerHistories` had neither until 2026-09-02, and
+  reported "this chain is not served" — permanent — as "please try again".
 - **Import from `utils/validation`, never from `../../utils`.** Several handler
   tests mock the barrel wholesale, and a validator a test can replace with
   `undefined` is not one the handler can rely on.
