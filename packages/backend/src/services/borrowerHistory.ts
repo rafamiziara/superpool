@@ -133,13 +133,37 @@ export async function borrowerHistoriesFor(
   nowSeconds: number,
   firestore: Firestore
 ): Promise<Record<string, BorrowerHistory>> {
-  const wallets = [...new Set(borrowers.map((borrower) => borrower.toLowerCase()))].slice(0, MAX_BORROWERS_PER_CALL)
-
   const histories = await Promise.all(
-    wallets.map(async (wallet) => [wallet, summariseLoans(await loansOf(wallet, chainId, firestore), nowSeconds)] as const)
+    walletsAsked(borrowers).map(async (wallet) => [wallet, summariseLoans(await loansOf(wallet, chainId, firestore), nowSeconds)] as const)
   )
 
   return Object.fromEntries(histories)
+}
+
+/**
+ * The same answer for a chain with nothing on it, without asking Firestore.
+ *
+ * For a chain this backend does not serve, where there are no loans to read
+ * and — the reason this exists rather than a plain empty object — **no chain
+ * to read a time from**. A wallet with no record is `isNew`, which is what a
+ * wallet on an unserved chain genuinely is as far as this backend can see.
+ *
+ * Normalised through `walletsAsked` like the real thing, so the two cannot
+ * disagree about which keys come back for a given request.
+ */
+export function emptyHistoriesFor(borrowers: string[]): Record<string, BorrowerHistory> {
+  return Object.fromEntries(walletsAsked(borrowers).map((wallet) => [wallet, emptyHistory()] as const))
+}
+
+/**
+ * Which wallets a request is actually asking about.
+ *
+ * Lowercased because that is how the loans are stored and how the response is
+ * keyed, deduplicated because asking twice is one question, and capped last so
+ * the cap counts wallets rather than repetitions of one.
+ */
+function walletsAsked(borrowers: string[]): string[] {
+  return [...new Set(borrowers.map((borrower) => borrower.toLowerCase()))].slice(0, MAX_BORROWERS_PER_CALL)
 }
 
 /**

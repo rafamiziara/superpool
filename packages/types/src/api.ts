@@ -685,6 +685,11 @@ export interface ListBorrowerHistoriesResponse {
    * is pushed months ahead by the verification scripts, and a history that
    * judged lateness against `Date.now()` would report every loan on it as
    * comfortably inside its term. Same rule `sendDueReminders` follows.
+   *
+   * **One exception**, and it is the only one: on a chain this backend does
+   * not serve, every history comes back `isNew` and there is no chain to read
+   * a block from, so this is server time. Nothing was judged against it —
+   * there are no loans — so it dates the answer rather than a comparison.
    */
   asOf: string
 }
