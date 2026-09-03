@@ -27,8 +27,9 @@ ngrok.yml
 .claude/*.local.json
 
 # Personal documentation files
-.dev
-
+# Scratch space - disposable, cleared when a feature closes (see temp/README.md)
+/temp/*
+!/temp/README.md
 # SuperDesign files
 .superdesign/
 
