@@ -2,7 +2,7 @@
 
 Scratch space. **Everything in here is disposable and gitignored.**
 
-The test: *would I mind if this vanished tonight?* If no, it belongs here. If yes, it is
+The test: _would I mind if this vanished tonight?_ If no, it belongs here. If yes, it is
 not temp — it needs a tracked home (`docs/` for reference material, `roadmap/<feature>/`
 for pipeline artifacts, a Linear issue for work to be done).
 
