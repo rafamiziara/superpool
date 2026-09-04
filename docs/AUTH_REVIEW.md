@@ -8,7 +8,7 @@
 
 ## 0. The short version
 
-The intuition is right, but not for the reason it usually is. The *protocol* is
+The intuition is right, but not for the reason it usually is. The _protocol_ is
 sound and close to the industry standard — nonce, sign, verify, mint a Firebase
 custom token. What is too complex is the **mobile orchestration around it**:
 about 800 lines of non-test code and 1,600 lines of tests wrapped around a flow
@@ -17,14 +17,14 @@ whose actual work is roughly forty lines and three awaits.
 The complexity is not merely ornamental. It is hiding **six real defects**, two
 of which are user-visible today:
 
-| # | Finding | Severity |
-|---|---|---|
-| 1 | A failed sign-in is a permanent dead end — no retry path exists | **High** |
-| 2 | The App Check token is minted fresh on **every single Firebase call** | **High** |
-| 3 | The wallet-disconnect effect is a render loop | **High** |
-| 4 | "Verify Signature ✓" is shown before verification is attempted | Medium |
-| 5 | The EIP-712 path is unreachable from the app; `safe-wallet` is accepted and silently ignored | Medium |
-| 6 | Smart-contract wallets (Safe, ERC-4337) cannot log in at all, by regex | Medium |
+| #   | Finding                                                                                      | Severity |
+| --- | -------------------------------------------------------------------------------------------- | -------- |
+| 1   | A failed sign-in is a permanent dead end — no retry path exists                              | **High** |
+| 2   | The App Check token is minted fresh on **every single Firebase call**                        | **High** |
+| 3   | The wallet-disconnect effect is a render loop                                                | **High** |
+| 4   | "Verify Signature ✓" is shown before verification is attempted                               | Medium   |
+| 5   | The EIP-712 path is unreachable from the app; `safe-wallet` is accepted and silently ignored | Medium   |
+| 6   | Smart-contract wallets (Safe, ERC-4337) cannot log in at all, by regex                       | Medium   |
 
 Plus roughly 300 lines of API surface that has no caller.
 
@@ -184,7 +184,7 @@ guard clause is load-bearing for a reason it was not written for.
 **Why the tests do not catch it**: `useAutoAuth.test.ts:23-55` mocks all three
 hooks as module-level constant objects, so identity is stable in the test and
 unstable in the app. This is the classic failure mode of mocking a hook's
-*shape* rather than its behaviour.
+_shape_ rather than its behaviour.
 
 **Fix**: the sub-hooks should return stable identities (`useMemo`/`useCallback`
 over a ref'd state), or — better, see §4 — stop being hooks at all.
@@ -309,19 +309,19 @@ handler branched on it, the schema would have rejected the request first.
 
 ## 3. The complexity itself
 
-| File | Lines | Tests |
-|---|---:|---:|
-| `hooks/auth/useAutoAuth.ts` | 144 | 467 |
-| `hooks/auth/useFirebaseAuth.ts` | 113 | 239 |
-| `hooks/auth/useMessageGeneration.ts` | 80 | 222 |
-| `hooks/auth/useSignatureHandling.ts` | 66 | 290 |
-| `stores/AuthStore.ts` | 199 | 167 |
-| `types/auth.ts` | 51 | — |
-| `constants/authSteps.ts` | 43 | — |
-| `utils/appCheckProvider.ts` | 50 | 120 |
-| `app/connecting.tsx` | 161 | 357 |
-| **mobile total** | **907** | **1,862** |
-| `functions/auth/*` + `utils/auth.ts` + `schemas/auth.ts` | 370 | 969 |
+| File                                                     |   Lines |     Tests |
+| -------------------------------------------------------- | ------: | --------: |
+| `hooks/auth/useAutoAuth.ts`                              |     144 |       467 |
+| `hooks/auth/useFirebaseAuth.ts`                          |     113 |       239 |
+| `hooks/auth/useMessageGeneration.ts`                     |      80 |       222 |
+| `hooks/auth/useSignatureHandling.ts`                     |      66 |       290 |
+| `stores/AuthStore.ts`                                    |     199 |       167 |
+| `types/auth.ts`                                          |      51 |         — |
+| `constants/authSteps.ts`                                 |      43 |         — |
+| `utils/appCheckProvider.ts`                              |      50 |       120 |
+| `app/connecting.tsx`                                     |     161 |       357 |
+| **mobile total**                                         | **907** | **1,862** |
+| `functions/auth/*` + `utils/auth.ts` + `schemas/auth.ts` |     370 |       969 |
 
 Two structural causes, both worth naming because they will recur elsewhere in
 the app if they are not:
@@ -377,7 +377,7 @@ so the UID can later become opaque without rewriting every rule.
 
 `viem@2.37` is already a dependency of the mobile app. `ethers@6` on the
 backend can verify a SIWE message with `verifyMessage` unchanged — SIWE is a
-`personal_sign` payload with a specified *format*, not a different signing
+`personal_sign` payload with a specified _format_, not a different signing
 scheme. So this is a **message-format change, not a protocol change**, and it
 removes rather than adds code:
 
@@ -405,7 +405,7 @@ account contract. `viem`'s `verifyMessage`/`verifySiweMessage` do both
 automatically given a public client, and there is an ethers-6 equivalent.
 
 This is what makes `signatureType` unnecessary rather than dead: the verifier
-decides how to verify from the *address*, which is a fact, instead of from a
+decides how to verify from the _address_, which is a fact, instead of from a
 field the caller asserts.
 
 Note the interaction with `chainId`: EIP-1271 needs a chain to make the call on,
@@ -447,14 +447,15 @@ Firebase call.
 
 Phased so each step is independently shippable and independently revertable.
 
-**Phase 1 — the two user-visible bugs** *(small, do first)*
+**Phase 1 — the two user-visible bugs** _(small, do first)_
+
 1. `expireTimeMillis: Date.now() + ttlMillis`; update
    `customAppCheckMinter.test.ts:65`, which pins the bug. Drop the `lastUsed`
    write from `isDeviceApproved`.
 2. Add a retry to `connecting.tsx` calling `authStore.resetProgress()`.
    Distinguish "user cancelled" from "failed".
 
-**Phase 2 — collapse the mobile hooks** *(the bulk of the simplification)*
+**Phase 2 — collapse the mobile hooks** _(the bulk of the simplification)_
 
 3. Fold `useMessageGeneration` and `useFirebaseAuth` into plain async
    functions in `src/services/auth.ts`. Keep `useSignatureHandling` as a thin
@@ -465,9 +466,9 @@ Phased so each step is independently shippable and independently revertable.
 5. Reduce `AUTH_STEPS` to the three real steps; delete the invented ones and
    the `'firebase-auth'` string special-case.
 6. Delete the dead surface listed in §3. Rewrite the tests against behaviour —
-   expect this phase to *remove* roughly a thousand lines of test.
+   expect this phase to _remove_ roughly a thousand lines of test.
 
-**Phase 3 — SIWE + EIP-1271** *(the modernisation)*
+**Phase 3 — SIWE + EIP-1271** _(the modernisation)_
 
 7. Swap `createAuthMessage` for `createSiweMessage`; keep the nonce and
    `claimAuthNonce` exactly as they are.
@@ -477,7 +478,7 @@ Phased so each step is independently shippable and independently revertable.
 9. Normalise addresses to lowercase at the schema boundary — **migration**,
    because existing Firebase UIDs are checksummed. Plan it as one.
 
-**Phase 4 — real attestation** *(gated on the dev build)*
+**Phase 4 — real attestation** _(gated on the dev build)_
 
 10. Play Integrity + App Attest, `ENFORCE_APP_CHECK=true`, delete the custom
     provider chain. Add a TTL policy on `auth_nonces.expiresAt` and
@@ -511,15 +512,15 @@ Phases 1 and 2 are worth doing regardless of whether 3 and 4 ever happen.
 
 ## Appendix — claims and how they were checked
 
-| Claim | Basis |
-|---|---|
-| Sub-hooks have exactly one consumer each | `grep` for each hook name across `src/` and `app/`; only `useAutoAuth` imports them, only `connecting.tsx` imports it |
-| `logout`, `clearError`, `clearSignature`, `resetProgress`, `resetWalletState`, `resetInitialization`, `isAuthenticatingForWallet` have no callers | `grep` across `src/` and `app/`, excluding tests |
-| `chainId` / `signatureType` are never populated | `AuthenticationData` is constructed once, at `useAutoAuth.ts:83-91` |
-| `authStore.error` is cleared only by `reset()`/`startStep()` | `grep setError\|reset\|resetProgress` across the app |
-| Tests hide the render-loop hazard | `useAutoAuth.test.ts:23-55` returns module-level constants from the mocked hooks |
-| `safe-wallet` has no handler branch | `verifySignatureAndLogin.ts:74` is a two-way `if/else` on `'typed-data'` |
-| Safe support was removed but the enum stayed | commit `4d2fa53` (2025-10-12), *"remove Safe wallet support"* |
-| No TTL policy on `auth_nonces` | nothing in `config/firebase.json` or `config/firestore.indexes.json`; TTL is configured out-of-band, so confirm in the console before acting |
-| `expireTimeMillis` is absolute in the JS SDK | Firebase JS SDK `AppCheckToken` contract; `customAppCheckMinter.test.ts:65` pins the duration being sent. **Worth confirming against the installed `firebase@12.2.1` typings before the fix lands.** |
-| AppKit SIWX on RN 1.3.2 | **not verified** — check before planning around it |
+| Claim                                                                                                                                             | Basis                                                                                                                                                                                                |
+| ------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Sub-hooks have exactly one consumer each                                                                                                          | `grep` for each hook name across `src/` and `app/`; only `useAutoAuth` imports them, only `connecting.tsx` imports it                                                                                |
+| `logout`, `clearError`, `clearSignature`, `resetProgress`, `resetWalletState`, `resetInitialization`, `isAuthenticatingForWallet` have no callers | `grep` across `src/` and `app/`, excluding tests                                                                                                                                                     |
+| `chainId` / `signatureType` are never populated                                                                                                   | `AuthenticationData` is constructed once, at `useAutoAuth.ts:83-91`                                                                                                                                  |
+| `authStore.error` is cleared only by `reset()`/`startStep()`                                                                                      | `grep setError\|reset\|resetProgress` across the app                                                                                                                                                 |
+| Tests hide the render-loop hazard                                                                                                                 | `useAutoAuth.test.ts:23-55` returns module-level constants from the mocked hooks                                                                                                                     |
+| `safe-wallet` has no handler branch                                                                                                               | `verifySignatureAndLogin.ts:74` is a two-way `if/else` on `'typed-data'`                                                                                                                             |
+| Safe support was removed but the enum stayed                                                                                                      | commit `4d2fa53` (2025-10-12), _"remove Safe wallet support"_                                                                                                                                        |
+| No TTL policy on `auth_nonces`                                                                                                                    | nothing in `config/firebase.json` or `config/firestore.indexes.json`; TTL is configured out-of-band, so confirm in the console before acting                                                         |
+| `expireTimeMillis` is absolute in the JS SDK                                                                                                      | Firebase JS SDK `AppCheckToken` contract; `customAppCheckMinter.test.ts:65` pins the duration being sent. **Worth confirming against the installed `firebase@12.2.1` typings before the fix lands.** |
+| AppKit SIWX on RN 1.3.2                                                                                                                           | **not verified** — check before planning around it                                                                                                                                                   |
