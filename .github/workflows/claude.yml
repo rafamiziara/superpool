@@ -39,9 +39,11 @@ jobs:
           # This is an optional setting that allows Claude to read CI results on PRs
           additional_permissions: |
             actions: read
-          
-          # Optional: Specify model (defaults to Claude Sonnet 4, uncomment for Claude Opus 4.1)
-          # model: "claude-opus-4-1-20250805"
+
+          # The action's built-in default model (claude-sonnet-4-20250514) has been
+          # retired by Anthropic, so it must be pinned explicitly. Using the alias
+          # instead of a dated snapshot so it doesn't go stale again.
+          model: "claude-sonnet-5"
           
           # Optional: Customize the trigger phrase (default: @claude)
           # trigger_phrase: "/claude"
