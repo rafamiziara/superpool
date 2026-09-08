@@ -51,6 +51,8 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
+    "@rm30/metro-config": "^0.1.0",
+    "@rm30/tsconfig": "^0.1.0",
     "@testing-library/react-native": "^13.3.3",
     "@types/jest": "^29.5.14",
     "@types/react": "~19.2.14",

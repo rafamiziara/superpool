@@ -31,6 +31,7 @@
   "packageManager": "pnpm@10.12.4",
   "devDependencies": {
     "@eslint/js": "^9.15.0",
+    "@rm30/tsconfig": "^0.1.0",
     "@typescript-eslint/eslint-plugin": "^8.15.0",
     "@typescript-eslint/parser": "^8.15.0",
     "eslint": "^9.15.0",

@@ -11,6 +11,9 @@ importers:
       '@eslint/js':
         specifier: ^9.15.0
         version: 9.39.3
+      '@rm30/tsconfig':
+        specifier: ^0.1.0
+        version: 0.1.0
       '@typescript-eslint/eslint-plugin':
         specifier: ^8.15.0
         version: 8.56.1(@typescript-eslint/parser@8.56.1(eslint@9.39.3(jiti@2.6.1))(typescript@6.0.3))(eslint@9.39.3(jiti@2.6.1))(typescript@6.0.3)
@@ -63,6 +66,9 @@ importers:
       '@eslint/eslintrc':
         specifier: ^3
         version: 3.3.4
+      '@rm30/tsconfig':
+        specifier: ^0.1.0
+        version: 0.1.0
       '@tailwindcss/postcss':
         specifier: ^4
         version: 4.2.1
@@ -193,6 +199,12 @@ importers:
         specifier: ^4.4.3
         version: 4.4.3
     devDependencies:
+      '@rm30/metro-config':
+        specifier: ^0.1.0
+        version: 0.1.0(uniwind@1.10.0(@expo/metro-config@56.0.16(bufferutil@4.1.0)(expo@56.0.15)(typescript@6.0.3)(utf-8-validate@6.0.6))(metro-cache@0.84.4)(metro-transform-worker@0.84.4(bufferutil@4.1.0)(utf-8-validate@6.0.6))(metro@0.84.4(bufferutil@4.1.0)(utf-8-validate@6.0.6))(react-native@0.85.3(@babel/core@7.29.0)(@react-native/jest-preset@0.85.3(@babel/core@7.29.0)(react@19.2.3))(@react-native/metro-config@0.85.3(@babel/core@7.29.0)(bufferutil@4.1.0)(utf-8-validate@6.0.6))(@types/react@19.2.14)(bufferutil@4.1.0)(react@19.2.3)(utf-8-validate@6.0.6))(react@19.2.3)(tailwindcss@4.3.2))
+      '@rm30/tsconfig':
+        specifier: ^0.1.0
+        version: 0.1.0
       '@testing-library/react-native':
         specifier: ^13.3.3
         version: 13.3.3(jest@29.7.0(@types/node@25.9.5)(ts-node@10.9.2(@types/node@25.9.5)(typescript@6.0.3)))(react-native@0.85.3(@babel/core@7.29.0)(@react-native/jest-preset@0.85.3(@babel/core@7.29.0)(react@19.2.3))(@react-native/metro-config@0.85.3(@babel/core@7.29.0)(bufferutil@4.1.0)(utf-8-validate@6.0.6))(@types/react@19.2.14)(bufferutil@4.1.0)(react@19.2.3)(utf-8-validate@6.0.6))(react-test-renderer@19.2.3(react@19.2.3))(react@19.2.3)
@@ -3656,6 +3668,17 @@ packages:
 
   '@reown/appkit@1.7.8':
     resolution: {integrity: sha512-51kTleozhA618T1UvMghkhKfaPcc9JlKwLJ5uV+riHyvSoWPKPRIa5A6M1Wano5puNyW0s3fwywhyqTHSilkaA==}
+
+  '@rm30/metro-config@0.1.0':
+    resolution: {integrity: sha512-N15375RF4hudGiiI0PiQLEBP0R8ZlJjHIBjsfSxpoQTHKWW7V3+oPAyyqHNoiLvMkqiEOIe/963qomN5lMHWPA==}
+    peerDependencies:
+      uniwind: '>=1.9.0'
+    peerDependenciesMeta:
+      uniwind:
+        optional: true
+
+  '@rm30/tsconfig@0.1.0':
+    resolution: {integrity: sha512-6G/d/ML+3x6zVUj7WtmM9IH1OnLbTHp1AuSTvrStfxbGIE04YPV5N75eXkO6SJqjGdUXJfQ3izM5amFqsMmBqQ==}
 
   '@rollup/plugin-alias@6.0.0':
     resolution: {integrity: sha512-tPCzJOtS7uuVZd+xPhoy5W4vThe6KWXNmsFCNktaAh5RTqcLiSfT4huPQIXkgJ6YCOjJHvecOAzQxLFhPxKr+g==}
@@ -17519,6 +17542,12 @@ snapshots:
       - uploadthing
       - utf-8-validate
       - zod
+
+  '@rm30/metro-config@0.1.0(uniwind@1.10.0(@expo/metro-config@56.0.16(bufferutil@4.1.0)(expo@56.0.15)(typescript@6.0.3)(utf-8-validate@6.0.6))(metro-cache@0.84.4)(metro-transform-worker@0.84.4(bufferutil@4.1.0)(utf-8-validate@6.0.6))(metro@0.84.4(bufferutil@4.1.0)(utf-8-validate@6.0.6))(react-native@0.85.3(@babel/core@7.29.0)(@react-native/jest-preset@0.85.3(@babel/core@7.29.0)(react@19.2.3))(@react-native/metro-config@0.85.3(@babel/core@7.29.0)(bufferutil@4.1.0)(utf-8-validate@6.0.6))(@types/react@19.2.14)(bufferutil@4.1.0)(react@19.2.3)(utf-8-validate@6.0.6))(react@19.2.3)(tailwindcss@4.3.2))':
+    optionalDependencies:
+      uniwind: 1.10.0(@expo/metro-config@56.0.16(bufferutil@4.1.0)(expo@56.0.15)(typescript@6.0.3)(utf-8-validate@6.0.6))(metro-cache@0.84.4)(metro-transform-worker@0.84.4(bufferutil@4.1.0)(utf-8-validate@6.0.6))(metro@0.84.4(bufferutil@4.1.0)(utf-8-validate@6.0.6))(react-native@0.85.3(@babel/core@7.29.0)(@react-native/jest-preset@0.85.3(@babel/core@7.29.0)(react@19.2.3))(@react-native/metro-config@0.85.3(@babel/core@7.29.0)(bufferutil@4.1.0)(utf-8-validate@6.0.6))(@types/react@19.2.14)(bufferutil@4.1.0)(react@19.2.3)(utf-8-validate@6.0.6))(react@19.2.3)(tailwindcss@4.3.2)
+
+  '@rm30/tsconfig@0.1.0': {}
 
   '@rollup/plugin-alias@6.0.0(rollup@4.62.4)':
     optionalDependencies:
