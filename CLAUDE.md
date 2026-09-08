@@ -60,7 +60,7 @@ pnpm lint             # Lint Solidity and TypeScript files
 ```bash
 pnpm build           # TypeScript compilation
 pnpm lint            # ESLint
-pnpm test            # Jest tests
+pnpm test            # Jest tests (Vitest migration is on chore/backend-vitest)
 pnpm serve           # Start Firebase emulators
 pnpm deploy          # Deploy to Firebase
 pnpm generateKey     # Generate dev keys for backend testing
@@ -92,10 +92,13 @@ pnpm web             # Run on web
 #### Types (`packages/types/`)
 
 ```bash
-pnpm build           # Build TypeScript definitions
-pnpm dev             # Watch mode for development
 pnpm type-check      # TypeScript type checking
 ```
+
+There is deliberately **no build**. The package is source-direct — `main`,
+`types` and `exports` all point at `src/index.ts` — because Metro, Next and tsc
+all read TypeScript from source. The tsup build it used to carry produced a
+`dist/` that only a `prebuild` hook and three CI steps ever depended on.
 
 ## Architecture
 
@@ -499,7 +502,7 @@ Comprehensive interfaces for type safety:
 - **State Management**: MobX, mobx-react-lite for reactive state management
 - **Styling**: Tailwind CSS v4 (web + mobile via Uniwind), shared design system
 - **Icons**: FontAwesome (@expo/vector-icons for mobile)
-- **Development**: pnpm workspaces, TypeScript project references, Jest
+- **Development**: pnpm workspaces, TypeScript project references. Tests: Vitest in `packages/agents`, Jest in `packages/backend` (migration in progress), jest-expo on mobile
 
 ## Git & Version Control
 
