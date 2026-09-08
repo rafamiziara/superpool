@@ -1311,9 +1311,9 @@ never copy a value across:
 - **Landing** has its own darker palette in `apps/landing/src/app/globals.css`
   (Tailwind v4, plain classNames).
 
-Reconciling the two is the job of the workspace-level design overhaul
-(`../DESIGN_OVERHAUL.md`); until then, follow whichever applies to the app you
-are in rather than introducing a third.
+Reconciling the two is the job of the workspace-level design overhaul, which lives
+outside this repo and is currently parked; until then, follow whichever applies to
+the app you are in rather than introducing a third.
 
 ## Assets
 
