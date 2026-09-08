@@ -1,4 +1,5 @@
 import type { MemberInfo } from '@superpool/types'
+import type { Mock } from 'vitest'
 import { mockLogger } from '../../__tests__/setup'
 
 /**
@@ -8,8 +9,8 @@ import { mockLogger } from '../../__tests__/setup'
  */
 type StoredMember = Omit<MemberInfo, 'joinedAt' | 'id'> & { id: string; joinedAt: Date }
 
-const { firestore } = require('../../services')
-const { listMembersHandler } = require('./listMembers')
+import { firestore } from '../../services'
+import { listMembersHandler } from './listMembers'
 
 const CHAIN_ID = 31337 // matches ACTIVE_CHAIN_CONFIG default
 const ACCOUNT = '0x9965507d1a55bcc2695c58ba16fb37d819b0a4dc'
@@ -47,12 +48,12 @@ describe('listMembersHandler', () => {
     }))
 
     return {
-      where: jest.fn().mockReturnThis(),
-      orderBy: jest.fn().mockReturnThis(),
-      limit: jest.fn().mockReturnThis(),
-      get: jest.fn().mockResolvedValue({ docs: mockDocs }),
-      count: jest.fn().mockReturnValue({
-        get: jest.fn().mockResolvedValue({ data: () => ({ count: totalCount }) }),
+      where: vi.fn().mockReturnThis(),
+      orderBy: vi.fn().mockReturnThis(),
+      limit: vi.fn().mockReturnThis(),
+      get: vi.fn().mockResolvedValue({ docs: mockDocs }),
+      count: vi.fn().mockReturnValue({
+        get: vi.fn().mockResolvedValue({ data: () => ({ count: totalCount }) }),
       }),
     }
   }
@@ -67,9 +68,9 @@ describe('listMembersHandler', () => {
   let mockQuery: ReturnType<typeof createMockQuery>
 
   beforeEach(() => {
-    jest.clearAllMocks()
+    vi.clearAllMocks()
     mockQuery = createMockQuery(mockMembers, mockMembers.length)
-    ;(firestore.collection as jest.Mock).mockReturnValue(mockQuery)
+    ;(firestore.collection as Mock).mockReturnValue(mockQuery)
   })
 
   it('should reject an unauthenticated caller', async () => {

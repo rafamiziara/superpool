@@ -1,4 +1,6 @@
-import type { ContributionInfo } from '@superpool/types'
+import type { ContributionInfo, ListContributionsRequest } from '@superpool/types'
+import type { CollectionReference, DocumentData } from 'firebase-admin/firestore'
+import type { CallableRequest } from 'firebase-functions/v2/https'
 import { mockLogger } from '../../__tests__/setup'
 
 /**
@@ -8,9 +10,10 @@ import { mockLogger } from '../../__tests__/setup'
  */
 type StoredContribution = Omit<ContributionInfo, 'contributedAt' | 'id'> & { id: string; contributedAt: Date }
 
-const { firestore } = require('../../services')
-const { listContributionsHandler } = require('./listContributions')
+import { firestore as realFirestore } from '../../services'
+import { listContributionsHandler } from './listContributions'
 
+const firestore = vi.mocked(realFirestore, true)
 const CHAIN_ID = 31337 // matches ACTIVE_CHAIN_CONFIG default
 const CONTRIBUTOR = '0x9965507d1a55bcc2695c58ba16fb37d819b0a4dc'
 
@@ -52,12 +55,12 @@ describe('listContributionsHandler', () => {
     }))
 
     return {
-      where: jest.fn().mockReturnThis(),
-      orderBy: jest.fn().mockReturnThis(),
-      limit: jest.fn().mockReturnThis(),
-      get: jest.fn().mockResolvedValue({ docs: mockDocs }),
-      count: jest.fn().mockReturnValue({
-        get: jest.fn().mockResolvedValue({ data: () => ({ count: totalCount }) }),
+      where: vi.fn().mockReturnThis(),
+      orderBy: vi.fn().mockReturnThis(),
+      limit: vi.fn().mockReturnThis(),
+      get: vi.fn().mockResolvedValue({ docs: mockDocs }),
+      count: vi.fn().mockReturnValue({
+        get: vi.fn().mockResolvedValue({ data: () => ({ count: totalCount }) }),
       }),
     }
   }
@@ -75,7 +78,7 @@ describe('listContributionsHandler', () => {
   }
 
   beforeEach(() => {
-    jest.clearAllMocks()
+    vi.clearAllMocks()
   })
 
   // -------------------------------------------------------------------------
@@ -84,7 +87,9 @@ describe('listContributionsHandler', () => {
 
   it('should throw unauthenticated when the request has no auth', async () => {
     // Act & Assert
-    await expect(listContributionsHandler(buildRequest({ auth: null }))).rejects.toHaveProperty('code', 'unauthenticated')
+    await expect(
+      listContributionsHandler(buildRequest({ auth: null }) as unknown as CallableRequest<ListContributionsRequest>)
+    ).rejects.toHaveProperty('code', 'unauthenticated')
   })
 
   // -------------------------------------------------------------------------
@@ -94,10 +99,10 @@ describe('listContributionsHandler', () => {
   it('should list contributions for the default chain', async () => {
     // Arrange
     const query = createMockQuery(mockContributions, 2)
-    firestore.collection.mockReturnValue(query)
+    vi.mocked(firestore.collection).mockReturnValue(query as unknown as CollectionReference<DocumentData, DocumentData>)
 
     // Act
-    const result = await listContributionsHandler(buildRequest())
+    const result = await listContributionsHandler(buildRequest() as unknown as CallableRequest<ListContributionsRequest>)
 
     // Assert
     expect(firestore.collection).toHaveBeenCalledWith('contributions')
@@ -109,10 +114,10 @@ describe('listContributionsHandler', () => {
   it('should use the document id as the contribution id', async () => {
     // Arrange
     const query = createMockQuery(mockContributions, 2)
-    firestore.collection.mockReturnValue(query)
+    vi.mocked(firestore.collection).mockReturnValue(query as unknown as CollectionReference<DocumentData, DocumentData>)
 
     // Act
-    const result = await listContributionsHandler(buildRequest())
+    const result = await listContributionsHandler(buildRequest() as unknown as CallableRequest<ListContributionsRequest>)
 
     // Assert
     expect(result.contributions[0].id).toBe(`${CHAIN_ID}-0xaaa-0`)
@@ -122,10 +127,10 @@ describe('listContributionsHandler', () => {
     // Arrange — a Date has no enumerable keys, so the callable encoder would
     // serialise it to `{}` on the wire.
     const query = createMockQuery(mockContributions, 2)
-    firestore.collection.mockReturnValue(query)
+    vi.mocked(firestore.collection).mockReturnValue(query as unknown as CollectionReference<DocumentData, DocumentData>)
 
     // Act
-    const result = await listContributionsHandler(buildRequest())
+    const result = await listContributionsHandler(buildRequest() as unknown as CallableRequest<ListContributionsRequest>)
 
     // Assert
     expect(result.contributions[0].contributedAt).toBe('2026-08-01T00:00:00.000Z')
@@ -134,10 +139,10 @@ describe('listContributionsHandler', () => {
   it('should order by contributedAt descending, newest first', async () => {
     // Arrange
     const query = createMockQuery(mockContributions, 2)
-    firestore.collection.mockReturnValue(query)
+    vi.mocked(firestore.collection).mockReturnValue(query as unknown as CollectionReference<DocumentData, DocumentData>)
 
     // Act
-    await listContributionsHandler(buildRequest())
+    await listContributionsHandler(buildRequest() as unknown as CallableRequest<ListContributionsRequest>)
 
     // Assert
     expect(query.orderBy).toHaveBeenCalledWith('contributedAt', 'desc')
@@ -150,10 +155,10 @@ describe('listContributionsHandler', () => {
   it('should filter by poolId when one is given', async () => {
     // Arrange
     const query = createMockQuery([mockContributions[0]], 1)
-    firestore.collection.mockReturnValue(query)
+    vi.mocked(firestore.collection).mockReturnValue(query as unknown as CollectionReference<DocumentData, DocumentData>)
 
     // Act
-    await listContributionsHandler(buildRequest({ data: { poolId: 1 } }))
+    await listContributionsHandler(buildRequest({ data: { poolId: 1 } }) as unknown as CallableRequest<ListContributionsRequest>)
 
     // Assert
     expect(query.where).toHaveBeenCalledWith('poolId', '==', 1)
@@ -163,10 +168,10 @@ describe('listContributionsHandler', () => {
     // Arrange — a falsy check here would drop the filter. Pool ids start at 1,
     // so this should return nothing rather than everything.
     const query = createMockQuery([], 0)
-    firestore.collection.mockReturnValue(query)
+    vi.mocked(firestore.collection).mockReturnValue(query as unknown as CollectionReference<DocumentData, DocumentData>)
 
     // Act
-    await listContributionsHandler(buildRequest({ data: { poolId: 0 } }))
+    await listContributionsHandler(buildRequest({ data: { poolId: 0 } }) as unknown as CallableRequest<ListContributionsRequest>)
 
     // Assert
     expect(query.where).toHaveBeenCalledWith('poolId', '==', 0)
@@ -175,10 +180,14 @@ describe('listContributionsHandler', () => {
   it('should lowercase the contributor filter, since the indexer stores it lowercased', async () => {
     // Arrange — wallets report addresses checksummed; a verbatim filter matches nothing.
     const query = createMockQuery([mockContributions[0]], 1)
-    firestore.collection.mockReturnValue(query)
+    vi.mocked(firestore.collection).mockReturnValue(query as unknown as CollectionReference<DocumentData, DocumentData>)
 
     // Act
-    await listContributionsHandler(buildRequest({ data: { contributor: '0x9965507D1a55bcC2695C58ba16FB37d819B0A4dc' } }))
+    await listContributionsHandler(
+      buildRequest({
+        data: { contributor: '0x9965507D1a55bcC2695C58ba16FB37d819B0A4dc' },
+      }) as unknown as CallableRequest<ListContributionsRequest>
+    )
 
     // Assert
     expect(query.where).toHaveBeenCalledWith('contributor', '==', CONTRIBUTOR)
@@ -187,10 +196,10 @@ describe('listContributionsHandler', () => {
   it('should not add a contributor filter when none is given', async () => {
     // Arrange
     const query = createMockQuery(mockContributions, 2)
-    firestore.collection.mockReturnValue(query)
+    vi.mocked(firestore.collection).mockReturnValue(query as unknown as CollectionReference<DocumentData, DocumentData>)
 
     // Act
-    await listContributionsHandler(buildRequest())
+    await listContributionsHandler(buildRequest() as unknown as CallableRequest<ListContributionsRequest>)
 
     // Assert
     expect(query.where).not.toHaveBeenCalledWith('contributor', '==', expect.anything())
@@ -203,10 +212,10 @@ describe('listContributionsHandler', () => {
   it('should default to a limit of 50', async () => {
     // Arrange
     const query = createMockQuery(mockContributions, 2)
-    firestore.collection.mockReturnValue(query)
+    vi.mocked(firestore.collection).mockReturnValue(query as unknown as CollectionReference<DocumentData, DocumentData>)
 
     // Act
-    const result = await listContributionsHandler(buildRequest())
+    const result = await listContributionsHandler(buildRequest() as unknown as CallableRequest<ListContributionsRequest>)
 
     // Assert
     expect(query.limit).toHaveBeenCalledWith(50)
@@ -216,10 +225,10 @@ describe('listContributionsHandler', () => {
   it('should cap the limit at 100, matching the Firestore rules', async () => {
     // Arrange — the rules reject a `list` with a larger limit outright.
     const query = createMockQuery(mockContributions, 2)
-    firestore.collection.mockReturnValue(query)
+    vi.mocked(firestore.collection).mockReturnValue(query as unknown as CollectionReference<DocumentData, DocumentData>)
 
     // Act
-    await listContributionsHandler(buildRequest({ data: { limit: 5000 } }))
+    await listContributionsHandler(buildRequest({ data: { limit: 5000 } }) as unknown as CallableRequest<ListContributionsRequest>)
 
     // Assert
     expect(query.limit).toHaveBeenCalledWith(100)
@@ -230,10 +239,12 @@ describe('listContributionsHandler', () => {
     // made. A page of minus three rows is a mistake, and saying so is the
     // whole point of validating the payload.
     const query = createMockQuery([], 0)
-    firestore.collection.mockReturnValue(query)
+    vi.mocked(firestore.collection).mockReturnValue(query as unknown as CollectionReference<DocumentData, DocumentData>)
 
     // Act & Assert
-    await expect(listContributionsHandler(buildRequest({ data: { limit: -3 } }))).rejects.toThrow(/limit/i)
+    await expect(
+      listContributionsHandler(buildRequest({ data: { limit: -3 } }) as unknown as CallableRequest<ListContributionsRequest>)
+    ).rejects.toThrow(/limit/i)
     expect(query.limit).not.toHaveBeenCalled()
   })
 
@@ -243,12 +254,15 @@ describe('listContributionsHandler', () => {
 
   it('should convert a query failure into an internal error', async () => {
     // Arrange
-    firestore.collection.mockImplementation(() => {
+    vi.mocked(firestore.collection).mockImplementation(() => {
       throw new Error('firestore unavailable')
     })
 
     // Act & Assert
-    await expect(listContributionsHandler(buildRequest())).rejects.toHaveProperty('code', 'internal')
+    await expect(listContributionsHandler(buildRequest() as unknown as CallableRequest<ListContributionsRequest>)).rejects.toHaveProperty(
+      'code',
+      'internal'
+    )
     expect(mockLogger.error).toHaveBeenCalledWith(
       'Error listing contributions',
       expect.objectContaining({ error: 'firestore unavailable' })

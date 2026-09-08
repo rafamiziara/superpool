@@ -1,23 +1,35 @@
+import type { IndexContributionRequest } from '@superpool/types'
+import type { JsonRpcProvider } from 'ethers'
+import type { CallableRequest } from 'firebase-functions/v2/https'
 import { mockLogger } from '../../__tests__/setup'
 import type { ParsedContributionEvent } from '../../services/contributionIndexer'
 
-jest.mock('../../utils/blockchain')
-jest.mock('../../services')
-jest.mock('../../services/contributionIndexer', () => ({
-  ...jest.requireActual('../../services/contributionIndexer'),
-  indexContributionsByTxHash: jest.fn(),
+vi.mock('../../utils/blockchain')
+vi.mock('../../services')
+vi.mock('../../services/contributionIndexer', async () => ({
+  ...(await vi.importActual<typeof import('../../services/contributionIndexer')>('../../services/contributionIndexer')),
+  indexContributionsByTxHash: vi.fn(),
 }))
 
 // `ACTIVE_CHAIN_CONFIG` reads the environment once, at module load. Set this
 // before the requires below or every case fails on an unconfigured factory.
-const FACTORY_ADDRESS = '0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512'
-process.env.POOL_FACTORY_ADDRESS = FACTORY_ADDRESS
+// The chain registry reads process.env once, at module load. ESM hoists every import
+// above ordinary statements, so this must run inside vi.hoisted to land first.
+const { FACTORY_ADDRESS } = vi.hoisted(() => {
+  const FACTORY_ADDRESS = '0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512'
+  process.env.POOL_FACTORY_ADDRESS = FACTORY_ADDRESS
+  return { FACTORY_ADDRESS }
+})
 
-const { indexContributionHandler } = require('./indexContribution')
-const { getProvider } = require('../../utils/blockchain')
-const { indexContributionsByTxHash } = require('../../services/contributionIndexer')
-const { HttpsError } = require('firebase-functions/v2/https')
+import { HttpsError } from 'firebase-functions/v2/https'
+import * as contributionIndexerMock from '../../services/contributionIndexer'
+import * as blockchainMock from '../../utils/blockchain'
+import { indexContributionHandler } from './indexContribution'
 
+// These modules are mocked above; vi.mocked restores the mock types that the
+// real signatures would otherwise hide.
+const { indexContributionsByTxHash } = vi.mocked(contributionIndexerMock)
+const { getProvider } = vi.mocked(blockchainMock)
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
@@ -26,16 +38,16 @@ const VALID_TX_HASH = `0x${'a'.repeat(64)}`
 const SUPPORTED_CHAIN_ID = 31337 // matches ACTIVE_CHAIN_CONFIG default
 const CONTRIBUTED_AT = new Date('2026-08-10T12:00:00.000Z')
 
-function buildRequest(
+function buildRequest<T>(
   overrides: Partial<{
     auth: object | null
     data: Record<string, unknown>
   }> = {}
-) {
+): CallableRequest<T> {
   return {
     auth: overrides.auth !== undefined ? overrides.auth : { uid: 'user-123', token: {} },
     data: overrides.data !== undefined ? overrides.data : { txHash: VALID_TX_HASH },
-  }
+  } as unknown as CallableRequest<T>
 }
 
 function buildContribution(overrides: Partial<ParsedContributionEvent> = {}): ParsedContributionEvent {
@@ -59,9 +71,9 @@ function buildContribution(overrides: Partial<ParsedContributionEvent> = {}): Pa
 
 describe('indexContributionHandler', () => {
   beforeEach(() => {
-    jest.clearAllMocks()
+    vi.clearAllMocks()
 
-    getProvider.mockReturnValue({ getTransactionReceipt: jest.fn(), getBlock: jest.fn() })
+    getProvider.mockReturnValue({ getTransactionReceipt: vi.fn(), getBlock: vi.fn() } as unknown as JsonRpcProvider)
 
     indexContributionsByTxHash.mockResolvedValue({
       contributions: [buildContribution()],
@@ -93,7 +105,10 @@ describe('indexContributionHandler', () => {
     const request = buildRequest({ data: { txHash: VALID_TX_HASH, chainId: 999999 } })
 
     // Act & Assert
-    await expect(indexContributionHandler(request)).rejects.toHaveProperty('code', 'invalid-argument')
+    await expect(indexContributionHandler(request as unknown as CallableRequest<IndexContributionRequest>)).rejects.toHaveProperty(
+      'code',
+      'invalid-argument'
+    )
   })
 
   // -------------------------------------------------------------------------

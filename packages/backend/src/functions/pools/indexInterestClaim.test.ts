@@ -1,22 +1,33 @@
+import type { CallableRequest } from 'firebase-functions/v2/https'
+import type { Mock } from 'vitest'
 import { mockLogger } from '../../__tests__/setup'
 import type { ParsedInterestClaimEvent } from '../../services/interestClaimIndexer'
 
-jest.mock('../../utils/blockchain')
-jest.mock('../../services')
-jest.mock('../../services/interestClaimIndexer', () => ({
-  ...jest.requireActual('../../services/interestClaimIndexer'),
-  indexInterestClaimsByTxHash: jest.fn(),
+vi.mock('../../utils/blockchain')
+vi.mock('../../services')
+vi.mock('../../services/interestClaimIndexer', async () => ({
+  ...(await vi.importActual<typeof import('../../services/interestClaimIndexer')>('../../services/interestClaimIndexer')),
+  indexInterestClaimsByTxHash: vi.fn(),
 }))
 
 // `ACTIVE_CHAIN_CONFIG` reads the environment once, at module load. Set this
 // before the requires below or every case fails on an unconfigured factory.
-const FACTORY_ADDRESS = '0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512'
-process.env.POOL_FACTORY_ADDRESS = FACTORY_ADDRESS
+// The chain registry reads process.env once, at module load. ESM hoists every import
+// above ordinary statements, so this must run inside vi.hoisted to land first.
+const { FACTORY_ADDRESS } = vi.hoisted(() => {
+  const FACTORY_ADDRESS = '0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512'
+  process.env.POOL_FACTORY_ADDRESS = FACTORY_ADDRESS
+  return { FACTORY_ADDRESS }
+})
 
-const { indexInterestClaimHandler } = require('./indexInterestClaim')
-const { getProvider } = require('../../utils/blockchain')
-const { indexInterestClaimsByTxHash } = require('../../services/interestClaimIndexer')
+import * as interestClaimIndexerMock from '../../services/interestClaimIndexer'
+import * as blockchainMock from '../../utils/blockchain'
+import { indexInterestClaimHandler } from './indexInterestClaim'
 
+// These modules are mocked above; vi.mocked restores the mock types that the
+// real signatures would otherwise hide.
+const { indexInterestClaimsByTxHash } = vi.mocked(interestClaimIndexerMock)
+const { getProvider } = vi.mocked(blockchainMock)
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
@@ -25,16 +36,16 @@ const VALID_TX_HASH = `0x${'a'.repeat(64)}`
 const SUPPORTED_CHAIN_ID = 31337 // matches ACTIVE_CHAIN_CONFIG default
 const CLAIMED_AT = new Date('2026-08-12T12:00:00.000Z')
 
-function buildRequest(
+function buildRequest<T>(
   overrides: Partial<{
     auth: object | null
     data: Record<string, unknown>
   }> = {}
-) {
+): CallableRequest<T> {
   return {
     auth: overrides.auth !== undefined ? overrides.auth : { uid: 'user-123', token: {} },
     data: overrides.data !== undefined ? overrides.data : { txHash: VALID_TX_HASH },
-  }
+  } as unknown as CallableRequest<T>
 }
 
 function buildClaim(overrides: Partial<ParsedInterestClaimEvent> = {}): ParsedInterestClaimEvent {
@@ -54,7 +65,7 @@ function buildClaim(overrides: Partial<ParsedInterestClaimEvent> = {}): ParsedIn
 
 /** Makes the indexer resolve with the given claims, all newly stored. */
 function resolveWith(claims: ParsedInterestClaimEvent[], stored = claims.map(() => true)) {
-  ;(indexInterestClaimsByTxHash as jest.Mock).mockResolvedValue({
+  ;(indexInterestClaimsByTxHash as Mock).mockResolvedValue({
     claims,
     results: claims.map((claim, i) => ({
       id: `${claim.chainId}-${claim.transactionHash}-${claim.logIndex}`,
@@ -71,8 +82,8 @@ function resolveWith(claims: ParsedInterestClaimEvent[], stored = claims.map(() 
 
 describe('indexInterestClaimHandler', () => {
   beforeEach(() => {
-    jest.clearAllMocks()
-    ;(getProvider as jest.Mock).mockReturnValue({})
+    vi.clearAllMocks()
+    ;(getProvider as Mock).mockReturnValue({})
     resolveWith([buildClaim()])
   })
 
@@ -174,8 +185,8 @@ describe('indexInterestClaimHandler', () => {
   describe('failures', () => {
     it('should pass an HttpsError through unchanged', async () => {
       // Arrange — "no InterestClaimed event" is a real answer, not an outage.
-      const { HttpsError } = require('firebase-functions/v2/https')
-      ;(indexInterestClaimsByTxHash as jest.Mock).mockRejectedValue(new HttpsError('not-found', 'No InterestClaimed event found'))
+      const { HttpsError } = await import('firebase-functions/v2/https')
+      ;(indexInterestClaimsByTxHash as Mock).mockRejectedValue(new HttpsError('not-found', 'No InterestClaimed event found'))
 
       // Act & Assert
       await expect(indexInterestClaimHandler(buildRequest() as never)).rejects.toThrow(/No InterestClaimed event found/)
@@ -183,7 +194,7 @@ describe('indexInterestClaimHandler', () => {
 
     it('should hide an unexpected failure behind a generic message', async () => {
       // Arrange
-      ;(indexInterestClaimsByTxHash as jest.Mock).mockRejectedValue(new Error('socket hang up'))
+      ;(indexInterestClaimsByTxHash as Mock).mockRejectedValue(new Error('socket hang up'))
 
       // Act & Assert
       await expect(indexInterestClaimHandler(buildRequest() as never)).rejects.toThrow(/Failed to index interest claim/)

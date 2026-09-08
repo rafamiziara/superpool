@@ -1,10 +1,15 @@
+import type { CallableRequest } from 'firebase-functions/v2/https'
 import { mockLogger } from '../../__tests__/setup'
+import type { SyncPoolEventsResult } from './syncPoolEvents'
 
-jest.mock('./syncPoolEvents')
+vi.mock('./syncPoolEvents')
 
-const { syncPoolEventsNowHandler } = require('./syncPoolEventsNow')
-const { syncPoolEventsHandler } = require('./syncPoolEvents')
+import * as syncPoolEventsMock from './syncPoolEvents'
+import { syncPoolEventsNowHandler } from './syncPoolEventsNow'
 
+// These modules are mocked above; vi.mocked restores the mock types that the
+// real signatures would otherwise hide.
+const { syncPoolEventsHandler } = vi.mocked(syncPoolEventsMock)
 // ---------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------
@@ -32,8 +37,8 @@ const SWEEP_RESULT = {
 // ---------------------------------------------------------------------------
 
 /** Pass `null` for an anonymous caller — an explicit `undefined` would take the default. */
-function buildRequest(data: object = {}, auth: object | null = AUTH) {
-  return { data, auth: auth ?? undefined } as never
+function buildRequest<T>(data: object = {}, auth: object | null = AUTH): CallableRequest<T> {
+  return { data, auth: auth ?? undefined } as unknown as CallableRequest<T> as never
 }
 
 beforeEach(() => {
@@ -42,7 +47,7 @@ beforeEach(() => {
   // here: authentication in this project is deliberately cheap, so any wallet
   // could start an unbounded run on the project's RPC and Functions budget.
   process.env.ADMIN_WALLETS = AUTH.uid
-  syncPoolEventsHandler.mockResolvedValue(SWEEP_RESULT)
+  syncPoolEventsHandler.mockResolvedValue(SWEEP_RESULT as unknown as SyncPoolEventsResult)
 })
 
 afterAll(() => {
@@ -178,7 +183,7 @@ describe('syncPoolEventsNowHandler', () => {
     it('should preserve an HttpsError raised by the sweep', async () => {
       // Arrange
       // Re-wrapping would turn a precise message into a generic "try again".
-      const { HttpsError } = require('firebase-functions/v2/https')
+      const { HttpsError } = await import('firebase-functions/v2/https')
       syncPoolEventsHandler.mockRejectedValue(new HttpsError('invalid-argument', 'Unsupported chain ID: 1'))
 
       // Act & Assert

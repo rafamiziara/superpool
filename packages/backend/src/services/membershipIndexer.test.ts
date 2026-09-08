@@ -1,17 +1,27 @@
-import { Interface } from 'ethers'
+import type { JsonRpcProvider, Log, Provider } from 'ethers'
+import * as ethersMock from 'ethers'
+import type { Firestore } from 'firebase-admin/firestore'
 import { mockLogger } from '../__tests__/setup'
 import { LendingPoolABI } from '../constants'
 
-const mockMembership = jest.fn()
-const mockGetPoolId = jest.fn()
+// Hoisted so the vi.mock factories below can close over them: vi.mock runs before
+// any module-level const is initialised.
+const { mockMembership, mockGetPoolId, mockNotifyMembershipRequested, mockNotifyMembershipDecided } = vi.hoisted(() => ({
+  mockMembership: vi.fn(),
+  mockGetPoolId: vi.fn(),
+  mockNotifyMembershipRequested: vi.fn(),
+  mockNotifyMembershipDecided: vi.fn(),
+}))
 
 // Mock ethers BEFORE importing the module: it builds a top-level Interface and
 // reads six topic hashes from it at load time.
-jest.mock('ethers', () => {
-  const actual = jest.requireActual('ethers')
+vi.mock('ethers', async () => {
+  const actual = await vi.importActual<typeof import('ethers')>('ethers')
   return {
     ...actual,
-    Contract: jest.fn().mockImplementation(() => ({ membership: mockMembership, getPoolId: mockGetPoolId })),
+    Contract: vi.fn().mockImplementation(function () {
+      return { membership: mockMembership, getPoolId: mockGetPoolId }
+    }),
   }
 })
 
@@ -20,28 +30,28 @@ jest.mock('ethers', () => {
  * notifies as well as the callable. Mocked here to keep this suite about
  * indexing — `poolNotifications.test.ts` covers what it decides to send.
  */
-const mockNotifyMembershipRequested = jest.fn()
-const mockNotifyMembershipDecided = jest.fn()
-
-jest.mock('./poolNotifications', () => ({
-  ...jest.requireActual('./poolNotifications'),
+vi.mock('./poolNotifications', async () => ({
+  ...(await vi.importActual<typeof import('./poolNotifications')>('./poolNotifications')),
   notifyMembershipRequested: (...args: unknown[]) => mockNotifyMembershipRequested(...args),
   notifyMembershipDecided: (...args: unknown[]) => mockNotifyMembershipDecided(...args),
 }))
 
-const {
+import {
   fetchMembership,
   indexMembership,
   indexMembershipFromLog,
   indexMembershipsByTxHash,
+  MEMBER_JOINED_TOPIC,
+  MEMBERSHIP_APPROVED_TOPIC,
+  MEMBERSHIP_REQUESTED_TOPIC,
+  MEMBERSHIP_TOPICS,
   membershipDocId,
   parseAccountFromLog,
-  MEMBERSHIP_REQUESTED_TOPIC,
-  MEMBERSHIP_APPROVED_TOPIC,
-  MEMBER_JOINED_TOPIC,
-  MEMBERSHIP_TOPICS,
-} = require('./membershipIndexer')
+} from './membershipIndexer'
 
+// These modules are mocked above; vi.mocked restores the mock types that the
+// real signatures would otherwise hide.
+const { Interface } = vi.mocked(ethersMock)
 // ---------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------
@@ -67,7 +77,7 @@ const REMOVED = 4
 // Helpers
 // ---------------------------------------------------------------------------
 
-function buildLog(overrides: Partial<{ topic: string; account: string; address: string; blockNumber: number }> = {}) {
+function buildLog(overrides: Partial<{ topic: string; account: string; address: string; blockNumber: number }> = {}): Log {
   const { topic = MEMBERSHIP_REQUESTED_TOPIC, account = ACCOUNT, address = POOL_ADDRESS, blockNumber = 120 } = overrides
 
   return {
@@ -78,27 +88,27 @@ function buildLog(overrides: Partial<{ topic: string; account: string; address: 
     // The only parameter is indexed, so `data` is empty and the address is topic 1.
     data: '0x',
     topics: [topic, `0x${'0'.repeat(24)}${account.slice(2)}`],
-  }
+  } as unknown as Log
 }
 
 function buildFirestore(options: { exists?: boolean; storedStatus?: string } = {}) {
   const { exists = false, storedStatus = 'active' } = options
-  const mockSet = jest.fn().mockResolvedValue(undefined)
+  const mockSet = vi.fn().mockResolvedValue(undefined)
   const mockDocRef = {
-    get: jest.fn().mockResolvedValue({ exists, data: () => (exists ? { status: storedStatus } : null) }),
+    get: vi.fn().mockResolvedValue({ exists, data: () => (exists ? { status: storedStatus } : null) }),
     set: mockSet,
   }
-  const mockDoc = jest.fn().mockReturnValue(mockDocRef)
-  const mockCollection = jest.fn().mockReturnValue({ doc: mockDoc })
+  const mockDoc = vi.fn().mockReturnValue(mockDocRef)
+  const mockCollection = vi.fn().mockReturnValue({ doc: mockDoc })
 
   return { mockFs: { collection: mockCollection }, mockDocRef, mockDoc, mockCollection }
 }
 
-function buildProvider(receipt: object | null = null) {
+function buildProvider(receipt: object | null = null): Provider {
   return {
-    getTransactionReceipt: jest.fn().mockResolvedValue(receipt),
-    getBlock: jest.fn().mockResolvedValue({ timestamp: BLOCK_TIME }),
-  }
+    getTransactionReceipt: vi.fn().mockResolvedValue(receipt),
+    getBlock: vi.fn().mockResolvedValue({ timestamp: BLOCK_TIME }),
+  } as unknown as Provider
 }
 
 const parsedMembership = {
@@ -166,7 +176,7 @@ describe('fetchMembership', () => {
   it('should return the chain state, not the log', async () => {
     mockMembership.mockResolvedValue(BigInt(REQUESTED))
 
-    expect(await fetchMembership(ACCOUNT, POOL_ADDRESS, {})).toBe('requested')
+    expect(await fetchMembership(ACCOUNT, POOL_ADDRESS, {} as unknown as Provider)).toBe('requested')
     expect(mockMembership).toHaveBeenCalledWith(ACCOUNT)
   })
 
@@ -174,14 +184,14 @@ describe('fetchMembership', () => {
     // Unlike LoanStatus, zero here means what it says.
     mockMembership.mockResolvedValue(BigInt(NONE))
 
-    expect(await fetchMembership(ACCOUNT, POOL_ADDRESS, {})).toBe('none')
+    expect(await fetchMembership(ACCOUNT, POOL_ADDRESS, {} as unknown as Provider)).toBe('none')
   })
 
   it('should throw on an ordinal this build does not know', async () => {
     // Reading it as `none` would quietly drop somebody out of their pool.
     mockMembership.mockResolvedValue(99n)
 
-    await expect(fetchMembership(ACCOUNT, POOL_ADDRESS, {})).rejects.toThrow('Unknown Membership ordinal')
+    await expect(fetchMembership(ACCOUNT, POOL_ADDRESS, {} as unknown as Provider)).rejects.toThrow('Unknown Membership ordinal')
   })
 })
 
@@ -189,7 +199,7 @@ describe('indexMembership', () => {
   it('should write a membership that has never been indexed', async () => {
     const { mockFs, mockDocRef, mockDoc } = buildFirestore({ exists: false })
 
-    const result = await indexMembership(parsedMembership, mockFs)
+    const result = await indexMembership(parsedMembership, mockFs as unknown as Firestore)
 
     expect(mockDoc).toHaveBeenCalledWith(`31337-7-${ACCOUNT.toLowerCase()}`)
     expect(mockDocRef.set).toHaveBeenCalledWith(expect.objectContaining({ account: ACCOUNT.toLowerCase(), status: 'active' }), {
@@ -201,7 +211,7 @@ describe('indexMembership', () => {
   it('should stamp joinedAt when creating the record', async () => {
     const { mockFs, mockDocRef } = buildFirestore({ exists: false })
 
-    await indexMembership(parsedMembership, mockFs)
+    await indexMembership(parsedMembership, mockFs as unknown as Firestore)
 
     expect(mockDocRef.set).toHaveBeenCalledWith(expect.objectContaining({ joinedAt: parsedMembership.joinedAt }), { merge: true })
   })
@@ -210,7 +220,7 @@ describe('indexMembership', () => {
     // A removal must not read as if they joined the day they were thrown out.
     const { mockFs, mockDocRef } = buildFirestore({ exists: true, storedStatus: 'active' })
 
-    await indexMembership({ ...parsedMembership, status: 'removed' }, mockFs)
+    await indexMembership({ ...parsedMembership, status: 'removed' }, mockFs as unknown as Firestore)
 
     expect(mockDocRef.set).toHaveBeenCalledWith(expect.not.objectContaining({ joinedAt: expect.anything() }), { merge: true })
   })
@@ -218,7 +228,7 @@ describe('indexMembership', () => {
   it('should rewrite the record when the standing changed', async () => {
     const { mockFs, mockDocRef } = buildFirestore({ exists: true, storedStatus: 'requested' })
 
-    const result = await indexMembership(parsedMembership, mockFs)
+    const result = await indexMembership(parsedMembership, mockFs as unknown as Firestore)
 
     expect(mockDocRef.set).toHaveBeenCalled()
     expect(result).toMatchObject({ alreadyIndexed: false, stored: true })
@@ -228,7 +238,7 @@ describe('indexMembership', () => {
     // What keeps a re-scan of settled history free.
     const { mockFs, mockDocRef } = buildFirestore({ exists: true, storedStatus: 'active' })
 
-    const result = await indexMembership(parsedMembership, mockFs)
+    const result = await indexMembership(parsedMembership, mockFs as unknown as Firestore)
 
     expect(mockDocRef.set).not.toHaveBeenCalled()
     expect(result).toMatchObject({ alreadyIndexed: true, stored: false })
@@ -239,10 +249,10 @@ describe('indexMembershipFromLog', () => {
   it('should resolve a log all the way to a stored record', async () => {
     const { mockFs } = buildFirestore({ exists: false })
 
-    const indexed = await indexMembershipFromLog(buildLog(), CHAIN_ID, FACTORY_ADDRESS, buildProvider(), mockFs)
+    const indexed = await indexMembershipFromLog(buildLog(), CHAIN_ID, FACTORY_ADDRESS, buildProvider(), mockFs as unknown as Firestore)
 
     expect(indexed).not.toBeNull()
-    expect(indexed.membership).toMatchObject({ poolId: POOL_ID, account: ACCOUNT.toLowerCase(), status: 'active' })
+    expect(indexed?.membership).toMatchObject({ poolId: POOL_ID, account: ACCOUNT.toLowerCase(), status: 'active' })
   })
 
   it('should report the chain state rather than the event that arrived', async () => {
@@ -255,10 +265,10 @@ describe('indexMembershipFromLog', () => {
       CHAIN_ID,
       FACTORY_ADDRESS,
       buildProvider(),
-      mockFs
+      mockFs as unknown as Firestore
     )
 
-    expect(indexed.membership.status).toBe('removed')
+    expect(indexed?.membership.status).toBe('removed')
   })
 
   it('should skip a contract the factory does not know', async () => {
@@ -267,7 +277,7 @@ describe('indexMembershipFromLog', () => {
     const { mockFs } = buildFirestore({ exists: false })
     mockGetPoolId.mockResolvedValue(0n)
 
-    expect(await indexMembershipFromLog(buildLog(), CHAIN_ID, FACTORY_ADDRESS, buildProvider(), mockFs)).toBeNull()
+    expect(await indexMembershipFromLog(buildLog(), CHAIN_ID, FACTORY_ADDRESS, buildProvider(), mockFs as unknown as Firestore)).toBeNull()
   })
 })
 
@@ -276,7 +286,13 @@ describe('indexMembershipsByTxHash', () => {
     const { mockFs } = buildFirestore({ exists: false })
     const receipt = { status: 1, logs: [buildLog(), buildLog({ topic: MEMBER_JOINED_TOPIC, account: FACTORY_ADDRESS })] }
 
-    const { members, results } = await indexMembershipsByTxHash(TX_HASH, CHAIN_ID, FACTORY_ADDRESS, buildProvider(receipt), mockFs)
+    const { members, results } = await indexMembershipsByTxHash(
+      TX_HASH,
+      CHAIN_ID,
+      FACTORY_ADDRESS,
+      buildProvider(receipt) as unknown as JsonRpcProvider,
+      mockFs as unknown as Firestore
+    )
 
     expect(members).toHaveLength(2)
     expect(results).toHaveLength(2)
@@ -286,7 +302,13 @@ describe('indexMembershipsByTxHash', () => {
     const { mockFs } = buildFirestore({ exists: false })
     const receipt = { status: 1, logs: [{ ...buildLog(), topics: [`0x${'f'.repeat(64)}`] }, buildLog()] }
 
-    const { members } = await indexMembershipsByTxHash(TX_HASH, CHAIN_ID, FACTORY_ADDRESS, buildProvider(receipt), mockFs)
+    const { members } = await indexMembershipsByTxHash(
+      TX_HASH,
+      CHAIN_ID,
+      FACTORY_ADDRESS,
+      buildProvider(receipt) as unknown as JsonRpcProvider,
+      mockFs as unknown as Firestore
+    )
 
     expect(members).toHaveLength(1)
   })
@@ -295,25 +317,43 @@ describe('indexMembershipsByTxHash', () => {
     const { mockFs } = buildFirestore({ exists: false })
     const receipt = { status: 1, logs: [] }
 
-    await expect(indexMembershipsByTxHash(TX_HASH, CHAIN_ID, FACTORY_ADDRESS, buildProvider(receipt), mockFs)).rejects.toThrow(
-      'No membership event found'
-    )
+    await expect(
+      indexMembershipsByTxHash(
+        TX_HASH,
+        CHAIN_ID,
+        FACTORY_ADDRESS,
+        buildProvider(receipt) as unknown as JsonRpcProvider,
+        mockFs as unknown as Firestore
+      )
+    ).rejects.toThrow('No membership event found')
   })
 
   it('should reject a reverted transaction', async () => {
     const { mockFs } = buildFirestore({ exists: false })
 
     await expect(
-      indexMembershipsByTxHash(TX_HASH, CHAIN_ID, FACTORY_ADDRESS, buildProvider({ status: 0, logs: [buildLog()] }), mockFs)
+      indexMembershipsByTxHash(
+        TX_HASH,
+        CHAIN_ID,
+        FACTORY_ADDRESS,
+        buildProvider({ status: 0, logs: [buildLog()] }) as unknown as JsonRpcProvider,
+        mockFs as unknown as Firestore
+      )
     ).rejects.toThrow('reverted')
   })
 
   it('should reject a missing receipt', async () => {
     const { mockFs } = buildFirestore({ exists: false })
 
-    await expect(indexMembershipsByTxHash(TX_HASH, CHAIN_ID, FACTORY_ADDRESS, buildProvider(null), mockFs)).rejects.toThrow(
-      'receipt not found'
-    )
+    await expect(
+      indexMembershipsByTxHash(
+        TX_HASH,
+        CHAIN_ID,
+        FACTORY_ADDRESS,
+        buildProvider(null) as unknown as JsonRpcProvider,
+        mockFs as unknown as Firestore
+      )
+    ).rejects.toThrow('receipt not found')
   })
 })
 
@@ -330,7 +370,7 @@ describe('indexMembership transitions', () => {
     mockMembership.mockResolvedValue(BigInt(REQUESTED))
     const { mockFs } = buildFirestore({ exists: false })
 
-    const result = await indexMembership({ ...parsedMembership, status: 'requested' }, mockFs)
+    const result = await indexMembership({ ...parsedMembership, status: 'requested' }, mockFs as unknown as Firestore)
 
     expect(result.transition).toBe('requested')
   })
@@ -341,7 +381,7 @@ describe('indexMembership transitions', () => {
     // never had the chance to admit or refuse.
     const { mockFs } = buildFirestore({ exists: false })
 
-    const result = await indexMembership({ ...parsedMembership, status: 'active' }, mockFs)
+    const result = await indexMembership({ ...parsedMembership, status: 'active' }, mockFs as unknown as Firestore)
 
     expect(result.transition).toBeNull()
   })
@@ -349,7 +389,7 @@ describe('indexMembership transitions', () => {
   it('reports the owner admitting an applicant', async () => {
     const { mockFs } = buildFirestore({ exists: true, storedStatus: 'requested' })
 
-    const result = await indexMembership({ ...parsedMembership, status: 'active' }, mockFs)
+    const result = await indexMembership({ ...parsedMembership, status: 'active' }, mockFs as unknown as Firestore)
 
     expect(result.transition).toBe('active')
   })
@@ -357,7 +397,7 @@ describe('indexMembership transitions', () => {
   it('reports the owner turning an applicant down', async () => {
     const { mockFs } = buildFirestore({ exists: true, storedStatus: 'requested' })
 
-    const result = await indexMembership({ ...parsedMembership, status: 'rejected' }, mockFs)
+    const result = await indexMembership({ ...parsedMembership, status: 'rejected' }, mockFs as unknown as Firestore)
 
     expect(result.transition).toBe('rejected')
   })
@@ -365,7 +405,7 @@ describe('indexMembership transitions', () => {
   it('reports a removal', async () => {
     const { mockFs } = buildFirestore({ exists: true, storedStatus: 'active' })
 
-    const result = await indexMembership({ ...parsedMembership, status: 'removed' }, mockFs)
+    const result = await indexMembership({ ...parsedMembership, status: 'removed' }, mockFs as unknown as Firestore)
 
     expect(result.transition).toBe('removed')
   })
@@ -375,7 +415,7 @@ describe('indexMembership transitions', () => {
     // times the sweep passes over the same block.
     const { mockFs } = buildFirestore({ exists: true, storedStatus: 'active' })
 
-    const result = await indexMembership({ ...parsedMembership, status: 'active' }, mockFs)
+    const result = await indexMembership({ ...parsedMembership, status: 'active' }, mockFs as unknown as Firestore)
 
     expect(result).toMatchObject({ alreadyIndexed: true, stored: false, transition: null })
   })
@@ -385,7 +425,7 @@ describe('indexMembership transitions', () => {
     // it is not something that happened to anyone.
     const { mockFs } = buildFirestore({ exists: true, storedStatus: 'active' })
 
-    const result = await indexMembership({ ...parsedMembership, status: 'none' }, mockFs)
+    const result = await indexMembership({ ...parsedMembership, status: 'none' }, mockFs as unknown as Firestore)
 
     expect(result.transition).toBeNull()
   })
@@ -393,7 +433,7 @@ describe('indexMembership transitions', () => {
   it('treats a stored none as no record at all', async () => {
     const { mockFs } = buildFirestore({ exists: true, storedStatus: 'none' })
 
-    const result = await indexMembership({ ...parsedMembership, status: 'requested' }, mockFs)
+    const result = await indexMembership({ ...parsedMembership, status: 'requested' }, mockFs as unknown as Firestore)
 
     expect(result.transition).toBe('requested')
   })
@@ -412,7 +452,7 @@ describe('indexMembershipFromLog notifications', () => {
     mockMembership.mockResolvedValue(BigInt(REQUESTED))
     const { mockFs } = buildFirestore({ exists: false })
 
-    await indexMembershipFromLog(buildLog(), CHAIN_ID, FACTORY_ADDRESS, buildProvider(), mockFs)
+    await indexMembershipFromLog(buildLog(), CHAIN_ID, FACTORY_ADDRESS, buildProvider(), mockFs as unknown as Firestore)
 
     expect(mockNotifyMembershipRequested).toHaveBeenCalledWith(
       expect.objectContaining({ transition: 'requested' }),
@@ -426,7 +466,7 @@ describe('indexMembershipFromLog notifications', () => {
     mockNotifyMembershipRequested.mockRejectedValue(new Error('expo unreachable'))
     const { mockFs, mockDocRef } = buildFirestore({ exists: false })
 
-    const indexed = await indexMembershipFromLog(buildLog(), CHAIN_ID, FACTORY_ADDRESS, buildProvider(), mockFs)
+    const indexed = await indexMembershipFromLog(buildLog(), CHAIN_ID, FACTORY_ADDRESS, buildProvider(), mockFs as unknown as Firestore)
 
     expect(indexed).not.toBeNull()
     expect(indexed!.result.stored).toBe(true)
@@ -438,7 +478,7 @@ describe('indexMembershipFromLog notifications', () => {
     mockNotifyMembershipRequested.mockRejectedValue('expo unreachable')
     const { mockFs } = buildFirestore({ exists: false })
 
-    const indexed = await indexMembershipFromLog(buildLog(), CHAIN_ID, FACTORY_ADDRESS, buildProvider(), mockFs)
+    const indexed = await indexMembershipFromLog(buildLog(), CHAIN_ID, FACTORY_ADDRESS, buildProvider(), mockFs as unknown as Firestore)
 
     expect(indexed!.result.stored).toBe(true)
     expect(mockLogger.error).toHaveBeenCalled()
@@ -448,7 +488,9 @@ describe('indexMembershipFromLog notifications', () => {
     mockGetPoolId.mockResolvedValue(BigInt(0))
     const { mockFs } = buildFirestore({ exists: false })
 
-    await expect(indexMembershipFromLog(buildLog(), CHAIN_ID, FACTORY_ADDRESS, buildProvider(), mockFs)).resolves.toBeNull()
+    await expect(
+      indexMembershipFromLog(buildLog(), CHAIN_ID, FACTORY_ADDRESS, buildProvider(), mockFs as unknown as Firestore)
+    ).resolves.toBeNull()
     expect(mockNotifyMembershipRequested).not.toHaveBeenCalled()
   })
 
@@ -458,7 +500,7 @@ describe('indexMembershipFromLog notifications', () => {
     mockMembership.mockResolvedValue(BigInt(ACTIVE))
     const { mockFs } = buildFirestore({ exists: true, storedStatus: 'requested' })
 
-    await indexMembershipFromLog(buildLog(), CHAIN_ID, FACTORY_ADDRESS, buildProvider(), mockFs)
+    await indexMembershipFromLog(buildLog(), CHAIN_ID, FACTORY_ADDRESS, buildProvider(), mockFs as unknown as Firestore)
 
     expect(mockNotifyMembershipDecided).toHaveBeenCalledWith(
       expect.objectContaining({ transition: 'active' }),
@@ -472,7 +514,7 @@ describe('indexMembershipFromLog notifications', () => {
     mockMembership.mockResolvedValue(BigInt(ACTIVE))
     const { mockFs } = buildFirestore({ exists: true, storedStatus: 'requested' })
 
-    const indexed = await indexMembershipFromLog(buildLog(), CHAIN_ID, FACTORY_ADDRESS, buildProvider(), mockFs)
+    const indexed = await indexMembershipFromLog(buildLog(), CHAIN_ID, FACTORY_ADDRESS, buildProvider(), mockFs as unknown as Firestore)
 
     expect(indexed!.result.stored).toBe(true)
     expect(mockLogger.error).toHaveBeenCalledWith('Membership decision notification failed; indexing stands', expect.anything())
@@ -487,7 +529,9 @@ describe('indexMembershipsByTxHash guards', () => {
     const { mockFs } = buildFirestore({ exists: false })
     const provider = buildProvider({ status: 1, logs: [buildLog()] })
 
-    await expect(indexMembershipsByTxHash(TX_HASH, CHAIN_ID, FACTORY_ADDRESS, provider, mockFs)).rejects.toMatchObject({
+    await expect(
+      indexMembershipsByTxHash(TX_HASH, CHAIN_ID, FACTORY_ADDRESS, provider as unknown as JsonRpcProvider, mockFs as unknown as Firestore)
+    ).rejects.toMatchObject({
       code: 'not-found',
     })
   })

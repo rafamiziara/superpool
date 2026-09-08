@@ -8,19 +8,19 @@ const DEVICE = 'device-1'
 function buildFirestore(options: { existing?: object | null; docs?: { id: string }[] } = {}) {
   const { existing = null, docs = [] } = options
 
-  const mockSet = jest.fn().mockResolvedValue(undefined)
-  const mockDelete = jest.fn().mockResolvedValue(undefined)
+  const mockSet = vi.fn().mockResolvedValue(undefined)
+  const mockDelete = vi.fn().mockResolvedValue(undefined)
   const mockDocRef = {
-    get: jest.fn().mockResolvedValue({ exists: existing !== null, data: () => existing }),
+    get: vi.fn().mockResolvedValue({ exists: existing !== null, data: () => existing }),
     set: mockSet,
     delete: mockDelete,
   }
-  const mockDoc = jest.fn().mockReturnValue(mockDocRef)
-  const mockGet = jest.fn().mockResolvedValue({ docs })
-  const mockWhere = jest.fn().mockReturnValue({ get: mockGet })
-  const mockCollection = jest.fn().mockReturnValue({ doc: mockDoc, where: mockWhere })
+  const mockDoc = vi.fn().mockReturnValue(mockDocRef)
+  const mockGet = vi.fn().mockResolvedValue({ docs })
+  const mockWhere = vi.fn().mockReturnValue({ get: mockGet })
+  const mockCollection = vi.fn().mockReturnValue({ doc: mockDoc, where: mockWhere })
 
-  return { firestore: { collection: mockCollection } as unknown as Firestore, mockSet, mockDelete, mockDoc, mockWhere, mockCollection }
+  return { firestore: { collection: mockCollection }, mockSet, mockDelete, mockDoc, mockWhere, mockCollection }
 }
 
 describe('isExpoPushToken', () => {
@@ -45,7 +45,7 @@ describe('savePushToken', () => {
     // Both directions are many-to-many, so neither party can be the key.
     const { firestore, mockDoc } = buildFirestore()
 
-    await savePushToken(TOKEN, WALLET, DEVICE, 'ios', firestore)
+    await savePushToken(TOKEN, WALLET, DEVICE, 'ios', firestore as unknown as Firestore)
 
     expect(mockDoc).toHaveBeenCalledWith(TOKEN)
   })
@@ -53,7 +53,7 @@ describe('savePushToken', () => {
   it('lowercases the wallet, since callers report it checksummed', async () => {
     const { firestore, mockSet } = buildFirestore()
 
-    await savePushToken(TOKEN, WALLET, DEVICE, 'ios', firestore)
+    await savePushToken(TOKEN, WALLET, DEVICE, 'ios', firestore as unknown as Firestore)
 
     expect(mockSet).toHaveBeenCalledWith(expect.objectContaining({ walletAddress: WALLET.toLowerCase() }))
   })
@@ -61,7 +61,7 @@ describe('savePushToken', () => {
   it('reports a write', async () => {
     const { firestore } = buildFirestore()
 
-    await expect(savePushToken(TOKEN, WALLET, DEVICE, 'ios', firestore)).resolves.toBe(true)
+    await expect(savePushToken(TOKEN, WALLET, DEVICE, 'ios', firestore as unknown as Firestore)).resolves.toBe(true)
   })
 
   // The client re-registers on every launch; that must not be a write per launch.
@@ -70,7 +70,7 @@ describe('savePushToken', () => {
       existing: { token: TOKEN, walletAddress: WALLET.toLowerCase(), deviceId: DEVICE, platform: 'ios', updatedAt: 1 },
     })
 
-    await expect(savePushToken(TOKEN, WALLET, DEVICE, 'ios', firestore)).resolves.toBe(false)
+    await expect(savePushToken(TOKEN, WALLET, DEVICE, 'ios', firestore as unknown as Firestore)).resolves.toBe(false)
     expect(mockSet).not.toHaveBeenCalled()
   })
 
@@ -79,7 +79,7 @@ describe('savePushToken', () => {
       existing: { token: TOKEN, walletAddress: WALLET.toLowerCase(), deviceId: DEVICE, platform: 'ios', updatedAt: 1 },
     })
 
-    await savePushToken(TOKEN, WALLET.toUpperCase().replace('0X', '0x'), DEVICE, 'ios', firestore)
+    await savePushToken(TOKEN, WALLET.toUpperCase().replace('0X', '0x'), DEVICE, 'ios', firestore as unknown as Firestore)
 
     expect(mockSet).not.toHaveBeenCalled()
   })
@@ -92,7 +92,7 @@ describe('savePushToken', () => {
       existing: { token: TOKEN, walletAddress: other, deviceId: DEVICE, platform: 'ios', updatedAt: 1 },
     })
 
-    await expect(savePushToken(TOKEN, WALLET, DEVICE, 'ios', firestore)).resolves.toBe(true)
+    await expect(savePushToken(TOKEN, WALLET, DEVICE, 'ios', firestore as unknown as Firestore)).resolves.toBe(true)
     // `set` without merge, or the previous wallet survives the write.
     expect(mockSet).toHaveBeenCalledWith(expect.objectContaining({ walletAddress: WALLET.toLowerCase() }))
     expect(mockSet).toHaveBeenCalledTimes(1)
@@ -104,7 +104,7 @@ describe('savePushToken', () => {
       existing: { token: TOKEN, walletAddress: WALLET.toLowerCase(), deviceId: DEVICE, platform: 'android', updatedAt: 1 },
     })
 
-    await expect(savePushToken(TOKEN, WALLET, DEVICE, 'ios', firestore)).resolves.toBe(true)
+    await expect(savePushToken(TOKEN, WALLET, DEVICE, 'ios', firestore as unknown as Firestore)).resolves.toBe(true)
     expect(mockSet).toHaveBeenCalledWith(expect.objectContaining({ platform: 'ios' }))
   })
 })
@@ -113,14 +113,14 @@ describe('deletePushToken', () => {
   it('removes a token that is there', async () => {
     const { firestore, mockDelete } = buildFirestore({ existing: { token: TOKEN } })
 
-    await expect(deletePushToken(TOKEN, firestore)).resolves.toBe(true)
+    await expect(deletePushToken(TOKEN, firestore as unknown as Firestore)).resolves.toBe(true)
     expect(mockDelete).toHaveBeenCalled()
   })
 
   it('reports nothing removed when there was nothing to remove', async () => {
     const { firestore, mockDelete } = buildFirestore()
 
-    await expect(deletePushToken(TOKEN, firestore)).resolves.toBe(false)
+    await expect(deletePushToken(TOKEN, firestore as unknown as Firestore)).resolves.toBe(false)
     expect(mockDelete).not.toHaveBeenCalled()
   })
 })
@@ -130,7 +130,10 @@ describe('tokensForWallet', () => {
     // One wallet on two phones is the ordinary case, not an edge one.
     const { firestore } = buildFirestore({ docs: [{ id: 'ExponentPushToken[a]' }, { id: 'ExponentPushToken[b]' }] })
 
-    await expect(tokensForWallet(WALLET, firestore)).resolves.toEqual(['ExponentPushToken[a]', 'ExponentPushToken[b]'])
+    await expect(tokensForWallet(WALLET, firestore as unknown as Firestore)).resolves.toEqual([
+      'ExponentPushToken[a]',
+      'ExponentPushToken[b]',
+    ])
   })
 
   it('queries on the lowercased address', async () => {
@@ -138,7 +141,7 @@ describe('tokensForWallet', () => {
     // returns nothing at all, silently.
     const { firestore, mockWhere } = buildFirestore()
 
-    await tokensForWallet(WALLET, firestore)
+    await tokensForWallet(WALLET, firestore as unknown as Firestore)
 
     expect(mockWhere).toHaveBeenCalledWith('walletAddress', '==', WALLET.toLowerCase())
   })
@@ -146,14 +149,14 @@ describe('tokensForWallet', () => {
   it('returns nothing for a wallet with no devices', async () => {
     const { firestore } = buildFirestore()
 
-    await expect(tokensForWallet(WALLET, firestore)).resolves.toEqual([])
+    await expect(tokensForWallet(WALLET, firestore as unknown as Firestore)).resolves.toEqual([])
   })
 
   // "Nobody" must not resolve to a query that could match a blank record.
   it('does not query at all for an empty address', async () => {
     const { firestore, mockWhere } = buildFirestore()
 
-    await expect(tokensForWallet('', firestore)).resolves.toEqual([])
+    await expect(tokensForWallet('', firestore as unknown as Firestore)).resolves.toEqual([])
     expect(mockWhere).not.toHaveBeenCalled()
   })
 })

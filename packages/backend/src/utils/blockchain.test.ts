@@ -1,29 +1,38 @@
 import { mockLogger } from '../__tests__/setup'
+import type { ChainConfig } from '../constants/chains'
 
 // ethers is mocked wholesale: these helpers are thin wiring around it, and the
 // value under test is the branching (missing config, failed tx, error mapping).
-jest.mock('ethers', () => ({
-  JsonRpcProvider: jest.fn().mockImplementation((url: string, chainId: number) => ({ url, chainId })),
-  Wallet: jest.fn().mockImplementation((key: string, provider: unknown) => ({ key, provider })),
-  Contract: jest.fn(),
+vi.mock('ethers', () => ({
+  JsonRpcProvider: vi.fn().mockImplementation(function (url: string, chainId: number) {
+    return { url, chainId }
+  }),
+  Wallet: vi.fn().mockImplementation(function (key: string, provider: unknown) {
+    return { key, provider }
+  }),
+  Contract: vi.fn(),
 }))
 
-jest.mock('../constants', () => ({
-  getChainConfig: jest.fn(),
+vi.mock('../constants', () => ({
+  getChainConfig: vi.fn(),
   PoolFactoryABI: ['function isWhitelistEnabled() view returns (bool)'],
 }))
 
-const {
-  getProvider,
+import * as ethersMock from 'ethers'
+import * as constantsMock from '../constants'
+import {
   getBackendWallet,
   getPoolFactoryContract,
-  isWhitelistModeEnabled,
+  getProvider,
   isWalletWhitelisted,
+  isWhitelistModeEnabled,
   whitelistWallet,
-} = require('./blockchain')
-const { getChainConfig } = require('../constants')
-const { Contract, JsonRpcProvider, Wallet } = require('ethers')
+} from './blockchain'
 
+// These modules are mocked above; vi.mocked restores the mock types that the
+// real signatures would otherwise hide.
+const { Contract, JsonRpcProvider, Wallet } = vi.mocked(ethersMock)
+const { getChainConfig } = vi.mocked(constantsMock)
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
@@ -37,7 +46,9 @@ const fullConfig = { rpcUrl: 'https://rpc.example', poolFactoryAddress: FACTORY 
 
 /** Installs a PoolFactory contract double with the given method implementations. */
 function mockFactory(methods: Record<string, unknown>) {
-  Contract.mockImplementation(() => methods)
+  vi.mocked(Contract).mockImplementation(function () {
+    return methods
+  })
   return methods
 }
 
@@ -49,8 +60,8 @@ describe('blockchain utils', () => {
   const ORIGINAL_KEY = process.env.BACKEND_WALLET_PRIVATE_KEY
 
   beforeEach(() => {
-    jest.clearAllMocks()
-    getChainConfig.mockReturnValue(fullConfig)
+    vi.clearAllMocks()
+    getChainConfig.mockReturnValue(fullConfig as unknown as ChainConfig)
     process.env.BACKEND_WALLET_PRIVATE_KEY = '0xprivatekey'
   })
 
@@ -76,7 +87,7 @@ describe('blockchain utils', () => {
     })
 
     it('should reject a chain with no RPC URL configured', () => {
-      getChainConfig.mockReturnValue({ poolFactoryAddress: FACTORY })
+      getChainConfig.mockReturnValue({ poolFactoryAddress: FACTORY } as unknown as ChainConfig)
 
       expect(() => getProvider(CHAIN_ID)).toThrow(expect.objectContaining({ code: 'internal' }))
     })
@@ -118,7 +129,7 @@ describe('blockchain utils', () => {
     })
 
     it('should reject a chain with no factory address configured', () => {
-      getChainConfig.mockReturnValue({ rpcUrl: fullConfig.rpcUrl })
+      getChainConfig.mockReturnValue({ rpcUrl: fullConfig.rpcUrl } as unknown as ChainConfig)
 
       expect(() => getPoolFactoryContract(CHAIN_ID)).toThrow(expect.objectContaining({ code: 'internal' }))
     })
@@ -130,13 +141,13 @@ describe('blockchain utils', () => {
 
   describe('isWhitelistModeEnabled', () => {
     it('should return the on-chain flag', async () => {
-      mockFactory({ isWhitelistEnabled: jest.fn().mockResolvedValue(true) })
+      mockFactory({ isWhitelistEnabled: vi.fn().mockResolvedValue(true) })
 
       await expect(isWhitelistModeEnabled(CHAIN_ID)).resolves.toBe(true)
     })
 
     it('should map a contract failure to internal', async () => {
-      mockFactory({ isWhitelistEnabled: jest.fn().mockRejectedValue(new Error('rpc down')) })
+      mockFactory({ isWhitelistEnabled: vi.fn().mockRejectedValue(new Error('rpc down')) })
 
       await expect(isWhitelistModeEnabled(CHAIN_ID)).rejects.toHaveProperty('code', 'internal')
       expect(mockLogger.error).toHaveBeenCalledWith('Error checking whitelist mode', expect.objectContaining({ error: 'rpc down' }))
@@ -145,13 +156,13 @@ describe('blockchain utils', () => {
 
   describe('isWalletWhitelisted', () => {
     it('should return the on-chain authorization', async () => {
-      mockFactory({ isAuthorizedCreator: jest.fn().mockResolvedValue(true) })
+      mockFactory({ isAuthorizedCreator: vi.fn().mockResolvedValue(true) })
 
       await expect(isWalletWhitelisted(WALLET, CHAIN_ID)).resolves.toBe(true)
     })
 
     it('should map a contract failure to internal', async () => {
-      mockFactory({ isAuthorizedCreator: jest.fn().mockRejectedValue(new Error('rpc down')) })
+      mockFactory({ isAuthorizedCreator: vi.fn().mockRejectedValue(new Error('rpc down')) })
 
       await expect(isWalletWhitelisted(WALLET, CHAIN_ID)).rejects.toHaveProperty('code', 'internal')
     })
@@ -164,9 +175,9 @@ describe('blockchain utils', () => {
   describe('whitelistWallet', () => {
     it('should send the authorization tx and return hash plus gas cost', async () => {
       mockFactory({
-        setCreatorAuthorization: jest.fn().mockResolvedValue({
+        setCreatorAuthorization: vi.fn().mockResolvedValue({
           hash: TX_HASH,
-          wait: jest.fn().mockResolvedValue(successfulReceipt()),
+          wait: vi.fn().mockResolvedValue(successfulReceipt()),
         }),
       })
 
@@ -175,9 +186,9 @@ describe('blockchain utils', () => {
 
     it('should fall back to effectiveGasPrice when gasPrice is absent', async () => {
       mockFactory({
-        setCreatorAuthorization: jest.fn().mockResolvedValue({
+        setCreatorAuthorization: vi.fn().mockResolvedValue({
           hash: TX_HASH,
-          wait: jest.fn().mockResolvedValue(successfulReceipt({ gasPrice: undefined, effectiveGasPrice: 3n })),
+          wait: vi.fn().mockResolvedValue(successfulReceipt({ gasPrice: undefined, effectiveGasPrice: 3n })),
         }),
       })
 
@@ -188,9 +199,9 @@ describe('blockchain utils', () => {
 
     it('should report zero gas cost when no price is available', async () => {
       mockFactory({
-        setCreatorAuthorization: jest.fn().mockResolvedValue({
+        setCreatorAuthorization: vi.fn().mockResolvedValue({
           hash: TX_HASH,
-          wait: jest.fn().mockResolvedValue(successfulReceipt({ gasPrice: undefined, effectiveGasPrice: undefined })),
+          wait: vi.fn().mockResolvedValue(successfulReceipt({ gasPrice: undefined, effectiveGasPrice: undefined })),
         }),
       })
 
@@ -200,16 +211,16 @@ describe('blockchain utils', () => {
     })
 
     it('should fail when the node returns no transaction response', async () => {
-      mockFactory({ setCreatorAuthorization: jest.fn().mockResolvedValue(null) })
+      mockFactory({ setCreatorAuthorization: vi.fn().mockResolvedValue(null) })
 
       await expect(whitelistWallet(WALLET, CHAIN_ID)).rejects.toHaveProperty('code', 'internal')
     })
 
     it('should fail when the transaction reverts', async () => {
       mockFactory({
-        setCreatorAuthorization: jest.fn().mockResolvedValue({
+        setCreatorAuthorization: vi.fn().mockResolvedValue({
           hash: TX_HASH,
-          wait: jest.fn().mockResolvedValue({ status: 0 }),
+          wait: vi.fn().mockResolvedValue({ status: 0 }),
         }),
       })
 
@@ -217,19 +228,19 @@ describe('blockchain utils', () => {
     })
 
     it('should surface an insufficient-funds failure distinctly', async () => {
-      mockFactory({ setCreatorAuthorization: jest.fn().mockRejectedValue(new Error('insufficient funds for gas')) })
+      mockFactory({ setCreatorAuthorization: vi.fn().mockRejectedValue(new Error('insufficient funds for gas')) })
 
       await expect(whitelistWallet(WALLET, CHAIN_ID)).rejects.toHaveProperty('message', expect.stringContaining('insufficient funds'))
     })
 
     it('should surface a nonce failure distinctly', async () => {
-      mockFactory({ setCreatorAuthorization: jest.fn().mockRejectedValue(new Error('nonce too low')) })
+      mockFactory({ setCreatorAuthorization: vi.fn().mockRejectedValue(new Error('nonce too low')) })
 
       await expect(whitelistWallet(WALLET, CHAIN_ID)).rejects.toHaveProperty('message', expect.stringContaining('nonce'))
     })
 
     it('should handle non-Error rejections', async () => {
-      mockFactory({ setCreatorAuthorization: jest.fn().mockRejectedValue('string failure') })
+      mockFactory({ setCreatorAuthorization: vi.fn().mockRejectedValue('string failure') })
 
       await expect(whitelistWallet(WALLET, CHAIN_ID)).rejects.toHaveProperty('code', 'internal')
     })

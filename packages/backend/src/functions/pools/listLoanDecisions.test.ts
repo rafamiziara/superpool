@@ -1,4 +1,5 @@
 import type { LoanDecisionInfo } from '@superpool/types'
+import type { Mock } from 'vitest'
 import { mockLogger } from '../../__tests__/setup'
 
 /**
@@ -8,8 +9,8 @@ import { mockLogger } from '../../__tests__/setup'
  */
 type StoredLoanDecision = Omit<LoanDecisionInfo, 'decidedAt' | 'id'> & { id: string; decidedAt: Date }
 
-const { firestore } = require('../../services')
-const { listLoanDecisionsHandler } = require('./listLoanDecisions')
+import { firestore } from '../../services'
+import { listLoanDecisionsHandler } from './listLoanDecisions'
 
 const CHAIN_ID = 31337 // matches ACTIVE_CHAIN_CONFIG default
 const BORROWER = '0x9965507d1a55bcc2695c58ba16fb37d819b0a4dc'
@@ -62,12 +63,12 @@ describe('listLoanDecisionsHandler', () => {
     }))
 
     return {
-      where: jest.fn().mockReturnThis(),
-      orderBy: jest.fn().mockReturnThis(),
-      limit: jest.fn().mockReturnThis(),
-      get: jest.fn().mockResolvedValue({ docs: mockDocs }),
-      count: jest.fn().mockReturnValue({
-        get: jest.fn().mockResolvedValue({ data: () => ({ count: totalCount }) }),
+      where: vi.fn().mockReturnThis(),
+      orderBy: vi.fn().mockReturnThis(),
+      limit: vi.fn().mockReturnThis(),
+      get: vi.fn().mockResolvedValue({ docs: mockDocs }),
+      count: vi.fn().mockReturnValue({
+        get: vi.fn().mockResolvedValue({ data: () => ({ count: totalCount }) }),
       }),
     }
   }
@@ -87,9 +88,9 @@ describe('listLoanDecisionsHandler', () => {
   let mockQuery: ReturnType<typeof createMockQuery>
 
   beforeEach(() => {
-    jest.clearAllMocks()
+    vi.clearAllMocks()
     mockQuery = createMockQuery(mockDecisions, mockDecisions.length)
-    ;(firestore.collection as jest.Mock).mockReturnValue(mockQuery)
+    ;(firestore.collection as Mock).mockReturnValue(mockQuery)
   })
 
   it('should reject an unauthenticated caller', async () => {
@@ -217,7 +218,7 @@ describe('listLoanDecisionsHandler', () => {
     // Arrange — a pool that lends on demand decides nothing, and that is an
     // answer rather than a gap.
     mockQuery = createMockQuery([], 0)
-    ;(firestore.collection as jest.Mock).mockReturnValue(mockQuery)
+    ;(firestore.collection as Mock).mockReturnValue(mockQuery)
 
     // Act
     const result = await listLoanDecisionsHandler(buildRequest() as never)

@@ -1,32 +1,44 @@
-jest.mock('../../services')
-jest.mock('../../services/notes', () => ({
-  ...jest.requireActual('../../services/notes'),
-  entitlementFor: jest.fn(),
-  saveNote: jest.fn(),
-  stageNote: jest.fn(),
+import type { Note } from '@superpool/types'
+import type { CallableRequest } from 'firebase-functions/v2/https'
+import type { NoteEntitlement } from '../../services/notes'
+
+vi.mock('../../services')
+vi.mock('../../services/notes', async () => ({
+  ...(await vi.importActual<typeof import('../../services/notes')>('../../services/notes')),
+  entitlementFor: vi.fn(),
+  saveNote: vi.fn(),
+  stageNote: vi.fn(),
 }))
 
-const { saveNoteHandler } = require('./saveNote')
-const { entitlementFor, saveNote, stageNote } = require('../../services/notes')
+import * as notesMock from '../../services/notes'
+import { saveNoteHandler } from './saveNote'
 
+// These modules are mocked above; vi.mocked restores the mock types that the
+// real signatures would otherwise hide.
+const { entitlementFor, saveNote, stageNote } = vi.mocked(notesMock)
 const OWNER = '0x1111111111111111111111111111111111111111'
 const BORROWER = '0x2222222222222222222222222222222222222222'
 const LOAN_ID = '31337-1-7'
 
 const NOTE = { id: `${LOAN_ID}:loan_rejected`, recordId: LOAN_ID, kind: 'loan_rejected', text: 'Not this month.' }
 
-function buildRequest(overrides: Partial<{ auth: object | null; data: Record<string, unknown> }> = {}) {
+function buildRequest<T>(overrides: Partial<{ auth: object | null; data: Record<string, unknown> }> = {}): CallableRequest<T> {
   return {
     auth: overrides.auth !== undefined ? overrides.auth : { uid: OWNER, token: {} },
     data: overrides.data !== undefined ? overrides.data : { kind: 'loan_rejected', recordId: LOAN_ID, text: 'Not this month.' },
-  }
+  } as unknown as CallableRequest<T>
 }
 
 beforeEach(() => {
-  jest.clearAllMocks()
-  entitlementFor.mockResolvedValue({ author: OWNER.toLowerCase(), subject: BORROWER.toLowerCase(), chainId: 31337, poolId: 1 })
-  saveNote.mockResolvedValue(NOTE)
-  stageNote.mockResolvedValue({ ...NOTE, kind: 'loan_purpose' })
+  vi.clearAllMocks()
+  entitlementFor.mockResolvedValue({
+    author: OWNER.toLowerCase(),
+    subject: BORROWER.toLowerCase(),
+    chainId: 31337,
+    poolId: 1,
+  } as unknown as NoteEntitlement)
+  saveNote.mockResolvedValue(NOTE as unknown as Note)
+  stageNote.mockResolvedValue({ ...NOTE, kind: 'loan_purpose' } as unknown as Note)
 })
 
 describe('saveNote', () => {
@@ -127,9 +139,3 @@ describe('saveNote, staged under a transaction', () => {
     await expect(saveNoteHandler(buildRequest({ auth: { uid: BORROWER }, data: staged }))).rejects.toThrow(/already been written/i)
   })
 })
-
-// A module, not a script: these files use `require` so that `jest.mock` hoists
-// above it, and without an export the test globals would collide with every
-// other callable test in the project.
-// biome-ignore lint/suspicious/noExportsInTest: `export {}` exports nothing — it marks the file as a module so its test globals do not collide with every other callable test.
-export {}

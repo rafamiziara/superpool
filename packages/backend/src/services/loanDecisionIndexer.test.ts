@@ -1,28 +1,50 @@
+import type { Log } from 'ethers'
+import type { Mock } from 'vitest'
 import { mockLogger } from '../__tests__/setup'
 import type { ParsedLoanDecision } from './loanDecisionIndexer'
+
+// Hoisted so the vi.mock factories below can close over them: vi.mock runs before
+// any module-level const is initialised.
+const { mockDecodeEventLog, mockGetEvent, mockGetPoolId } = vi.hoisted(() => ({
+  mockDecodeEventLog: vi.fn(),
+  // Per name, not one value for all three: a single topic hash would collapse the three
+  // events onto one entry and every log would decode as whichever won. Seeded here rather
+  // than at module level because the module reads these at import time, and ESM hoists
+  // imports above ordinary statements.
+  mockGetEvent: vi.fn().mockImplementation((name: string) => {
+    const topics: Record<string, string> = {
+      LoanApproved: '0xLOAN_APPROVED_TOPIC',
+      LoanRejected: '0xLOAN_REJECTED_TOPIC',
+      LoanDefaulted: '0xLOAN_DEFAULTED_TOPIC',
+    }
+
+    return { topicHash: topics[name] }
+  }),
+  mockGetPoolId: vi.fn(),
+}))
 
 // ---------------------------------------------------------------------------
 // Shared mock references — captured at module-definition time so tests can
 // configure them per-case via mockReturnValue / mockImplementation.
 // ---------------------------------------------------------------------------
-const mockDecodeEventLog = jest.fn()
-const mockGetEvent = jest.fn()
-const mockGetPoolId = jest.fn()
-
 // Mock ethers BEFORE importing the module under test. The module creates a
 // top-level `new Interface([...LendingPoolABI])`, so the mock must be in
 // place before the first `require`.
-jest.mock('ethers', () => {
-  const actual = jest.requireActual('ethers')
+vi.mock('ethers', async () => {
+  const actual = await vi.importActual<typeof import('ethers')>('ethers')
   return {
     ...actual,
-    Interface: jest.fn().mockImplementation(() => ({
-      decodeEventLog: mockDecodeEventLog,
-      getEvent: mockGetEvent,
-    })),
-    Contract: jest.fn().mockImplementation(() => ({
-      getPoolId: mockGetPoolId,
-    })),
+    Interface: vi.fn().mockImplementation(function () {
+      return {
+        decodeEventLog: mockDecodeEventLog,
+        getEvent: mockGetEvent,
+      }
+    }),
+    Contract: vi.fn().mockImplementation(function () {
+      return {
+        getPoolId: mockGetPoolId,
+      }
+    }),
   }
 })
 
@@ -30,28 +52,16 @@ const APPROVED_TOPIC = '0xLOAN_APPROVED_TOPIC'
 const REJECTED_TOPIC = '0xLOAN_REJECTED_TOPIC'
 const DEFAULTED_TOPIC = '0xLOAN_DEFAULTED_TOPIC'
 
-// Per name, not one value for all three: a single topic hash would collapse the
-// three events onto one entry and every log would decode as whichever won.
-mockGetEvent.mockImplementation((name: string) => {
-  const topics: Record<string, string> = {
-    LoanApproved: APPROVED_TOPIC,
-    LoanRejected: REJECTED_TOPIC,
-    LoanDefaulted: DEFAULTED_TOPIC,
-  }
-
-  return { topicHash: topics[name] }
-})
-
 // Import AFTER mocks are registered
-const {
-  parseLoanDecisionLog,
+import {
   indexLoanDecisionEvent,
   indexLoanDecisionsByTxHash,
-  readDecisionSender,
-  loanDecisionDocId,
   isLoanDecisionLog,
   LOAN_DECISION_TOPICS,
-} = require('./loanDecisionIndexer')
+  loanDecisionDocId,
+  parseLoanDecisionLog,
+  readDecisionSender,
+} from './loanDecisionIndexer'
 
 // ---------------------------------------------------------------------------
 // Shared test constants
@@ -87,7 +97,7 @@ function buildMockLog(
     index: number
     address: string
   }> = {}
-) {
+): Log {
   return {
     // All three parameters of all three decision events are `indexed`, so a
     // real log carries no data.
@@ -98,7 +108,7 @@ function buildMockLog(
     index: 0,
     address: POOL_ADDRESS,
     ...overrides,
-  }
+  } as unknown as Log
 }
 
 function makeDefaultDecodeReturn(overrides: Record<string, unknown> = {}) {
@@ -128,9 +138,9 @@ function buildParsedDecision(overrides: Partial<ParsedLoanDecision> = {}): Parse
   }
 }
 
-function buildFirestore(create = jest.fn().mockResolvedValue(undefined)) {
-  const doc = jest.fn().mockReturnValue({ create })
-  const collection = jest.fn().mockReturnValue({ doc })
+function buildFirestore(create = vi.fn().mockResolvedValue(undefined)) {
+  const doc = vi.fn().mockReturnValue({ create })
+  const collection = vi.fn().mockReturnValue({ doc })
 
   return { firestore: { collection } as never, collection, doc, create }
 }
@@ -143,13 +153,13 @@ function buildProvider(
   }> = {}
 ) {
   return {
-    getTransactionReceipt: jest
+    getTransactionReceipt: vi
       .fn()
       .mockResolvedValue(
         overrides.receipt === undefined ? { status: 1, blockNumber: BLOCK_NUMBER, from: OWNER, logs: [buildMockLog()] } : overrides.receipt
       ),
-    getBlock: jest.fn().mockResolvedValue(overrides.block === undefined ? { timestamp: BLOCK_TIMESTAMP } : overrides.block),
-    getTransaction: jest.fn().mockResolvedValue(overrides.transaction === undefined ? { from: OWNER } : overrides.transaction),
+    getBlock: vi.fn().mockResolvedValue(overrides.block === undefined ? { timestamp: BLOCK_TIMESTAMP } : overrides.block),
+    getTransaction: vi.fn().mockResolvedValue(overrides.transaction === undefined ? { from: OWNER } : overrides.transaction),
   } as never
 }
 
@@ -204,7 +214,7 @@ describe('LOAN_DECISION_TOPICS', () => {
 
 describe('parseLoanDecisionLog', () => {
   beforeEach(() => {
-    jest.clearAllMocks()
+    vi.clearAllMocks()
     mockDecodeEventLog.mockReturnValue(makeDefaultDecodeReturn())
   })
 
@@ -332,7 +342,7 @@ describe('parseLoanDecisionLog', () => {
 // ---------------------------------------------------------------------------
 
 describe('readDecisionSender', () => {
-  beforeEach(() => jest.clearAllMocks())
+  beforeEach(() => vi.clearAllMocks())
 
   it('should return the transaction sender', async () => {
     // Act
@@ -358,7 +368,7 @@ describe('readDecisionSender', () => {
 // ---------------------------------------------------------------------------
 
 describe('indexLoanDecisionEvent', () => {
-  beforeEach(() => jest.clearAllMocks())
+  beforeEach(() => vi.clearAllMocks())
 
   it('should store a decision under its log id', async () => {
     // Arrange
@@ -387,7 +397,7 @@ describe('indexLoanDecisionEvent', () => {
   it('should treat an existing document as already indexed rather than an error', async () => {
     // Arrange — a re-scan of a range covers decisions it has already written,
     // and `create()` refusing is what makes that idempotent.
-    const create = jest.fn().mockRejectedValue(alreadyExistsError())
+    const create = vi.fn().mockRejectedValue(alreadyExistsError())
     const { firestore } = buildFirestore(create)
 
     // Act
@@ -400,7 +410,7 @@ describe('indexLoanDecisionEvent', () => {
 
   it('should propagate any other write failure', async () => {
     // Arrange
-    const create = jest.fn().mockRejectedValue(Object.assign(new Error('unavailable'), { code: 14 }))
+    const create = vi.fn().mockRejectedValue(Object.assign(new Error('unavailable'), { code: 14 }))
     const { firestore } = buildFirestore(create)
 
     // Act & Assert
@@ -414,7 +424,7 @@ describe('indexLoanDecisionEvent', () => {
 
 describe('indexLoanDecisionsByTxHash', () => {
   beforeEach(() => {
-    jest.clearAllMocks()
+    vi.clearAllMocks()
     mockDecodeEventLog.mockReturnValue(makeDefaultDecodeReturn())
     mockGetPoolId.mockResolvedValue(1n)
   })
@@ -445,7 +455,7 @@ describe('indexLoanDecisionsByTxHash', () => {
 
     // Assert
     expect(result.decisions[0].decidedBy).toBe(OWNER.toLowerCase())
-    expect((provider as unknown as { getTransaction: jest.Mock }).getTransaction).not.toHaveBeenCalled()
+    expect((provider as unknown as { getTransaction: Mock }).getTransaction).not.toHaveBeenCalled()
   })
 
   it('should return nothing for a transaction that decided nothing', async () => {
@@ -462,7 +472,7 @@ describe('indexLoanDecisionsByTxHash', () => {
     // Assert
     expect(result).toEqual({ decisions: [], results: [] })
     expect(create).not.toHaveBeenCalled()
-    expect((provider as unknown as { getBlock: jest.Mock }).getBlock).not.toHaveBeenCalled()
+    expect((provider as unknown as { getBlock: Mock }).getBlock).not.toHaveBeenCalled()
   })
 
   it('should skip a decision emitted by a contract the factory does not know', async () => {

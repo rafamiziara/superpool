@@ -1,4 +1,6 @@
-import type { PoolInfo } from '@superpool/types'
+import type { ListPoolsRequest, PoolInfo } from '@superpool/types'
+import type { CollectionReference, DocumentData } from 'firebase-admin/firestore'
+import type { CallableRequest } from 'firebase-functions/v2/https'
 import { mockLogger } from '../../__tests__/setup'
 
 /**
@@ -17,11 +19,12 @@ type StoredPool = Omit<PoolInfo, 'createdAt' | 'loanToken'> & {
 const NATIVE = '0x0000000000000000000000000000000000000000'
 
 // Import mocked services (already mocked in setup.ts)
-const { firestore } = require('../../services')
+import { firestore as realFirestore } from '../../services'
 
 // Import the handler to test
-const { listPoolsHandler } = require('./listPools')
+import { listPoolsHandler } from './listPools'
 
+const firestore = vi.mocked(realFirestore, true)
 describe('listPoolsHandler', () => {
   const mockPools: StoredPool[] = [
     {
@@ -70,13 +73,13 @@ describe('listPoolsHandler', () => {
     }))
 
     const query = {
-      where: jest.fn().mockReturnThis(),
-      orderBy: jest.fn().mockReturnThis(),
-      offset: jest.fn().mockReturnThis(),
-      limit: jest.fn().mockReturnThis(),
-      get: jest.fn().mockResolvedValue({ docs: mockDocs }),
-      count: jest.fn().mockReturnValue({
-        get: jest.fn().mockResolvedValue({
+      where: vi.fn().mockReturnThis(),
+      orderBy: vi.fn().mockReturnThis(),
+      offset: vi.fn().mockReturnThis(),
+      limit: vi.fn().mockReturnThis(),
+      get: vi.fn().mockResolvedValue({ docs: mockDocs }),
+      count: vi.fn().mockReturnValue({
+        get: vi.fn().mockResolvedValue({
           data: () => ({ count: totalCount }),
         }),
       }),
@@ -86,7 +89,7 @@ describe('listPoolsHandler', () => {
   }
 
   beforeEach(() => {
-    jest.clearAllMocks()
+    vi.clearAllMocks()
   })
 
   // Test Case: Successful pool listing with defaults (Happy Path)
@@ -94,10 +97,10 @@ describe('listPoolsHandler', () => {
     // Arrange
     const request = { data: {} }
     const mockQuery = createMockQuery(mockPools, 2)
-    firestore.collection.mockReturnValue(mockQuery)
+    vi.mocked(firestore.collection).mockReturnValue(mockQuery as unknown as CollectionReference<DocumentData, DocumentData>)
 
     // Act
-    const result = await listPoolsHandler(request)
+    const result = await listPoolsHandler(request as unknown as CallableRequest<ListPoolsRequest>)
 
     // Assert
     expect(firestore.collection).toHaveBeenCalledWith('pools')
@@ -124,9 +127,11 @@ describe('listPoolsHandler', () => {
       // The retrofit. Nothing could have created a token pool before the field
       // existed, so an absent one is not missing information — it is the answer.
       const { loanToken: _omitted, ...legacyPool } = mockPools[0]
-      firestore.collection.mockReturnValue(createMockQuery([legacyPool], 1))
+      vi.mocked(firestore.collection).mockReturnValue(
+        createMockQuery([legacyPool], 1) as unknown as CollectionReference<DocumentData, DocumentData>
+      )
 
-      const result = await listPoolsHandler({ data: {} })
+      const result = await listPoolsHandler({ data: {} } as unknown as CallableRequest<ListPoolsRequest>)
 
       expect(result.pools[0].loanToken).toBe(NATIVE)
       expect(result.pools[0].tokenSymbol).toBeUndefined()
@@ -137,18 +142,22 @@ describe('listPoolsHandler', () => {
       // The native symbol is POL on Polygon and ETH on Base — a fact about the
       // chain, which the app already knows, not about the pool. Answering 'POL'
       // here would put it on a Base pool.
-      firestore.collection.mockReturnValue(createMockQuery([mockPools[0]], 1))
+      vi.mocked(firestore.collection).mockReturnValue(
+        createMockQuery([mockPools[0]], 1) as unknown as CollectionReference<DocumentData, DocumentData>
+      )
 
-      const result = await listPoolsHandler({ data: {} })
+      const result = await listPoolsHandler({ data: {} } as unknown as CallableRequest<ListPoolsRequest>)
 
       expect(result.pools[0].loanToken).toBe(NATIVE)
       expect(result.pools[0].tokenSymbol).toBeUndefined()
     })
 
     it('carries a token pool’s symbol and decimals through', async () => {
-      firestore.collection.mockReturnValue(createMockQuery([mockPools[1]], 1))
+      vi.mocked(firestore.collection).mockReturnValue(
+        createMockQuery([mockPools[1]], 1) as unknown as CollectionReference<DocumentData, DocumentData>
+      )
 
-      const result = await listPoolsHandler({ data: {} })
+      const result = await listPoolsHandler({ data: {} } as unknown as CallableRequest<ListPoolsRequest>)
 
       expect(result.pools[0]).toMatchObject({
         loanToken: '0xstablecoin',
@@ -162,9 +171,11 @@ describe('listPoolsHandler', () => {
       // be read has to reach the app as unsupported; 18 decimals against a
       // 6-decimal token renders 5 USDC as 5,000,000,000,000.
       const { tokenSymbol: _symbol, tokenDecimals: _decimals, ...unreadable } = mockPools[1]
-      firestore.collection.mockReturnValue(createMockQuery([unreadable], 1))
+      vi.mocked(firestore.collection).mockReturnValue(
+        createMockQuery([unreadable], 1) as unknown as CollectionReference<DocumentData, DocumentData>
+      )
 
-      const result = await listPoolsHandler({ data: {} })
+      const result = await listPoolsHandler({ data: {} } as unknown as CallableRequest<ListPoolsRequest>)
 
       expect(result.pools[0].loanToken).toBe('0xstablecoin')
       expect(result.pools[0].tokenDecimals).toBeUndefined()
@@ -176,10 +187,10 @@ describe('listPoolsHandler', () => {
     // Arrange
     const request = { data: { page: 2, limit: 10 } }
     const mockQuery = createMockQuery(mockPools, 25)
-    firestore.collection.mockReturnValue(mockQuery)
+    vi.mocked(firestore.collection).mockReturnValue(mockQuery as unknown as CollectionReference<DocumentData, DocumentData>)
 
     // Act
-    const result = await listPoolsHandler(request)
+    const result = await listPoolsHandler(request as unknown as CallableRequest<ListPoolsRequest>)
 
     // Assert
     expect(mockQuery.offset).toHaveBeenCalledWith(10) // (page - 1) * limit = (2 - 1) * 10
@@ -199,10 +210,10 @@ describe('listPoolsHandler', () => {
     const ownerAddress = '0x70997970C51812dc3A010C7d01b50e0d17dc79C8'
     const request = { data: { ownerAddress } }
     const mockQuery = createMockQuery([mockPools[0]], 1)
-    firestore.collection.mockReturnValue(mockQuery)
+    vi.mocked(firestore.collection).mockReturnValue(mockQuery as unknown as CollectionReference<DocumentData, DocumentData>)
 
     // Act
-    const result = await listPoolsHandler(request)
+    const result = await listPoolsHandler(request as unknown as CallableRequest<ListPoolsRequest>)
 
     // Assert
     expect(mockQuery.where).toHaveBeenCalledWith('poolOwner', '==', ownerAddress.toLowerCase())
@@ -216,9 +227,9 @@ describe('listPoolsHandler', () => {
       // Normalised on this side of the wire so there is one implementation of
       // "what counts as the same word" rather than two that can drift.
       const mockQuery = createMockQuery([mockPools[0]], 1)
-      firestore.collection.mockReturnValue(mockQuery)
+      vi.mocked(firestore.collection).mockReturnValue(mockQuery as unknown as CollectionReference<DocumentData, DocumentData>)
 
-      await listPoolsHandler({ data: { searchTerm: 'East Side LENDING' } })
+      await listPoolsHandler({ data: { searchTerm: 'East Side LENDING' } } as unknown as CallableRequest<ListPoolsRequest>)
 
       expect(mockQuery.where).toHaveBeenCalledWith('searchTokens', 'array-contains', 'lending')
     })
@@ -227,9 +238,9 @@ describe('listPoolsHandler', () => {
       // The array holds prefixes up to a cap, so a longer query has to be cut
       // to the same length or it matches nothing at all.
       const mockQuery = createMockQuery([], 0)
-      firestore.collection.mockReturnValue(mockQuery)
+      vi.mocked(firestore.collection).mockReturnValue(mockQuery as unknown as CollectionReference<DocumentData, DocumentData>)
 
-      await listPoolsHandler({ data: { searchTerm: 'neighbourhood' } })
+      await listPoolsHandler({ data: { searchTerm: 'neighbourhood' } } as unknown as CallableRequest<ListPoolsRequest>)
 
       expect(mockQuery.where).toHaveBeenCalledWith('searchTokens', 'array-contains', 'neighbourhoo')
     })
@@ -238,18 +249,18 @@ describe('listPoolsHandler', () => {
       // One letter matches most of the chain. The caller already has a page it
       // can filter, so this is no search rather than a bad one.
       const mockQuery = createMockQuery(mockPools, 2)
-      firestore.collection.mockReturnValue(mockQuery)
+      vi.mocked(firestore.collection).mockReturnValue(mockQuery as unknown as CollectionReference<DocumentData, DocumentData>)
 
-      await listPoolsHandler({ data: { searchTerm: 'a' } })
+      await listPoolsHandler({ data: { searchTerm: 'a' } } as unknown as CallableRequest<ListPoolsRequest>)
 
       expect(mockQuery.where).not.toHaveBeenCalledWith('searchTokens', 'array-contains', expect.anything())
     })
 
     it('ignores an empty search rather than matching nothing', async () => {
       const mockQuery = createMockQuery(mockPools, 2)
-      firestore.collection.mockReturnValue(mockQuery)
+      vi.mocked(firestore.collection).mockReturnValue(mockQuery as unknown as CollectionReference<DocumentData, DocumentData>)
 
-      const result = await listPoolsHandler({ data: { searchTerm: '   ' } })
+      const result = await listPoolsHandler({ data: { searchTerm: '   ' } } as unknown as CallableRequest<ListPoolsRequest>)
 
       expect(mockQuery.where).not.toHaveBeenCalledWith('searchTokens', 'array-contains', expect.anything())
       expect(result.pools).toHaveLength(2)
@@ -259,9 +270,9 @@ describe('listPoolsHandler', () => {
       // Every feed is per chain by construction. A search that dropped the
       // chain filter would show pools from a network the user is not on.
       const mockQuery = createMockQuery([mockPools[0]], 1)
-      firestore.collection.mockReturnValue(mockQuery)
+      vi.mocked(firestore.collection).mockReturnValue(mockQuery as unknown as CollectionReference<DocumentData, DocumentData>)
 
-      await listPoolsHandler({ data: { chainId: 80002, searchTerm: 'guild' } })
+      await listPoolsHandler({ data: { chainId: 80002, searchTerm: 'guild' } } as unknown as CallableRequest<ListPoolsRequest>)
 
       expect(mockQuery.where).toHaveBeenCalledWith('chainId', '==', 80002)
       expect(mockQuery.where).toHaveBeenCalledWith('isActive', '==', true)
@@ -274,10 +285,10 @@ describe('listPoolsHandler', () => {
     // Arrange
     const request = { data: { chainId: 137 } }
     const mockQuery = createMockQuery(mockPools, 2)
-    firestore.collection.mockReturnValue(mockQuery)
+    vi.mocked(firestore.collection).mockReturnValue(mockQuery as unknown as CollectionReference<DocumentData, DocumentData>)
 
     // Act
-    await listPoolsHandler(request)
+    await listPoolsHandler(request as unknown as CallableRequest<ListPoolsRequest>)
 
     // Assert
     expect(mockQuery.where).toHaveBeenCalledWith('chainId', '==', 137)
@@ -288,10 +299,10 @@ describe('listPoolsHandler', () => {
     // Arrange
     const request = { data: { activeOnly: false } }
     const mockQuery = createMockQuery(mockPools, 2)
-    firestore.collection.mockReturnValue(mockQuery)
+    vi.mocked(firestore.collection).mockReturnValue(mockQuery as unknown as CollectionReference<DocumentData, DocumentData>)
 
     // Act
-    await listPoolsHandler(request)
+    await listPoolsHandler(request as unknown as CallableRequest<ListPoolsRequest>)
 
     // Assert
     // Should only have one where call for chainId, not for isActive
@@ -305,10 +316,10 @@ describe('listPoolsHandler', () => {
     // Arrange
     const request = { data: { limit: 500 } }
     const mockQuery = createMockQuery(mockPools, 2)
-    firestore.collection.mockReturnValue(mockQuery)
+    vi.mocked(firestore.collection).mockReturnValue(mockQuery as unknown as CollectionReference<DocumentData, DocumentData>)
 
     // Act
-    const result = await listPoolsHandler(request)
+    const result = await listPoolsHandler(request as unknown as CallableRequest<ListPoolsRequest>)
 
     // Assert
     expect(mockQuery.limit).toHaveBeenCalledWith(100)
@@ -320,10 +331,10 @@ describe('listPoolsHandler', () => {
     // Arrange
     const request = { data: { limit: -5 } }
     const mockQuery = createMockQuery(mockPools, 2)
-    firestore.collection.mockReturnValue(mockQuery)
+    vi.mocked(firestore.collection).mockReturnValue(mockQuery as unknown as CollectionReference<DocumentData, DocumentData>)
 
     // Act & Assert
-    await expect(listPoolsHandler(request)).rejects.toThrow(/limit/i)
+    await expect(listPoolsHandler(request as unknown as CallableRequest<ListPoolsRequest>)).rejects.toThrow(/limit/i)
     expect(mockQuery.limit).not.toHaveBeenCalled()
   })
 
@@ -333,10 +344,10 @@ describe('listPoolsHandler', () => {
     // and answering it with the first hides that.
     const request = { data: { page: 0 } }
     const mockQuery = createMockQuery(mockPools, 2)
-    firestore.collection.mockReturnValue(mockQuery)
+    vi.mocked(firestore.collection).mockReturnValue(mockQuery as unknown as CollectionReference<DocumentData, DocumentData>)
 
     // Act & Assert
-    await expect(listPoolsHandler(request)).rejects.toThrow(/page/i)
+    await expect(listPoolsHandler(request as unknown as CallableRequest<ListPoolsRequest>)).rejects.toThrow(/page/i)
     expect(mockQuery.offset).not.toHaveBeenCalled()
   })
 
@@ -345,10 +356,10 @@ describe('listPoolsHandler', () => {
     // Arrange
     const request = { data: {} }
     const mockQuery = createMockQuery([], 0)
-    firestore.collection.mockReturnValue(mockQuery)
+    vi.mocked(firestore.collection).mockReturnValue(mockQuery as unknown as CollectionReference<DocumentData, DocumentData>)
 
     // Act
-    const result = await listPoolsHandler(request)
+    const result = await listPoolsHandler(request as unknown as CallableRequest<ListPoolsRequest>)
 
     // Assert
     expect(result.pools).toEqual([])
@@ -370,10 +381,10 @@ describe('listPoolsHandler', () => {
       },
     }
     const mockQuery = createMockQuery([mockPools[0]], 1)
-    firestore.collection.mockReturnValue(mockQuery)
+    vi.mocked(firestore.collection).mockReturnValue(mockQuery as unknown as CollectionReference<DocumentData, DocumentData>)
 
     // Act
-    const result = await listPoolsHandler(request)
+    const result = await listPoolsHandler(request as unknown as CallableRequest<ListPoolsRequest>)
 
     // Assert
     expect(mockQuery.where).toHaveBeenCalledWith('chainId', '==', 80002)
@@ -387,10 +398,10 @@ describe('listPoolsHandler', () => {
     // Arrange
     const request = { data: { page: 3, limit: 10 } }
     const mockQuery = createMockQuery([mockPools[0]], 21) // 3rd page of 21 total items
-    firestore.collection.mockReturnValue(mockQuery)
+    vi.mocked(firestore.collection).mockReturnValue(mockQuery as unknown as CollectionReference<DocumentData, DocumentData>)
 
     // Act
-    const result = await listPoolsHandler(request)
+    const result = await listPoolsHandler(request as unknown as CallableRequest<ListPoolsRequest>)
 
     // Assert
     expect(result.hasNextPage).toBe(false) // offset 20 + 1 pool = 21, not less than 21
@@ -403,13 +414,15 @@ describe('listPoolsHandler', () => {
     const request = { data: {} }
     const mockQuery = createMockQuery([], 0)
     mockQuery.count.mockReturnValue({
-      get: jest.fn().mockRejectedValue(new Error('Firestore error')),
+      get: vi.fn().mockRejectedValue(new Error('Firestore error')),
     })
-    firestore.collection.mockReturnValue(mockQuery)
+    vi.mocked(firestore.collection).mockReturnValue(mockQuery as unknown as CollectionReference<DocumentData, DocumentData>)
 
     // Act & Assert
-    await expect(listPoolsHandler(request)).rejects.toThrow('Failed to list pools. Please try again.')
-    await expect(listPoolsHandler(request)).rejects.toHaveProperty('code', 'internal')
+    await expect(listPoolsHandler(request as unknown as CallableRequest<ListPoolsRequest>)).rejects.toThrow(
+      'Failed to list pools. Please try again.'
+    )
+    await expect(listPoolsHandler(request as unknown as CallableRequest<ListPoolsRequest>)).rejects.toHaveProperty('code', 'internal')
     expect(mockLogger.error).toHaveBeenCalledWith(
       'Error listing pools',
       expect.objectContaining({
@@ -425,11 +438,13 @@ describe('listPoolsHandler', () => {
     const request = { data: {} }
     const mockQuery = createMockQuery([], 0)
     mockQuery.get.mockRejectedValue(new Error('Query execution failed'))
-    firestore.collection.mockReturnValue(mockQuery)
+    vi.mocked(firestore.collection).mockReturnValue(mockQuery as unknown as CollectionReference<DocumentData, DocumentData>)
 
     // Act & Assert
-    await expect(listPoolsHandler(request)).rejects.toThrow('Failed to list pools. Please try again.')
-    await expect(listPoolsHandler(request)).rejects.toHaveProperty('code', 'internal')
+    await expect(listPoolsHandler(request as unknown as CallableRequest<ListPoolsRequest>)).rejects.toThrow(
+      'Failed to list pools. Please try again.'
+    )
+    await expect(listPoolsHandler(request as unknown as CallableRequest<ListPoolsRequest>)).rejects.toHaveProperty('code', 'internal')
   })
 
   // Test Case: Handle missing createdAt timestamp
@@ -445,21 +460,21 @@ describe('listPoolsHandler', () => {
       },
     ]
     const mockQuery = {
-      where: jest.fn().mockReturnThis(),
-      orderBy: jest.fn().mockReturnThis(),
-      offset: jest.fn().mockReturnThis(),
-      limit: jest.fn().mockReturnThis(),
-      get: jest.fn().mockResolvedValue({ docs: mockDocs }),
-      count: jest.fn().mockReturnValue({
-        get: jest.fn().mockResolvedValue({
+      where: vi.fn().mockReturnThis(),
+      orderBy: vi.fn().mockReturnThis(),
+      offset: vi.fn().mockReturnThis(),
+      limit: vi.fn().mockReturnThis(),
+      get: vi.fn().mockResolvedValue({ docs: mockDocs }),
+      count: vi.fn().mockReturnValue({
+        get: vi.fn().mockResolvedValue({
           data: () => ({ count: 1 }),
         }),
       }),
     }
-    firestore.collection.mockReturnValue(mockQuery)
+    vi.mocked(firestore.collection).mockReturnValue(mockQuery as unknown as CollectionReference<DocumentData, DocumentData>)
 
     // Act
-    const result = await listPoolsHandler(request)
+    const result = await listPoolsHandler(request as unknown as CallableRequest<ListPoolsRequest>)
 
     // Assert
     // An ISO string, not a Date: a Date returned from a callable is encoded to `{}`.
@@ -474,11 +489,13 @@ describe('listPoolsHandler', () => {
     const mockQuery = createMockQuery([], 0)
     const nonErrorObject = { code: 'CUSTOM_ERROR', details: 'Custom error details' }
     mockQuery.get.mockRejectedValue(nonErrorObject)
-    firestore.collection.mockReturnValue(mockQuery)
+    vi.mocked(firestore.collection).mockReturnValue(mockQuery as unknown as CollectionReference<DocumentData, DocumentData>)
 
     // Act & Assert
-    await expect(listPoolsHandler(request)).rejects.toThrow('Failed to list pools. Please try again.')
-    await expect(listPoolsHandler(request)).rejects.toHaveProperty('code', 'internal')
+    await expect(listPoolsHandler(request as unknown as CallableRequest<ListPoolsRequest>)).rejects.toThrow(
+      'Failed to list pools. Please try again.'
+    )
+    await expect(listPoolsHandler(request as unknown as CallableRequest<ListPoolsRequest>)).rejects.toHaveProperty('code', 'internal')
     expect(mockLogger.error).toHaveBeenCalledWith(
       'Error listing pools',
       expect.objectContaining({

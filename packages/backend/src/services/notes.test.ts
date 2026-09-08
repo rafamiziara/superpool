@@ -74,7 +74,7 @@ function buildFirestore(seed: Docs = {}) {
     }
   }
 
-  return { firestore: { collection } as unknown as Firestore, store }
+  return { firestore: { collection }, store }
 }
 
 function replacer(this: Record<string, unknown>, key: string, value: unknown) {
@@ -153,7 +153,7 @@ describe('entitlementFor', () => {
   it('lets the borrower state a purpose on their own loan', async () => {
     const { firestore } = buildFirestore(seeded())
 
-    await expect(entitlementFor(LOAN_ID, 'loan_purpose', firestore)).resolves.toMatchObject({
+    await expect(entitlementFor(LOAN_ID, 'loan_purpose', firestore as unknown as Firestore)).resolves.toMatchObject({
       author: BORROWER.toLowerCase(),
       subject: BORROWER.toLowerCase(),
     })
@@ -164,7 +164,7 @@ describe('entitlementFor', () => {
   it('gives every decision to the pool owner, and names the borrower as its subject', async () => {
     const { firestore } = buildFirestore(seeded())
 
-    await expect(entitlementFor(LOAN_ID, 'loan_rejected', firestore)).resolves.toMatchObject({
+    await expect(entitlementFor(LOAN_ID, 'loan_rejected', firestore as unknown as Firestore)).resolves.toMatchObject({
       author: OWNER.toLowerCase(),
       subject: BORROWER.toLowerCase(),
     })
@@ -173,7 +173,7 @@ describe('entitlementFor', () => {
   it('reads a membership kind from the membership register, not the loans', async () => {
     const { firestore } = buildFirestore(seeded())
 
-    await expect(entitlementFor(MEMBER_ID, 'membership_removed', firestore)).resolves.toMatchObject({
+    await expect(entitlementFor(MEMBER_ID, 'membership_removed', firestore as unknown as Firestore)).resolves.toMatchObject({
       author: OWNER.toLowerCase(),
       subject: BORROWER.toLowerCase(),
       poolId: POOL_ID,
@@ -184,7 +184,7 @@ describe('entitlementFor', () => {
   it('refuses a record nobody has indexed', async () => {
     const { firestore } = buildFirestore(seeded())
 
-    await expect(entitlementFor(`${CHAIN_ID}-9-9`, 'loan_rejected', firestore)).resolves.toBeNull()
+    await expect(entitlementFor(`${CHAIN_ID}-9-9`, 'loan_rejected', firestore as unknown as Firestore)).resolves.toBeNull()
   })
 
   it('refuses when the pool itself was never indexed, since there is no owner', async () => {
@@ -192,7 +192,7 @@ describe('entitlementFor', () => {
     delete docs.pools[`${CHAIN_ID}-${POOL_ID}`]
     const { firestore } = buildFirestore(docs)
 
-    await expect(entitlementFor(LOAN_ID, 'loan_rejected', firestore)).resolves.toBeNull()
+    await expect(entitlementFor(LOAN_ID, 'loan_rejected', firestore as unknown as Firestore)).resolves.toBeNull()
   })
 
   it('refuses a record with no subject on it', async () => {
@@ -200,7 +200,7 @@ describe('entitlementFor', () => {
     docs.loans[LOAN_ID] = { chainId: CHAIN_ID, poolId: POOL_ID }
     const { firestore } = buildFirestore(docs)
 
-    await expect(entitlementFor(LOAN_ID, 'loan_rejected', firestore)).resolves.toBeNull()
+    await expect(entitlementFor(LOAN_ID, 'loan_rejected', firestore as unknown as Firestore)).resolves.toBeNull()
   })
 })
 
@@ -208,7 +208,7 @@ describe('saveNote', () => {
   it('stores the note under (record, outcome) and lowercases both parties', async () => {
     const { firestore, store } = buildFirestore(seeded())
 
-    const note = await saveNote(params(), firestore)
+    const note = await saveNote(params(), firestore as unknown as Firestore)
 
     expect(note).toMatchObject({ id: `${LOAN_ID}:loan_rejected`, author: OWNER.toLowerCase(), subject: BORROWER.toLowerCase() })
     expect(store.notes[`${LOAN_ID}:loan_rejected`]).toBeDefined()
@@ -217,7 +217,7 @@ describe('saveNote', () => {
   it('dates the note on the wire as ISO, which is what survives the callable encoder', async () => {
     const { firestore } = buildFirestore(seeded())
 
-    const note = await saveNote(params(), firestore)
+    const note = await saveNote(params(), firestore as unknown as Firestore)
 
     expect(new Date(note!.createdAt).getTime()).not.toBeNaN()
   })
@@ -226,8 +226,8 @@ describe('saveNote', () => {
   it('is write-once: a second note under the same key changes nothing', async () => {
     const { firestore, store } = buildFirestore(seeded())
 
-    await saveNote(params(), firestore)
-    const second = await saveNote(params({ text: 'Actually, never mind.' }), firestore)
+    await saveNote(params(), firestore as unknown as Firestore)
+    const second = await saveNote(params({ text: 'Actually, never mind.' }), firestore as unknown as Firestore)
 
     expect(second).toBeNull()
     expect(store.notes[`${LOAN_ID}:loan_rejected`].text).toBe(params().text)
@@ -237,7 +237,7 @@ describe('saveNote', () => {
     const { firestore } = buildFirestore(seeded())
     const written = Timestamp.fromMillis(1_700_000_000_000)
 
-    const note = await saveNote(params({ createdAt: written }), firestore)
+    const note = await saveNote(params({ createdAt: written }), firestore as unknown as Firestore)
 
     expect(note!.createdAt).toBe(written.toDate().toISOString())
   })
@@ -246,17 +246,17 @@ describe('saveNote', () => {
 describe('noteFor', () => {
   it('answers with the note attached to that outcome', async () => {
     const { firestore } = buildFirestore(seeded())
-    await saveNote(params(), firestore)
+    await saveNote(params(), firestore as unknown as Firestore)
 
-    await expect(noteFor(LOAN_ID, 'loan_rejected', firestore)).resolves.toMatchObject({ text: params().text })
+    await expect(noteFor(LOAN_ID, 'loan_rejected', firestore as unknown as Firestore)).resolves.toMatchObject({ text: params().text })
   })
 
   // The check that makes a reason the owner thought better of invisible.
   it('does not answer with a note written for a different outcome', async () => {
     const { firestore } = buildFirestore(seeded())
-    await saveNote(params(), firestore)
+    await saveNote(params(), firestore as unknown as Firestore)
 
-    await expect(noteFor(LOAN_ID, 'loan_approved', firestore)).resolves.toBeNull()
+    await expect(noteFor(LOAN_ID, 'loan_approved', firestore as unknown as Firestore)).resolves.toBeNull()
   })
 })
 
@@ -266,9 +266,9 @@ describe('resolveStagedNote', () => {
 
   it('moves a staged purpose onto the loan the transaction created', async () => {
     const { firestore, store } = buildFirestore(seeded())
-    await stageNote(stageParams(), firestore)
+    await stageNote(stageParams(), firestore as unknown as Firestore)
 
-    const note = await resolveStagedNote(CHAIN_ID, '0xDEAD', LOAN_ID, 'loan_purpose', BORROWER, POOL_ID, firestore)
+    const note = await resolveStagedNote(CHAIN_ID, '0xDEAD', LOAN_ID, 'loan_purpose', BORROWER, POOL_ID, firestore as unknown as Firestore)
 
     expect(note).toMatchObject({ recordId: LOAN_ID, poolId: POOL_ID, kind: 'loan_purpose' })
     expect(store.notes[`${LOAN_ID}:loan_purpose`]).toBeDefined()
@@ -279,9 +279,9 @@ describe('resolveStagedNote', () => {
   // where the claim on a transaction hash is honoured, or is not.
   it('drops a purpose staged by somebody who is not the borrower', async () => {
     const { firestore, store } = buildFirestore(seeded())
-    await stageNote(params({ ...stageParams(), author: STRANGER, subject: STRANGER }), firestore)
+    await stageNote(params({ ...stageParams(), author: STRANGER, subject: STRANGER }), firestore as unknown as Firestore)
 
-    const note = await resolveStagedNote(CHAIN_ID, '0xdead', LOAN_ID, 'loan_purpose', BORROWER, POOL_ID, firestore)
+    const note = await resolveStagedNote(CHAIN_ID, '0xdead', LOAN_ID, 'loan_purpose', BORROWER, POOL_ID, firestore as unknown as Firestore)
 
     expect(note).toBeNull()
     expect(store.notes?.[`${LOAN_ID}:loan_purpose`]).toBeUndefined()
@@ -291,16 +291,18 @@ describe('resolveStagedNote', () => {
   it('says nothing when no purpose was staged, which is the ordinary case', async () => {
     const { firestore } = buildFirestore(seeded())
 
-    await expect(resolveStagedNote(CHAIN_ID, '0xdead', LOAN_ID, 'loan_purpose', BORROWER, POOL_ID, firestore)).resolves.toBeNull()
+    await expect(
+      resolveStagedNote(CHAIN_ID, '0xdead', LOAN_ID, 'loan_purpose', BORROWER, POOL_ID, firestore as unknown as Firestore)
+    ).resolves.toBeNull()
   })
 
   // Re-scanning a range is a supported operation here.
   it('is free to run twice: the second pass finds nothing to move and breaks nothing', async () => {
     const { firestore, store } = buildFirestore(seeded())
-    await stageNote(stageParams(), firestore)
+    await stageNote(stageParams(), firestore as unknown as Firestore)
 
-    await resolveStagedNote(CHAIN_ID, '0xdead', LOAN_ID, 'loan_purpose', BORROWER, POOL_ID, firestore)
-    await resolveStagedNote(CHAIN_ID, '0xdead', LOAN_ID, 'loan_purpose', BORROWER, POOL_ID, firestore)
+    await resolveStagedNote(CHAIN_ID, '0xdead', LOAN_ID, 'loan_purpose', BORROWER, POOL_ID, firestore as unknown as Firestore)
+    await resolveStagedNote(CHAIN_ID, '0xdead', LOAN_ID, 'loan_purpose', BORROWER, POOL_ID, firestore as unknown as Firestore)
 
     expect(store.notes[`${LOAN_ID}:loan_purpose`].text).toBe(params().text)
   })
@@ -311,8 +313,8 @@ describe('stageNote', () => {
     const { firestore } = buildFirestore(seeded())
     const staged = params({ recordId: stagedRecordId(CHAIN_ID, '0xdead'), kind: 'loan_purpose', author: BORROWER, subject: BORROWER })
 
-    await expect(stageNote(staged, firestore)).resolves.not.toBeNull()
-    await expect(stageNote(staged, firestore)).resolves.toBeNull()
+    await expect(stageNote(staged, firestore as unknown as Firestore)).resolves.not.toBeNull()
+    await expect(stageNote(staged, firestore as unknown as Firestore)).resolves.toBeNull()
   })
 })
 
@@ -320,9 +322,12 @@ describe('listNotes', () => {
   async function seedNotes() {
     const built = buildFirestore(seeded())
 
-    await saveNote(params(), built.firestore)
-    await saveNote(params({ recordId: MEMBER_ID, kind: 'membership_removed' }), built.firestore)
-    await saveNote(params({ recordId: `${CHAIN_ID}-${POOL_ID}-8`, kind: 'loan_rejected', subject: STRANGER }), built.firestore)
+    await saveNote(params(), built.firestore as unknown as Firestore)
+    await saveNote(params({ recordId: MEMBER_ID, kind: 'membership_removed' }), built.firestore as unknown as Firestore)
+    await saveNote(
+      params({ recordId: `${CHAIN_ID}-${POOL_ID}-8`, kind: 'loan_rejected', subject: STRANGER }),
+      built.firestore as unknown as Firestore
+    )
 
     return built
   }
@@ -330,7 +335,10 @@ describe('listNotes', () => {
   it('gives a pool owner every note on their own pool', async () => {
     const { firestore } = await seedNotes()
 
-    const { notes, totalCount } = await listNotes({ caller: OWNER, chainId: CHAIN_ID, poolId: POOL_ID, limit: 50 }, firestore)
+    const { notes, totalCount } = await listNotes(
+      { caller: OWNER, chainId: CHAIN_ID, poolId: POOL_ID, limit: 50 },
+      firestore as unknown as Firestore
+    )
 
     expect(notes).toHaveLength(3)
     expect(totalCount).toBe(3)
@@ -341,7 +349,10 @@ describe('listNotes', () => {
   it('gives everybody else only the notes about themselves', async () => {
     const { firestore } = await seedNotes()
 
-    const { notes } = await listNotes({ caller: BORROWER, chainId: CHAIN_ID, poolId: POOL_ID, limit: 50 }, firestore)
+    const { notes } = await listNotes(
+      { caller: BORROWER, chainId: CHAIN_ID, poolId: POOL_ID, limit: 50 },
+      firestore as unknown as Firestore
+    )
 
     expect(notes.map((note) => note.subject)).toEqual([BORROWER.toLowerCase(), BORROWER.toLowerCase()])
   })
@@ -351,7 +362,7 @@ describe('listNotes', () => {
 
     const { notes, totalCount } = await listNotes(
       { caller: '0x4444444444444444444444444444444444444444', chainId: CHAIN_ID, poolId: POOL_ID, limit: 50 },
-      firestore
+      firestore as unknown as Firestore
     )
 
     expect(notes).toHaveLength(0)
@@ -361,7 +372,10 @@ describe('listNotes', () => {
   it('narrows to one record when asked', async () => {
     const { firestore } = await seedNotes()
 
-    const { notes } = await listNotes({ caller: OWNER, chainId: CHAIN_ID, poolId: POOL_ID, recordId: MEMBER_ID, limit: 50 }, firestore)
+    const { notes } = await listNotes(
+      { caller: OWNER, chainId: CHAIN_ID, poolId: POOL_ID, recordId: MEMBER_ID, limit: 50 },
+      firestore as unknown as Firestore
+    )
 
     expect(notes.map((note) => note.kind)).toEqual(['membership_removed'])
   })
@@ -370,7 +384,7 @@ describe('listNotes', () => {
   it('falls back to the caller’s own notes when no pool is named', async () => {
     const { firestore } = await seedNotes()
 
-    const { notes } = await listNotes({ caller: OWNER, chainId: CHAIN_ID, limit: 50 }, firestore)
+    const { notes } = await listNotes({ caller: OWNER, chainId: CHAIN_ID, limit: 50 }, firestore as unknown as Firestore)
 
     expect(notes).toHaveLength(0)
   })

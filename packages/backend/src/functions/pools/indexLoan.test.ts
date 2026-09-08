@@ -1,32 +1,46 @@
+import type { JsonRpcProvider } from 'ethers'
+import type { CallableRequest } from 'firebase-functions/v2/https'
 import { mockLogger } from '../../__tests__/setup'
-import type { ParsedLoan } from '../../services/loanIndexer'
+import type { ParsedLoanDecision } from '../../services/loanDecisionIndexer'
+import type { IndexLoanResult, ParsedLoan } from '../../services/loanIndexer'
 
-jest.mock('../../utils/blockchain')
-jest.mock('../../services')
-jest.mock('../../services/loanIndexer', () => ({
-  ...jest.requireActual('../../services/loanIndexer'),
-  indexLoansByTxHash: jest.fn(),
+vi.mock('../../utils/blockchain')
+vi.mock('../../services')
+vi.mock('../../services/loanIndexer', async () => ({
+  ...(await vi.importActual<typeof import('../../services/loanIndexer')>('../../services/loanIndexer')),
+  indexLoansByTxHash: vi.fn(),
 }))
-jest.mock('../../services/loanRepaymentIndexer', () => ({
-  ...jest.requireActual('../../services/loanRepaymentIndexer'),
-  indexLoanRepaymentsByTxHash: jest.fn(),
+vi.mock('../../services/loanRepaymentIndexer', async () => ({
+  ...(await vi.importActual<typeof import('../../services/loanRepaymentIndexer')>('../../services/loanRepaymentIndexer')),
+  indexLoanRepaymentsByTxHash: vi.fn(),
 }))
-jest.mock('../../services/loanDecisionIndexer', () => ({
-  ...jest.requireActual('../../services/loanDecisionIndexer'),
-  indexLoanDecisionsByTxHash: jest.fn(),
+vi.mock('../../services/loanDecisionIndexer', async () => ({
+  ...(await vi.importActual<typeof import('../../services/loanDecisionIndexer')>('../../services/loanDecisionIndexer')),
+  indexLoanDecisionsByTxHash: vi.fn(),
 }))
 
 // `ACTIVE_CHAIN_CONFIG` reads the environment once, at module load. Set this
 // before the requires below or every case fails on an unconfigured factory.
-const FACTORY_ADDRESS = '0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512'
-process.env.POOL_FACTORY_ADDRESS = FACTORY_ADDRESS
+// The chain registry reads process.env once, at module load. ESM hoists every import
+// above ordinary statements, so this must run inside vi.hoisted to land first.
+const { FACTORY_ADDRESS } = vi.hoisted(() => {
+  const FACTORY_ADDRESS = '0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512'
+  process.env.POOL_FACTORY_ADDRESS = FACTORY_ADDRESS
+  return { FACTORY_ADDRESS }
+})
 
-const { indexLoanHandler } = require('./indexLoan')
-const { getProvider } = require('../../utils/blockchain')
-const { indexLoansByTxHash } = require('../../services/loanIndexer')
-const { indexLoanRepaymentsByTxHash } = require('../../services/loanRepaymentIndexer')
-const { indexLoanDecisionsByTxHash } = require('../../services/loanDecisionIndexer')
+import * as loanDecisionIndexerMock from '../../services/loanDecisionIndexer'
+import * as loanIndexerMock from '../../services/loanIndexer'
+import * as loanRepaymentIndexerMock from '../../services/loanRepaymentIndexer'
+import * as blockchainMock from '../../utils/blockchain'
+import { indexLoanHandler } from './indexLoan'
 
+// These modules are mocked above; vi.mocked restores the mock types that the
+// real signatures would otherwise hide.
+const { indexLoanDecisionsByTxHash } = vi.mocked(loanDecisionIndexerMock)
+const { indexLoansByTxHash } = vi.mocked(loanIndexerMock)
+const { indexLoanRepaymentsByTxHash } = vi.mocked(loanRepaymentIndexerMock)
+const { getProvider } = vi.mocked(blockchainMock)
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
@@ -35,11 +49,11 @@ const VALID_TX_HASH = `0x${'a'.repeat(64)}`
 const SUPPORTED_CHAIN_ID = 31337 // matches ACTIVE_CHAIN_CONFIG default
 const STARTED_AT = new Date('2026-08-11T12:00:00.000Z')
 
-function buildRequest(overrides: Partial<{ auth: object | null; data: Record<string, unknown> }> = {}) {
+function buildRequest<T>(overrides: Partial<{ auth: object | null; data: Record<string, unknown> }> = {}): CallableRequest<T> {
   return {
     auth: overrides.auth !== undefined ? overrides.auth : { uid: 'user-123', token: {} },
     data: overrides.data !== undefined ? overrides.data : { txHash: VALID_TX_HASH },
-  }
+  } as unknown as CallableRequest<T>
 }
 
 function buildLoan(overrides: Partial<ParsedLoan> = {}): ParsedLoan {
@@ -68,18 +82,21 @@ function buildLoan(overrides: Partial<ParsedLoan> = {}): ParsedLoan {
 function resolveWith(loans: ParsedLoan[], stored: boolean[] = loans.map(() => true)) {
   indexLoansByTxHash.mockResolvedValue({
     loans,
-    results: loans.map((loan, i) => ({
-      id: `${loan.chainId}-${loan.poolId}-${loan.loanId}`,
-      loanId: loan.loanId,
-      poolId: loan.poolId,
-      alreadyIndexed: !stored[i],
-      stored: stored[i],
-    })),
+    results: loans.map(
+      (loan, i) =>
+        ({
+          id: `${loan.chainId}-${loan.poolId}-${loan.loanId}`,
+          loanId: loan.loanId,
+          poolId: loan.poolId,
+          alreadyIndexed: !stored[i],
+          stored: stored[i],
+        }) as unknown as IndexLoanResult
+    ),
   })
 }
 
 beforeEach(() => {
-  getProvider.mockReturnValue({})
+  getProvider.mockReturnValue({} as unknown as JsonRpcProvider)
   resolveWith([buildLoan()])
   // The common case: every loan transaction that is not a repayment. The
   // helper returns an empty result rather than throwing, so the callable's
@@ -205,7 +222,7 @@ describe('indexLoanHandler', () => {
       // decision itself — and the app knows only that it confirmed a
       // transaction.
       indexLoanDecisionsByTxHash.mockResolvedValue({
-        decisions: [{ loanId: 3, poolId: 7, outcome: 'approved' }],
+        decisions: [{ loanId: 3, poolId: 7, outcome: 'approved' } as unknown as ParsedLoanDecision],
         results: [{ id: '31337-0xtx-0', loanId: 3, poolId: 7, outcome: 'approved', alreadyIndexed: false, stored: true }],
       })
 
@@ -220,7 +237,7 @@ describe('indexLoanHandler', () => {
       // for a screen that asks for it by pool, so it has no place in this
       // response and nothing in the app reads it from here.
       indexLoanDecisionsByTxHash.mockResolvedValue({
-        decisions: [{ loanId: 3, poolId: 7, outcome: 'rejected' }],
+        decisions: [{ loanId: 3, poolId: 7, outcome: 'rejected' } as unknown as ParsedLoanDecision],
         results: [{ id: '31337-0xtx-0', loanId: 3, poolId: 7, outcome: 'rejected', alreadyIndexed: false, stored: true }],
       })
 
@@ -266,7 +283,7 @@ describe('indexLoanHandler', () => {
     it('should pass an HttpsError through untouched', async () => {
       // Re-wrapping would turn "that was not a SuperPool pool" into a generic
       // "try again", which is not something retrying fixes.
-      const { HttpsError } = require('firebase-functions/v2/https')
+      const { HttpsError } = await import('firebase-functions/v2/https')
       indexLoansByTxHash.mockRejectedValue(new HttpsError('not-found', 'No loan event found'))
 
       await expect(indexLoanHandler(buildRequest() as never)).rejects.toMatchObject({ code: 'not-found' })

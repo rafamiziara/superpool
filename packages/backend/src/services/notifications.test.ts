@@ -1,5 +1,6 @@
 import type { NotificationData } from '@superpool/types'
 import type { Firestore } from 'firebase-admin/firestore'
+import type { MockInstance } from 'vitest'
 import { notificationKey, notifyOnce, notifyWallet } from './notifications'
 
 const WALLET = '0x9965507D1a55bcC2695C58ba16FB37d819B0A4dc'
@@ -26,41 +27,41 @@ function expoReply(tickets: object[]) {
 function buildFirestore(options: { tokens?: string[]; markerExists?: boolean } = {}) {
   const { tokens = [], markerExists = false } = options
 
-  const mockDelete = jest.fn().mockResolvedValue(undefined)
+  const mockDelete = vi.fn().mockResolvedValue(undefined)
   const mockCreate = markerExists
-    ? jest.fn().mockRejectedValue(new Error('ALREADY_EXISTS: entity already exists'))
-    : jest.fn().mockResolvedValue(undefined)
+    ? vi.fn().mockRejectedValue(new Error('ALREADY_EXISTS: entity already exists'))
+    : vi.fn().mockResolvedValue(undefined)
 
-  const mockTokenDelete = jest.fn().mockResolvedValue(undefined)
+  const mockTokenDelete = vi.fn().mockResolvedValue(undefined)
   const tokenDocRef = {
-    get: jest.fn().mockResolvedValue({ exists: true, data: () => ({}) }),
+    get: vi.fn().mockResolvedValue({ exists: true, data: () => ({}) }),
     delete: mockTokenDelete,
   }
 
-  const mockGet = jest.fn().mockResolvedValue({ docs: tokens.map((id) => ({ id })) })
-  const mockWhere = jest.fn().mockReturnValue({ get: mockGet })
+  const mockGet = vi.fn().mockResolvedValue({ docs: tokens.map((id) => ({ id })) })
+  const mockWhere = vi.fn().mockReturnValue({ get: mockGet })
 
   const markerDocRef = { create: mockCreate, delete: mockDelete }
 
   // The receipt queue writes through a batch. Without this the queuing half of
   // a send is unreachable from these tests and only looks covered.
   const batchSets: { ticketId: string; token: string }[] = []
-  const mockBatchCommit = jest.fn().mockResolvedValue(undefined)
+  const mockBatchCommit = vi.fn().mockResolvedValue(undefined)
 
-  const mockCollection = jest.fn().mockImplementation((name: string) => {
-    if (name === 'notifications_sent') return { doc: jest.fn().mockReturnValue(markerDocRef) }
+  const mockCollection = vi.fn().mockImplementation((name: string) => {
+    if (name === 'notifications_sent') return { doc: vi.fn().mockReturnValue(markerDocRef) }
 
-    return { doc: jest.fn().mockReturnValue(tokenDocRef), where: mockWhere }
+    return { doc: vi.fn().mockReturnValue(tokenDocRef), where: mockWhere }
   })
 
   return {
     firestore: {
       collection: mockCollection,
-      batch: jest.fn().mockReturnValue({
-        set: jest.fn().mockImplementation((_ref: unknown, data: { ticketId: string; token: string }) => batchSets.push(data)),
+      batch: vi.fn().mockReturnValue({
+        set: vi.fn().mockImplementation((_ref: unknown, data: { ticketId: string; token: string }) => batchSets.push(data)),
         commit: mockBatchCommit,
       }),
-    } as unknown as Firestore,
+    },
     mockCreate,
     mockDelete,
     mockTokenDelete,
@@ -68,10 +69,10 @@ function buildFirestore(options: { tokens?: string[]; markerExists?: boolean } =
   }
 }
 
-let fetchSpy: jest.SpyInstance
+let fetchSpy: MockInstance
 
 beforeEach(() => {
-  fetchSpy = jest.spyOn(global, 'fetch')
+  fetchSpy = vi.spyOn(global, 'fetch')
 })
 
 afterEach(() => {
@@ -87,7 +88,7 @@ describe('notifyWallet', () => {
     fetchSpy.mockResolvedValue(expoReply([{ status: 'ok' }, { status: 'ok' }]) as never)
     const { firestore } = buildFirestore({ tokens: ['ExponentPushToken[a]', 'ExponentPushToken[b]'] })
 
-    await expect(notifyWallet(WALLET, NOTIFICATION, firestore)).resolves.toMatchObject({ sent: 2, pruned: 0 })
+    await expect(notifyWallet(WALLET, NOTIFICATION, firestore as unknown as Firestore)).resolves.toMatchObject({ sent: 2, pruned: 0 })
 
     const body = JSON.parse(fetchSpy.mock.calls[0][1]!.body as string)
     expect(body.map((message: { to: string }) => message.to)).toEqual(['ExponentPushToken[a]', 'ExponentPushToken[b]'])
@@ -97,7 +98,7 @@ describe('notifyWallet', () => {
     fetchSpy.mockResolvedValue(expoReply([{ status: 'ok' }]) as never)
     const { firestore } = buildFirestore({ tokens: ['ExponentPushToken[a]'] })
 
-    await notifyWallet(WALLET, NOTIFICATION, firestore)
+    await notifyWallet(WALLET, NOTIFICATION, firestore as unknown as Firestore)
 
     const body = JSON.parse(fetchSpy.mock.calls[0][1]!.body as string)
     expect(body[0]).toMatchObject({ title: NOTIFICATION.title, body: NOTIFICATION.body, data: DATA })
@@ -108,7 +109,12 @@ describe('notifyWallet', () => {
   it('posts nothing for a wallet with no devices', async () => {
     const { firestore } = buildFirestore({ tokens: [] })
 
-    await expect(notifyWallet(WALLET, NOTIFICATION, firestore)).resolves.toEqual({ sent: 0, pruned: 0, queued: 0, noRecipients: true })
+    await expect(notifyWallet(WALLET, NOTIFICATION, firestore as unknown as Firestore)).resolves.toEqual({
+      sent: 0,
+      pruned: 0,
+      queued: 0,
+      noRecipients: true,
+    })
     expect(fetchSpy).not.toHaveBeenCalled()
   })
 
@@ -118,7 +124,7 @@ describe('notifyWallet', () => {
     fetchSpy.mockResolvedValue(expoReply([{ status: 'error', details: { error: 'DeviceNotRegistered' } }]) as never)
     const { firestore, mockTokenDelete } = buildFirestore({ tokens: ['ExponentPushToken[a]'] })
 
-    await expect(notifyWallet(WALLET, NOTIFICATION, firestore)).resolves.toMatchObject({ sent: 0, pruned: 1 })
+    await expect(notifyWallet(WALLET, NOTIFICATION, firestore as unknown as Firestore)).resolves.toMatchObject({ sent: 0, pruned: 1 })
     expect(mockTokenDelete).toHaveBeenCalled()
   })
 
@@ -131,7 +137,7 @@ describe('notifyWallet', () => {
       tokens: ['ExponentPushToken[a]', 'ExponentPushToken[b]', 'ExponentPushToken[c]'],
     })
 
-    await expect(notifyWallet(WALLET, NOTIFICATION, firestore)).resolves.toMatchObject({ sent: 2, pruned: 1 })
+    await expect(notifyWallet(WALLET, NOTIFICATION, firestore as unknown as Firestore)).resolves.toMatchObject({ sent: 2, pruned: 1 })
     expect(mockTokenDelete).toHaveBeenCalledTimes(1)
   })
 
@@ -153,7 +159,7 @@ describe('notifyWallet', () => {
     )
     const { firestore, batchSets } = buildFirestore({ tokens: ['ExponentPushToken[a]', 'ExponentPushToken[b]'] })
 
-    await expect(notifyWallet(WALLET, NOTIFICATION, firestore)).resolves.toMatchObject({ sent: 2, queued: 2 })
+    await expect(notifyWallet(WALLET, NOTIFICATION, firestore as unknown as Firestore)).resolves.toMatchObject({ sent: 2, queued: 2 })
     expect(batchSets.map((record) => record.ticketId)).toEqual(['ticket-a', 'ticket-b'])
     // Paired by index, the only correspondence Expo offers — and the pairing
     // cannot be rebuilt after this loop, which is why it is stored.
@@ -169,7 +175,11 @@ describe('notifyWallet', () => {
     )
     const { firestore, batchSets } = buildFirestore({ tokens: ['ExponentPushToken[a]', 'ExponentPushToken[b]'] })
 
-    await expect(notifyWallet(WALLET, NOTIFICATION, firestore)).resolves.toMatchObject({ sent: 1, pruned: 1, queued: 1 })
+    await expect(notifyWallet(WALLET, NOTIFICATION, firestore as unknown as Firestore)).resolves.toMatchObject({
+      sent: 1,
+      pruned: 1,
+      queued: 1,
+    })
     expect(batchSets.map((record) => record.ticketId)).toEqual(['ticket-a'])
   })
 
@@ -177,7 +187,7 @@ describe('notifyWallet', () => {
     fetchSpy.mockResolvedValue(expoReply([{ status: 'error', details: { error: 'MessageRateExceeded' } }]) as never)
     const { firestore, mockTokenDelete } = buildFirestore({ tokens: ['ExponentPushToken[a]'] })
 
-    await expect(notifyWallet(WALLET, NOTIFICATION, firestore)).resolves.toMatchObject({ sent: 0, pruned: 0 })
+    await expect(notifyWallet(WALLET, NOTIFICATION, firestore as unknown as Firestore)).resolves.toMatchObject({ sent: 0, pruned: 0 })
     expect(mockTokenDelete).not.toHaveBeenCalled()
   })
 
@@ -188,7 +198,7 @@ describe('notifyWallet', () => {
       .mockResolvedValueOnce(expoReply(Array.from({ length: 50 }, () => ({ status: 'ok' }))) as never)
     const { firestore } = buildFirestore({ tokens })
 
-    await expect(notifyWallet(WALLET, NOTIFICATION, firestore)).resolves.toMatchObject({ sent: 150 })
+    await expect(notifyWallet(WALLET, NOTIFICATION, firestore as unknown as Firestore)).resolves.toMatchObject({ sent: 150 })
     expect(fetchSpy).toHaveBeenCalledTimes(2)
     expect(JSON.parse(fetchSpy.mock.calls[0][1]!.body as string)).toHaveLength(100)
     expect(JSON.parse(fetchSpy.mock.calls[1][1]!.body as string)).toHaveLength(50)
@@ -198,7 +208,7 @@ describe('notifyWallet', () => {
     fetchSpy.mockResolvedValue({ ok: false, status: 502, text: async () => 'bad gateway' } as never)
     const { firestore } = buildFirestore({ tokens: ['ExponentPushToken[a]'] })
 
-    await expect(notifyWallet(WALLET, NOTIFICATION, firestore)).rejects.toThrow('502')
+    await expect(notifyWallet(WALLET, NOTIFICATION, firestore as unknown as Firestore)).rejects.toThrow('502')
   })
 
   // A 200 carrying an `errors` array rather than tickets. Reading that as "no
@@ -212,14 +222,14 @@ describe('notifyWallet', () => {
     } as never)
     const { firestore } = buildFirestore({ tokens: ['ExponentPushToken[a]'] })
 
-    await expect(notifyWallet(WALLET, NOTIFICATION, firestore)).rejects.toThrow('Invalid credentials')
+    await expect(notifyWallet(WALLET, NOTIFICATION, firestore as unknown as Firestore)).rejects.toThrow('Invalid credentials')
   })
 
   it('survives a reply carrying neither tickets nor errors', async () => {
     fetchSpy.mockResolvedValue({ ok: true, status: 200, json: async () => ({}), text: async () => '' } as never)
     const { firestore } = buildFirestore({ tokens: ['ExponentPushToken[a]'] })
 
-    await expect(notifyWallet(WALLET, NOTIFICATION, firestore)).resolves.toMatchObject({ sent: 0, pruned: 0 })
+    await expect(notifyWallet(WALLET, NOTIFICATION, firestore as unknown as Firestore)).resolves.toMatchObject({ sent: 0, pruned: 0 })
   })
 })
 
@@ -236,14 +246,14 @@ describe('notifyOnce', () => {
     fetchSpy.mockResolvedValue(expoReply([{ status: 'ok' }]) as never)
     const { firestore } = buildFirestore({ tokens: ['ExponentPushToken[a]'] })
 
-    await expect(notifyOnce('key-1', WALLET, NOTIFICATION, firestore)).resolves.toMatchObject({ sent: 1 })
+    await expect(notifyOnce('key-1', WALLET, NOTIFICATION, firestore as unknown as Firestore)).resolves.toMatchObject({ sent: 1 })
     expect(fetchSpy).toHaveBeenCalledTimes(1)
   })
 
   it('sends nothing the second time', async () => {
     const { firestore } = buildFirestore({ tokens: ['ExponentPushToken[a]'], markerExists: true })
 
-    await expect(notifyOnce('key-1', WALLET, NOTIFICATION, firestore)).resolves.toBeNull()
+    await expect(notifyOnce('key-1', WALLET, NOTIFICATION, firestore as unknown as Firestore)).resolves.toBeNull()
     expect(fetchSpy).not.toHaveBeenCalled()
   })
 
@@ -261,7 +271,7 @@ describe('notifyOnce', () => {
       order.push('claim')
     })
 
-    await notifyOnce('key-1', WALLET, NOTIFICATION, firestore)
+    await notifyOnce('key-1', WALLET, NOTIFICATION, firestore as unknown as Firestore)
 
     expect(order).toEqual(['claim', 'send'])
   })
@@ -271,7 +281,7 @@ describe('notifyOnce', () => {
     fetchSpy.mockRejectedValue(new Error('network down') as never)
     const { firestore, mockDelete } = buildFirestore({ tokens: ['ExponentPushToken[a]'] })
 
-    await expect(notifyOnce('key-1', WALLET, NOTIFICATION, firestore)).rejects.toThrow('network down')
+    await expect(notifyOnce('key-1', WALLET, NOTIFICATION, firestore as unknown as Firestore)).rejects.toThrow('network down')
     expect(mockDelete).toHaveBeenCalled()
   })
 
@@ -281,14 +291,16 @@ describe('notifyOnce', () => {
     fetchSpy.mockResolvedValue(expoReply([{ status: 'error', details: { error: 'DeviceNotRegistered' } }]) as never)
     const { firestore, mockDelete } = buildFirestore({ tokens: ['ExponentPushToken[a]'] })
 
-    await expect(notifyOnce('key-1', WALLET, NOTIFICATION, firestore)).resolves.toMatchObject({ pruned: 1 })
+    await expect(notifyOnce('key-1', WALLET, NOTIFICATION, firestore as unknown as Firestore)).resolves.toMatchObject({ pruned: 1 })
     expect(mockDelete).not.toHaveBeenCalled()
   })
 
   it('keeps the claim when the wallet had no devices at all', async () => {
     const { firestore, mockDelete } = buildFirestore({ tokens: [] })
 
-    await expect(notifyOnce('key-1', WALLET, NOTIFICATION, firestore)).resolves.toMatchObject({ noRecipients: true })
+    await expect(notifyOnce('key-1', WALLET, NOTIFICATION, firestore as unknown as Firestore)).resolves.toMatchObject({
+      noRecipients: true,
+    })
     expect(mockDelete).not.toHaveBeenCalled()
   })
 })

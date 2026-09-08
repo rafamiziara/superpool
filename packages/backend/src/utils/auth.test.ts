@@ -261,8 +261,8 @@ function buildFirestore(initial?: Record<string, unknown>) {
   let queue: Promise<unknown> = Promise.resolve()
 
   const firestore = {
-    collection: jest.fn(() => ({ doc: (id: string) => ({ id }) })),
-    runTransaction: jest.fn(<T>(work: (transaction: unknown) => Promise<T>): Promise<T> => {
+    collection: vi.fn(() => ({ doc: (id: string) => ({ id }) })),
+    runTransaction: vi.fn(<T>(work: (transaction: unknown) => Promise<T>): Promise<T> => {
       const run = queue.then(() =>
         work({
           get: async (ref: { id: string }) => ({ exists: docs.has(ref.id), data: () => docs.get(ref.id) }),
@@ -278,7 +278,7 @@ function buildFirestore(initial?: Record<string, unknown>) {
     }),
   }
 
-  return { firestore: firestore as unknown as Firestore, docs }
+  return { firestore: firestore, docs }
 }
 
 const WALLET = '0x1234567890123456789012345678901234567890'
@@ -291,7 +291,7 @@ describe('claimAuthNonce', () => {
   it('returns the challenge and consumes it', async () => {
     const { firestore, docs } = buildFirestore(challenge())
 
-    await expect(claimAuthNonce(WALLET, firestore)).resolves.toMatchObject({ nonce: 'a-nonce' })
+    await expect(claimAuthNonce(WALLET, firestore as unknown as Firestore)).resolves.toMatchObject({ nonce: 'a-nonce' })
     expect(docs.has(WALLET)).toBe(false)
   })
 
@@ -302,7 +302,10 @@ describe('claimAuthNonce', () => {
     // document, both passed, and both got a token.
     const { firestore } = buildFirestore(challenge())
 
-    const results = await Promise.all([claimAuthNonce(WALLET, firestore), claimAuthNonce(WALLET, firestore)])
+    const results = await Promise.all([
+      claimAuthNonce(WALLET, firestore as unknown as Firestore),
+      claimAuthNonce(WALLET, firestore as unknown as Firestore),
+    ])
 
     expect(results.filter(Boolean)).toHaveLength(1)
   })
@@ -310,7 +313,7 @@ describe('claimAuthNonce', () => {
   it('returns null when there is no challenge', async () => {
     const { firestore } = buildFirestore()
 
-    await expect(claimAuthNonce(WALLET, firestore)).resolves.toBeNull()
+    await expect(claimAuthNonce(WALLET, firestore as unknown as Firestore)).resolves.toBeNull()
   })
 
   it('refuses a lapsed challenge and consumes it anyway', async () => {
@@ -318,14 +321,14 @@ describe('claimAuthNonce', () => {
     // attempt would get the same answer more slowly.
     const { firestore, docs } = buildFirestore(challenge(-1))
 
-    await expect(claimAuthNonce(WALLET, firestore)).rejects.toBeInstanceOf(NonceExpiredError)
+    await expect(claimAuthNonce(WALLET, firestore as unknown as Firestore)).rejects.toBeInstanceOf(NonceExpiredError)
     expect(docs.has(WALLET)).toBe(false)
   })
 
   it('keys the challenge on the wallet', async () => {
     const { firestore } = buildFirestore(challenge())
 
-    await claimAuthNonce(WALLET, firestore)
+    await claimAuthNonce(WALLET, firestore as unknown as Firestore)
 
     expect(firestore.collection).toHaveBeenCalledWith(AUTH_NONCES_COLLECTION)
   })

@@ -1,19 +1,32 @@
-import { Interface } from 'ethers'
+import type { JsonRpcProvider, Log, Provider } from 'ethers'
+import * as ethersMock from 'ethers'
+import type { Firestore } from 'firebase-admin/firestore'
 import { mockLogger } from '../__tests__/setup'
 import { LendingPoolABI } from '../constants'
 
-const mockGetLoan = jest.fn()
-const mockGetPoolId = jest.fn()
 /** Only reached for a loan that predates accrual; see `accrualOf`. */
-const mockLoanBalance = jest.fn()
+// Hoisted so the vi.mock factories below can close over them: vi.mock runs before
+// any module-level const is initialised.
+const { mockGetLoan, mockGetPoolId, mockLoanBalance, mockNotifyLoanRequested, mockNotifyLoanDecided, mockResolveStagedNote } = vi.hoisted(
+  () => ({
+    mockGetLoan: vi.fn(),
+    mockGetPoolId: vi.fn(),
+    mockLoanBalance: vi.fn(),
+    mockNotifyLoanRequested: vi.fn(),
+    mockNotifyLoanDecided: vi.fn(),
+    mockResolveStagedNote: vi.fn(),
+  })
+)
 
 // Mock ethers BEFORE importing the module: it builds a top-level Interface and
 // reads two topic hashes from it at load time.
-jest.mock('ethers', () => {
-  const actual = jest.requireActual('ethers')
+vi.mock('ethers', async () => {
+  const actual = await vi.importActual<typeof import('ethers')>('ethers')
   return {
     ...actual,
-    Contract: jest.fn().mockImplementation(() => ({ getLoan: mockGetLoan, getPoolId: mockGetPoolId, loanBalance: mockLoanBalance })),
+    Contract: vi.fn().mockImplementation(function () {
+      return { getLoan: mockGetLoan, getPoolId: mockGetPoolId, loanBalance: mockLoanBalance }
+    }),
   }
 })
 
@@ -22,11 +35,8 @@ jest.mock('ethers', () => {
  * as well as the callable. Mocked here to keep this suite about indexing —
  * `poolNotifications.test.ts` covers what it decides to send.
  */
-const mockNotifyLoanRequested = jest.fn()
-const mockNotifyLoanDecided = jest.fn()
-
-jest.mock('./poolNotifications', () => ({
-  ...jest.requireActual('./poolNotifications'),
+vi.mock('./poolNotifications', async () => ({
+  ...(await vi.importActual<typeof import('./poolNotifications')>('./poolNotifications')),
   notifyLoanRequested: (...args: unknown[]) => mockNotifyLoanRequested(...args),
   notifyLoanDecided: (...args: unknown[]) => mockNotifyLoanDecided(...args),
 }))
@@ -36,24 +46,25 @@ jest.mock('./poolNotifications', () => ({
  * moved onto the loan here, where both are in hand. Mocked for the same reason
  * the notifications are — `notes.test.ts` covers what the move does.
  */
-const mockResolveStagedNote = jest.fn()
-
-jest.mock('./notes', () => ({
-  ...jest.requireActual('./notes'),
+vi.mock('./notes', async () => ({
+  ...(await vi.importActual<typeof import('./notes')>('./notes')),
   resolveStagedNote: (...args: unknown[]) => mockResolveStagedNote(...args),
 }))
 
-const {
+import {
   fetchLoan,
   indexLoan,
   indexLoanFromLog,
   indexLoansByTxHash,
-  loanDocId,
-  parseLoanIdFromLog,
   LOAN_CREATED_TOPIC,
   LOAN_REPAID_TOPIC,
-} = require('./loanIndexer')
+  loanDocId,
+  parseLoanIdFromLog,
+} from './loanIndexer'
 
+// These modules are mocked above; vi.mocked restores the mock types that the
+// real signatures would otherwise hide.
+const { Interface } = vi.mocked(ethersMock)
 // ---------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------
@@ -78,7 +89,7 @@ const REAL_CREATED_TOPIC = new Interface([...LendingPoolABI]).getEvent('LoanCrea
 // Helpers
 // ---------------------------------------------------------------------------
 
-function buildLog(overrides: Partial<{ topic: string; loanId: number; address: string; blockNumber: number }> = {}) {
+function buildLog(overrides: Partial<{ topic: string; loanId: number; address: string; blockNumber: number }> = {}): Log {
   const { topic = LOAN_CREATED_TOPIC, loanId = LOAN_ID, address = POOL_ADDRESS, blockNumber = 120 } = overrides
 
   return {
@@ -89,7 +100,7 @@ function buildLog(overrides: Partial<{ topic: string; loanId: number; address: s
     data: '0x',
     // All three parameters are indexed, so `data` is empty and `loanId` is topic 1.
     topics: [topic, `0x${loanId.toString(16).padStart(64, '0')}`, `0x${'0'.repeat(24)}${BORROWER.slice(2)}`, '0x0'],
-  }
+  } as unknown as Log
 }
 
 function buildChainLoan(
@@ -161,7 +172,7 @@ function buildFirestore(
     storedAccruedAt = new Date(START_TIME * 1000),
     storedDefaultedAt,
   } = options
-  const mockSet = jest.fn().mockResolvedValue(undefined)
+  const mockSet = vi.fn().mockResolvedValue(undefined)
   const storedData = {
     isRepaid: storedIsRepaid,
     status: storedStatus,
@@ -175,19 +186,19 @@ function buildFirestore(
     ...(storedDefaultedAt ? { defaultedAt: timestampOf(storedDefaultedAt) } : {}),
   }
   const mockDocRef = {
-    get: jest.fn().mockResolvedValue({ exists, data: () => (exists ? storedData : undefined) }),
+    get: vi.fn().mockResolvedValue({ exists, data: () => (exists ? storedData : undefined) }),
     set: mockSet,
   }
-  const mockDoc = jest.fn().mockReturnValue(mockDocRef)
-  const mockCollection = jest.fn().mockReturnValue({ doc: mockDoc })
+  const mockDoc = vi.fn().mockReturnValue(mockDocRef)
+  const mockCollection = vi.fn().mockReturnValue({ doc: mockDoc })
 
   return { mockFs: { collection: mockCollection }, mockDocRef, mockDoc, mockCollection }
 }
 
-function buildProvider(receipt: object | null = null) {
+function buildProvider(receipt: object | null = null): Provider {
   return {
-    getTransactionReceipt: jest.fn().mockResolvedValue(receipt),
-  }
+    getTransactionReceipt: vi.fn().mockResolvedValue(receipt),
+  } as unknown as Provider
 }
 
 const parsedLoan = {
@@ -261,7 +272,7 @@ describe('fetchLoan', () => {
     // would depend on which one that was.
     mockGetLoan.mockResolvedValue(buildChainLoan({ isRepaid: true, repaidAt: REPAID_AT.getTime() / 1000 }))
 
-    const loan = await fetchLoan(LOAN_ID, POOL_ADDRESS, {})
+    const loan = await fetchLoan(LOAN_ID, POOL_ADDRESS, {} as unknown as Provider)
 
     expect(loan.repaidAt).toEqual(REPAID_AT)
   })
@@ -269,13 +280,13 @@ describe('fetchLoan', () => {
   it('should report no stamp at all for an outstanding loan', async () => {
     // The contract's zero is "not repaid", and dating a settlement to 1970 is
     // exactly the kind of thing a reputation query would then count as late.
-    const loan = await fetchLoan(LOAN_ID, POOL_ADDRESS, {})
+    const loan = await fetchLoan(LOAN_ID, POOL_ADDRESS, {} as unknown as Provider)
 
     expect(loan.repaidAt).toBeUndefined()
   })
 
   it('should return the chain state, not the log', async () => {
-    const loan = await fetchLoan(LOAN_ID, POOL_ADDRESS, {})
+    const loan = await fetchLoan(LOAN_ID, POOL_ADDRESS, {} as unknown as Provider)
 
     expect(mockGetLoan).toHaveBeenCalledWith(LOAN_ID)
     expect(loan).toEqual({
@@ -297,7 +308,7 @@ describe('fetchLoan', () => {
   })
 
   it('should lowercase the borrower so listLoans can filter by wallet', async () => {
-    const loan = await fetchLoan(LOAN_ID, POOL_ADDRESS, {})
+    const loan = await fetchLoan(LOAN_ID, POOL_ADDRESS, {} as unknown as Provider)
 
     expect(loan.borrower).toBe(BORROWER.toLowerCase())
   })
@@ -305,7 +316,7 @@ describe('fetchLoan', () => {
   it('should report a settled loan as repaid', async () => {
     mockGetLoan.mockResolvedValue(buildChainLoan({ isRepaid: true }))
 
-    const loan = await fetchLoan(LOAN_ID, POOL_ADDRESS, {})
+    const loan = await fetchLoan(LOAN_ID, POOL_ADDRESS, {} as unknown as Provider)
 
     expect(loan.isRepaid).toBe(true)
   })
@@ -315,7 +326,7 @@ describe('indexLoan', () => {
   it('should write a loan that has never been indexed', async () => {
     const { mockFs, mockDocRef, mockDoc } = buildFirestore({ exists: false })
 
-    const result = await indexLoan(parsedLoan, mockFs)
+    const result = await indexLoan(parsedLoan, mockFs as unknown as Firestore)
 
     expect(mockDoc).toHaveBeenCalledWith('31337-7-3')
     expect(mockDocRef.set).toHaveBeenCalledWith(expect.objectContaining({ loanId: LOAN_ID, isRepaid: false }), { merge: true })
@@ -327,7 +338,7 @@ describe('indexLoan', () => {
     // settlement of a document that already exists.
     const { mockFs, mockDocRef } = buildFirestore({ exists: true, storedIsRepaid: false })
 
-    const result = await indexLoan({ ...parsedLoan, isRepaid: true }, mockFs)
+    const result = await indexLoan({ ...parsedLoan, isRepaid: true }, mockFs as unknown as Firestore)
 
     expect(mockDocRef.set).toHaveBeenCalledWith(expect.objectContaining({ isRepaid: true }), { merge: true })
     expect(result.stored).toBe(true)
@@ -336,7 +347,7 @@ describe('indexLoan', () => {
   it('should merge rather than replace', async () => {
     const { mockFs, mockDocRef } = buildFirestore({ exists: true })
 
-    await indexLoan({ ...parsedLoan, isRepaid: true }, mockFs)
+    await indexLoan({ ...parsedLoan, isRepaid: true }, mockFs as unknown as Firestore)
 
     expect(mockDocRef.set).toHaveBeenCalledWith(expect.anything(), { merge: true })
   })
@@ -346,7 +357,7 @@ describe('indexLoan', () => {
     // every pass would rewrite every loan it has ever seen.
     const { mockFs, mockDocRef } = buildFirestore({ exists: true, storedIsRepaid: false })
 
-    const result = await indexLoan(parsedLoan, mockFs)
+    const result = await indexLoan(parsedLoan, mockFs as unknown as Firestore)
 
     expect(mockDocRef.set).not.toHaveBeenCalled()
     expect(result).toMatchObject({ alreadyIndexed: true, stored: false })
@@ -358,7 +369,7 @@ describe('indexLoan', () => {
     // record stuck at `requested` for the life of the loan.
     const { mockFs, mockDocRef } = buildFirestore({ exists: true, storedStatus: 'requested' })
 
-    const result = await indexLoan({ ...parsedLoan, status: 'disbursed' }, mockFs)
+    const result = await indexLoan({ ...parsedLoan, status: 'disbursed' }, mockFs as unknown as Firestore)
 
     expect(mockDocRef.set).toHaveBeenCalledWith(expect.objectContaining({ status: 'disbursed' }), { merge: true })
     expect(result.stored).toBe(true)
@@ -372,7 +383,10 @@ describe('indexLoan', () => {
       storedAmountRepaid: '5250000000000000000',
     })
 
-    const result = await indexLoan({ ...parsedLoan, isRepaid: true, repaidAt: REPAID_AT, amountRepaid: '5250000000000000000' }, mockFs)
+    const result = await indexLoan(
+      { ...parsedLoan, isRepaid: true, repaidAt: REPAID_AT, amountRepaid: '5250000000000000000' },
+      mockFs as unknown as Firestore
+    )
 
     expect(mockDocRef.set).not.toHaveBeenCalled()
     expect(result.stored).toBe(false)
@@ -389,7 +403,7 @@ describe('indexLoan', () => {
   it('should rewrite a loan that has been paid down without being settled', async () => {
     const { mockFs, mockDocRef } = buildFirestore({ exists: true, storedIsRepaid: false, storedAmountRepaid: '0' })
 
-    const result = await indexLoan({ ...parsedLoan, amountRepaid: '2000000000000000000' }, mockFs)
+    const result = await indexLoan({ ...parsedLoan, amountRepaid: '2000000000000000000' }, mockFs as unknown as Firestore)
 
     expect(mockDocRef.set).toHaveBeenCalledWith(expect.objectContaining({ amountRepaid: '2000000000000000000', isRepaid: false }), {
       merge: true,
@@ -400,7 +414,7 @@ describe('indexLoan', () => {
   it('should let a record written before instalments existed pick the total up', async () => {
     const { mockFs, mockDocRef } = buildFirestore({ exists: true, storedIsRepaid: false, storedAmountRepaid: null })
 
-    const result = await indexLoan({ ...parsedLoan, amountRepaid: '2000000000000000000' }, mockFs)
+    const result = await indexLoan({ ...parsedLoan, amountRepaid: '2000000000000000000' }, mockFs as unknown as Firestore)
 
     expect(mockDocRef.set).toHaveBeenCalledWith(expect.objectContaining({ amountRepaid: '2000000000000000000' }), { merge: true })
     expect(result.stored).toBe(true)
@@ -412,7 +426,10 @@ describe('indexLoan', () => {
     // block that leaves `startTime` alone.
     const { mockFs, mockDocRef } = buildFirestore({ exists: true, storedIsRepaid: false, storedBlockNumber: 120 })
 
-    await indexLoan({ ...parsedLoan, amountRepaid: '2000000000000000000', transactionHash: OTHER_TX_HASH, blockNumber: 400 }, mockFs)
+    await indexLoan(
+      { ...parsedLoan, amountRepaid: '2000000000000000000', transactionHash: OTHER_TX_HASH, blockNumber: 400 },
+      mockFs as unknown as Firestore
+    )
 
     const written = mockDocRef.set.mock.calls[0][0]
     expect(written).not.toHaveProperty('transactionHash')
@@ -423,7 +440,7 @@ describe('indexLoan', () => {
     it('should store the repayment stamp', async () => {
       const { mockFs, mockDocRef } = buildFirestore({ exists: true, storedIsRepaid: false })
 
-      await indexLoan({ ...parsedLoan, isRepaid: true, repaidAt: REPAID_AT }, mockFs)
+      await indexLoan({ ...parsedLoan, isRepaid: true, repaidAt: REPAID_AT }, mockFs as unknown as Firestore)
 
       expect(mockDocRef.set).toHaveBeenCalledWith(expect.objectContaining({ repaidAt: REPAID_AT }), { merge: true })
     })
@@ -433,7 +450,7 @@ describe('indexLoan', () => {
       // that has not been repaid would fail to index at all.
       const { mockFs, mockDocRef } = buildFirestore({ exists: false })
 
-      await indexLoan(parsedLoan, mockFs)
+      await indexLoan(parsedLoan, mockFs as unknown as Firestore)
 
       expect(mockDocRef.set.mock.calls[0][0]).not.toHaveProperty('repaidAt')
     })
@@ -444,7 +461,7 @@ describe('indexLoan', () => {
       // report the record as current and never pick the date up.
       const { mockFs, mockDocRef } = buildFirestore({ exists: true, storedIsRepaid: true })
 
-      const result = await indexLoan({ ...parsedLoan, isRepaid: true, repaidAt: REPAID_AT }, mockFs)
+      const result = await indexLoan({ ...parsedLoan, isRepaid: true, repaidAt: REPAID_AT }, mockFs as unknown as Firestore)
 
       expect(mockDocRef.set).toHaveBeenCalledWith(expect.objectContaining({ repaidAt: REPAID_AT }), { merge: true })
       expect(result.stored).toBe(true)
@@ -458,7 +475,10 @@ describe('indexLoan', () => {
       // the row went on showing the date the money went out.
       const { mockFs, mockDocRef } = buildFirestore({ exists: true, storedIsRepaid: false })
 
-      await indexLoan({ ...parsedLoan, isRepaid: true, repaidAt: REPAID_AT, transactionHash: OTHER_TX_HASH, blockNumber: 500 }, mockFs)
+      await indexLoan(
+        { ...parsedLoan, isRepaid: true, repaidAt: REPAID_AT, transactionHash: OTHER_TX_HASH, blockNumber: 500 },
+        mockFs as unknown as Firestore
+      )
 
       const written = mockDocRef.set.mock.calls[0][0]
 
@@ -473,7 +493,10 @@ describe('indexLoan', () => {
       const approvedAt = new Date((START_TIME + 3600) * 1000)
       const { mockFs, mockDocRef } = buildFirestore({ exists: true, storedStatus: 'requested' })
 
-      await indexLoan({ ...parsedLoan, startedAt: approvedAt, transactionHash: OTHER_TX_HASH, blockNumber: 500 }, mockFs)
+      await indexLoan(
+        { ...parsedLoan, startedAt: approvedAt, transactionHash: OTHER_TX_HASH, blockNumber: 500 },
+        mockFs as unknown as Firestore
+      )
 
       expect(mockDocRef.set).toHaveBeenCalledWith(
         expect.objectContaining({ transactionHash: OTHER_TX_HASH, blockNumber: 500, startedAt: approvedAt }),
@@ -490,7 +513,7 @@ describe('indexLoan', () => {
       // current date is the one that set it.
       const { mockFs, mockDocRef } = buildFirestore({ exists: true, storedIsRepaid: true, storedBlockNumber: 500 })
 
-      const result = await indexLoan({ ...parsedLoan, isRepaid: true, blockNumber: 120 }, mockFs)
+      const result = await indexLoan({ ...parsedLoan, isRepaid: true, blockNumber: 120 }, mockFs as unknown as Firestore)
 
       expect(mockDocRef.set).toHaveBeenCalledWith(expect.objectContaining({ transactionHash: TX_HASH, blockNumber: 120 }), {
         merge: true,
@@ -501,7 +524,7 @@ describe('indexLoan', () => {
     it('should report a record already pointing at the earliest event as current', async () => {
       const { mockFs, mockDocRef } = buildFirestore({ exists: true, storedIsRepaid: true, storedBlockNumber: 120 })
 
-      const result = await indexLoan({ ...parsedLoan, isRepaid: true, blockNumber: 120 }, mockFs)
+      const result = await indexLoan({ ...parsedLoan, isRepaid: true, blockNumber: 120 }, mockFs as unknown as Firestore)
 
       expect(mockDocRef.set).not.toHaveBeenCalled()
       expect(result).toMatchObject({ alreadyIndexed: true, stored: false })
@@ -510,7 +533,7 @@ describe('indexLoan', () => {
     it('should be set on a loan seen for the first time', async () => {
       const { mockFs, mockDocRef } = buildFirestore({ exists: false })
 
-      await indexLoan(parsedLoan, mockFs)
+      await indexLoan(parsedLoan, mockFs as unknown as Firestore)
 
       expect(mockDocRef.set).toHaveBeenCalledWith(expect.objectContaining({ transactionHash: TX_HASH, blockNumber: 120 }), {
         merge: true,
@@ -523,7 +546,7 @@ describe('indexLoanFromLog', () => {
   it('should resolve the pool, read the chain and store the loan', async () => {
     const { mockFs } = buildFirestore()
 
-    const indexed = await indexLoanFromLog(buildLog(), CHAIN_ID, FACTORY_ADDRESS, {}, mockFs)
+    const indexed = await indexLoanFromLog(buildLog(), CHAIN_ID, FACTORY_ADDRESS, {} as unknown as Provider, mockFs as unknown as Firestore)
 
     expect(indexed?.loan).toMatchObject({ loanId: LOAN_ID, poolId: POOL_ID, chainId: CHAIN_ID, transactionHash: TX_HASH })
     expect(indexed?.result.stored).toBe(true)
@@ -535,7 +558,7 @@ describe('indexLoanFromLog', () => {
     mockGetPoolId.mockResolvedValue(0n)
     const { mockFs, mockDocRef } = buildFirestore()
 
-    const indexed = await indexLoanFromLog(buildLog(), CHAIN_ID, FACTORY_ADDRESS, {}, mockFs)
+    const indexed = await indexLoanFromLog(buildLog(), CHAIN_ID, FACTORY_ADDRESS, {} as unknown as Provider, mockFs as unknown as Firestore)
 
     expect(indexed).toBeNull()
     expect(mockDocRef.set).not.toHaveBeenCalled()
@@ -545,7 +568,13 @@ describe('indexLoanFromLog', () => {
     const { mockFs } = buildFirestore({ exists: true, storedIsRepaid: false })
     mockGetLoan.mockResolvedValue(buildChainLoan({ isRepaid: true }))
 
-    const indexed = await indexLoanFromLog(buildLog({ topic: LOAN_REPAID_TOPIC }), CHAIN_ID, FACTORY_ADDRESS, {}, mockFs)
+    const indexed = await indexLoanFromLog(
+      buildLog({ topic: LOAN_REPAID_TOPIC }),
+      CHAIN_ID,
+      FACTORY_ADDRESS,
+      {} as unknown as Provider,
+      mockFs as unknown as Firestore
+    )
 
     expect(indexed?.loan.isRepaid).toBe(true)
     expect(indexed?.result.stored).toBe(true)
@@ -554,7 +583,13 @@ describe('indexLoanFromLog', () => {
   it('should record the block the log came from', async () => {
     const { mockFs } = buildFirestore()
 
-    const indexed = await indexLoanFromLog(buildLog({ blockNumber: 456 }), CHAIN_ID, FACTORY_ADDRESS, {}, mockFs)
+    const indexed = await indexLoanFromLog(
+      buildLog({ blockNumber: 456 }),
+      CHAIN_ID,
+      FACTORY_ADDRESS,
+      {} as unknown as Provider,
+      mockFs as unknown as Firestore
+    )
 
     expect(indexed?.loan.blockNumber).toBe(456)
   })
@@ -569,7 +604,13 @@ describe('indexLoansByTxHash', () => {
     const { mockFs } = buildFirestore()
     const provider = buildProvider(buildReceipt([buildLog()]))
 
-    const { loans, results } = await indexLoansByTxHash(TX_HASH, CHAIN_ID, FACTORY_ADDRESS, provider, mockFs)
+    const { loans, results } = await indexLoansByTxHash(
+      TX_HASH,
+      CHAIN_ID,
+      FACTORY_ADDRESS,
+      provider as unknown as JsonRpcProvider,
+      mockFs as unknown as Firestore
+    )
 
     expect(loans).toHaveLength(1)
     expect(results[0].stored).toBe(true)
@@ -579,7 +620,13 @@ describe('indexLoansByTxHash', () => {
     const { mockFs } = buildFirestore()
     const provider = buildProvider(buildReceipt([{ ...buildLog(), topics: ['0xsomethingelse'] }, buildLog()]))
 
-    const { loans } = await indexLoansByTxHash(TX_HASH, CHAIN_ID, FACTORY_ADDRESS, provider, mockFs)
+    const { loans } = await indexLoansByTxHash(
+      TX_HASH,
+      CHAIN_ID,
+      FACTORY_ADDRESS,
+      provider as unknown as JsonRpcProvider,
+      mockFs as unknown as Firestore
+    )
 
     expect(loans).toHaveLength(1)
   })
@@ -588,7 +635,13 @@ describe('indexLoansByTxHash', () => {
     const { mockFs } = buildFirestore()
     const provider = buildProvider(buildReceipt([buildLog({ topic: LOAN_REPAID_TOPIC })]))
 
-    const { loans } = await indexLoansByTxHash(TX_HASH, CHAIN_ID, FACTORY_ADDRESS, provider, mockFs)
+    const { loans } = await indexLoansByTxHash(
+      TX_HASH,
+      CHAIN_ID,
+      FACTORY_ADDRESS,
+      provider as unknown as JsonRpcProvider,
+      mockFs as unknown as Firestore
+    )
 
     expect(loans).toHaveLength(1)
   })
@@ -596,7 +649,15 @@ describe('indexLoansByTxHash', () => {
   it('should reject a transaction with no receipt', async () => {
     const { mockFs } = buildFirestore()
 
-    await expect(indexLoansByTxHash(TX_HASH, CHAIN_ID, FACTORY_ADDRESS, buildProvider(null), mockFs)).rejects.toMatchObject({
+    await expect(
+      indexLoansByTxHash(
+        TX_HASH,
+        CHAIN_ID,
+        FACTORY_ADDRESS,
+        buildProvider(null) as unknown as JsonRpcProvider,
+        mockFs as unknown as Firestore
+      )
+    ).rejects.toMatchObject({
       code: 'not-found',
     })
   })
@@ -605,7 +666,9 @@ describe('indexLoansByTxHash', () => {
     const { mockFs } = buildFirestore()
     const provider = buildProvider(buildReceipt([buildLog()], 0))
 
-    await expect(indexLoansByTxHash(TX_HASH, CHAIN_ID, FACTORY_ADDRESS, provider, mockFs)).rejects.toMatchObject({
+    await expect(
+      indexLoansByTxHash(TX_HASH, CHAIN_ID, FACTORY_ADDRESS, provider as unknown as JsonRpcProvider, mockFs as unknown as Firestore)
+    ).rejects.toMatchObject({
       code: 'failed-precondition',
     })
   })
@@ -614,7 +677,9 @@ describe('indexLoansByTxHash', () => {
     const { mockFs } = buildFirestore()
     const provider = buildProvider(buildReceipt([]))
 
-    await expect(indexLoansByTxHash(TX_HASH, CHAIN_ID, FACTORY_ADDRESS, provider, mockFs)).rejects.toMatchObject({ code: 'not-found' })
+    await expect(
+      indexLoansByTxHash(TX_HASH, CHAIN_ID, FACTORY_ADDRESS, provider as unknown as JsonRpcProvider, mockFs as unknown as Firestore)
+    ).rejects.toMatchObject({ code: 'not-found' })
   })
 
   it('should reject a loan from a pool this factory did not deploy', async () => {
@@ -624,7 +689,9 @@ describe('indexLoansByTxHash', () => {
     const { mockFs } = buildFirestore()
     const provider = buildProvider(buildReceipt([buildLog()]))
 
-    await expect(indexLoansByTxHash(TX_HASH, CHAIN_ID, FACTORY_ADDRESS, provider, mockFs)).rejects.toMatchObject({ code: 'not-found' })
+    await expect(
+      indexLoansByTxHash(TX_HASH, CHAIN_ID, FACTORY_ADDRESS, provider as unknown as JsonRpcProvider, mockFs as unknown as Firestore)
+    ).rejects.toMatchObject({ code: 'not-found' })
   })
 })
 
@@ -648,7 +715,7 @@ describe('the accrual snapshot', () => {
       })
     )
 
-    const loan = await fetchLoan(LOAN_ID, POOL_ADDRESS, {})
+    const loan = await fetchLoan(LOAN_ID, POOL_ADDRESS, {} as unknown as Provider)
 
     expect(loan.principalOutstanding).toBe('4000000000000000000')
     expect(loan.interestOutstanding).toBe('120000000000000000')
@@ -666,7 +733,7 @@ describe('the accrual snapshot', () => {
     mockGetLoan.mockResolvedValue(buildChainLoan({ accruedAt: 0, principalOutstanding: 0n, interestOutstanding: 0n }))
     mockLoanBalance.mockResolvedValue([5_000_000_000_000_000_000n, 250_000_000_000_000_000n])
 
-    const loan = await fetchLoan(LOAN_ID, POOL_ADDRESS, {})
+    const loan = await fetchLoan(LOAN_ID, POOL_ADDRESS, {} as unknown as Provider)
 
     expect(mockLoanBalance).toHaveBeenCalledWith(LOAN_ID)
     expect(loan.principalOutstanding).toBe('5000000000000000000')
@@ -682,7 +749,7 @@ describe('the accrual snapshot', () => {
     mockGetLoan.mockResolvedValue(buildChainLoan({ accruedAt: 0, principalOutstanding: 0n, interestOutstanding: 0n }))
     mockLoanBalance.mockResolvedValue([5_000_000_000_000_000_000n, 250_000_000_000_000_000n])
 
-    const loan = await fetchLoan(LOAN_ID, POOL_ADDRESS, {})
+    const loan = await fetchLoan(LOAN_ID, POOL_ADDRESS, {} as unknown as Provider)
 
     expect(loan.accruedAt).toBeUndefined()
   })
@@ -692,7 +759,7 @@ describe('the accrual snapshot', () => {
     // leaves whatever is there — which is the same shape `repaidAt` uses.
     const { mockFs, mockDocRef } = buildFirestore({ exists: false })
 
-    await indexLoan({ ...parsedLoan, accruedAt: undefined }, mockFs)
+    await indexLoan({ ...parsedLoan, accruedAt: undefined }, mockFs as unknown as Firestore)
 
     expect(mockDocRef.set).toHaveBeenCalledWith(expect.not.objectContaining({ accruedAt: expect.anything() }), { merge: true })
   })
@@ -707,7 +774,7 @@ describe('the accrual snapshot', () => {
 
     const result = await indexLoan(
       { ...parsedLoan, interestOutstanding: '90000000000000000', accruedAt: new Date((START_TIME + 3600) * 1000) },
-      mockFs
+      mockFs as unknown as Firestore
     )
 
     expect(mockDocRef.set).toHaveBeenCalledWith(expect.objectContaining({ interestOutstanding: '90000000000000000' }), { merge: true })
@@ -717,7 +784,7 @@ describe('the accrual snapshot', () => {
   it('should write nothing when the snapshot is unchanged', async () => {
     const { mockFs, mockDocRef } = buildFirestore({ exists: true })
 
-    const result = await indexLoan(parsedLoan, mockFs)
+    const result = await indexLoan(parsedLoan, mockFs as unknown as Firestore)
 
     expect(mockDocRef.set).not.toHaveBeenCalled()
     expect(result.alreadyIndexed).toBe(true)
@@ -726,7 +793,7 @@ describe('the accrual snapshot', () => {
   it('should rewrite a loan whose principal has come down', async () => {
     const { mockFs, mockDocRef } = buildFirestore({ exists: true })
 
-    const result = await indexLoan({ ...parsedLoan, principalOutstanding: '3000000000000000000' }, mockFs)
+    const result = await indexLoan({ ...parsedLoan, principalOutstanding: '3000000000000000000' }, mockFs as unknown as Firestore)
 
     expect(mockDocRef.set).toHaveBeenCalledWith(expect.objectContaining({ principalOutstanding: '3000000000000000000' }), { merge: true })
     expect(result.stored).toBe(true)
@@ -737,7 +804,7 @@ describe('indexLoan transitions', () => {
   it('reports a request from a loan with no record', async () => {
     const { mockFs } = buildFirestore({ exists: false })
 
-    const result = await indexLoan({ ...parsedLoan, status: 'requested' }, mockFs)
+    const result = await indexLoan({ ...parsedLoan, status: 'requested' }, mockFs as unknown as Firestore)
 
     expect(result.transition).toBe('requested')
   })
@@ -747,7 +814,7 @@ describe('indexLoan transitions', () => {
     // request to observe and absent → disbursed is the whole story.
     const { mockFs } = buildFirestore({ exists: false })
 
-    const result = await indexLoan(parsedLoan, mockFs)
+    const result = await indexLoan(parsedLoan, mockFs as unknown as Firestore)
 
     expect(result.transition).toBe('disbursed')
   })
@@ -758,7 +825,7 @@ describe('indexLoan transitions', () => {
     // transaction they sent themselves a second ago.
     const { mockFs } = buildFirestore({ exists: true, storedStatus: 'requested' })
 
-    const result = await indexLoan(parsedLoan, mockFs)
+    const result = await indexLoan(parsedLoan, mockFs as unknown as Firestore)
 
     expect(result.transition).toBe('approved')
   })
@@ -766,7 +833,7 @@ describe('indexLoan transitions', () => {
   it('reports the owner rejecting a request', async () => {
     const { mockFs } = buildFirestore({ exists: true, storedStatus: 'requested' })
 
-    const result = await indexLoan({ ...parsedLoan, status: 'rejected' }, mockFs)
+    const result = await indexLoan({ ...parsedLoan, status: 'rejected' }, mockFs as unknown as Firestore)
 
     expect(result.transition).toBe('rejected')
   })
@@ -774,7 +841,7 @@ describe('indexLoan transitions', () => {
   it('reports a repayment', async () => {
     const { mockFs } = buildFirestore({ exists: true, storedStatus: 'disbursed', storedIsRepaid: false })
 
-    const result = await indexLoan({ ...parsedLoan, isRepaid: true, repaidAt: REPAID_AT }, mockFs)
+    const result = await indexLoan({ ...parsedLoan, isRepaid: true, repaidAt: REPAID_AT }, mockFs as unknown as Firestore)
 
     expect(result.transition).toBe('repaid')
   })
@@ -784,7 +851,7 @@ describe('indexLoan transitions', () => {
     // is waiting on.
     const { mockFs } = buildFirestore({ exists: false })
 
-    const result = await indexLoan({ ...parsedLoan, isRepaid: true, repaidAt: REPAID_AT }, mockFs)
+    const result = await indexLoan({ ...parsedLoan, isRepaid: true, repaidAt: REPAID_AT }, mockFs as unknown as Firestore)
 
     expect(result.transition).toBe('repaid')
   })
@@ -793,7 +860,10 @@ describe('indexLoan transitions', () => {
   it('reports nothing when only the transaction reference moved', async () => {
     const { mockFs, mockDocRef } = buildFirestore({ exists: true, storedStatus: 'requested', storedBlockNumber: 200 })
 
-    const result = await indexLoan({ ...parsedLoan, status: 'requested', blockNumber: 100, transactionHash: OTHER_TX_HASH }, mockFs)
+    const result = await indexLoan(
+      { ...parsedLoan, status: 'requested', blockNumber: 100, transactionHash: OTHER_TX_HASH },
+      mockFs as unknown as Firestore
+    )
 
     // The write still happens — the reference genuinely is being corrected.
     expect(mockDocRef.set).toHaveBeenCalled()
@@ -805,7 +875,7 @@ describe('indexLoan transitions', () => {
   it('reports nothing when the record already matches the chain', async () => {
     const { mockFs } = buildFirestore({ exists: true, storedStatus: 'disbursed', storedIsRepaid: false })
 
-    const result = await indexLoan(parsedLoan, mockFs)
+    const result = await indexLoan(parsedLoan, mockFs as unknown as Firestore)
 
     expect(result).toMatchObject({ alreadyIndexed: true, stored: false, transition: null })
   })
@@ -820,7 +890,10 @@ describe('indexLoan transitions', () => {
       storedAmountRepaid: '5250000000000000000',
     })
 
-    const result = await indexLoan({ ...parsedLoan, isRepaid: true, repaidAt: REPAID_AT, amountRepaid: '5250000000000000000' }, mockFs)
+    const result = await indexLoan(
+      { ...parsedLoan, isRepaid: true, repaidAt: REPAID_AT, amountRepaid: '5250000000000000000' },
+      mockFs as unknown as Firestore
+    )
 
     expect(result.transition).toBeNull()
   })
@@ -832,7 +905,7 @@ describe('indexLoan transitions', () => {
   it('reports a payment that does not close the debt', async () => {
     const { mockFs } = buildFirestore({ exists: true, storedStatus: 'disbursed', storedIsRepaid: false, storedAmountRepaid: '0' })
 
-    const result = await indexLoan({ ...parsedLoan, amountRepaid: '2000000000000000000' }, mockFs)
+    const result = await indexLoan({ ...parsedLoan, amountRepaid: '2000000000000000000' }, mockFs as unknown as Firestore)
 
     expect(result.transition).toBe('repayment')
   })
@@ -847,7 +920,10 @@ describe('indexLoan transitions', () => {
       storedAmountRepaid: '2000000000000000000',
     })
 
-    const result = await indexLoan({ ...parsedLoan, isRepaid: true, repaidAt: REPAID_AT, amountRepaid: '5250000000000000000' }, mockFs)
+    const result = await indexLoan(
+      { ...parsedLoan, isRepaid: true, repaidAt: REPAID_AT, amountRepaid: '5250000000000000000' },
+      mockFs as unknown as Firestore
+    )
 
     expect(result.transition).toBe('repaid')
   })
@@ -860,7 +936,7 @@ describe('indexLoan transitions', () => {
       storedAmountRepaid: '2000000000000000000',
     })
 
-    const result = await indexLoan({ ...parsedLoan, amountRepaid: '2000000000000000000' }, mockFs)
+    const result = await indexLoan({ ...parsedLoan, amountRepaid: '2000000000000000000' }, mockFs as unknown as Firestore)
 
     expect(result).toMatchObject({ alreadyIndexed: true, stored: false, transition: null })
   })
@@ -884,7 +960,10 @@ describe('indexLoan transitions', () => {
       storedAmountRepaid: null,
     })
 
-    const result = await indexLoan({ ...parsedLoan, isRepaid: true, repaidAt: REPAID_AT, amountRepaid: '5250000000000000000' }, mockFs)
+    const result = await indexLoan(
+      { ...parsedLoan, isRepaid: true, repaidAt: REPAID_AT, amountRepaid: '5250000000000000000' },
+      mockFs as unknown as Firestore
+    )
 
     // The write happens — the record genuinely gains the field.
     expect(mockDocRef.set).toHaveBeenCalledWith(expect.objectContaining({ amountRepaid: '5250000000000000000' }), { merge: true })
@@ -896,7 +975,7 @@ describe('indexLoan transitions', () => {
     // created straight at `rejected`.
     const { mockFs } = buildFirestore({ exists: false })
 
-    const result = await indexLoan({ ...parsedLoan, status: 'rejected' }, mockFs)
+    const result = await indexLoan({ ...parsedLoan, status: 'rejected' }, mockFs as unknown as Firestore)
 
     expect(result.transition).toBe('rejected')
   })
@@ -909,12 +988,12 @@ describe('indexLoan transitions', () => {
       collection: () => ({
         doc: () => ({
           get: async () => ({ exists: true, data: () => ({ isRepaid: false, blockNumber: 120 }) }),
-          set: jest.fn().mockResolvedValue(undefined),
+          set: vi.fn().mockResolvedValue(undefined),
         }),
       }),
     }
 
-    const result = await indexLoan({ ...parsedLoan, status: 'requested' }, mockFs)
+    const result = await indexLoan({ ...parsedLoan, status: 'requested' }, mockFs as unknown as Firestore)
 
     expect(result.transition).toBe('requested')
   })
@@ -923,7 +1002,7 @@ describe('indexLoan transitions', () => {
     // Rejection is final; nothing moves out of it.
     const { mockFs } = buildFirestore({ exists: true, storedStatus: 'rejected' })
 
-    const result = await indexLoan({ ...parsedLoan, status: 'rejected' }, mockFs)
+    const result = await indexLoan({ ...parsedLoan, status: 'rejected' }, mockFs as unknown as Firestore)
 
     expect(result.transition).toBeNull()
   })
@@ -941,7 +1020,7 @@ describe('indexLoanFromLog notifications', () => {
   it('offers every indexed loan to the notification service', async () => {
     const { mockFs } = buildFirestore({ exists: false })
 
-    await indexLoanFromLog(buildLog(), CHAIN_ID, FACTORY_ADDRESS, buildProvider(), mockFs)
+    await indexLoanFromLog(buildLog(), CHAIN_ID, FACTORY_ADDRESS, buildProvider(), mockFs as unknown as Firestore)
 
     expect(mockNotifyLoanRequested).toHaveBeenCalledWith(
       expect.objectContaining({ transition: expect.anything() }),
@@ -956,7 +1035,7 @@ describe('indexLoanFromLog notifications', () => {
     mockNotifyLoanRequested.mockRejectedValue(new Error('expo unreachable'))
     const { mockFs, mockDocRef } = buildFirestore({ exists: false })
 
-    const indexed = await indexLoanFromLog(buildLog(), CHAIN_ID, FACTORY_ADDRESS, buildProvider(), mockFs)
+    const indexed = await indexLoanFromLog(buildLog(), CHAIN_ID, FACTORY_ADDRESS, buildProvider(), mockFs as unknown as Firestore)
 
     expect(indexed).not.toBeNull()
     expect(indexed!.result.stored).toBe(true)
@@ -969,7 +1048,7 @@ describe('indexLoanFromLog notifications', () => {
     mockNotifyLoanRequested.mockRejectedValue('expo unreachable')
     const { mockFs } = buildFirestore({ exists: false })
 
-    const indexed = await indexLoanFromLog(buildLog(), CHAIN_ID, FACTORY_ADDRESS, buildProvider(), mockFs)
+    const indexed = await indexLoanFromLog(buildLog(), CHAIN_ID, FACTORY_ADDRESS, buildProvider(), mockFs as unknown as Firestore)
 
     expect(indexed!.result.stored).toBe(true)
     expect(mockLogger.error).toHaveBeenCalled()
@@ -979,7 +1058,9 @@ describe('indexLoanFromLog notifications', () => {
     mockGetPoolId.mockResolvedValue(BigInt(0))
     const { mockFs } = buildFirestore({ exists: false })
 
-    await expect(indexLoanFromLog(buildLog(), CHAIN_ID, FACTORY_ADDRESS, buildProvider(), mockFs)).resolves.toBeNull()
+    await expect(
+      indexLoanFromLog(buildLog(), CHAIN_ID, FACTORY_ADDRESS, buildProvider(), mockFs as unknown as Firestore)
+    ).resolves.toBeNull()
     expect(mockNotifyLoanRequested).not.toHaveBeenCalled()
   })
 })
@@ -995,7 +1076,7 @@ describe('indexLoanFromLog and a staged purpose', () => {
   it('moves it onto the loan a lend-on-demand pool created', async () => {
     const { mockFs } = buildFirestore({ exists: false })
 
-    await indexLoanFromLog(buildLog(), CHAIN_ID, FACTORY_ADDRESS, buildProvider(), mockFs)
+    await indexLoanFromLog(buildLog(), CHAIN_ID, FACTORY_ADDRESS, buildProvider(), mockFs as unknown as Firestore)
 
     expect(mockResolveStagedNote).toHaveBeenCalledWith(
       CHAIN_ID,
@@ -1012,7 +1093,7 @@ describe('indexLoanFromLog and a staged purpose', () => {
     mockGetLoan.mockResolvedValue(buildChainLoan({ status: 1 }))
     const { mockFs } = buildFirestore({ exists: false })
 
-    await indexLoanFromLog(buildLog(), CHAIN_ID, FACTORY_ADDRESS, buildProvider(), mockFs)
+    await indexLoanFromLog(buildLog(), CHAIN_ID, FACTORY_ADDRESS, buildProvider(), mockFs as unknown as Firestore)
 
     expect(mockResolveStagedNote).toHaveBeenCalled()
   })
@@ -1025,7 +1106,7 @@ describe('indexLoanFromLog and a staged purpose', () => {
     mockGetLoan.mockResolvedValue(buildChainLoan({ status: 0 }))
     const { mockFs } = buildFirestore({ exists: true, storedStatus: 'requested' })
 
-    await indexLoanFromLog(buildLog(), CHAIN_ID, FACTORY_ADDRESS, buildProvider(), mockFs)
+    await indexLoanFromLog(buildLog(), CHAIN_ID, FACTORY_ADDRESS, buildProvider(), mockFs as unknown as Firestore)
 
     expect(mockResolveStagedNote).not.toHaveBeenCalled()
   })
@@ -1035,7 +1116,7 @@ describe('indexLoanFromLog and a staged purpose', () => {
     mockResolveStagedNote.mockRejectedValue(new Error('firestore is down'))
     const { mockFs } = buildFirestore({ exists: false })
 
-    const indexed = await indexLoanFromLog(buildLog(), CHAIN_ID, FACTORY_ADDRESS, buildProvider(), mockFs)
+    const indexed = await indexLoanFromLog(buildLog(), CHAIN_ID, FACTORY_ADDRESS, buildProvider(), mockFs as unknown as Firestore)
 
     expect(indexed!.result.stored).toBe(true)
     expect(mockLogger.error).toHaveBeenCalled()
@@ -1047,7 +1128,7 @@ describe('indexLoanFromLog and a staged purpose', () => {
     mockNotifyLoanRequested.mockImplementation(async () => void order.push('notify'))
     const { mockFs } = buildFirestore({ exists: false })
 
-    await indexLoanFromLog(buildLog(), CHAIN_ID, FACTORY_ADDRESS, buildProvider(), mockFs)
+    await indexLoanFromLog(buildLog(), CHAIN_ID, FACTORY_ADDRESS, buildProvider(), mockFs as unknown as Firestore)
 
     expect(order).toEqual(['note', 'notify'])
   })
@@ -1067,7 +1148,7 @@ describe('a defaulted loan', () => {
     // there, so it is appended here, and reordering either relabels history.
     mockGetLoan.mockResolvedValue(buildChainLoan({ status: 3, defaultedAt: DECLARED_AT_SECONDS }))
 
-    const loan = await fetchLoan(LOAN_ID, POOL_ADDRESS, {})
+    const loan = await fetchLoan(LOAN_ID, POOL_ADDRESS, {} as unknown as Provider)
 
     expect(loan.status).toBe('defaulted')
   })
@@ -1077,7 +1158,7 @@ describe('a defaulted loan', () => {
     // date every undeclared loan to 1970.
     mockGetLoan.mockResolvedValue(buildChainLoan())
 
-    const loan = await fetchLoan(LOAN_ID, POOL_ADDRESS, {})
+    const loan = await fetchLoan(LOAN_ID, POOL_ADDRESS, {} as unknown as Provider)
 
     expect(loan.defaultedAt).toBeUndefined()
   })
@@ -1085,7 +1166,7 @@ describe('a defaulted loan', () => {
   it('reads the declaration stamp when there is one', async () => {
     mockGetLoan.mockResolvedValue(buildChainLoan({ status: 3, defaultedAt: DECLARED_AT_SECONDS }))
 
-    const loan = await fetchLoan(LOAN_ID, POOL_ADDRESS, {})
+    const loan = await fetchLoan(LOAN_ID, POOL_ADDRESS, {} as unknown as Provider)
 
     expect(loan.defaultedAt).toEqual(DECLARED_AT)
   })
@@ -1093,7 +1174,7 @@ describe('a defaulted loan', () => {
   it('omits the stamp from the write rather than storing undefined', async () => {
     const { mockFs, mockDocRef } = buildFirestore({ exists: false })
 
-    await indexLoan(parsedLoan, mockFs)
+    await indexLoan(parsedLoan, mockFs as unknown as Firestore)
 
     expect(mockDocRef.set).toHaveBeenCalledWith(expect.not.objectContaining({ defaultedAt: expect.anything() }), { merge: true })
   })
@@ -1105,7 +1186,7 @@ describe('a defaulted loan', () => {
     // the stamp in the comparison this reads as already indexed.
     const { mockFs, mockDocRef } = buildFirestore({ exists: true, storedStatus: 'disbursed' })
 
-    const result = await indexLoan({ ...parsedLoan, status: 'defaulted', defaultedAt: DECLARED_AT }, mockFs)
+    const result = await indexLoan({ ...parsedLoan, status: 'defaulted', defaultedAt: DECLARED_AT }, mockFs as unknown as Firestore)
 
     expect(result.stored).toBe(true)
     expect(mockDocRef.set).toHaveBeenCalledWith(expect.objectContaining({ status: 'defaulted', defaultedAt: DECLARED_AT }), {
@@ -1120,7 +1201,7 @@ describe('a defaulted loan', () => {
       storedDefaultedAt: DECLARED_AT,
     })
 
-    const result = await indexLoan({ ...parsedLoan, status: 'defaulted', defaultedAt: DECLARED_AT }, mockFs)
+    const result = await indexLoan({ ...parsedLoan, status: 'defaulted', defaultedAt: DECLARED_AT }, mockFs as unknown as Firestore)
 
     expect(mockDocRef.set).not.toHaveBeenCalled()
     expect(result.alreadyIndexed).toBe(true)
@@ -1129,7 +1210,7 @@ describe('a defaulted loan', () => {
   it('reports the declaration as a transition', async () => {
     const { mockFs } = buildFirestore({ exists: true, storedStatus: 'disbursed' })
 
-    const result = await indexLoan({ ...parsedLoan, status: 'defaulted', defaultedAt: DECLARED_AT }, mockFs)
+    const result = await indexLoan({ ...parsedLoan, status: 'defaulted', defaultedAt: DECLARED_AT }, mockFs as unknown as Firestore)
 
     expect(result.transition).toBe('defaulted')
   })
@@ -1146,7 +1227,7 @@ describe('a defaulted loan', () => {
 
     const result = await indexLoan(
       { ...parsedLoan, status: 'defaulted', defaultedAt: DECLARED_AT, isRepaid: true, repaidAt: REPAID_AT },
-      mockFs
+      mockFs as unknown as Firestore
     )
 
     expect(result.transition).toBe('repaid')
@@ -1163,7 +1244,10 @@ describe('a defaulted loan', () => {
 
     // Same state, an earlier transaction reference: the write happens, but
     // only to correct the reference. `stored` is not news.
-    const result = await indexLoan({ ...parsedLoan, status: 'defaulted', defaultedAt: DECLARED_AT, blockNumber: 90 }, mockFs)
+    const result = await indexLoan(
+      { ...parsedLoan, status: 'defaulted', defaultedAt: DECLARED_AT, blockNumber: 90 },
+      mockFs as unknown as Firestore
+    )
 
     expect(result.stored).toBe(true)
     expect(result.transition).toBeNull()
@@ -1174,7 +1258,7 @@ describe('a defaulted loan', () => {
     mockGetLoan.mockResolvedValue(buildChainLoan({ status: 3, defaultedAt: DECLARED_AT_SECONDS }))
     const { mockFs } = buildFirestore({ exists: true, storedStatus: 'disbursed' })
 
-    await indexLoanFromLog(buildLog(), CHAIN_ID, FACTORY_ADDRESS, {}, mockFs)
+    await indexLoanFromLog(buildLog(), CHAIN_ID, FACTORY_ADDRESS, {} as unknown as Provider, mockFs as unknown as Firestore)
 
     expect(mockNotifyLoanDecided).toHaveBeenCalledWith(
       expect.objectContaining({ transition: 'defaulted' }),
@@ -1191,9 +1275,9 @@ describe('a defaulted loan', () => {
     mockGetLoan.mockResolvedValue(buildChainLoan({ status: 3, defaultedAt: DECLARED_AT_SECONDS }))
     const { mockFs } = buildFirestore({ exists: true, storedStatus: 'disbursed' })
 
-    const indexed = await indexLoanFromLog(buildLog(), CHAIN_ID, FACTORY_ADDRESS, {}, mockFs)
+    const indexed = await indexLoanFromLog(buildLog(), CHAIN_ID, FACTORY_ADDRESS, {} as unknown as Provider, mockFs as unknown as Firestore)
 
-    expect(indexed.result.stored).toBe(true)
+    expect(indexed?.result.stored).toBe(true)
     expect(mockLogger.error).toHaveBeenCalledWith('Loan decision notification failed; indexing stands', expect.anything())
   })
 
@@ -1202,6 +1286,6 @@ describe('a defaulted loan', () => {
     // which is a lie rather than a gap.
     mockGetLoan.mockResolvedValue(buildChainLoan({ status: 9 }))
 
-    await expect(fetchLoan(LOAN_ID, POOL_ADDRESS, {})).rejects.toThrow('Unknown LoanStatus ordinal from chain: 9')
+    await expect(fetchLoan(LOAN_ID, POOL_ADDRESS, {} as unknown as Provider)).rejects.toThrow('Unknown LoanStatus ordinal from chain: 9')
   })
 })

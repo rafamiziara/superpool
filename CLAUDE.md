@@ -59,7 +59,7 @@ pnpm lint             # solhint (Solidity); TypeScript is covered by `pnpm check
 
 ```bash
 pnpm build           # TypeScript compilation
-pnpm test            # Jest tests (Vitest migration is on chore/backend-vitest)
+pnpm test            # Vitest (coverage on by default; SKIP_COVERAGE=true to skip)
 pnpm serve           # Start Firebase emulators
 pnpm deploy          # Deploy to Firebase
 pnpm generateKey     # Generate dev keys for backend testing
@@ -500,7 +500,7 @@ Comprehensive interfaces for type safety:
 - **State Management**: MobX, mobx-react-lite for reactive state management
 - **Styling**: Tailwind CSS v4 (web + mobile via Uniwind), shared design system
 - **Icons**: FontAwesome (@expo/vector-icons for mobile)
-- **Development**: pnpm workspaces, TypeScript project references. Tests: Vitest in `packages/agents`, Jest in `packages/backend` (migration in progress), jest-expo on mobile
+- **Development**: pnpm workspaces, TypeScript project references. Tests: Vitest everywhere except mobile, which keeps jest-expo — it transforms through Babel, never touches the TypeScript API, and is the only supported path for the React Native transform and Expo module mocking
 
 ## Git & Version Control
 

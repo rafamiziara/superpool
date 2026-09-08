@@ -1,12 +1,13 @@
 import type { AssessmentInfo } from '@superpool/types'
 import type { Firestore } from 'firebase-admin/firestore'
+import type { Mock } from 'vitest'
 import { mockLogger } from '../__tests__/setup'
 
-jest.mock('./borrowerHistory', () => ({
-  ...jest.requireActual('./borrowerHistory'),
-  borrowerHistoriesFor: jest.fn(),
+vi.mock('./borrowerHistory', async () => ({
+  ...(await vi.importActual<typeof import('./borrowerHistory')>('./borrowerHistory')),
+  borrowerHistoriesFor: vi.fn(),
 }))
-jest.mock('./notes', () => ({ ...jest.requireActual('./notes'), noteFor: jest.fn() }))
+vi.mock('./notes', async () => ({ ...(await vi.importActual<typeof import('./notes')>('./notes')), noteFor: vi.fn() }))
 
 import {
   ASSESSMENT_DAILY_CAP,
@@ -21,9 +22,13 @@ import {
   saveAssessment,
   toWholeUnits,
 } from './assessments'
-import { borrowerHistoriesFor } from './borrowerHistory'
-import { noteFor } from './notes'
+import * as borrowerHistoryMock from './borrowerHistory'
+import * as notesMock from './notes'
 
+// These modules are mocked above; vi.mocked restores the mock types that the
+// real signatures would otherwise hide.
+const { borrowerHistoriesFor } = vi.mocked(borrowerHistoryMock)
+const { noteFor } = vi.mocked(notesMock)
 const ZERO = '0x0000000000000000000000000000000000000000'
 const USDC = '0x1111111111111111111111111111111111111111'
 const OWNER = '0x2222222222222222222222222222222222222222'
@@ -100,7 +105,7 @@ function buildFirestore(seed: Docs = {}) {
     return result
   }
 
-  return { firestore: { collection, runTransaction } as unknown as Firestore, store }
+  return { firestore: { collection, runTransaction }, store }
 }
 
 interface FakeRef {
@@ -142,9 +147,9 @@ const seeded = (overrides: { loan?: Record<string, unknown>; pool?: Record<strin
 })
 
 beforeEach(() => {
-  jest.clearAllMocks()
-  ;(borrowerHistoriesFor as jest.Mock).mockResolvedValue({ [BORROWER.toLowerCase()]: HISTORY })
-  ;(noteFor as jest.Mock).mockResolvedValue(null)
+  vi.clearAllMocks()
+  ;(borrowerHistoriesFor as Mock).mockResolvedValue({ [BORROWER.toLowerCase()]: HISTORY })
+  ;(noteFor as Mock).mockResolvedValue(null)
 })
 
 // ---------------------------------------------------------------------------
@@ -190,7 +195,7 @@ describe('ownershipOf', () => {
   it('names the pool’s owner and where to read its liquidity', async () => {
     const { firestore } = buildFirestore(seeded())
 
-    await expect(ownershipOf(LOAN_ID, firestore)).resolves.toMatchObject({
+    await expect(ownershipOf(LOAN_ID, firestore as unknown as Firestore)).resolves.toMatchObject({
       poolOwner: OWNER.toLowerCase(),
       poolAddress: POOL_ADDRESS,
       chainId: 31337,
@@ -202,7 +207,7 @@ describe('ownershipOf', () => {
   it('resolves the denomination too, so an unpriceable pool costs no chain call', async () => {
     const { firestore } = buildFirestore(seeded({ pool: { tokenDecimals: undefined } }))
 
-    const ownership = await ownershipOf(LOAN_ID, firestore)
+    const ownership = await ownershipOf(LOAN_ID, firestore as unknown as Firestore)
 
     expect(ownership!.denomination).toBeUndefined()
   })
@@ -210,7 +215,7 @@ describe('ownershipOf', () => {
   it('answers nothing for a loan nobody has indexed', async () => {
     const { firestore } = buildFirestore(seeded())
 
-    await expect(ownershipOf('31337-9-9', firestore)).resolves.toBeNull()
+    await expect(ownershipOf('31337-9-9', firestore as unknown as Firestore)).resolves.toBeNull()
   })
 
   it('answers nothing when the pool itself was never indexed', async () => {
@@ -218,7 +223,7 @@ describe('ownershipOf', () => {
     delete docs.pools['31337-1']
     const { firestore } = buildFirestore(docs)
 
-    await expect(ownershipOf(LOAN_ID, firestore)).resolves.toBeNull()
+    await expect(ownershipOf(LOAN_ID, firestore as unknown as Firestore)).resolves.toBeNull()
   })
 })
 
@@ -230,7 +235,7 @@ describe('gatherFacts', () => {
   it('sends whole units, never the smallest one', async () => {
     const { firestore } = buildFirestore(seeded())
 
-    const gathered = await gatherFacts(LOAN_ID, 200_000_000n, 1_800_000_000, firestore)
+    const gathered = await gatherFacts(LOAN_ID, 200_000_000n, 1_800_000_000, firestore as unknown as Firestore)
 
     expect(gathered).toMatchObject({
       facts: {
@@ -246,16 +251,16 @@ describe('gatherFacts', () => {
   it('quotes the term’s price rather than a moving balance', async () => {
     const { firestore } = buildFirestore(seeded())
 
-    const gathered = await gatherFacts(LOAN_ID, 200_000_000n, 1_800_000_000, firestore)
+    const gathered = await gatherFacts(LOAN_ID, 200_000_000n, 1_800_000_000, firestore as unknown as Firestore)
 
     expect(gathered).toMatchObject({ facts: { request: { repaymentTotal: 52.5 } } })
   })
 
   it('carries the purpose when the borrower stated one', async () => {
-    ;(noteFor as jest.Mock).mockResolvedValue({ text: 'School fees.' })
+    ;(noteFor as Mock).mockResolvedValue({ text: 'School fees.' })
     const { firestore } = buildFirestore(seeded())
 
-    const gathered = await gatherFacts(LOAN_ID, 200_000_000n, 1_800_000_000, firestore)
+    const gathered = await gatherFacts(LOAN_ID, 200_000_000n, 1_800_000_000, firestore as unknown as Firestore)
 
     expect(gathered).toMatchObject({ facts: { request: { purpose: 'School fees.' } } })
   })
@@ -263,7 +268,7 @@ describe('gatherFacts', () => {
   it('leaves the purpose out entirely when there is none', async () => {
     const { firestore } = buildFirestore(seeded())
 
-    const gathered = await gatherFacts(LOAN_ID, 200_000_000n, 1_800_000_000, firestore)
+    const gathered = await gatherFacts(LOAN_ID, 200_000_000n, 1_800_000_000, firestore as unknown as Firestore)
 
     // Absent rather than undefined: the schema on the wire marks it optional,
     // and Mastra would reject an explicit `undefined` at the boundary.
@@ -276,7 +281,7 @@ describe('gatherFacts', () => {
     docs.loans['31337-1-9'] = { chainId: 31337, poolId: 1, status: 'disbursed' }
     const { firestore } = buildFirestore(docs)
 
-    const gathered = await gatherFacts(LOAN_ID, 200_000_000n, 1_800_000_000, firestore)
+    const gathered = await gatherFacts(LOAN_ID, 200_000_000n, 1_800_000_000, firestore as unknown as Firestore)
 
     expect(gathered).toMatchObject({ facts: { pool: { pendingRequests: 2 } } })
   })
@@ -284,7 +289,7 @@ describe('gatherFacts', () => {
   it('judges the borrower’s record against the moment it was given', async () => {
     const { firestore } = buildFirestore(seeded())
 
-    await gatherFacts(LOAN_ID, 200_000_000n, 1_800_000_000, firestore)
+    await gatherFacts(LOAN_ID, 200_000_000n, 1_800_000_000, firestore as unknown as Firestore)
 
     expect(borrowerHistoriesFor).toHaveBeenCalledWith([BORROWER], 31337, 1_800_000_000, expect.anything())
   })
@@ -292,7 +297,9 @@ describe('gatherFacts', () => {
   it('reports an unpriceable pool rather than guessing an exponent', async () => {
     const { firestore } = buildFirestore(seeded({ pool: { tokenDecimals: undefined } }))
 
-    await expect(gatherFacts(LOAN_ID, 200_000_000n, 1_800_000_000, firestore)).resolves.toEqual({ unsupported: true })
+    await expect(gatherFacts(LOAN_ID, 200_000_000n, 1_800_000_000, firestore as unknown as Firestore)).resolves.toEqual({
+      unsupported: true,
+    })
   })
 
   it('says nothing when the pool itself was never indexed', async () => {
@@ -300,14 +307,14 @@ describe('gatherFacts', () => {
     delete docs.pools['31337-1']
     const { firestore } = buildFirestore(docs)
 
-    await expect(gatherFacts(LOAN_ID, 200_000_000n, 1_800_000_000, firestore)).resolves.toBeNull()
+    await expect(gatherFacts(LOAN_ID, 200_000_000n, 1_800_000_000, firestore as unknown as Firestore)).resolves.toBeNull()
     expect(mockLogger.warn).toHaveBeenCalled()
   })
 
   it('says nothing about a loan nobody has indexed', async () => {
     const { firestore } = buildFirestore(seeded())
 
-    await expect(gatherFacts('31337-9-9', 0n, 1_800_000_000, firestore)).resolves.toBeNull()
+    await expect(gatherFacts('31337-9-9', 0n, 1_800_000_000, firestore as unknown as Firestore)).resolves.toBeNull()
     expect(mockLogger.warn).toHaveBeenCalled()
   })
 })
@@ -330,7 +337,10 @@ describe('saveAssessment', () => {
   it('stores the reading under the loan’s own id', async () => {
     const { firestore, store } = buildFirestore(seeded())
 
-    const saved = await saveAssessment({ loanDocId: LOAN_ID, chainId: 31337, poolId: 1, loanId: 7, reading, inputs }, firestore)
+    const saved = await saveAssessment(
+      { loanDocId: LOAN_ID, chainId: 31337, poolId: 1, loanId: 7, reading, inputs },
+      firestore as unknown as Firestore
+    )
 
     expect(saved).toMatchObject({ id: LOAN_ID, risk: 'low', inputs })
     expect(store.assessments[LOAN_ID]).toBeDefined()
@@ -339,7 +349,10 @@ describe('saveAssessment', () => {
   it('dates it on the wire as ISO, which is what survives the callable encoder', async () => {
     const { firestore } = buildFirestore(seeded())
 
-    const saved = await saveAssessment({ loanDocId: LOAN_ID, chainId: 31337, poolId: 1, loanId: 7, reading, inputs }, firestore)
+    const saved = await saveAssessment(
+      { loanDocId: LOAN_ID, chainId: 31337, poolId: 1, loanId: 7, reading, inputs },
+      firestore as unknown as Firestore
+    )
 
     expect(Date.parse(saved.createdAt)).not.toBeNaN()
   })
@@ -349,10 +362,10 @@ describe('saveAssessment', () => {
   it('keeps the previous reading when it is redone', async () => {
     const { firestore } = buildFirestore(seeded())
 
-    await saveAssessment({ loanDocId: LOAN_ID, chainId: 31337, poolId: 1, loanId: 7, reading, inputs }, firestore)
+    await saveAssessment({ loanDocId: LOAN_ID, chainId: 31337, poolId: 1, loanId: 7, reading, inputs }, firestore as unknown as Firestore)
     const second = await saveAssessment(
       { loanDocId: LOAN_ID, chainId: 31337, poolId: 1, loanId: 7, reading: { ...reading, risk: 'high' }, inputs },
-      firestore
+      firestore as unknown as Firestore
     )
 
     expect(second.risk).toBe('high')
@@ -364,10 +377,10 @@ describe('saveAssessment', () => {
     const { firestore } = buildFirestore(seeded())
 
     for (let index = 0; index < 6; index += 1) {
-      await saveAssessment({ loanDocId: LOAN_ID, chainId: 31337, poolId: 1, loanId: 7, reading, inputs }, firestore)
+      await saveAssessment({ loanDocId: LOAN_ID, chainId: 31337, poolId: 1, loanId: 7, reading, inputs }, firestore as unknown as Firestore)
     }
 
-    const stored = await assessmentFor(LOAN_ID, firestore)
+    const stored = await assessmentFor(LOAN_ID, firestore as unknown as Firestore)
 
     expect(stored!.history!.length).toBeLessThanOrEqual(3)
   })
@@ -377,7 +390,7 @@ describe('assessmentFor', () => {
   it('reads nothing back for a loan nobody has assessed', async () => {
     const { firestore } = buildFirestore(seeded())
 
-    await expect(assessmentFor(LOAN_ID, firestore)).resolves.toBeNull()
+    await expect(assessmentFor(LOAN_ID, firestore as unknown as Firestore)).resolves.toBeNull()
   })
 })
 
@@ -416,23 +429,30 @@ describe('claimAssessment', () => {
   it('grants a reading and counts it', async () => {
     const { firestore } = buildFirestore({})
 
-    await expect(claimAssessment(OWNER, firestore)).resolves.toMatchObject({ granted: true, used: 1, cap: ASSESSMENT_DAILY_CAP })
+    await expect(claimAssessment(OWNER, firestore as unknown as Firestore)).resolves.toMatchObject({
+      granted: true,
+      used: 1,
+      cap: ASSESSMENT_DAILY_CAP,
+    })
   })
 
   it('counts each one, so a day adds up', async () => {
     const { firestore } = buildFirestore({})
 
-    await claimAssessment(OWNER, firestore)
-    await claimAssessment(OWNER, firestore)
+    await claimAssessment(OWNER, firestore as unknown as Firestore)
+    await claimAssessment(OWNER, firestore as unknown as Firestore)
 
-    await expect(claimAssessment(OWNER, firestore)).resolves.toMatchObject({ used: 3 })
+    await expect(claimAssessment(OWNER, firestore as unknown as Firestore)).resolves.toMatchObject({ used: 3 })
   })
 
   it('refuses once the day is spent', async () => {
     const { firestore, store } = buildFirestore({})
     store.assessment_quota = { [`${OWNER.toLowerCase()}-${quotaDay()}`]: { count: ASSESSMENT_DAILY_CAP } }
 
-    await expect(claimAssessment(OWNER, firestore)).resolves.toMatchObject({ granted: false, used: ASSESSMENT_DAILY_CAP })
+    await expect(claimAssessment(OWNER, firestore as unknown as Firestore)).resolves.toMatchObject({
+      granted: false,
+      used: ASSESSMENT_DAILY_CAP,
+    })
   })
 
   // A wallet has no timezone, and a guess that resets a quota is a guess that
@@ -440,8 +460,8 @@ describe('claimAssessment', () => {
   it('keys the day in UTC, and each wallet has its own', async () => {
     const { firestore, store } = buildFirestore({})
 
-    await claimAssessment(OWNER, firestore)
-    await claimAssessment(BORROWER, firestore)
+    await claimAssessment(OWNER, firestore as unknown as Firestore)
+    await claimAssessment(BORROWER, firestore as unknown as Firestore)
 
     expect(Object.keys(store.assessment_quota).sort()).toEqual(
       [`${BORROWER.toLowerCase()}-${quotaDay()}`, `${OWNER.toLowerCase()}-${quotaDay()}`].sort()
@@ -451,16 +471,16 @@ describe('claimAssessment', () => {
   it('matches the wallet case-insensitively, as every address here is', async () => {
     const { firestore } = buildFirestore({})
 
-    await claimAssessment(OWNER.toUpperCase(), firestore)
+    await claimAssessment(OWNER.toUpperCase(), firestore as unknown as Firestore)
 
-    await expect(claimAssessment(OWNER.toLowerCase(), firestore)).resolves.toMatchObject({ used: 2 })
+    await expect(claimAssessment(OWNER.toLowerCase(), firestore as unknown as Firestore)).resolves.toMatchObject({ used: 2 })
   })
 
   it('reads yesterday as a fresh day', async () => {
     const { firestore, store } = buildFirestore({})
     store.assessment_quota = { [`${OWNER.toLowerCase()}-2020-01-01`]: { count: ASSESSMENT_DAILY_CAP } }
 
-    await expect(claimAssessment(OWNER, firestore)).resolves.toMatchObject({ granted: true, used: 1 })
+    await expect(claimAssessment(OWNER, firestore as unknown as Firestore)).resolves.toMatchObject({ granted: true, used: 1 })
   })
 })
 
@@ -470,16 +490,16 @@ describe('releaseAssessment', () => {
   it('gives a claim back', async () => {
     const { firestore } = buildFirestore({})
 
-    await claimAssessment(OWNER, firestore)
-    await releaseAssessment(OWNER, firestore)
+    await claimAssessment(OWNER, firestore as unknown as Firestore)
+    await releaseAssessment(OWNER, firestore as unknown as Firestore)
 
-    await expect(claimAssessment(OWNER, firestore)).resolves.toMatchObject({ used: 1 })
+    await expect(claimAssessment(OWNER, firestore as unknown as Firestore)).resolves.toMatchObject({ used: 1 })
   })
 
   it('never goes below nothing', async () => {
     const { firestore, store } = buildFirestore({})
 
-    await releaseAssessment(OWNER, firestore)
+    await releaseAssessment(OWNER, firestore as unknown as Firestore)
 
     expect(store.assessment_quota[`${OWNER.toLowerCase()}-${quotaDay()}`].count).toBe(0)
   })
@@ -487,7 +507,7 @@ describe('releaseAssessment', () => {
   // Failing to release is survivable — the count resets at midnight — so this
   // must never be the thing that fails a request.
   it('swallows a failure rather than taking the request down with it', async () => {
-    const firestore = { runTransaction: jest.fn().mockRejectedValue(new Error('contention')) } as unknown as Firestore
+    const firestore = { runTransaction: vi.fn().mockRejectedValue(new Error('contention')) } as unknown as Firestore
 
     await expect(releaseAssessment(OWNER, firestore)).resolves.toBeUndefined()
     expect(mockLogger.warn).toHaveBeenCalled()

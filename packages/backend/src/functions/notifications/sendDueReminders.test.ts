@@ -1,17 +1,28 @@
+import type { JsonRpcProvider } from 'ethers'
+import type { CallableRequest } from 'firebase-functions/v2/https'
+
 // The chain registry reads the environment once, at module load, and a chain
 // with no factory address is skipped — so this must be set before the first
 // require below or every scan finds nothing to do.
-process.env.POOL_FACTORY_ADDRESS = '0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512'
+// The chain registry reads process.env once, at module load. ESM hoists every import
+// above ordinary statements, so this must run inside vi.hoisted to land first.
+vi.hoisted(() => {
+  process.env.POOL_FACTORY_ADDRESS = '0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512'
+})
 
 import { mockLogger } from '../../__tests__/setup'
 
-jest.mock('../../services/dueReminders')
-jest.mock('../../utils/blockchain')
+vi.mock('../../services/dueReminders')
+vi.mock('../../utils/blockchain')
 
-const { sendDueRemindersHandler, sendDueRemindersNowHandler } = require('./sendDueReminders')
-const { remindChain } = require('../../services/dueReminders')
-const { getProvider } = require('../../utils/blockchain')
+import * as dueRemindersMock from '../../services/dueReminders'
+import * as blockchainMock from '../../utils/blockchain'
+import { sendDueRemindersHandler, sendDueRemindersNowHandler } from './sendDueReminders'
 
+// These modules are mocked above; vi.mocked restores the mock types that the
+// real signatures would otherwise hide.
+const { remindChain } = vi.mocked(dueRemindersMock)
+const { getProvider } = vi.mocked(blockchainMock)
 const CHAIN_ID = 31337
 const AUTH = { uid: '0x9965507D1a55bcC2695C58ba16FB37d819B0A4dc' }
 /** A signed-in caller who is not an operator. Trivial to become — see `requireAdmin`. */
@@ -20,8 +31,8 @@ const STRANGER = { uid: '0x14dC79964da2C08b23698B3D3cc7Ca32193d9955' }
 const RESULT = { chainId: CHAIN_ID, scanned: 3, dueSoon: 1, overdue: 1 }
 
 /** Pass `null` for an anonymous caller — an explicit `undefined` would take the default. */
-function buildRequest(auth: object | null = AUTH) {
-  return { data: undefined, auth: auth ?? undefined } as never
+function buildRequest<T>(auth: object | null = AUTH): CallableRequest<T> {
+  return { data: undefined, auth: auth ?? undefined } as unknown as CallableRequest<T> as never
 }
 
 beforeEach(() => {
@@ -32,7 +43,7 @@ beforeEach(() => {
   process.env.ADMIN_WALLETS = AUTH.uid
   remindChain.mockReset()
   remindChain.mockResolvedValue(RESULT)
-  getProvider.mockReturnValue({})
+  getProvider.mockReturnValue({} as unknown as JsonRpcProvider)
 })
 
 afterAll(() => {

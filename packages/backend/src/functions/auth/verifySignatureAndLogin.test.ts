@@ -1,43 +1,53 @@
+import type { VerifySignatureAndLoginRequest } from '@superpool/types'
+import type { CallableRequest } from 'firebase-functions/v2/https'
+import type { MockedFunction } from 'vitest'
 import { mockLogger } from '../../__tests__/setup'
 import { AUTH_NONCES_COLLECTION, USERS_COLLECTION } from '../../constants'
 
+// Hoisted so the vi.mock factories below can close over them: vi.mock runs before
+// any module-level const is initialised.
+const { mockCreateAuthMessage, mockClaimAuthNonce, mockApproveDevice } = vi.hoisted(() => ({
+  mockCreateAuthMessage: vi.fn(),
+  mockClaimAuthNonce: vi.fn(),
+  mockApproveDevice: vi.fn(),
+}))
+
 // Mock ethers module completely with all needed functions
-jest.mock('ethers', () => ({
-  isAddress: jest.fn(),
-  verifyMessage: jest.fn(),
-  verifyTypedData: jest.fn(),
+vi.mock('ethers', () => ({
+  isAddress: vi.fn(),
+  verifyMessage: vi.fn(),
+  verifyTypedData: vi.fn(),
 }))
 
 // Mock by module path, not through the barrel: the handler imports from
 // `utils/auth`, so a barrel mock would leave the real functions in place. See
 // CLAUDE.md, "Import from `utils/validation`, never from `../../utils`".
-const mockCreateAuthMessage = jest.fn()
-const mockClaimAuthNonce = jest.fn()
-jest.mock('../../utils/auth', () => ({
+vi.mock('../../utils/auth', async () => ({
   createAuthMessage: mockCreateAuthMessage,
   claimAuthNonce: mockClaimAuthNonce,
   // The real class: the handler catches it by `instanceof`, so a stand-in
   // would make the expiry path untestable rather than merely mocked.
-  NonceExpiredError: jest.requireActual('../../utils/auth').NonceExpiredError,
+  NonceExpiredError: (await vi.importActual<typeof import('../../utils/auth')>('../../utils/auth')).NonceExpiredError,
 }))
 
 // Mock the DeviceVerificationService
-const mockApproveDevice = jest.fn()
-jest.mock('../../services/deviceVerification', () => ({
+vi.mock('../../services/deviceVerification', () => ({
   DeviceVerificationService: {
     approveDevice: mockApproveDevice,
   },
 }))
 
+import * as ethers from 'ethers'
 // Import mocked services and functions
-const { firestore, auth } = require('../../services')
-const ethers = require('ethers')
-const { verifySignatureAndLoginHandler } = require('./verifySignatureAndLogin')
+import { auth as realAuth, firestore as realFirestore } from '../../services'
+import { verifySignatureAndLoginHandler } from './verifySignatureAndLogin'
 
+const auth = vi.mocked(realAuth, true)
+const firestore = vi.mocked(realFirestore, true)
 // Get mocked ethers functions
-const mockedIsAddress = ethers.isAddress as jest.MockedFunction<typeof ethers.isAddress>
-const mockedVerifyMessage = ethers.verifyMessage as jest.MockedFunction<typeof ethers.verifyMessage>
-const mockedVerifyTypedData = ethers.verifyTypedData as jest.MockedFunction<typeof ethers.verifyTypedData>
+const mockedIsAddress = ethers.isAddress as unknown as MockedFunction<typeof ethers.isAddress>
+const mockedVerifyMessage = ethers.verifyMessage as unknown as MockedFunction<typeof ethers.verifyMessage>
+const mockedVerifyTypedData = ethers.verifyTypedData as unknown as MockedFunction<typeof ethers.verifyTypedData>
 
 describe('verifySignatureAndLoginHandler', () => {
   const walletAddress = '0x1234567890123456789012345678901234567890'
@@ -56,7 +66,7 @@ describe('verifySignatureAndLoginHandler', () => {
   })
 
   beforeEach(() => {
-    jest.clearAllMocks()
+    vi.clearAllMocks()
 
     // Configure ethers mocks for successful verification
     mockedIsAddress.mockReturnValue(true)
@@ -89,14 +99,14 @@ describe('verifySignatureAndLoginHandler', () => {
     }
 
     // Mock firestore collection/doc chain
-    firestore.collection.mockImplementation((collectionName: string) => {
-      const docMock = jest.fn((_docId: string) => {
+    vi.mocked(firestore.collection).mockImplementation((collectionName: string) => {
+      const docMock = vi.fn((_docId: string) => {
         const mockDoc = collectionName === AUTH_NONCES_COLLECTION ? mockNonceDoc : mockUserDoc
         return {
-          get: jest.fn().mockResolvedValue(mockDoc),
-          set: jest.fn().mockResolvedValue(undefined),
-          update: jest.fn().mockResolvedValue(undefined),
-          delete: jest.fn().mockResolvedValue(undefined),
+          get: vi.fn().mockResolvedValue(mockDoc),
+          set: vi.fn().mockResolvedValue(undefined),
+          update: vi.fn().mockResolvedValue(undefined),
+          delete: vi.fn().mockResolvedValue(undefined),
         }
       })
       return { doc: docMock }
@@ -113,7 +123,7 @@ describe('verifySignatureAndLoginHandler', () => {
     const request = { data: { walletAddress, signature } }
 
     // Act
-    const result = await verifySignatureAndLoginHandler(request)
+    const result = await verifySignatureAndLoginHandler(request as unknown as CallableRequest<VerifySignatureAndLoginRequest>)
 
     // Assert
     expect(mockedIsAddress).toHaveBeenCalledWith(walletAddress)
@@ -131,23 +141,23 @@ describe('verifySignatureAndLoginHandler', () => {
   it('should create a new user profile if one does not exist', async () => {
     // Arrange
     const request = { data: { walletAddress, signature } }
-    const mockSetFn = jest.fn().mockResolvedValue(undefined)
+    const mockSetFn = vi.fn().mockResolvedValue(undefined)
 
-    firestore.collection.mockImplementation((collectionName: string) => {
-      const docMock = jest.fn((_docId: string) => {
+    vi.mocked(firestore.collection).mockImplementation((collectionName: string) => {
+      const docMock = vi.fn((_docId: string) => {
         if (collectionName === AUTH_NONCES_COLLECTION) {
           return {
-            get: jest.fn().mockResolvedValue({
+            get: vi.fn().mockResolvedValue({
               exists: true,
               data: () => ({ nonce, timestamp, expiresAt: mockNow + 10 * 60 * 1000 }),
             }),
-            delete: jest.fn().mockResolvedValue(undefined),
+            delete: vi.fn().mockResolvedValue(undefined),
           }
         } else {
           return {
-            get: jest.fn().mockResolvedValue({ exists: false }),
+            get: vi.fn().mockResolvedValue({ exists: false }),
             set: mockSetFn,
-            update: jest.fn().mockResolvedValue(undefined),
+            update: vi.fn().mockResolvedValue(undefined),
           }
         }
       })
@@ -155,7 +165,7 @@ describe('verifySignatureAndLoginHandler', () => {
     })
 
     // Act
-    await verifySignatureAndLoginHandler(request)
+    await verifySignatureAndLoginHandler(request as unknown as CallableRequest<VerifySignatureAndLoginRequest>)
 
     // Assert
     expect(mockSetFn).toHaveBeenCalledWith({
@@ -173,8 +183,12 @@ describe('verifySignatureAndLoginHandler', () => {
     const request = { data: { walletAddress: '', signature } }
 
     // Act & Assert
-    await expect(verifySignatureAndLoginHandler(request)).rejects.toThrow(/walletAddress/)
-    await expect(verifySignatureAndLoginHandler(request)).rejects.toHaveProperty('code', 'invalid-argument')
+    await expect(verifySignatureAndLoginHandler(request as unknown as CallableRequest<VerifySignatureAndLoginRequest>)).rejects.toThrow(
+      /walletAddress/
+    )
+    await expect(
+      verifySignatureAndLoginHandler(request as unknown as CallableRequest<VerifySignatureAndLoginRequest>)
+    ).rejects.toHaveProperty('code', 'invalid-argument')
   })
 
   // Test Case: Invalid Argument - Invalid signature format (missing 0x prefix)
@@ -183,8 +197,12 @@ describe('verifySignatureAndLoginHandler', () => {
     const request = { data: { walletAddress, signature: 'invalid-signature' } }
 
     // Act & Assert
-    await expect(verifySignatureAndLoginHandler(request)).rejects.toThrow(/signature: must be a 65-byte hex signature/)
-    await expect(verifySignatureAndLoginHandler(request)).rejects.toHaveProperty('code', 'invalid-argument')
+    await expect(verifySignatureAndLoginHandler(request as unknown as CallableRequest<VerifySignatureAndLoginRequest>)).rejects.toThrow(
+      /signature: must be a 65-byte hex signature/
+    )
+    await expect(
+      verifySignatureAndLoginHandler(request as unknown as CallableRequest<VerifySignatureAndLoginRequest>)
+    ).rejects.toHaveProperty('code', 'invalid-argument')
   })
 
   // Test Case: Invalid Argument - Invalid hex characters in signature
@@ -194,8 +212,12 @@ describe('verifySignatureAndLoginHandler', () => {
     const request = { data: { walletAddress, signature: invalidHexSignature } }
 
     // Act & Assert
-    await expect(verifySignatureAndLoginHandler(request)).rejects.toThrow(/signature: must be a 65-byte hex signature/)
-    await expect(verifySignatureAndLoginHandler(request)).rejects.toHaveProperty('code', 'invalid-argument')
+    await expect(verifySignatureAndLoginHandler(request as unknown as CallableRequest<VerifySignatureAndLoginRequest>)).rejects.toThrow(
+      /signature: must be a 65-byte hex signature/
+    )
+    await expect(
+      verifySignatureAndLoginHandler(request as unknown as CallableRequest<VerifySignatureAndLoginRequest>)
+    ).rejects.toHaveProperty('code', 'invalid-argument')
   })
 
   // Test Case: Invalid Argument - Signature too short (< 132 chars)
@@ -205,8 +227,12 @@ describe('verifySignatureAndLoginHandler', () => {
     const request = { data: { walletAddress, signature: shortSignature } }
 
     // Act & Assert
-    await expect(verifySignatureAndLoginHandler(request)).rejects.toThrow(/signature: must be a 65-byte hex signature/)
-    await expect(verifySignatureAndLoginHandler(request)).rejects.toHaveProperty('code', 'invalid-argument')
+    await expect(verifySignatureAndLoginHandler(request as unknown as CallableRequest<VerifySignatureAndLoginRequest>)).rejects.toThrow(
+      /signature: must be a 65-byte hex signature/
+    )
+    await expect(
+      verifySignatureAndLoginHandler(request as unknown as CallableRequest<VerifySignatureAndLoginRequest>)
+    ).rejects.toHaveProperty('code', 'invalid-argument')
   })
 
   // Test Case: Invalid Argument - Signature too long (> 132 chars)
@@ -216,8 +242,12 @@ describe('verifySignatureAndLoginHandler', () => {
     const request = { data: { walletAddress, signature: longSignature } }
 
     // Act & Assert
-    await expect(verifySignatureAndLoginHandler(request)).rejects.toThrow(/signature: must be a 65-byte hex signature/)
-    await expect(verifySignatureAndLoginHandler(request)).rejects.toHaveProperty('code', 'invalid-argument')
+    await expect(verifySignatureAndLoginHandler(request as unknown as CallableRequest<VerifySignatureAndLoginRequest>)).rejects.toThrow(
+      /signature: must be a 65-byte hex signature/
+    )
+    await expect(
+      verifySignatureAndLoginHandler(request as unknown as CallableRequest<VerifySignatureAndLoginRequest>)
+    ).rejects.toHaveProperty('code', 'invalid-argument')
   })
 
   // Test Case: Not Found - Nonce does not exist
@@ -227,25 +257,29 @@ describe('verifySignatureAndLoginHandler', () => {
     mockClaimAuthNonce.mockResolvedValue(null)
 
     // Act & Assert
-    await expect(verifySignatureAndLoginHandler(request)).rejects.toThrow(
+    await expect(verifySignatureAndLoginHandler(request as unknown as CallableRequest<VerifySignatureAndLoginRequest>)).rejects.toThrow(
       'No authentication message found for this wallet address. Please generate a new message.'
     )
-    await expect(verifySignatureAndLoginHandler(request)).rejects.toHaveProperty('code', 'not-found')
+    await expect(
+      verifySignatureAndLoginHandler(request as unknown as CallableRequest<VerifySignatureAndLoginRequest>)
+    ).rejects.toHaveProperty('code', 'not-found')
   })
 
   // Test Case: Deadline Exceeded - Nonce has expired
   it('should throw a deadline-exceeded error when the challenge has lapsed', async () => {
     // Arrange
     const request = { data: { walletAddress, signature } }
-    const { NonceExpiredError } = jest.requireActual('../../utils/auth')
+    const { NonceExpiredError } = await vi.importActual<typeof import('../../utils/auth')>('../../utils/auth')
     mockClaimAuthNonce.mockRejectedValue(new NonceExpiredError())
 
     // Act & Assert — the claim consumes an expired challenge on its way out,
     // so there is nothing left for a second attempt to find.
-    await expect(verifySignatureAndLoginHandler(request)).rejects.toThrow(
+    await expect(verifySignatureAndLoginHandler(request as unknown as CallableRequest<VerifySignatureAndLoginRequest>)).rejects.toThrow(
       'Authentication message has expired. Please generate a new message.'
     )
-    await expect(verifySignatureAndLoginHandler(request)).rejects.toHaveProperty('code', 'deadline-exceeded')
+    await expect(
+      verifySignatureAndLoginHandler(request as unknown as CallableRequest<VerifySignatureAndLoginRequest>)
+    ).rejects.toHaveProperty('code', 'deadline-exceeded')
   })
 
   // Test Case: Unauthenticated - Signature verification fails
@@ -257,8 +291,12 @@ describe('verifySignatureAndLoginHandler', () => {
     })
 
     // Act & Assert
-    await expect(verifySignatureAndLoginHandler(request)).rejects.toThrow('Invalid signature or expired nonce. Please try again.')
-    await expect(verifySignatureAndLoginHandler(request)).rejects.toHaveProperty('code', 'unauthenticated')
+    await expect(verifySignatureAndLoginHandler(request as unknown as CallableRequest<VerifySignatureAndLoginRequest>)).rejects.toThrow(
+      'Invalid signature or expired nonce. Please try again.'
+    )
+    await expect(
+      verifySignatureAndLoginHandler(request as unknown as CallableRequest<VerifySignatureAndLoginRequest>)
+    ).rejects.toHaveProperty('code', 'unauthenticated')
   })
 
   // Test Case: Unauthenticated - Recovered address does not match
@@ -268,8 +306,12 @@ describe('verifySignatureAndLoginHandler', () => {
     mockedVerifyMessage.mockReturnValue('0xDifferentAddress')
 
     // Act & Assert
-    await expect(verifySignatureAndLoginHandler(request)).rejects.toThrow('The signature does not match the provided wallet address.')
-    await expect(verifySignatureAndLoginHandler(request)).rejects.toHaveProperty('code', 'unauthenticated')
+    await expect(verifySignatureAndLoginHandler(request as unknown as CallableRequest<VerifySignatureAndLoginRequest>)).rejects.toThrow(
+      'The signature does not match the provided wallet address.'
+    )
+    await expect(
+      verifySignatureAndLoginHandler(request as unknown as CallableRequest<VerifySignatureAndLoginRequest>)
+    ).rejects.toHaveProperty('code', 'unauthenticated')
   })
 
   // Test Case: Internal - User profile creation/update fails
@@ -277,21 +319,21 @@ describe('verifySignatureAndLoginHandler', () => {
     // Arrange
     const request = { data: { walletAddress, signature } }
 
-    firestore.collection.mockImplementation((collectionName: string) => {
-      const docMock = jest.fn((_docId: string) => {
+    vi.mocked(firestore.collection).mockImplementation((collectionName: string) => {
+      const docMock = vi.fn((_docId: string) => {
         if (collectionName === AUTH_NONCES_COLLECTION) {
           return {
-            get: jest.fn().mockResolvedValue({
+            get: vi.fn().mockResolvedValue({
               exists: true,
               data: () => ({ nonce, timestamp, expiresAt: mockNow + 10 * 60 * 1000 }),
             }),
-            delete: jest.fn().mockResolvedValue(undefined),
+            delete: vi.fn().mockResolvedValue(undefined),
           }
         } else {
           return {
-            get: jest.fn().mockResolvedValue({ exists: false }),
-            set: jest.fn().mockRejectedValue(new Error('Firestore write error')),
-            update: jest.fn().mockResolvedValue(undefined),
+            get: vi.fn().mockResolvedValue({ exists: false }),
+            set: vi.fn().mockRejectedValue(new Error('Firestore write error')),
+            update: vi.fn().mockResolvedValue(undefined),
           }
         }
       })
@@ -299,8 +341,12 @@ describe('verifySignatureAndLoginHandler', () => {
     })
 
     // Act & Assert
-    await expect(verifySignatureAndLoginHandler(request)).rejects.toThrow('Failed to create or update user profile. Please try again.')
-    await expect(verifySignatureAndLoginHandler(request)).rejects.toHaveProperty('code', 'internal')
+    await expect(verifySignatureAndLoginHandler(request as unknown as CallableRequest<VerifySignatureAndLoginRequest>)).rejects.toThrow(
+      'Failed to create or update user profile. Please try again.'
+    )
+    await expect(
+      verifySignatureAndLoginHandler(request as unknown as CallableRequest<VerifySignatureAndLoginRequest>)
+    ).rejects.toHaveProperty('code', 'internal')
   })
 
   // Test Case: SECURITY - Nonce deletion fails (must fail authentication to prevent replay attacks)
@@ -316,7 +362,9 @@ describe('verifySignatureAndLoginHandler', () => {
     mockClaimAuthNonce.mockRejectedValue(new Error('Firestore transaction error'))
 
     // Act & Assert
-    await expect(verifySignatureAndLoginHandler(request)).rejects.toThrow('Firestore transaction error')
+    await expect(verifySignatureAndLoginHandler(request as unknown as CallableRequest<VerifySignatureAndLoginRequest>)).rejects.toThrow(
+      'Firestore transaction error'
+    )
     expect(mockedVerifyMessage).not.toHaveBeenCalled()
     expect(auth.createCustomToken).not.toHaveBeenCalled()
   })
@@ -329,7 +377,9 @@ describe('verifySignatureAndLoginHandler', () => {
     // recovers a different address and the equality check refuses the login.
     const request = { data: { walletAddress, signature, signatureType: 'typed-data', chainId: 1 } }
 
-    await expect(verifySignatureAndLoginHandler(request)).resolves.toMatchObject({ firebaseToken })
+    await expect(
+      verifySignatureAndLoginHandler(request as unknown as CallableRequest<VerifySignatureAndLoginRequest>)
+    ).resolves.toMatchObject({ firebaseToken })
   })
 
   // Test Case: Unauthenticated - Custom token creation fails
@@ -339,8 +389,12 @@ describe('verifySignatureAndLoginHandler', () => {
     auth.createCustomToken.mockRejectedValue(new Error('Firebase auth error'))
 
     // Act & Assert
-    await expect(verifySignatureAndLoginHandler(request)).rejects.toThrow('Failed to generate a valid session token.')
-    await expect(verifySignatureAndLoginHandler(request)).rejects.toHaveProperty('code', 'unauthenticated')
+    await expect(verifySignatureAndLoginHandler(request as unknown as CallableRequest<VerifySignatureAndLoginRequest>)).rejects.toThrow(
+      'Failed to generate a valid session token.'
+    )
+    await expect(
+      verifySignatureAndLoginHandler(request as unknown as CallableRequest<VerifySignatureAndLoginRequest>)
+    ).rejects.toHaveProperty('code', 'unauthenticated')
   })
 
   // Test Case: Device approval on successful authentication
@@ -352,7 +406,7 @@ describe('verifySignatureAndLoginHandler', () => {
     mockApproveDevice.mockResolvedValue(undefined)
 
     // Act
-    const result = await verifySignatureAndLoginHandler(request)
+    const result = await verifySignatureAndLoginHandler(request as unknown as CallableRequest<VerifySignatureAndLoginRequest>)
 
     // Assert
     expect(mockApproveDevice).toHaveBeenCalledWith(deviceId, walletAddress, platform)
@@ -368,7 +422,7 @@ describe('verifySignatureAndLoginHandler', () => {
     mockApproveDevice.mockRejectedValue(new Error('Device approval failed'))
 
     // Act
-    const result = await verifySignatureAndLoginHandler(request)
+    const result = await verifySignatureAndLoginHandler(request as unknown as CallableRequest<VerifySignatureAndLoginRequest>)
 
     // Assert
     expect(mockApproveDevice).toHaveBeenCalledWith(deviceId, walletAddress, platform)
@@ -390,7 +444,7 @@ describe('verifySignatureAndLoginHandler', () => {
     const request = { data: { walletAddress, signature } }
 
     // Act
-    await verifySignatureAndLoginHandler(request)
+    await verifySignatureAndLoginHandler(request as unknown as CallableRequest<VerifySignatureAndLoginRequest>)
 
     // Assert
     expect(mockApproveDevice).not.toHaveBeenCalled()
@@ -402,7 +456,7 @@ describe('verifySignatureAndLoginHandler', () => {
     const request = { data: { walletAddress, signature, deviceId: 'test-device-789' } }
 
     // Act
-    await verifySignatureAndLoginHandler(request)
+    await verifySignatureAndLoginHandler(request as unknown as CallableRequest<VerifySignatureAndLoginRequest>)
 
     // Assert
     expect(mockApproveDevice).not.toHaveBeenCalled()
@@ -418,7 +472,7 @@ describe('verifySignatureAndLoginHandler', () => {
     mockedVerifyTypedData.mockReturnValue(walletAddress)
 
     // Act
-    const result = await verifySignatureAndLoginHandler(request)
+    const result = await verifySignatureAndLoginHandler(request as unknown as CallableRequest<VerifySignatureAndLoginRequest>)
 
     // Assert
     expect(mockedVerifyTypedData).toHaveBeenCalledWith(
@@ -456,8 +510,12 @@ describe('verifySignatureAndLoginHandler', () => {
     })
 
     // Act & Assert
-    await expect(verifySignatureAndLoginHandler(request)).rejects.toThrow('Invalid signature or expired nonce. Please try again.')
-    await expect(verifySignatureAndLoginHandler(request)).rejects.toHaveProperty('code', 'unauthenticated')
+    await expect(verifySignatureAndLoginHandler(request as unknown as CallableRequest<VerifySignatureAndLoginRequest>)).rejects.toThrow(
+      'Invalid signature or expired nonce. Please try again.'
+    )
+    await expect(
+      verifySignatureAndLoginHandler(request as unknown as CallableRequest<VerifySignatureAndLoginRequest>)
+    ).rejects.toHaveProperty('code', 'unauthenticated')
   })
 
   // Test Case: EIP-712 with default chainId when not provided
@@ -469,7 +527,7 @@ describe('verifySignatureAndLoginHandler', () => {
     mockedVerifyTypedData.mockReturnValue(walletAddress)
 
     // Act
-    const result = await verifySignatureAndLoginHandler(request)
+    const result = await verifySignatureAndLoginHandler(request as unknown as CallableRequest<VerifySignatureAndLoginRequest>)
 
     // Assert
     expect(mockedVerifyTypedData).toHaveBeenCalledWith(
@@ -496,8 +554,12 @@ describe('verifySignatureAndLoginHandler', () => {
     })
 
     // Act & Assert
-    await expect(verifySignatureAndLoginHandler(request)).rejects.toThrow('Invalid signature or expired nonce. Please try again.')
-    await expect(verifySignatureAndLoginHandler(request)).rejects.toHaveProperty('code', 'unauthenticated')
+    await expect(verifySignatureAndLoginHandler(request as unknown as CallableRequest<VerifySignatureAndLoginRequest>)).rejects.toThrow(
+      'Invalid signature or expired nonce. Please try again.'
+    )
+    await expect(
+      verifySignatureAndLoginHandler(request as unknown as CallableRequest<VerifySignatureAndLoginRequest>)
+    ).rejects.toHaveProperty('code', 'unauthenticated')
   })
 
   // Test Case: String thrown during signature verification
@@ -511,8 +573,12 @@ describe('verifySignatureAndLoginHandler', () => {
     })
 
     // Act & Assert
-    await expect(verifySignatureAndLoginHandler(request)).rejects.toThrow('Invalid signature or expired nonce. Please try again.')
-    await expect(verifySignatureAndLoginHandler(request)).rejects.toHaveProperty('code', 'unauthenticated')
+    await expect(verifySignatureAndLoginHandler(request as unknown as CallableRequest<VerifySignatureAndLoginRequest>)).rejects.toThrow(
+      'Invalid signature or expired nonce. Please try again.'
+    )
+    await expect(
+      verifySignatureAndLoginHandler(request as unknown as CallableRequest<VerifySignatureAndLoginRequest>)
+    ).rejects.toHaveProperty('code', 'unauthenticated')
   })
 
   // Test Case: Null thrown during signature verification
@@ -525,7 +591,11 @@ describe('verifySignatureAndLoginHandler', () => {
     })
 
     // Act & Assert
-    await expect(verifySignatureAndLoginHandler(request)).rejects.toThrow('Invalid signature or expired nonce. Please try again.')
-    await expect(verifySignatureAndLoginHandler(request)).rejects.toHaveProperty('code', 'unauthenticated')
+    await expect(verifySignatureAndLoginHandler(request as unknown as CallableRequest<VerifySignatureAndLoginRequest>)).rejects.toThrow(
+      'Invalid signature or expired nonce. Please try again.'
+    )
+    await expect(
+      verifySignatureAndLoginHandler(request as unknown as CallableRequest<VerifySignatureAndLoginRequest>)
+    ).rejects.toHaveProperty('code', 'unauthenticated')
   })
 })

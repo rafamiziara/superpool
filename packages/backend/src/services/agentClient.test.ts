@@ -1,9 +1,13 @@
-const mockStartAsync = jest.fn()
-const mockCreateRun = jest.fn()
-const mockGetWorkflow = jest.fn()
-const mockMastraClient = jest.fn()
+const mockStartAsync = vi.fn()
+const mockCreateRun = vi.fn()
+// Hoisted so the vi.mock factories below can close over them: vi.mock runs before
+// any module-level const is initialised.
+const { mockGetWorkflow, mockMastraClient } = vi.hoisted(() => ({
+  mockGetWorkflow: vi.fn(),
+  mockMastraClient: vi.fn(),
+}))
 
-jest.mock('@mastra/client-js', () => ({
+vi.mock('@mastra/client-js', () => ({
   MastraClient: function (...args: unknown[]) {
     mockMastraClient(...args)
 
@@ -27,7 +31,7 @@ const FACTS = {
 }
 
 beforeEach(() => {
-  jest.clearAllMocks()
+  vi.clearAllMocks()
   process.env.AGENT_SERVICE_URL = URL
   process.env.MASTRA_JWT_SECRET = SECRET
   mockGetWorkflow.mockReturnValue({ createRun: mockCreateRun })

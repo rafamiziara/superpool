@@ -1,24 +1,37 @@
-import { isAddress } from 'ethers'
+import type { AuthMessageRequest } from '@superpool/types'
+import * as ethersMock from 'ethers'
+import type { CollectionReference, DocumentData } from 'firebase-admin/firestore'
+import type { CallableRequest } from 'firebase-functions/v2/https'
+import type { MockedFunction } from 'vitest'
 import { createMockCollection } from '../../__tests__/mocks'
 import { AUTH_NONCES_COLLECTION } from '../../constants'
 
+// Hoisted so the vi.mock factories below can close over them: vi.mock runs before
+// any module-level const is initialised.
+const { mockCreateAuthMessage } = vi.hoisted(() => ({
+  mockCreateAuthMessage: vi.fn(),
+}))
+
 // Mock ethers module
-jest.mock('ethers', () => ({
-  isAddress: jest.fn(),
+vi.mock('ethers', () => ({
+  isAddress: vi.fn(),
 }))
 
 // Mock the createAuthMessage utility function
-const mockCreateAuthMessage = jest.fn()
-jest.mock('../../utils', () => ({
+vi.mock('../../utils', () => ({
   createAuthMessage: mockCreateAuthMessage,
 }))
 
 // Import mocked services (already mocked in setup.ts)
-const { firestore } = require('../../services')
+import { firestore as realFirestore } from '../../services'
 
 // Get the actual function handler to test
-const { generateAuthMessageHandler } = require('./generateAuthMessage')
+import { generateAuthMessageHandler } from './generateAuthMessage'
 
+const firestore = vi.mocked(realFirestore, true)
+// These modules are mocked above; vi.mocked restores the mock types that the
+// real signatures would otherwise hide.
+const { isAddress } = vi.mocked(ethersMock)
 describe('generateAuthMessage', () => {
   const walletAddress = '0x1234567890123456789012345678901234567890'
   const mockMessage = 'mock-message-to-sign'
@@ -29,14 +42,14 @@ describe('generateAuthMessage', () => {
   Date.prototype.getTime = () => mockTimestamp
 
   beforeEach(() => {
-    jest.clearAllMocks()
+    vi.clearAllMocks()
 
     // Setup ethers mocks
-    ;(isAddress as jest.MockedFunction<typeof isAddress>).mockReturnValue(true)
+    ;(isAddress as unknown as MockedFunction<typeof isAddress>).mockReturnValue(true)
     mockCreateAuthMessage.mockReturnValue(mockMessage)
 
     // Setup firestore mock
-    firestore.collection.mockReturnValue(createMockCollection())
+    vi.mocked(firestore.collection).mockReturnValue(createMockCollection() as unknown as CollectionReference<DocumentData, DocumentData>)
   })
 
   afterAll(() => {
@@ -49,13 +62,13 @@ describe('generateAuthMessage', () => {
     const request = { data: { walletAddress } }
 
     // Act
-    const result = await generateAuthMessageHandler(request)
+    const result = await generateAuthMessageHandler(request as unknown as CallableRequest<AuthMessageRequest>)
 
     // Assert
     expect(isAddress).toHaveBeenCalledWith(walletAddress)
     expect(firestore.collection).toHaveBeenCalledWith(AUTH_NONCES_COLLECTION)
-    expect(firestore.collection().doc).toHaveBeenCalledWith(walletAddress)
-    expect(firestore.collection().doc().set).toHaveBeenCalledWith({
+    expect(firestore.collection(AUTH_NONCES_COLLECTION).doc).toHaveBeenCalledWith(walletAddress)
+    expect(firestore.collection(AUTH_NONCES_COLLECTION).doc(walletAddress).set).toHaveBeenCalledWith({
       nonce: 'test-nonce-uuid',
       timestamp: mockTimestamp,
       expiresAt: mockTimestamp + 10 * 60 * 1000,
@@ -70,8 +83,11 @@ describe('generateAuthMessage', () => {
     const request = { data: {} }
 
     // Act & Assert
-    await expect(generateAuthMessageHandler(request)).rejects.toThrow(/walletAddress/)
-    await expect(generateAuthMessageHandler(request)).rejects.toHaveProperty('code', 'invalid-argument')
+    await expect(generateAuthMessageHandler(request as unknown as CallableRequest<AuthMessageRequest>)).rejects.toThrow(/walletAddress/)
+    await expect(generateAuthMessageHandler(request as unknown as CallableRequest<AuthMessageRequest>)).rejects.toHaveProperty(
+      'code',
+      'invalid-argument'
+    )
     expect(isAddress).not.toHaveBeenCalled()
   })
 
@@ -80,11 +96,16 @@ describe('generateAuthMessage', () => {
     // Arrange
     const invalidAddress = 'invalid-eth-address'
     const request = { data: { walletAddress: invalidAddress } }
-    ;(isAddress as jest.MockedFunction<typeof isAddress>).mockReturnValue(false)
+    ;(isAddress as unknown as MockedFunction<typeof isAddress>).mockReturnValue(false)
 
     // Act & Assert
-    await expect(generateAuthMessageHandler(request)).rejects.toThrow(/walletAddress: must be an Ethereum address/)
-    await expect(generateAuthMessageHandler(request)).rejects.toHaveProperty('code', 'invalid-argument')
+    await expect(generateAuthMessageHandler(request as unknown as CallableRequest<AuthMessageRequest>)).rejects.toThrow(
+      /walletAddress: must be an Ethereum address/
+    )
+    await expect(generateAuthMessageHandler(request as unknown as CallableRequest<AuthMessageRequest>)).rejects.toHaveProperty(
+      'code',
+      'invalid-argument'
+    )
     expect(isAddress).toHaveBeenCalledWith(invalidAddress)
   })
 
@@ -97,10 +118,15 @@ describe('generateAuthMessage', () => {
     // Make the `set` method throw an error to simulate a failure
     const mockCollection = createMockCollection()
     mockCollection.doc().set.mockRejectedValue(firestoreError)
-    firestore.collection.mockReturnValue(mockCollection)
+    vi.mocked(firestore.collection).mockReturnValue(mockCollection as unknown as CollectionReference<DocumentData, DocumentData>)
 
     // Act & Assert
-    await expect(generateAuthMessageHandler(request)).rejects.toThrow('Failed to save authentication nonce.')
-    await expect(generateAuthMessageHandler(request)).rejects.toHaveProperty('code', 'internal')
+    await expect(generateAuthMessageHandler(request as unknown as CallableRequest<AuthMessageRequest>)).rejects.toThrow(
+      'Failed to save authentication nonce.'
+    )
+    await expect(generateAuthMessageHandler(request as unknown as CallableRequest<AuthMessageRequest>)).rejects.toHaveProperty(
+      'code',
+      'internal'
+    )
   })
 })

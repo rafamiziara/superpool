@@ -142,7 +142,7 @@ function buildFirestore(docs: Docs) {
   let next = 0
 
   return {
-    firestore: { collection: () => query(`q${next++}`) } as unknown as Firestore,
+    firestore: { collection: () => query(`q${next++}`) },
     selected,
   }
 }
@@ -165,7 +165,7 @@ describe('borrowerHistoriesFor', () => {
   it('summarises one wallet from its own loans', async () => {
     const { firestore } = buildFirestore({ a: stored(), b: stored({ isRepaid: true, repaidAt: stamp(DUE - 1) }) })
 
-    const histories = await borrowerHistoriesFor([BORROWER], 31337, DUE, firestore)
+    const histories = await borrowerHistoriesFor([BORROWER], 31337, DUE, firestore as unknown as Firestore)
 
     expect(histories[BORROWER.toLowerCase()]).toMatchObject({ total: 2, outstanding: 1, repaid: 1, onTime: 1 })
   })
@@ -175,7 +175,7 @@ describe('borrowerHistoriesFor', () => {
   it('answers for a wallet that has never borrowed', async () => {
     const { firestore } = buildFirestore({})
 
-    const histories = await borrowerHistoriesFor([OTHER], 31337, DUE, firestore)
+    const histories = await borrowerHistoriesFor([OTHER], 31337, DUE, firestore as unknown as Firestore)
 
     expect(histories[OTHER.toLowerCase()]).toEqual(emptyHistory())
   })
@@ -183,7 +183,12 @@ describe('borrowerHistoriesFor', () => {
   it('lowercases the key, since callers report addresses checksummed', async () => {
     const { firestore } = buildFirestore({})
 
-    const histories = await borrowerHistoriesFor(['0xAbCdAbCdAbCdAbCdAbCdAbCdAbCdAbCdAbCdAbCd'], 31337, DUE, firestore)
+    const histories = await borrowerHistoriesFor(
+      ['0xAbCdAbCdAbCdAbCdAbCdAbCdAbCdAbCdAbCdAbCd'],
+      31337,
+      DUE,
+      firestore as unknown as Firestore
+    )
 
     expect(Object.keys(histories)).toEqual(['0xabcdabcdabcdabcdabcdabcdabcdabcdabcdabcd'])
   })
@@ -191,7 +196,7 @@ describe('borrowerHistoriesFor', () => {
   it('asks the same wallet about only once', async () => {
     const { firestore } = buildFirestore({})
 
-    const histories = await borrowerHistoriesFor([BORROWER, BORROWER.toUpperCase()], 31337, DUE, firestore)
+    const histories = await borrowerHistoriesFor([BORROWER, BORROWER.toUpperCase()], 31337, DUE, firestore as unknown as Firestore)
 
     expect(Object.keys(histories)).toHaveLength(1)
   })
@@ -200,7 +205,7 @@ describe('borrowerHistoriesFor', () => {
     const { firestore } = buildFirestore({})
     const many = Array.from({ length: MAX_BORROWERS_PER_CALL + 5 }, (_, index) => `0x${String(index).padStart(40, '0')}`)
 
-    const histories = await borrowerHistoriesFor(many, 31337, DUE, firestore)
+    const histories = await borrowerHistoriesFor(many, 31337, DUE, firestore as unknown as Firestore)
 
     expect(Object.keys(histories)).toHaveLength(MAX_BORROWERS_PER_CALL)
   })
@@ -210,7 +215,7 @@ describe('borrowerHistoriesFor', () => {
   it('reads only the fields a history is made of', async () => {
     const { firestore, selected } = buildFirestore({})
 
-    await borrowerHistoriesFor([BORROWER], 31337, DUE, firestore)
+    await borrowerHistoriesFor([BORROWER], 31337, DUE, firestore as unknown as Firestore)
 
     expect(selected[0]).toEqual(['borrower', 'status', 'isRepaid', 'startedAt', 'duration', 'repaidAt', 'defaultedAt'])
   })
@@ -220,7 +225,7 @@ describe('borrowerHistoriesFor', () => {
   it('leaves out a loan it cannot date, and says so', async () => {
     const { firestore } = buildFirestore({ a: stored({ startedAt: undefined }), b: stored({ duration: undefined }) })
 
-    const histories = await borrowerHistoriesFor([BORROWER], 31337, DUE, firestore)
+    const histories = await borrowerHistoriesFor([BORROWER], 31337, DUE, firestore as unknown as Firestore)
 
     expect(histories[BORROWER.toLowerCase()]).toEqual(emptyHistory())
     expect(mockLogger.warn).toHaveBeenCalledTimes(2)

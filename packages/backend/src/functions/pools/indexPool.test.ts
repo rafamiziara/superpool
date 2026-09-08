@@ -1,23 +1,37 @@
+import type { IndexPoolRequest } from '@superpool/types'
+import type { JsonRpcProvider } from 'ethers'
+import type { CallableRequest } from 'firebase-functions/v2/https'
 import { mockLogger } from '../../__tests__/setup'
 
-jest.mock('../../utils/blockchain')
-jest.mock('../../services')
-jest.mock('../../services/eventIndexer')
-jest.mock('../../services/membershipIndexer')
+vi.mock('../../utils/blockchain')
+vi.mock('../../services')
+vi.mock('../../services/eventIndexer')
+vi.mock('../../services/membershipIndexer')
 
 // The chain config reads the environment once, at module load, and the factory
 // address is what proves an event came from a pool of ours — without this the
 // creator's membership is skipped rather than indexed. Set before the requires.
-const FACTORY_ADDRESS = '0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512'
-process.env.POOL_FACTORY_ADDRESS = FACTORY_ADDRESS
+// The chain registry reads process.env once, at module load. ESM hoists every import
+// above ordinary statements, so this must run inside vi.hoisted to land first.
+const { FACTORY_ADDRESS } = vi.hoisted(() => {
+  const FACTORY_ADDRESS = '0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512'
+  process.env.POOL_FACTORY_ADDRESS = FACTORY_ADDRESS
+  return { FACTORY_ADDRESS }
+})
 
-const { indexPoolHandler } = require('./indexPool')
-const { getProvider } = require('../../utils/blockchain')
-const { indexPoolByTxHash } = require('../../services/eventIndexer')
-const { indexMembershipsByTxHash } = require('../../services/membershipIndexer')
-const { firestore } = require('../../services')
-const { HttpsError } = require('firebase-functions/v2/https')
+import { HttpsError } from 'firebase-functions/v2/https'
+import * as servicesMock from '../../services'
+import * as eventIndexerMock from '../../services/eventIndexer'
+import * as membershipIndexerMock from '../../services/membershipIndexer'
+import * as blockchainMock from '../../utils/blockchain'
+import { indexPoolHandler } from './indexPool'
 
+// These modules are mocked above; vi.mocked restores the mock types that the
+// real signatures would otherwise hide.
+const { firestore } = vi.mocked(servicesMock)
+const { indexPoolByTxHash } = vi.mocked(eventIndexerMock)
+const { indexMembershipsByTxHash } = vi.mocked(membershipIndexerMock)
+const { getProvider } = vi.mocked(blockchainMock)
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
@@ -25,16 +39,16 @@ const { HttpsError } = require('firebase-functions/v2/https')
 const VALID_TX_HASH = `0x${'a'.repeat(64)}`
 const SUPPORTED_CHAIN_ID = 31337 // matches ACTIVE_CHAIN_CONFIG default
 
-function buildRequest(
+function buildRequest<T>(
   overrides: Partial<{
     auth: object | null
     data: Record<string, unknown>
   }> = {}
-) {
+): CallableRequest<T> {
   return {
     auth: overrides.auth !== undefined ? overrides.auth : { uid: 'user-123', token: {} },
     data: overrides.data !== undefined ? overrides.data : { txHash: VALID_TX_HASH },
-  }
+  } as unknown as CallableRequest<T>
 }
 
 // ---------------------------------------------------------------------------
@@ -43,13 +57,13 @@ function buildRequest(
 
 describe('indexPoolHandler', () => {
   beforeEach(() => {
-    jest.clearAllMocks()
+    vi.clearAllMocks()
 
     // Default: getProvider returns a mock provider object
     getProvider.mockReturnValue({
-      getTransactionReceipt: jest.fn(),
-      getBlock: jest.fn(),
-    })
+      getTransactionReceipt: vi.fn(),
+      getBlock: vi.fn(),
+    } as unknown as JsonRpcProvider)
 
     // Default: indexPoolByTxHash resolves with a new pool result
     indexPoolByTxHash.mockResolvedValue({ poolId: 1, alreadyIndexed: false, stored: true })
@@ -68,7 +82,10 @@ describe('indexPoolHandler', () => {
     const request = buildRequest({ auth: null })
 
     // Act & Assert
-    await expect(indexPoolHandler(request)).rejects.toHaveProperty('code', 'unauthenticated')
+    await expect(indexPoolHandler(request as unknown as CallableRequest<IndexPoolRequest>)).rejects.toHaveProperty(
+      'code',
+      'unauthenticated'
+    )
   })
 
   it('should throw unauthenticated when request auth is undefined', async () => {
@@ -76,7 +93,10 @@ describe('indexPoolHandler', () => {
     const request = { data: { txHash: VALID_TX_HASH } } // auth property absent
 
     // Act & Assert
-    await expect(indexPoolHandler(request)).rejects.toHaveProperty('code', 'unauthenticated')
+    await expect(indexPoolHandler(request as unknown as CallableRequest<IndexPoolRequest>)).rejects.toHaveProperty(
+      'code',
+      'unauthenticated'
+    )
   })
 
   // -------------------------------------------------------------------------
@@ -88,7 +108,10 @@ describe('indexPoolHandler', () => {
     const request = buildRequest({ data: {} })
 
     // Act & Assert
-    await expect(indexPoolHandler(request)).rejects.toHaveProperty('code', 'invalid-argument')
+    await expect(indexPoolHandler(request as unknown as CallableRequest<IndexPoolRequest>)).rejects.toHaveProperty(
+      'code',
+      'invalid-argument'
+    )
   })
 
   it('should throw invalid-argument when txHash is missing the 0x prefix', async () => {
@@ -96,7 +119,10 @@ describe('indexPoolHandler', () => {
     const request = buildRequest({ data: { txHash: 'a'.repeat(64) } })
 
     // Act & Assert
-    await expect(indexPoolHandler(request)).rejects.toHaveProperty('code', 'invalid-argument')
+    await expect(indexPoolHandler(request as unknown as CallableRequest<IndexPoolRequest>)).rejects.toHaveProperty(
+      'code',
+      'invalid-argument'
+    )
   })
 
   it('should throw invalid-argument when txHash is too short', async () => {
@@ -104,7 +130,10 @@ describe('indexPoolHandler', () => {
     const request = buildRequest({ data: { txHash: `0x${'a'.repeat(60)}` } })
 
     // Act & Assert
-    await expect(indexPoolHandler(request)).rejects.toHaveProperty('code', 'invalid-argument')
+    await expect(indexPoolHandler(request as unknown as CallableRequest<IndexPoolRequest>)).rejects.toHaveProperty(
+      'code',
+      'invalid-argument'
+    )
   })
 
   it('should throw invalid-argument when txHash is too long', async () => {
@@ -112,7 +141,10 @@ describe('indexPoolHandler', () => {
     const request = buildRequest({ data: { txHash: `0x${'a'.repeat(66)}` } })
 
     // Act & Assert
-    await expect(indexPoolHandler(request)).rejects.toHaveProperty('code', 'invalid-argument')
+    await expect(indexPoolHandler(request as unknown as CallableRequest<IndexPoolRequest>)).rejects.toHaveProperty(
+      'code',
+      'invalid-argument'
+    )
   })
 
   it('should throw invalid-argument when txHash contains non-hex characters', async () => {
@@ -120,7 +152,10 @@ describe('indexPoolHandler', () => {
     const request = buildRequest({ data: { txHash: `0x${'g'.repeat(64)}` } })
 
     // Act & Assert
-    await expect(indexPoolHandler(request)).rejects.toHaveProperty('code', 'invalid-argument')
+    await expect(indexPoolHandler(request as unknown as CallableRequest<IndexPoolRequest>)).rejects.toHaveProperty(
+      'code',
+      'invalid-argument'
+    )
   })
 
   // -------------------------------------------------------------------------
@@ -132,7 +167,10 @@ describe('indexPoolHandler', () => {
     const request = buildRequest({ data: { txHash: VALID_TX_HASH, chainId: 999999 } })
 
     // Act & Assert
-    await expect(indexPoolHandler(request)).rejects.toHaveProperty('code', 'invalid-argument')
+    await expect(indexPoolHandler(request as unknown as CallableRequest<IndexPoolRequest>)).rejects.toHaveProperty(
+      'code',
+      'invalid-argument'
+    )
   })
 
   it('should use the default chainId (31337) when none is provided', async () => {
@@ -141,7 +179,7 @@ describe('indexPoolHandler', () => {
     indexPoolByTxHash.mockResolvedValue({ poolId: 2, alreadyIndexed: false, stored: true })
 
     // Act
-    await indexPoolHandler(request)
+    await indexPoolHandler(request as unknown as CallableRequest<IndexPoolRequest>)
 
     // Assert
     expect(indexPoolByTxHash).toHaveBeenCalledWith(VALID_TX_HASH, SUPPORTED_CHAIN_ID, expect.anything(), firestore)
@@ -157,7 +195,7 @@ describe('indexPoolHandler', () => {
     indexPoolByTxHash.mockRejectedValue(new HttpsError('not-found', 'Receipt not found'))
 
     // Act & Assert
-    await expect(indexPoolHandler(request)).rejects.toHaveProperty('code', 'not-found')
+    await expect(indexPoolHandler(request as unknown as CallableRequest<IndexPoolRequest>)).rejects.toHaveProperty('code', 'not-found')
   })
 
   it('should re-throw HttpsError failed-precondition from indexPoolByTxHash', async () => {
@@ -166,7 +204,10 @@ describe('indexPoolHandler', () => {
     indexPoolByTxHash.mockRejectedValue(new HttpsError('failed-precondition', 'Tx reverted'))
 
     // Act & Assert
-    await expect(indexPoolHandler(request)).rejects.toHaveProperty('code', 'failed-precondition')
+    await expect(indexPoolHandler(request as unknown as CallableRequest<IndexPoolRequest>)).rejects.toHaveProperty(
+      'code',
+      'failed-precondition'
+    )
   })
 
   it('should throw HttpsError internal for generic non-HttpsErrors', async () => {
@@ -175,7 +216,7 @@ describe('indexPoolHandler', () => {
     indexPoolByTxHash.mockRejectedValue(new Error('unexpected network error'))
 
     // Act & Assert
-    await expect(indexPoolHandler(request)).rejects.toHaveProperty('code', 'internal')
+    await expect(indexPoolHandler(request as unknown as CallableRequest<IndexPoolRequest>)).rejects.toHaveProperty('code', 'internal')
   })
 
   it('should log error details when a generic error is thrown', async () => {
@@ -184,7 +225,7 @@ describe('indexPoolHandler', () => {
     indexPoolByTxHash.mockRejectedValue(new Error('rpc timeout'))
 
     // Act
-    await expect(indexPoolHandler(request)).rejects.toHaveProperty('code', 'internal')
+    await expect(indexPoolHandler(request as unknown as CallableRequest<IndexPoolRequest>)).rejects.toHaveProperty('code', 'internal')
 
     // Assert
     expect(mockLogger.error).toHaveBeenCalledWith(
@@ -207,7 +248,7 @@ describe('indexPoolHandler', () => {
     indexPoolByTxHash.mockResolvedValue({ poolId: 42, alreadyIndexed: false, stored: true })
 
     // Act
-    const result = await indexPoolHandler(request)
+    const result = await indexPoolHandler(request as unknown as CallableRequest<IndexPoolRequest>)
 
     // Assert
     expect(result).toEqual({ poolId: 42, alreadyIndexed: false, stored: true })
@@ -219,7 +260,7 @@ describe('indexPoolHandler', () => {
     indexPoolByTxHash.mockResolvedValue({ poolId: 7, alreadyIndexed: true, stored: false })
 
     // Act
-    const result = await indexPoolHandler(request)
+    const result = await indexPoolHandler(request as unknown as CallableRequest<IndexPoolRequest>)
 
     // Assert
     expect(result).toEqual({ poolId: 7, alreadyIndexed: true, stored: false })
@@ -231,7 +272,7 @@ describe('indexPoolHandler', () => {
     indexPoolByTxHash.mockResolvedValue({ poolId: 3, alreadyIndexed: false, stored: true })
 
     // Act
-    await indexPoolHandler(request)
+    await indexPoolHandler(request as unknown as CallableRequest<IndexPoolRequest>)
 
     // Assert
     expect(mockLogger.info).toHaveBeenCalledWith(
@@ -246,7 +287,7 @@ describe('indexPoolHandler', () => {
     indexPoolByTxHash.mockResolvedValue({ poolId: 1, alreadyIndexed: false, stored: true })
 
     // Act
-    await indexPoolHandler(request)
+    await indexPoolHandler(request as unknown as CallableRequest<IndexPoolRequest>)
 
     // Assert
     expect(indexPoolByTxHash).toHaveBeenCalledWith(expect.anything(), expect.anything(), expect.anything(), firestore)
@@ -258,7 +299,7 @@ describe('indexPoolHandler', () => {
     indexPoolByTxHash.mockResolvedValue({ poolId: 1, alreadyIndexed: false, stored: true })
 
     // Act
-    await indexPoolHandler(request)
+    await indexPoolHandler(request as unknown as CallableRequest<IndexPoolRequest>)
 
     // Assert
     expect(indexPoolByTxHash).toHaveBeenCalledWith(VALID_TX_HASH, SUPPORTED_CHAIN_ID, expect.anything(), firestore)
@@ -277,7 +318,7 @@ describe('indexPoolHandler', () => {
     const request = buildRequest({ data: { txHash: VALID_TX_HASH, chainId: SUPPORTED_CHAIN_ID } })
 
     // Act
-    await indexPoolHandler(request)
+    await indexPoolHandler(request as unknown as CallableRequest<IndexPoolRequest>)
 
     // Assert
     expect(indexMembershipsByTxHash).toHaveBeenCalledWith(VALID_TX_HASH, SUPPORTED_CHAIN_ID, FACTORY_ADDRESS, expect.anything(), firestore)
@@ -288,7 +329,7 @@ describe('indexPoolHandler', () => {
     const request = buildRequest({ data: { txHash: VALID_TX_HASH } })
 
     // Act
-    await indexPoolHandler(request)
+    await indexPoolHandler(request as unknown as CallableRequest<IndexPoolRequest>)
 
     // Assert
     expect(indexPoolByTxHash.mock.invocationCallOrder[0]).toBeLessThan(indexMembershipsByTxHash.mock.invocationCallOrder[0])
@@ -303,7 +344,7 @@ describe('indexPoolHandler', () => {
     indexMembershipsByTxHash.mockRejectedValue(new HttpsError('not-found', 'No membership event found'))
 
     // Act
-    const result = await indexPoolHandler(request)
+    const result = await indexPoolHandler(request as unknown as CallableRequest<IndexPoolRequest>)
 
     // Assert
     expect(result).toEqual({ poolId: 1, alreadyIndexed: false, stored: true })

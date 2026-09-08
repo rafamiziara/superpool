@@ -1,4 +1,5 @@
 import type { LoanInfo } from '@superpool/types'
+import type { Mock } from 'vitest'
 import { mockLogger } from '../../__tests__/setup'
 
 /**
@@ -8,8 +9,8 @@ import { mockLogger } from '../../__tests__/setup'
  */
 type StoredLoan = Omit<LoanInfo, 'startedAt' | 'repaidAt' | 'id'> & { id: string; startedAt: Date; repaidAt?: Date }
 
-const { firestore } = require('../../services')
-const { listLoansHandler } = require('./listLoans')
+import { firestore } from '../../services'
+import { listLoansHandler } from './listLoans'
 
 const CHAIN_ID = 31337 // matches ACTIVE_CHAIN_CONFIG default
 const BORROWER = '0x9965507d1a55bcc2695c58ba16fb37d819b0a4dc'
@@ -68,12 +69,12 @@ describe('listLoansHandler', () => {
     }))
 
     return {
-      where: jest.fn().mockReturnThis(),
-      orderBy: jest.fn().mockReturnThis(),
-      limit: jest.fn().mockReturnThis(),
-      get: jest.fn().mockResolvedValue({ docs: mockDocs }),
-      count: jest.fn().mockReturnValue({
-        get: jest.fn().mockResolvedValue({ data: () => ({ count: totalCount }) }),
+      where: vi.fn().mockReturnThis(),
+      orderBy: vi.fn().mockReturnThis(),
+      limit: vi.fn().mockReturnThis(),
+      get: vi.fn().mockResolvedValue({ docs: mockDocs }),
+      count: vi.fn().mockReturnValue({
+        get: vi.fn().mockResolvedValue({ data: () => ({ count: totalCount }) }),
       }),
     }
   }
@@ -88,9 +89,9 @@ describe('listLoansHandler', () => {
   let mockQuery: ReturnType<typeof createMockQuery>
 
   beforeEach(() => {
-    jest.clearAllMocks()
+    vi.clearAllMocks()
     mockQuery = createMockQuery(mockLoans, mockLoans.length)
-    ;(firestore.collection as jest.Mock).mockReturnValue(mockQuery)
+    ;(firestore.collection as Mock).mockReturnValue(mockQuery)
   })
 
   it('should reject an unauthenticated caller', async () => {

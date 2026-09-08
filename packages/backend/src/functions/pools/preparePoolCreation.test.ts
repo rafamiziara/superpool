@@ -1,18 +1,26 @@
+import type { PreparePoolCreationRequest } from '@superpool/types'
+import type { CollectionReference, DocumentData } from 'firebase-admin/firestore'
+import type { CallableRequest } from 'firebase-functions/v2/https'
 import { mockLogger } from '../../__tests__/setup'
 
-jest.mock('../../utils')
-jest.mock('../../services')
+vi.mock('../../utils')
+vi.mock('../../services')
 // Mocked by its own path, not through the barrel: the handler imports it that
 // way so the budget and the lock are things it can actually rely on. See
 // CLAUDE.md, "Import from `utils/validation`, never from `../../utils`".
-jest.mock('../../services/walletBudget')
+vi.mock('../../services/walletBudget')
 
-const { preparePoolCreationHandler } = require('./preparePoolCreation')
-const { isWalletWhitelisted, isWhitelistModeEnabled, whitelistWallet } = require('../../utils')
-const { firestore } = require('../../services')
-const { claimWhitelisting, releaseWhitelisting, withWalletLock, WalletBusyError } = require('../../services/walletBudget')
-const { DEFAULT_CHAIN_ID, WHITELISTING_LOGS_COLLECTION } = require('../../constants')
+import { DEFAULT_CHAIN_ID, WHITELISTING_LOGS_COLLECTION } from '../../constants'
+import * as servicesMock from '../../services'
+import * as walletBudgetMock from '../../services/walletBudget'
+import * as utilsMock from '../../utils'
+import { preparePoolCreationHandler } from './preparePoolCreation'
 
+// These modules are mocked above; vi.mocked restores the mock types that the
+// real signatures would otherwise hide.
+const { firestore } = vi.mocked(servicesMock)
+const { claimWhitelisting, releaseWhitelisting, WalletBusyError, withWalletLock } = vi.mocked(walletBudgetMock)
+const { isWalletWhitelisted, isWhitelistModeEnabled, whitelistWallet } = vi.mocked(utilsMock)
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
@@ -21,22 +29,22 @@ const { DEFAULT_CHAIN_ID, WHITELISTING_LOGS_COLLECTION } = require('../../consta
 const WALLET = '0x7C3ed3a184BAAb1DaF35f5387bA23736C7CD18a6'
 const TX_HASH = `0x${'b'.repeat(64)}`
 
-function buildRequest(
+function buildRequest<T>(
   overrides: Partial<{
     auth: object | null
     data: Record<string, unknown>
   }> = {}
-) {
+): CallableRequest<T> {
   return {
     auth: overrides.auth !== undefined ? overrides.auth : { uid: WALLET, token: {} },
     data: overrides.data !== undefined ? overrides.data : {},
-  }
+  } as unknown as CallableRequest<T>
 }
 
 /** Captures the audit-log document written to the whitelisting collection. */
 function mockAuditLog() {
-  const add = jest.fn().mockResolvedValue({ id: 'log-1' })
-  firestore.collection.mockReturnValue({ add })
+  const add = vi.fn().mockResolvedValue({ id: 'log-1' })
+  vi.mocked(firestore.collection).mockReturnValue({ add } as unknown as CollectionReference<DocumentData, DocumentData>)
   return add
 }
 
@@ -46,7 +54,7 @@ function mockAuditLog() {
 
 describe('preparePoolCreationHandler', () => {
   beforeEach(() => {
-    jest.clearAllMocks()
+    vi.clearAllMocks()
     mockAuditLog()
     isWhitelistModeEnabled.mockResolvedValue(true)
     isWalletWhitelisted.mockResolvedValue(false)
@@ -68,13 +76,16 @@ describe('preparePoolCreationHandler', () => {
   it('should throw invalid-argument when the uid is not an address', async () => {
     const request = buildRequest({ auth: { uid: 'not-an-address', token: {} } })
 
-    await expect(preparePoolCreationHandler(request)).rejects.toHaveProperty('code', 'invalid-argument')
+    await expect(preparePoolCreationHandler(request as unknown as CallableRequest<PreparePoolCreationRequest>)).rejects.toHaveProperty(
+      'code',
+      'invalid-argument'
+    )
   })
 
   it('should not attempt whitelisting when the address is invalid', async () => {
     const request = buildRequest({ auth: { uid: 'not-an-address', token: {} } })
 
-    await expect(preparePoolCreationHandler(request)).rejects.toThrow()
+    await expect(preparePoolCreationHandler(request as unknown as CallableRequest<PreparePoolCreationRequest>)).rejects.toThrow()
     expect(whitelistWallet).not.toHaveBeenCalled()
   })
 
@@ -147,7 +158,9 @@ describe('preparePoolCreationHandler', () => {
   })
 
   it('should still succeed when writing the audit log fails', async () => {
-    firestore.collection.mockReturnValue({ add: jest.fn().mockRejectedValue(new Error('firestore down')) })
+    vi.mocked(firestore.collection).mockReturnValue({
+      add: vi.fn().mockRejectedValue(new Error('firestore down')),
+    } as unknown as CollectionReference<DocumentData, DocumentData>)
 
     const result = await preparePoolCreationHandler(buildRequest())
 
@@ -168,7 +181,9 @@ describe('preparePoolCreationHandler', () => {
 
   it('should not mask a logging failure that happens during error handling', async () => {
     whitelistWallet.mockRejectedValue(new Error('chain unreachable'))
-    firestore.collection.mockReturnValue({ add: jest.fn().mockRejectedValue(new Error('firestore down')) })
+    vi.mocked(firestore.collection).mockReturnValue({
+      add: vi.fn().mockRejectedValue(new Error('firestore down')),
+    } as unknown as CollectionReference<DocumentData, DocumentData>)
 
     await expect(preparePoolCreationHandler(buildRequest())).rejects.toHaveProperty('code', 'internal')
     expect(mockLogger.error).toHaveBeenCalledWith('Failed to log whitelisting error', expect.anything())
@@ -185,7 +200,7 @@ describe('preparePoolCreationHandler', () => {
   })
 
   it('should preserve an HttpsError raised downstream', async () => {
-    const { HttpsError } = require('firebase-functions/v2/https')
+    const { HttpsError } = await import('firebase-functions/v2/https')
     isWalletWhitelisted.mockRejectedValue(new HttpsError('unavailable', 'RPC down'))
 
     await expect(preparePoolCreationHandler(buildRequest())).rejects.toHaveProperty('code', 'unavailable')

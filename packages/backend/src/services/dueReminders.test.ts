@@ -1,10 +1,14 @@
 import type { Firestore } from 'firebase-admin/firestore'
 import { mockLogger } from '../__tests__/setup'
 
-const mockNotifyOnce = jest.fn()
+// Hoisted so the vi.mock factories below can close over them: vi.mock runs before
+// any module-level const is initialised.
+const { mockNotifyOnce } = vi.hoisted(() => ({
+  mockNotifyOnce: vi.fn(),
+}))
 
-jest.mock('./notifications', () => ({
-  ...jest.requireActual('./notifications'),
+vi.mock('./notifications', async () => ({
+  ...(await vi.importActual<typeof import('./notifications')>('./notifications')),
   notifyOnce: (...args: unknown[]) => mockNotifyOnce(...args),
 }))
 
@@ -47,27 +51,27 @@ function loanDoc(fixture: LoanFixture) {
 
 function buildFirestore(docs: ReturnType<typeof loanDoc>[], pool: object | null = { name: 'Builders Guild' }) {
   const loansQuery = {
-    where: jest.fn(),
-    limit: jest.fn(),
-    get: jest.fn().mockResolvedValue({ docs, size: docs.length }),
+    where: vi.fn(),
+    limit: vi.fn(),
+    get: vi.fn().mockResolvedValue({ docs, size: docs.length }),
   }
   loansQuery.where.mockReturnValue(loansQuery)
   loansQuery.limit.mockReturnValue(loansQuery)
 
-  const poolRef = { get: jest.fn().mockResolvedValue({ exists: pool !== null, data: () => pool }) }
+  const poolRef = { get: vi.fn().mockResolvedValue({ exists: pool !== null, data: () => pool }) }
 
-  const collection = jest.fn().mockImplementation((name: string) => {
+  const collection = vi.fn().mockImplementation((name: string) => {
     if (name === 'loans') return loansQuery
-    return { doc: jest.fn().mockReturnValue(poolRef) }
+    return { doc: vi.fn().mockReturnValue(poolRef) }
   })
 
-  return { firestore: { collection } as unknown as Firestore, loansQuery }
+  return { firestore: { collection }, loansQuery }
 }
 
 /** A provider whose head block is at `CHAIN_NOW`. */
 function providerAt(timestamp: number | null = CHAIN_NOW) {
   return {
-    getBlock: jest.fn().mockResolvedValue(timestamp === null ? null : { timestamp }),
+    getBlock: vi.fn().mockResolvedValue(timestamp === null ? null : { timestamp }),
   }
 }
 
@@ -80,7 +84,7 @@ describe('remindChain', () => {
   it('warns a borrower whose term ends within a day', async () => {
     const { firestore } = buildFirestore([loanDoc({ startedSecondsAgo: 30 * DAY - 3600, duration: 30 * DAY })])
 
-    const result = await remindChain(CHAIN_ID, providerAt() as never, firestore)
+    const result = await remindChain(CHAIN_ID, providerAt() as never, firestore as unknown as Firestore)
 
     expect(result).toMatchObject({ chainId: CHAIN_ID, scanned: 1, dueSoon: 1, overdue: 0 })
     expect(mockNotifyOnce).toHaveBeenCalledWith(
@@ -94,7 +98,7 @@ describe('remindChain', () => {
   it('says nothing to a borrower with time left', async () => {
     const { firestore } = buildFirestore([loanDoc({ startedSecondsAgo: DAY, duration: 30 * DAY })])
 
-    const result = await remindChain(CHAIN_ID, providerAt() as never, firestore)
+    const result = await remindChain(CHAIN_ID, providerAt() as never, firestore as unknown as Firestore)
 
     expect(result.dueSoon).toBe(0)
     expect(mockNotifyOnce).not.toHaveBeenCalled()
@@ -103,7 +107,7 @@ describe('remindChain', () => {
   it('tells a borrower whose term has run out', async () => {
     const { firestore } = buildFirestore([loanDoc({ startedSecondsAgo: 31 * DAY, duration: 30 * DAY })])
 
-    const result = await remindChain(CHAIN_ID, providerAt() as never, firestore)
+    const result = await remindChain(CHAIN_ID, providerAt() as never, firestore as unknown as Firestore)
 
     expect(result).toMatchObject({ dueSoon: 0, overdue: 1 })
     expect(mockNotifyOnce).toHaveBeenCalledWith(
@@ -120,7 +124,7 @@ describe('remindChain', () => {
     // approaching is worthless once it has passed.
     const { firestore } = buildFirestore([loanDoc({ startedSecondsAgo: 30 * DAY + 60, duration: 30 * DAY })])
 
-    await remindChain(CHAIN_ID, providerAt() as never, firestore)
+    await remindChain(CHAIN_ID, providerAt() as never, firestore as unknown as Firestore)
 
     expect(mockNotifyOnce).toHaveBeenCalledTimes(1)
     expect(mockNotifyOnce.mock.calls[0][0]).toContain('loan_overdue')
@@ -131,7 +135,7 @@ describe('remindChain', () => {
     // is exactly who a reminder is for.
     const { firestore } = buildFirestore([loanDoc({ startedSecondsAgo: 40 * DAY, duration: 30 * DAY, status: 'defaulted' })])
 
-    const result = await remindChain(CHAIN_ID, providerAt() as never, firestore)
+    const result = await remindChain(CHAIN_ID, providerAt() as never, firestore as unknown as Firestore)
 
     expect(result.overdue).toBe(1)
   })
@@ -139,7 +143,7 @@ describe('remindChain', () => {
   it('asks the index for open loans on this chain only', async () => {
     const { firestore, loansQuery } = buildFirestore([])
 
-    await remindChain(CHAIN_ID, providerAt() as never, firestore)
+    await remindChain(CHAIN_ID, providerAt() as never, firestore as unknown as Firestore)
 
     expect(loansQuery.where).toHaveBeenCalledWith('chainId', '==', CHAIN_ID)
     expect(loansQuery.where).toHaveBeenCalledWith('status', 'in', ['disbursed', 'defaulted'])
@@ -158,7 +162,7 @@ describe('remindChain', () => {
 
       const { firestore } = buildFirestore([loanDoc({ startedSecondsAgo: 31 * DAY, duration: 30 * DAY })])
 
-      const result = await remindChain(CHAIN_ID, providerAt() as never, firestore)
+      const result = await remindChain(CHAIN_ID, providerAt() as never, firestore as unknown as Firestore)
 
       expect(result.overdue).toBe(1)
     })
@@ -168,7 +172,7 @@ describe('remindChain', () => {
       // inside its term by chain time is not late, whatever the server thinks.
       const { firestore } = buildFirestore([loanDoc({ startedSecondsAgo: 2 * DAY, duration: 30 * DAY })])
 
-      const result = await remindChain(CHAIN_ID, providerAt(CHAIN_NOW) as never, firestore)
+      const result = await remindChain(CHAIN_ID, providerAt(CHAIN_NOW) as never, firestore as unknown as Firestore)
 
       expect(result.overdue).toBe(0)
       expect(mockNotifyOnce).not.toHaveBeenCalled()
@@ -177,13 +181,15 @@ describe('remindChain', () => {
     it('refuses to date anything when the chain has no head block', async () => {
       const { firestore } = buildFirestore([loanDoc({ startedSecondsAgo: 31 * DAY, duration: 30 * DAY })])
 
-      await expect(remindChain(CHAIN_ID, providerAt(null) as never, firestore)).rejects.toThrow('cannot date a reminder')
+      await expect(remindChain(CHAIN_ID, providerAt(null) as never, firestore as unknown as Firestore)).rejects.toThrow(
+        'cannot date a reminder'
+      )
     })
 
     it('treats the window boundary as due soon', async () => {
       const { firestore } = buildFirestore([loanDoc({ startedSecondsAgo: 30 * DAY - DUE_SOON_WINDOW_SECONDS, duration: 30 * DAY })])
 
-      const result = await remindChain(CHAIN_ID, providerAt() as never, firestore)
+      const result = await remindChain(CHAIN_ID, providerAt() as never, firestore as unknown as Firestore)
 
       expect(result.dueSoon).toBe(1)
     })
@@ -193,7 +199,7 @@ describe('remindChain', () => {
     it('skips a loan with no start date rather than inventing one', async () => {
       const { firestore } = buildFirestore([loanDoc({ startedSecondsAgo: 0, duration: 30 * DAY, startedAt: null })])
 
-      const result = await remindChain(CHAIN_ID, providerAt() as never, firestore)
+      const result = await remindChain(CHAIN_ID, providerAt() as never, firestore as unknown as Firestore)
 
       expect(result.scanned).toBe(0)
       expect(mockNotifyOnce).not.toHaveBeenCalled()
@@ -203,7 +209,7 @@ describe('remindChain', () => {
     it('stays quiet when the pool was never indexed', async () => {
       const { firestore } = buildFirestore([loanDoc({ startedSecondsAgo: 31 * DAY, duration: 30 * DAY })], null)
 
-      const result = await remindChain(CHAIN_ID, providerAt() as never, firestore)
+      const result = await remindChain(CHAIN_ID, providerAt() as never, firestore as unknown as Firestore)
 
       expect(result.overdue).toBe(0)
       expect(mockNotifyOnce).not.toHaveBeenCalled()
@@ -216,7 +222,7 @@ describe('remindChain', () => {
     mockNotifyOnce.mockResolvedValue(null)
     const { firestore } = buildFirestore([loanDoc({ startedSecondsAgo: 31 * DAY, duration: 30 * DAY })])
 
-    const result = await remindChain(CHAIN_ID, providerAt() as never, firestore)
+    const result = await remindChain(CHAIN_ID, providerAt() as never, firestore as unknown as Firestore)
 
     expect(result.overdue).toBe(0)
   })
@@ -227,7 +233,7 @@ describe('remindChain', () => {
       loanDoc({ docId: `${CHAIN_ID}-${POOL_ID}-2`, startedSecondsAgo: 40 * DAY, duration: 30 * DAY }),
     ])
 
-    const result = await remindChain(CHAIN_ID, providerAt() as never, firestore)
+    const result = await remindChain(CHAIN_ID, providerAt() as never, firestore as unknown as Firestore)
 
     expect(result).toMatchObject({ scanned: 2, overdue: 2 })
     // Keyed on the loan document, so one borrower's two debts are two

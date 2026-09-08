@@ -15,7 +15,7 @@
     "target": "es2022",
     "isolatedModules": true,
     "skipLibCheck": true,
-    "types": ["node", "jest"],
+    "types": ["node", "vitest/globals"],
     "paths": {
       "@superpool/types/*": ["../types/*"]
     }

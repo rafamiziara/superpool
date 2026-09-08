@@ -1,21 +1,26 @@
 import type * as express from 'express'
 import type { Request } from 'firebase-functions/v2/https'
+import type { MockedFunction } from 'vitest'
 import { mockLogger } from '../../__tests__/setup'
 
-// Mock the DeviceVerificationService
-const mockIsDeviceApproved = jest.fn() as jest.MockedFunction<(deviceId: string) => Promise<boolean>>
-jest.mock('../../services/deviceVerification', () => ({
+// Mock the DeviceVerificationService. Hoisted so the vi.mock factory below can close
+// over it: vi.mock runs before any module-level const is initialised.
+const { mockIsDeviceApproved } = vi.hoisted(() => ({
+  mockIsDeviceApproved: vi.fn() as unknown as MockedFunction<(deviceId: string) => Promise<boolean>>,
+}))
+vi.mock('../../services/deviceVerification', () => ({
   DeviceVerificationService: {
     isDeviceApproved: mockIsDeviceApproved,
   },
 }))
 
 // Import mocked services (already mocked in setup.ts)
-const { appCheck } = require('../../services')
+import { appCheck as realAppcheck } from '../../services'
 
 // Import the handler to test
-const { customAppCheckMinterHandler } = require('./customAppCheckMinter')
+import { customAppCheckMinterHandler } from './customAppCheckMinter'
 
+const appCheck = vi.mocked(realAppcheck, true)
 describe('customAppCheckMinterHandler', () => {
   const TTL_MILLIS = 1000 * 60 * 60 * 24
   const FIREBASE_APP_ID = 'app-id-test'
@@ -23,12 +28,12 @@ describe('customAppCheckMinterHandler', () => {
   // Use a mocked request and response object
   const mockRequest = { method: 'POST', body: {} } as Request
   const mockResponse = {
-    status: jest.fn().mockReturnThis(),
-    send: jest.fn().mockReturnThis(),
+    status: vi.fn().mockReturnThis(),
+    send: vi.fn().mockReturnThis(),
   } as Partial<express.Response>
 
   beforeEach(() => {
-    jest.clearAllMocks()
+    vi.clearAllMocks()
 
     process.env.APP_ID_FIREBASE = FIREBASE_APP_ID
 

@@ -1,49 +1,63 @@
+import type { Log, Provider } from 'ethers'
 import { Interface } from 'ethers'
+import type { Firestore } from 'firebase-admin/firestore'
+import type { Mock } from 'vitest'
 import { mockLogger } from '../__tests__/setup'
 import { LendingPoolABI, PoolFactoryABI } from '../constants'
+import type { ParsedContributionEvent } from './contributionIndexer'
+import type { ParsedPoolEvent } from './eventIndexer'
+import type { ParsedInterestClaimEvent } from './interestClaimIndexer'
+import type { ParsedLoanDecision } from './loanDecisionIndexer'
+import type { IndexLoanResult, ParsedLoan } from './loanIndexer'
+import type { ParsedLoanRepaymentEvent } from './loanRepaymentIndexer'
+import type { ParsedWithdrawalEvent } from './withdrawalIndexer'
 
 // The three indexers are covered by their own suites; what is under test here
 // is how the sweep drives them — ordering, filtering, caching and containment.
-jest.mock('./eventIndexer')
-jest.mock('./contributionIndexer')
-jest.mock('./withdrawalIndexer')
-jest.mock('./interestClaimIndexer')
-jest.mock('./loanRepaymentIndexer', () => {
+vi.mock('./eventIndexer')
+vi.mock('./contributionIndexer')
+vi.mock('./withdrawalIndexer')
+vi.mock('./interestClaimIndexer')
+vi.mock('./loanRepaymentIndexer', async () => {
   // Same reasoning as `loanIndexer` below: the topic is real, because the
   // sweep routes on it.
-  const actual = jest.requireActual('./loanRepaymentIndexer')
-  return { ...actual, indexLoanRepaymentEvent: jest.fn(), parseLoanRepaymentLog: jest.fn() }
+  const actual = await vi.importActual<typeof import('./loanRepaymentIndexer')>('./loanRepaymentIndexer')
+  return { ...actual, indexLoanRepaymentEvent: vi.fn(), parseLoanRepaymentLog: vi.fn() }
 })
-jest.mock('./loanDecisionIndexer', () => {
+vi.mock('./loanDecisionIndexer', async () => {
   // The three topics are real for the same reason: the sweep routes on them.
-  const actual = jest.requireActual('./loanDecisionIndexer')
-  return { ...actual, indexLoanDecisionEvent: jest.fn(), parseLoanDecisionLog: jest.fn(), readDecisionSender: jest.fn() }
+  const actual = await vi.importActual<typeof import('./loanDecisionIndexer')>('./loanDecisionIndexer')
+  return { ...actual, indexLoanDecisionEvent: vi.fn(), parseLoanDecisionLog: vi.fn(), readDecisionSender: vi.fn() }
 })
-jest.mock('./loanIndexer', () => {
+vi.mock('./loanIndexer', async () => {
   // The topics are real: the sweep routes on them, and stubbing them would let
   // the test agree with itself rather than with the shipped ABI.
-  const actual = jest.requireActual('./loanIndexer')
-  return { ...actual, indexLoanFromLog: jest.fn() }
+  const actual = await vi.importActual<typeof import('./loanIndexer')>('./loanIndexer')
+  return { ...actual, indexLoanFromLog: vi.fn() }
 })
 
+import * as contributionIndexerMock from './contributionIndexer'
+import * as eventIndexerMock from './eventIndexer'
 // ethers is deliberately NOT mocked: the sweep routes on topic hashes derived
 // from the shipped ABIs, and a stubbed Interface would agree with whatever the
 // test invented rather than with the contracts.
-const { sweepBlockRange } = require('./eventSweeper')
-const { fetchPoolActive, fetchPoolMetadata, indexPoolEvent, parsePoolCreatedLog, updatePoolActive } = require('./eventIndexer')
-const { indexContributionEvent, parseFundsDepositedLog, resolvePoolId } = require('./contributionIndexer')
-const { indexWithdrawalEvent, parseFundsWithdrawnLog } = require('./withdrawalIndexer')
-const { indexInterestClaimEvent, parseInterestClaimedLog } = require('./interestClaimIndexer')
-const { indexLoanFromLog, LOAN_CREATED_TOPIC, LOAN_REPAID_TOPIC, LOAN_TOPICS } = require('./loanIndexer')
-const { indexLoanRepaymentEvent, parseLoanRepaymentLog, LOAN_REPAYMENT_MADE_TOPIC } = require('./loanRepaymentIndexer')
-const {
-  indexLoanDecisionEvent,
-  parseLoanDecisionLog,
-  readDecisionSender,
-  LOAN_APPROVED_TOPIC,
-  LOAN_DECISION_TOPICS,
-} = require('./loanDecisionIndexer')
+import { sweepBlockRange } from './eventSweeper'
+import * as interestClaimIndexerMock from './interestClaimIndexer'
+import * as loanDecisionIndexerMock from './loanDecisionIndexer'
+import * as loanIndexerMock from './loanIndexer'
+import * as loanRepaymentIndexerMock from './loanRepaymentIndexer'
+import * as withdrawalIndexerMock from './withdrawalIndexer'
 
+// These modules are mocked above; vi.mocked restores the mock types that the
+// real signatures would otherwise hide.
+const { indexContributionEvent, parseFundsDepositedLog, resolvePoolId } = vi.mocked(contributionIndexerMock)
+const { fetchPoolActive, fetchPoolMetadata, indexPoolEvent, parsePoolCreatedLog, updatePoolActive } = vi.mocked(eventIndexerMock)
+const { indexInterestClaimEvent, parseInterestClaimedLog } = vi.mocked(interestClaimIndexerMock)
+const { indexLoanDecisionEvent, LOAN_APPROVED_TOPIC, LOAN_DECISION_TOPICS, parseLoanDecisionLog, readDecisionSender } =
+  vi.mocked(loanDecisionIndexerMock)
+const { indexLoanFromLog, LOAN_CREATED_TOPIC, LOAN_REPAID_TOPIC, LOAN_TOPICS } = vi.mocked(loanIndexerMock)
+const { indexLoanRepaymentEvent, LOAN_REPAYMENT_MADE_TOPIC, parseLoanRepaymentLog } = vi.mocked(loanRepaymentIndexerMock)
+const { indexWithdrawalEvent, parseFundsWithdrawnLog } = vi.mocked(withdrawalIndexerMock)
 // ---------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------
@@ -69,7 +83,7 @@ const POOL_REACTIVATED_TOPIC = new Interface([...PoolFactoryABI]).getEvent('Pool
 // Helpers
 // ---------------------------------------------------------------------------
 
-function buildLog(overrides: Partial<{ blockNumber: number; address: string; index: number; transactionHash: string }> = {}) {
+function buildLog(overrides: Partial<{ blockNumber: number; address: string; index: number; transactionHash: string }> = {}): Log {
   return {
     blockNumber: overrides.blockNumber ?? 120,
     address: overrides.address ?? POOL_ADDRESS,
@@ -77,7 +91,7 @@ function buildLog(overrides: Partial<{ blockNumber: number; address: string; ind
     transactionHash: overrides.transactionHash ?? `0x${'a'.repeat(64)}`,
     data: '0x',
     topics: ['0xtopic'],
-  }
+  } as unknown as Log
 }
 
 /**
@@ -119,7 +133,7 @@ function buildMockProvider(logs: ProviderLogs = {}, options: { blockTimestamp?: 
   return {
     // `topics[0]` is an array for the status query — a topic-OR — so it is
     // matched by shape rather than by key.
-    getLogs: jest.fn().mockImplementation((filter: { topics: (string | string[])[] }) => {
+    getLogs: vi.fn().mockImplementation((filter: { topics: (string | string[])[] }) => {
       const topic = filter.topics[0]
 
       // Three topic-OR queries now — pool status, loans and decisions — told
@@ -135,18 +149,18 @@ function buildMockProvider(logs: ProviderLogs = {}, options: { blockTimestamp?: 
 
       return Promise.resolve(byTopic[topic as string] ?? [])
     }),
-    getBlock: jest.fn().mockResolvedValue({ timestamp: options.blockTimestamp ?? BLOCK_TIMESTAMP }),
+    getBlock: vi.fn().mockResolvedValue({ timestamp: options.blockTimestamp ?? BLOCK_TIMESTAMP }),
   }
 }
 
 function buildFirestore() {
-  return { collection: jest.fn() }
+  return { collection: vi.fn() }
 }
 
 function sweep(provider: object, firestore: object = buildFirestore()) {
   return sweepBlockRange({
-    provider,
-    firestore,
+    provider: provider as unknown as Provider,
+    firestore: firestore as unknown as Firestore,
     chainId: CHAIN_ID,
     factoryAddress: FACTORY_ADDRESS,
     fromBlock: FROM_BLOCK,
@@ -155,44 +169,58 @@ function sweep(provider: object, firestore: object = buildFirestore()) {
 }
 
 /** The `getLogs` filter the provider was given for one topic. */
-function filterFor(provider: { getLogs: jest.Mock }, topic: string) {
-  const call = provider.getLogs.mock.calls.find(([filter]: [{ topics: string[] }]) => filter.topics[0] === topic)
+function filterFor(provider: { getLogs: Mock }, topic: string) {
+  const call = (provider.getLogs.mock.calls as unknown as [{ topics: string[] }][]).find(([filter]) => filter.topics[0] === topic)
 
   return call?.[0]
 }
 
 beforeEach(() => {
-  parsePoolCreatedLog.mockImplementation(() => ({ poolId: 1, description: '' }))
+  parsePoolCreatedLog.mockImplementation(() => ({ poolId: 1, description: '' }) as unknown as ParsedPoolEvent)
   fetchPoolMetadata.mockResolvedValue({ description: 'a description', loanToken: NATIVE })
   indexPoolEvent.mockResolvedValue({ poolId: 1, alreadyIndexed: false, stored: true })
 
-  parseFundsDepositedLog.mockImplementation(() => ({ poolAddress: POOL_ADDRESS, contributor: '0xabc', amount: '1' }))
+  parseFundsDepositedLog.mockImplementation(
+    () => ({ poolAddress: POOL_ADDRESS, contributor: '0xabc', amount: '1' }) as unknown as Omit<ParsedContributionEvent, 'poolId'>
+  )
   indexContributionEvent.mockResolvedValue({ id: 'c1', poolId: 1, alreadyIndexed: false, stored: true })
 
-  parseFundsWithdrawnLog.mockImplementation(() => ({ poolAddress: POOL_ADDRESS, member: '0xabc', amount: '1' }))
+  parseFundsWithdrawnLog.mockImplementation(
+    () => ({ poolAddress: POOL_ADDRESS, member: '0xabc', amount: '1' }) as unknown as Omit<ParsedWithdrawalEvent, 'poolId'>
+  )
   indexWithdrawalEvent.mockResolvedValue({ id: 'w1', poolId: 1, alreadyIndexed: false, stored: true })
 
-  parseInterestClaimedLog.mockImplementation(() => ({ poolAddress: POOL_ADDRESS, account: '0xabc', amount: '1' }))
+  parseInterestClaimedLog.mockImplementation(
+    () => ({ poolAddress: POOL_ADDRESS, account: '0xabc', amount: '1' }) as unknown as Omit<ParsedInterestClaimEvent, 'poolId'>
+  )
   indexInterestClaimEvent.mockResolvedValue({ id: 'i1', poolId: 1, alreadyIndexed: false, stored: true })
 
-  parseLoanRepaymentLog.mockImplementation(() => ({ poolAddress: POOL_ADDRESS, loanId: 1, borrower: '0xabc', amount: '1' }))
+  parseLoanRepaymentLog.mockImplementation(
+    () => ({ poolAddress: POOL_ADDRESS, loanId: 1, borrower: '0xabc', amount: '1' }) as unknown as Omit<ParsedLoanRepaymentEvent, 'poolId'>
+  )
   indexLoanRepaymentEvent.mockResolvedValue({ id: 'r1', loanId: 1, poolId: 1, alreadyIndexed: false, stored: true })
 
-  parseLoanDecisionLog.mockImplementation(() => ({
-    poolAddress: POOL_ADDRESS,
-    loanId: 1,
-    borrower: '0xabc',
-    amount: '1',
-    outcome: 'approved',
-    decidedBy: OWNER,
-  }))
+  parseLoanDecisionLog.mockImplementation(
+    () =>
+      ({
+        poolAddress: POOL_ADDRESS,
+        loanId: 1,
+        borrower: '0xabc',
+        amount: '1',
+        outcome: 'approved',
+        decidedBy: OWNER,
+      }) as unknown as Omit<ParsedLoanDecision, 'poolId'>
+  )
   indexLoanDecisionEvent.mockResolvedValue({ id: 'd1', loanId: 1, poolId: 1, outcome: 'approved', alreadyIndexed: false, stored: true })
   readDecisionSender.mockResolvedValue(OWNER)
 
   fetchPoolActive.mockResolvedValue(false)
   updatePoolActive.mockResolvedValue(true)
 
-  indexLoanFromLog.mockResolvedValue({ loan: { loanId: 1, poolId: 7 }, result: { stored: true } })
+  indexLoanFromLog.mockResolvedValue({
+    loan: { loanId: 1, poolId: 7 } as unknown as ParsedLoan,
+    result: { stored: true } as unknown as IndexLoanResult,
+  })
 
   resolvePoolId.mockResolvedValue(7)
 })
@@ -524,8 +552,8 @@ describe('sweepBlockRange', () => {
       await sweep(provider)
 
       // Assert
-      const call = provider.getLogs.mock.calls.find(
-        ([f]: [{ topics: unknown[] }]) =>
+      const call = (provider.getLogs.mock.calls as unknown as [{ topics: unknown[]; address: string }][]).find(
+        ([f]) =>
           Array.isArray(f.topics[0]) &&
           (f.topics[0] as string[]).includes(LOAN_APPROVED_TOPIC) &&
           !(f.topics[0] as string[]).includes(LOAN_CREATED_TOPIC)
@@ -570,9 +598,9 @@ describe('sweepBlockRange', () => {
     it('should resolve each pool address only once', async () => {
       // Arrange
       parseFundsDepositedLog
-        .mockReturnValueOnce({ poolAddress: POOL_ADDRESS })
-        .mockReturnValueOnce({ poolAddress: POOL_ADDRESS })
-        .mockReturnValueOnce({ poolAddress: OTHER_POOL_ADDRESS })
+        .mockReturnValueOnce({ poolAddress: POOL_ADDRESS } as unknown as Omit<ParsedContributionEvent, 'poolId'>)
+        .mockReturnValueOnce({ poolAddress: POOL_ADDRESS } as unknown as Omit<ParsedContributionEvent, 'poolId'>)
+        .mockReturnValueOnce({ poolAddress: OTHER_POOL_ADDRESS } as unknown as Omit<ParsedContributionEvent, 'poolId'>)
       const provider = buildMockProvider({ deposits: [buildLog(), buildLog({ index: 1 }), buildLog({ index: 2 })] })
 
       // Act
@@ -588,8 +616,8 @@ describe('sweepBlockRange', () => {
       // depending on the provider; a case-sensitive cache key would double the
       // RPC calls without being wrong.
       parseFundsDepositedLog
-        .mockReturnValueOnce({ poolAddress: POOL_ADDRESS })
-        .mockReturnValueOnce({ poolAddress: POOL_ADDRESS.toLowerCase() })
+        .mockReturnValueOnce({ poolAddress: POOL_ADDRESS } as unknown as Omit<ParsedContributionEvent, 'poolId'>)
+        .mockReturnValueOnce({ poolAddress: POOL_ADDRESS.toLowerCase() } as unknown as Omit<ParsedContributionEvent, 'poolId'>)
       const provider = buildMockProvider({ deposits: [buildLog(), buildLog({ index: 1 })] })
 
       // Act
@@ -743,7 +771,7 @@ describe('sweepBlockRange', () => {
 
       // Assert
       expect(counts.statusUpdates).toBe(3)
-      expect(fetchPoolActive.mock.calls.map((call: [number]) => call[0])).toEqual([7, 9, 11])
+      expect(fetchPoolActive.mock.calls.map((call) => call[0])).toEqual([7, 9, 11])
     })
 
     it('should count only the pools whose stored flag actually changed', async () => {
@@ -768,7 +796,9 @@ describe('sweepBlockRange', () => {
       await sweep(provider)
 
       // Assert
-      const call = provider.getLogs.mock.calls.find(([f]: [{ topics: unknown[] }]) => Array.isArray(f.topics[0]))
+      const call = (provider.getLogs.mock.calls as unknown as [{ topics: unknown[]; address: string }][]).find(([f]) =>
+        Array.isArray(f.topics[0])
+      )
       expect(call?.[0]).toEqual({
         address: FACTORY_ADDRESS,
         fromBlock: FROM_BLOCK,
@@ -911,8 +941,8 @@ describe('sweepBlockRange', () => {
       await sweep(provider)
 
       // Assert
-      const call = provider.getLogs.mock.calls.find(
-        ([f]: [{ topics: unknown[] }]) => Array.isArray(f.topics[0]) && (f.topics[0] as string[]).includes(LOAN_CREATED_TOPIC)
+      const call = (provider.getLogs.mock.calls as unknown as [{ topics: unknown[] }][]).find(
+        ([f]) => Array.isArray(f.topics[0]) && (f.topics[0] as string[]).includes(LOAN_CREATED_TOPIC)
       )
       expect(call?.[0]).toEqual({
         fromBlock: FROM_BLOCK,
@@ -958,7 +988,10 @@ describe('sweepBlockRange', () => {
       // Arrange
       // A sweep re-reads the `LoanCreated` log on every pass, long after the
       // loan was repaid; counting that would report phantom work forever.
-      indexLoanFromLog.mockResolvedValue({ loan: { loanId: 1 }, result: { stored: false } })
+      indexLoanFromLog.mockResolvedValue({
+        loan: { loanId: 1 } as unknown as ParsedLoan,
+        result: { stored: false } as unknown as IndexLoanResult,
+      })
       const provider = buildMockProvider({ loans: [buildLog()] })
 
       // Act

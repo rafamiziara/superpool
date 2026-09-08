@@ -1,39 +1,49 @@
+import type { JsonRpcProvider, Log, Provider } from 'ethers'
+import type { Firestore } from 'firebase-admin/firestore'
 import { mockLogger } from '../__tests__/setup'
 import type { ParsedContributionEvent } from './contributionIndexer'
+
+// Hoisted so the vi.mock factories below can close over them: vi.mock runs before
+// any module-level const is initialised.
+const { mockDecodeEventLog, mockGetEvent, mockGetPoolId } = vi.hoisted(() => ({
+  mockDecodeEventLog: vi.fn(),
+  mockGetEvent: vi.fn(),
+  mockGetPoolId: vi.fn(),
+}))
 
 // ---------------------------------------------------------------------------
 // Shared mock references — captured at module-definition time so tests can
 // configure them per-case via mockReturnValue / mockImplementation.
 // ---------------------------------------------------------------------------
-const mockDecodeEventLog = jest.fn()
-const mockGetEvent = jest.fn()
-const mockGetPoolId = jest.fn()
-
 // Mock ethers BEFORE importing the module under test. The module creates a
 // top-level `new Interface([...LendingPoolABI])`, so the mock must be in
 // place before the first `require`.
-jest.mock('ethers', () => {
-  const actual = jest.requireActual('ethers')
+vi.mock('ethers', async () => {
+  const actual = await vi.importActual<typeof import('ethers')>('ethers')
   return {
     ...actual,
-    Interface: jest.fn().mockImplementation(() => ({
-      decodeEventLog: mockDecodeEventLog,
-      getEvent: mockGetEvent,
-    })),
-    Contract: jest.fn().mockImplementation(() => ({
-      getPoolId: mockGetPoolId,
-    })),
+    Interface: vi.fn().mockImplementation(function () {
+      return {
+        decodeEventLog: mockDecodeEventLog,
+        getEvent: mockGetEvent,
+      }
+    }),
+    Contract: vi.fn().mockImplementation(function () {
+      return {
+        getPoolId: mockGetPoolId,
+      }
+    }),
   }
 })
 
 // Import AFTER mocks are registered
-const {
-  parseFundsDepositedLog,
-  resolvePoolId,
+import {
+  contributionDocId,
   indexContributionEvent,
   indexContributionsByTxHash,
-  contributionDocId,
-} = require('./contributionIndexer')
+  parseFundsDepositedLog,
+  resolvePoolId,
+} from './contributionIndexer'
 
 // ---------------------------------------------------------------------------
 // Shared test constants
@@ -69,7 +79,7 @@ function buildMockLog(
     index: number
     address: string
   }> = {}
-) {
+): Log {
   return {
     // Both FundsDeposited parameters are `indexed`, so a real log carries no data.
     data: '0x',
@@ -79,7 +89,7 @@ function buildMockLog(
     index: 0,
     address: POOL_ADDRESS,
     ...overrides,
-  }
+  } as unknown as Log
 }
 
 function makeDefaultDecodeReturn(overrides: Record<string, unknown> = {}) {
@@ -135,7 +145,7 @@ describe('contributionDocId', () => {
 
 describe('parseFundsDepositedLog', () => {
   beforeEach(() => {
-    jest.clearAllMocks()
+    vi.clearAllMocks()
     mockDecodeEventLog.mockReturnValue(makeDefaultDecodeReturn())
     mockGetEvent.mockReturnValue({ topicHash: FUNDS_DEPOSITED_TOPIC })
   })
@@ -235,7 +245,7 @@ describe('parseFundsDepositedLog', () => {
 
 describe('resolvePoolId', () => {
   beforeEach(() => {
-    jest.clearAllMocks()
+    vi.clearAllMocks()
   })
 
   it('should return the factory pool id as a plain number', async () => {
@@ -243,7 +253,7 @@ describe('resolvePoolId', () => {
     mockGetPoolId.mockResolvedValue(BigInt(7))
 
     // Act
-    const result = await resolvePoolId(POOL_ADDRESS, FACTORY_ADDRESS, {})
+    const result = await resolvePoolId(POOL_ADDRESS, FACTORY_ADDRESS, {} as unknown as Provider)
 
     // Assert
     expect(result).toBe(7)
@@ -256,7 +266,7 @@ describe('resolvePoolId', () => {
     mockGetPoolId.mockResolvedValue(BigInt(0))
 
     // Act
-    const result = await resolvePoolId('0xNotAPool', FACTORY_ADDRESS, {})
+    const result = await resolvePoolId('0xNotAPool', FACTORY_ADDRESS, {} as unknown as Provider)
 
     // Assert
     expect(result).toBe(0)
@@ -271,16 +281,16 @@ describe('indexContributionEvent', () => {
   function buildMockFirestore(docExists: boolean) {
     // `create()` is what makes this atomic: Firestore rejects it with
     // ALREADY_EXISTS rather than overwriting.
-    const mockCreate = docExists ? jest.fn().mockRejectedValue(alreadyExistsError()) : jest.fn().mockResolvedValue(undefined)
+    const mockCreate = docExists ? vi.fn().mockRejectedValue(alreadyExistsError()) : vi.fn().mockResolvedValue(undefined)
     const mockDocRef = { create: mockCreate }
-    const mockCollection = { doc: jest.fn().mockReturnValue(mockDocRef) }
-    const mockFs = { collection: jest.fn().mockReturnValue(mockCollection) }
+    const mockCollection = { doc: vi.fn().mockReturnValue(mockDocRef) }
+    const mockFs = { collection: vi.fn().mockReturnValue(mockCollection) }
 
     return { mockFs, mockCollection, mockDocRef }
   }
 
   beforeEach(() => {
-    jest.clearAllMocks()
+    vi.clearAllMocks()
   })
 
   it('should write the contribution document with all required fields', async () => {
@@ -289,7 +299,7 @@ describe('indexContributionEvent', () => {
     const contribution = buildParsedContribution({ poolId: 3 })
 
     // Act
-    await indexContributionEvent(contribution, mockFs)
+    await indexContributionEvent(contribution, mockFs as unknown as Firestore)
 
     // Assert
     expect(mockDocRef.create).toHaveBeenCalledWith({
@@ -310,7 +320,7 @@ describe('indexContributionEvent', () => {
     const { mockFs } = buildMockFirestore(false)
 
     // Act
-    await indexContributionEvent(buildParsedContribution(), mockFs)
+    await indexContributionEvent(buildParsedContribution(), mockFs as unknown as Firestore)
 
     // Assert
     expect(mockFs.collection).toHaveBeenCalledWith('contributions')
@@ -321,7 +331,7 @@ describe('indexContributionEvent', () => {
     const { mockFs, mockCollection } = buildMockFirestore(false)
 
     // Act
-    await indexContributionEvent(buildParsedContribution({ chainId: 80002, logIndex: 2 }), mockFs)
+    await indexContributionEvent(buildParsedContribution({ chainId: 80002, logIndex: 2 }), mockFs as unknown as Firestore)
 
     // Assert
     expect(mockCollection.doc).toHaveBeenCalledWith(`80002-${TX_HASH}-2`)
@@ -332,7 +342,7 @@ describe('indexContributionEvent', () => {
     const { mockFs } = buildMockFirestore(false)
 
     // Act
-    const result = await indexContributionEvent(buildParsedContribution({ poolId: 2 }), mockFs)
+    const result = await indexContributionEvent(buildParsedContribution({ poolId: 2 }), mockFs as unknown as Firestore)
 
     // Assert
     expect(result).toEqual({ id: `${CHAIN_ID}-${TX_HASH}-0`, poolId: 2, alreadyIndexed: false, stored: true })
@@ -343,7 +353,7 @@ describe('indexContributionEvent', () => {
     const { mockFs } = buildMockFirestore(true)
 
     // Act
-    const result = await indexContributionEvent(buildParsedContribution({ poolId: 2 }), mockFs)
+    const result = await indexContributionEvent(buildParsedContribution({ poolId: 2 }), mockFs as unknown as Firestore)
 
     // Assert
     expect(result).toEqual({ id: `${CHAIN_ID}-${TX_HASH}-0`, poolId: 2, alreadyIndexed: true, stored: false })
@@ -354,17 +364,20 @@ describe('indexContributionEvent', () => {
     // Arrange — the contribute screen indexes what it watched confirm while
     // startup recovery drains the same hash. Only one may report a store.
     let created = false
-    const mockCreate = jest.fn().mockImplementation(async () => {
+    const mockCreate = vi.fn().mockImplementation(async () => {
       if (created) throw alreadyExistsError()
       created = true
     })
     const mockFs = {
-      collection: jest.fn().mockReturnValue({ doc: jest.fn().mockReturnValue({ create: mockCreate }) }),
+      collection: vi.fn().mockReturnValue({ doc: vi.fn().mockReturnValue({ create: mockCreate }) }),
     }
     const contribution = buildParsedContribution({ poolId: 5 })
 
     // Act
-    const results = await Promise.all([indexContributionEvent(contribution, mockFs), indexContributionEvent(contribution, mockFs)])
+    const results = await Promise.all([
+      indexContributionEvent(contribution, mockFs as unknown as Firestore),
+      indexContributionEvent(contribution, mockFs as unknown as Firestore),
+    ])
 
     // Assert
     expect(results.filter((result: { stored: boolean }) => result.stored)).toHaveLength(1)
@@ -374,13 +387,13 @@ describe('indexContributionEvent', () => {
   it('should propagate a write failure that is not ALREADY_EXISTS', async () => {
     // Arrange — a permission error must not be reported as an already-indexed
     // contribution, which would silently drop it.
-    const mockCreate = jest.fn().mockRejectedValue(Object.assign(new Error('7 PERMISSION_DENIED'), { code: 7 }))
+    const mockCreate = vi.fn().mockRejectedValue(Object.assign(new Error('7 PERMISSION_DENIED'), { code: 7 }))
     const mockFs = {
-      collection: jest.fn().mockReturnValue({ doc: jest.fn().mockReturnValue({ create: mockCreate }) }),
+      collection: vi.fn().mockReturnValue({ doc: vi.fn().mockReturnValue({ create: mockCreate }) }),
     }
 
     // Act & Assert
-    await expect(indexContributionEvent(buildParsedContribution(), mockFs)).rejects.toThrow('7 PERMISSION_DENIED')
+    await expect(indexContributionEvent(buildParsedContribution(), mockFs as unknown as Firestore)).rejects.toThrow('7 PERMISSION_DENIED')
   })
 })
 
@@ -400,22 +413,22 @@ describe('indexContributionsByTxHash', () => {
     const block = overrides.block === undefined ? { timestamp: BLOCK_TIMESTAMP } : overrides.block
 
     return {
-      getTransactionReceipt: jest.fn().mockResolvedValue(receipt),
-      getBlock: jest.fn().mockResolvedValue(block),
+      getTransactionReceipt: vi.fn().mockResolvedValue(receipt),
+      getBlock: vi.fn().mockResolvedValue(block),
     }
   }
 
   function buildMockFirestore() {
-    const mockCreate = jest.fn().mockResolvedValue(undefined)
+    const mockCreate = vi.fn().mockResolvedValue(undefined)
     const mockFs = {
-      collection: jest.fn().mockReturnValue({ doc: jest.fn().mockReturnValue({ create: mockCreate }) }),
+      collection: vi.fn().mockReturnValue({ doc: vi.fn().mockReturnValue({ create: mockCreate }) }),
     }
 
     return { mockFs, mockCreate }
   }
 
   beforeEach(() => {
-    jest.clearAllMocks()
+    vi.clearAllMocks()
     mockDecodeEventLog.mockReturnValue(makeDefaultDecodeReturn())
     mockGetEvent.mockReturnValue({ topicHash: FUNDS_DEPOSITED_TOPIC })
     mockGetPoolId.mockResolvedValue(BigInt(1))
@@ -427,7 +440,13 @@ describe('indexContributionsByTxHash', () => {
     const { mockFs } = buildMockFirestore()
 
     // Act
-    const result = await indexContributionsByTxHash(TX_HASH, CHAIN_ID, FACTORY_ADDRESS, provider, mockFs)
+    const result = await indexContributionsByTxHash(
+      TX_HASH,
+      CHAIN_ID,
+      FACTORY_ADDRESS,
+      provider as unknown as JsonRpcProvider,
+      mockFs as unknown as Firestore
+    )
 
     // Assert
     expect(result.contributions).toHaveLength(1)
@@ -443,7 +462,13 @@ describe('indexContributionsByTxHash', () => {
     const { mockFs, mockCreate } = buildMockFirestore()
 
     // Act
-    const result = await indexContributionsByTxHash(TX_HASH, CHAIN_ID, FACTORY_ADDRESS, provider, mockFs)
+    const result = await indexContributionsByTxHash(
+      TX_HASH,
+      CHAIN_ID,
+      FACTORY_ADDRESS,
+      provider as unknown as JsonRpcProvider,
+      mockFs as unknown as Firestore
+    )
 
     // Assert
     expect(result.contributions).toHaveLength(2)
@@ -462,7 +487,13 @@ describe('indexContributionsByTxHash', () => {
     const { mockFs } = buildMockFirestore()
 
     // Act
-    const result = await indexContributionsByTxHash(TX_HASH, CHAIN_ID, FACTORY_ADDRESS, provider, mockFs)
+    const result = await indexContributionsByTxHash(
+      TX_HASH,
+      CHAIN_ID,
+      FACTORY_ADDRESS,
+      provider as unknown as JsonRpcProvider,
+      mockFs as unknown as Firestore
+    )
 
     // Assert
     expect(result.contributions).toHaveLength(1)
@@ -474,9 +505,9 @@ describe('indexContributionsByTxHash', () => {
     const { mockFs } = buildMockFirestore()
 
     // Act & Assert
-    await expect(indexContributionsByTxHash(TX_HASH, CHAIN_ID, FACTORY_ADDRESS, provider, mockFs)).rejects.toThrow(
-      `Transaction receipt not found for hash: ${TX_HASH}`
-    )
+    await expect(
+      indexContributionsByTxHash(TX_HASH, CHAIN_ID, FACTORY_ADDRESS, provider as unknown as JsonRpcProvider, mockFs as unknown as Firestore)
+    ).rejects.toThrow(`Transaction receipt not found for hash: ${TX_HASH}`)
   })
 
   it('should throw failed-precondition when the transaction reverted', async () => {
@@ -485,9 +516,9 @@ describe('indexContributionsByTxHash', () => {
     const { mockFs } = buildMockFirestore()
 
     // Act & Assert
-    await expect(indexContributionsByTxHash(TX_HASH, CHAIN_ID, FACTORY_ADDRESS, provider, mockFs)).rejects.toThrow(
-      `Transaction was reverted or failed: ${TX_HASH}`
-    )
+    await expect(
+      indexContributionsByTxHash(TX_HASH, CHAIN_ID, FACTORY_ADDRESS, provider as unknown as JsonRpcProvider, mockFs as unknown as Firestore)
+    ).rejects.toThrow(`Transaction was reverted or failed: ${TX_HASH}`)
   })
 
   it('should throw not-found when the transaction has no FundsDeposited log', async () => {
@@ -498,9 +529,9 @@ describe('indexContributionsByTxHash', () => {
     const { mockFs } = buildMockFirestore()
 
     // Act & Assert
-    await expect(indexContributionsByTxHash(TX_HASH, CHAIN_ID, FACTORY_ADDRESS, provider, mockFs)).rejects.toThrow(
-      `No FundsDeposited event found in transaction: ${TX_HASH}`
-    )
+    await expect(
+      indexContributionsByTxHash(TX_HASH, CHAIN_ID, FACTORY_ADDRESS, provider as unknown as JsonRpcProvider, mockFs as unknown as Firestore)
+    ).rejects.toThrow(`No FundsDeposited event found in transaction: ${TX_HASH}`)
   })
 
   it('should throw internal when the block cannot be fetched', async () => {
@@ -509,9 +540,9 @@ describe('indexContributionsByTxHash', () => {
     const { mockFs } = buildMockFirestore()
 
     // Act & Assert
-    await expect(indexContributionsByTxHash(TX_HASH, CHAIN_ID, FACTORY_ADDRESS, provider, mockFs)).rejects.toThrow(
-      `Failed to fetch block ${BLOCK_NUMBER}`
-    )
+    await expect(
+      indexContributionsByTxHash(TX_HASH, CHAIN_ID, FACTORY_ADDRESS, provider as unknown as JsonRpcProvider, mockFs as unknown as Firestore)
+    ).rejects.toThrow(`Failed to fetch block ${BLOCK_NUMBER}`)
   })
 
   it('should reject a deposit into a contract the factory did not deploy', async () => {
@@ -522,9 +553,9 @@ describe('indexContributionsByTxHash', () => {
     const { mockFs, mockCreate } = buildMockFirestore()
 
     // Act & Assert
-    await expect(indexContributionsByTxHash(TX_HASH, CHAIN_ID, FACTORY_ADDRESS, provider, mockFs)).rejects.toThrow(
-      'Deposit was not made to a pool deployed by SuperPool'
-    )
+    await expect(
+      indexContributionsByTxHash(TX_HASH, CHAIN_ID, FACTORY_ADDRESS, provider as unknown as JsonRpcProvider, mockFs as unknown as Firestore)
+    ).rejects.toThrow('Deposit was not made to a pool deployed by SuperPool')
     expect(mockCreate).not.toHaveBeenCalled()
   })
 })

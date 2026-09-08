@@ -1,23 +1,28 @@
+import type { CallableRequest } from 'firebase-functions/v2/https'
+import type { ScheduledEvent } from 'firebase-functions/v2/scheduler'
 import { mockLogger } from '../../__tests__/setup'
 
-jest.mock('../../services/pushReceipts')
-jest.mock('../../services')
+vi.mock('../../services/pushReceipts')
+vi.mock('../../services')
 
-const { collectPushReceiptsHandler, collectPushReceiptsNowHandler } = require('./collectPushReceipts')
-const { collectReceipts } = require('../../services/pushReceipts')
+import * as pushReceiptsMock from '../../services/pushReceipts'
+import { collectPushReceiptsHandler, collectPushReceiptsNowHandler } from './collectPushReceipts'
 
+// These modules are mocked above; vi.mocked restores the mock types that the
+// real signatures would otherwise hide.
+const { collectReceipts } = vi.mocked(pushReceiptsMock)
 const AUTH = { uid: '0x9965507D1a55bcC2695C58ba16FB37d819B0A4dc' }
 /** A signed-in caller who is not an operator. Trivial to become — see `requireAdmin`. */
 const STRANGER = { uid: '0x14dC79964da2C08b23698B3D3cc7Ca32193d9955' }
 const RESULT = { checked: 4, pruned: 1, failed: 0, expired: 0, pending: 2 }
 
 /** Pass `null` for an anonymous caller — an explicit `undefined` would take the default. */
-function buildRequest(auth: object | null = AUTH) {
-  return { data: undefined, auth: auth ?? undefined } as never
+function buildRequest<T>(auth: object | null = AUTH): CallableRequest<T> {
+  return { data: undefined, auth: auth ?? undefined } as unknown as CallableRequest<T> as never
 }
 
 beforeEach(() => {
-  jest.clearAllMocks()
+  vi.clearAllMocks()
   process.env.FUNCTIONS_EMULATOR = 'false'
   // These are operator endpoints now. `request.auth` alone was never a gate
   // here: authentication in this project is deliberately cheap, so any wallet
@@ -51,10 +56,10 @@ describe('the scheduled function', () => {
     // A schedule that throws is retried by the platform, which would re-ask
     // Expo about the same tickets. There is nothing to retry: the rows stay
     // queued and the next cycle picks them up anyway.
-    const { collectPushReceipts } = require('./collectPushReceipts')
+    const { collectPushReceipts } = await import('./collectPushReceipts')
     collectReceipts.mockRejectedValue(new Error('firestore exploded'))
 
-    await expect(collectPushReceipts.run(undefined)).resolves.toBeUndefined()
+    await expect(collectPushReceipts.run(undefined as unknown as ScheduledEvent)).resolves.toBeUndefined()
     expect(mockLogger.error).toHaveBeenCalledWith('Scheduled push receipt collection failed', expect.anything())
   })
 })

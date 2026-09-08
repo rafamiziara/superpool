@@ -24,9 +24,10 @@
     "testNotes": "tsx scripts/testNotes.ts",
     "testAgentSeam": "tsx scripts/testAgentSeam.ts",
     "testAssessment": "tsx scripts/testAssessment.ts",
-    "test": "jest",
+    "test": "vitest run",
     "type-check": "tsc --noEmit",
-    "type-check:prod": "tsc --noEmit -p tsconfig.build.json"
+    "type-check:prod": "tsc --noEmit -p tsconfig.build.json",
+    "test:watch": "vitest"
   },
   "engines": {
     "node": "22"
@@ -44,14 +45,13 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
-    "@types/jest": "^30.0.0",
     "@types/jsonwebtoken": "^9.0.10",
+    "@vitest/coverage-v8": "^5.0.0",
     "firebase-functions-test": "^3.4.1",
-    "jest": "^30.0.5",
     "minimatch": "^10.0.3",
-    "ts-jest": "^29.4.1",
     "tsx": "^4.23.13",
-    "typescript": "~6.0.3"
+    "typescript": "~6.0.3",
+    "vitest": "^5.0.0"
   },
   "private": true
 }

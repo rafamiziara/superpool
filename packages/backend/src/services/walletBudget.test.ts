@@ -1,4 +1,5 @@
 import type { Firestore } from 'firebase-admin/firestore'
+import type { Mock } from 'vitest'
 import { claimWhitelisting, releaseWhitelisting, WalletBusyError, withWalletLock } from './walletBudget'
 
 const CHAIN_ID = 80002
@@ -16,14 +17,14 @@ function buildFirestore() {
 
   const docRef = (id: string) => ({
     id,
-    set: jest.fn(async (data: Record<string, unknown>) => {
+    set: vi.fn(async (data: Record<string, unknown>) => {
       docs.set(id, data)
     }),
   })
 
   const firestore = {
-    collection: jest.fn(() => ({ doc: (id: string) => docRef(id) })),
-    runTransaction: jest.fn(async (work: (transaction: unknown) => Promise<unknown>) =>
+    collection: vi.fn(() => ({ doc: (id: string) => docRef(id) })),
+    runTransaction: vi.fn(async (work: (transaction: unknown) => Promise<unknown>) =>
       work({
         get: async (ref: { id: string }) => ({ data: () => docs.get(ref.id) }),
         set: (ref: { id: string }, data: Record<string, unknown>) => docs.set(ref.id, data),
@@ -31,7 +32,7 @@ function buildFirestore() {
     ),
   }
 
-  return { firestore: firestore as unknown as Firestore, docs }
+  return { firestore: firestore, docs }
 }
 
 describe('claimWhitelisting', () => {
@@ -42,7 +43,7 @@ describe('claimWhitelisting', () => {
   it('grants a claim and counts it', async () => {
     const { firestore } = buildFirestore()
 
-    const claim = await claimWhitelisting(CHAIN_ID, firestore)
+    const claim = await claimWhitelisting(CHAIN_ID, firestore as unknown as Firestore)
 
     expect(claim).toMatchObject({ granted: true, used: 1 })
   })
@@ -50,28 +51,28 @@ describe('claimWhitelisting', () => {
   it('counts consecutive claims against the same day', async () => {
     const { firestore } = buildFirestore()
 
-    await claimWhitelisting(CHAIN_ID, firestore)
-    const second = await claimWhitelisting(CHAIN_ID, firestore)
+    await claimWhitelisting(CHAIN_ID, firestore as unknown as Firestore)
+    const second = await claimWhitelisting(CHAIN_ID, firestore as unknown as Firestore)
 
     expect(second.used).toBe(2)
   })
 
   it('refuses once the day is spent', async () => {
     const { firestore, docs } = buildFirestore()
-    const cap = (await claimWhitelisting(CHAIN_ID, firestore)).cap
+    const cap = (await claimWhitelisting(CHAIN_ID, firestore as unknown as Firestore)).cap
 
     // Fast-forward the counter rather than making `cap` calls.
     docs.set(`budget-${CHAIN_ID}-${new Date().toISOString().slice(0, 10)}`, { count: cap })
 
-    expect(await claimWhitelisting(CHAIN_ID, firestore)).toMatchObject({ granted: false })
+    expect(await claimWhitelisting(CHAIN_ID, firestore as unknown as Firestore)).toMatchObject({ granted: false })
   })
 
   it('counts each chain separately', async () => {
     // One wallet, but a budget exhausted on Amoy must not stop localhost.
     const { firestore } = buildFirestore()
 
-    await claimWhitelisting(CHAIN_ID, firestore)
-    const other = await claimWhitelisting(31337, firestore)
+    await claimWhitelisting(CHAIN_ID, firestore as unknown as Firestore)
+    const other = await claimWhitelisting(31337, firestore as unknown as Firestore)
 
     expect(other.used).toBe(1)
   })
@@ -79,27 +80,27 @@ describe('claimWhitelisting', () => {
   it('gives a claim back', async () => {
     const { firestore } = buildFirestore()
 
-    await claimWhitelisting(CHAIN_ID, firestore)
-    await releaseWhitelisting(CHAIN_ID, firestore)
+    await claimWhitelisting(CHAIN_ID, firestore as unknown as Firestore)
+    await releaseWhitelisting(CHAIN_ID, firestore as unknown as Firestore)
 
-    expect((await claimWhitelisting(CHAIN_ID, firestore)).used).toBe(1)
+    expect((await claimWhitelisting(CHAIN_ID, firestore as unknown as Firestore)).used).toBe(1)
   })
 
   it('never lets a release drive the count below zero', async () => {
     const { firestore } = buildFirestore()
 
-    await releaseWhitelisting(CHAIN_ID, firestore)
+    await releaseWhitelisting(CHAIN_ID, firestore as unknown as Firestore)
 
-    expect((await claimWhitelisting(CHAIN_ID, firestore)).used).toBe(1)
+    expect((await claimWhitelisting(CHAIN_ID, firestore as unknown as Firestore)).used).toBe(1)
   })
 
   it('does not throw when a release fails', async () => {
     // A leaked claim costs one slot out of the day and resets at midnight,
     // which is a far better failure than an error path that can itself fail.
     const { firestore } = buildFirestore()
-    ;(firestore.runTransaction as jest.Mock).mockRejectedValueOnce(new Error('firestore unavailable'))
+    ;(firestore.runTransaction as Mock).mockRejectedValueOnce(new Error('firestore unavailable'))
 
-    await expect(releaseWhitelisting(CHAIN_ID, firestore)).resolves.toBeUndefined()
+    await expect(releaseWhitelisting(CHAIN_ID, firestore as unknown as Firestore)).resolves.toBeUndefined()
   })
 })
 
@@ -107,18 +108,18 @@ describe('withWalletLock', () => {
   it('runs the work and returns its value', async () => {
     const { firestore } = buildFirestore()
 
-    await expect(withWalletLock(CHAIN_ID, firestore, async () => 'done')).resolves.toBe('done')
+    await expect(withWalletLock(CHAIN_ID, firestore as unknown as Firestore, async () => 'done')).resolves.toBe('done')
   })
 
   it('refuses a second holder while the first is working', async () => {
     const { firestore } = buildFirestore()
 
     let release!: () => void
-    const held = withWalletLock(CHAIN_ID, firestore, () => new Promise<void>((resolve) => (release = resolve)))
+    const held = withWalletLock(CHAIN_ID, firestore as unknown as Firestore, () => new Promise<void>((resolve) => (release = resolve)))
 
     // The failure this prevents: both callers build a transaction on the same
     // nonce and the chain keeps one.
-    await expect(withWalletLock(CHAIN_ID, firestore, async () => 'second')).rejects.toBeInstanceOf(WalletBusyError)
+    await expect(withWalletLock(CHAIN_ID, firestore as unknown as Firestore, async () => 'second')).rejects.toBeInstanceOf(WalletBusyError)
 
     release()
     await held
@@ -127,9 +128,9 @@ describe('withWalletLock', () => {
   it('frees the lock once the work is done', async () => {
     const { firestore } = buildFirestore()
 
-    await withWalletLock(CHAIN_ID, firestore, async () => 'first')
+    await withWalletLock(CHAIN_ID, firestore as unknown as Firestore, async () => 'first')
 
-    await expect(withWalletLock(CHAIN_ID, firestore, async () => 'second')).resolves.toBe('second')
+    await expect(withWalletLock(CHAIN_ID, firestore as unknown as Firestore, async () => 'second')).resolves.toBe('second')
   })
 
   it('frees the lock when the work throws', async () => {
@@ -137,9 +138,11 @@ describe('withWalletLock', () => {
     // out, which is the kind of outage that looks like a hung product.
     const { firestore } = buildFirestore()
 
-    await expect(withWalletLock(CHAIN_ID, firestore, async () => Promise.reject(new Error('rpc down')))).rejects.toThrow('rpc down')
+    await expect(
+      withWalletLock(CHAIN_ID, firestore as unknown as Firestore, async () => Promise.reject(new Error('rpc down')))
+    ).rejects.toThrow('rpc down')
 
-    await expect(withWalletLock(CHAIN_ID, firestore, async () => 'second')).resolves.toBe('second')
+    await expect(withWalletLock(CHAIN_ID, firestore as unknown as Firestore, async () => 'second')).resolves.toBe('second')
   })
 
   it('takes over a lease that has expired', async () => {
@@ -148,16 +151,16 @@ describe('withWalletLock', () => {
     const { firestore, docs } = buildFirestore()
     docs.set(`lock-${CHAIN_ID}`, { chainId: CHAIN_ID, lockedUntil: Date.now() - 1 })
 
-    await expect(withWalletLock(CHAIN_ID, firestore, async () => 'taken over')).resolves.toBe('taken over')
+    await expect(withWalletLock(CHAIN_ID, firestore as unknown as Firestore, async () => 'taken over')).resolves.toBe('taken over')
   })
 
   it('locks each chain separately', async () => {
     const { firestore } = buildFirestore()
 
     let release!: () => void
-    const held = withWalletLock(CHAIN_ID, firestore, () => new Promise<void>((resolve) => (release = resolve)))
+    const held = withWalletLock(CHAIN_ID, firestore as unknown as Firestore, () => new Promise<void>((resolve) => (release = resolve)))
 
-    await expect(withWalletLock(31337, firestore, async () => 'other chain')).resolves.toBe('other chain')
+    await expect(withWalletLock(31337, firestore as unknown as Firestore, async () => 'other chain')).resolves.toBe('other chain')
 
     release()
     await held

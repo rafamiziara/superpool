@@ -1,26 +1,31 @@
-jest.mock('../../services')
-jest.mock('../../services/pushTokens', () => ({
-  ...jest.requireActual('../../services/pushTokens'),
-  savePushToken: jest.fn(),
-  deletePushToken: jest.fn(),
+import type { CallableRequest } from 'firebase-functions/v2/https'
+
+vi.mock('../../services')
+vi.mock('../../services/pushTokens', async () => ({
+  ...(await vi.importActual<typeof import('../../services/pushTokens')>('../../services/pushTokens')),
+  savePushToken: vi.fn(),
+  deletePushToken: vi.fn(),
 }))
 
-const { registerPushTokenHandler } = require('./registerPushToken')
-const { unregisterPushTokenHandler } = require('./unregisterPushToken')
-const { savePushToken, deletePushToken } = require('../../services/pushTokens')
+import * as pushTokensMock from '../../services/pushTokens'
+import { registerPushTokenHandler } from './registerPushToken'
+import { unregisterPushTokenHandler } from './unregisterPushToken'
 
+// These modules are mocked above; vi.mocked restores the mock types that the
+// real signatures would otherwise hide.
+const { deletePushToken, savePushToken } = vi.mocked(pushTokensMock)
 const TOKEN = 'ExponentPushToken[abcdefghijklmnop]'
 const WALLET = '0x9965507d1a55bcc2695c58ba16fb37d819b0a4dc'
 
-function buildRequest(overrides: Partial<{ auth: object | null; data: Record<string, unknown> }> = {}) {
+function buildRequest<T>(overrides: Partial<{ auth: object | null; data: Record<string, unknown> }> = {}): CallableRequest<T> {
   return {
     auth: overrides.auth !== undefined ? overrides.auth : { uid: WALLET, token: {} },
     data: overrides.data !== undefined ? overrides.data : { token: TOKEN, deviceId: 'device-1', platform: 'ios' },
-  }
+  } as unknown as CallableRequest<T>
 }
 
 beforeEach(() => {
-  jest.clearAllMocks()
+  vi.clearAllMocks()
   savePushToken.mockResolvedValue(true)
   deletePushToken.mockResolvedValue(true)
 })
@@ -86,7 +91,9 @@ describe('registerPushToken', () => {
   // A callable can be invoked with no payload at all; destructuring it must not
   // be the thing that throws.
   it('refuses a request with no data rather than crashing on it', async () => {
-    await expect(registerPushTokenHandler({ ...buildRequest(), data: undefined })).rejects.toMatchObject({ code: 'invalid-argument' })
+    await expect(
+      registerPushTokenHandler({ ...buildRequest(), data: undefined } as unknown as CallableRequest<never>)
+    ).rejects.toMatchObject({ code: 'invalid-argument' })
   })
 })
 
@@ -116,7 +123,9 @@ describe('unregisterPushToken', () => {
   })
 
   it('refuses a request with no data rather than crashing on it', async () => {
-    await expect(unregisterPushTokenHandler({ ...buildRequest(), data: undefined })).rejects.toMatchObject({ code: 'invalid-argument' })
+    await expect(
+      unregisterPushTokenHandler({ ...buildRequest(), data: undefined } as unknown as CallableRequest<never>)
+    ).rejects.toMatchObject({ code: 'invalid-argument' })
   })
 
   it('reports a delete failure as internal rather than leaking it', async () => {

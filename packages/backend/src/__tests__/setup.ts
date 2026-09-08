@@ -3,38 +3,46 @@
  * Following mobile app philosophy: minimal mocking, real logic testing
  */
 
-// Mock only unavoidable external dependencies
-export const mockLogger = {
-  info: jest.fn(),
-  error: jest.fn(),
-  warn: jest.fn(),
-}
-
-// Mock Firebase Functions SDK (unavoidable external dependency)
-jest.mock('firebase-functions/v2', () => ({
-  logger: mockLogger,
+// The hoisted binding cannot itself be exported — Vitest rejects that outright — so the
+// value is hoisted under one name and re-exported under another. `vi.mock` factories are
+// hoisted above everything else in the module and so cannot close over an ordinary
+// `const`; jest allowed it only because its hoist plugin whitelists identifiers beginning
+// with "mock", which is why this was called mockLogger. Three test files import it.
+const hoisted = vi.hoisted(() => ({
+  mockLogger: {
+    info: vi.fn(),
+    error: vi.fn(),
+    warn: vi.fn(),
+  },
 }))
 
-jest.mock('firebase-functions', () => ({
-  logger: mockLogger,
+export const mockLogger = hoisted.mockLogger
+
+// Mock Firebase Functions SDK (unavoidable external dependency)
+vi.mock('firebase-functions/v2', () => ({
+  logger: hoisted.mockLogger,
+}))
+
+vi.mock('firebase-functions', () => ({
+  logger: hoisted.mockLogger,
 }))
 
 // Mock Firebase Admin initialization (uses service account)
-jest.mock('../config/firebase', () => ({
+vi.mock('../config/firebase', () => ({
   auth: {
-    createCustomToken: jest.fn(),
+    createCustomToken: vi.fn(),
   },
   firestore: {
-    collection: jest.fn(),
+    collection: vi.fn(),
   },
   appCheck: {
-    createToken: jest.fn(),
+    createToken: vi.fn(),
   },
 }))
 
 // Mock uuid for deterministic nonces
-jest.mock('uuid', () => ({
-  v4: jest.fn(() => 'test-nonce-uuid'),
+vi.mock('uuid', () => ({
+  v4: vi.fn(() => 'test-nonce-uuid'),
 }))
 
 // Suppress expected warnings

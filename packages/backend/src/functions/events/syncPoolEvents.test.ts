@@ -1,22 +1,37 @@
+import type { JsonRpcProvider } from 'ethers'
+import type { CollectionReference, DocumentData } from 'firebase-admin/firestore'
+import type { SweepCounts } from '../../services/eventSweeper'
+
 // The chain registry reads the environment once, at module load, and the
 // handler refuses to run without a factory address — so these must be set
 // before the first require below. Two chains, because sweeping more than one is
 // the behaviour that matters most here.
-process.env.POOL_FACTORY_ADDRESS = '0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512'
-process.env.POOL_FACTORY_ADDRESS_80002 = '0x0Aa731eD9C24B6f8E3d15C97a40Fb2D6E8391B55'
-process.env.RPC_URL_80002 = 'https://rpc-amoy.example/'
+// The chain registry reads process.env once, at module load. ESM hoists every import
+// above ordinary statements, so this must run inside vi.hoisted to land first.
+vi.hoisted(() => {
+  process.env.POOL_FACTORY_ADDRESS = '0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512'
+})
+vi.hoisted(() => {
+  process.env.POOL_FACTORY_ADDRESS_80002 = '0x0Aa731eD9C24B6f8E3d15C97a40Fb2D6E8391B55'
+  process.env.RPC_URL_80002 = 'https://rpc-amoy.example/'
+})
 
 import { mockLogger } from '../../__tests__/setup'
 
-jest.mock('../../utils/blockchain')
-jest.mock('../../services')
-jest.mock('../../services/eventSweeper')
+vi.mock('../../utils/blockchain')
+vi.mock('../../services')
+vi.mock('../../services/eventSweeper')
 
-const { syncPoolEventsHandler, syncAllChainsHandler, resolveInitialFromBlock } = require('./syncPoolEvents')
-const { getProvider } = require('../../utils/blockchain')
-const { sweepBlockRange } = require('../../services/eventSweeper')
-const { firestore } = require('../../services')
+import * as servicesMock from '../../services'
+import * as eventSweeperMock from '../../services/eventSweeper'
+import * as blockchainMock from '../../utils/blockchain'
+import { resolveInitialFromBlock, syncAllChainsHandler, syncPoolEventsHandler } from './syncPoolEvents'
 
+// These modules are mocked above; vi.mocked restores the mock types that the
+// real signatures would otherwise hide.
+const { firestore } = vi.mocked(servicesMock)
+const { sweepBlockRange } = vi.mocked(eventSweeperMock)
+const { getProvider } = vi.mocked(blockchainMock)
 // ---------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------
@@ -45,7 +60,7 @@ const NO_COUNTS = { pools: 0, contributions: 0, withdrawals: 0, statusUpdates: 0
 // ---------------------------------------------------------------------------
 
 function buildMockProvider(currentBlock: number = CURRENT_BLOCK) {
-  return { getBlockNumber: jest.fn().mockResolvedValue(currentBlock) }
+  return { getBlockNumber: vi.fn().mockResolvedValue(currentBlock) }
 }
 
 interface FirestoreOptions {
@@ -58,16 +73,16 @@ function setupFirestore(options: FirestoreOptions = {}) {
   const { syncStateExists = true, lastProcessedBlock = LAST_PROCESSED_BLOCK, setError } = options
 
   const syncStateRef = {
-    get: jest.fn().mockResolvedValue({
+    get: vi.fn().mockResolvedValue({
       exists: syncStateExists,
       data: () => (syncStateExists ? { lastProcessedBlock } : null),
     }),
-    set: setError ? jest.fn().mockRejectedValue(setError) : jest.fn().mockResolvedValue(undefined),
+    set: setError ? vi.fn().mockRejectedValue(setError) : vi.fn().mockResolvedValue(undefined),
   }
 
-  const doc = jest.fn().mockReturnValue(syncStateRef)
+  const doc = vi.fn().mockReturnValue(syncStateRef)
 
-  firestore.collection.mockReturnValue({ doc })
+  vi.mocked(firestore.collection).mockReturnValue({ doc } as unknown as CollectionReference<DocumentData, DocumentData>)
 
   return { syncStateRef, doc }
 }
@@ -79,8 +94,8 @@ function sweptRanges(): [number, number][] {
 
 beforeEach(() => {
   delete process.env.START_BLOCK
-  getProvider.mockReturnValue(buildMockProvider())
-  sweepBlockRange.mockResolvedValue({ ...NO_COUNTS })
+  getProvider.mockReturnValue(buildMockProvider() as unknown as JsonRpcProvider)
+  sweepBlockRange.mockResolvedValue({ ...NO_COUNTS } as unknown as SweepCounts)
 })
 
 // ---------------------------------------------------------------------------
@@ -198,7 +213,7 @@ describe('syncPoolEventsHandler', () => {
       // Public RPCs cap the span of a single `getLogs`, so the gap has to be
       // walked rather than asked for in one query.
       setupFirestore({ lastProcessedBlock: -1 })
-      getProvider.mockReturnValue(buildMockProvider(1200))
+      getProvider.mockReturnValue(buildMockProvider(1200) as unknown as JsonRpcProvider)
 
       // Act
       await syncPoolEventsHandler({ fromBlock: 0 })
@@ -227,7 +242,7 @@ describe('syncPoolEventsHandler', () => {
       // 100 ranges of 500 blocks. A first run on a long chain must return
       // rather than run past the function timeout; the next run continues.
       setupFirestore({ syncStateExists: false })
-      getProvider.mockReturnValue(buildMockProvider(1_000_000))
+      getProvider.mockReturnValue(buildMockProvider(1_000_000) as unknown as JsonRpcProvider)
 
       // Act
       const result = await syncPoolEventsHandler({ fromBlock: 0 })
@@ -241,10 +256,10 @@ describe('syncPoolEventsHandler', () => {
     it('should accumulate counts across every range it sweeps', async () => {
       // Arrange
       setupFirestore({ lastProcessedBlock: -1 })
-      getProvider.mockReturnValue(buildMockProvider(600))
+      getProvider.mockReturnValue(buildMockProvider(600) as unknown as JsonRpcProvider)
       sweepBlockRange
-        .mockResolvedValueOnce({ pools: 2, contributions: 3, withdrawals: 1, statusUpdates: 1 })
-        .mockResolvedValueOnce({ pools: 1, contributions: 0, withdrawals: 4, statusUpdates: 2 })
+        .mockResolvedValueOnce({ pools: 2, contributions: 3, withdrawals: 1, statusUpdates: 1 } as unknown as SweepCounts)
+        .mockResolvedValueOnce({ pools: 1, contributions: 0, withdrawals: 4, statusUpdates: 2 } as unknown as SweepCounts)
 
       // Act
       const result = await syncPoolEventsHandler({ fromBlock: 0 })
@@ -259,7 +274,7 @@ describe('syncPoolEventsHandler', () => {
       // Arrange
       // A run that dies mid-backfill must keep what it has already indexed.
       const { syncStateRef } = setupFirestore({ lastProcessedBlock: -1 })
-      getProvider.mockReturnValue(buildMockProvider(1200))
+      getProvider.mockReturnValue(buildMockProvider(1200) as unknown as JsonRpcProvider)
 
       // Act
       await syncPoolEventsHandler({ fromBlock: 0 })
@@ -272,7 +287,7 @@ describe('syncPoolEventsHandler', () => {
     it('should increment a counter per feed', async () => {
       // Arrange
       const { syncStateRef } = setupFirestore()
-      sweepBlockRange.mockResolvedValue({ pools: 1, contributions: 2, withdrawals: 3, statusUpdates: 4 })
+      sweepBlockRange.mockResolvedValue({ pools: 1, contributions: 2, withdrawals: 3, statusUpdates: 4 } as unknown as SweepCounts)
 
       // Act
       await syncPoolEventsHandler()
@@ -300,7 +315,9 @@ describe('syncPoolEventsHandler', () => {
       await syncPoolEventsHandler({ fromBlock: 0 })
 
       // Assert
-      const written = syncStateRef.set.mock.calls.map(([data]: [{ lastProcessedBlock: number }]) => data.lastProcessedBlock)
+      const written = (syncStateRef.set.mock.calls as unknown as [{ lastProcessedBlock: number }][]).map(
+        ([data]) => data.lastProcessedBlock
+      )
       expect(Math.min(...written)).toBe(4900)
     })
 
@@ -308,7 +325,7 @@ describe('syncPoolEventsHandler', () => {
       // Arrange
       // The events are indexed either way; a repeated range costs nothing.
       setupFirestore({ lastProcessedBlock: -1, setError: new Error('Firestore unavailable') })
-      getProvider.mockReturnValue(buildMockProvider(1200))
+      getProvider.mockReturnValue(buildMockProvider(1200) as unknown as JsonRpcProvider)
 
       // Act
       const result = await syncPoolEventsHandler({ fromBlock: 0 })
@@ -325,13 +342,13 @@ describe('syncPoolEventsHandler', () => {
       // Arrange
       // Without it there is no way to tell a pool of ours from any other
       // contract, so sweeping would index strangers' events.
-      jest.resetModules()
+      vi.resetModules()
       const previous = process.env.POOL_FACTORY_ADDRESS
       delete process.env.POOL_FACTORY_ADDRESS
 
       // Act & Assert
       try {
-        const { syncPoolEventsHandler: handler } = require('./syncPoolEvents')
+        const { syncPoolEventsHandler: handler } = await import('./syncPoolEvents')
         await expect(handler()).rejects.toThrow('PoolFactory address not configured')
       } finally {
         process.env.POOL_FACTORY_ADDRESS = previous
@@ -350,7 +367,7 @@ describe('syncPoolEventsHandler', () => {
 
     it('should throw when the chain head cannot be read', async () => {
       // Arrange
-      getProvider.mockReturnValue({ getBlockNumber: jest.fn().mockRejectedValue(new Error('network timeout')) })
+      getProvider.mockReturnValue({ getBlockNumber: vi.fn().mockRejectedValue(new Error('network timeout')) } as unknown as JsonRpcProvider)
 
       // Act & Assert
       await expect(syncPoolEventsHandler()).rejects.toThrow('network timeout')
@@ -361,9 +378,9 @@ describe('syncPoolEventsHandler', () => {
       // Advancing past blocks that were never read would lose their events for
       // good — nothing revisits them.
       const { syncStateRef } = setupFirestore({ lastProcessedBlock: -1 })
-      getProvider.mockReturnValue(buildMockProvider(1200))
+      getProvider.mockReturnValue(buildMockProvider(1200) as unknown as JsonRpcProvider)
       sweepBlockRange
-        .mockResolvedValueOnce({ pools: 1, contributions: 0, withdrawals: 0, statusUpdates: 0 })
+        .mockResolvedValueOnce({ pools: 1, contributions: 0, withdrawals: 0, statusUpdates: 0 } as unknown as SweepCounts)
         .mockRejectedValueOnce(new Error('RPC down'))
 
       // Act
@@ -383,9 +400,9 @@ describe('syncPoolEventsHandler', () => {
     it('should report what it indexed before the failure', async () => {
       // Arrange
       setupFirestore({ lastProcessedBlock: -1 })
-      getProvider.mockReturnValue(buildMockProvider(1200))
+      getProvider.mockReturnValue(buildMockProvider(1200) as unknown as JsonRpcProvider)
       sweepBlockRange
-        .mockResolvedValueOnce({ pools: 2, contributions: 1, withdrawals: 0, statusUpdates: 0 })
+        .mockResolvedValueOnce({ pools: 2, contributions: 1, withdrawals: 0, statusUpdates: 0 } as unknown as SweepCounts)
         .mockRejectedValueOnce(new Error('RPC down'))
 
       // Act
@@ -484,10 +501,10 @@ describe('syncPoolEventsHandler', () => {
     // localhost indexing too.
     it('carries on after one chain fails', async () => {
       setupFirestore()
-      getProvider.mockImplementation((chainId: number) => {
+      getProvider.mockImplementation((chainId: number): JsonRpcProvider => {
         if (chainId === SECOND_CHAIN_ID) throw new Error('amoy unreachable')
 
-        return buildMockProvider()
+        return buildMockProvider() as unknown as JsonRpcProvider
       })
 
       const results = await syncAllChainsHandler()

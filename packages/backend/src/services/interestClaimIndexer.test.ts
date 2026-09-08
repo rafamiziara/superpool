@@ -1,38 +1,42 @@
+import type { Log } from 'ethers'
 import { mockLogger } from '../__tests__/setup'
 import type { ParsedInterestClaimEvent } from './interestClaimIndexer'
+
+// Hoisted so the vi.mock factories below can close over them: vi.mock runs before
+// any module-level const is initialised.
+const { mockDecodeEventLog, mockGetEvent, mockGetPoolId } = vi.hoisted(() => ({
+  mockDecodeEventLog: vi.fn(),
+  mockGetEvent: vi.fn(),
+  mockGetPoolId: vi.fn(),
+}))
 
 // ---------------------------------------------------------------------------
 // Shared mock references — captured at module-definition time so tests can
 // configure them per-case via mockReturnValue / mockImplementation.
 // ---------------------------------------------------------------------------
-const mockDecodeEventLog = jest.fn()
-const mockGetEvent = jest.fn()
-const mockGetPoolId = jest.fn()
-
 // Mock ethers BEFORE importing the module under test. The module creates a
 // top-level `new Interface([...LendingPoolABI])`, so the mock must be in
 // place before the first `require`.
-jest.mock('ethers', () => {
-  const actual = jest.requireActual('ethers')
+vi.mock('ethers', async () => {
+  const actual = await vi.importActual<typeof import('ethers')>('ethers')
   return {
     ...actual,
-    Interface: jest.fn().mockImplementation(() => ({
-      decodeEventLog: mockDecodeEventLog,
-      getEvent: mockGetEvent,
-    })),
-    Contract: jest.fn().mockImplementation(() => ({
-      getPoolId: mockGetPoolId,
-    })),
+    Interface: vi.fn().mockImplementation(function () {
+      return {
+        decodeEventLog: mockDecodeEventLog,
+        getEvent: mockGetEvent,
+      }
+    }),
+    Contract: vi.fn().mockImplementation(function () {
+      return {
+        getPoolId: mockGetPoolId,
+      }
+    }),
   }
 })
 
 // Import AFTER mocks are registered
-const {
-  parseInterestClaimedLog,
-  indexInterestClaimEvent,
-  indexInterestClaimsByTxHash,
-  interestClaimDocId,
-} = require('./interestClaimIndexer')
+import { indexInterestClaimEvent, indexInterestClaimsByTxHash, interestClaimDocId, parseInterestClaimedLog } from './interestClaimIndexer'
 
 // ---------------------------------------------------------------------------
 // Shared test constants
@@ -68,7 +72,7 @@ function buildMockLog(
     index: number
     address: string
   }> = {}
-) {
+): Log {
   return {
     // Both InterestClaimed parameters are `indexed`, so a real log carries no data.
     data: '0x',
@@ -78,7 +82,7 @@ function buildMockLog(
     index: 0,
     address: POOL_ADDRESS,
     ...overrides,
-  }
+  } as unknown as Log
 }
 
 function makeDefaultDecodeReturn(overrides: Record<string, unknown> = {}) {
@@ -104,9 +108,9 @@ function buildParsedClaim(overrides: Partial<ParsedInterestClaimEvent> = {}): Pa
   }
 }
 
-function buildFirestore(create = jest.fn().mockResolvedValue(undefined)) {
-  const doc = jest.fn().mockReturnValue({ create })
-  const collection = jest.fn().mockReturnValue({ doc })
+function buildFirestore(create = vi.fn().mockResolvedValue(undefined)) {
+  const doc = vi.fn().mockReturnValue({ create })
+  const collection = vi.fn().mockReturnValue({ doc })
 
   return { firestore: { collection } as never, collection, doc, create }
 }
@@ -118,12 +122,12 @@ function buildProvider(
   }> = {}
 ) {
   return {
-    getTransactionReceipt: jest
+    getTransactionReceipt: vi
       .fn()
       .mockResolvedValue(
         overrides.receipt === undefined ? { status: 1, blockNumber: BLOCK_NUMBER, logs: [buildMockLog()] } : overrides.receipt
       ),
-    getBlock: jest.fn().mockResolvedValue(overrides.block === undefined ? { timestamp: BLOCK_TIMESTAMP } : overrides.block),
+    getBlock: vi.fn().mockResolvedValue(overrides.block === undefined ? { timestamp: BLOCK_TIMESTAMP } : overrides.block),
   } as never
 }
 
@@ -157,7 +161,7 @@ describe('interestClaimDocId', () => {
 
 describe('parseInterestClaimedLog', () => {
   beforeEach(() => {
-    jest.clearAllMocks()
+    vi.clearAllMocks()
     mockDecodeEventLog.mockReturnValue(makeDefaultDecodeReturn())
     mockGetEvent.mockReturnValue({ topicHash: INTEREST_CLAIMED_TOPIC })
   })
@@ -256,7 +260,7 @@ describe('parseInterestClaimedLog', () => {
 
 describe('indexInterestClaimEvent', () => {
   beforeEach(() => {
-    jest.clearAllMocks()
+    vi.clearAllMocks()
   })
 
   it('should write the claim to the interest_claims collection', async () => {
@@ -276,7 +280,7 @@ describe('indexInterestClaimEvent', () => {
   it('should use create() so racing indexing paths cannot double-write', async () => {
     // Arrange — the pool screen indexes the transaction it just watched confirm
     // while the scheduled sweep covers the same block.
-    const { firestore, create } = buildFirestore(jest.fn().mockRejectedValue(alreadyExistsError()))
+    const { firestore, create } = buildFirestore(vi.fn().mockRejectedValue(alreadyExistsError()))
 
     // Act
     const result = await indexInterestClaimEvent(buildParsedClaim(), firestore)
@@ -289,7 +293,7 @@ describe('indexInterestClaimEvent', () => {
 
   it('should rethrow a write failure that is not a duplicate', async () => {
     // Arrange
-    const { firestore } = buildFirestore(jest.fn().mockRejectedValue(new Error('permission denied')))
+    const { firestore } = buildFirestore(vi.fn().mockRejectedValue(new Error('permission denied')))
 
     // Act & Assert
     await expect(indexInterestClaimEvent(buildParsedClaim(), firestore)).rejects.toThrow('permission denied')
@@ -302,7 +306,7 @@ describe('indexInterestClaimEvent', () => {
 
 describe('indexInterestClaimsByTxHash', () => {
   beforeEach(() => {
-    jest.clearAllMocks()
+    vi.clearAllMocks()
     mockDecodeEventLog.mockReturnValue(makeDefaultDecodeReturn())
     mockGetEvent.mockReturnValue({ topicHash: INTEREST_CLAIMED_TOPIC })
     mockGetPoolId.mockResolvedValue(BigInt(1))

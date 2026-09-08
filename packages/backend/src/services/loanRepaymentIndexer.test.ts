@@ -1,40 +1,45 @@
+import type { Log } from 'ethers'
 import { mockLogger } from '../__tests__/setup'
 import type { ParsedLoanRepaymentEvent } from './loanRepaymentIndexer'
+
+// Hoisted so the vi.mock factories below can close over them: vi.mock runs before
+// any module-level const is initialised.
+const { mockDecodeEventLog, mockGetEvent, mockGetPoolId } = vi.hoisted(() => ({
+  mockDecodeEventLog: vi.fn(),
+  mockGetEvent: vi.fn().mockReturnValue({ topicHash: '0xLOAN_REPAYMENT_MADE_TOPIC' }),
+  mockGetPoolId: vi.fn(),
+}))
 
 // ---------------------------------------------------------------------------
 // Shared mock references — captured at module-definition time so tests can
 // configure them per-case via mockReturnValue / mockImplementation.
 // ---------------------------------------------------------------------------
-const mockDecodeEventLog = jest.fn()
-const mockGetEvent = jest.fn()
-const mockGetPoolId = jest.fn()
-
 // Mock ethers BEFORE importing the module under test. The module creates a
 // top-level `new Interface([...LendingPoolABI])`, so the mock must be in
 // place before the first `require`.
-jest.mock('ethers', () => {
-  const actual = jest.requireActual('ethers')
+vi.mock('ethers', async () => {
+  const actual = await vi.importActual<typeof import('ethers')>('ethers')
   return {
     ...actual,
-    Interface: jest.fn().mockImplementation(() => ({
-      decodeEventLog: mockDecodeEventLog,
-      getEvent: mockGetEvent,
-    })),
-    Contract: jest.fn().mockImplementation(() => ({
-      getPoolId: mockGetPoolId,
-    })),
+    Interface: vi.fn().mockImplementation(function () {
+      return {
+        decodeEventLog: mockDecodeEventLog,
+        getEvent: mockGetEvent,
+      }
+    }),
+    Contract: vi.fn().mockImplementation(function () {
+      return {
+        getPoolId: mockGetPoolId,
+      }
+    }),
   }
 })
 
-mockGetEvent.mockReturnValue({ topicHash: '0xLOAN_REPAYMENT_MADE_TOPIC' })
+// Seeded inside vi.hoisted rather than here: the module computes its topic hash at
+// import time, and ESM hoists the import below above ordinary statements.
 
 // Import AFTER mocks are registered
-const {
-  parseLoanRepaymentLog,
-  indexLoanRepaymentEvent,
-  indexLoanRepaymentsByTxHash,
-  loanRepaymentDocId,
-} = require('./loanRepaymentIndexer')
+import { indexLoanRepaymentEvent, indexLoanRepaymentsByTxHash, loanRepaymentDocId, parseLoanRepaymentLog } from './loanRepaymentIndexer'
 
 // ---------------------------------------------------------------------------
 // Shared test constants
@@ -70,7 +75,7 @@ function buildMockLog(
     index: number
     address: string
   }> = {}
-) {
+): Log {
   return {
     // All three LoanRepaymentMade parameters are `indexed`, so a real log
     // carries no data.
@@ -81,7 +86,7 @@ function buildMockLog(
     index: 0,
     address: POOL_ADDRESS,
     ...overrides,
-  }
+  } as unknown as Log
 }
 
 function makeDefaultDecodeReturn(overrides: Record<string, unknown> = {}) {
@@ -109,9 +114,9 @@ function buildParsedRepayment(overrides: Partial<ParsedLoanRepaymentEvent> = {})
   }
 }
 
-function buildFirestore(create = jest.fn().mockResolvedValue(undefined)) {
-  const doc = jest.fn().mockReturnValue({ create })
-  const collection = jest.fn().mockReturnValue({ doc })
+function buildFirestore(create = vi.fn().mockResolvedValue(undefined)) {
+  const doc = vi.fn().mockReturnValue({ create })
+  const collection = vi.fn().mockReturnValue({ doc })
 
   return { firestore: { collection } as never, collection, doc, create }
 }
@@ -123,12 +128,12 @@ function buildProvider(
   }> = {}
 ) {
   return {
-    getTransactionReceipt: jest
+    getTransactionReceipt: vi
       .fn()
       .mockResolvedValue(
         overrides.receipt === undefined ? { status: 1, blockNumber: BLOCK_NUMBER, logs: [buildMockLog()] } : overrides.receipt
       ),
-    getBlock: jest.fn().mockResolvedValue(overrides.block === undefined ? { timestamp: BLOCK_TIMESTAMP } : overrides.block),
+    getBlock: vi.fn().mockResolvedValue(overrides.block === undefined ? { timestamp: BLOCK_TIMESTAMP } : overrides.block),
   } as never
 }
 
@@ -164,7 +169,7 @@ describe('loanRepaymentDocId', () => {
 
 describe('parseLoanRepaymentLog', () => {
   beforeEach(() => {
-    jest.clearAllMocks()
+    vi.clearAllMocks()
     mockDecodeEventLog.mockReturnValue(makeDefaultDecodeReturn())
     mockGetEvent.mockReturnValue({ topicHash: LOAN_REPAYMENT_MADE_TOPIC })
   })
@@ -253,7 +258,7 @@ describe('parseLoanRepaymentLog', () => {
 
 describe('indexLoanRepaymentEvent', () => {
   beforeEach(() => {
-    jest.clearAllMocks()
+    vi.clearAllMocks()
     mockLogger.info.mockClear()
   })
 
@@ -281,7 +286,7 @@ describe('indexLoanRepaymentEvent', () => {
   it('should treat an existing document as already indexed rather than failing', async () => {
     // Arrange — `create()` racing itself is the normal case: the callable and
     // the sweep both index the same transaction.
-    const { firestore } = buildFirestore(jest.fn().mockRejectedValue(alreadyExistsError()))
+    const { firestore } = buildFirestore(vi.fn().mockRejectedValue(alreadyExistsError()))
 
     // Act
     const result = await indexLoanRepaymentEvent(buildParsedRepayment(), firestore)
@@ -292,7 +297,7 @@ describe('indexLoanRepaymentEvent', () => {
 
   it('should rethrow any failure that is not a collision', async () => {
     // Arrange
-    const { firestore } = buildFirestore(jest.fn().mockRejectedValue(new Error('network down')))
+    const { firestore } = buildFirestore(vi.fn().mockRejectedValue(new Error('network down')))
 
     // Act & Assert
     await expect(indexLoanRepaymentEvent(buildParsedRepayment(), firestore)).rejects.toThrow('network down')
@@ -325,7 +330,7 @@ describe('indexLoanRepaymentEvent', () => {
 
 describe('indexLoanRepaymentsByTxHash', () => {
   beforeEach(() => {
-    jest.clearAllMocks()
+    vi.clearAllMocks()
     mockDecodeEventLog.mockReturnValue(makeDefaultDecodeReturn())
     mockGetEvent.mockReturnValue({ topicHash: LOAN_REPAYMENT_MADE_TOPIC })
     mockGetPoolId.mockResolvedValue(1n)

@@ -1,31 +1,35 @@
-jest.mock('../../services')
-jest.mock('../../services/agentClient', () => ({ assessLoanWithAgent: jest.fn() }))
-jest.mock('../../services/assessments', () => ({
-  ...jest.requireActual('../../services/assessments'),
-  assessmentFor: jest.fn(),
-  claimAssessment: jest.fn(),
-  gatherFacts: jest.fn(),
-  ownershipOf: jest.fn(),
-  releaseAssessment: jest.fn(),
-  saveAssessment: jest.fn(),
+import type { AssessmentInfo } from '@superpool/types'
+import type { JsonRpcProvider } from 'ethers'
+import type { CallableRequest } from 'firebase-functions/v2/https'
+import type { AgentAssessment } from '../../services/agentClient'
+
+vi.mock('../../services')
+vi.mock('../../services/agentClient', () => ({ assessLoanWithAgent: vi.fn() }))
+vi.mock('../../services/assessments', async () => ({
+  ...(await vi.importActual<typeof import('../../services/assessments')>('../../services/assessments')),
+  assessmentFor: vi.fn(),
+  claimAssessment: vi.fn(),
+  gatherFacts: vi.fn(),
+  ownershipOf: vi.fn(),
+  releaseAssessment: vi.fn(),
+  saveAssessment: vi.fn(),
 }))
-jest.mock('../../utils/blockchain', () => ({ getProvider: jest.fn() }))
-jest.mock('ethers', () => ({ ...jest.requireActual('ethers'), Contract: jest.fn() }))
+vi.mock('../../utils/blockchain', () => ({ getProvider: vi.fn() }))
+vi.mock('ethers', async () => ({ ...(await vi.importActual<typeof import('ethers')>('ethers')), Contract: vi.fn() }))
 
-const { assessLoanHandler } = require('./assessLoan')
-const { getAssessmentHandler } = require('./getAssessment')
-const { assessLoanWithAgent } = require('../../services/agentClient')
-const {
-  assessmentFor,
-  claimAssessment,
-  gatherFacts,
-  ownershipOf,
-  releaseAssessment,
-  saveAssessment,
-} = require('../../services/assessments')
-const { getProvider } = require('../../utils/blockchain')
-const { Contract } = require('ethers')
+import * as ethersMock from 'ethers'
+import * as agentClientMock from '../../services/agentClient'
+import * as assessmentsMock from '../../services/assessments'
+import * as blockchainMock from '../../utils/blockchain'
+import { assessLoanHandler } from './assessLoan'
+import { getAssessmentHandler } from './getAssessment'
 
+// These modules are mocked above; vi.mocked restores the mock types that the
+// real signatures would otherwise hide.
+const { Contract } = vi.mocked(ethersMock)
+const { assessLoanWithAgent } = vi.mocked(agentClientMock)
+const { assessmentFor, claimAssessment, gatherFacts, ownershipOf, releaseAssessment, saveAssessment } = vi.mocked(assessmentsMock)
+const { getProvider } = vi.mocked(blockchainMock)
 const OWNER = '0x2222222222222222222222222222222222222222'
 const BORROWER = '0x3333333333333333333333333333333333333333'
 const LOAN_ID = '31337-1-7'
@@ -53,7 +57,13 @@ const FACTS = {
   loanId: 7,
 }
 
-const READING = { risk: 'low', summary: 'Modest ask, clean record.', observations: [], questions: [], limitations: ['No purpose.'] }
+const READING: AgentAssessment = {
+  risk: 'low',
+  summary: 'Modest ask, clean record.',
+  observations: [],
+  questions: [],
+  limitations: ['No purpose.'],
+}
 
 const STORED = {
   id: LOAN_ID,
@@ -65,24 +75,26 @@ const STORED = {
   createdAt: '2026-08-18T09:00:00.000Z',
 }
 
-function buildRequest(overrides: Partial<{ auth: object | null; data: Record<string, unknown> }> = {}) {
+function buildRequest<T>(overrides: Partial<{ auth: object | null; data: Record<string, unknown> }> = {}): CallableRequest<T> {
   return {
     auth: overrides.auth !== undefined ? overrides.auth : { uid: OWNER, token: {} },
     data: overrides.data !== undefined ? overrides.data : { loanId: LOAN_ID },
-  }
+  } as unknown as CallableRequest<T>
 }
 
 beforeEach(() => {
-  jest.clearAllMocks()
+  vi.clearAllMocks()
   ownershipOf.mockResolvedValue(OWNERSHIP)
   assessmentFor.mockResolvedValue(null)
   gatherFacts.mockResolvedValue(FACTS)
   assessLoanWithAgent.mockResolvedValue({ status: 'ok', assessment: READING })
-  saveAssessment.mockResolvedValue(STORED)
+  saveAssessment.mockResolvedValue(STORED as unknown as AssessmentInfo)
   claimAssessment.mockResolvedValue({ granted: true, used: 1, cap: 50 })
   releaseAssessment.mockResolvedValue(undefined)
-  Contract.mockImplementation(() => ({ totalFunds: jest.fn().mockResolvedValue(200_000_000n) }))
-  getProvider.mockReturnValue({ getBlock: jest.fn().mockResolvedValue({ timestamp: 1_800_000_000 }) })
+  vi.mocked(Contract).mockImplementation(function () {
+    return { totalFunds: vi.fn().mockResolvedValue(200_000_000n) }
+  })
+  getProvider.mockReturnValue({ getBlock: vi.fn().mockResolvedValue({ timestamp: 1_800_000_000 }) } as unknown as JsonRpcProvider)
 })
 
 describe('assessLoan', () => {
@@ -138,7 +150,7 @@ describe('assessLoan', () => {
   // An LLM judgement is not reproducible, so a decision surface that recomputed
   // on every open would say something different each time.
   it('reads a stored assessment back rather than making a new one', async () => {
-    assessmentFor.mockResolvedValue(STORED)
+    assessmentFor.mockResolvedValue(STORED as unknown as AssessmentInfo)
 
     const result = await assessLoanHandler(buildRequest())
 
@@ -147,7 +159,7 @@ describe('assessLoan', () => {
   })
 
   it('makes a new one when the owner asks for it', async () => {
-    assessmentFor.mockResolvedValue(STORED)
+    assessmentFor.mockResolvedValue(STORED as unknown as AssessmentInfo)
 
     const result = await assessLoanHandler(buildRequest({ data: { loanId: LOAN_ID, refresh: true } }))
 
@@ -159,8 +171,10 @@ describe('assessLoan', () => {
   // a reading taken when the pool held 200 describes a pool that no longer
   // exists once it holds 5.
   it('makes a new one when the pool has moved under it', async () => {
-    assessmentFor.mockResolvedValue(STORED)
-    Contract.mockImplementation(() => ({ totalFunds: jest.fn().mockResolvedValue(5_000_000n) }))
+    assessmentFor.mockResolvedValue(STORED as unknown as AssessmentInfo)
+    vi.mocked(Contract).mockImplementation(function () {
+      return { totalFunds: vi.fn().mockResolvedValue(5_000_000n) }
+    })
 
     const result = await assessLoanHandler(buildRequest())
 
@@ -212,7 +226,7 @@ describe('assessLoan', () => {
   // The better of two silences: a reading from last week beats none, as long
   // as the response says which it is.
   it('falls back to the stored reading when a refresh cannot be made', async () => {
-    assessmentFor.mockResolvedValue(STORED)
+    assessmentFor.mockResolvedValue(STORED as unknown as AssessmentInfo)
     assessLoanWithAgent.mockResolvedValue({ status: 'unreachable', reason: 'fetch failed' })
 
     const result = await assessLoanHandler(buildRequest({ data: { loanId: LOAN_ID, refresh: true } }))
@@ -221,7 +235,7 @@ describe('assessLoan', () => {
   })
 
   it('reports an unreachable chain as an internal error rather than guessing liquidity', async () => {
-    getProvider.mockReturnValue({ getBlock: jest.fn().mockResolvedValue(null) })
+    getProvider.mockReturnValue({ getBlock: vi.fn().mockResolvedValue(null) } as unknown as JsonRpcProvider)
 
     await expect(assessLoanHandler(buildRequest())).rejects.toThrow(/Failed to assess/i)
   })
@@ -250,7 +264,7 @@ describe('the daily cap', () => {
   })
 
   it('still hands back a stored reading when the day is spent', async () => {
-    assessmentFor.mockResolvedValue(STORED)
+    assessmentFor.mockResolvedValue(STORED as unknown as AssessmentInfo)
     claimAssessment.mockResolvedValue({ granted: false, used: 50, cap: 50 })
 
     await expect(assessLoanHandler(buildRequest({ data: { loanId: LOAN_ID, refresh: true } }))).resolves.toEqual({
@@ -266,7 +280,7 @@ describe('the daily cap', () => {
     allowance.
   */
   it('costs nothing to read a stored one back', async () => {
-    assessmentFor.mockResolvedValue(STORED)
+    assessmentFor.mockResolvedValue(STORED as unknown as AssessmentInfo)
 
     await assessLoanHandler(buildRequest())
 
@@ -305,7 +319,7 @@ describe('the daily cap', () => {
 
 describe('getAssessment', () => {
   it('gives the owner what is stored', async () => {
-    assessmentFor.mockResolvedValue(STORED)
+    assessmentFor.mockResolvedValue(STORED as unknown as AssessmentInfo)
 
     await expect(getAssessmentHandler(buildRequest())).resolves.toEqual({ assessment: STORED })
   })
@@ -320,7 +334,7 @@ describe('getAssessment', () => {
     caller is not entitled to know.
   */
   it('shows the borrower nothing, and does not tell them why', async () => {
-    assessmentFor.mockResolvedValue(STORED)
+    assessmentFor.mockResolvedValue(STORED as unknown as AssessmentInfo)
 
     await expect(getAssessmentHandler(buildRequest({ auth: { uid: BORROWER } }))).resolves.toEqual({})
   })
@@ -335,9 +349,3 @@ describe('getAssessment', () => {
     expect(assessLoanWithAgent).not.toHaveBeenCalled()
   })
 })
-
-// A module, not a script: this file uses `require` so that `jest.mock` hoists
-// above it, and without an export the test globals would collide with every
-// other callable test in the project.
-// biome-ignore lint/suspicious/noExportsInTest: `export {}` exports nothing — it marks the file as a module so its test globals do not collide with every other callable test.
-export {}

@@ -1,15 +1,19 @@
 import type { Firestore } from 'firebase-admin/firestore'
 
-const mockNotifyOnce = jest.fn()
-const mockNoteFor = jest.fn()
+// Hoisted so the vi.mock factories below can close over them: vi.mock runs before
+// any module-level const is initialised.
+const { mockNotifyOnce, mockNoteFor } = vi.hoisted(() => ({
+  mockNotifyOnce: vi.fn(),
+  mockNoteFor: vi.fn(),
+}))
 
-jest.mock('./notifications', () => ({
-  ...jest.requireActual('./notifications'),
+vi.mock('./notifications', async () => ({
+  ...(await vi.importActual<typeof import('./notifications')>('./notifications')),
   notifyOnce: (...args: unknown[]) => mockNotifyOnce(...args),
 }))
 
-jest.mock('./notes', () => ({
-  ...jest.requireActual('./notes'),
+vi.mock('./notes', async () => ({
+  ...(await vi.importActual<typeof import('./notes')>('./notes')),
   noteFor: (...args: unknown[]) => mockNoteFor(...args),
 }))
 
@@ -23,11 +27,11 @@ const OWNER = '0x3f8a9d21e4c09b7cd51b04e1f2a6cc7382e4b9a0'
 const ASKER = '0x9965507d1a55bcc2695c58ba16fb37d819b0a4dc'
 
 function buildFirestore(pool: object | null = { poolOwner: OWNER, name: 'Builders Guild' }) {
-  const mockDoc = jest.fn().mockReturnValue({
-    get: jest.fn().mockResolvedValue({ exists: pool !== null, data: () => pool }),
+  const mockDoc = vi.fn().mockReturnValue({
+    get: vi.fn().mockResolvedValue({ exists: pool !== null, data: () => pool }),
   })
 
-  return { firestore: { collection: jest.fn().mockReturnValue({ doc: mockDoc }) } as unknown as Firestore, mockDoc }
+  return { firestore: { collection: vi.fn().mockReturnValue({ doc: mockDoc }) }, mockDoc }
 }
 
 function loanResult(transition: LoanTransition): IndexLoanResult {
@@ -93,7 +97,7 @@ describe('notifyLoanRequested', () => {
   it('tells the pool owner when somebody asks to borrow', async () => {
     const { firestore } = buildFirestore()
 
-    await notifyLoanRequested(loanResult('requested'), parsedLoan(), firestore)
+    await notifyLoanRequested(loanResult('requested'), parsedLoan(), firestore as unknown as Firestore)
 
     expect(mockNotifyOnce).toHaveBeenCalledWith(
       `${CHAIN_ID}-${POOL_ID}-1-loan_requested`,
@@ -111,7 +115,7 @@ describe('notifyLoanRequested', () => {
   it('says nothing for a write that changed no state', async () => {
     const { firestore } = buildFirestore()
 
-    await notifyLoanRequested(loanResult(null), parsedLoan(), firestore)
+    await notifyLoanRequested(loanResult(null), parsedLoan(), firestore as unknown as Firestore)
 
     expect(mockNotifyOnce).not.toHaveBeenCalled()
   })
@@ -121,7 +125,7 @@ describe('notifyLoanRequested', () => {
     async (transition) => {
       const { firestore } = buildFirestore()
 
-      await notifyLoanRequested(loanResult(transition), parsedLoan(), firestore)
+      await notifyLoanRequested(loanResult(transition), parsedLoan(), firestore as unknown as Firestore)
 
       expect(mockNotifyOnce).not.toHaveBeenCalled()
     }
@@ -131,7 +135,7 @@ describe('notifyLoanRequested', () => {
   it('does not tell an owner they borrowed from their own pool', async () => {
     const { firestore } = buildFirestore()
 
-    await notifyLoanRequested(loanResult('requested'), parsedLoan(OWNER), firestore)
+    await notifyLoanRequested(loanResult('requested'), parsedLoan(OWNER), firestore as unknown as Firestore)
 
     expect(mockNotifyOnce).not.toHaveBeenCalled()
   })
@@ -140,7 +144,11 @@ describe('notifyLoanRequested', () => {
     // Addresses are stored lowercased; a checksummed one must still match.
     const { firestore } = buildFirestore({ poolOwner: OWNER, name: 'Builders Guild' })
 
-    await notifyLoanRequested(loanResult('requested'), parsedLoan(OWNER.toUpperCase().replace('0X', '0x')), firestore)
+    await notifyLoanRequested(
+      loanResult('requested'),
+      parsedLoan(OWNER.toUpperCase().replace('0X', '0x')),
+      firestore as unknown as Firestore
+    )
 
     expect(mockNotifyOnce).not.toHaveBeenCalled()
   })
@@ -150,7 +158,7 @@ describe('notifyLoanRequested', () => {
   it('stays quiet when the pool was never indexed', async () => {
     const { firestore } = buildFirestore(null)
 
-    await notifyLoanRequested(loanResult('requested'), parsedLoan(), firestore)
+    await notifyLoanRequested(loanResult('requested'), parsedLoan(), firestore as unknown as Firestore)
 
     expect(mockNotifyOnce).not.toHaveBeenCalled()
   })
@@ -158,7 +166,7 @@ describe('notifyLoanRequested', () => {
   it('reads the pool by chain and id', async () => {
     const { firestore, mockDoc } = buildFirestore()
 
-    await notifyLoanRequested(loanResult('requested'), parsedLoan(), firestore)
+    await notifyLoanRequested(loanResult('requested'), parsedLoan(), firestore as unknown as Firestore)
 
     expect(mockDoc).toHaveBeenCalledWith(`${CHAIN_ID}-${POOL_ID}`)
   })
@@ -166,7 +174,7 @@ describe('notifyLoanRequested', () => {
   it('falls back to a plain name rather than an empty one', async () => {
     const { firestore } = buildFirestore({ poolOwner: OWNER, name: '' })
 
-    await notifyLoanRequested(loanResult('requested'), parsedLoan(), firestore)
+    await notifyLoanRequested(loanResult('requested'), parsedLoan(), firestore as unknown as Firestore)
 
     expect(mockNotifyOnce).toHaveBeenCalledWith(
       expect.any(String),
@@ -185,7 +193,7 @@ describe('notifyMembershipRequested', () => {
   it('tells the pool owner when somebody asks to join', async () => {
     const { firestore } = buildFirestore()
 
-    await notifyMembershipRequested(membershipResult('requested'), parsedMembership(), firestore)
+    await notifyMembershipRequested(membershipResult('requested'), parsedMembership(), firestore as unknown as Firestore)
 
     expect(mockNotifyOnce).toHaveBeenCalledWith(
       `${CHAIN_ID}-${POOL_ID}-${ASKER}-membership_requested`,
@@ -202,7 +210,7 @@ describe('notifyMembershipRequested', () => {
   it('says nothing when a deposit enrolled somebody automatically', async () => {
     const { firestore } = buildFirestore()
 
-    await notifyMembershipRequested(membershipResult(null), parsedMembership(), firestore)
+    await notifyMembershipRequested(membershipResult(null), parsedMembership(), firestore as unknown as Firestore)
 
     expect(mockNotifyOnce).not.toHaveBeenCalled()
   })
@@ -212,7 +220,7 @@ describe('notifyMembershipRequested', () => {
     async (transition) => {
       const { firestore } = buildFirestore()
 
-      await notifyMembershipRequested(membershipResult(transition), parsedMembership(), firestore)
+      await notifyMembershipRequested(membershipResult(transition), parsedMembership(), firestore as unknown as Firestore)
 
       expect(mockNotifyOnce).not.toHaveBeenCalled()
     }
@@ -221,7 +229,7 @@ describe('notifyMembershipRequested', () => {
   it('does not tell an owner they asked to join their own pool', async () => {
     const { firestore } = buildFirestore()
 
-    await notifyMembershipRequested(membershipResult('requested'), parsedMembership(OWNER), firestore)
+    await notifyMembershipRequested(membershipResult('requested'), parsedMembership(OWNER), firestore as unknown as Firestore)
 
     expect(mockNotifyOnce).not.toHaveBeenCalled()
   })
@@ -229,7 +237,7 @@ describe('notifyMembershipRequested', () => {
   it('stays quiet when the pool was never indexed', async () => {
     const { firestore } = buildFirestore(null)
 
-    await notifyMembershipRequested(membershipResult('requested'), parsedMembership(), firestore)
+    await notifyMembershipRequested(membershipResult('requested'), parsedMembership(), firestore as unknown as Firestore)
 
     expect(mockNotifyOnce).not.toHaveBeenCalled()
   })
@@ -239,7 +247,7 @@ describe('notifyMembershipRequested', () => {
   it('does not read a blank actor as the owner', async () => {
     const { firestore } = buildFirestore()
 
-    await notifyMembershipRequested(membershipResult('requested'), parsedMembership(''), firestore)
+    await notifyMembershipRequested(membershipResult('requested'), parsedMembership(''), firestore as unknown as Firestore)
 
     expect(mockNotifyOnce).toHaveBeenCalled()
   })
@@ -247,7 +255,7 @@ describe('notifyMembershipRequested', () => {
   it('stays quiet when the indexed pool has no owner recorded', async () => {
     const { firestore } = buildFirestore({ name: 'Builders Guild' })
 
-    await notifyMembershipRequested(membershipResult('requested'), parsedMembership(), firestore)
+    await notifyMembershipRequested(membershipResult('requested'), parsedMembership(), firestore as unknown as Firestore)
 
     expect(mockNotifyOnce).not.toHaveBeenCalled()
   })
@@ -259,19 +267,19 @@ describe('notifyMembershipRequested', () => {
 
 /** A provider whose transactions were all sent by somebody other than the borrower. */
 function ownerSentIt() {
-  return { getTransaction: jest.fn().mockResolvedValue({ from: OWNER }) }
+  return { getTransaction: vi.fn().mockResolvedValue({ from: OWNER }) }
 }
 
 /** A provider reporting that the borrower sent the transaction themselves. */
 function borrowerSentIt() {
-  return { getTransaction: jest.fn().mockResolvedValue({ from: ASKER }) }
+  return { getTransaction: vi.fn().mockResolvedValue({ from: ASKER }) }
 }
 
 describe('notifyLoanDecided', () => {
   it('tells a borrower their loan was approved', async () => {
     const { firestore } = buildFirestore()
 
-    await notifyLoanDecided(loanResult('approved'), parsedLoan(), ownerSentIt() as never, firestore)
+    await notifyLoanDecided(loanResult('approved'), parsedLoan(), ownerSentIt() as never, firestore as unknown as Firestore)
 
     expect(mockNotifyOnce).toHaveBeenCalledWith(
       `${CHAIN_ID}-${POOL_ID}-1-loan_approved`,
@@ -287,7 +295,7 @@ describe('notifyLoanDecided', () => {
   it('tells a borrower their debt was declared in default', async () => {
     const { firestore } = buildFirestore()
 
-    await notifyLoanDecided(loanResult('defaulted'), parsedLoan(), ownerSentIt() as never, firestore)
+    await notifyLoanDecided(loanResult('defaulted'), parsedLoan(), ownerSentIt() as never, firestore as unknown as Firestore)
 
     const [, recipient, notification] = mockNotifyOnce.mock.calls[0]
 
@@ -302,7 +310,7 @@ describe('notifyLoanDecided', () => {
     // That is the `disbursed` transition, and it is not an answer to anyone.
     const { firestore } = buildFirestore()
 
-    await notifyLoanDecided(loanResult('disbursed'), parsedLoan(), ownerSentIt() as never, firestore)
+    await notifyLoanDecided(loanResult('disbursed'), parsedLoan(), ownerSentIt() as never, firestore as unknown as Firestore)
 
     expect(mockNotifyOnce).not.toHaveBeenCalled()
   })
@@ -310,7 +318,7 @@ describe('notifyLoanDecided', () => {
   it.each(['requested', 'repayment', 'repaid', null] as LoanTransition[])('stays quiet on the %s transition', async (transition) => {
     const { firestore } = buildFirestore()
 
-    await notifyLoanDecided(loanResult(transition), parsedLoan(), ownerSentIt() as never, firestore)
+    await notifyLoanDecided(loanResult(transition), parsedLoan(), ownerSentIt() as never, firestore as unknown as Firestore)
 
     expect(mockNotifyOnce).not.toHaveBeenCalled()
   })
@@ -319,7 +327,7 @@ describe('notifyLoanDecided', () => {
     it('tells a borrower the owner turned them down', async () => {
       const { firestore } = buildFirestore()
 
-      await notifyLoanDecided(loanResult('rejected'), parsedLoan(), ownerSentIt() as never, firestore)
+      await notifyLoanDecided(loanResult('rejected'), parsedLoan(), ownerSentIt() as never, firestore as unknown as Firestore)
 
       expect(mockNotifyOnce).toHaveBeenCalledWith(expect.any(String), ASKER, expect.objectContaining({ title: 'Loan declined' }), firestore)
     })
@@ -330,7 +338,7 @@ describe('notifyLoanDecided', () => {
       // Only the transaction's sender can.
       const { firestore } = buildFirestore()
 
-      await notifyLoanDecided(loanResult('rejected'), parsedLoan(), borrowerSentIt() as never, firestore)
+      await notifyLoanDecided(loanResult('rejected'), parsedLoan(), borrowerSentIt() as never, firestore as unknown as Firestore)
 
       expect(mockNotifyOnce).not.toHaveBeenCalled()
     })
@@ -340,18 +348,18 @@ describe('notifyLoanDecided', () => {
       // were refused when they changed their own mind. The claim is never made,
       // so a later sweep can still send it.
       const { firestore } = buildFirestore()
-      const provider = { getTransaction: jest.fn().mockRejectedValue(new Error('no rpc')) }
+      const provider = { getTransaction: vi.fn().mockRejectedValue(new Error('no rpc')) }
 
-      await notifyLoanDecided(loanResult('rejected'), parsedLoan(), provider as never, firestore)
+      await notifyLoanDecided(loanResult('rejected'), parsedLoan(), provider as never, firestore as unknown as Firestore)
 
       expect(mockNotifyOnce).not.toHaveBeenCalled()
     })
 
     it('stays quiet when the transaction cannot be found', async () => {
       const { firestore } = buildFirestore()
-      const provider = { getTransaction: jest.fn().mockResolvedValue(null) }
+      const provider = { getTransaction: vi.fn().mockResolvedValue(null) }
 
-      await notifyLoanDecided(loanResult('rejected'), parsedLoan(), provider as never, firestore)
+      await notifyLoanDecided(loanResult('rejected'), parsedLoan(), provider as never, firestore as unknown as Firestore)
 
       expect(mockNotifyOnce).not.toHaveBeenCalled()
     })
@@ -361,7 +369,7 @@ describe('notifyLoanDecided', () => {
       const { firestore } = buildFirestore()
       const provider = ownerSentIt()
 
-      await notifyLoanDecided(loanResult('approved'), parsedLoan(), provider as never, firestore)
+      await notifyLoanDecided(loanResult('approved'), parsedLoan(), provider as never, firestore as unknown as Firestore)
 
       expect(provider.getTransaction).not.toHaveBeenCalled()
     })
@@ -370,7 +378,7 @@ describe('notifyLoanDecided', () => {
   it('does not tell an owner about a decision on their own loan', async () => {
     const { firestore } = buildFirestore()
 
-    await notifyLoanDecided(loanResult('approved'), parsedLoan(OWNER), ownerSentIt() as never, firestore)
+    await notifyLoanDecided(loanResult('approved'), parsedLoan(OWNER), ownerSentIt() as never, firestore as unknown as Firestore)
 
     expect(mockNotifyOnce).not.toHaveBeenCalled()
   })
@@ -378,7 +386,7 @@ describe('notifyLoanDecided', () => {
   it('stays quiet when the pool was never indexed', async () => {
     const { firestore } = buildFirestore(null)
 
-    await notifyLoanDecided(loanResult('approved'), parsedLoan(), ownerSentIt() as never, firestore)
+    await notifyLoanDecided(loanResult('approved'), parsedLoan(), ownerSentIt() as never, firestore as unknown as Firestore)
 
     expect(mockNotifyOnce).not.toHaveBeenCalled()
   })
@@ -392,7 +400,7 @@ describe('notifyMembershipDecided', () => {
   it('tells an applicant they are in', async () => {
     const { firestore } = buildFirestore()
 
-    await notifyMembershipDecided(membershipResult('active'), parsedMembership(), firestore)
+    await notifyMembershipDecided(membershipResult('active'), parsedMembership(), firestore as unknown as Firestore)
 
     expect(mockNotifyOnce).toHaveBeenCalledWith(
       `${CHAIN_ID}-${POOL_ID}-${ASKER}-membership_approved`,
@@ -405,7 +413,7 @@ describe('notifyMembershipDecided', () => {
   it('tells an applicant they were turned down', async () => {
     const { firestore } = buildFirestore()
 
-    await notifyMembershipDecided(membershipResult('rejected'), parsedMembership(), firestore)
+    await notifyMembershipDecided(membershipResult('rejected'), parsedMembership(), firestore as unknown as Firestore)
 
     expect(mockNotifyOnce).toHaveBeenCalledWith(
       expect.any(String),
@@ -420,7 +428,7 @@ describe('notifyMembershipDecided', () => {
     // member asked for; `left` is self-authored besides.
     const { firestore } = buildFirestore()
 
-    await notifyMembershipDecided(membershipResult(transition), parsedMembership(), firestore)
+    await notifyMembershipDecided(membershipResult(transition), parsedMembership(), firestore as unknown as Firestore)
 
     expect(mockNotifyOnce).not.toHaveBeenCalled()
   })
@@ -428,7 +436,7 @@ describe('notifyMembershipDecided', () => {
   it('does not tell an owner they admitted themselves', async () => {
     const { firestore } = buildFirestore()
 
-    await notifyMembershipDecided(membershipResult('active'), parsedMembership(OWNER), firestore)
+    await notifyMembershipDecided(membershipResult('active'), parsedMembership(OWNER), firestore as unknown as Firestore)
 
     expect(mockNotifyOnce).not.toHaveBeenCalled()
   })
@@ -436,7 +444,7 @@ describe('notifyMembershipDecided', () => {
   it('stays quiet when the pool was never indexed', async () => {
     const { firestore } = buildFirestore(null)
 
-    await notifyMembershipDecided(membershipResult('active'), parsedMembership(), firestore)
+    await notifyMembershipDecided(membershipResult('active'), parsedMembership(), firestore as unknown as Firestore)
 
     expect(mockNotifyOnce).not.toHaveBeenCalled()
   })
@@ -455,7 +463,7 @@ describe('the reason a push carries', () => {
     const { firestore } = buildFirestore()
     mockNoteFor.mockResolvedValue({ text: 'The pool is fully lent out until March.' })
 
-    await notifyLoanDecided(loanResult('rejected'), parsedLoan(), ownerSentIt() as never, firestore)
+    await notifyLoanDecided(loanResult('rejected'), parsedLoan(), ownerSentIt() as never, firestore as unknown as Firestore)
 
     expect(bodyOf()).toContain('The pool is fully lent out until March.')
   })
@@ -465,7 +473,7 @@ describe('the reason a push carries', () => {
   it('asks for the note belonging to the transition that actually happened', async () => {
     const { firestore } = buildFirestore()
 
-    await notifyLoanDecided(loanResult('approved'), parsedLoan(), ownerSentIt() as never, firestore)
+    await notifyLoanDecided(loanResult('approved'), parsedLoan(), ownerSentIt() as never, firestore as unknown as Firestore)
 
     expect(mockNoteFor).toHaveBeenCalledWith(`${CHAIN_ID}-${POOL_ID}-1`, 'loan_approved', firestore)
   })
@@ -476,7 +484,7 @@ describe('the reason a push carries', () => {
     const { firestore } = buildFirestore()
     mockNoteFor.mockResolvedValue({ text: 'School fees, due at the end of the month.' })
 
-    await notifyLoanRequested(loanResult('requested'), parsedLoan(), firestore)
+    await notifyLoanRequested(loanResult('requested'), parsedLoan(), firestore as unknown as Firestore)
 
     expect(mockNoteFor).toHaveBeenCalledWith(`${CHAIN_ID}-${POOL_ID}-1`, 'loan_purpose', firestore)
     expect(bodyOf()).toContain('School fees, due at the end of the month.')
@@ -486,7 +494,7 @@ describe('the reason a push carries', () => {
     const { firestore } = buildFirestore()
     mockNoteFor.mockResolvedValue({ text: 'We already have someone from your street.' })
 
-    await notifyMembershipDecided(membershipResult('rejected'), parsedMembership(), firestore)
+    await notifyMembershipDecided(membershipResult('rejected'), parsedMembership(), firestore as unknown as Firestore)
 
     expect(mockNoteFor).toHaveBeenCalledWith(`${CHAIN_ID}-${POOL_ID}-${ASKER}`, 'membership_rejected', firestore)
     expect(bodyOf()).toContain('We already have someone from your street.')
@@ -495,7 +503,7 @@ describe('the reason a push carries', () => {
   it('sends the bare body when nobody wrote a reason', async () => {
     const { firestore } = buildFirestore()
 
-    await notifyLoanDecided(loanResult('rejected'), parsedLoan(), ownerSentIt() as never, firestore)
+    await notifyLoanDecided(loanResult('rejected'), parsedLoan(), ownerSentIt() as never, firestore as unknown as Firestore)
 
     expect(bodyOf()).toBe('Builders Guild turned down your loan request.')
   })
@@ -506,7 +514,7 @@ describe('the reason a push carries', () => {
     const { firestore } = buildFirestore()
     mockNoteFor.mockRejectedValue(new Error('firestore is down'))
 
-    await notifyLoanDecided(loanResult('rejected'), parsedLoan(), ownerSentIt() as never, firestore)
+    await notifyLoanDecided(loanResult('rejected'), parsedLoan(), ownerSentIt() as never, firestore as unknown as Firestore)
 
     expect(bodyOf()).toBe('Builders Guild turned down your loan request.')
   })
@@ -515,7 +523,7 @@ describe('the reason a push carries', () => {
     const { firestore } = buildFirestore()
     mockNoteFor.mockResolvedValue({ text: 'x'.repeat(280) })
 
-    await notifyLoanDecided(loanResult('rejected'), parsedLoan(), ownerSentIt() as never, firestore)
+    await notifyLoanDecided(loanResult('rejected'), parsedLoan(), ownerSentIt() as never, firestore as unknown as Firestore)
 
     expect(bodyOf().length).toBe(240)
     expect(bodyOf().endsWith('…')).toBe(true)

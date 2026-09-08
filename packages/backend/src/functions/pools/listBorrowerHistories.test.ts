@@ -1,15 +1,23 @@
-jest.mock('../../services')
-jest.mock('../../services/borrowerHistory', () => ({
-  ...jest.requireActual('../../services/borrowerHistory'),
-  borrowerHistoriesFor: jest.fn(),
+import type { ListBorrowerHistoriesRequest } from '@superpool/types'
+import type { JsonRpcProvider } from 'ethers'
+import type { CallableRequest } from 'firebase-functions/v2/https'
+
+vi.mock('../../services')
+vi.mock('../../services/borrowerHistory', async () => ({
+  ...(await vi.importActual<typeof import('../../services/borrowerHistory')>('../../services/borrowerHistory')),
+  borrowerHistoriesFor: vi.fn(),
 }))
-jest.mock('../../utils/blockchain', () => ({ getProvider: jest.fn() }))
+vi.mock('../../utils/blockchain', () => ({ getProvider: vi.fn() }))
 
-const { listBorrowerHistoriesHandler } = require('./listBorrowerHistories')
-const { borrowerHistoriesFor, MAX_BORROWERS_PER_CALL, emptyHistory } = require('../../services/borrowerHistory')
-const { getProvider } = require('../../utils/blockchain')
-const { HttpsError } = require('firebase-functions/v2/https')
+import { HttpsError } from 'firebase-functions/v2/https'
+import * as borrowerHistoryMock from '../../services/borrowerHistory'
+import * as blockchainMock from '../../utils/blockchain'
+import { listBorrowerHistoriesHandler } from './listBorrowerHistories'
 
+// These modules are mocked above; vi.mocked restores the mock types that the
+// real signatures would otherwise hide.
+const { borrowerHistoriesFor, emptyHistory, MAX_BORROWERS_PER_CALL } = vi.mocked(borrowerHistoryMock)
+const { getProvider } = vi.mocked(blockchainMock)
 const CALLER = '0x1111111111111111111111111111111111111111'
 const BORROWER = '0x2222222222222222222222222222222222222222'
 
@@ -18,17 +26,17 @@ const CHAIN_SECONDS = 1_800_000_000
 
 const HISTORY = { total: 2, repaid: 1, onTime: 1, late: 0, undated: 0, outstanding: 1, overdue: 0, defaulted: 0, isNew: false }
 
-function buildRequest(overrides: Partial<{ auth: object | null; data: Record<string, unknown> }> = {}) {
+function buildRequest<T>(overrides: Partial<{ auth: object | null; data: Record<string, unknown> }> = {}): CallableRequest<T> {
   return {
     auth: overrides.auth !== undefined ? overrides.auth : { uid: CALLER, token: {} },
     data: overrides.data !== undefined ? overrides.data : { chainId: 31337, borrowers: [BORROWER] },
-  }
+  } as unknown as CallableRequest<T>
 }
 
 beforeEach(() => {
-  jest.clearAllMocks()
+  vi.clearAllMocks()
   borrowerHistoriesFor.mockResolvedValue({ [BORROWER.toLowerCase()]: HISTORY })
-  getProvider.mockReturnValue({ getBlock: jest.fn().mockResolvedValue({ timestamp: CHAIN_SECONDS }) })
+  getProvider.mockReturnValue({ getBlock: vi.fn().mockResolvedValue({ timestamp: CHAIN_SECONDS }) } as unknown as JsonRpcProvider)
 })
 
 describe('listBorrowerHistories', () => {
@@ -62,7 +70,7 @@ describe('listBorrowerHistories', () => {
   })
 
   it('reports an unreachable chain rather than guessing a clock', async () => {
-    getProvider.mockReturnValue({ getBlock: jest.fn().mockResolvedValue(null) })
+    getProvider.mockReturnValue({ getBlock: vi.fn().mockResolvedValue(null) } as unknown as JsonRpcProvider)
 
     await expect(listBorrowerHistoriesHandler(buildRequest())).rejects.toThrow(/Failed to read borrowing histories/i)
   })
@@ -106,7 +114,7 @@ describe('listBorrowerHistories', () => {
     const UNSERVED = { auth: { uid: CALLER, token: {} }, data: { chainId: 999, borrowers: [BORROWER] } }
 
     it('answers empty rather than refusing, like its seven siblings', async () => {
-      const result = await listBorrowerHistoriesHandler(UNSERVED)
+      const result = await listBorrowerHistoriesHandler(UNSERVED as unknown as CallableRequest<ListBorrowerHistoriesRequest>)
 
       expect(result.histories).toEqual({ [BORROWER.toLowerCase()]: emptyHistory() })
     })
@@ -115,14 +123,17 @@ describe('listBorrowerHistories', () => {
     // caller guess whether the wallet is new or the call went wrong.
     it('still returns every wallet it was asked about', async () => {
       const other = '0x3333333333333333333333333333333333333333'
-      const result = await listBorrowerHistoriesHandler({ ...UNSERVED, data: { chainId: 999, borrowers: [BORROWER, other] } })
+      const result = await listBorrowerHistoriesHandler({
+        ...UNSERVED,
+        data: { chainId: 999, borrowers: [BORROWER, other] },
+      } as unknown as CallableRequest<ListBorrowerHistoriesRequest>)
 
       expect(Object.keys(result.histories).sort()).toEqual([BORROWER.toLowerCase(), other].sort())
       expect(result.histories[other].isNew).toBe(true)
     })
 
     it('never reaches the chain or the loans', async () => {
-      await listBorrowerHistoriesHandler(UNSERVED)
+      await listBorrowerHistoriesHandler(UNSERVED as unknown as CallableRequest<ListBorrowerHistoriesRequest>)
 
       expect(getProvider).not.toHaveBeenCalled()
       expect(borrowerHistoriesFor).not.toHaveBeenCalled()
@@ -131,7 +142,7 @@ describe('listBorrowerHistories', () => {
     // Server time, and the one place this response is not chain time — there
     // is no chain to read a block from. It dates the answer, not a comparison.
     it('dates the answer it gave', async () => {
-      const result = await listBorrowerHistoriesHandler(UNSERVED)
+      const result = await listBorrowerHistoriesHandler(UNSERVED as unknown as CallableRequest<ListBorrowerHistoriesRequest>)
 
       expect(Date.parse(result.asOf)).not.toBeNaN()
     })
@@ -152,9 +163,3 @@ describe('listBorrowerHistories', () => {
     await expect(listBorrowerHistoriesHandler(buildRequest())).rejects.toMatchObject({ code: 'invalid-argument' })
   })
 })
-
-// A module, not a script: this file uses `require` so that `jest.mock` hoists
-// above it, and without an export the test globals would collide with every
-// other callable test in the project.
-// biome-ignore lint/suspicious/noExportsInTest: `export {}` exports nothing — it marks the file as a module so its test globals do not collide with every other callable test.
-export {}

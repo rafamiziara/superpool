@@ -4,15 +4,15 @@
 
 // Export mock instances for test access
 export const mockAuth = {
-  createCustomToken: jest.fn().mockResolvedValue('custom-token-123'),
+  createCustomToken: vi.fn().mockResolvedValue('custom-token-123'),
 }
 
 export const mockFirestore = {
-  collection: jest.fn(),
+  collection: vi.fn(),
 }
 
 export const mockAppCheck = {
-  createToken: jest.fn().mockResolvedValue({ token: 'appcheck-token', ttlMillis: 3600000 }),
+  createToken: vi.fn().mockResolvedValue({ token: 'appcheck-token', ttlMillis: 3600000 }),
 }
 
 // Firestore mock helpers
@@ -21,26 +21,26 @@ export function createMockDoc(data: Record<string, unknown> = {}, exists = true)
     exists,
     data: () => data,
     ref: {
-      update: jest.fn().mockResolvedValue(undefined),
+      update: vi.fn().mockResolvedValue(undefined),
     },
   }
 }
 
 export function createMockCollection() {
   return {
-    doc: jest.fn().mockReturnValue({
-      get: jest.fn().mockResolvedValue(createMockDoc()),
-      set: jest.fn().mockResolvedValue(undefined),
-      update: jest.fn().mockResolvedValue(undefined),
-      delete: jest.fn().mockResolvedValue(undefined),
+    doc: vi.fn().mockReturnValue({
+      get: vi.fn().mockResolvedValue(createMockDoc()),
+      set: vi.fn().mockResolvedValue(undefined),
+      update: vi.fn().mockResolvedValue(undefined),
+      delete: vi.fn().mockResolvedValue(undefined),
     }),
-    where: jest.fn().mockReturnThis(),
-    orderBy: jest.fn().mockReturnThis(),
-    limit: jest.fn().mockReturnThis(),
-    offset: jest.fn().mockReturnThis(),
-    count: jest.fn().mockReturnValue({
-      get: jest.fn().mockResolvedValue({ data: () => ({ count: 0 }) }),
+    where: vi.fn().mockReturnThis(),
+    orderBy: vi.fn().mockReturnThis(),
+    limit: vi.fn().mockReturnThis(),
+    offset: vi.fn().mockReturnThis(),
+    count: vi.fn().mockReturnValue({
+      get: vi.fn().mockResolvedValue({ data: () => ({ count: 0 }) }),
     }),
-    get: jest.fn().mockResolvedValue({ docs: [] }),
+    get: vi.fn().mockResolvedValue({ docs: [] }),
   }
 }

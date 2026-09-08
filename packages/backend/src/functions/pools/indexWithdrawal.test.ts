@@ -1,22 +1,33 @@
+import type { CallableRequest } from 'firebase-functions/v2/https'
+import type { Mock } from 'vitest'
 import { mockLogger } from '../../__tests__/setup'
 import type { ParsedWithdrawalEvent } from '../../services/withdrawalIndexer'
 
-jest.mock('../../utils/blockchain')
-jest.mock('../../services')
-jest.mock('../../services/withdrawalIndexer', () => ({
-  ...jest.requireActual('../../services/withdrawalIndexer'),
-  indexWithdrawalsByTxHash: jest.fn(),
+vi.mock('../../utils/blockchain')
+vi.mock('../../services')
+vi.mock('../../services/withdrawalIndexer', async () => ({
+  ...(await vi.importActual<typeof import('../../services/withdrawalIndexer')>('../../services/withdrawalIndexer')),
+  indexWithdrawalsByTxHash: vi.fn(),
 }))
 
 // `ACTIVE_CHAIN_CONFIG` reads the environment once, at module load. Set this
 // before the requires below or every case fails on an unconfigured factory.
-const FACTORY_ADDRESS = '0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512'
-process.env.POOL_FACTORY_ADDRESS = FACTORY_ADDRESS
+// The chain registry reads process.env once, at module load. ESM hoists every import
+// above ordinary statements, so this must run inside vi.hoisted to land first.
+const { FACTORY_ADDRESS } = vi.hoisted(() => {
+  const FACTORY_ADDRESS = '0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512'
+  process.env.POOL_FACTORY_ADDRESS = FACTORY_ADDRESS
+  return { FACTORY_ADDRESS }
+})
 
-const { indexWithdrawalHandler } = require('./indexWithdrawal')
-const { getProvider } = require('../../utils/blockchain')
-const { indexWithdrawalsByTxHash } = require('../../services/withdrawalIndexer')
+import * as withdrawalIndexerMock from '../../services/withdrawalIndexer'
+import * as blockchainMock from '../../utils/blockchain'
+import { indexWithdrawalHandler } from './indexWithdrawal'
 
+// These modules are mocked above; vi.mocked restores the mock types that the
+// real signatures would otherwise hide.
+const { indexWithdrawalsByTxHash } = vi.mocked(withdrawalIndexerMock)
+const { getProvider } = vi.mocked(blockchainMock)
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
@@ -25,16 +36,16 @@ const VALID_TX_HASH = `0x${'a'.repeat(64)}`
 const SUPPORTED_CHAIN_ID = 31337 // matches ACTIVE_CHAIN_CONFIG default
 const WITHDRAWN_AT = new Date('2026-08-11T12:00:00.000Z')
 
-function buildRequest(
+function buildRequest<T>(
   overrides: Partial<{
     auth: object | null
     data: Record<string, unknown>
   }> = {}
-) {
+): CallableRequest<T> {
   return {
     auth: overrides.auth !== undefined ? overrides.auth : { uid: 'user-123', token: {} },
     data: overrides.data !== undefined ? overrides.data : { txHash: VALID_TX_HASH },
-  }
+  } as unknown as CallableRequest<T>
 }
 
 function buildWithdrawal(overrides: Partial<ParsedWithdrawalEvent> = {}): ParsedWithdrawalEvent {
@@ -54,7 +65,7 @@ function buildWithdrawal(overrides: Partial<ParsedWithdrawalEvent> = {}): Parsed
 
 /** Makes the indexer resolve with the given withdrawals, all newly stored. */
 function resolveWith(withdrawals: ParsedWithdrawalEvent[], stored = withdrawals.map(() => true)) {
-  ;(indexWithdrawalsByTxHash as jest.Mock).mockResolvedValue({
+  ;(indexWithdrawalsByTxHash as Mock).mockResolvedValue({
     withdrawals,
     results: withdrawals.map((withdrawal, i) => ({
       id: `${withdrawal.chainId}-${withdrawal.transactionHash}-${withdrawal.logIndex}`,
@@ -71,8 +82,8 @@ function resolveWith(withdrawals: ParsedWithdrawalEvent[], stored = withdrawals.
 
 describe('indexWithdrawalHandler', () => {
   beforeEach(() => {
-    jest.clearAllMocks()
-    ;(getProvider as jest.Mock).mockReturnValue({})
+    vi.clearAllMocks()
+    ;(getProvider as Mock).mockReturnValue({})
     resolveWith([buildWithdrawal()])
   })
 
@@ -187,8 +198,8 @@ describe('indexWithdrawalHandler', () => {
   describe('failures', () => {
     it('should pass an HttpsError through unchanged', async () => {
       // Arrange — "no FundsWithdrawn event" is a real answer, not an outage.
-      const { HttpsError } = require('firebase-functions/v2/https')
-      ;(indexWithdrawalsByTxHash as jest.Mock).mockRejectedValue(new HttpsError('not-found', 'No FundsWithdrawn event found'))
+      const { HttpsError } = await import('firebase-functions/v2/https')
+      ;(indexWithdrawalsByTxHash as Mock).mockRejectedValue(new HttpsError('not-found', 'No FundsWithdrawn event found'))
 
       // Act & Assert
       await expect(indexWithdrawalHandler(buildRequest() as never)).rejects.toThrow(/No FundsWithdrawn event found/)
@@ -196,7 +207,7 @@ describe('indexWithdrawalHandler', () => {
 
     it('should hide an unexpected failure behind a generic message', async () => {
       // Arrange
-      ;(indexWithdrawalsByTxHash as jest.Mock).mockRejectedValue(new Error('socket hang up'))
+      ;(indexWithdrawalsByTxHash as Mock).mockRejectedValue(new Error('socket hang up'))
 
       // Act & Assert
       await expect(indexWithdrawalHandler(buildRequest() as never)).rejects.toThrow(/Failed to index withdrawal/)

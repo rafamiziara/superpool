@@ -1,5 +1,6 @@
 import type { PushReceipt } from '@superpool/types'
 import type { Firestore } from 'firebase-admin/firestore'
+import type { Mock, MockInstance } from 'vitest'
 import { mockLogger } from '../__tests__/setup'
 import { collectReceipts, RECEIPT_DELAY_MS, RECEIPT_EXPIRY_MS, recordTickets } from './pushReceipts'
 
@@ -29,45 +30,45 @@ function buildFirestore(rows: PushReceipt[]) {
   const receiptDeletes: string[] = []
   const tokenDeletes: string[] = []
   const batchSets: PushReceipt[] = []
-  const mockCommit = jest.fn().mockResolvedValue(undefined)
+  const mockCommit = vi.fn().mockResolvedValue(undefined)
 
   const receiptsCollection = {
-    where: jest.fn().mockReturnThis(),
-    orderBy: jest.fn().mockReturnThis(),
-    limit: jest.fn().mockReturnThis(),
-    get: jest.fn().mockResolvedValue({ empty: rows.length === 0, docs: rows.map((data) => ({ data: () => data })) }),
-    doc: jest.fn().mockImplementation((id: string) => ({
-      delete: jest.fn().mockImplementation(async () => {
+    where: vi.fn().mockReturnThis(),
+    orderBy: vi.fn().mockReturnThis(),
+    limit: vi.fn().mockReturnThis(),
+    get: vi.fn().mockResolvedValue({ empty: rows.length === 0, docs: rows.map((data) => ({ data: () => data })) }),
+    doc: vi.fn().mockImplementation((id: string) => ({
+      delete: vi.fn().mockImplementation(async () => {
         receiptDeletes.push(id)
       }),
     })),
   }
 
   const tokensCollection = {
-    doc: jest.fn().mockImplementation((id: string) => ({
-      get: jest.fn().mockResolvedValue({ exists: true }),
-      delete: jest.fn().mockImplementation(async () => {
+    doc: vi.fn().mockImplementation((id: string) => ({
+      get: vi.fn().mockResolvedValue({ exists: true }),
+      delete: vi.fn().mockImplementation(async () => {
         tokenDeletes.push(id)
       }),
     })),
   }
 
   const firestore = {
-    collection: jest.fn().mockImplementation((name: string) => (name === 'push_receipts' ? receiptsCollection : tokensCollection)),
-    batch: jest.fn().mockReturnValue({
-      set: jest.fn().mockImplementation((_ref: unknown, data: PushReceipt) => batchSets.push(data)),
+    collection: vi.fn().mockImplementation((name: string) => (name === 'push_receipts' ? receiptsCollection : tokensCollection)),
+    batch: vi.fn().mockReturnValue({
+      set: vi.fn().mockImplementation((_ref: unknown, data: PushReceipt) => batchSets.push(data)),
       commit: mockCommit,
     }),
-  } as unknown as Firestore
+  }
 
   return { firestore, receiptsCollection, receiptDeletes, tokenDeletes, batchSets, mockCommit }
 }
 
-let fetchSpy: jest.SpyInstance
+let fetchSpy: MockInstance
 
 beforeEach(() => {
-  jest.clearAllMocks()
-  fetchSpy = jest.spyOn(global, 'fetch')
+  vi.clearAllMocks()
+  fetchSpy = vi.spyOn(global, 'fetch')
 })
 
 afterEach(() => {
@@ -87,7 +88,7 @@ describe('recordTickets', () => {
         { ticketId: 'ticket-2', token: OTHER_TOKEN, kind: 'loan_requested' },
       ],
       WALLET,
-      firestore
+      firestore as unknown as Firestore
     )
 
     expect(queued).toBe(2)
@@ -99,15 +100,17 @@ describe('recordTickets', () => {
   it('writes nothing when nothing was accepted', async () => {
     const { firestore, mockCommit } = buildFirestore([])
 
-    await expect(recordTickets([], WALLET, firestore)).resolves.toBe(0)
+    await expect(recordTickets([], WALLET, firestore as unknown as Firestore)).resolves.toBe(0)
     expect(mockCommit).not.toHaveBeenCalled()
   })
 
   it('survives a non-Error thrown by the write', async () => {
     const { firestore } = buildFirestore([])
-    ;(firestore.batch as jest.Mock).mockReturnValue({ set: jest.fn(), commit: jest.fn().mockRejectedValue('firestore, but as a string') })
+    ;(firestore.batch as Mock).mockReturnValue({ set: vi.fn(), commit: vi.fn().mockRejectedValue('firestore, but as a string') })
 
-    await expect(recordTickets([{ ticketId: 'ticket-1', token: TOKEN, kind: 'loan_requested' }], WALLET, firestore)).resolves.toBe(0)
+    await expect(
+      recordTickets([{ ticketId: 'ticket-1', token: TOKEN, kind: 'loan_requested' }], WALLET, firestore as unknown as Firestore)
+    ).resolves.toBe(0)
   })
 
   it('swallows a write failure rather than failing the send', async () => {
@@ -115,12 +118,14 @@ describe('recordTickets', () => {
     // `notifyOnce` claim and deliver the same message a second time — a worse
     // outcome than losing the ability to check on it.
     const { firestore } = buildFirestore([])
-    ;(firestore.batch as jest.Mock).mockReturnValue({
-      set: jest.fn(),
-      commit: jest.fn().mockRejectedValue(new Error('firestore unavailable')),
+    ;(firestore.batch as Mock).mockReturnValue({
+      set: vi.fn(),
+      commit: vi.fn().mockRejectedValue(new Error('firestore unavailable')),
     })
 
-    await expect(recordTickets([{ ticketId: 'ticket-1', token: TOKEN, kind: 'loan_requested' }], WALLET, firestore)).resolves.toBe(0)
+    await expect(
+      recordTickets([{ ticketId: 'ticket-1', token: TOKEN, kind: 'loan_requested' }], WALLET, firestore as unknown as Firestore)
+    ).resolves.toBe(0)
     expect(mockLogger.warn).toHaveBeenCalledWith(expect.stringContaining('Could not queue push receipts'), expect.anything())
   })
 })
@@ -129,7 +134,13 @@ describe('collectReceipts', () => {
   it('asks about nothing when the queue is empty', async () => {
     const { firestore } = buildFirestore([])
 
-    await expect(collectReceipts(firestore, NOW)).resolves.toEqual({ checked: 0, pruned: 0, failed: 0, expired: 0, pending: 0 })
+    await expect(collectReceipts(firestore as unknown as Firestore, NOW)).resolves.toEqual({
+      checked: 0,
+      pruned: 0,
+      failed: 0,
+      expired: 0,
+      pending: 0,
+    })
     expect(fetchSpy).not.toHaveBeenCalled()
   })
 
@@ -138,7 +149,7 @@ describe('collectReceipts', () => {
     // answers nothing.
     const { firestore, receiptsCollection } = buildFirestore([])
 
-    await collectReceipts(firestore, NOW)
+    await collectReceipts(firestore as unknown as Firestore, NOW)
 
     expect(receiptsCollection.where).toHaveBeenCalledWith('createdAt', '<=', NOW - RECEIPT_DELAY_MS)
   })
@@ -147,7 +158,7 @@ describe('collectReceipts', () => {
     const { firestore, receiptDeletes, tokenDeletes } = buildFirestore([row()])
     fetchSpy.mockResolvedValue(receiptsReply({ 'ticket-1': { status: 'ok' } }))
 
-    const result = await collectReceipts(firestore, NOW)
+    const result = await collectReceipts(firestore as unknown as Firestore, NOW)
 
     expect(result).toMatchObject({ checked: 1, pruned: 0, failed: 0 })
     expect(receiptDeletes).toEqual(['ticket-1'])
@@ -166,7 +177,7 @@ describe('collectReceipts', () => {
     const { firestore, receiptDeletes, tokenDeletes } = buildFirestore([row()])
     fetchSpy.mockResolvedValue(receiptsReply({ 'ticket-1': { status: 'error', details: { error: 'DeviceNotRegistered' } } }))
 
-    const result = await collectReceipts(firestore, NOW)
+    const result = await collectReceipts(firestore as unknown as Firestore, NOW)
 
     expect(result).toMatchObject({ checked: 1, pruned: 1, failed: 0 })
     expect(tokenDeletes).toEqual([TOKEN])
@@ -188,7 +199,7 @@ describe('collectReceipts', () => {
       const { firestore, tokenDeletes, receiptDeletes } = buildFirestore([row()])
       fetchSpy.mockResolvedValue(receiptsReply({ 'ticket-1': { status: 'error', details: { error } } }))
 
-      const result = await collectReceipts(firestore, NOW)
+      const result = await collectReceipts(firestore as unknown as Firestore, NOW)
 
       expect(result).toMatchObject({ checked: 1, pruned: 0, failed: 1 })
       expect(tokenDeletes).toEqual([])
@@ -205,7 +216,7 @@ describe('collectReceipts', () => {
     const { firestore, receiptDeletes } = buildFirestore([row()])
     fetchSpy.mockResolvedValue(receiptsReply({}))
 
-    const result = await collectReceipts(firestore, NOW)
+    const result = await collectReceipts(firestore as unknown as Firestore, NOW)
 
     expect(result).toMatchObject({ checked: 0, pending: 1, expired: 0 })
     expect(receiptDeletes).toEqual([])
@@ -217,7 +228,7 @@ describe('collectReceipts', () => {
     const { firestore, receiptDeletes, tokenDeletes } = buildFirestore([row({ createdAt: NOW - RECEIPT_EXPIRY_MS - 1000 })])
     fetchSpy.mockResolvedValue(receiptsReply({}))
 
-    const result = await collectReceipts(firestore, NOW)
+    const result = await collectReceipts(firestore as unknown as Firestore, NOW)
 
     expect(result).toMatchObject({ expired: 1, pending: 0 })
     expect(receiptDeletes).toEqual(['ticket-1'])
@@ -231,7 +242,7 @@ describe('collectReceipts', () => {
     const { firestore, receiptDeletes } = buildFirestore([row()])
     fetchSpy.mockRejectedValue(new Error('network down'))
 
-    const result = await collectReceipts(firestore, NOW)
+    const result = await collectReceipts(firestore as unknown as Firestore, NOW)
 
     expect(result).toMatchObject({ checked: 0, pending: 1 })
     expect(receiptDeletes).toEqual([])
@@ -241,7 +252,7 @@ describe('collectReceipts', () => {
     const { firestore, receiptDeletes } = buildFirestore([row()])
     fetchSpy.mockResolvedValue({ ok: false, status: 503, json: async () => ({}), text: async () => 'unavailable' })
 
-    const result = await collectReceipts(firestore, NOW)
+    const result = await collectReceipts(firestore as unknown as Firestore, NOW)
 
     expect(result).toMatchObject({ checked: 0, pending: 1 })
     expect(receiptDeletes).toEqual([])
@@ -258,7 +269,7 @@ describe('collectReceipts', () => {
       text: async () => '',
     })
 
-    const result = await collectReceipts(firestore, NOW)
+    const result = await collectReceipts(firestore as unknown as Firestore, NOW)
 
     expect(result).toMatchObject({ checked: 0, pending: 1 })
     expect(receiptDeletes).toEqual([])
@@ -271,12 +282,12 @@ describe('collectReceipts', () => {
     // happened by then.
     const rows = [row({ ticketId: 'ticket-1' }), row({ ticketId: 'ticket-2', token: OTHER_TOKEN })]
     const { firestore, tokenDeletes } = buildFirestore(rows)
-    ;(firestore.collection as jest.Mock).mockImplementation((name: string) => {
+    ;(firestore.collection as Mock).mockImplementation((name: string) => {
       if (name !== 'push_receipts') {
         return {
-          doc: jest.fn().mockImplementation((id: string) => ({
-            get: jest.fn().mockResolvedValue({ exists: true }),
-            delete: jest.fn().mockImplementation(async () => {
+          doc: vi.fn().mockImplementation((id: string) => ({
+            get: vi.fn().mockResolvedValue({ exists: true }),
+            delete: vi.fn().mockImplementation(async () => {
               tokenDeletes.push(id)
             }),
           })),
@@ -284,11 +295,11 @@ describe('collectReceipts', () => {
       }
 
       return {
-        where: jest.fn().mockReturnThis(),
-        orderBy: jest.fn().mockReturnThis(),
-        limit: jest.fn().mockReturnThis(),
-        get: jest.fn().mockResolvedValue({ empty: false, docs: rows.map((data) => ({ data: () => data })) }),
-        doc: jest.fn().mockReturnValue({ delete: jest.fn().mockRejectedValue(new Error('firestore unavailable')) }),
+        where: vi.fn().mockReturnThis(),
+        orderBy: vi.fn().mockReturnThis(),
+        limit: vi.fn().mockReturnThis(),
+        get: vi.fn().mockResolvedValue({ empty: false, docs: rows.map((data) => ({ data: () => data })) }),
+        doc: vi.fn().mockReturnValue({ delete: vi.fn().mockRejectedValue(new Error('firestore unavailable')) }),
       }
     })
 
@@ -299,7 +310,7 @@ describe('collectReceipts', () => {
       })
     )
 
-    const result = await collectReceipts(firestore, NOW)
+    const result = await collectReceipts(firestore as unknown as Firestore, NOW)
 
     expect(result).toMatchObject({ checked: 2, pruned: 2 })
     expect(tokenDeletes).toEqual([TOKEN, OTHER_TOKEN])
@@ -321,7 +332,7 @@ describe('collectReceipts', () => {
       })
     )
 
-    const result = await collectReceipts(firestore, NOW)
+    const result = await collectReceipts(firestore as unknown as Firestore, NOW)
 
     expect(result).toMatchObject({ checked: 2, pruned: 1, failed: 0, pending: 1 })
     expect(tokenDeletes).toEqual([OTHER_TOKEN])
@@ -333,7 +344,7 @@ describe('collectReceipts', () => {
     // scheduled caller passes nothing.
     const { firestore, receiptsCollection } = buildFirestore([])
 
-    await collectReceipts(firestore)
+    await collectReceipts(firestore as unknown as Firestore)
 
     expect(receiptsCollection.where).toHaveBeenCalledWith('createdAt', '<=', expect.any(Number))
   })
@@ -342,7 +353,7 @@ describe('collectReceipts', () => {
     const { firestore, receiptDeletes } = buildFirestore([row()])
     fetchSpy.mockResolvedValue({ ok: true, status: 200, json: async () => ({}), text: async () => '' })
 
-    await expect(collectReceipts(firestore, NOW)).resolves.toMatchObject({ checked: 0, pending: 1 })
+    await expect(collectReceipts(firestore as unknown as Firestore, NOW)).resolves.toMatchObject({ checked: 0, pending: 1 })
     expect(receiptDeletes).toEqual([])
   })
 
@@ -350,13 +361,13 @@ describe('collectReceipts', () => {
     const { firestore } = buildFirestore([row()])
     fetchSpy.mockRejectedValue('the network, but as a string')
 
-    await expect(collectReceipts(firestore, NOW)).resolves.toMatchObject({ pending: 1 })
+    await expect(collectReceipts(firestore as unknown as Firestore, NOW)).resolves.toMatchObject({ pending: 1 })
   })
 
   it('asks oldest first, so a backlog drains in the order it built up', async () => {
     const { firestore, receiptsCollection } = buildFirestore([])
 
-    await collectReceipts(firestore, NOW)
+    await collectReceipts(firestore as unknown as Firestore, NOW)
 
     expect(receiptsCollection.orderBy).toHaveBeenCalledWith('createdAt')
   })
@@ -364,7 +375,7 @@ describe('collectReceipts', () => {
   it('bounds one run, so a backlog is drained over several', async () => {
     const { firestore, receiptsCollection } = buildFirestore([])
 
-    await collectReceipts(firestore, NOW)
+    await collectReceipts(firestore as unknown as Firestore, NOW)
 
     expect(receiptsCollection.limit).toHaveBeenCalledWith(5000)
   })

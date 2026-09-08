@@ -1,13 +1,12 @@
 import type { ApprovedDevice } from '@superpool/types'
 import { mockLogger } from '../__tests__/setup'
 import { APPROVED_DEVICES_COLLECTION } from '../constants'
-
-// Import mocked services (already mocked in setup.ts)
-const { firestore } = require('./index')
-
 // Import the service to test
-const { DeviceVerificationService } = require('./deviceVerification')
+import { DeviceVerificationService } from './deviceVerification'
+// Import mocked services (already mocked in setup.ts)
+import { firestore as realFirestore } from './index'
 
+const firestore = vi.mocked(realFirestore, true)
 describe('DeviceVerificationService', () => {
   const deviceId = 'test-device-123'
   const walletAddress = '0x1234567890123456789012345678901234567890'
@@ -19,7 +18,7 @@ describe('DeviceVerificationService', () => {
   Date.prototype.getTime = () => mockTimestamp
 
   beforeEach(() => {
-    jest.clearAllMocks()
+    vi.clearAllMocks()
   })
 
   afterAll(() => {
@@ -30,7 +29,7 @@ describe('DeviceVerificationService', () => {
     // Test Case: Device exists and is approved (Happy Path)
     it('should return true and update lastUsed timestamp when device is approved', async () => {
       // Arrange
-      const mockUpdate = jest.fn().mockResolvedValue(undefined)
+      const mockUpdate = vi.fn().mockResolvedValue(undefined)
       const mockDeviceDoc = {
         exists: true,
         ref: {
@@ -38,15 +37,15 @@ describe('DeviceVerificationService', () => {
         },
       }
 
-      const mockDoc = jest.fn().mockReturnValue({
-        get: jest.fn().mockResolvedValue(mockDeviceDoc),
+      const mockDoc = vi.fn().mockReturnValue({
+        get: vi.fn().mockResolvedValue(mockDeviceDoc),
       })
 
-      const mockCollection = jest.fn().mockReturnValue({
+      const mockCollection = vi.fn().mockReturnValue({
         doc: mockDoc,
       })
 
-      firestore.collection.mockReturnValue(mockCollection())
+      vi.mocked(firestore.collection).mockReturnValue(mockCollection())
 
       // Act
       const result = await DeviceVerificationService.isDeviceApproved(deviceId)
@@ -66,15 +65,15 @@ describe('DeviceVerificationService', () => {
         exists: false,
       }
 
-      const mockDoc = jest.fn().mockReturnValue({
-        get: jest.fn().mockResolvedValue(mockDeviceDoc),
+      const mockDoc = vi.fn().mockReturnValue({
+        get: vi.fn().mockResolvedValue(mockDeviceDoc),
       })
 
-      const mockCollection = jest.fn().mockReturnValue({
+      const mockCollection = vi.fn().mockReturnValue({
         doc: mockDoc,
       })
 
-      firestore.collection.mockReturnValue(mockCollection())
+      vi.mocked(firestore.collection).mockReturnValue(mockCollection())
 
       // Act
       const result = await DeviceVerificationService.isDeviceApproved(deviceId)
@@ -90,15 +89,15 @@ describe('DeviceVerificationService', () => {
     it('should return false and log error when verification fails', async () => {
       // Arrange
       const error = new Error('Firestore read error')
-      const mockDoc = jest.fn().mockReturnValue({
-        get: jest.fn().mockRejectedValue(error),
+      const mockDoc = vi.fn().mockReturnValue({
+        get: vi.fn().mockRejectedValue(error),
       })
 
-      const mockCollection = jest.fn().mockReturnValue({
+      const mockCollection = vi.fn().mockReturnValue({
         doc: mockDoc,
       })
 
-      firestore.collection.mockReturnValue(mockCollection())
+      vi.mocked(firestore.collection).mockReturnValue(mockCollection())
 
       // Act
       const result = await DeviceVerificationService.isDeviceApproved(deviceId)
@@ -112,7 +111,7 @@ describe('DeviceVerificationService', () => {
     it('should return false when lastUsed update fails', async () => {
       // Arrange
       const updateError = new Error('Update failed')
-      const mockUpdate = jest.fn().mockRejectedValue(updateError)
+      const mockUpdate = vi.fn().mockRejectedValue(updateError)
       const mockDeviceDoc = {
         exists: true,
         ref: {
@@ -120,15 +119,15 @@ describe('DeviceVerificationService', () => {
         },
       }
 
-      const mockDoc = jest.fn().mockReturnValue({
-        get: jest.fn().mockResolvedValue(mockDeviceDoc),
+      const mockDoc = vi.fn().mockReturnValue({
+        get: vi.fn().mockResolvedValue(mockDeviceDoc),
       })
 
-      const mockCollection = jest.fn().mockReturnValue({
+      const mockCollection = vi.fn().mockReturnValue({
         doc: mockDoc,
       })
 
-      firestore.collection.mockReturnValue(mockCollection())
+      vi.mocked(firestore.collection).mockReturnValue(mockCollection())
 
       // Act
       const result = await DeviceVerificationService.isDeviceApproved(deviceId)
@@ -146,16 +145,16 @@ describe('DeviceVerificationService', () => {
     // Test Case: Successfully approve device (Happy Path)
     it('should successfully approve a device with android platform', async () => {
       // Arrange
-      const mockSet = jest.fn().mockResolvedValue(undefined)
-      const mockDoc = jest.fn().mockReturnValue({
+      const mockSet = vi.fn().mockResolvedValue(undefined)
+      const mockDoc = vi.fn().mockReturnValue({
         set: mockSet,
       })
 
-      const mockCollection = jest.fn().mockReturnValue({
+      const mockCollection = vi.fn().mockReturnValue({
         doc: mockDoc,
       })
 
-      firestore.collection.mockReturnValue(mockCollection())
+      vi.mocked(firestore.collection).mockReturnValue(mockCollection())
 
       const expectedDevice: ApprovedDevice = {
         deviceId,
@@ -182,16 +181,16 @@ describe('DeviceVerificationService', () => {
     // Test Case: Approve iOS device
     it('should successfully approve a device with ios platform', async () => {
       // Arrange
-      const mockSet = jest.fn().mockResolvedValue(undefined)
-      const mockDoc = jest.fn().mockReturnValue({
+      const mockSet = vi.fn().mockResolvedValue(undefined)
+      const mockDoc = vi.fn().mockReturnValue({
         set: mockSet,
       })
 
-      const mockCollection = jest.fn().mockReturnValue({
+      const mockCollection = vi.fn().mockReturnValue({
         doc: mockDoc,
       })
 
-      firestore.collection.mockReturnValue(mockCollection())
+      vi.mocked(firestore.collection).mockReturnValue(mockCollection())
 
       const expectedDevice: ApprovedDevice = {
         deviceId,
@@ -216,16 +215,16 @@ describe('DeviceVerificationService', () => {
     // Test Case: Approve web device
     it('should successfully approve a device with web platform', async () => {
       // Arrange
-      const mockSet = jest.fn().mockResolvedValue(undefined)
-      const mockDoc = jest.fn().mockReturnValue({
+      const mockSet = vi.fn().mockResolvedValue(undefined)
+      const mockDoc = vi.fn().mockReturnValue({
         set: mockSet,
       })
 
-      const mockCollection = jest.fn().mockReturnValue({
+      const mockCollection = vi.fn().mockReturnValue({
         doc: mockDoc,
       })
 
-      firestore.collection.mockReturnValue(mockCollection())
+      vi.mocked(firestore.collection).mockReturnValue(mockCollection())
 
       const expectedDevice: ApprovedDevice = {
         deviceId,
@@ -251,16 +250,16 @@ describe('DeviceVerificationService', () => {
     it('should throw error and log when device approval fails', async () => {
       // Arrange
       const error = new Error('Firestore write error')
-      const mockSet = jest.fn().mockRejectedValue(error)
-      const mockDoc = jest.fn().mockReturnValue({
+      const mockSet = vi.fn().mockRejectedValue(error)
+      const mockDoc = vi.fn().mockReturnValue({
         set: mockSet,
       })
 
-      const mockCollection = jest.fn().mockReturnValue({
+      const mockCollection = vi.fn().mockReturnValue({
         doc: mockDoc,
       })
 
-      firestore.collection.mockReturnValue(mockCollection())
+      vi.mocked(firestore.collection).mockReturnValue(mockCollection())
 
       // Act & Assert
       await expect(DeviceVerificationService.approveDevice(deviceId, walletAddress, platform)).rejects.toThrow('Failed to approve device')
@@ -276,16 +275,16 @@ describe('DeviceVerificationService', () => {
       // Arrange
       const device1 = 'device-1'
       const device2 = 'device-2'
-      const mockSet = jest.fn().mockResolvedValue(undefined)
-      const mockDoc = jest.fn().mockReturnValue({
+      const mockSet = vi.fn().mockResolvedValue(undefined)
+      const mockDoc = vi.fn().mockReturnValue({
         set: mockSet,
       })
 
-      const mockCollection = jest.fn().mockReturnValue({
+      const mockCollection = vi.fn().mockReturnValue({
         doc: mockDoc,
       })
 
-      firestore.collection.mockReturnValue(mockCollection())
+      vi.mocked(firestore.collection).mockReturnValue(mockCollection())
 
       // Act
       await DeviceVerificationService.approveDevice(device1, walletAddress, 'android')
@@ -301,16 +300,16 @@ describe('DeviceVerificationService', () => {
     it('should overwrite existing device approval when called again', async () => {
       // Arrange
       const newWalletAddress = '0x9876543210987654321098765432109876543210'
-      const mockSet = jest.fn().mockResolvedValue(undefined)
-      const mockDoc = jest.fn().mockReturnValue({
+      const mockSet = vi.fn().mockResolvedValue(undefined)
+      const mockDoc = vi.fn().mockReturnValue({
         set: mockSet,
       })
 
-      const mockCollection = jest.fn().mockReturnValue({
+      const mockCollection = vi.fn().mockReturnValue({
         doc: mockDoc,
       })
 
-      firestore.collection.mockReturnValue(mockCollection())
+      vi.mocked(firestore.collection).mockReturnValue(mockCollection())
 
       // Act - First approval
       await DeviceVerificationService.approveDevice(deviceId, walletAddress, 'android')

@@ -1,21 +1,32 @@
+import type { JsonRpcProvider } from 'ethers'
+import type { CallableRequest } from 'firebase-functions/v2/https'
 import type { ParsedMembership } from '../../services/membershipIndexer'
 
-jest.mock('../../utils/blockchain')
-jest.mock('../../services')
-jest.mock('../../services/membershipIndexer', () => ({
-  ...jest.requireActual('../../services/membershipIndexer'),
-  indexMembershipsByTxHash: jest.fn(),
+vi.mock('../../utils/blockchain')
+vi.mock('../../services')
+vi.mock('../../services/membershipIndexer', async () => ({
+  ...(await vi.importActual<typeof import('../../services/membershipIndexer')>('../../services/membershipIndexer')),
+  indexMembershipsByTxHash: vi.fn(),
 }))
 
 // `ACTIVE_CHAIN_CONFIG` reads the environment once, at module load. Set this
 // before the requires below or every case fails on an unconfigured factory.
-const FACTORY_ADDRESS = '0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512'
-process.env.POOL_FACTORY_ADDRESS = FACTORY_ADDRESS
+// The chain registry reads process.env once, at module load. ESM hoists every import
+// above ordinary statements, so this must run inside vi.hoisted to land first.
+const { FACTORY_ADDRESS } = vi.hoisted(() => {
+  const FACTORY_ADDRESS = '0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512'
+  process.env.POOL_FACTORY_ADDRESS = FACTORY_ADDRESS
+  return { FACTORY_ADDRESS }
+})
 
-const { indexMembershipHandler } = require('./indexMembership')
-const { getProvider } = require('../../utils/blockchain')
-const { indexMembershipsByTxHash } = require('../../services/membershipIndexer')
+import * as membershipIndexerMock from '../../services/membershipIndexer'
+import * as blockchainMock from '../../utils/blockchain'
+import { indexMembershipHandler } from './indexMembership'
 
+// These modules are mocked above; vi.mocked restores the mock types that the
+// real signatures would otherwise hide.
+const { indexMembershipsByTxHash } = vi.mocked(membershipIndexerMock)
+const { getProvider } = vi.mocked(blockchainMock)
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
@@ -25,11 +36,11 @@ const SUPPORTED_CHAIN_ID = 31337 // matches ACTIVE_CHAIN_CONFIG default
 const ACCOUNT = '0x9965507d1a55bcc2695c58ba16fb37d819b0a4dc'
 const JOINED_AT = new Date('2026-08-11T12:00:00.000Z')
 
-function buildRequest(overrides: Partial<{ auth: object | null; data: Record<string, unknown> }> = {}) {
+function buildRequest<T>(overrides: Partial<{ auth: object | null; data: Record<string, unknown> }> = {}): CallableRequest<T> {
   return {
     auth: overrides.auth !== undefined ? overrides.auth : { uid: 'user-123', token: {} },
     data: overrides.data !== undefined ? overrides.data : { txHash: VALID_TX_HASH },
-  }
+  } as unknown as CallableRequest<T>
 }
 
 function buildMembership(overrides: Partial<ParsedMembership> = {}): ParsedMembership {
@@ -61,8 +72,8 @@ function resolveWith(members: ParsedMembership[], stored: boolean[] = members.ma
 }
 
 beforeEach(() => {
-  jest.clearAllMocks()
-  getProvider.mockReturnValue({})
+  vi.clearAllMocks()
+  getProvider.mockReturnValue({} as unknown as JsonRpcProvider)
   resolveWith([buildMembership()])
 })
 
@@ -168,7 +179,7 @@ describe('indexMembershipHandler', () => {
     it('should pass an HttpsError through untouched', async () => {
       // "No membership event in this transaction" is worth the caller seeing;
       // flattening it to `internal` would lose why.
-      const { HttpsError } = require('firebase-functions/v2/https')
+      const { HttpsError } = await import('firebase-functions/v2/https')
       indexMembershipsByTxHash.mockRejectedValue(new HttpsError('not-found', 'No membership event found'))
 
       await expect(indexMembershipHandler(buildRequest() as never)).rejects.toMatchObject({ code: 'not-found' })
