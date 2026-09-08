@@ -1,4 +1,4 @@
-import { Firestore } from 'firebase-admin/firestore'
+import type { Firestore } from 'firebase-admin/firestore'
 import { AUTH_NONCES_COLLECTION } from '../constants'
 import { claimAuthNonce, createAuthMessage, NonceExpiredError } from './auth'
 
@@ -135,7 +135,7 @@ describe('createAuthMessage', () => {
 
     // Assert
     expect(result).toContain(uuidNonce)
-    expect(result).toContain('Nonce:\n' + uuidNonce)
+    expect(result).toContain(`Nonce:\n${uuidNonce}`)
   })
 
   // Test Case: Lowercase wallet address

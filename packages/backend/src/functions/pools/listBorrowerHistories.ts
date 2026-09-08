@@ -1,12 +1,12 @@
-import { ListBorrowerHistoriesRequest, ListBorrowerHistoriesResponse } from '@superpool/types'
+import type { ListBorrowerHistoriesRequest, ListBorrowerHistoriesResponse } from '@superpool/types'
 import { logger } from 'firebase-functions/v2'
-import { CallableRequest, HttpsError, onCall } from 'firebase-functions/v2/https'
+import { type CallableRequest, HttpsError, onCall } from 'firebase-functions/v2/https'
 import { DEFAULT_CHAIN_ID, getChainConfig } from '../../constants'
 import { listBorrowerHistoriesSchema } from '../../schemas'
 import { firestore } from '../../services'
 import { borrowerHistoriesFor, emptyHistoriesFor } from '../../services/borrowerHistory'
-import { parseRequest } from '../../utils/validation'
 import { getProvider } from '../../utils/blockchain'
+import { parseRequest } from '../../utils/validation'
 
 export const listBorrowerHistoriesHandler = async (
   request: CallableRequest<ListBorrowerHistoriesRequest>

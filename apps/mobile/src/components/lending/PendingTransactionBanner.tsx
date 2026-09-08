@@ -1,6 +1,5 @@
 import { FontAwesome } from '@expo/vector-icons'
 import { observer } from 'mobx-react-lite'
-import React from 'react'
 import { ActivityIndicator, Pressable, Text } from 'react-native'
 import { useAccount } from 'wagmi'
 import { DEFAULT_CHAIN_ID } from '../../config/contracts'

@@ -1,8 +1,8 @@
-import { isMain } from './lib/main'
-import { ethers, isSimulatedNetwork, network } from '../hardhat.connection'
 import * as dotenv from 'dotenv'
-import { PoolFactory } from '../typechain-types'
+import { ethers, isSimulatedNetwork, network } from '../hardhat.connection'
+import type { PoolFactory } from '../typechain-types'
 import { deploySafe } from './deploy-safe'
+import { isMain } from './lib/main'
 import { simulateAcceptOwnership } from './simulate-multisig'
 
 dotenv.config()

@@ -1,5 +1,5 @@
-import { BorrowerHistory } from '@superpool/types'
-import { Firestore, Timestamp } from 'firebase-admin/firestore'
+import type { BorrowerHistory } from '@superpool/types'
+import type { Firestore, Timestamp } from 'firebase-admin/firestore'
 import { logger } from 'firebase-functions/v2'
 import { LOANS_COLLECTION } from '../constants'
 

@@ -52,9 +52,9 @@
  * despill clean up — but it costs edge quality that a PNG would have kept.
  */
 
-const fs = require('fs')
-const zlib = require('zlib')
-const path = require('path')
+const fs = require('node:fs')
+const zlib = require('node:zlib')
+const path = require('node:path')
 
 // ── PNG plumbing ─────────────────────────────────────────────────────────────
 
@@ -311,7 +311,7 @@ async function main() {
     process.exit(1)
   }
 
-  const output = positional[1] || input.replace(/\.png$/i, '') + '.cut.png'
+  const output = positional[1] || `${input.replace(/\.png$/i, '')}.cut.png`
   const keyColour = parseHex(flag('--key', '00ff00'))
   const t0 = Number(flag('--t0', 20))
   const t1 = Number(flag('--t1', 380))
@@ -327,7 +327,7 @@ async function main() {
   fs.writeFileSync(output, encodePNG(width, height, px))
 
   const total = width * height
-  const pct = (n) => ((100 * n) / total).toFixed(2) + '%'
+  const pct = (n) => `${((100 * n) / total).toFixed(2)}%`
   console.log(`${path.basename(input)} → ${path.basename(output)}  ${width}x${height}`)
   console.log(`  cleared   ${pct(cleared)}   fully transparent`)
   console.log(`  softened  ${pct(softened)}   partial alpha (the edge)`)
@@ -339,13 +339,13 @@ async function main() {
   if (preview) {
     const base = output.replace(/\.png$/i, '')
     // The two surfaces the artwork has to survive: the app's background and paper.
-    fs.writeFileSync(base + '.on-dark.png', encodePNG(width, height, composite(px, [0x06, 0x0b, 0x16])))
-    fs.writeFileSync(base + '.on-light.png', encodePNG(width, height, composite(px, [0xff, 0xff, 0xff])))
+    fs.writeFileSync(`${base}.on-dark.png`, encodePNG(width, height, composite(px, [0x06, 0x0b, 0x16])))
+    fs.writeFileSync(`${base}.on-light.png`, encodePNG(width, height, composite(px, [0xff, 0xff, 0xff])))
     console.log(`  previews  ${path.basename(base)}.on-dark.png, ${path.basename(base)}.on-light.png`)
   }
 }
 
 main().catch((error) => {
-  console.error('chromakey: ' + error.message)
+  console.error(`chromakey: ${error.message}`)
   process.exit(1)
 })

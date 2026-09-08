@@ -1,6 +1,5 @@
 import type { LoanInfo, PoolInfo } from '@superpool/types'
 import { zeroAddress } from 'viem'
-import React from 'react'
 import { render } from '../../__tests__/test-utils'
 import { MOCK_USER_ADDRESS } from '../../mocks/lending'
 import { authStore } from '../../stores/AuthStore'

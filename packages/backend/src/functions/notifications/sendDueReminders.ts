@@ -1,12 +1,12 @@
 import { logger } from 'firebase-functions/v2'
-import { CallableRequest, HttpsError, onCall } from 'firebase-functions/v2/https'
+import { type CallableRequest, HttpsError, onCall } from 'firebase-functions/v2/https'
 import { onSchedule } from 'firebase-functions/v2/scheduler'
 import { SUPPORTED_CHAINS } from '../../constants'
 import { firestore } from '../../services'
-import { DueReminderResult, remindChain } from '../../services/dueReminders'
-import { getProvider } from '../../utils/blockchain'
+import { type DueReminderResult, remindChain } from '../../services/dueReminders'
 import { requireAdmin } from '../../utils/admin'
 import { enforceAppCheck } from '../../utils/appCheck'
+import { getProvider } from '../../utils/blockchain'
 
 /**
  * Remind every chain's borrowers about the dates on their loans.

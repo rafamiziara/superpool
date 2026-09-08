@@ -1,5 +1,4 @@
 import { TransactionStatus, TransactionType } from '@superpool/types'
-import React from 'react'
 import { render } from '../../../../src/__tests__/test-utils'
 import { poolStore } from '../../../../src/stores/PoolStore'
 import ActivityScreen from './index'

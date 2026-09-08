@@ -18,7 +18,7 @@ env:
 
 jobs:
   quality:
-    name: Format, lint & type-check
+    name: Lint, format & type-check
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -36,11 +36,9 @@ jobs:
       - name: Compile contracts (generates typechain-types)
         run: pnpm --filter contracts compile
 
-      - name: Check formatting
-        run: pnpm format:check
 
-      - name: Lint TypeScript
-        run: pnpm lint:ts
+      - name: Lint & format
+        run: pnpm check
 
       - name: Lint Solidity
         run: pnpm lint:sol

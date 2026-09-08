@@ -52,14 +52,13 @@ pnpm test             # Run tests on ephemeral Hardhat network
 pnpm test:gas         # Run tests with gas reporting
 pnpm deploy:amoy      # Deploy to Polygon Amoy testnet
 pnpm coverage         # Generate test coverage report
-pnpm lint             # Lint Solidity and TypeScript files
+pnpm lint             # solhint (Solidity); TypeScript is covered by `pnpm check` at the root
 ```
 
 ### Backend (`packages/backend/`)
 
 ```bash
 pnpm build           # TypeScript compilation
-pnpm lint            # ESLint
 pnpm test            # Jest tests (Vitest migration is on chore/backend-vitest)
 pnpm serve           # Start Firebase emulators
 pnpm deploy          # Deploy to Firebase
@@ -73,7 +72,6 @@ pnpm signMessage     # Sign test messages for backend auth
 pnpm dev             # Start Next.js development server (port 3001)
 pnpm build           # Build for production
 pnpm start           # Start production server
-pnpm lint            # ESLint
 pnpm type-check      # TypeScript type checking
 ```
 
@@ -1356,16 +1354,51 @@ in both.
    - Fix ALL TypeScript errors before proceeding
    - NEVER use `any` or `unknown` types - always provide proper typing
 
-2. **Code Formatting** (MANDATORY):
-   - Run `pnpm format` in the specific package/app worked on
-   - If working across multiple packages, run `pnpm format` from root
-   - Ensure all code follows consistent formatting standards
+2. **Lint and format** (MANDATORY):
+   - Run `pnpm check` from the root — Biome does both in one pass
+   - `pnpm check:fix` applies the safe fixes
+   - Fix ALL errors before proceeding. Warnings are a standing backlog rather than
+     a gate; see the Biome section below for which rules are deliberately warnings
+   - Solidity is separate: `pnpm lint:sol` (solhint)
 
-3. **Linting** (MANDATORY):
-   - Run `pnpm lint` in the specific package/app worked on
-   - Fix ALL linting errors and warnings before proceeding
-   - Follow ESLint rules and project coding standards
-   - If any code was changed/fixed during linting, run step 2 (formatting) again to ensure proper formatting
+### Biome
+
+Root `biome.json`, extending the shared `@rm30/biome-config`. One tool for lint and
+format; ESLint and Prettier are gone with their nine devDependencies. **solhint stays
+separate** — Biome does not do Solidity.
+
+Four scoped overrides, each for a case the analyser gets wrong rather than a rule being
+dodged:
+
+- **`useExhaustiveDependencies` is a warning**, carried over verbatim from
+  `eslint-plugin-react-hooks`. The rule does not understand MobX: reading an observable
+  during an `observer` component's render *does* re-subscribe, so its "outer scope values
+  aren't valid dependencies" is false here — and this file records the bug caused by
+  dropping `authStore.chainId`. **When superpool moves to Zustand the rule becomes
+  correct and should be promoted to an error.**
+- **`useArrowFunction` is off, repo-wide.** Its autofix rewrote 472 function expressions
+  and broke two things at once: a mocked constructor (`new MastraClient(...)` — an arrow
+  cannot be constructed, and the backend suite caught it) and every Mocha `function ()`
+  in `packages/contracts/test`, where `this` carries `this.timeout(...)`. The fix looks
+  purely stylistic and is not. Do not re-enable it without checking both.
+- **`useDateNow` is off, repo-wide.** Its autofix rewrites `new Date().getTime()` to
+  `Date.now()` — better code, but the auth and device-verification tests freeze time by
+  replacing `Date.prototype.getTime`, which `Date.now()` does not go through. Six tests
+  started reading the real clock. Adopting it means moving those tests to
+  `jest.spyOn(Date, 'now')` first.
+- **`*.d.ts` is exempt from `noUnusedVariables`.** A declaration file exists to declare
+  types; unused-within-the-file is its normal state.
+- **`apps/mobile/global.css` is exempt from `noDuplicateCustomProperties` and
+  `noUnknownFunction`.** `@variant` blocks legitimately redeclare a property per platform,
+  and `hairlineWidth()` is a React Native function.
+- **`NavigationStore.test.ts` is exempt from `useLiteralKeys`.** Bracket access is how
+  those tests reach private methods; the autofix rewrites it to dot access, which
+  TypeScript then rejects. That regression is easy to reintroduce — the fix looks safe.
+- **`noConsole` is off for `packages/contracts/scripts` and `scripts/`.** These are CLI
+  tools whose output *is* the console: they print addresses and env lines to paste.
+
+The remaining ~150 warnings are almost all `noNonNullAssertion`, which ESLint never
+checked. They are a backlog, not a decision.
 
 **CRITICAL TypeScript Rule**: NEVER use `any` or `unknown` types when working with TypeScript/JavaScript. Always provide proper, specific typing for variables, function parameters, return types, and object properties.
 

@@ -53,7 +53,7 @@ const SUFFIXED_FACTORY = /^POOL_FACTORY_ADDRESS_(\d+)$/
  */
 function legacyChain(): ChainConfig {
   return {
-    chainId: parseInt(process.env.CHAIN_ID || '31337'),
+    chainId: parseInt(process.env.CHAIN_ID || '31337', 10),
     name: process.env.CHAIN_NAME || 'Localhost',
     rpcUrl: process.env.RPC_URL || 'http://127.0.0.1:8545',
     poolFactoryAddress: process.env.POOL_FACTORY_ADDRESS || '',
@@ -69,7 +69,7 @@ function suffixedChains(): ChainConfig[] {
 
     if (!match || !value) continue
 
-    const chainId = parseInt(match[1])
+    const chainId = parseInt(match[1], 10)
 
     chains.push({
       chainId,
@@ -110,7 +110,7 @@ export const SUPPORTED_CHAINS: ChainConfig[] = (() => {
  * `CHAIN_ID`, which is what every existing `.env` sets. Kept as a value rather
  * than a lookup because the `list*` callables use it as a parameter default.
  */
-export const DEFAULT_CHAIN_ID: number = parseInt(process.env.DEFAULT_CHAIN_ID || process.env.CHAIN_ID || '31337')
+export const DEFAULT_CHAIN_ID: number = parseInt(process.env.DEFAULT_CHAIN_ID || process.env.CHAIN_ID || '31337', 10)
 
 /**
  * The configuration for one chain, or undefined if this backend does not serve
@@ -168,7 +168,7 @@ export const ACTIVE_CHAIN_CONFIG: ChainConfig = getChainConfig(DEFAULT_CHAIN_ID)
 function positiveIntOr(value: string | undefined): number | undefined {
   if (!value) return undefined
 
-  const parsed = parseInt(value)
+  const parsed = parseInt(value, 10)
 
   return Number.isInteger(parsed) && parsed > 0 ? parsed : undefined
 }

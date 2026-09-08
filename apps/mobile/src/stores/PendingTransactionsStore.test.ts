@@ -663,7 +663,7 @@ describe('extractPoolCreatedResult', () => {
   })
 
   it('ignores unrelated logs', () => {
-    const unrelated = { ...makePoolCreatedLog(1n, POOL_ADDRESS), topics: ['0x' + 'ab'.repeat(32)] } as ReceiptLog
+    const unrelated = { ...makePoolCreatedLog(1n, POOL_ADDRESS), topics: [`0x${'ab'.repeat(32)}`] } as ReceiptLog
     const receipt = makeReceipt({ logs: [unrelated] })
 
     expect(extractPoolCreatedResult(receipt)).toBeUndefined()

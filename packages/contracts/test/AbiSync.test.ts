@@ -1,8 +1,8 @@
-import { artifacts } from '../hardhat.connection'
+import * as fs from 'node:fs'
+import * as path from 'node:path'
 import { expect } from 'chai'
-import * as fs from 'fs'
-import * as path from 'path'
-import { ABI_CONTRACTS, ABI_OUTPUT_FILES, REGENERATE_COMMAND, renderAbiModule, RenderedAbi, REPO_ROOT } from '../scripts/abi-codegen'
+import { artifacts } from '../hardhat.connection'
+import { ABI_CONTRACTS, ABI_OUTPUT_FILES, REGENERATE_COMMAND, REPO_ROOT, type RenderedAbi, renderAbiModule } from '../scripts/abi-codegen'
 
 /**
  * Guards the consumers' ABI copies against drift.

@@ -1,13 +1,13 @@
-import { isMain } from './lib/main'
-import { exitWithUsage, optionalArgument, requiredArgument } from './lib/args'
-import { isLocalNetwork } from './lib/verification'
-import { safeContractNetworks, safeRpcUrl } from './lib/safe'
-import { signerKeyFor } from './lib/accounts'
-import { ethers, network } from '../hardhat.connection'
 import Safe from '@safe-global/protocol-kit'
-import { MetaTransactionData, SafeTransaction } from '@safe-global/types-kit'
+import type { MetaTransactionData, SafeTransaction } from '@safe-global/types-kit'
 import * as dotenv from 'dotenv'
-import { PoolFactory } from '../typechain-types'
+import { ethers, network } from '../hardhat.connection'
+import type { PoolFactory } from '../typechain-types'
+import { signerKeyFor } from './lib/accounts'
+import { exitWithUsage, optionalArgument, requiredArgument } from './lib/args'
+import { isMain } from './lib/main'
+import { safeContractNetworks, safeRpcUrl } from './lib/safe'
+import { isLocalNetwork } from './lib/verification'
 
 dotenv.config()
 
@@ -480,7 +480,7 @@ export {
   completeOwnershipTransfer,
   emergencyRollback,
   initiateOwnershipTransfer,
-  OwnershipTransferConfig,
-  TransferResult,
+  type OwnershipTransferConfig,
+  type TransferResult,
   verifyOwnershipStatus,
 }

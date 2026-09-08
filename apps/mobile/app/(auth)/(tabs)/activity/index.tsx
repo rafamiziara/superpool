@@ -1,7 +1,6 @@
 import type { Transaction } from '@superpool/types'
 import { StatusBar } from 'expo-status-bar'
 import { observer } from 'mobx-react-lite'
-import React from 'react'
 import { ScrollView, Text, View } from 'react-native'
 import { ActivityRow } from '../../../../src/components/lending/ActivityRow'
 import { poolStore } from '../../../../src/stores/PoolStore'

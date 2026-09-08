@@ -1,9 +1,9 @@
 import 'firebase-functions/v2/https'
 
-import * as express from 'express'
+import type { CustomAppCheckMinterResponse } from '@superpool/types'
+import type * as express from 'express'
 import { logger } from 'firebase-functions/v2'
-import { onRequest, Request } from 'firebase-functions/v2/https'
-import { CustomAppCheckMinterResponse } from '@superpool/types'
+import { onRequest, type Request } from 'firebase-functions/v2/https'
 import { customAppCheckMinterSchema } from '../../schemas'
 import { appCheck } from '../../services'
 import { DeviceVerificationService } from '../../services/deviceVerification'

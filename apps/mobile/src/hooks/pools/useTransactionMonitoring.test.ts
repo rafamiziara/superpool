@@ -7,6 +7,7 @@ import {
   type TransactionReceipt,
   WaitForTransactionReceiptTimeoutError,
 } from 'viem'
+import { makeContributeTransaction, makePendingTransaction, TX_HASH } from '../../__tests__/fixtures/pendingTransaction'
 import {
   mockEstimateContractGas,
   mockGetTransactionReceipt,
@@ -14,7 +15,6 @@ import {
   mockWagmiUsePublicClient,
   mockWaitForTransactionReceipt,
 } from '../../__tests__/mocks'
-import { makeContributeTransaction, makePendingTransaction, TX_HASH } from '../../__tests__/fixtures/pendingTransaction'
 import { LendingPoolABI, PoolFactoryABI } from '../../constants/abis'
 import { pendingTransactionsStore } from '../../stores/PendingTransactionsStore'
 import { useTransactionMonitoring } from './useTransactionMonitoring'
@@ -114,7 +114,7 @@ describe('useTransactionMonitoring', () => {
     it('resolves with the pool identifiers decoded from the receipt', async () => {
       const { result } = renderHook(() => useTransactionMonitoring())
 
-      let outcome
+      let outcome: Awaited<ReturnType<typeof result.current.waitForTransaction>> | undefined
       await act(async () => {
         outcome = await result.current.waitForTransaction(TX_HASH, 'CREATE_POOL')
       })
@@ -154,7 +154,7 @@ describe('useTransactionMonitoring', () => {
       mockWaitForTransactionReceipt.mockResolvedValue(makeReceipt({ logs: [makeFundsDepositedLog(5_000_000_000_000_000_000n)] }))
       const { result } = renderHook(() => useTransactionMonitoring())
 
-      let outcome
+      let outcome: Awaited<ReturnType<typeof result.current.waitForTransaction>> | undefined
       await act(async () => {
         outcome = await result.current.waitForTransaction(TX_HASH, 'CONTRIBUTE')
       })
@@ -248,7 +248,7 @@ describe('useTransactionMonitoring', () => {
     await pendingTransactionsStore.reset()
     const { result } = renderHook(() => useTransactionMonitoring())
 
-    let outcome
+    let outcome: Awaited<ReturnType<typeof result.current.waitForTransaction>> | undefined
     await act(async () => {
       outcome = await result.current.waitForTransaction(TX_HASH, 'CREATE_POOL')
     })

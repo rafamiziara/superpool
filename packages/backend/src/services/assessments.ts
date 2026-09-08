@@ -1,6 +1,6 @@
-import { AssessmentInfo, AssessmentInputs } from '@superpool/types'
+import type { AssessmentInfo, AssessmentInputs } from '@superpool/types'
 import { formatUnits } from 'ethers'
-import { Firestore, Timestamp } from 'firebase-admin/firestore'
+import { type Firestore, Timestamp } from 'firebase-admin/firestore'
 import { logger } from 'firebase-functions/v2'
 import { ASSESSMENT_QUOTA_COLLECTION, ASSESSMENTS_COLLECTION, LOANS_COLLECTION, nativeSymbolFor, POOLS_COLLECTION } from '../constants'
 import type { AgentAssessmentFacts } from './agentClient'
@@ -66,7 +66,7 @@ export interface GatheredFacts {
  * Configurable because the right number depends on what a reading costs and on
  * whose key is paying, and neither is settled while this runs on one laptop.
  */
-export const ASSESSMENT_DAILY_CAP = parseInt(process.env.ASSESSMENT_DAILY_CAP || '50')
+export const ASSESSMENT_DAILY_CAP = parseInt(process.env.ASSESSMENT_DAILY_CAP || '50', 10)
 
 /**
  * The day a claim belongs to, in UTC.

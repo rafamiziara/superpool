@@ -1,5 +1,4 @@
 import { AppKitButton } from '@reown/appkit-wagmi-react-native'
-import React from 'react'
 import { View } from 'react-native'
 import { useAccount } from 'wagmi'
 

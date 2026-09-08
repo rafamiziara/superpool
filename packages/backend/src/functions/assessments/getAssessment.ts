@@ -1,6 +1,6 @@
-import { GetAssessmentRequest, GetAssessmentResponse } from '@superpool/types'
+import type { GetAssessmentRequest, GetAssessmentResponse } from '@superpool/types'
 import { logger } from 'firebase-functions/v2'
-import { CallableRequest, HttpsError, onCall } from 'firebase-functions/v2/https'
+import { type CallableRequest, HttpsError, onCall } from 'firebase-functions/v2/https'
 import { getAssessmentSchema } from '../../schemas'
 import { firestore } from '../../services'
 import { assessmentFor, ownershipOf } from '../../services/assessments'

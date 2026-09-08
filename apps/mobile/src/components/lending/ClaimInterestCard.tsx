@@ -1,6 +1,6 @@
 import { FontAwesome } from '@expo/vector-icons'
 import { observer } from 'mobx-react-lite'
-import React, { useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { ActivityIndicator, Pressable, Text, View } from 'react-native'
 import { useAccount, useReadContract } from 'wagmi'
 import { LendingPoolABI } from '../../constants/abis'

@@ -31,7 +31,7 @@ const { indexLoanDecisionsByTxHash } = require('../../services/loanDecisionIndex
 // Helpers
 // ---------------------------------------------------------------------------
 
-const VALID_TX_HASH = '0x' + 'a'.repeat(64)
+const VALID_TX_HASH = `0x${'a'.repeat(64)}`
 const SUPPORTED_CHAIN_ID = 31337 // matches ACTIVE_CHAIN_CONFIG default
 const STARTED_AT = new Date('2026-08-11T12:00:00.000Z')
 

@@ -1,6 +1,6 @@
 import { mockLogger } from '../__tests__/setup'
 import { buildSearchTokens } from '../utils/searchTokens'
-import { ParsedPoolEvent } from './eventIndexer'
+import type { ParsedPoolEvent } from './eventIndexer'
 
 // ---------------------------------------------------------------------------
 // Shared mock references — captured at module-definition time so tests can

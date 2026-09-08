@@ -1,6 +1,5 @@
 import type { Transaction } from '@superpool/types'
 import { TransactionStatus, TransactionType } from '@superpool/types'
-import React from 'react'
 import { NATIVE } from '../../__tests__/fixtures/denomination'
 import { render } from '../../__tests__/test-utils'
 import { ActivityRow } from './ActivityRow'

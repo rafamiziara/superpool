@@ -1,6 +1,6 @@
 import * as Device from 'expo-device'
-import { mockGetExpoPushToken, mockGetPermissions, mockRequestPermissions, mockSetNotificationChannel } from '../__tests__/setup'
 import { mockFirebaseCallable } from '../__tests__/mocks'
+import { mockGetExpoPushToken, mockGetPermissions, mockRequestPermissions, mockSetNotificationChannel } from '../__tests__/setup'
 import {
   hasNotificationPermission,
   registerForPushNotifications,

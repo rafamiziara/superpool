@@ -1,5 +1,5 @@
-import { isMain } from './lib/main'
 import { ethers } from '../hardhat.connection'
+import { isMain } from './lib/main'
 
 /**
  * Demonstration script showing how Safe multi-sig workflow would work
@@ -112,8 +112,8 @@ async function demoSafeWorkflow() {
     const signature1 = await deployer.signMessage(message)
     const signature2 = await owner1.signMessage(message)
 
-    console.log('Owner 1 Signature:', signature1.slice(0, 20) + '...')
-    console.log('Owner 2 Signature:', signature2.slice(0, 20) + '...')
+    console.log('Owner 1 Signature:', `${signature1.slice(0, 20)}...`)
+    console.log('Owner 2 Signature:', `${signature2.slice(0, 20)}...`)
     console.log('✅ Threshold reached! Transaction ready for execution')
   } catch {
     console.log('Signature demonstration (mock signatures generated)')

@@ -1,10 +1,9 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native'
-import React from 'react'
 import { type Address, parseEther } from 'viem'
+import { NATIVE } from '../../__tests__/fixtures/denomination'
 import { mockWagmiUseAccount, mockWagmiUseReadContract } from '../../__tests__/mocks'
 import { poolStore } from '../../stores/PoolStore'
 import { ClaimInterestCard } from './ClaimInterestCard'
-import { NATIVE } from '../../__tests__/fixtures/denomination'
 
 const WALLET_ADDRESS = '0x70997970C51812dc3A010C7d01b50e0d17dc79C8'
 const POOL_ADDRESS = '0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0'

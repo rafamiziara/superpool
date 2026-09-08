@@ -1,6 +1,5 @@
 import { FontAwesome } from '@expo/vector-icons'
 import { router } from 'expo-router'
-import React from 'react'
 import { Pressable, Text, View } from 'react-native'
 import { palette } from '../../constants/palette'
 

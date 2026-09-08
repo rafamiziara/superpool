@@ -1,5 +1,5 @@
 import { act, renderHook } from '@testing-library/react-native'
-import { ErrorDetails, ErrorType } from '../../types/errors'
+import { type ErrorDetails, ErrorType } from '../../types/errors'
 import { useErrorHandling } from './useErrorHandling'
 
 describe('useErrorHandling', () => {

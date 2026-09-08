@@ -1,8 +1,8 @@
-import { NotificationData } from '@superpool/types'
-import { Firestore } from 'firebase-admin/firestore'
+import type { NotificationData } from '@superpool/types'
+import type { Firestore } from 'firebase-admin/firestore'
 import { logger } from 'firebase-functions/v2'
 import { NOTIFICATIONS_SENT_COLLECTION } from '../constants'
-import { AcceptedTicket, recordTickets } from './pushReceipts'
+import { type AcceptedTicket, recordTickets } from './pushReceipts'
 import { deletePushToken, tokensForWallet } from './pushTokens'
 
 /**

@@ -3,10 +3,10 @@
  * than written as a literal character class, because combining characters
  * render as nothing in an editor and do not survive every copy-paste.
  */
-const COMBINING_MARKS = new RegExp('[\\u0300-\\u036f]', 'g')
+const COMBINING_MARKS = /[\u0300-\u036f]/g
 
 /** Anything that is not a letter or a digit separates one word from the next. */
-const SEPARATORS = new RegExp('[^\\p{L}\\p{N}]+', 'gu')
+const SEPARATORS = /[^\p{L}\p{N}]+/gu
 
 /**
  * Shorter than this and a prefix matches most of the chain.

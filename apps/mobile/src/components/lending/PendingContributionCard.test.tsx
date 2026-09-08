@@ -1,4 +1,3 @@
-import React from 'react'
 import { makeContributeTransaction, TX_HASH } from '../../__tests__/fixtures/pendingTransaction'
 import { fireEvent, render } from '../../__tests__/test-utils'
 import type { ContributeTransaction } from '../../stores/PendingTransactionsStore'

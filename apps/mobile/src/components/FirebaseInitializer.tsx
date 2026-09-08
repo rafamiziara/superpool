@@ -1,5 +1,5 @@
-import { useEffect } from 'react'
 import { onAuthStateChanged } from 'firebase/auth'
+import { useEffect } from 'react'
 import { FIREBASE_AUTH } from '../config/firebase'
 import { authStore } from '../stores/AuthStore'
 import { sameAddress } from '../utils/format'

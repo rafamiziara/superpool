@@ -1,5 +1,4 @@
 import { type Loan, LoanStatus } from '@superpool/types'
-import React from 'react'
 import { render } from '../../__tests__/test-utils'
 import { LoanDueBadge } from './LoanDueBadge'
 

@@ -1,5 +1,5 @@
-import { NotificationKind, PushReceipt } from '@superpool/types'
-import { Firestore } from 'firebase-admin/firestore'
+import type { NotificationKind, PushReceipt } from '@superpool/types'
+import type { Firestore } from 'firebase-admin/firestore'
 import { logger } from 'firebase-functions/v2'
 import { PUSH_RECEIPTS_COLLECTION } from '../constants'
 import { deletePushToken } from './pushTokens'

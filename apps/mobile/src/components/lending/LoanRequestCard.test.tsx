@@ -1,7 +1,7 @@
 import type { BorrowerHistory, LoanInfo } from '@superpool/types'
-import React from 'react'
-import { fireEvent, render } from '../../__tests__/test-utils'
+import type React from 'react'
 import { NATIVE } from '../../__tests__/fixtures/denomination'
+import { fireEvent, render } from '../../__tests__/test-utils'
 import { LoanRequestCard } from './LoanRequestCard'
 
 const BORROWER = '0x15d34aaf54267db7d7c367839aaf71a00a2c6a65'

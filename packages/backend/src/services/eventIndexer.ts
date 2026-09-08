@@ -1,8 +1,8 @@
-import { DocumentReference, Firestore } from 'firebase-admin/firestore'
-import { Contract, Interface, JsonRpcProvider, Log, Provider, ZeroAddress } from 'ethers'
+import { Contract, Interface, type JsonRpcProvider, type Log, type Provider, ZeroAddress } from 'ethers'
+import type { DocumentReference, Firestore } from 'firebase-admin/firestore'
 import { logger } from 'firebase-functions/v2'
 import { HttpsError } from 'firebase-functions/v2/https'
-import { ERC20MetadataABI, PoolFactoryABI, POOLS_COLLECTION } from '../constants'
+import { ERC20MetadataABI, POOLS_COLLECTION, PoolFactoryABI } from '../constants'
 import { buildSearchTokens, mergeSearchTokens } from '../utils/searchTokens'
 
 export interface ParsedPoolEvent {

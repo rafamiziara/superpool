@@ -1,11 +1,11 @@
-import { ListNotesRequest, ListNotesResponse } from '@superpool/types'
+import type { ListNotesRequest, ListNotesResponse } from '@superpool/types'
 import { logger } from 'firebase-functions/v2'
-import { CallableRequest, HttpsError, onCall } from 'firebase-functions/v2/https'
+import { type CallableRequest, HttpsError, onCall } from 'firebase-functions/v2/https'
 import { DEFAULT_CHAIN_ID } from '../../constants'
 import { listNotesSchema } from '../../schemas'
 import { firestore } from '../../services'
-import { parseRequest } from '../../utils/validation'
 import { listNotes as list } from '../../services/notes'
+import { parseRequest } from '../../utils/validation'
 
 /** Mirrors the cap the other feeds use. Notes are the sparsest of them. */
 const MAX_LIMIT = 100

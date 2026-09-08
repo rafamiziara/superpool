@@ -1,6 +1,6 @@
 import { isAddress } from 'ethers'
-import { AUTH_NONCES_COLLECTION } from '../../constants'
 import { createMockCollection } from '../../__tests__/mocks'
+import { AUTH_NONCES_COLLECTION } from '../../constants'
 
 // Mock ethers module
 jest.mock('ethers', () => ({

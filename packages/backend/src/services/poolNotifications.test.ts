@@ -1,4 +1,4 @@
-import { Firestore } from 'firebase-admin/firestore'
+import type { Firestore } from 'firebase-admin/firestore'
 
 const mockNotifyOnce = jest.fn()
 const mockNoteFor = jest.fn()
@@ -13,8 +13,8 @@ jest.mock('./notes', () => ({
   noteFor: (...args: unknown[]) => mockNoteFor(...args),
 }))
 
-import { IndexLoanResult, LoanTransition, ParsedLoan } from './loanIndexer'
-import { IndexMembershipResult, MembershipTransition, ParsedMembership } from './membershipIndexer'
+import type { IndexLoanResult, LoanTransition, ParsedLoan } from './loanIndexer'
+import type { IndexMembershipResult, MembershipTransition, ParsedMembership } from './membershipIndexer'
 import { notifyLoanDecided, notifyLoanRequested, notifyMembershipDecided, notifyMembershipRequested } from './poolNotifications'
 
 const CHAIN_ID = 31337

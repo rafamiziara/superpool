@@ -31,7 +31,7 @@ const { Contract, JsonRpcProvider, Wallet } = require('ethers')
 const CHAIN_ID = 80002
 const WALLET = '0x7C3ed3a184BAAb1DaF35f5387bA23736C7CD18a6'
 const FACTORY = '0x91bC24Da032F32d94F7A0AE55a3f11b8A85e0d31'
-const TX_HASH = '0x' + 'c'.repeat(64)
+const TX_HASH = `0x${'c'.repeat(64)}`
 
 const fullConfig = { rpcUrl: 'https://rpc.example', poolFactoryAddress: FACTORY }
 

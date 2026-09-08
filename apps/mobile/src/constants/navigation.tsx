@@ -1,5 +1,4 @@
 import { DarkTheme } from 'expo-router'
-import React from 'react'
 import { Image } from 'react-native'
 import { WalletHeaderButton } from '../components/WalletHeaderButton'
 import { palette } from './palette'

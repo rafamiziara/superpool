@@ -1,6 +1,6 @@
-import { ListMembersRequest, ListMembersResponse } from '@superpool/types'
+import type { ListMembersRequest, ListMembersResponse } from '@superpool/types'
 import { logger } from 'firebase-functions/v2'
-import { CallableRequest, HttpsError, onCall } from 'firebase-functions/v2/https'
+import { type CallableRequest, HttpsError, onCall } from 'firebase-functions/v2/https'
 import { DEFAULT_CHAIN_ID, MEMBERSHIPS_COLLECTION } from '../../constants'
 import { listMembersSchema } from '../../schemas'
 import { firestore } from '../../services'

@@ -1,5 +1,6 @@
 import { act, renderHook } from '@testing-library/react-native'
 import { type Address, BaseError, ContractFunctionRevertedError, InsufficientFundsError, UserRejectedRequestError } from 'viem'
+import { NATIVE, USDC } from '../../__tests__/fixtures/denomination'
 import {
   mockEstimateContractGas,
   mockGetTransactionReceipt,
@@ -12,7 +13,6 @@ import {
 import { LendingPoolABI } from '../../constants/abis'
 import { pendingTransactionsStore } from '../../stores/PendingTransactionsStore'
 import { type ContributionParams, describeContributionError, useContribution, validateContributionParams } from './useContribution'
-import { NATIVE, USDC } from '../../__tests__/fixtures/denomination'
 
 const POOL_ADDRESS = '0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0'
 const WALLET_ADDRESS = '0x70997970C51812dc3A010C7d01b50e0d17dc79C8'
@@ -46,7 +46,7 @@ type RevertAbiItem = NonNullable<ContractFunctionRevertedError['data']>['abiItem
 /** Looks the error up in the shipped ABI, so a rename there fails this test too. */
 function findAbiError(name: string): RevertAbiItem {
   const item = LendingPoolABI.find((entry) => entry.type === 'error' && entry.name === name)
-  if (!item || item.type !== 'error') throw new Error(`LendingPoolABI has no error named ${name}`)
+  if (item?.type !== 'error') throw new Error(`LendingPoolABI has no error named ${name}`)
 
   return item
 }
@@ -204,7 +204,7 @@ describe('useContribution', () => {
     it('returns the transaction hash', async () => {
       const { result } = renderHook(() => useContribution())
 
-      let txHash
+      let txHash: Awaited<ReturnType<typeof result.current.contribute>> | undefined
       await act(async () => {
         txHash = await result.current.contribute(makeParams())
       })

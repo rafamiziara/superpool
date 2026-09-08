@@ -1,12 +1,12 @@
-import { ContributionInfo, IndexContributionRequest, IndexContributionResponse } from '@superpool/types'
+import type { ContributionInfo, IndexContributionRequest, IndexContributionResponse } from '@superpool/types'
 import { logger } from 'firebase-functions/v2'
-import { CallableRequest, HttpsError, onCall } from 'firebase-functions/v2/https'
+import { type CallableRequest, HttpsError, onCall } from 'firebase-functions/v2/https'
 import { DEFAULT_CHAIN_ID, getChainConfig } from '../../constants'
 import { indexByTransactionSchema } from '../../schemas'
 import { firestore } from '../../services'
-import { contributionDocId, indexContributionsByTxHash, ParsedContributionEvent } from '../../services/contributionIndexer'
-import { parseRequest } from '../../utils/validation'
+import { contributionDocId, indexContributionsByTxHash, type ParsedContributionEvent } from '../../services/contributionIndexer'
 import { getProvider } from '../../utils/blockchain'
+import { parseRequest } from '../../utils/validation'
 
 /** Firestore's Date becomes an ISO string on the wire; see ContributionInfo. */
 function toContributionInfo(contribution: ParsedContributionEvent): ContributionInfo {

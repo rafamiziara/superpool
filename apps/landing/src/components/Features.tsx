@@ -73,6 +73,7 @@ export function Features() {
 
         <div className="mt-16 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {features.map((feature) => (
+            // biome-ignore lint/a11y/noStaticElementInteractions: onMouseMove drives a decorative cursor-following glow; there is no behaviour to reach by keyboard.
             <div
               key={feature.title}
               data-reveal

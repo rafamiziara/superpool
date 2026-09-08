@@ -1,6 +1,6 @@
-import { ListContributionsRequest, ListContributionsResponse } from '@superpool/types'
+import type { ListContributionsRequest, ListContributionsResponse } from '@superpool/types'
 import { logger } from 'firebase-functions/v2'
-import { CallableRequest, HttpsError, onCall } from 'firebase-functions/v2/https'
+import { type CallableRequest, HttpsError, onCall } from 'firebase-functions/v2/https'
 import { CONTRIBUTIONS_COLLECTION, DEFAULT_CHAIN_ID } from '../../constants'
 import { listContributionsSchema } from '../../schemas'
 import { firestore } from '../../services'

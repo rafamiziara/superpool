@@ -1,5 +1,5 @@
 import { HttpsError } from 'firebase-functions/v2/https'
-import { z } from 'zod'
+import type { z } from 'zod'
 
 /** How many issues to name before the message stops being useful. */
 const MAX_REPORTED_ISSUES = 3

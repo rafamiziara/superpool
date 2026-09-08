@@ -1,5 +1,5 @@
 import { NOTE_MAX_LENGTH } from '@superpool/types'
-import React from 'react'
+import type React from 'react'
 import { fireEvent, render } from '../../__tests__/test-utils'
 import { NoteField } from './NoteField'
 

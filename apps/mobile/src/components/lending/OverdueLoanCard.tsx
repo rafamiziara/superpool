@@ -1,6 +1,5 @@
 import { FontAwesome } from '@expo/vector-icons'
 import type { BorrowerHistory, LoanInfo, Note } from '@superpool/types'
-import React from 'react'
 import { Pressable, Text, View } from 'react-native'
 import { useReadContract } from 'wagmi'
 import { LendingPoolABI } from '../../constants/abis'

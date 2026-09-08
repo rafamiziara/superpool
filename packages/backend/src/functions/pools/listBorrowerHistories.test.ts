@@ -156,4 +156,5 @@ describe('listBorrowerHistories', () => {
 // A module, not a script: this file uses `require` so that `jest.mock` hoists
 // above it, and without an export the test globals would collide with every
 // other callable test in the project.
+// biome-ignore lint/suspicious/noExportsInTest: `export {}` exports nothing — it marks the file as a module so its test globals do not collide with every other callable test.
 export {}

@@ -1,4 +1,4 @@
-import React from 'react'
+import type React from 'react'
 import { View } from 'react-native'
 
 export interface ProgressIndicatorProps {
@@ -65,6 +65,7 @@ export const ProgressIndicator: React.FC<ProgressIndicatorProps> = ({
     <View className={`flex-row justify-center items-center ${gapClasses[size]} ${className}`} testID={`${testID}-container`}>
       {Array.from({ length: totalSteps }, (_, index) => (
         <View
+          // biome-ignore lint/suspicious/noArrayIndexKey: a fixed-length step indicator — the index IS the step's identity, and the list never reorders.
           key={index}
           className={getDotClassName(index)}
           testID={`${testID}-step-${index}`}

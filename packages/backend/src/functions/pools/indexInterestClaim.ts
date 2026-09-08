@@ -1,12 +1,12 @@
-import { IndexInterestClaimRequest, IndexInterestClaimResponse, InterestClaimInfo } from '@superpool/types'
+import type { IndexInterestClaimRequest, IndexInterestClaimResponse, InterestClaimInfo } from '@superpool/types'
 import { logger } from 'firebase-functions/v2'
-import { CallableRequest, HttpsError, onCall } from 'firebase-functions/v2/https'
+import { type CallableRequest, HttpsError, onCall } from 'firebase-functions/v2/https'
 import { DEFAULT_CHAIN_ID, getChainConfig } from '../../constants'
 import { indexByTransactionSchema } from '../../schemas'
 import { firestore } from '../../services'
-import { indexInterestClaimsByTxHash, interestClaimDocId, ParsedInterestClaimEvent } from '../../services/interestClaimIndexer'
-import { parseRequest } from '../../utils/validation'
+import { indexInterestClaimsByTxHash, interestClaimDocId, type ParsedInterestClaimEvent } from '../../services/interestClaimIndexer'
 import { getProvider } from '../../utils/blockchain'
+import { parseRequest } from '../../utils/validation'
 
 /** Firestore's Date becomes an ISO string on the wire; see InterestClaimInfo. */
 function toInterestClaimInfo(claim: ParsedInterestClaimEvent): InterestClaimInfo {

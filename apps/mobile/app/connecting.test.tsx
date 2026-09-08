@@ -1,5 +1,4 @@
 import { act, render } from '@testing-library/react-native'
-import React from 'react'
 import ConnectingScreen from './connecting'
 
 // Mock dependencies - only external ones with side effects

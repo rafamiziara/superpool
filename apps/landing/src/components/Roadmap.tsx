@@ -1,9 +1,9 @@
 'use client'
 
 import { useEffect, useRef } from 'react'
-import { getGsap } from '@/lib/gsap'
 import { SectionHeading } from '@/components/SectionHeading'
 import { DEPLOYMENT } from '@/config/deployment'
+import { getGsap } from '@/lib/gsap'
 
 type Status = 'shipped' | 'building' | 'exploring'
 

@@ -1,6 +1,6 @@
-import { UnregisterPushTokenRequest, UnregisterPushTokenResponse } from '@superpool/types'
+import type { UnregisterPushTokenRequest, UnregisterPushTokenResponse } from '@superpool/types'
 import { logger } from 'firebase-functions/v2'
-import { CallableRequest, HttpsError, onCall } from 'firebase-functions/v2/https'
+import { type CallableRequest, HttpsError, onCall } from 'firebase-functions/v2/https'
 import { unregisterPushTokenSchema } from '../../schemas'
 import { firestore } from '../../services'
 import { deletePushToken } from '../../services/pushTokens'

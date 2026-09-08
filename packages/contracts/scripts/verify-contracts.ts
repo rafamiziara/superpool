@@ -1,7 +1,7 @@
-import { network } from '../hardhat.connection'
 import * as dotenv from 'dotenv'
-import { manualVerifyCommand, verificationBlocker, verifyAllWithRetry, VerifyTarget } from './lib/verification'
+import { network } from '../hardhat.connection'
 import { argumentList, requiredArgument } from './lib/args'
+import { manualVerifyCommand, type VerifyTarget, verificationBlocker, verifyAllWithRetry } from './lib/verification'
 
 dotenv.config()
 

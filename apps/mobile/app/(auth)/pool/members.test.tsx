@@ -1,6 +1,5 @@
 import type { MemberInfo } from '@superpool/types'
 import { act, fireEvent, render, waitFor } from '@testing-library/react-native'
-import React from 'react'
 import { mockLocalSearchParams } from '../../../src/__tests__/setup'
 import { MOCK_USER_ADDRESS } from '../../../src/mocks/lending'
 import { authStore } from '../../../src/stores/AuthStore'

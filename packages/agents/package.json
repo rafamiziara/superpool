@@ -14,8 +14,6 @@
     "test": "vitest run",
     "eval": "tsx src/mastra/evals/run.ts",
     "type-check": "tsc --noEmit",
-    "lint": "eslint src --config ../../eslint.config.mjs",
-    "format": "prettier --write . --ignore-path ../../.prettierignore",
     "test:watch": "vitest"
   },
   "dependencies": {

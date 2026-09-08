@@ -1,5 +1,4 @@
 import { MemberStatus } from '@superpool/types'
-import React from 'react'
 import {
   makeContributeTransaction,
   makePendingTransaction,

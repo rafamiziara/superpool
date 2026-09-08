@@ -46,9 +46,8 @@
     "test:safe": "hardhat run scripts/smoke-safe.ts --network polygonAmoyFork",
     "demo:safe": "hardhat run scripts/demo-safe.ts --network localhost",
     "test:full": "npm run test:local && npm run test:safe",
-    "lint": "solhint contracts/*.sol && cd ../.. && npx eslint packages/contracts/**/*.ts --config eslint.config.mjs",
+    "lint": "solhint contracts/*.sol",
     "clean": "hardhat clean",
-    "format": "prettier --write . --ignore-path ../../.prettierignore",
     "test:gas:json": "hardhat test --gas-stats-json gas-stats.json"
   },
   "keywords": [

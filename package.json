@@ -7,6 +7,8 @@
   "scripts": {
     "dev": "node scripts/dev-environment.js --with-app",
     "dev:backend": "node scripts/dev-environment.js",
+    "check": "biome check .",
+    "check:fix": "biome check --write .",
     "test": "pnpm run test:backend && pnpm run test:contracts && pnpm run test:mobile",
     "test:backend": "pnpm --filter backend test",
     "test:contracts": "pnpm --filter contracts test",
@@ -19,28 +21,17 @@
     "coverage:report": "nyc report --reporter=html --reporter=text-summary",
     "coverage:open": "start coverage/merged/index.html",
     "coverage:clean": "rimraf coverage",
-    "lint": "pnpm run lint:ts && pnpm run lint:sol",
-    "lint:ts": "eslint . --config eslint.config.mjs",
-    "lint:sol": "pnpm --filter contracts lint",
-    "format": "prettier --write .",
-    "format:check": "prettier --check ."
+    "lint:sol": "pnpm --filter contracts lint"
   },
   "keywords": [],
   "author": "",
   "license": "MIT",
   "packageManager": "pnpm@10.12.4",
   "devDependencies": {
-    "@eslint/js": "^9.15.0",
+    "@biomejs/biome": "2.5.12",
+    "@rm30/biome-config": "^0.1.0",
     "@rm30/tsconfig": "^0.1.0",
-    "@typescript-eslint/eslint-plugin": "^8.15.0",
-    "@typescript-eslint/parser": "^8.15.0",
-    "eslint": "^9.15.0",
-    "eslint-config-prettier": "^9.1.0",
-    "eslint-plugin-prettier": "^5.5.4",
-    "eslint-plugin-react-hooks": "^7.0.1",
-    "globals": "^15.12.0",
     "nyc": "^17.1.0",
-    "prettier": "^3.3.3",
     "rimraf": "^6.0.1"
   }
 }

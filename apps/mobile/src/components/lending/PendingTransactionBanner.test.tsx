@@ -1,4 +1,3 @@
-import React from 'react'
 import { LOCALHOST_CHAIN_ID, makePendingTransaction, OTHER_TX_HASH } from '../../__tests__/fixtures/pendingTransaction'
 import { mockWagmiUseAccount } from '../../__tests__/mocks'
 import { fireEvent, render } from '../../__tests__/test-utils'

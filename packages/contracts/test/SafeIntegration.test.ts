@@ -1,11 +1,12 @@
-import { ethers, isSimulatedNetwork, network, upgrades } from '../hardhat.connection'
 import type { HardhatEthersSigner } from '@nomicfoundation/hardhat-ethers/types'
 import { expect, use } from 'chai'
 import chaiAsPromised from 'chai-as-promised'
+import { ethers, isSimulatedNetwork, network, upgrades } from '../hardhat.connection'
 
-import { deploySafe, SafeConfig } from '../scripts/deploy-safe'
+import { deploySafe, type SafeConfig } from '../scripts/deploy-safe'
 import { completeOwnershipTransfer, initiateOwnershipTransfer, verifyOwnershipStatus } from '../scripts/transfer-ownership'
-import { LendingPool, PoolFactory } from '../typechain-types'
+import type { LendingPool, PoolFactory } from '../typechain-types'
+
 // chai-as-promised, for the async assertions below.
 use(chaiAsPromised)
 
@@ -62,7 +63,7 @@ describe('Safe Integration Tests', function () {
       const safeConfig: SafeConfig = {
         owners: [safeOwner1.address, safeOwner2.address, safeOwner3.address],
         threshold: 2,
-        saltNonce: '0x' + Date.now().toString(16),
+        saltNonce: `0x${Date.now().toString(16)}`,
       }
 
       const deploymentResult = await deploySafe(safeConfig)
@@ -142,7 +143,7 @@ describe('Safe Integration Tests', function () {
       const safeConfig: SafeConfig = {
         owners: [safeOwner1.address, safeOwner2.address, safeOwner3.address],
         threshold: 2,
-        saltNonce: '0x' + Date.now().toString(16),
+        saltNonce: `0x${Date.now().toString(16)}`,
       }
 
       const deploymentResult = await deploySafe(safeConfig)
@@ -259,7 +260,7 @@ describe('Safe Integration Tests', function () {
       const safeConfig: SafeConfig = {
         owners: [safeOwner1.address, safeOwner2.address, safeOwner3.address],
         threshold: 2,
-        saltNonce: '0x' + Date.now().toString(16),
+        saltNonce: `0x${Date.now().toString(16)}`,
       }
 
       const deploymentResult = await deploySafe(safeConfig)
@@ -386,7 +387,7 @@ describe('Safe Integration Tests', function () {
       const config: SafeConfig = {
         owners: owners,
         threshold: 3,
-        saltNonce: '0x' + Date.now().toString(16),
+        saltNonce: `0x${Date.now().toString(16)}`,
       }
 
       const result = await deploySafe(config)

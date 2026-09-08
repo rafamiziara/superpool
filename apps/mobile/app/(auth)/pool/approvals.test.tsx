@@ -1,7 +1,6 @@
 import type { LoanInfo } from '@superpool/types'
 import type { RenderResult } from '@testing-library/react-native'
 import { act, fireEvent, render, waitFor } from '@testing-library/react-native'
-import React from 'react'
 import { mockWagmiUseReadContract } from '../../../src/__tests__/mocks'
 import { mockLocalSearchParams } from '../../../src/__tests__/setup'
 import { MOCK_USER_ADDRESS } from '../../../src/mocks/lending'

@@ -1,7 +1,7 @@
-import { makeAutoObservable } from 'mobx'
 import type { User } from '@superpool/types'
-import type { AuthStep } from '../types/auth'
+import { makeAutoObservable } from 'mobx'
 import { AUTH_STEPS } from '../constants/authSteps'
+import type { AuthStep } from '../types/auth'
 import { sameAddress } from '../utils/format'
 import { logger } from '../utils/logger'
 

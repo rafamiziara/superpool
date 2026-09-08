@@ -1,0 +1,105 @@
+{
+  "$schema": "https://biomejs.dev/schemas/2.5.12/schema.json",
+  "extends": [
+    "@rm30/biome-config"
+  ],
+  "files": {
+    "includes": [
+      "!**/node_modules",
+      "!**/dist",
+      "!**/build",
+      "!**/lib",
+      "!**/coverage",
+      "!**/lcov-report",
+      "!**/.next",
+      "!**/.expo",
+      "!**/.expo-shared",
+      "!**/.mastra",
+      "!**/android",
+      "!**/ios",
+      "!**/typechain-types",
+      "!**/artifacts",
+      "!**/cache",
+      "!.dev",
+      "!temp",
+      "!packages/backend/scripts",
+      "!**/merge-coverage.js",
+      "!**/tailwind.config.js",
+      "!**/jest.config.ts",
+      "!**/jest.config.js",
+      "!**/vitest.config.ts",
+      "!**/abis.generated.ts",
+      "!**/uniwind-types.d.ts",
+      "!**/next-env.d.ts",
+      "!**/expo-env.d.ts",
+      "!**/pnpm-lock.yaml"
+    ]
+  },
+  "linter": {
+    "rules": {
+      "correctness": {
+        "useExhaustiveDependencies": "warn",
+        "useHookAtTopLevel": "error"
+      },
+      "complexity": {
+        "useArrowFunction": "off",
+        "useDateNow": "off"
+      }
+    }
+  },
+  "overrides": [
+    {
+      "includes": [
+        "**/*.d.ts"
+      ],
+      "linter": {
+        "rules": {
+          "correctness": {
+            "noUnusedVariables": "off"
+          }
+        }
+      }
+    },
+    {
+      "includes": [
+        "apps/mobile/global.css"
+      ],
+      "linter": {
+        "rules": {
+          "suspicious": {
+            "noDuplicateCustomProperties": "off"
+          },
+          "correctness": {
+            "noUnknownFunction": "off"
+          }
+        }
+      }
+    },
+    {
+      "includes": [
+        "apps/mobile/src/stores/NavigationStore.test.ts"
+      ],
+      "linter": {
+        "rules": {
+          "complexity": {
+            "useLiteralKeys": "off"
+          }
+        }
+      }
+    },
+    {
+      "includes": [
+        "packages/contracts/scripts/**",
+        "packages/contracts/test/**",
+        "scripts/**"
+      ],
+      "linter": {
+        "rules": {
+          "suspicious": {
+            "noConsole": "off"
+          }
+        }
+      }
+    }
+  ]
+}

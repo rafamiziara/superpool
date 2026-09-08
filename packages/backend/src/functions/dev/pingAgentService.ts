@@ -1,5 +1,5 @@
 import { logger } from 'firebase-functions/v2'
-import { CallableRequest, HttpsError, onCall } from 'firebase-functions/v2/https'
+import { type CallableRequest, HttpsError, onCall } from 'firebase-functions/v2/https'
 import { pingAgentServiceSchema } from '../../schemas'
 import { type AgentPingResult, pingAgentService as ping } from '../../services/agentClient'
 import { parseRequest } from '../../utils/validation'

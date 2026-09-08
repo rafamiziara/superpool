@@ -1,5 +1,4 @@
 import { NOTE_MAX_LENGTH } from '@superpool/types'
-import React from 'react'
 import { Text, TextInput, View } from 'react-native'
 
 export interface NoteFieldProps {

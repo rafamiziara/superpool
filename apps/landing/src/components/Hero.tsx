@@ -1,5 +1,5 @@
-import { WaveField } from '@/components/WaveField'
 import { GitHubIcon } from '@/components/Navigation'
+import { WaveField } from '@/components/WaveField'
 import { DEPLOYMENT } from '@/config/deployment'
 
 function riseDelay(seconds: number): React.CSSProperties {

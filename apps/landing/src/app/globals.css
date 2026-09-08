@@ -1,4 +1,4 @@
-@import 'tailwindcss';
+@import "tailwindcss";
 
 @theme {
   /* SuperPool landing — "the pool at night" */
@@ -42,9 +42,9 @@
 /* next/font variables live on <html>, so these must be resolved at the
    usage site — hence @theme inline */
 @theme inline {
-  --font-display: var(--font-space-grotesk), 'Space Grotesk', system-ui, sans-serif;
-  --font-body: var(--font-jakarta), 'Plus Jakarta Sans', system-ui, sans-serif;
-  --font-mono: var(--font-space-mono), 'Space Mono', monospace;
+  --font-display: var(--font-space-grotesk), "Space Grotesk", system-ui, sans-serif;
+  --font-body: var(--font-jakarta), "Plus Jakarta Sans", system-ui, sans-serif;
+  --font-mono: var(--font-space-mono), "Space Mono", monospace;
   --font-sans: var(--font-body);
 }
 
@@ -76,7 +76,7 @@ body {
 
 /* Subtle static grain so large dark areas don't band */
 .grain::before {
-  content: '';
+  content: "";
   position: fixed;
   inset: 0;
   z-index: 60;

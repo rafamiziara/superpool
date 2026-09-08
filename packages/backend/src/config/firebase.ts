@@ -1,5 +1,5 @@
 import * as admin from 'firebase-admin'
-import { initializeApp } from 'firebase-admin/app'
+import { type App, initializeApp } from 'firebase-admin/app'
 import { getAppCheck } from 'firebase-admin/app-check'
 import { getAuth } from 'firebase-admin/auth'
 import { getFirestore } from 'firebase-admin/firestore'
@@ -8,7 +8,7 @@ import { getFirestore } from 'firebase-admin/firestore'
 const serviceAccountKey = require('../../service-account-key.json')
 
 // Initialize the Firebase Admin SDK once for the entire server.
-let adminApp
+let adminApp: App
 try {
   adminApp = admin.app()
 } catch {

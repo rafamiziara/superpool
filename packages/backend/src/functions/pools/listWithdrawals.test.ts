@@ -1,4 +1,4 @@
-import { WithdrawalInfo } from '@superpool/types'
+import type { WithdrawalInfo } from '@superpool/types'
 import { mockLogger } from '../../__tests__/setup'
 
 /**

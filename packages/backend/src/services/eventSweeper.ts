@@ -1,5 +1,5 @@
-import { Interface, Log, Provider } from 'ethers'
-import { Firestore } from 'firebase-admin/firestore'
+import { Interface, type Log, type Provider } from 'ethers'
+import type { Firestore } from 'firebase-admin/firestore'
 import { logger } from 'firebase-functions/v2'
 import { LendingPoolABI, PoolFactoryABI } from '../constants'
 import { indexContributionEvent, parseFundsDepositedLog, resolvePoolId } from './contributionIndexer'

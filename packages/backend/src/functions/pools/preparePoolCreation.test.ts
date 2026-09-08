@@ -19,7 +19,7 @@ const { DEFAULT_CHAIN_ID, WHITELISTING_LOGS_COLLECTION } = require('../../consta
 
 // Checksummed: ethers' isAddress() rejects mixed-case addresses with a bad checksum.
 const WALLET = '0x7C3ed3a184BAAb1DaF35f5387bA23736C7CD18a6'
-const TX_HASH = '0x' + 'b'.repeat(64)
+const TX_HASH = `0x${'b'.repeat(64)}`
 
 function buildRequest(
   overrides: Partial<{

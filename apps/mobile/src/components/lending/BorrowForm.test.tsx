@@ -1,6 +1,6 @@
-import React from 'react'
-import { fireEvent, render } from '../../__tests__/test-utils'
+import type React from 'react'
 import { NATIVE } from '../../__tests__/fixtures/denomination'
+import { fireEvent, render } from '../../__tests__/test-utils'
 import { BorrowForm } from './BorrowForm'
 
 const POOL_NAME = 'Neighbourhood Fund'

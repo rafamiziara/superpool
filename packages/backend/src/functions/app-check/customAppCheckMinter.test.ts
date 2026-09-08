@@ -1,5 +1,5 @@
-import * as express from 'express'
-import { Request } from 'firebase-functions/v2/https'
+import type * as express from 'express'
+import type { Request } from 'firebase-functions/v2/https'
 import { mockLogger } from '../../__tests__/setup'
 
 // Mock the DeviceVerificationService

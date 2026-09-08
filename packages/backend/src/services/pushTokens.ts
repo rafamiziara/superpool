@@ -1,5 +1,5 @@
-import { PushToken } from '@superpool/types'
-import { Firestore } from 'firebase-admin/firestore'
+import type { PushToken } from '@superpool/types'
+import type { Firestore } from 'firebase-admin/firestore'
 import { logger } from 'firebase-functions/v2'
 import { PUSH_TOKENS_COLLECTION } from '../constants'
 

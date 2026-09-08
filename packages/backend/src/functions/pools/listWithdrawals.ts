@@ -1,6 +1,6 @@
-import { ListWithdrawalsRequest, ListWithdrawalsResponse } from '@superpool/types'
+import type { ListWithdrawalsRequest, ListWithdrawalsResponse } from '@superpool/types'
 import { logger } from 'firebase-functions/v2'
-import { CallableRequest, HttpsError, onCall } from 'firebase-functions/v2/https'
+import { type CallableRequest, HttpsError, onCall } from 'firebase-functions/v2/https'
 import { DEFAULT_CHAIN_ID, WITHDRAWALS_COLLECTION } from '../../constants'
 import { listWithdrawalsSchema } from '../../schemas'
 import { firestore } from '../../services'

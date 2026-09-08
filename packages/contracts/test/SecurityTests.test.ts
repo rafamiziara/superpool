@@ -1,7 +1,7 @@
-import { ethers, time, upgrades } from '../hardhat.connection'
 import type { HardhatEthersSigner } from '@nomicfoundation/hardhat-ethers/types'
 import { expect } from 'chai'
-import { LendingPool } from '../typechain-types'
+import { ethers, time, upgrades } from '../hardhat.connection'
+import type { LendingPool } from '../typechain-types'
 
 /**
  * Deploys a pool the way the factory does: behind a beacon proxy.

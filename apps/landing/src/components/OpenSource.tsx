@@ -1,5 +1,5 @@
-import { SectionHeading } from '@/components/SectionHeading'
 import { GitHubIcon } from '@/components/Navigation'
+import { SectionHeading } from '@/components/SectionHeading'
 import { DEPLOYMENT, explorerAddressUrl, shortAddress } from '@/config/deployment'
 
 interface RepoStats {

@@ -1,11 +1,11 @@
-import { isMain } from './lib/main'
+import Safe from '@safe-global/protocol-kit'
+import type { MetaTransactionData } from '@safe-global/types-kit'
+import * as dotenv from 'dotenv'
+import { artifacts, ethers, network } from '../hardhat.connection'
 import { signerKeyFor } from './lib/accounts'
 import { optionalArgument, requiredArgument } from './lib/args'
+import { isMain } from './lib/main'
 import { safeContractNetworks, safeRpcUrl } from './lib/safe'
-import { artifacts, ethers, network } from '../hardhat.connection'
-import Safe from '@safe-global/protocol-kit'
-import { MetaTransactionData } from '@safe-global/types-kit'
-import * as dotenv from 'dotenv'
 
 dotenv.config()
 

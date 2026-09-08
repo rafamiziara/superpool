@@ -1,5 +1,4 @@
 import { render } from '@testing-library/react-native'
-import React from 'react'
 import { mockWagmiUseAccount } from '../__tests__/mocks'
 import { unregisterForPushNotifications } from '../services/pushNotifications'
 import { authStore } from '../stores/AuthStore'

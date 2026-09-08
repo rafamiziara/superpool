@@ -1,7 +1,7 @@
-import React from 'react'
+import type React from 'react'
 import { parseEther } from 'viem'
-import { fireEvent, render } from '../../__tests__/test-utils'
 import { NATIVE } from '../../__tests__/fixtures/denomination'
+import { fireEvent, render } from '../../__tests__/test-utils'
 import { ContributeForm } from './ContributeForm'
 
 const POOL_NAME = 'Neighbourhood Fund'

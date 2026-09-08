@@ -1,5 +1,4 @@
 import { FontAwesome } from '@expo/vector-icons'
-import React from 'react'
 import { Text, View } from 'react-native'
 import { palette } from '../../constants/palette'
 import { chainName } from '../../utils/explorer'

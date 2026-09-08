@@ -1,7 +1,7 @@
-import { ethers, upgrades } from '../hardhat.connection'
 import type { HardhatEthersSigner } from '@nomicfoundation/hardhat-ethers/types'
 import { expect } from 'chai'
-import { LendingPool, PoolFactory } from '../typechain-types'
+import { ethers, upgrades } from '../hardhat.connection'
+import type { LendingPool, PoolFactory } from '../typechain-types'
 
 describe('PoolFactory Ownable2Step', function () {
   let poolFactory: PoolFactory

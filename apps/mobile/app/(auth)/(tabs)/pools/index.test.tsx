@@ -1,4 +1,3 @@
-import React from 'react'
 import { LOCALHOST_CHAIN_ID, makePendingTransaction, TX_HASH } from '../../../../src/__tests__/fixtures/pendingTransaction'
 import { mockFirebaseCallable, mockWagmiUseAccount } from '../../../../src/__tests__/mocks'
 import { mockRouterPush } from '../../../../src/__tests__/setup'

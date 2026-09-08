@@ -22,7 +22,7 @@ const { HttpsError } = require('firebase-functions/v2/https')
 // Helpers
 // ---------------------------------------------------------------------------
 
-const VALID_TX_HASH = '0x' + 'a'.repeat(64)
+const VALID_TX_HASH = `0x${'a'.repeat(64)}`
 const SUPPORTED_CHAIN_ID = 31337 // matches ACTIVE_CHAIN_CONFIG default
 const CONTRIBUTED_AT = new Date('2026-08-10T12:00:00.000Z')
 

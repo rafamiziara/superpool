@@ -1,4 +1,4 @@
-import React from 'react'
+import type React from 'react'
 import { ActivityIndicator, Text, View } from 'react-native'
 import { palette } from '../constants/palette'
 

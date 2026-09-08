@@ -5,7 +5,7 @@ export function Footer() {
     <footer className="relative border-t border-hairline-soft bg-abyss">
       {/* The logo's wave, one last time */}
       <div className="flex justify-center pt-14" aria-hidden="true">
-        <svg width="120" height="24" viewBox="0 0 120 24" fill="none" className="text-brand/40">
+        <svg width="120" height="24" viewBox="0 0 120 24" fill="none" aria-hidden="true" className="text-brand/40">
           <path
             d="M2 12c5-8 10-8 15 0s10 8 15 0 10-8 15 0 10 8 15 0 10-8 15 0 10 8 15 0 10-8 15 0"
             stroke="currentColor"

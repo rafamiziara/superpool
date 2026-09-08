@@ -1,7 +1,6 @@
 import { FontAwesome } from '@expo/vector-icons'
 import type { PoolInfo } from '@superpool/types'
 import { observer } from 'mobx-react-lite'
-import React from 'react'
 import { Pressable, Text, View } from 'react-native'
 import { palette } from '../../constants/palette'
 import { poolStore } from '../../stores/PoolStore'

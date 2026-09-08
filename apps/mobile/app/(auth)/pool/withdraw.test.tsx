@@ -1,5 +1,4 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native'
-import React from 'react'
 import { type Address, parseEther } from 'viem'
 import { mockWagmiUseAccount, mockWagmiUseReadContract } from '../../../src/__tests__/mocks'
 import { mockLocalSearchParams, mockRouterDismissTo } from '../../../src/__tests__/setup'

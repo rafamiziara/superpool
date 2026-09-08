@@ -1,7 +1,6 @@
 import { AppKitButton } from '@reown/appkit-wagmi-react-native'
 import { StatusBar } from 'expo-status-bar'
 import { observer } from 'mobx-react-lite'
-import React from 'react'
 import { Image, Text, View } from 'react-native'
 import { LoadingSpinner } from '../src/components/LoadingSpinner'
 import { AUTH_STEP_INFO, AUTH_STEPS } from '../src/constants/authSteps'

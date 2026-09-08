@@ -1,5 +1,5 @@
-import { Contract, Interface, JsonRpcProvider, Log, Provider } from 'ethers'
-import { Firestore, Timestamp } from 'firebase-admin/firestore'
+import { Contract, Interface, type JsonRpcProvider, type Log, type Provider } from 'ethers'
+import type { Firestore, Timestamp } from 'firebase-admin/firestore'
 import { logger } from 'firebase-functions/v2'
 import { HttpsError } from 'firebase-functions/v2/https'
 import { LendingPoolABI, LOANS_COLLECTION } from '../constants'

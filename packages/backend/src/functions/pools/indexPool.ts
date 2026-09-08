@@ -1,13 +1,13 @@
-import { IndexPoolRequest, IndexPoolResponse } from '@superpool/types'
+import type { IndexPoolRequest, IndexPoolResponse } from '@superpool/types'
 import { logger } from 'firebase-functions/v2'
-import { CallableRequest, HttpsError, onCall } from 'firebase-functions/v2/https'
+import { type CallableRequest, HttpsError, onCall } from 'firebase-functions/v2/https'
 import { DEFAULT_CHAIN_ID, getChainConfig } from '../../constants'
 import { indexByTransactionSchema } from '../../schemas'
 import { firestore } from '../../services'
 import { indexPoolByTxHash } from '../../services/eventIndexer'
 import { indexMembershipsByTxHash } from '../../services/membershipIndexer'
-import { parseRequest } from '../../utils/validation'
 import { getProvider } from '../../utils/blockchain'
+import { parseRequest } from '../../utils/validation'
 
 export const indexPoolHandler = async (request: CallableRequest<IndexPoolRequest>): Promise<IndexPoolResponse> => {
   // 1. Require auth

@@ -1,6 +1,6 @@
 import { MastraClient } from '@mastra/client-js'
-import * as jwt from 'jsonwebtoken'
 import { logger } from 'firebase-functions/v2'
+import * as jwt from 'jsonwebtoken'
 
 /**
  * How the backend talks to the agent service (`packages/agents`).

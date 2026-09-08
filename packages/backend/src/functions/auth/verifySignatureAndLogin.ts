@@ -1,7 +1,7 @@
-import { AuthNonce, User, VerifySignatureAndLoginRequest, VerifySignatureAndLoginResponse } from '@superpool/types'
+import type { AuthNonce, User, VerifySignatureAndLoginRequest, VerifySignatureAndLoginResponse } from '@superpool/types'
 import { verifyMessage, verifyTypedData } from 'ethers'
 import { logger } from 'firebase-functions/v2'
-import { CallableRequest, HttpsError, onCall } from 'firebase-functions/v2/https'
+import { type CallableRequest, HttpsError, onCall } from 'firebase-functions/v2/https'
 import { USERS_COLLECTION } from '../../constants'
 import { verifySignatureAndLoginSchema } from '../../schemas'
 import { auth, firestore } from '../../services'
@@ -64,7 +64,7 @@ export const verifySignatureAndLoginHandler = async (request: CallableRequest<Ve
 
   try {
     logger.info('Attempting signature verification', {
-      signature: signature.substring(0, 20) + '...',
+      signature: `${signature.substring(0, 20)}...`,
       walletAddress,
       signatureLength: signature.length,
       chainId,

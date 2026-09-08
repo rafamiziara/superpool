@@ -1,6 +1,6 @@
 import type { NotificationData, NotificationKind } from '@superpool/types'
-import { router } from 'expo-router'
 import * as Notifications from 'expo-notifications'
+import { router } from 'expo-router'
 import { useEffect } from 'react'
 import Toast from 'react-native-toast-message'
 import { logger } from '../utils/logger'

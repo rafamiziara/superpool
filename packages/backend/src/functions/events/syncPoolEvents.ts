@@ -3,7 +3,7 @@ import { logger } from 'firebase-functions/v2'
 import { onSchedule } from 'firebase-functions/v2/scheduler'
 import { DEFAULT_CHAIN_ID, EVENT_SYNC_STATE_COLLECTION, getChainConfig, SUPPORTED_CHAINS } from '../../constants'
 import { firestore } from '../../services'
-import { sweepBlockRange, SweepCounts } from '../../services/eventSweeper'
+import { type SweepCounts, sweepBlockRange } from '../../services/eventSweeper'
 import { getProvider } from '../../utils/blockchain'
 
 /** Blocks per `getLogs` call. Public RPCs cap the span of a single query. */
@@ -97,7 +97,7 @@ export function resolveInitialFromBlock(currentBlock: number, chainId: number): 
   // `START_BLOCK`. Without the per-chain form, one chain's deployment block
   // would be applied to every chain — which on a second chain means either
   // sweeping from far too early or skipping its history entirely.
-  const configured = getChainConfig(chainId)?.startBlock ?? parseInt(process.env.START_BLOCK || '0')
+  const configured = getChainConfig(chainId)?.startBlock ?? parseInt(process.env.START_BLOCK || '0', 10)
 
   if (configured > 0) return configured
 

@@ -1,12 +1,12 @@
-import { SyncPoolEventsRequest, SyncPoolEventsResponse } from '@superpool/types'
+import type { SyncPoolEventsRequest, SyncPoolEventsResponse } from '@superpool/types'
 import { logger } from 'firebase-functions/v2'
-import { CallableRequest, HttpsError, onCall } from 'firebase-functions/v2/https'
+import { type CallableRequest, HttpsError, onCall } from 'firebase-functions/v2/https'
 import { DEFAULT_CHAIN_ID, getChainConfig, SUPPORTED_CHAIN_IDS } from '../../constants'
 import { syncPoolEventsSchema } from '../../schemas'
-import { parseRequest } from '../../utils/validation'
-import { syncPoolEventsHandler } from './syncPoolEvents'
 import { requireAdmin } from '../../utils/admin'
 import { enforceAppCheck } from '../../utils/appCheck'
+import { parseRequest } from '../../utils/validation'
+import { syncPoolEventsHandler } from './syncPoolEvents'
 
 export const syncPoolEventsNowHandler = async (request: CallableRequest<SyncPoolEventsRequest>): Promise<SyncPoolEventsResponse> => {
   // Scheduled functions do not fire in the emulator, so this callable is the

@@ -1,5 +1,4 @@
 import { render } from '@testing-library/react-native'
-import React from 'react'
 import { mockFirebaseAuth } from '../__tests__/mocks'
 import { FIREBASE_AUTH } from '../config/firebase'
 import { authStore } from '../stores/AuthStore'
@@ -102,7 +101,7 @@ describe('FirebaseInitializer', () => {
 
     beforeEach(() => {
       const mockUnsubscribe = jest.fn()
-      mockOnAuthStateChanged.mockImplementation((auth, callback) => {
+      mockOnAuthStateChanged.mockImplementation((_auth, callback) => {
         authStateCallback = callback
         return mockUnsubscribe
       })
@@ -223,7 +222,7 @@ describe('FirebaseInitializer', () => {
       const mockUnsubscribe = jest.fn()
       const mockConsoleError = jest.spyOn(console, 'error').mockImplementation(() => {})
 
-      mockOnAuthStateChanged.mockImplementation((auth, callback) => {
+      mockOnAuthStateChanged.mockImplementation((_auth, callback) => {
         authStateCallback = callback
         return mockUnsubscribe
       })

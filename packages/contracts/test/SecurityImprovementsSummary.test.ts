@@ -1,9 +1,9 @@
-import { ethers, upgrades } from '../hardhat.connection'
-import * as fs from 'fs'
-import * as path from 'path'
+import * as fs from 'node:fs'
+import * as path from 'node:path'
 import type { HardhatEthersSigner } from '@nomicfoundation/hardhat-ethers/types'
 import { expect } from 'chai'
-import { LendingPool, PoolFactory } from '../typechain-types'
+import { ethers, upgrades } from '../hardhat.connection'
+import type { LendingPool, PoolFactory } from '../typechain-types'
 
 describe('Security Improvements Summary', function () {
   let poolFactory: PoolFactory

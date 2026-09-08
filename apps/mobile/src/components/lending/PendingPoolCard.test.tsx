@@ -1,5 +1,4 @@
 import { fireEvent, render, screen } from '@testing-library/react-native'
-import React from 'react'
 import { makePendingTransaction, TX_HASH } from '../../__tests__/fixtures/pendingTransaction'
 import { PendingPoolCard } from './PendingPoolCard'
 

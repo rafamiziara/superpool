@@ -1,5 +1,4 @@
 import type { LoanInfo } from '@superpool/types'
-import React from 'react'
 import { render } from '../../__tests__/test-utils'
 import { LoanDueNotice } from './LoanDueNotice'
 

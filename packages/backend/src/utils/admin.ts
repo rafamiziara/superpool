@@ -1,5 +1,5 @@
 import { logger } from 'firebase-functions/v2'
-import { CallableRequest, HttpsError } from 'firebase-functions/v2/https'
+import { type CallableRequest, HttpsError } from 'firebase-functions/v2/https'
 
 /**
  * Who may run the operator-only endpoints.

@@ -1,6 +1,6 @@
 import { useCallback, useState } from 'react'
 import { useSignMessage } from 'wagmi'
-import { SignatureHandlingHook, SignatureHandlingState } from '../../types/auth'
+import type { SignatureHandlingHook, SignatureHandlingState } from '../../types/auth'
 import { logger } from '../../utils/logger'
 
 export const useSignatureHandling = (): SignatureHandlingHook => {

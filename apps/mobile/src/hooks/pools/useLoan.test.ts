@@ -1,5 +1,6 @@
 import { act, renderHook } from '@testing-library/react-native'
 import { type Address, BaseError, ContractFunctionRevertedError, UserRejectedRequestError } from 'viem'
+import { NATIVE, USDC } from '../../__tests__/fixtures/denomination'
 import {
   mockEstimateContractGas,
   mockGetTransactionReceipt,
@@ -11,7 +12,6 @@ import {
 } from '../../__tests__/mocks'
 import { LendingPoolABI } from '../../constants/abis'
 import { pendingTransactionsStore } from '../../stores/PendingTransactionsStore'
-import { NATIVE, USDC } from '../../__tests__/fixtures/denomination'
 import {
   type BorrowParams,
   calculateRepayment,
@@ -83,7 +83,7 @@ type RevertAbiItem = NonNullable<ContractFunctionRevertedError['data']>['abiItem
 /** Looks the error up in the shipped ABI, so a rename there fails this test too. */
 function findAbiError(name: string): RevertAbiItem {
   const item = LendingPoolABI.find((entry) => entry.type === 'error' && entry.name === name)
-  if (!item || item.type !== 'error') throw new Error(`LendingPoolABI has no error named ${name}`)
+  if (item?.type !== 'error') throw new Error(`LendingPoolABI has no error named ${name}`)
 
   return item
 }

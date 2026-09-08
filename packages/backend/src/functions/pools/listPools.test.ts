@@ -1,4 +1,4 @@
-import { PoolInfo } from '@superpool/types'
+import type { PoolInfo } from '@superpool/types'
 import { mockLogger } from '../../__tests__/setup'
 
 /**

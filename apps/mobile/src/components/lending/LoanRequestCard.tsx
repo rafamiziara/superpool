@@ -1,5 +1,4 @@
 import type { AssessLoanResponse, AssessmentInfo, BorrowerHistory, LoanInfo, Note } from '@superpool/types'
-import React from 'react'
 import { ActivityIndicator, Pressable, Text, View } from 'react-native'
 import { calculateRepayment } from '../../hooks/pools/useLoan'
 import type { Denomination } from '../../utils/denomination'

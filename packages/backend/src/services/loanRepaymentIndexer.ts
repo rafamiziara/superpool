@@ -1,5 +1,5 @@
-import { Interface, JsonRpcProvider, Log } from 'ethers'
-import { Firestore } from 'firebase-admin/firestore'
+import { Interface, type JsonRpcProvider, type Log } from 'ethers'
+import type { Firestore } from 'firebase-admin/firestore'
 import { logger } from 'firebase-functions/v2'
 import { HttpsError } from 'firebase-functions/v2/https'
 import { LendingPoolABI, LOAN_REPAYMENTS_COLLECTION } from '../constants'

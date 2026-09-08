@@ -1,4 +1,4 @@
-import React from 'react'
+import type React from 'react'
 import { render } from '../src/__tests__/test-utils'
 import RootLayout from './_layout'
 

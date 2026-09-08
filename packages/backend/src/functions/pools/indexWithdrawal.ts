@@ -1,12 +1,12 @@
-import { IndexWithdrawalRequest, IndexWithdrawalResponse, WithdrawalInfo } from '@superpool/types'
+import type { IndexWithdrawalRequest, IndexWithdrawalResponse, WithdrawalInfo } from '@superpool/types'
 import { logger } from 'firebase-functions/v2'
-import { CallableRequest, HttpsError, onCall } from 'firebase-functions/v2/https'
+import { type CallableRequest, HttpsError, onCall } from 'firebase-functions/v2/https'
 import { DEFAULT_CHAIN_ID, getChainConfig } from '../../constants'
 import { indexByTransactionSchema } from '../../schemas'
 import { firestore } from '../../services'
-import { indexWithdrawalsByTxHash, ParsedWithdrawalEvent, withdrawalDocId } from '../../services/withdrawalIndexer'
-import { parseRequest } from '../../utils/validation'
+import { indexWithdrawalsByTxHash, type ParsedWithdrawalEvent, withdrawalDocId } from '../../services/withdrawalIndexer'
 import { getProvider } from '../../utils/blockchain'
+import { parseRequest } from '../../utils/validation'
 
 /** Firestore's Date becomes an ISO string on the wire; see WithdrawalInfo. */
 function toWithdrawalInfo(withdrawal: ParsedWithdrawalEvent): WithdrawalInfo {

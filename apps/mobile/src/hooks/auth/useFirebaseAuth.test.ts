@@ -1,5 +1,4 @@
-import type { VerifySignatureAndLoginResponse } from '@superpool/types'
-import { AuthenticationData, User } from '@superpool/types'
+import type { AuthenticationData, User, VerifySignatureAndLoginResponse } from '@superpool/types'
 import { act, renderHook } from '@testing-library/react-native'
 import { mockFirebaseAuth, mockFirebaseCallable } from '../../__tests__/mocks'
 import { useFirebaseAuth } from './useFirebaseAuth'

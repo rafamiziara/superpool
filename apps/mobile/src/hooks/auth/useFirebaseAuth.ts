@@ -1,10 +1,9 @@
-import type { VerifySignatureAndLoginResponse } from '@superpool/types'
-import { AuthenticationData, User } from '@superpool/types'
+import type { AuthenticationData, User, VerifySignatureAndLoginResponse } from '@superpool/types'
 import { signInWithCustomToken, signOut } from 'firebase/auth'
 import { httpsCallable } from 'firebase/functions'
 import { useCallback, useState } from 'react'
 import { FIREBASE_AUTH, FIREBASE_FUNCTIONS } from '../../config/firebase'
-import { FirebaseAuthHook, FirebaseAuthState } from '../../types/auth'
+import type { FirebaseAuthHook, FirebaseAuthState } from '../../types/auth'
 import { logger } from '../../utils/logger'
 
 export const useFirebaseAuth = (): FirebaseAuthHook => {
@@ -41,7 +40,7 @@ export const useFirebaseAuth = (): FirebaseAuthHook => {
 
       const responseData = response.data as VerifySignatureAndLoginResponse
 
-      if (!responseData || !responseData.firebaseToken || !responseData.user) {
+      if (!responseData?.firebaseToken || !responseData.user) {
         throw new Error('Invalid response from Firebase function - missing token or user data')
       }
 

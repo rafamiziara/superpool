@@ -1,8 +1,7 @@
 import { fireEvent, render, screen } from '@testing-library/react-native'
-import React from 'react'
 import { parseEther } from 'viem'
-import { CreatePoolForm, createPoolFormSchema } from './CreatePoolForm'
 import { NATIVE, USDC } from '../../__tests__/fixtures/denomination'
+import { CreatePoolForm, createPoolFormSchema } from './CreatePoolForm'
 
 /** Fills every field with values that parse, so tests can vary one at a time. */
 function fillValidForm(overrides: Partial<Record<string, string>> = {}) {

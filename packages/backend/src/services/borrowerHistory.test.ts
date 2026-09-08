@@ -1,4 +1,4 @@
-import { Firestore, Timestamp } from 'firebase-admin/firestore'
+import { type Firestore, Timestamp } from 'firebase-admin/firestore'
 import { mockLogger } from '../__tests__/setup'
 import { borrowerHistoriesFor, emptyHistory, MAX_BORROWERS_PER_CALL, summariseLoans } from './borrowerHistory'
 

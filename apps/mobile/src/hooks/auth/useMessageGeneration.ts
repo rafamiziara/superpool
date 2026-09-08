@@ -1,9 +1,8 @@
-import { AuthMessage } from '@superpool/types'
-import type { AuthMessageResponse } from '@superpool/types'
+import type { AuthMessage, AuthMessageResponse } from '@superpool/types'
 import { httpsCallable } from 'firebase/functions'
 import { useCallback, useState } from 'react'
 import { FIREBASE_FUNCTIONS } from '../../config/firebase'
-import { MessageGenerationHook, MessageGenerationState } from '../../types/auth'
+import type { MessageGenerationHook, MessageGenerationState } from '../../types/auth'
 import { logger } from '../../utils/logger'
 
 export const useMessageGeneration = (): MessageGenerationHook => {

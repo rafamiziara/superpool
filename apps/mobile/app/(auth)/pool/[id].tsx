@@ -3,25 +3,25 @@ import { MemberStatus, type NoteKind } from '@superpool/types'
 import { router, Stack, useLocalSearchParams } from 'expo-router'
 import { StatusBar } from 'expo-status-bar'
 import { observer } from 'mobx-react-lite'
-import React, { useState } from 'react'
+import { useState } from 'react'
 import { Pressable, ScrollView, Text, View } from 'react-native'
 import { useReadContract } from 'wagmi'
 import { ActivityRow } from '../../../src/components/lending/ActivityRow'
 import { ApprovalsLink } from '../../../src/components/lending/ApprovalsLink'
+import { ClaimInterestCard } from '../../../src/components/lending/ClaimInterestCard'
 import { NoteCallout } from '../../../src/components/lending/NoteCallout'
 import { OverdueLink } from '../../../src/components/lending/OverdueLink'
-import { ClaimInterestCard } from '../../../src/components/lending/ClaimInterestCard'
 import { PendingContributionCard } from '../../../src/components/lending/PendingContributionCard'
 import { TransactionStatusModal } from '../../../src/components/lending/TransactionStatusModal'
 import { LendingPoolABI } from '../../../src/constants/abis'
 import { palette } from '../../../src/constants/palette'
+import { useNotes } from '../../../src/hooks/pools/useNotes'
 import {
   type ContributeTransaction,
   isDismissable,
   type PendingTransaction,
   pendingTransactionsStore,
 } from '../../../src/stores/PendingTransactionsStore'
-import { useNotes } from '../../../src/hooks/pools/useNotes'
 import { poolStore } from '../../../src/stores/PoolStore'
 import { denominationFor } from '../../../src/utils/denomination'
 import { bpsToPercent, formatAmount, formatDuration, sameAddress, shortAddress } from '../../../src/utils/format'

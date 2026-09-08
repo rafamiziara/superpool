@@ -1,5 +1,5 @@
-import { AuthNonce } from '@superpool/types'
-import { Firestore } from 'firebase-admin/firestore'
+import type { AuthNonce } from '@superpool/types'
+import type { Firestore } from 'firebase-admin/firestore'
 import { AUTH_NONCES_COLLECTION } from '../constants'
 
 /**

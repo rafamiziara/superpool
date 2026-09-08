@@ -1,7 +1,7 @@
-import { AssessLoanRequest, AssessLoanResponse } from '@superpool/types'
+import type { AssessLoanRequest, AssessLoanResponse } from '@superpool/types'
 import { Contract } from 'ethers'
 import { logger } from 'firebase-functions/v2'
-import { CallableRequest, HttpsError, onCall } from 'firebase-functions/v2/https'
+import { type CallableRequest, HttpsError, onCall } from 'firebase-functions/v2/https'
 import { DEFAULT_CHAIN_ID, LendingPoolABI } from '../../constants'
 import { assessLoanSchema } from '../../schemas'
 import { firestore } from '../../services'
@@ -16,9 +16,9 @@ import {
   saveAssessment,
   toWholeUnits,
 } from '../../services/assessments'
-import { parseRequest } from '../../utils/validation'
-import { getProvider } from '../../utils/blockchain'
 import { enforceAppCheck } from '../../utils/appCheck'
+import { getProvider } from '../../utils/blockchain'
+import { parseRequest } from '../../utils/validation'
 
 export const assessLoanHandler = async (request: CallableRequest<AssessLoanRequest>): Promise<AssessLoanResponse> => {
   if (!request.auth) {

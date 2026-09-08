@@ -1,11 +1,11 @@
-import { NOTE_MAX_LENGTH, SaveNoteRequest, SaveNoteResponse } from '@superpool/types'
-import { CallableRequest, HttpsError, onCall } from 'firebase-functions/v2/https'
+import { NOTE_MAX_LENGTH, type SaveNoteRequest, type SaveNoteResponse } from '@superpool/types'
+import { type CallableRequest, HttpsError, onCall } from 'firebase-functions/v2/https'
 import { DEFAULT_CHAIN_ID } from '../../constants'
 import { saveNoteSchema } from '../../schemas'
 import { firestore } from '../../services'
 import { entitlementFor, normaliseNoteText, saveNote as save, stagedRecordId, stageNote } from '../../services/notes'
-import { parseRequest } from '../../utils/validation'
 import { enforceAppCheck } from '../../utils/appCheck'
+import { parseRequest } from '../../utils/validation'
 
 export const saveNoteHandler = async (request: CallableRequest<SaveNoteRequest>): Promise<SaveNoteResponse> => {
   if (!request.auth) {

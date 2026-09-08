@@ -1,5 +1,4 @@
 import { act, fireEvent, render, waitFor } from '@testing-library/react-native'
-import React from 'react'
 import { mockWagmiUseReadContract } from '../../../src/__tests__/mocks'
 import { mockLocalSearchParams, mockRouterDismissTo } from '../../../src/__tests__/setup'
 import { poolStore } from '../../../src/stores/PoolStore'
@@ -54,7 +53,13 @@ function mockChainReads({
   interest = 200_000_000_000_000_000n,
   /** Leaves `loanBalance` unanswered, as it is on the first render. */
   balancePending = false,
-}: { requiresApproval?: boolean; available?: bigint; principal?: bigint; interest?: bigint; balancePending?: boolean } = {}) {
+}: {
+  requiresApproval?: boolean
+  available?: bigint
+  principal?: bigint
+  interest?: bigint
+  balancePending?: boolean
+} = {}) {
   mockWagmiUseReadContract.mockImplementation((config?: { functionName?: string }) => {
     if (config?.functionName === 'poolConfig') {
       return { data: [10_000_000_000_000_000_000n, 500n, 2_592_000n, true, requiresApproval], refetch: jest.fn() }

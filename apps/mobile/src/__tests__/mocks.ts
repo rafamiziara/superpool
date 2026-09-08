@@ -1,5 +1,5 @@
-import { AppCheckToken, CustomProviderOptions } from 'firebase/app-check'
-import React from 'react'
+import type { AppCheckToken, CustomProviderOptions } from 'firebase/app-check'
+import type React from 'react'
 import type { Address } from 'viem'
 
 // Wagmi hooks mocks

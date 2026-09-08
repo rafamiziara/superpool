@@ -1,6 +1,6 @@
-import { act, render } from '../../src/__tests__/test-utils'
 import { runInAction } from 'mobx'
-import React from 'react'
+import type React from 'react'
+import { act, render } from '../../src/__tests__/test-utils'
 import { authStore } from '../../src/stores/AuthStore'
 import { poolStore } from '../../src/stores/PoolStore'
 import AuthLayout from './_layout'

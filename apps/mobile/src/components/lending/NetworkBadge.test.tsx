@@ -1,4 +1,3 @@
-import React from 'react'
 import { render } from '../../__tests__/test-utils'
 import { NetworkBadge } from './NetworkBadge'
 

@@ -1,6 +1,6 @@
-import { AuthMessageRequest, AuthMessageResponse } from '@superpool/types'
+import type { AuthMessageRequest, AuthMessageResponse } from '@superpool/types'
 import { logger } from 'firebase-functions/v2'
-import { CallableRequest, HttpsError, onCall } from 'firebase-functions/v2/https'
+import { type CallableRequest, HttpsError, onCall } from 'firebase-functions/v2/https'
 import { v4 as uuidv4 } from 'uuid'
 import { AUTH_NONCES_COLLECTION } from '../../constants'
 import { authMessageSchema } from '../../schemas'
@@ -32,7 +32,7 @@ export const generateAuthMessageHandler = async (request: CallableRequest<AuthMe
   const message = createAuthMessage(walletAddress, nonce, timestamp)
 
   logger.info('Generated auth message data', {
-    message: message.substring(0, 50) + '...',
+    message: `${message.substring(0, 50)}...`,
     nonce,
     timestamp,
     walletAddress,

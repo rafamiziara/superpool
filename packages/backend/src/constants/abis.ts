@@ -12,7 +12,7 @@
  * ABIs are produced.
  */
 
-export { PoolFactoryABI, LendingPoolABI } from './abis.generated'
+export { LendingPoolABI, PoolFactoryABI } from './abis.generated'
 
 /**
  * The two ERC-20 metadata calls the pool indexer needs.

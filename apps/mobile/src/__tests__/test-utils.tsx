@@ -1,7 +1,7 @@
-import React from 'react'
-import { render, RenderOptions } from '@testing-library/react-native'
-import { SafeAreaProvider } from 'react-native-safe-area-context'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { type RenderOptions, render } from '@testing-library/react-native'
+import type React from 'react'
+import { SafeAreaProvider } from 'react-native-safe-area-context'
 
 // Create a test query client
 const createTestQueryClient = () =>

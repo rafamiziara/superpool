@@ -1,5 +1,5 @@
-import { AssessmentInfo } from '@superpool/types'
-import { Firestore } from 'firebase-admin/firestore'
+import type { AssessmentInfo } from '@superpool/types'
+import type { Firestore } from 'firebase-admin/firestore'
 import { mockLogger } from '../__tests__/setup'
 
 jest.mock('./borrowerHistory', () => ({
@@ -8,8 +8,6 @@ jest.mock('./borrowerHistory', () => ({
 }))
 jest.mock('./notes', () => ({ ...jest.requireActual('./notes'), noteFor: jest.fn() }))
 
-import { borrowerHistoriesFor } from './borrowerHistory'
-import { noteFor } from './notes'
 import {
   ASSESSMENT_DAILY_CAP,
   assessmentFor,
@@ -23,6 +21,8 @@ import {
   saveAssessment,
   toWholeUnits,
 } from './assessments'
+import { borrowerHistoriesFor } from './borrowerHistory'
+import { noteFor } from './notes'
 
 const ZERO = '0x0000000000000000000000000000000000000000'
 const USDC = '0x1111111111111111111111111111111111111111'

@@ -1,7 +1,7 @@
-import { ethers, time, upgrades } from '../hardhat.connection'
 import type { HardhatEthersSigner } from '@nomicfoundation/hardhat-ethers/types'
 import { expect } from 'chai'
-import { LendingPool, PoolFactory, TestERC20, TestFeeOnTransferERC20, TestNoReturnERC20 } from '../typechain-types'
+import { ethers, time, upgrades } from '../hardhat.connection'
+import type { LendingPool, PoolFactory, TestERC20, TestFeeOnTransferERC20, TestNoReturnERC20 } from '../typechain-types'
 
 /**
  * Six decimals throughout, deliberately.

@@ -1,9 +1,9 @@
-import { ethers, network, upgrades } from '../hardhat.connection'
+import { mkdirSync, writeFileSync } from 'node:fs'
+import { join } from 'node:path'
 import * as dotenv from 'dotenv'
-import { mkdirSync, writeFileSync } from 'fs'
-import { join } from 'path'
-import { verifyContract } from './lib/verification'
+import { ethers, network, upgrades } from '../hardhat.connection'
 import { localAccountKey } from './lib/accounts'
+import { verifyContract } from './lib/verification'
 
 dotenv.config()
 

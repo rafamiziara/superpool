@@ -1,7 +1,6 @@
-import React from 'react'
+import { LOCALHOST_CHAIN_ID } from '../../../../src/__tests__/fixtures/pendingTransaction'
 import { mockFirebaseCallable, mockWagmiUseAccount } from '../../../../src/__tests__/mocks'
 import { mockRouterPush } from '../../../../src/__tests__/setup'
-import { LOCALHOST_CHAIN_ID } from '../../../../src/__tests__/fixtures/pendingTransaction'
 import { act, fireEvent, render } from '../../../../src/__tests__/test-utils'
 import { poolStore } from '../../../../src/stores/PoolStore'
 import DiscoverScreen from './index'

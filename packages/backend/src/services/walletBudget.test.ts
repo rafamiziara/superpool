@@ -1,4 +1,4 @@
-import { Firestore } from 'firebase-admin/firestore'
+import type { Firestore } from 'firebase-admin/firestore'
 import { claimWhitelisting, releaseWhitelisting, WalletBusyError, withWalletLock } from './walletBudget'
 
 const CHAIN_ID = 80002

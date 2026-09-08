@@ -1,6 +1,15 @@
 import { StatusBar } from 'expo-status-bar'
-import React, { useRef, useState } from 'react'
-import { Dimensions, FlatList, Image, ListRenderItem, NativeScrollEvent, NativeSyntheticEvent, Text, View } from 'react-native'
+import { useRef, useState } from 'react'
+import {
+  Dimensions,
+  FlatList,
+  Image,
+  type ListRenderItem,
+  type NativeScrollEvent,
+  type NativeSyntheticEvent,
+  Text,
+  View,
+} from 'react-native'
 import { ConnectWalletButton } from '../src/components/ConnectWalletButton'
 import { ProgressIndicator } from '../src/components/ProgressIndicator'
 

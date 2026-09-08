@@ -1,14 +1,14 @@
-import { IndexLoanRequest, IndexLoanResponse, LoanInfo, LoanRepaymentInfo } from '@superpool/types'
+import type { IndexLoanRequest, IndexLoanResponse, LoanInfo, LoanRepaymentInfo } from '@superpool/types'
 import { logger } from 'firebase-functions/v2'
-import { CallableRequest, HttpsError, onCall } from 'firebase-functions/v2/https'
+import { type CallableRequest, HttpsError, onCall } from 'firebase-functions/v2/https'
 import { DEFAULT_CHAIN_ID, getChainConfig } from '../../constants'
 import { indexByTransactionSchema } from '../../schemas'
 import { firestore } from '../../services'
 import { indexLoanDecisionsByTxHash } from '../../services/loanDecisionIndexer'
-import { indexLoansByTxHash, loanDocId, ParsedLoan } from '../../services/loanIndexer'
-import { indexLoanRepaymentsByTxHash, loanRepaymentDocId, ParsedLoanRepaymentEvent } from '../../services/loanRepaymentIndexer'
-import { parseRequest } from '../../utils/validation'
+import { indexLoansByTxHash, loanDocId, type ParsedLoan } from '../../services/loanIndexer'
+import { indexLoanRepaymentsByTxHash, loanRepaymentDocId, type ParsedLoanRepaymentEvent } from '../../services/loanRepaymentIndexer'
 import { getProvider } from '../../utils/blockchain'
+import { parseRequest } from '../../utils/validation'
 
 /** Firestore's Date becomes an ISO string on the wire; see LoanInfo. */
 function toLoanInfo(loan: ParsedLoan): LoanInfo {

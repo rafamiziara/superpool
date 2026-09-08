@@ -1,4 +1,4 @@
-import { AuthStep, AuthStepInfo } from '../types/auth'
+import type { AuthStep, AuthStepInfo } from '../types/auth'
 
 export const AUTH_STEPS: AuthStep[] = [
   'connect-wallet',

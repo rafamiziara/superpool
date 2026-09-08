@@ -25,7 +25,7 @@ export const POOL_SORT_MODES: PoolSortMode[] = ['newest', 'liquidity', 'rate', '
  * than written as a literal character class, because combining characters
  * render as nothing in an editor and do not survive every copy-paste.
  */
-const COMBINING_MARKS = new RegExp('[\\u0300-\\u036f]', 'g')
+const COMBINING_MARKS = /[\u0300-\u036f]/g
 
 /**
  * Normalised for comparison: case-folded, accent-stripped and collapsed to

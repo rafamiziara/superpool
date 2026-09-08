@@ -104,7 +104,9 @@ export const useAssessments = (loanDocIds: string[]): UseAssessmentsReturn => {
     const wanted = key ? key.split(',') : []
     const fresh = wanted.filter((loanDocId) => !asked.current.has(loanDocId))
 
-    fresh.forEach((loanDocId) => asked.current.add(loanDocId))
+    fresh.forEach((loanDocId) => {
+      asked.current.add(loanDocId)
+    })
 
     void Promise.all(fresh.map((loanDocId) => load(loanDocId, false)))
   }, [key, load])

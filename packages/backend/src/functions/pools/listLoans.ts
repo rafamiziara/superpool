@@ -1,6 +1,6 @@
-import { ListLoansRequest, ListLoansResponse } from '@superpool/types'
+import type { ListLoansRequest, ListLoansResponse } from '@superpool/types'
 import { logger } from 'firebase-functions/v2'
-import { CallableRequest, HttpsError, onCall } from 'firebase-functions/v2/https'
+import { type CallableRequest, HttpsError, onCall } from 'firebase-functions/v2/https'
 import { DEFAULT_CHAIN_ID, LOANS_COLLECTION } from '../../constants'
 import { listLoansSchema } from '../../schemas'
 import { firestore } from '../../services'

@@ -1,5 +1,4 @@
-import { AuthMessage } from '@superpool/types'
-import type { AuthMessageResponse } from '@superpool/types'
+import type { AuthMessage, AuthMessageResponse } from '@superpool/types'
 import { act, renderHook } from '@testing-library/react-native'
 import { mockFirebaseCallable } from '../../__tests__/mocks'
 import { useMessageGeneration } from './useMessageGeneration'

@@ -1,4 +1,4 @@
-import { ContributionInfo } from '@superpool/types'
+import type { ContributionInfo } from '@superpool/types'
 import { mockLogger } from '../../__tests__/setup'
 
 /**

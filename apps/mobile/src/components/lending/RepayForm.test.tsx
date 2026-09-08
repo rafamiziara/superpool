@@ -1,5 +1,5 @@
 import { fireEvent, render, screen } from '@testing-library/react-native'
-import React from 'react'
+import type React from 'react'
 import { parseEther } from 'viem'
 import { NATIVE, USDC } from '../../__tests__/fixtures/denomination'
 import { RepayForm } from './RepayForm'

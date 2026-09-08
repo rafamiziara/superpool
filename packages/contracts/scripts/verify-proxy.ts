@@ -1,6 +1,6 @@
+import * as dotenv from 'dotenv'
 import { ethers, hre, network, upgrades } from '../hardhat.connection'
 import { requiredArgument } from './lib/args'
-import * as dotenv from 'dotenv'
 import { manualVerifyCommand, verificationBlocker, verifyWithRetry } from './lib/verification'
 
 dotenv.config()

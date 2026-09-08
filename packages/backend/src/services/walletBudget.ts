@@ -1,4 +1,4 @@
-import { Firestore } from 'firebase-admin/firestore'
+import type { Firestore } from 'firebase-admin/firestore'
 import { logger } from 'firebase-functions/v2'
 import { WALLET_BUDGET_COLLECTION } from '../constants'
 

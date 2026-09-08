@@ -1,5 +1,5 @@
-import { PushReceipt } from '@superpool/types'
-import { Firestore } from 'firebase-admin/firestore'
+import type { PushReceipt } from '@superpool/types'
+import type { Firestore } from 'firebase-admin/firestore'
 import { mockLogger } from '../__tests__/setup'
 import { collectReceipts, RECEIPT_DELAY_MS, RECEIPT_EXPIRY_MS, recordTickets } from './pushReceipts'
 

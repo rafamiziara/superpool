@@ -8,8 +8,7 @@
     "src/**/*"
   ],
   "scripts": {
-    "type-check": "tsc --noEmit",
-    "format": "prettier --write . --ignore-path ../../.prettierignore"
+    "type-check": "tsc --noEmit"
   },
   "exports": {
     ".": {

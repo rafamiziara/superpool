@@ -1,4 +1,4 @@
-import { AuthenticationData } from '@superpool/types'
+import type { AuthenticationData } from '@superpool/types'
 import { useEffect } from 'react'
 import { Platform } from 'react-native'
 import { FIREBASE_AUTH } from '../../config/firebase'

@@ -1,7 +1,7 @@
-import { isMain } from './lib/main'
-import { ethers, network, upgrades } from '../hardhat.connection'
 import * as dotenv from 'dotenv'
-import { PoolFactory } from '../typechain-types'
+import { ethers, network, upgrades } from '../hardhat.connection'
+import type { PoolFactory } from '../typechain-types'
+import { isMain } from './lib/main'
 
 dotenv.config()
 

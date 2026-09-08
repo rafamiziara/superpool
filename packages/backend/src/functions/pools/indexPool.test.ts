@@ -22,7 +22,7 @@ const { HttpsError } = require('firebase-functions/v2/https')
 // Helpers
 // ---------------------------------------------------------------------------
 
-const VALID_TX_HASH = '0x' + 'a'.repeat(64)
+const VALID_TX_HASH = `0x${'a'.repeat(64)}`
 const SUPPORTED_CHAIN_ID = 31337 // matches ACTIVE_CHAIN_CONFIG default
 
 function buildRequest(
@@ -101,7 +101,7 @@ describe('indexPoolHandler', () => {
 
   it('should throw invalid-argument when txHash is too short', async () => {
     // Arrange
-    const request = buildRequest({ data: { txHash: '0x' + 'a'.repeat(60) } })
+    const request = buildRequest({ data: { txHash: `0x${'a'.repeat(60)}` } })
 
     // Act & Assert
     await expect(indexPoolHandler(request)).rejects.toHaveProperty('code', 'invalid-argument')
@@ -109,7 +109,7 @@ describe('indexPoolHandler', () => {
 
   it('should throw invalid-argument when txHash is too long', async () => {
     // Arrange
-    const request = buildRequest({ data: { txHash: '0x' + 'a'.repeat(66) } })
+    const request = buildRequest({ data: { txHash: `0x${'a'.repeat(66)}` } })
 
     // Act & Assert
     await expect(indexPoolHandler(request)).rejects.toHaveProperty('code', 'invalid-argument')
@@ -117,7 +117,7 @@ describe('indexPoolHandler', () => {
 
   it('should throw invalid-argument when txHash contains non-hex characters', async () => {
     // Arrange
-    const request = buildRequest({ data: { txHash: '0x' + 'g'.repeat(64) } })
+    const request = buildRequest({ data: { txHash: `0x${'g'.repeat(64)}` } })
 
     // Act & Assert
     await expect(indexPoolHandler(request)).rejects.toHaveProperty('code', 'invalid-argument')

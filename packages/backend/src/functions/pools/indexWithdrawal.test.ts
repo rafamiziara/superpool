@@ -21,7 +21,7 @@ const { indexWithdrawalsByTxHash } = require('../../services/withdrawalIndexer')
 // Helpers
 // ---------------------------------------------------------------------------
 
-const VALID_TX_HASH = '0x' + 'a'.repeat(64)
+const VALID_TX_HASH = `0x${'a'.repeat(64)}`
 const SUPPORTED_CHAIN_ID = 31337 // matches ACTIVE_CHAIN_CONFIG default
 const WITHDRAWN_AT = new Date('2026-08-11T12:00:00.000Z')
 
@@ -90,7 +90,7 @@ describe('indexWithdrawalHandler', () => {
       ['an empty hash', { txHash: '' }],
       ['a short hash', { txHash: '0xabc' }],
       ['a hash without the 0x prefix', { txHash: 'a'.repeat(64) }],
-      ['a hash with non-hex characters', { txHash: '0x' + 'z'.repeat(64) }],
+      ['a hash with non-hex characters', { txHash: `0x${'z'.repeat(64)}` }],
     ])('should reject %s', async (_label, data) => {
       // Act & Assert
       await expect(indexWithdrawalHandler(buildRequest({ data }) as never)).rejects.toThrow(/txHash/)

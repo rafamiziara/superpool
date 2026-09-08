@@ -1,5 +1,5 @@
 import type { BorrowerHistory, LoanInfo } from '@superpool/types'
-import React from 'react'
+import type React from 'react'
 import { mockWagmiUseReadContract } from '../../__tests__/mocks'
 import { fireEvent, render } from '../../__tests__/test-utils'
 import { OverdueLoanCard } from './OverdueLoanCard'

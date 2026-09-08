@@ -1,7 +1,6 @@
 import { FontAwesome } from '@expo/vector-icons'
 import type { Note, Transaction } from '@superpool/types'
 import { TransactionStatus, TransactionType } from '@superpool/types'
-import React from 'react'
 import { Text, View } from 'react-native'
 import { palette } from '../../constants/palette'
 import type { Denomination } from '../../utils/denomination'

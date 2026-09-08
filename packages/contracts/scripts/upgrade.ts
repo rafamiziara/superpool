@@ -1,7 +1,7 @@
-import { ethers, network, upgrades } from '../hardhat.connection'
+import { existsSync, readFileSync, writeFileSync } from 'node:fs'
+import { join } from 'node:path'
 import * as dotenv from 'dotenv'
-import { existsSync, readFileSync, writeFileSync } from 'fs'
-import { join } from 'path'
+import { ethers, network, upgrades } from '../hardhat.connection'
 
 dotenv.config()
 

@@ -1,5 +1,4 @@
 import { FontAwesome } from '@expo/vector-icons'
-import React from 'react'
 import { ActivityIndicator, Linking, Modal, Pressable, Text, View } from 'react-native'
 import { palette } from '../../constants/palette'
 import {
@@ -10,8 +9,8 @@ import {
   type PendingTransactionType,
 } from '../../stores/PendingTransactionsStore'
 import { recordedDenomination } from '../../utils/denomination'
-import { bpsToPercent, formatAmount, formatDuration, shortAddress } from '../../utils/format'
 import { chainName, transactionUrl } from '../../utils/explorer'
+import { bpsToPercent, formatAmount, formatDuration, shortAddress } from '../../utils/format'
 
 /** Where a step is, which is all the row needs to render itself. */
 type StepState = 'done' | 'active' | 'pending' | 'failed'

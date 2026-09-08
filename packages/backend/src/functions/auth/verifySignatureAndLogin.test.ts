@@ -1,5 +1,5 @@
-import { AUTH_NONCES_COLLECTION, USERS_COLLECTION } from '../../constants'
 import { mockLogger } from '../../__tests__/setup'
+import { AUTH_NONCES_COLLECTION, USERS_COLLECTION } from '../../constants'
 
 // Mock ethers module completely with all needed functions
 jest.mock('ethers', () => ({
@@ -43,7 +43,7 @@ describe('verifySignatureAndLoginHandler', () => {
   const walletAddress = '0x1234567890123456789012345678901234567890'
   const mockMessage = 'test-message'
   const timestamp = 1234567890
-  const signature = '0x' + 'a'.repeat(130)
+  const signature = `0x${'a'.repeat(130)}`
   const nonce = 'test-nonce'
   const firebaseToken = 'test-firebase-token'
 
@@ -190,7 +190,7 @@ describe('verifySignatureAndLoginHandler', () => {
   // Test Case: Invalid Argument - Invalid hex characters in signature
   it('should throw an invalid-argument error if signature contains invalid hex characters', async () => {
     // Arrange
-    const invalidHexSignature = '0x' + 'G'.repeat(130) // 132 chars total, correct length but invalid hex
+    const invalidHexSignature = `0x${'G'.repeat(130)}` // 132 chars total, correct length but invalid hex
     const request = { data: { walletAddress, signature: invalidHexSignature } }
 
     // Act & Assert
@@ -201,7 +201,7 @@ describe('verifySignatureAndLoginHandler', () => {
   // Test Case: Invalid Argument - Signature too short (< 132 chars)
   it('should throw an invalid-argument error if signature is too short', async () => {
     // Arrange
-    const shortSignature = '0x' + 'a'.repeat(100) // 102 chars total
+    const shortSignature = `0x${'a'.repeat(100)}` // 102 chars total
     const request = { data: { walletAddress, signature: shortSignature } }
 
     // Act & Assert
@@ -212,7 +212,7 @@ describe('verifySignatureAndLoginHandler', () => {
   // Test Case: Invalid Argument - Signature too long (> 132 chars)
   it('should throw an invalid-argument error if signature is too long', async () => {
     // Arrange
-    const longSignature = '0x' + 'a'.repeat(150) // 152 chars total
+    const longSignature = `0x${'a'.repeat(150)}` // 152 chars total
     const request = { data: { walletAddress, signature: longSignature } }
 
     // Act & Assert
@@ -411,7 +411,7 @@ describe('verifySignatureAndLoginHandler', () => {
   // Test Case: EIP-712 typed data signature verification
   it('should successfully verify EIP-712 typed data signature', async () => {
     // Arrange
-    const typedDataSignature = '0x' + 'b'.repeat(130)
+    const typedDataSignature = `0x${'b'.repeat(130)}`
     const chainId = 137
     const request = { data: { walletAddress, signature: typedDataSignature, signatureType: 'typed-data', chainId } }
 
@@ -448,7 +448,7 @@ describe('verifySignatureAndLoginHandler', () => {
   // Test Case: EIP-712 signature verification failure
   it('should throw an error when EIP-712 signature verification fails', async () => {
     // Arrange
-    const typedDataSignature = '0x' + 'c'.repeat(130)
+    const typedDataSignature = `0x${'c'.repeat(130)}`
     const request = { data: { walletAddress, signature: typedDataSignature, signatureType: 'typed-data', chainId: 1 } }
 
     mockedVerifyTypedData.mockImplementation(() => {
@@ -463,7 +463,7 @@ describe('verifySignatureAndLoginHandler', () => {
   // Test Case: EIP-712 with default chainId when not provided
   it('should use default chainId when not provided for EIP-712', async () => {
     // Arrange
-    const typedDataSignature = '0x' + 'd'.repeat(130)
+    const typedDataSignature = `0x${'d'.repeat(130)}`
     const request = { data: { walletAddress, signature: typedDataSignature, signatureType: 'typed-data' } }
 
     mockedVerifyTypedData.mockReturnValue(walletAddress)

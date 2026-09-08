@@ -1,5 +1,4 @@
 import { useAppKit } from '@reown/appkit-wagmi-react-native'
-import React from 'react'
 import { Pressable, Text } from 'react-native'
 
 export interface ConnectWalletButtonProps {

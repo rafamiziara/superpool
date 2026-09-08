@@ -1,5 +1,5 @@
 import type { AssessmentInfo } from '@superpool/types'
-import React from 'react'
+import type React from 'react'
 import { NATIVE } from '../../__tests__/fixtures/denomination'
 import { fireEvent, render } from '../../__tests__/test-utils'
 import { AssessmentPanel } from './AssessmentPanel'

@@ -1,5 +1,5 @@
-import { Note, NOTE_MAX_LENGTH, NoteKind } from '@superpool/types'
-import { Firestore, Timestamp } from 'firebase-admin/firestore'
+import { NOTE_MAX_LENGTH, type Note, type NoteKind } from '@superpool/types'
+import { type Firestore, Timestamp } from 'firebase-admin/firestore'
 import { logger } from 'firebase-functions/v2'
 import { LOANS_COLLECTION, MEMBERSHIPS_COLLECTION, NOTES_COLLECTION, POOLS_COLLECTION, STAGED_NOTES_COLLECTION } from '../constants'
 

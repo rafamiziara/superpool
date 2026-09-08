@@ -1,7 +1,7 @@
-import { ethers, time, upgrades } from '../hardhat.connection'
-import { expect } from 'chai'
 import type { HardhatEthersSigner } from '@nomicfoundation/hardhat-ethers/types'
-import { LendingPool } from '../typechain-types'
+import { expect } from 'chai'
+import { ethers, time, upgrades } from '../hardhat.connection'
+import type { LendingPool } from '../typechain-types'
 
 /**
  * Where `loans[loanId]` starts in storage, found rather than hardcoded.

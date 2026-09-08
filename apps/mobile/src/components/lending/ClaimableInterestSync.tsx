@@ -1,5 +1,5 @@
 import { observer } from 'mobx-react-lite'
-import React, { useEffect } from 'react'
+import { useEffect } from 'react'
 import { useAccount, useReadContract } from 'wagmi'
 import { LendingPoolABI } from '../../constants/abis'
 import { poolStore } from '../../stores/PoolStore'

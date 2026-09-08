@@ -1,6 +1,6 @@
-import { ListInterestClaimsRequest, ListInterestClaimsResponse } from '@superpool/types'
+import type { ListInterestClaimsRequest, ListInterestClaimsResponse } from '@superpool/types'
 import { logger } from 'firebase-functions/v2'
-import { CallableRequest, HttpsError, onCall } from 'firebase-functions/v2/https'
+import { type CallableRequest, HttpsError, onCall } from 'firebase-functions/v2/https'
 import { DEFAULT_CHAIN_ID, INTEREST_CLAIMS_COLLECTION } from '../../constants'
 import { listInterestClaimsSchema } from '../../schemas'
 import { firestore } from '../../services'

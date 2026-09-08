@@ -1,10 +1,10 @@
 import 'react-native-get-random-values'
 
-import { AppCheckToken, CustomProvider } from 'firebase/app-check'
+import { type AppCheckToken, CustomProvider } from 'firebase/app-check'
 import { getUniqueDeviceId } from './deviceId'
 import { logger } from './logger'
 
-const APP_CHECK_MINTER_URL = process.env.EXPO_PUBLIC_CLOUD_FUNCTIONS_BASE_URL + 'customAppCheckMinter'
+const APP_CHECK_MINTER_URL = `${process.env.EXPO_PUBLIC_CLOUD_FUNCTIONS_BASE_URL}customAppCheckMinter`
 
 export const appCheckProvider = (): CustomProvider => {
   const provider = new CustomProvider({

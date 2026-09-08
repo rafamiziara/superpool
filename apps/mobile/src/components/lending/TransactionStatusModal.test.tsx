@@ -1,4 +1,3 @@
-import React from 'react'
 import { Linking } from 'react-native'
 import {
   BORROWER_ADDRESS,

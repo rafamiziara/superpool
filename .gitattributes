@@ -1,0 +1,4 @@
+# Biome formats to LF (see the shared RM30 Biome config). Without this, a Windows
+# checkout with core.autocrlf=true rewrites every file to CRLF and `biome check`
+# then wants them back — a permanent, unfixable diff.
+* text=auto eol=lf

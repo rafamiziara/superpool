@@ -1,4 +1,4 @@
-import { Loan, LoanInfo, LoanStatus } from '@superpool/types'
+import { type Loan, type LoanInfo, LoanStatus } from '@superpool/types'
 
 /**
  * Where a loan stands against its own due date.

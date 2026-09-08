@@ -1,4 +1,4 @@
-import { Firestore } from 'firebase-admin/firestore'
+import type { Firestore } from 'firebase-admin/firestore'
 import { deletePushToken, isExpoPushToken, savePushToken, tokensForWallet } from './pushTokens'
 
 const TOKEN = 'ExponentPushToken[abcdefghijklmnop]'

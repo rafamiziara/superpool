@@ -1,4 +1,4 @@
-import { AuthenticationData, AuthMessage, User } from '@superpool/types'
+import type { AuthenticationData, AuthMessage, User } from '@superpool/types'
 
 export interface MessageGenerationState {
   message: string | null

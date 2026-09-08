@@ -1,8 +1,8 @@
 import { logger } from 'firebase-functions/v2'
-import { CallableRequest, HttpsError, onCall } from 'firebase-functions/v2/https'
+import { type CallableRequest, HttpsError, onCall } from 'firebase-functions/v2/https'
 import { onSchedule } from 'firebase-functions/v2/scheduler'
 import { firestore } from '../../services'
-import { collectReceipts, CollectResult } from '../../services/pushReceipts'
+import { type CollectResult, collectReceipts } from '../../services/pushReceipts'
 import { requireAdmin } from '../../utils/admin'
 import { enforceAppCheck } from '../../utils/appCheck'
 

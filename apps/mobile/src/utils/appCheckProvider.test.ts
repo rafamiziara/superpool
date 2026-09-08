@@ -3,7 +3,9 @@ import { appCheckProvider } from './appCheckProvider'
 
 // Mock dependencies
 jest.mock('./deviceId')
+
 import { getUniqueDeviceId } from './deviceId'
+
 const mockGetUniqueDeviceId = getUniqueDeviceId as jest.MockedFunction<typeof getUniqueDeviceId>
 
 // Mock fetch

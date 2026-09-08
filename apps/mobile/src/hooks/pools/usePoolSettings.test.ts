@@ -33,7 +33,7 @@ type RevertAbiItem = NonNullable<ContractFunctionRevertedError['data']>['abiItem
 /** Looks the error up in the shipped ABI, so a rename there fails this test too. */
 function revertedWith(name: string): ContractFunctionRevertedError {
   const item = LendingPoolABI.find((entry) => entry.type === 'error' && entry.name === name)
-  if (!item || item.type !== 'error') throw new Error(`LendingPoolABI has no error named ${name}`)
+  if (item?.type !== 'error') throw new Error(`LendingPoolABI has no error named ${name}`)
 
   const reverted = new ContractFunctionRevertedError({ abi: [], functionName: 'setRequiresApproval' })
   reverted.data = { abiItem: item as RevertAbiItem, errorName: name, args: [] }

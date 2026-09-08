@@ -1,8 +1,7 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native'
-import React from 'react'
 import type { Address } from 'viem'
-import { mockRouterDismissTo } from '../../../src/__tests__/setup'
 import { mockWagmiUseAccount, mockWagmiUseBalance } from '../../../src/__tests__/mocks'
+import { mockRouterDismissTo } from '../../../src/__tests__/setup'
 import CreatePoolScreen from './create'
 
 const WALLET_ADDRESS = '0x70997970C51812dc3A010C7d01b50e0d17dc79C8'

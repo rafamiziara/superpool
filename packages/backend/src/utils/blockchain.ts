@@ -1,7 +1,7 @@
 import { Contract, JsonRpcProvider, Wallet } from 'ethers'
+import { defineSecret } from 'firebase-functions/params'
 import { logger } from 'firebase-functions/v2'
 import { HttpsError } from 'firebase-functions/v2/https'
-import { defineSecret } from 'firebase-functions/params'
 import { getChainConfig, PoolFactoryABI } from '../constants'
 
 /**
@@ -122,7 +122,7 @@ export const whitelistWallet = async (walletAddress: string, chainId: number): P
     // Call setCreatorAuthorization to whitelist the wallet
     const txResponse = await poolFactory.setCreatorAuthorization(walletAddress, true)
 
-    if (!txResponse || !txResponse.hash) {
+    if (!txResponse?.hash) {
       throw new Error('Failed to get transaction response')
     }
 
@@ -134,7 +134,7 @@ export const whitelistWallet = async (walletAddress: string, chainId: number): P
     // Wait for transaction confirmation
     const receipt = await txResponse.wait()
 
-    if (!receipt || receipt.status !== 1) {
+    if (receipt?.status !== 1) {
       throw new Error('Transaction failed or was reverted')
     }
 

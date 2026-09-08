@@ -10,8 +10,8 @@ import {
   type LoanTransactionType,
   type MembershipResult,
   type MembershipTransactionType,
-  pendingTransactionsStore,
   type PendingTransactionType,
+  pendingTransactionsStore,
   type WithdrawResult,
 } from '../../stores/PendingTransactionsStore'
 import { describeTransactionError } from './transactionErrors'
@@ -109,7 +109,7 @@ export const useTransactionMonitoring = (): UseTransactionMonitoringReturn => {
       setError(null)
       setIsWaiting(true)
 
-      let receipt
+      let receipt: Awaited<ReturnType<typeof publicClient.waitForTransactionReceipt>>
       try {
         receipt = await publicClient.waitForTransactionReceipt({ hash: txHash, timeout: RECEIPT_TIMEOUT_MS })
       } catch (waitError) {

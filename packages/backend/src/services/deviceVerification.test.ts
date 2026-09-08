@@ -1,6 +1,6 @@
-import { ApprovedDevice } from '@superpool/types'
-import { APPROVED_DEVICES_COLLECTION } from '../constants'
+import type { ApprovedDevice } from '@superpool/types'
 import { mockLogger } from '../__tests__/setup'
+import { APPROVED_DEVICES_COLLECTION } from '../constants'
 
 // Import mocked services (already mocked in setup.ts)
 const { firestore } = require('./index')

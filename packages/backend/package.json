@@ -1,7 +1,6 @@
 {
   "name": "backend",
   "scripts": {
-    "lint": "eslint src --config ../../eslint.config.mjs",
     "build": "tsc -p tsconfig.build.json",
     "build:watch": "tsc -p tsconfig.build.json --watch",
     "serve": "npm run build && cd ../../config && firebase emulators:start --inspect-functions",
@@ -26,7 +25,6 @@
     "testAgentSeam": "tsx scripts/testAgentSeam.ts",
     "testAssessment": "tsx scripts/testAssessment.ts",
     "test": "jest",
-    "format": "prettier --write . --ignore-path ../../.prettierignore",
     "type-check": "tsc --noEmit",
     "type-check:prod": "tsc --noEmit -p tsconfig.build.json"
   },

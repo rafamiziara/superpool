@@ -1,6 +1,5 @@
 import { FontAwesome } from '@expo/vector-icons'
 import type { Loan } from '@superpool/types'
-import React from 'react'
 import { Text, View } from 'react-native'
 import { palette } from '../../constants/palette'
 import { type Lateness, latenessOf } from '../../utils/lateness'

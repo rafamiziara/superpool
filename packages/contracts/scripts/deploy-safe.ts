@@ -1,10 +1,10 @@
-import { isMain } from './lib/main'
-import { isLocalNetwork } from './lib/verification'
-import { safeContractNetworks, safeRpcUrl } from './lib/safe'
-import { signerKeyFor } from './lib/accounts'
-import { ethers, network } from '../hardhat.connection'
-import Safe, { PredictedSafeProps, SafeAccountConfig } from '@safe-global/protocol-kit'
+import Safe, { type PredictedSafeProps, type SafeAccountConfig } from '@safe-global/protocol-kit'
 import * as dotenv from 'dotenv'
+import { ethers, network } from '../hardhat.connection'
+import { signerKeyFor } from './lib/accounts'
+import { isMain } from './lib/main'
+import { safeContractNetworks, safeRpcUrl } from './lib/safe'
+import { isLocalNetwork } from './lib/verification'
 
 dotenv.config()
 
@@ -203,7 +203,7 @@ function getDefaultSafeConfig(environment: 'local' | 'testnet' | 'mainnet'): Saf
     case 'testnet': {
       // For testnet, use environment variables
       const testnetOwners = process.env.SAFE_OWNERS?.split(',') || []
-      const testnetThreshold = parseInt(process.env.SAFE_THRESHOLD || '2')
+      const testnetThreshold = parseInt(process.env.SAFE_THRESHOLD || '2', 10)
 
       if (testnetOwners.length === 0) {
         throw new Error('SAFE_OWNERS environment variable not set for testnet deployment')
@@ -218,7 +218,7 @@ function getDefaultSafeConfig(environment: 'local' | 'testnet' | 'mainnet'): Saf
     case 'mainnet': {
       // For mainnet, use environment variables with strict validation
       const mainnetOwners = process.env.SAFE_OWNERS?.split(',') || []
-      const mainnetThreshold = parseInt(process.env.SAFE_THRESHOLD || '3')
+      const mainnetThreshold = parseInt(process.env.SAFE_THRESHOLD || '3', 10)
 
       if (mainnetOwners.length === 0) {
         throw new Error('SAFE_OWNERS environment variable not set for mainnet deployment')
@@ -315,4 +315,4 @@ if (isMain(import.meta.url)) {
 }
 
 // Export functions for use in other scripts
-export { DeploymentResult, deploySafe, getDefaultSafeConfig, SafeConfig }
+export { type DeploymentResult, deploySafe, getDefaultSafeConfig, type SafeConfig }

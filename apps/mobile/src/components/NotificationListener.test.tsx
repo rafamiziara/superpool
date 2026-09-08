@@ -1,5 +1,4 @@
 import type { NotificationData } from '@superpool/types'
-import React from 'react'
 import Toast from 'react-native-toast-message'
 import { mockAddNotificationReceivedListener, mockAddNotificationResponseReceivedListener, mockRouterPush } from '../__tests__/setup'
 import { render } from '../__tests__/test-utils'

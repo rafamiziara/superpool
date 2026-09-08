@@ -1,9 +1,9 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { getGsap } from '@/lib/gsap'
-import { SectionHeading } from '@/components/SectionHeading'
 import { PoolVisual } from '@/components/PoolVisual'
+import { SectionHeading } from '@/components/SectionHeading'
+import { getGsap } from '@/lib/gsap'
 
 const steps = [
   {

@@ -7,10 +7,10 @@
 //   node scripts/dev-environment.js              # backend only (pnpm dev:backend)
 //   node scripts/dev-environment.js --with-app   # also spawn Expo (pnpm dev)
 
-const { spawn, exec } = require('child_process')
-const fs = require('fs')
-const path = require('path')
-const http = require('http')
+const { spawn, exec } = require('node:child_process')
+const fs = require('node:fs')
+const path = require('node:path')
+const http = require('node:http')
 
 class DevEnvironment {
   constructor({ withApp = false } = {}) {

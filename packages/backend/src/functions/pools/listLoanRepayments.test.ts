@@ -1,4 +1,4 @@
-import { LoanRepaymentInfo } from '@superpool/types'
+import type { LoanRepaymentInfo } from '@superpool/types'
 import { mockLogger } from '../../__tests__/setup'
 
 /**

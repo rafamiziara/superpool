@@ -1,5 +1,4 @@
 import { NativeTabs } from 'expo-router/unstable-native-tabs'
-import React from 'react'
 import { Platform } from 'react-native'
 import { palette } from '../../../src/constants/palette'
 

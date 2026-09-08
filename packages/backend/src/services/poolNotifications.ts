@@ -1,12 +1,12 @@
-import { NoteKind, NotificationData } from '@superpool/types'
-import { Provider } from 'ethers'
-import { Firestore } from 'firebase-admin/firestore'
+import type { NoteKind, NotificationData } from '@superpool/types'
+import type { Provider } from 'ethers'
+import type { Firestore } from 'firebase-admin/firestore'
 import { logger } from 'firebase-functions/v2'
 import { POOLS_COLLECTION } from '../constants'
-import { IndexLoanResult, ParsedLoan } from './loanIndexer'
-import { IndexMembershipResult, ParsedMembership } from './membershipIndexer'
-import { notificationKey, notifyOnce } from './notifications'
+import type { IndexLoanResult, ParsedLoan } from './loanIndexer'
+import type { IndexMembershipResult, ParsedMembership } from './membershipIndexer'
 import { noteFor } from './notes'
+import { notificationKey, notifyOnce } from './notifications'
 
 /**
  * Which transitions are worth a push, and to whom.

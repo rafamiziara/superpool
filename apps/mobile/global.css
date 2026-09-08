@@ -1,5 +1,5 @@
-@import 'tailwindcss';
-@import 'uniwind';
+@import "tailwindcss";
+@import "uniwind";
 
 /*
  * SuperPool mobile theme — "Abyss & Aurora"
@@ -36,13 +36,13 @@
 @layer theme {
   :root {
     @variant ios {
-      --font-mono: 'Menlo';
+      --font-mono: "Menlo";
     }
     @variant android {
-      --font-mono: 'monospace';
+      --font-mono: "monospace";
     }
     @variant web {
-      --font-mono: 'monospace';
+      --font-mono: "monospace";
     }
   }
 }

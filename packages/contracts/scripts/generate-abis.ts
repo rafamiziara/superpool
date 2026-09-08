@@ -1,7 +1,7 @@
+import * as fs from 'node:fs'
+import * as path from 'node:path'
 import { artifacts } from '../hardhat.connection'
-import * as fs from 'fs'
-import * as path from 'path'
-import { ABI_CONTRACTS, ABI_OUTPUT_FILES, renderAbiModule, RenderedAbi, REPO_ROOT } from './abi-codegen'
+import { ABI_CONTRACTS, ABI_OUTPUT_FILES, REPO_ROOT, type RenderedAbi, renderAbiModule } from './abi-codegen'
 
 /**
  * Regenerates the shared ABI module from the compiled contract artifacts.

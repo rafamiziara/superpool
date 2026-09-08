@@ -1,11 +1,11 @@
-import { RegisterPushTokenRequest, RegisterPushTokenResponse } from '@superpool/types'
+import type { RegisterPushTokenRequest, RegisterPushTokenResponse } from '@superpool/types'
 import { logger } from 'firebase-functions/v2'
-import { CallableRequest, HttpsError, onCall } from 'firebase-functions/v2/https'
+import { type CallableRequest, HttpsError, onCall } from 'firebase-functions/v2/https'
 import { registerPushTokenSchema } from '../../schemas'
 import { firestore } from '../../services'
 import { savePushToken } from '../../services/pushTokens'
-import { parseRequest } from '../../utils/validation'
 import { enforceAppCheck } from '../../utils/appCheck'
+import { parseRequest } from '../../utils/validation'
 
 export const registerPushTokenHandler = async (request: CallableRequest<RegisterPushTokenRequest>): Promise<RegisterPushTokenResponse> => {
   if (!request.auth) {

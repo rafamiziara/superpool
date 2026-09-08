@@ -15,7 +15,7 @@ import { useCallback, useState } from 'react'
 import { useAccount } from 'wagmi'
 import { DEFAULT_CHAIN_ID } from '../../config/contracts'
 import { FIREBASE_FUNCTIONS } from '../../config/firebase'
-import { pendingTransactionsStore, type PendingTransactionType } from '../../stores/PendingTransactionsStore'
+import { type PendingTransactionType, pendingTransactionsStore } from '../../stores/PendingTransactionsStore'
 import { poolStore } from '../../stores/PoolStore'
 import { logger } from '../../utils/logger'
 

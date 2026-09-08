@@ -1,5 +1,5 @@
-import { existsSync, readdirSync, readFileSync } from 'fs'
-import { join } from 'path'
+import { existsSync, readdirSync, readFileSync } from 'node:fs'
+import { join } from 'node:path'
 
 /**
  * Emit the `.env` lines for a deployment, from its `deployments/<network>.json`.

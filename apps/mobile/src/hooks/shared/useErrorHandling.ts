@@ -1,6 +1,6 @@
 import { useCallback, useState } from 'react'
-import { ErrorContext, ErrorDetails, ErrorHandler, ErrorType } from '../../types/errors'
 import { ERROR_MESSAGES } from '../../constants/errorMessages'
+import { type ErrorContext, type ErrorDetails, type ErrorHandler, ErrorType } from '../../types/errors'
 
 export const useErrorHandling = (): ErrorHandler & {
   lastError: ErrorDetails | null

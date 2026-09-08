@@ -1,6 +1,5 @@
 import { FontAwesome } from '@expo/vector-icons'
 import type { AssessLoanResponse, AssessmentInfo } from '@superpool/types'
-import React from 'react'
 import { ActivityIndicator, Pressable, Text, View } from 'react-native'
 import { palette } from '../../constants/palette'
 import type { Denomination } from '../../utils/denomination'

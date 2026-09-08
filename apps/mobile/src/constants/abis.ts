@@ -12,7 +12,7 @@
  * return-type inference, so import from here rather than widening to `Abi`.
  */
 
-export { PoolFactoryABI, LendingPoolABI } from './abis.generated'
+export { LendingPoolABI, PoolFactoryABI } from './abis.generated'
 
 /**
  * The three ERC-20 calls a token pool needs from the app's side.

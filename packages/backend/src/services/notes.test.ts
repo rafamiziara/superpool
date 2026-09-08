@@ -1,4 +1,4 @@
-import { Firestore, Timestamp } from 'firebase-admin/firestore'
+import { type Firestore, Timestamp } from 'firebase-admin/firestore'
 import {
   entitlementFor,
   isNoteKind,
