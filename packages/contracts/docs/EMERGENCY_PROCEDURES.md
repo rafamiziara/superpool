@@ -25,9 +25,9 @@
 
 This is a single-maintainer proof-of-concept; there is no on-call rotation.
 
-| Role                     | Contact                                                                                                       |
-| ------------------------ | ------------------------------------------------------------------------------------------------------------- |
-| Maintainer               | Rafael Miziara — contact@rm30.dev                                                                             |
+| Role                     | Contact                                                                                                          |
+| ------------------------ | ---------------------------------------------------------------------------------------------------------------- |
+| Maintainer               | Rafael Miziara — contact@rm30.dev                                                                                |
 | Vulnerability disclosure | A [GitHub issue](https://github.com/rafamiziara/superpool/issues), or the email above if it should not be public |
 
 ## 🔧 Common Emergency Scenarios
