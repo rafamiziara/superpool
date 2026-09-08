@@ -1,11 +1,9 @@
 {
   "extends": "@rm30/tsconfig/base.json",
   "compilerOptions": {
-    // Emit is on here: packages/types builds declarations from this base.
-    "noEmit": false,
-    "declaration": true,
-    "declarationMap": true,
-    "sourceMap": true,
+    // Nothing in this repo emits from here any more — packages/types is source-direct
+    // and only type-checks. Kept as the seam for future workspace packages.
+    "noEmit": true,
     "jsx": "react-jsx",
     "types": []
   },

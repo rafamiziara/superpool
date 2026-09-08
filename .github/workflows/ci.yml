@@ -33,11 +33,6 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      # packages/*/dist and packages/contracts/typechain-types are gitignored,
-      # so a fresh checkout has to generate them before anything type-checks.
-      - name: Build shared packages
-        run: pnpm --filter @superpool/types build
-
       - name: Compile contracts (generates typechain-types)
         run: pnpm --filter contracts compile
 
@@ -78,9 +73,6 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Build shared packages
-        run: pnpm --filter @superpool/types build
-
       # No .env is provisioned: hardhat.config.ts falls back to public RPC URLs,
       # and neither the backend nor the mobile jest setup reads the environment.
       # Safe multi-sig tests need a forked network and live in `pnpm test:safe`,
@@ -103,9 +95,6 @@ jobs:
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
-
-      - name: Build shared packages
-        run: pnpm --filter @superpool/types build
 
       - name: Build landing page
         run: pnpm --filter @superpool/landing build

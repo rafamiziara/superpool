@@ -42,10 +42,10 @@ export default [
       'packages/backend/scripts/**',
 
       // Build configs outside of TypeScript projects
-      '**/tsup.config.ts',
       '**/tailwind.config.js',
       '**/jest.config.ts',
       '**/jest.config.js',
+      '**/vitest.config.ts',
     ],
   },
 
