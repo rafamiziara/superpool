@@ -9,7 +9,7 @@ interface RepoStats {
 
 async function getRepoStats(): Promise<RepoStats | null> {
   try {
-    const res = await fetch('https://api.github.com/repos/rm30-dev/superpool', {
+    const res = await fetch('https://api.github.com/repos/rafamiziara/superpool', {
       next: { revalidate: 3600 },
     })
     if (!res.ok) return null
@@ -64,7 +64,7 @@ export async function OpenSource() {
 
             <a
               data-reveal
-              href="https://github.com/rm30-dev/superpool"
+              href="https://github.com/rafamiziara/superpool"
               target="_blank"
               rel="noopener noreferrer"
               className="mt-10 inline-flex items-center gap-2.5 rounded-full bg-foam px-7 py-3.5 font-display text-sm font-semibold text-abyss transition-all duration-300 hover:bg-white hover:shadow-[0_0_40px_rgba(233,241,252,0.25)]"
@@ -87,7 +87,7 @@ export async function OpenSource() {
               </div>
               <div className="space-y-1 p-6 font-mono text-[0.8rem] leading-relaxed">
                 <p className="text-mist">
-                  <span className="text-lumen">$</span> git clone https://github.com/rm30-dev/superpool.git
+                  <span className="text-lumen">$</span> git clone https://github.com/rafamiziara/superpool.git
                 </p>
                 <p className="text-mist">
                   <span className="text-lumen">$</span> pnpm install

@@ -216,7 +216,7 @@ The SuperPool contracts implement multiple layers of security controls and follo
 
 For security-related issues or vulnerability reports:
 
-- **GitHub issue**: https://github.com/rm30-dev/superpool/issues — the default route
+- **GitHub issue**: https://github.com/rafamiziara/superpool/issues — the default route
 - **Email**: contact@rm30.dev — for anything that should not be public first
 
 There is no bug bounty and no 24/7 response: this is an unaudited
