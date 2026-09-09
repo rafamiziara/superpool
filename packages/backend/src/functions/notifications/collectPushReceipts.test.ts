@@ -56,7 +56,7 @@ describe('the scheduled function', () => {
     // A schedule that throws is retried by the platform, which would re-ask
     // Expo about the same tickets. There is nothing to retry: the rows stay
     // queued and the next cycle picks them up anyway.
-    const { collectPushReceipts } = await import('./collectPushReceipts')
+    const { collectPushReceipts } = await import('./collectPushReceipts.js')
     collectReceipts.mockRejectedValue(new Error('firestore exploded'))
 
     await expect(collectPushReceipts.run(undefined as unknown as ScheduledEvent)).resolves.toBeUndefined()

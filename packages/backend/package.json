@@ -50,7 +50,7 @@
     "firebase-functions-test": "^3.4.1",
     "minimatch": "^10.0.3",
     "tsx": "^4.23.13",
-    "typescript": "~6.0.3",
+    "typescript": "^7.0.2",
     "vitest": "^5.0.0"
   },
   "private": true

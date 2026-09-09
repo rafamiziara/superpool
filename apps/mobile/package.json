@@ -59,7 +59,7 @@
     "jest-expo": "^56.0.5",
     "minimatch": "^10.0.3",
     "tailwindcss": "^4.2.2",
-    "typescript": "~6.0.3"
+    "typescript": "^7.0.2"
   },
   "private": true
 }

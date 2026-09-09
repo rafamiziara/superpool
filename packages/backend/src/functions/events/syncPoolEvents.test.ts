@@ -348,7 +348,7 @@ describe('syncPoolEventsHandler', () => {
 
       // Act & Assert
       try {
-        const { syncPoolEventsHandler: handler } = await import('./syncPoolEvents')
+        const { syncPoolEventsHandler: handler } = await import('./syncPoolEvents.js')
         await expect(handler()).rejects.toThrow('PoolFactory address not configured')
       } finally {
         process.env.POOL_FACTORY_ADDRESS = previous

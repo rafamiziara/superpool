@@ -9,7 +9,7 @@
  * case awaits it.
  */
 
-type ChainsModule = typeof import('./chains')
+type ChainsModule = typeof import('./chains.js')
 
 /** Load the registry against exactly this environment, and nothing inherited. */
 async function loadWith(env: Record<string, string>): Promise<ChainsModule> {
@@ -23,7 +23,7 @@ async function loadWith(env: Record<string, string>): Promise<ChainsModule> {
     // Drop the cached instance so the next import re-reads process.env. The env is
     // restored only after the import resolves, since the module reads it on load.
     vi.resetModules()
-    return await import('./chains')
+    return await import('./chains.js')
   } finally {
     process.env = saved
   }

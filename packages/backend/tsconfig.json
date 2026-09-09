@@ -1,11 +1,8 @@
 {
   "compilerOptions": {
-    "module": "commonjs",
+    "module": "node16",
     "esModuleInterop": true,
-    // TODO: migrate to moduleResolution "node16" — blocked on ts-jest ignoring the
-    // inline `moduleResolution` override, which pins the test transform to node10.
-    "moduleResolution": "node",
-    "ignoreDeprecations": "6.0",
+    "moduleResolution": "node16",
     "noImplicitReturns": true,
     "noUnusedLocals": false,
     "outDir": "lib",

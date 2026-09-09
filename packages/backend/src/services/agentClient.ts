@@ -1,4 +1,7 @@
-import { MastraClient } from '@mastra/client-js'
+// Resolved through the package's `import` condition: this file emits CommonJS, but the
+// types being borrowed are the ESM ones. See `clientFor` for why the value is loaded
+// dynamically rather than imported here.
+import type { MastraClient } from '@mastra/client-js' with { 'resolution-mode': 'import' }
 import { logger } from 'firebase-functions/v2'
 import * as jwt from 'jsonwebtoken'
 
@@ -78,7 +81,15 @@ export function signServiceToken(secret: string): string {
   return jwt.sign({ sub: 'superpool-backend' }, secret, { expiresIn: TOKEN_TTL_SECONDS, algorithm: 'HS256' })
 }
 
-export function clientFor(config: AgentServiceConfig, timeoutMs: number): MastraClient {
+export async function clientFor(config: AgentServiceConfig, timeoutMs: number): Promise<MastraClient> {
+  // `@mastra/client-js` is ESM-only by declaration ("type": "module"), and this package
+  // emits CommonJS for the Functions runtime. It does ship dist/index.cjs, but its
+  // `require` export condition points `types` at an ESM .d.ts, so under
+  // moduleResolution node16 TypeScript refuses the static import (TS1479). Loading it
+  // dynamically is the resolution TypeScript itself suggests, and it is what the
+  // deployed bundle already does with it.
+  const { MastraClient } = await import('@mastra/client-js')
+
   return new MastraClient({
     baseUrl: config.baseUrl,
     headers: { Authorization: `Bearer ${signServiceToken(config.secret)}` },
@@ -121,7 +132,7 @@ export async function pingAgentService(echo: string): Promise<AgentPingResult> {
   const startedAt = Date.now()
 
   try {
-    const run = await clientFor(config, PING_TIMEOUT_MS).getWorkflow('pingWorkflow').createRun()
+    const run = await (await clientFor(config, PING_TIMEOUT_MS)).getWorkflow('pingWorkflow').createRun()
     const outcome = await run.startAsync({ inputData: { echo } })
 
     if (outcome.status !== 'success') {
@@ -201,7 +212,7 @@ export async function assessLoanWithAgent(facts: AgentAssessmentFacts): Promise<
   if (!config) return { status: 'not-configured' }
 
   try {
-    const run = await clientFor(config, ASSESSMENT_TIMEOUT_MS).getWorkflow('assessLoanWorkflow').createRun()
+    const run = await (await clientFor(config, ASSESSMENT_TIMEOUT_MS)).getWorkflow('assessLoanWorkflow').createRun()
     const outcome = await run.startAsync({ inputData: facts })
 
     if (outcome.status !== 'success') {
