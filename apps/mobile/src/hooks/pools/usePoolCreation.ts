@@ -189,7 +189,7 @@ export const usePoolCreation = (): UsePoolCreationReturn => {
 
         // Recorded before returning so a kill straight after signing still leaves
         // the transaction recoverable at next launch.
-        await pendingTransactionsStore.addPendingTransaction({
+        await pendingTransactionsStore.getState().addPendingTransaction({
           txHash,
           chainId: activeChainId,
           type: 'CREATE_POOL',

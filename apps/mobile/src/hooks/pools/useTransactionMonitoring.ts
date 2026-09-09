@@ -123,19 +123,19 @@ export const useTransactionMonitoring = (): UseTransactionMonitoringReturn => {
       }
 
       if (receipt.status === 'reverted') {
-        await pendingTransactionsStore.updateTransactionStatus(txHash, 'failed')
+        await pendingTransactionsStore.getState().updateTransactionStatus(txHash, 'failed')
 
         return fail('Transaction was reverted')
       }
 
       const result = extractResult(type, receipt)
       if (!result) {
-        await pendingTransactionsStore.updateTransactionStatus(txHash, 'failed')
+        await pendingTransactionsStore.getState().updateTransactionStatus(txHash, 'failed')
 
         return fail(MISSING_LOG_MESSAGE[type])
       }
 
-      await pendingTransactionsStore.updateTransactionStatus(txHash, 'confirmed', result)
+      await pendingTransactionsStore.getState().updateTransactionStatus(txHash, 'confirmed', result)
 
       setIsWaiting(false)
 

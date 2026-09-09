@@ -17,6 +17,8 @@ import {
   isDismissable,
   type PendingTransaction,
   pendingTransactionsStore,
+  selectConfirmedUnindexed,
+  usePendingTransactionsStore,
 } from '../../../../src/stores/PendingTransactionsStore'
 import { poolStore } from '../../../../src/stores/PoolStore'
 import { chainName } from '../../../../src/utils/explorer'
@@ -33,10 +35,10 @@ import { chainName } from '../../../../src/utils/explorer'
  * A `submitted` transaction has no `poolId` yet and needs no dedupe: nothing it
  * produced can be listed until it is mined.
  */
-function unlistedPoolCreations(chainId: number): CreatePoolTransaction[] {
+function unlistedPoolCreations(transactions: PendingTransaction[], chainId: number): CreatePoolTransaction[] {
   const listed = new Set(poolStore.pools.map((pool) => pool.poolId))
 
-  return pendingTransactionsStore.transactions
+  return transactions
     .filter((transaction): transaction is CreatePoolTransaction => transaction.type === 'CREATE_POOL')
     .filter((transaction) => transaction.chainId === chainId)
     .filter((transaction) => transaction.result === undefined || !listed.has(transaction.result.poolId))
@@ -49,14 +51,17 @@ function PoolsScreen() {
 
   const activeChainId = chainId ?? DEFAULT_CHAIN_ID
   const pools = poolStore.myPools
-  const pending = unlistedPoolCreations(activeChainId)
+  // Subscribed rather than read: this used to be a MobX observable read inside
+  // an `observer`, which is what re-rendered the screen when a creation landed.
+  const transactions = usePendingTransactionsStore((state) => state.transactions)
+  const pending = unlistedPoolCreations(transactions, activeChainId)
 
   /** The transaction the status modal is describing; `null` keeps it closed. */
   const [detail, setDetail] = useState<PendingTransaction | null>(null)
 
   const dismiss = (transaction: PendingTransaction) => {
     setDetail(null)
-    pendingTransactionsStore.removePendingTransaction(transaction.txHash)
+    pendingTransactionsStore.getState().removePendingTransaction(transaction.txHash)
   }
 
   /**
@@ -68,7 +73,13 @@ function PoolsScreen() {
    * failure leaves it untouched so the effect does not re-fire. Retrying is the
    * pull-to-refresh path below.
    */
-  const confirmedHashes = pendingTransactionsStore.confirmedUnindexed.map((transaction) => transaction.txHash).join(',')
+  // A joined string, so the selector's value is stable: `selectConfirmedUnindexed`
+  // builds a fresh array and subscribing to that would fire on every write.
+  const confirmedHashes = usePendingTransactionsStore((state) =>
+    selectConfirmedUnindexed(state)
+      .map((transaction) => transaction.txHash)
+      .join(',')
+  )
 
   useEffect(() => {
     if (confirmedHashes === '') return

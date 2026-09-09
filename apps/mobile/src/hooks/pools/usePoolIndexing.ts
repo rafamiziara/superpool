@@ -15,7 +15,7 @@ import { useCallback, useState } from 'react'
 import { useAccount } from 'wagmi'
 import { DEFAULT_CHAIN_ID } from '../../config/contracts'
 import { FIREBASE_FUNCTIONS } from '../../config/firebase'
-import { type PendingTransactionType, pendingTransactionsStore } from '../../stores/PendingTransactionsStore'
+import { type PendingTransactionType, pendingTransactionsStore, selectConfirmedUnindexed } from '../../stores/PendingTransactionsStore'
 import { poolStore } from '../../stores/PoolStore'
 import { logger } from '../../utils/logger'
 
@@ -85,7 +85,7 @@ export const usePoolIndexing = (): UsePoolIndexingReturn => {
         // disappears from the UI in the gap between the two. `refreshPools`
         // reloads contributions in the same pass, so both types are covered.
         await poolStore.refreshPools()
-        await pendingTransactionsStore.removePendingTransaction(txHash)
+        await pendingTransactionsStore.getState().removePendingTransaction(txHash)
       } catch (error) {
         // Deliberately not surfaced — see the note on this hook.
         logger.warn('Immediate indexing failed; the scheduled sync will pick it up:', error)
@@ -102,8 +102,8 @@ export const usePoolIndexing = (): UsePoolIndexingReturn => {
    * confirmed while the app was closed would wait for the scheduled sync.
    */
   const indexConfirmed = useCallback(async (): Promise<void> => {
-    // Snapshotted because triggerIndexing mutates the list it comes from.
-    const confirmed = [...pendingTransactionsStore.confirmedUnindexed]
+    // Snapshotted because triggerIndexing rewrites the list it comes from.
+    const confirmed = selectConfirmedUnindexed(pendingTransactionsStore.getState())
 
     for (const transaction of confirmed) {
       await triggerIndexing(transaction.txHash, transaction.type, transaction.chainId)

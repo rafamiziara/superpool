@@ -389,7 +389,7 @@ export const useLoan = (): UseLoanReturn => {
         // Recorded before returning so a kill straight after signing still
         // leaves the transaction recoverable at next launch. No `loanId` yet —
         // the contract assigns it, and the receipt is where it comes back.
-        await pendingTransactionsStore.addPendingTransaction({
+        await pendingTransactionsStore.getState().addPendingTransaction({
           txHash,
           chainId: activeChainId,
           type: 'BORROW',
@@ -495,7 +495,7 @@ export const useLoan = (): UseLoanReturn => {
           })
         }
 
-        await pendingTransactionsStore.addPendingTransaction({
+        await pendingTransactionsStore.getState().addPendingTransaction({
           txHash,
           chainId: activeChainId,
           type: 'REPAY',
@@ -576,7 +576,7 @@ export const useLoan = (): UseLoanReturn => {
           ...(gas === undefined ? {} : { gas }),
         })
 
-        await pendingTransactionsStore.addPendingTransaction({
+        await pendingTransactionsStore.getState().addPendingTransaction({
           txHash,
           chainId: activeChainId,
           type,
@@ -656,7 +656,7 @@ export const useLoan = (): UseLoanReturn => {
 
         // No `loanId`: a request is assigned one by the contract, exactly as a
         // borrow is, and it comes back on the receipt.
-        await pendingTransactionsStore.addPendingTransaction({
+        await pendingTransactionsStore.getState().addPendingTransaction({
           txHash,
           chainId: activeChainId,
           type: 'REQUEST_LOAN',

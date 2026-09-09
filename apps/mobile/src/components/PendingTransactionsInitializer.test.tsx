@@ -9,27 +9,24 @@ import {
 import { pendingTransactionsStore } from '../stores/PendingTransactionsStore'
 import { PendingTransactionsInitializer } from './PendingTransactionsInitializer'
 
-// The store is replaced wholesale rather than spied on: MobX defines its actions
-// as non-configurable, so `jest.spyOn` cannot redefine them.
-jest.mock('../stores/PendingTransactionsStore', () => ({
-  pendingTransactionsStore: {
-    loadFromStorage: jest.fn(),
-    checkPendingTransactions: jest.fn(),
-  },
-}))
-
-const loadFromStorage = jest.mocked(pendingTransactionsStore.loadFromStorage)
-const checkPendingTransactions = jest.mocked(pendingTransactionsStore.checkPendingTransactions)
+/*
+  The two actions are spied on where they live, rather than the store being
+  replaced wholesale. That used to be impossible: MobX defined its actions as
+  non-configurable, so `jest.spyOn` could not redefine them. Zustand keeps them
+  as ordinary properties on a plain state object.
+*/
 
 describe('PendingTransactionsInitializer', () => {
   let warnSpy: jest.SpyInstance
+  let loadFromStorage: jest.SpyInstance
+  let checkPendingTransactions: jest.SpyInstance
 
   beforeEach(() => {
     jest.clearAllMocks()
     warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => undefined)
 
-    loadFromStorage.mockResolvedValue(undefined)
-    checkPendingTransactions.mockResolvedValue(undefined)
+    loadFromStorage = jest.spyOn(pendingTransactionsStore.getState(), 'loadFromStorage').mockResolvedValue(undefined)
+    checkPendingTransactions = jest.spyOn(pendingTransactionsStore.getState(), 'checkPendingTransactions').mockResolvedValue(undefined)
 
     mockWagmiUsePublicClient.mockReturnValue({
       chain: { id: 31337 },
@@ -42,6 +39,8 @@ describe('PendingTransactionsInitializer', () => {
 
   afterEach(() => {
     warnSpy.mockRestore()
+    loadFromStorage.mockRestore()
+    checkPendingTransactions.mockRestore()
   })
 
   it('restores storage, then resolves what the chain has decided', async () => {

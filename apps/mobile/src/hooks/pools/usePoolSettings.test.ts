@@ -43,7 +43,7 @@ function revertedWith(name: string): ContractFunctionRevertedError {
 
 beforeEach(async () => {
   jest.clearAllMocks()
-  await pendingTransactionsStore.reset()
+  await pendingTransactionsStore.getState().reset()
   mockWagmiUseAccount.mockReturnValue({
     isConnected: true,
     isConnecting: false,
@@ -187,7 +187,7 @@ describe('usePoolSettings', () => {
       await result.current.setRequiresApproval({ poolAddress: POOL_ADDRESS, requiresApproval: true })
     })
 
-    expect(pendingTransactionsStore.transactions).toHaveLength(0)
+    expect(pendingTransactionsStore.getState().transactions).toHaveLength(0)
   })
 
   it('should clear a previous failure on reset', async () => {

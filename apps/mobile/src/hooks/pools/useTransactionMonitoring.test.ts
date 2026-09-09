@@ -16,7 +16,7 @@ import {
   mockWaitForTransactionReceipt,
 } from '../../__tests__/mocks'
 import { LendingPoolABI, PoolFactoryABI } from '../../constants/abis'
-import { pendingTransactionsStore } from '../../stores/PendingTransactionsStore'
+import { pendingTransactionsStore, selectConfirmedUnindexed, selectHasPending } from '../../stores/PendingTransactionsStore'
 import { useTransactionMonitoring } from './useTransactionMonitoring'
 
 type ReceiptLog = TransactionReceipt['logs'][number]
@@ -85,13 +85,13 @@ function makeReceipt(overrides: Partial<TransactionReceipt> = {}): TransactionRe
   }
 }
 
-const storedStatus = () => pendingTransactionsStore.transactions[0]?.status
+const storedStatus = () => pendingTransactionsStore.getState().transactions[0]?.status
 
 describe('useTransactionMonitoring', () => {
   beforeEach(async () => {
     jest.clearAllMocks()
-    await pendingTransactionsStore.reset()
-    await pendingTransactionsStore.addPendingTransaction(makePendingTransaction())
+    await pendingTransactionsStore.getState().reset()
+    await pendingTransactionsStore.getState().addPendingTransaction(makePendingTransaction())
 
     mockWagmiUsePublicClient.mockReturnValue({
       chain: { id: 31337 },
@@ -142,15 +142,15 @@ describe('useTransactionMonitoring', () => {
       })
 
       expect(storedStatus()).toBe('confirmed')
-      expect(pendingTransactionsStore.transactions[0].result).toEqual({ poolId: 7, poolAddress: POOL_ADDRESS })
-      expect(pendingTransactionsStore.confirmedUnindexed).toHaveLength(1)
+      expect(pendingTransactionsStore.getState().transactions[0].result).toEqual({ poolId: 7, poolAddress: POOL_ADDRESS })
+      expect(selectConfirmedUnindexed(pendingTransactionsStore.getState())).toHaveLength(1)
     })
 
     it('decodes a contribution from its FundsDeposited log', async () => {
       // The type given here is what picks the decoder. Passing the wrong one
       // finds no log and marks a perfectly good deposit failed.
-      await pendingTransactionsStore.reset()
-      await pendingTransactionsStore.addPendingTransaction(makeContributeTransaction())
+      await pendingTransactionsStore.getState().reset()
+      await pendingTransactionsStore.getState().addPendingTransaction(makeContributeTransaction())
       mockWaitForTransactionReceipt.mockResolvedValue(makeReceipt({ logs: [makeFundsDepositedLog(5_000_000_000_000_000_000n)] }))
       const { result } = renderHook(() => useTransactionMonitoring())
 
@@ -164,8 +164,8 @@ describe('useTransactionMonitoring', () => {
     })
 
     it('fails a contribution whose receipt carries no deposit log', async () => {
-      await pendingTransactionsStore.reset()
-      await pendingTransactionsStore.addPendingTransaction(makeContributeTransaction())
+      await pendingTransactionsStore.getState().reset()
+      await pendingTransactionsStore.getState().addPendingTransaction(makeContributeTransaction())
       mockWaitForTransactionReceipt.mockResolvedValue(makeReceipt({ logs: [] }))
       const { result } = renderHook(() => useTransactionMonitoring())
 
@@ -200,7 +200,7 @@ describe('useTransactionMonitoring', () => {
       })
 
       expect(storedStatus()).toBe('failed')
-      expect(pendingTransactionsStore.confirmedUnindexed).toHaveLength(0)
+      expect(selectConfirmedUnindexed(pendingTransactionsStore.getState())).toHaveLength(0)
     })
   })
 
@@ -214,7 +214,7 @@ describe('useTransactionMonitoring', () => {
       })
 
       expect(storedStatus()).toBe('submitted')
-      expect(pendingTransactionsStore.hasPending).toBe(true)
+      expect(selectHasPending(pendingTransactionsStore.getState())).toBe(true)
     })
 
     it('leaves a transaction submitted when the RPC call fails', async () => {
@@ -245,7 +245,7 @@ describe('useTransactionMonitoring', () => {
   })
 
   it('does not fail when the hash is not one it stored', async () => {
-    await pendingTransactionsStore.reset()
+    await pendingTransactionsStore.getState().reset()
     const { result } = renderHook(() => useTransactionMonitoring())
 
     let outcome: Awaited<ReturnType<typeof result.current.waitForTransaction>> | undefined
@@ -254,6 +254,6 @@ describe('useTransactionMonitoring', () => {
     })
 
     expect(outcome).toEqual({ poolId: 7, poolAddress: POOL_ADDRESS, txHash: TX_HASH })
-    expect(pendingTransactionsStore.transactions).toHaveLength(0)
+    expect(pendingTransactionsStore.getState().transactions).toHaveLength(0)
   })
 })

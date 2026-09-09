@@ -296,7 +296,7 @@ function DashboardScreen() {
             ? () => {
                 const { txHash } = detail
                 setDetail(null)
-                pendingTransactionsStore.removePendingTransaction(txHash)
+                pendingTransactionsStore.getState().removePendingTransaction(txHash)
               }
             : undefined
         }

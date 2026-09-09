@@ -1,6 +1,8 @@
 import AsyncStorage from '@react-native-async-storage/async-storage'
-import { makeAutoObservable, runInAction } from 'mobx'
 import { parseEventLogs, type TransactionReceipt } from 'viem'
+import { useStore } from 'zustand'
+import { subscribeWithSelector } from 'zustand/middleware'
+import { createStore, type Mutate, type StoreApi } from 'zustand/vanilla'
 import { LendingPoolABI, PoolFactoryABI } from '../constants/abis'
 import type { Denomination } from '../utils/denomination'
 import { logger } from '../utils/logger'
@@ -785,81 +787,23 @@ export function extractResult(
  * swallowed, since losing the local record must not fail a transaction that is
  * already on chain.
  */
-export class PendingTransactionsStore {
-  transactions: PendingTransaction[] = []
+export interface PendingTransactionsState {
+  transactions: PendingTransaction[]
   /** True while restoring from AsyncStorage at startup. */
-  isLoading = false
+  isLoading: boolean
+}
 
-  constructor() {
-    makeAutoObservable(this)
-  }
-
-  get pendingCount(): number {
-    return this.transactions.filter((transaction) => transaction.status === 'submitted').length
-  }
-
-  get hasPending(): boolean {
-    return this.pendingCount > 0
-  }
-
-  /** Confirmed on chain but not yet known to the backend — the retry set for indexing. */
-  get confirmedUnindexed(): PendingTransaction[] {
-    return this.transactions.filter((transaction) => transaction.status === 'confirmed')
-  }
-
+export interface PendingTransactionsActions {
   /** Restores persisted transactions. Call once at startup. */
-  loadFromStorage = async (): Promise<void> => {
-    runInAction(() => {
-      this.isLoading = true
-    })
-
-    const restored = await this.readStorage()
-
-    runInAction(() => {
-      this.transactions = restored
-      this.isLoading = false
-    })
-  }
-
+  loadFromStorage: () => Promise<void>
   /** Adds a transaction, replacing any existing entry with the same hash. */
-  addPendingTransaction = async (transaction: PendingTransaction): Promise<void> => {
-    runInAction(() => {
-      const others = this.transactions.filter((existing) => existing.txHash !== transaction.txHash)
-      this.transactions = [...others, transaction].slice(-MAX_STORED_TRANSACTIONS)
-    })
-
-    await this.persist()
-  }
-
-  updateTransactionStatus = async (
+  addPendingTransaction: (transaction: PendingTransaction) => Promise<void>
+  updateTransactionStatus: (
     txHash: `0x${string}`,
     status: PendingTransactionStatus,
     result?: CreatePoolResult | ContributeResult | WithdrawResult | LoanResult | MembershipResult
-  ): Promise<void> => {
-    const transaction = this.transactions.find((existing) => existing.txHash === txHash)
-    if (!transaction) return
-
-    runInAction(() => {
-      transaction.status = status
-      // The result shape follows the transaction's own type; the caller is the
-      // monitor, which extracted it from that type's event in the first place.
-      if (result) transaction.result = result as typeof transaction.result
-    })
-
-    await this.persist()
-  }
-
-  removePendingTransaction = async (txHash: `0x${string}`): Promise<void> => {
-    const remaining = this.transactions.filter((existing) => existing.txHash !== txHash)
-    if (remaining.length === this.transactions.length) return
-
-    runInAction(() => {
-      this.transactions = remaining
-    })
-
-    await this.persist()
-  }
-
+  ) => Promise<void>
+  removePendingTransaction: (txHash: `0x${string}`) => Promise<void>
   /**
    * Resolves every still-submitted transaction against the chain. Call at startup
    * after `loadFromStorage()`, once a client is available.
@@ -867,75 +811,165 @@ export class PendingTransactionsStore {
    * Only transactions belonging to the client's chain are checked, so a stored
    * transaction from another network is not read against the wrong node.
    */
-  checkPendingTransactions = async (client: TransactionReceiptReader): Promise<void> => {
-    const chainId = client.chain?.id
-    const submitted = this.transactions.filter(
-      (transaction) => transaction.status === 'submitted' && (chainId === undefined || transaction.chainId === chainId)
-    )
-
-    for (const transaction of submitted) {
-      const receipt = await this.fetchReceipt(client, transaction.txHash)
-      if (!receipt) continue
-
-      if (receipt.status === 'success') {
-        await this.updateTransactionStatus(transaction.txHash, 'confirmed', extractResult(transaction.type, receipt))
-      } else {
-        await this.updateTransactionStatus(transaction.txHash, 'failed')
-      }
-    }
-  }
-
+  checkPendingTransactions: (client: TransactionReceiptReader) => Promise<void>
   /** Clears all state and the persisted copy. */
-  reset = async (): Promise<void> => {
-    runInAction(() => {
-      this.transactions = []
-    })
+  reset: () => Promise<void>
+}
 
-    await this.persist()
-  }
+export type PendingTransactionsStoreState = PendingTransactionsState & PendingTransactionsActions
 
-  /**
-   * Viem throws `TransactionReceiptNotFoundError` for a transaction the node has
-   * not mined yet — it does not return null. That, and a transport error, both
-   * mean "no verdict yet", so the transaction is left submitted rather than being
-   * marked failed on what is usually just a slow block or a dropped connection.
-   */
-  private fetchReceipt = async (client: TransactionReceiptReader, hash: `0x${string}`): Promise<TransactionReceipt | null> => {
-    try {
-      return await client.getTransactionReceipt({ hash })
-    } catch {
-      return null
-    }
-  }
+export const selectPendingCount = (state: PendingTransactionsState): number =>
+  state.transactions.filter((transaction) => transaction.status === 'submitted').length
 
-  private persist = async (): Promise<void> => {
-    try {
-      await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(this.transactions))
-    } catch (error) {
-      logger.warn('Failed to persist pending transactions:', error)
-    }
-  }
+export const selectHasPending = (state: PendingTransactionsState): boolean => selectPendingCount(state) > 0
 
-  private readStorage = async (): Promise<PendingTransaction[]> => {
-    try {
-      const stored = await AsyncStorage.getItem(STORAGE_KEY)
-      if (!stored) return []
+/**
+ * Confirmed on chain but not yet known to the backend — the retry set for indexing.
+ *
+ * Returns a fresh array, so it is not something to subscribe with directly:
+ * every store change would look like a change. Subscribe to `transactions` and
+ * derive, or select something stable off the result such as the joined hashes.
+ */
+export const selectConfirmedUnindexed = (state: PendingTransactionsState): PendingTransaction[] =>
+  state.transactions.filter((transaction) => transaction.status === 'confirmed')
 
-      const parsed = JSON.parse(stored) as JsonValue
-      if (!Array.isArray(parsed)) return []
-
-      const restored: PendingTransaction[] = []
-      for (const entry of parsed) {
-        const transaction = toPendingTransaction(entry)
-        if (transaction) restored.push(transaction)
-      }
-
-      return restored.slice(-MAX_STORED_TRANSACTIONS)
-    } catch (error) {
-      logger.warn('Failed to restore pending transactions:', error)
-      return []
-    }
+/**
+ * Viem throws `TransactionReceiptNotFoundError` for a transaction the node has
+ * not mined yet — it does not return null. That, and a transport error, both
+ * mean "no verdict yet", so the transaction is left submitted rather than being
+ * marked failed on what is usually just a slow block or a dropped connection.
+ */
+const fetchReceipt = async (client: TransactionReceiptReader, hash: `0x${string}`): Promise<TransactionReceipt | null> => {
+  try {
+    return await client.getTransactionReceipt({ hash })
+  } catch {
+    return null
   }
 }
 
-export const pendingTransactionsStore = new PendingTransactionsStore()
+const persist = async (transactions: PendingTransaction[]): Promise<void> => {
+  try {
+    await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(transactions))
+  } catch (error) {
+    logger.warn('Failed to persist pending transactions:', error)
+  }
+}
+
+const readStorage = async (): Promise<PendingTransaction[]> => {
+  try {
+    const stored = await AsyncStorage.getItem(STORAGE_KEY)
+    if (!stored) return []
+
+    const parsed = JSON.parse(stored) as JsonValue
+    if (!Array.isArray(parsed)) return []
+
+    const restored: PendingTransaction[] = []
+    for (const entry of parsed) {
+      const transaction = toPendingTransaction(entry)
+      if (transaction) restored.push(transaction)
+    }
+
+    return restored.slice(-MAX_STORED_TRANSACTIONS)
+  } catch (error) {
+    logger.warn('Failed to restore pending transactions:', error)
+    return []
+  }
+}
+
+export type PendingTransactionsStoreApi = Mutate<StoreApi<PendingTransactionsStoreState>, [['zustand/subscribeWithSelector', never]]>
+
+/** A fresh, independent store. The tests want isolation per case. */
+export const createPendingTransactionsStore = (): PendingTransactionsStoreApi =>
+  createStore<PendingTransactionsStoreState>()(
+    subscribeWithSelector((set, get) => ({
+      transactions: [],
+      isLoading: false,
+
+      loadFromStorage: async () => {
+        set({ isLoading: true })
+
+        const restored = await readStorage()
+
+        set({ transactions: restored, isLoading: false })
+      },
+
+      addPendingTransaction: async (transaction) => {
+        const others = get().transactions.filter((existing) => existing.txHash !== transaction.txHash)
+        const transactions = [...others, transaction].slice(-MAX_STORED_TRANSACTIONS)
+
+        set({ transactions })
+
+        await persist(transactions)
+      },
+
+      updateTransactionStatus: async (txHash, status, result) => {
+        const current = get().transactions
+        if (!current.some((existing) => existing.txHash === txHash)) return
+
+        /*
+          A new transaction object and a new array, where MobX was content to
+          have the found entry mutated in place. Zustand compares references:
+          mutating the entry would leave both it and the array identical, so
+          nothing subscribed would hear about a confirmation.
+        */
+        const transactions = current.map((existing) =>
+          existing.txHash === txHash
+            ? /*
+                The result shape follows the transaction's own type; the caller is
+                the monitor, which extracted it from that type's event in the first
+                place. Spreading a discriminated union decouples `type` from
+                `result` as far as the compiler is concerned, so the assertion
+                restates what the caller already guarantees — the same one the
+                mutating version made per field.
+              */
+              ({ ...existing, status, ...(result ? { result } : {}) } as PendingTransaction)
+            : existing
+        )
+
+        set({ transactions })
+
+        await persist(transactions)
+      },
+
+      removePendingTransaction: async (txHash) => {
+        const current = get().transactions
+        const remaining = current.filter((existing) => existing.txHash !== txHash)
+        if (remaining.length === current.length) return
+
+        set({ transactions: remaining })
+
+        await persist(remaining)
+      },
+
+      checkPendingTransactions: async (client) => {
+        const chainId = client.chain?.id
+        const submitted = get().transactions.filter(
+          (transaction) => transaction.status === 'submitted' && (chainId === undefined || transaction.chainId === chainId)
+        )
+
+        for (const transaction of submitted) {
+          const receipt = await fetchReceipt(client, transaction.txHash)
+          if (!receipt) continue
+
+          if (receipt.status === 'success') {
+            await get().updateTransactionStatus(transaction.txHash, 'confirmed', extractResult(transaction.type, receipt))
+          } else {
+            await get().updateTransactionStatus(transaction.txHash, 'failed')
+          }
+        }
+      },
+
+      reset: async () => {
+        set({ transactions: [] })
+
+        await persist([])
+      },
+    }))
+  )
+
+export const pendingTransactionsStore = createPendingTransactionsStore()
+
+/** Subscribe a component to exactly what `selector` returns. */
+export function usePendingTransactionsStore<T>(selector: (state: PendingTransactionsStoreState) => T): T {
+  return useStore(pendingTransactionsStore, selector)
+}

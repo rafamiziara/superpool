@@ -9,7 +9,7 @@ import {
   TX_HASH,
 } from '../../__tests__/fixtures/pendingTransaction'
 import { mockFirebaseCallable, mockWagmiUseAccount } from '../../__tests__/mocks'
-import { type CreatePoolTransaction, pendingTransactionsStore } from '../../stores/PendingTransactionsStore'
+import { type CreatePoolTransaction, pendingTransactionsStore, selectConfirmedUnindexed } from '../../stores/PendingTransactionsStore'
 import { poolStore } from '../../stores/PoolStore'
 import { usePoolIndexing } from './usePoolIndexing'
 
@@ -44,7 +44,7 @@ describe('usePoolIndexing', () => {
 
   beforeEach(async () => {
     jest.clearAllMocks()
-    await pendingTransactionsStore.reset()
+    await pendingTransactionsStore.getState().reset()
 
     logSpy = jest.spyOn(console, 'log').mockImplementation(() => undefined)
     warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => undefined)
@@ -74,7 +74,7 @@ describe('usePoolIndexing', () => {
 
   describe('triggerIndexing', () => {
     beforeEach(async () => {
-      await pendingTransactionsStore.addPendingTransaction(makeConfirmed())
+      await pendingTransactionsStore.getState().addPendingTransaction(makeConfirmed())
     })
 
     it('asks the backend to index the transaction on the connected chain', async () => {
@@ -118,7 +118,7 @@ describe('usePoolIndexing', () => {
       })
 
       expect(refreshPools).toHaveBeenCalled()
-      expect(pendingTransactionsStore.transactions).toHaveLength(0)
+      expect(pendingTransactionsStore.getState().transactions).toHaveLength(0)
     })
 
     it('swallows a backend failure and keeps the transaction for the scheduled sync', async () => {
@@ -130,8 +130,8 @@ describe('usePoolIndexing', () => {
       })
 
       expect(warnSpy).toHaveBeenCalled()
-      expect(pendingTransactionsStore.transactions).toHaveLength(1)
-      expect(pendingTransactionsStore.confirmedUnindexed).toHaveLength(1)
+      expect(pendingTransactionsStore.getState().transactions).toHaveLength(1)
+      expect(selectConfirmedUnindexed(pendingTransactionsStore.getState())).toHaveLength(1)
       expect(result.current.isIndexing).toBe(false)
     })
 
@@ -143,7 +143,7 @@ describe('usePoolIndexing', () => {
         await expect(result.current.triggerIndexing(TX_HASH, 'CREATE_POOL')).resolves.toBeUndefined()
       })
 
-      expect(pendingTransactionsStore.transactions).toHaveLength(1)
+      expect(pendingTransactionsStore.getState().transactions).toHaveLength(1)
     })
 
     it('treats an already-indexed pool as success', async () => {
@@ -154,15 +154,15 @@ describe('usePoolIndexing', () => {
         await result.current.triggerIndexing(TX_HASH, 'CREATE_POOL')
       })
 
-      expect(pendingTransactionsStore.transactions).toHaveLength(0)
+      expect(pendingTransactionsStore.getState().transactions).toHaveLength(0)
     })
   })
 
   describe('routing by transaction type', () => {
     it('sends a contribution to indexContribution, not indexPool', async () => {
-      await pendingTransactionsStore.addPendingTransaction(
-        makeContributeTransaction({ status: 'confirmed', result: { amount: '5000000000000000000' } })
-      )
+      await pendingTransactionsStore
+        .getState()
+        .addPendingTransaction(makeContributeTransaction({ status: 'confirmed', result: { amount: '5000000000000000000' } }))
       const { result } = renderHook(() => usePoolIndexing())
 
       await act(async () => {
@@ -171,16 +171,16 @@ describe('usePoolIndexing', () => {
 
       expect(mockFirebaseCallable).toHaveBeenCalledWith(expect.anything(), 'indexContribution')
       expect(mockFirebaseCallable).not.toHaveBeenCalledWith(expect.anything(), 'indexPool')
-      expect(pendingTransactionsStore.transactions).toHaveLength(0)
+      expect(pendingTransactionsStore.getState().transactions).toHaveLength(0)
     })
 
     it('routes a mixed drain to both callables', async () => {
       // Startup recovery can confirm a creation and a deposit in the same pass;
       // the type on each record is what decides where it goes.
-      await pendingTransactionsStore.addPendingTransaction(makeConfirmed())
-      await pendingTransactionsStore.addPendingTransaction(
-        makeContributeTransaction({ txHash: OTHER_TX_HASH, status: 'confirmed', result: { amount: '1' } })
-      )
+      await pendingTransactionsStore.getState().addPendingTransaction(makeConfirmed())
+      await pendingTransactionsStore
+        .getState()
+        .addPendingTransaction(makeContributeTransaction({ txHash: OTHER_TX_HASH, status: 'confirmed', result: { amount: '1' } }))
       const { result } = renderHook(() => usePoolIndexing())
 
       await act(async () => {
@@ -196,9 +196,9 @@ describe('usePoolIndexing', () => {
       async (type) => {
         // The callable re-reads the loan through `getLoan` and stores the state
         // afterwards, so all six actions resolve to the same record.
-        await pendingTransactionsStore.addPendingTransaction(
-          makeLoanTransaction({ type, status: 'confirmed', result: { loanId: 1, amount: '1' } })
-        )
+        await pendingTransactionsStore
+          .getState()
+          .addPendingTransaction(makeLoanTransaction({ type, status: 'confirmed', result: { loanId: 1, amount: '1' } }))
         const { result } = renderHook(() => usePoolIndexing())
 
         await act(async () => {
@@ -206,15 +206,15 @@ describe('usePoolIndexing', () => {
         })
 
         expect(mockFirebaseCallable).toHaveBeenCalledWith(expect.anything(), 'indexLoan')
-        expect(pendingTransactionsStore.transactions).toHaveLength(0)
+        expect(pendingTransactionsStore.getState().transactions).toHaveLength(0)
       }
     )
   })
 
   describe('indexConfirmed', () => {
     it('indexes every confirmed transaction, including ones recovered at startup', async () => {
-      await pendingTransactionsStore.addPendingTransaction(makeConfirmed())
-      await pendingTransactionsStore.addPendingTransaction(makeConfirmed({ txHash: OTHER_TX_HASH, chainId: 80002 }))
+      await pendingTransactionsStore.getState().addPendingTransaction(makeConfirmed())
+      await pendingTransactionsStore.getState().addPendingTransaction(makeConfirmed({ txHash: OTHER_TX_HASH, chainId: 80002 }))
       const { result } = renderHook(() => usePoolIndexing())
 
       await act(async () => {
@@ -225,11 +225,11 @@ describe('usePoolIndexing', () => {
       expect(indexPoolCallable).toHaveBeenCalledWith({ txHash: TX_HASH, chainId: LOCALHOST_CHAIN_ID })
       // Each transaction is indexed on the chain it was submitted to.
       expect(indexPoolCallable).toHaveBeenCalledWith({ txHash: OTHER_TX_HASH, chainId: 80002 })
-      expect(pendingTransactionsStore.transactions).toHaveLength(0)
+      expect(pendingTransactionsStore.getState().transactions).toHaveLength(0)
     })
 
     it('leaves still-submitted transactions alone', async () => {
-      await pendingTransactionsStore.addPendingTransaction(makeConfirmed({ status: 'submitted' }))
+      await pendingTransactionsStore.getState().addPendingTransaction(makeConfirmed({ status: 'submitted' }))
       const { result } = renderHook(() => usePoolIndexing())
 
       await act(async () => {
@@ -237,11 +237,11 @@ describe('usePoolIndexing', () => {
       })
 
       expect(indexPoolCallable).not.toHaveBeenCalled()
-      expect(pendingTransactionsStore.transactions).toHaveLength(1)
+      expect(pendingTransactionsStore.getState().transactions).toHaveLength(1)
     })
 
     it('ignores failed transactions', async () => {
-      await pendingTransactionsStore.addPendingTransaction(makeConfirmed({ status: 'failed' }))
+      await pendingTransactionsStore.getState().addPendingTransaction(makeConfirmed({ status: 'failed' }))
       const { result } = renderHook(() => usePoolIndexing())
 
       await act(async () => {
@@ -262,8 +262,8 @@ describe('usePoolIndexing', () => {
     })
 
     it('carries on after one transaction fails to index', async () => {
-      await pendingTransactionsStore.addPendingTransaction(makeConfirmed())
-      await pendingTransactionsStore.addPendingTransaction(makeConfirmed({ txHash: OTHER_TX_HASH }))
+      await pendingTransactionsStore.getState().addPendingTransaction(makeConfirmed())
+      await pendingTransactionsStore.getState().addPendingTransaction(makeConfirmed({ txHash: OTHER_TX_HASH }))
       indexPoolCallable.mockRejectedValueOnce(new Error('functions/unavailable'))
       const { result } = renderHook(() => usePoolIndexing())
 
@@ -272,7 +272,7 @@ describe('usePoolIndexing', () => {
       })
 
       expect(indexPoolCallable).toHaveBeenCalledTimes(2)
-      expect(pendingTransactionsStore.transactions.map((transaction) => transaction.txHash)).toEqual([TX_HASH])
+      expect(pendingTransactionsStore.getState().transactions.map((transaction) => transaction.txHash)).toEqual([TX_HASH])
     })
   })
 })

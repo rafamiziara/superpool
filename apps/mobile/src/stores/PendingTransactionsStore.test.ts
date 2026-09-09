@@ -11,6 +11,7 @@ import {
 } from '../__tests__/fixtures/pendingTransaction'
 import { LendingPoolABI, PoolFactoryABI } from '../constants/abis'
 import {
+  createPendingTransactionsStore,
   extractFundsDepositedResult,
   extractInterestClaimedResult,
   extractLoanResult,
@@ -21,7 +22,10 @@ import {
   isLoanTransactionType,
   isMembershipTransactionType,
   type PendingTransaction,
-  PendingTransactionsStore,
+  type PendingTransactionsStoreApi,
+  selectConfirmedUnindexed,
+  selectHasPending,
+  selectPendingCount,
   type TransactionReceiptReader,
 } from './PendingTransactionsStore'
 
@@ -164,14 +168,14 @@ async function readStoredHashes(): Promise<string[]> {
 // ---------------------------------------------------------------------------
 
 describe('PendingTransactionsStore', () => {
-  let store: PendingTransactionsStore
+  let store: PendingTransactionsStoreApi
   let warnSpy: jest.SpyInstance
 
   beforeEach(async () => {
     await AsyncStorage.clear()
     jest.clearAllMocks()
     warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => undefined)
-    store = new PendingTransactionsStore()
+    store = createPendingTransactionsStore()
   })
 
   afterEach(() => {
@@ -179,96 +183,96 @@ describe('PendingTransactionsStore', () => {
   })
 
   it('starts empty', () => {
-    expect(store.transactions).toHaveLength(0)
-    expect(store.isLoading).toBe(false)
-    expect(store.hasPending).toBe(false)
-    expect(store.pendingCount).toBe(0)
-    expect(store.confirmedUnindexed).toHaveLength(0)
+    expect(store.getState().transactions).toHaveLength(0)
+    expect(store.getState().isLoading).toBe(false)
+    expect(selectHasPending(store.getState())).toBe(false)
+    expect(selectPendingCount(store.getState())).toBe(0)
+    expect(selectConfirmedUnindexed(store.getState())).toHaveLength(0)
   })
 
   describe('addPendingTransaction', () => {
     it('adds and persists', async () => {
-      await store.addPendingTransaction(makePendingTransaction())
+      await store.getState().addPendingTransaction(makePendingTransaction())
 
-      expect(store.transactions).toHaveLength(1)
+      expect(store.getState().transactions).toHaveLength(1)
       expect(await readStoredHashes()).toEqual([TX_HASH])
     })
 
     it('replaces an entry with the same hash rather than duplicating it', async () => {
-      await store.addPendingTransaction(makePendingTransaction())
-      await store.addPendingTransaction(makePendingTransaction({ status: 'confirmed' }))
+      await store.getState().addPendingTransaction(makePendingTransaction())
+      await store.getState().addPendingTransaction(makePendingTransaction({ status: 'confirmed' }))
 
-      expect(store.transactions).toHaveLength(1)
-      expect(store.transactions[0].status).toBe('confirmed')
+      expect(store.getState().transactions).toHaveLength(1)
+      expect(store.getState().transactions[0].status).toBe('confirmed')
     })
 
     it('keeps the newest 50 transactions', async () => {
       for (let index = 0; index < 55; index += 1) {
-        await store.addPendingTransaction(makePendingTransaction({ txHash: `0x${String(index).padStart(64, '0')}` }))
+        await store.getState().addPendingTransaction(makePendingTransaction({ txHash: `0x${String(index).padStart(64, '0')}` }))
       }
 
-      expect(store.transactions).toHaveLength(50)
-      expect(store.transactions[0].txHash).toBe(`0x${'5'.padStart(64, '0')}`)
+      expect(store.getState().transactions).toHaveLength(50)
+      expect(store.getState().transactions[0].txHash).toBe(`0x${'5'.padStart(64, '0')}`)
       expect(await readStoredHashes()).toHaveLength(50)
     })
 
     it('keeps the transaction when persistence fails', async () => {
       jest.mocked(AsyncStorage.setItem).mockRejectedValueOnce(new Error('quota exceeded'))
 
-      await expect(store.addPendingTransaction(makePendingTransaction())).resolves.toBeUndefined()
+      await expect(store.getState().addPendingTransaction(makePendingTransaction())).resolves.toBeUndefined()
 
-      expect(store.transactions).toHaveLength(1)
+      expect(store.getState().transactions).toHaveLength(1)
       expect(warnSpy).toHaveBeenCalled()
     })
   })
 
   describe('updateTransactionStatus', () => {
     beforeEach(async () => {
-      await store.addPendingTransaction(makePendingTransaction())
+      await store.getState().addPendingTransaction(makePendingTransaction())
     })
 
     it('updates status and result, and persists both', async () => {
-      await store.updateTransactionStatus(TX_HASH, 'confirmed', { poolId: 7, poolAddress: POOL_ADDRESS })
+      await store.getState().updateTransactionStatus(TX_HASH, 'confirmed', { poolId: 7, poolAddress: POOL_ADDRESS })
 
-      expect(store.transactions[0].status).toBe('confirmed')
-      expect(store.transactions[0].result).toEqual({ poolId: 7, poolAddress: POOL_ADDRESS })
+      expect(store.getState().transactions[0].status).toBe('confirmed')
+      expect(store.getState().transactions[0].result).toEqual({ poolId: 7, poolAddress: POOL_ADDRESS })
 
       const persisted = JSON.parse((await AsyncStorage.getItem(STORAGE_KEY)) ?? '[]') as PendingTransaction[]
       expect(persisted[0].result).toEqual({ poolId: 7, poolAddress: POOL_ADDRESS })
     })
 
     it('leaves an existing result in place when none is supplied', async () => {
-      await store.updateTransactionStatus(TX_HASH, 'confirmed', { poolId: 7, poolAddress: POOL_ADDRESS })
-      await store.updateTransactionStatus(TX_HASH, 'failed')
+      await store.getState().updateTransactionStatus(TX_HASH, 'confirmed', { poolId: 7, poolAddress: POOL_ADDRESS })
+      await store.getState().updateTransactionStatus(TX_HASH, 'failed')
 
-      expect(store.transactions[0].status).toBe('failed')
-      expect(store.transactions[0].result).toEqual({ poolId: 7, poolAddress: POOL_ADDRESS })
+      expect(store.getState().transactions[0].status).toBe('failed')
+      expect(store.getState().transactions[0].result).toEqual({ poolId: 7, poolAddress: POOL_ADDRESS })
     })
 
     it('ignores an unknown hash', async () => {
-      await store.updateTransactionStatus(OTHER_TX_HASH, 'confirmed')
+      await store.getState().updateTransactionStatus(OTHER_TX_HASH, 'confirmed')
 
-      expect(store.transactions[0].status).toBe('submitted')
+      expect(store.getState().transactions[0].status).toBe('submitted')
       expect(AsyncStorage.setItem).toHaveBeenCalledTimes(1) // only the add
     })
   })
 
   describe('removePendingTransaction', () => {
     it('removes and persists', async () => {
-      await store.addPendingTransaction(makePendingTransaction())
-      await store.removePendingTransaction(TX_HASH)
+      await store.getState().addPendingTransaction(makePendingTransaction())
+      await store.getState().removePendingTransaction(TX_HASH)
 
-      expect(store.transactions).toHaveLength(0)
+      expect(store.getState().transactions).toHaveLength(0)
       expect(await readStoredHashes()).toEqual([])
     })
 
     it('does not write when the hash is unknown', async () => {
-      await store.addPendingTransaction(makePendingTransaction())
+      await store.getState().addPendingTransaction(makePendingTransaction())
       jest.mocked(AsyncStorage.setItem).mockClear()
 
-      await store.removePendingTransaction(OTHER_TX_HASH)
+      await store.getState().removePendingTransaction(OTHER_TX_HASH)
 
-      expect(store.transactions).toHaveLength(1)
+      expect(store.getState().transactions).toHaveLength(1)
       expect(AsyncStorage.setItem).not.toHaveBeenCalled()
     })
   })
@@ -277,29 +281,29 @@ describe('PendingTransactionsStore', () => {
     it('restores persisted transactions', async () => {
       await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify([makePendingTransaction()]))
 
-      await store.loadFromStorage()
+      await store.getState().loadFromStorage()
 
-      expect(store.transactions).toHaveLength(1)
-      expect(store.transactions[0].txHash).toBe(TX_HASH)
-      expect(store.isLoading).toBe(false)
+      expect(store.getState().transactions).toHaveLength(1)
+      expect(store.getState().transactions[0].txHash).toBe(TX_HASH)
+      expect(store.getState().isLoading).toBe(false)
     })
 
     it('restores an optional result', async () => {
       const confirmed = makePendingTransaction({ status: 'confirmed', result: { poolId: 7, poolAddress: POOL_ADDRESS } })
       await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify([confirmed]))
 
-      await store.loadFromStorage()
+      await store.getState().loadFromStorage()
 
-      expect(store.transactions[0].result).toEqual({ poolId: 7, poolAddress: POOL_ADDRESS })
+      expect(store.getState().transactions[0].result).toEqual({ poolId: 7, poolAddress: POOL_ADDRESS })
     })
 
     it('restores the denomination the record was written with', async () => {
       const usdc = makePendingTransaction({ denomination: { symbol: 'USDC', decimals: 6, address: USDC_ADDRESS } })
       await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify([usdc]))
 
-      await store.loadFromStorage()
+      await store.getState().loadFromStorage()
 
-      expect(store.transactions[0].denomination).toEqual({ symbol: 'USDC', decimals: 6, address: USDC_ADDRESS })
+      expect(store.getState().transactions[0].denomination).toEqual({ symbol: 'USDC', decimals: 6, address: USDC_ADDRESS })
     })
 
     it('leaves a record written before denominations existed without one', async () => {
@@ -308,9 +312,9 @@ describe('PendingTransactionsStore', () => {
       // as unknown.
       await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify([makePendingTransaction()]))
 
-      await store.loadFromStorage()
+      await store.getState().loadFromStorage()
 
-      expect(store.transactions[0].denomination).toBeUndefined()
+      expect(store.getState().transactions[0].denomination).toBeUndefined()
     })
 
     it('drops a malformed denomination rather than restoring half of it', async () => {
@@ -319,42 +323,42 @@ describe('PendingTransactionsStore', () => {
       const broken = makePendingTransaction({ denomination: { symbol: 'USDC' } as never })
       await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify([broken]))
 
-      await store.loadFromStorage()
+      await store.getState().loadFromStorage()
 
-      expect(store.transactions[0].denomination).toBeUndefined()
+      expect(store.getState().transactions[0].denomination).toBeUndefined()
     })
 
     it('starts empty when nothing is stored', async () => {
-      await store.loadFromStorage()
+      await store.getState().loadFromStorage()
 
-      expect(store.transactions).toHaveLength(0)
+      expect(store.getState().transactions).toHaveLength(0)
     })
 
     it('recovers from malformed JSON instead of throwing at startup', async () => {
       await AsyncStorage.setItem(STORAGE_KEY, '{ not json')
 
-      await expect(store.loadFromStorage()).resolves.toBeUndefined()
+      await expect(store.getState().loadFromStorage()).resolves.toBeUndefined()
 
-      expect(store.transactions).toHaveLength(0)
-      expect(store.isLoading).toBe(false)
+      expect(store.getState().transactions).toHaveLength(0)
+      expect(store.getState().isLoading).toBe(false)
       expect(warnSpy).toHaveBeenCalled()
     })
 
     it('recovers from a read failure', async () => {
       jest.mocked(AsyncStorage.getItem).mockRejectedValueOnce(new Error('storage unavailable'))
 
-      await store.loadFromStorage()
+      await store.getState().loadFromStorage()
 
-      expect(store.transactions).toHaveLength(0)
-      expect(store.isLoading).toBe(false)
+      expect(store.getState().transactions).toHaveLength(0)
+      expect(store.getState().isLoading).toBe(false)
     })
 
     it('ignores a payload that is not an array', async () => {
       await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify({ txHash: TX_HASH }))
 
-      await store.loadFromStorage()
+      await store.getState().loadFromStorage()
 
-      expect(store.transactions).toHaveLength(0)
+      expect(store.getState().transactions).toHaveLength(0)
     })
 
     it.each([
@@ -371,38 +375,38 @@ describe('PendingTransactionsStore', () => {
     ])('drops an entry left by an older build: %s', async (_label, entry) => {
       await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify([entry, makePendingTransaction({ txHash: OTHER_TX_HASH })]))
 
-      await store.loadFromStorage()
+      await store.getState().loadFromStorage()
 
-      expect(store.transactions.map((transaction) => transaction.txHash)).toEqual([OTHER_TX_HASH])
+      expect(store.getState().transactions.map((transaction) => transaction.txHash)).toEqual([OTHER_TX_HASH])
     })
 
     it('drops an unusable result but keeps the transaction', async () => {
       const entry = { ...makePendingTransaction(), status: 'confirmed', result: { poolId: '7', poolAddress: POOL_ADDRESS } }
       await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify([entry]))
 
-      await store.loadFromStorage()
+      await store.getState().loadFromStorage()
 
-      expect(store.transactions).toHaveLength(1)
-      expect(store.transactions[0].result).toBeUndefined()
+      expect(store.getState().transactions).toHaveLength(1)
+      expect(store.getState().transactions[0].result).toBeUndefined()
     })
 
     it('restores a contribution record', async () => {
       await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify([makeContributeTransaction()]))
 
-      await store.loadFromStorage()
+      await store.getState().loadFromStorage()
 
-      expect(store.transactions).toHaveLength(1)
-      expect(store.transactions[0].type).toBe('CONTRIBUTE')
-      expect(store.transactions[0].params).toEqual(makeContributeTransaction().params)
+      expect(store.getState().transactions).toHaveLength(1)
+      expect(store.getState().transactions[0].type).toBe('CONTRIBUTE')
+      expect(store.getState().transactions[0].params).toEqual(makeContributeTransaction().params)
     })
 
     it('restores a contribution result', async () => {
       const confirmed = makeContributeTransaction({ status: 'confirmed', result: { amount: '5000000000000000000' } })
       await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify([confirmed]))
 
-      await store.loadFromStorage()
+      await store.getState().loadFromStorage()
 
-      expect(store.transactions[0].result).toEqual({ amount: '5000000000000000000' })
+      expect(store.getState().transactions[0].result).toEqual({ amount: '5000000000000000000' })
     })
 
     it('restores a claim record, which carries no amount', async () => {
@@ -411,11 +415,11 @@ describe('PendingTransactionsStore', () => {
       const claim = { ...makeContributeTransaction(), type: 'CLAIM_INTEREST', params: CLAIM_PARAMS }
       await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify([claim]))
 
-      await store.loadFromStorage()
+      await store.getState().loadFromStorage()
 
-      expect(store.transactions).toHaveLength(1)
-      expect(store.transactions[0].type).toBe('CLAIM_INTEREST')
-      expect(store.transactions[0].params).toEqual(CLAIM_PARAMS)
+      expect(store.getState().transactions).toHaveLength(1)
+      expect(store.getState().transactions[0].type).toBe('CLAIM_INTEREST')
+      expect(store.getState().transactions[0].params).toEqual(CLAIM_PARAMS)
     })
 
     it('restores a claim result', async () => {
@@ -427,9 +431,9 @@ describe('PendingTransactionsStore', () => {
       }
       await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify([claim]))
 
-      await store.loadFromStorage()
+      await store.getState().loadFromStorage()
 
-      expect(store.transactions[0].result).toEqual({ amount: '50000000000000000' })
+      expect(store.getState().transactions[0].result).toEqual({ amount: '50000000000000000' })
     })
 
     it.each([
@@ -440,9 +444,9 @@ describe('PendingTransactionsStore', () => {
       const claim = { ...makeContributeTransaction(), type: 'CLAIM_INTEREST', params }
       await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify([claim, makeContributeTransaction({ txHash: OTHER_TX_HASH })]))
 
-      await store.loadFromStorage()
+      await store.getState().loadFromStorage()
 
-      expect(store.transactions.map((transaction) => transaction.txHash)).toEqual([OTHER_TX_HASH])
+      expect(store.getState().transactions.map((transaction) => transaction.txHash)).toEqual([OTHER_TX_HASH])
     })
 
     it.each([
@@ -453,9 +457,9 @@ describe('PendingTransactionsStore', () => {
     ])('drops a malformed contribution entry: %s', async (_label, entry) => {
       await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify([entry, makeContributeTransaction({ txHash: OTHER_TX_HASH })]))
 
-      await store.loadFromStorage()
+      await store.getState().loadFromStorage()
 
-      expect(store.transactions.map((transaction) => transaction.txHash)).toEqual([OTHER_TX_HASH])
+      expect(store.getState().transactions.map((transaction) => transaction.txHash)).toEqual([OTHER_TX_HASH])
     })
 
     it('does not accept pool-creation params on a contribution record', async () => {
@@ -464,9 +468,9 @@ describe('PendingTransactionsStore', () => {
       const mismatched = { ...makeContributeTransaction(), params: makePendingTransaction().params }
       await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify([mismatched]))
 
-      await store.loadFromStorage()
+      await store.getState().loadFromStorage()
 
-      expect(store.transactions).toHaveLength(0)
+      expect(store.getState().transactions).toHaveLength(0)
     })
 
     it.each(['BORROW', 'REPAY', 'REQUEST_LOAN', 'APPROVE_LOAN', 'REJECT_LOAN', 'CANCEL_LOAN_REQUEST'] as const)(
@@ -477,10 +481,10 @@ describe('PendingTransactionsStore', () => {
         // recovery had nothing to resolve against the chain.
         await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify([makeLoanTransaction({ type })]))
 
-        await store.loadFromStorage()
+        await store.getState().loadFromStorage()
 
-        expect(store.transactions).toHaveLength(1)
-        expect(store.transactions[0].type).toBe(type)
+        expect(store.getState().transactions).toHaveLength(1)
+        expect(store.getState().transactions[0].type).toBe(type)
       }
     )
 
@@ -488,9 +492,9 @@ describe('PendingTransactionsStore', () => {
       const entry = makeLoanTransaction({ type: 'APPROVE_LOAN', params: { ...LOAN_PARAMS, loanId: 7, borrower: POOL_OWNER } })
       await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify([entry]))
 
-      await store.loadFromStorage()
+      await store.getState().loadFromStorage()
 
-      expect(store.transactions[0].params).toMatchObject({ loanId: 7, borrower: POOL_OWNER })
+      expect(store.getState().transactions[0].params).toMatchObject({ loanId: 7, borrower: POOL_OWNER })
     })
 
     it('restores a borrow with no loan id, which is a valid state', async () => {
@@ -498,19 +502,19 @@ describe('PendingTransactionsStore', () => {
       // arrives — a validator that demanded it would drop every live borrow.
       await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify([makeLoanTransaction({ type: 'BORROW' })]))
 
-      await store.loadFromStorage()
+      await store.getState().loadFromStorage()
 
-      expect(store.transactions).toHaveLength(1)
-      expect(store.transactions[0].params).not.toHaveProperty('loanId')
+      expect(store.getState().transactions).toHaveLength(1)
+      expect(store.getState().transactions[0].params).not.toHaveProperty('loanId')
     })
 
     it('restores a loan result', async () => {
       const confirmed = makeLoanTransaction({ status: 'confirmed', result: { loanId: 3, amount: '5000000000000000000' } })
       await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify([confirmed]))
 
-      await store.loadFromStorage()
+      await store.getState().loadFromStorage()
 
-      expect(store.transactions[0].result).toEqual({ loanId: 3, amount: '5000000000000000000' })
+      expect(store.getState().transactions[0].result).toEqual({ loanId: 3, amount: '5000000000000000000' })
     })
 
     it.each([
@@ -521,9 +525,9 @@ describe('PendingTransactionsStore', () => {
       const entry = { ...makeLoanTransaction(), params }
       await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify([entry, makeContributeTransaction({ txHash: OTHER_TX_HASH })]))
 
-      await store.loadFromStorage()
+      await store.getState().loadFromStorage()
 
-      expect(store.transactions.map((transaction) => transaction.txHash)).toEqual([OTHER_TX_HASH])
+      expect(store.getState().transactions.map((transaction) => transaction.txHash)).toEqual([OTHER_TX_HASH])
     })
 
     it('does not accept contribution params on a loan record', async () => {
@@ -532,9 +536,9 @@ describe('PendingTransactionsStore', () => {
       const mismatched = { ...makeLoanTransaction({ status: 'confirmed' }), result: { amount: '1' } }
       await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify([mismatched]))
 
-      await store.loadFromStorage()
+      await store.getState().loadFromStorage()
 
-      expect(store.transactions[0].result).toBeUndefined()
+      expect(store.getState().transactions[0].result).toBeUndefined()
     })
 
     it('caps a stored list that grew beyond the limit', async () => {
@@ -543,82 +547,82 @@ describe('PendingTransactionsStore', () => {
       )
       await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(stored))
 
-      await store.loadFromStorage()
+      await store.getState().loadFromStorage()
 
-      expect(store.transactions).toHaveLength(50)
-      expect(store.transactions[0].txHash).toBe(`0x${'10'.padStart(64, '0')}`)
+      expect(store.getState().transactions).toHaveLength(50)
+      expect(store.getState().transactions[0].txHash).toBe(`0x${'10'.padStart(64, '0')}`)
     })
   })
 
   describe('checkPendingTransactions', () => {
     beforeEach(async () => {
-      await store.addPendingTransaction(makePendingTransaction())
+      await store.getState().addPendingTransaction(makePendingTransaction())
     })
 
     it('confirms a successful transaction and decodes its pool identifiers', async () => {
-      await store.checkPendingTransactions(makeClient({ [TX_HASH]: makeReceipt() }, 31337))
+      await store.getState().checkPendingTransactions(makeClient({ [TX_HASH]: makeReceipt() }, 31337))
 
-      expect(store.transactions[0].status).toBe('confirmed')
-      expect(store.transactions[0].result).toEqual({ poolId: 7, poolAddress: POOL_ADDRESS })
-      expect(store.confirmedUnindexed).toHaveLength(1)
-      expect(store.hasPending).toBe(false)
+      expect(store.getState().transactions[0].status).toBe('confirmed')
+      expect(store.getState().transactions[0].result).toEqual({ poolId: 7, poolAddress: POOL_ADDRESS })
+      expect(selectConfirmedUnindexed(store.getState())).toHaveLength(1)
+      expect(selectHasPending(store.getState())).toBe(false)
     })
 
     it('confirms a contribution by decoding its FundsDeposited log, not PoolCreated', async () => {
       // Recovery has only the stored `type` to tell the two apart, so the wrong
       // extractor here would mark every recovered deposit failed.
-      await store.reset()
-      await store.addPendingTransaction(makeContributeTransaction())
+      await store.getState().reset()
+      await store.getState().addPendingTransaction(makeContributeTransaction())
       const receipt = makeReceipt({ logs: [makeFundsDepositedLog(POOL_OWNER, 5_000_000_000_000_000_000n)] })
 
-      await store.checkPendingTransactions(makeClient({ [TX_HASH]: receipt }, 31337))
+      await store.getState().checkPendingTransactions(makeClient({ [TX_HASH]: receipt }, 31337))
 
-      expect(store.transactions[0].status).toBe('confirmed')
-      expect(store.transactions[0].result).toEqual({ amount: '5000000000000000000' })
+      expect(store.getState().transactions[0].status).toBe('confirmed')
+      expect(store.getState().transactions[0].result).toEqual({ amount: '5000000000000000000' })
     })
 
     it('marks a reverted transaction failed', async () => {
-      await store.checkPendingTransactions(makeClient({ [TX_HASH]: makeReceipt({ status: 'reverted', logs: [] }) }, 31337))
+      await store.getState().checkPendingTransactions(makeClient({ [TX_HASH]: makeReceipt({ status: 'reverted', logs: [] }) }, 31337))
 
-      expect(store.transactions[0].status).toBe('failed')
-      expect(store.transactions[0].result).toBeUndefined()
-      expect(store.confirmedUnindexed).toHaveLength(0)
+      expect(store.getState().transactions[0].status).toBe('failed')
+      expect(store.getState().transactions[0].result).toBeUndefined()
+      expect(selectConfirmedUnindexed(store.getState())).toHaveLength(0)
     })
 
     it('leaves an unmined transaction submitted when Viem throws receipt-not-found', async () => {
-      await store.checkPendingTransactions(makeClient({}, 31337))
+      await store.getState().checkPendingTransactions(makeClient({}, 31337))
 
-      expect(store.transactions[0].status).toBe('submitted')
-      expect(store.hasPending).toBe(true)
+      expect(store.getState().transactions[0].status).toBe('submitted')
+      expect(selectHasPending(store.getState())).toBe(true)
     })
 
     it('confirms without a result when the receipt carries no PoolCreated log', async () => {
-      await store.checkPendingTransactions(makeClient({ [TX_HASH]: makeReceipt({ logs: [] }) }, 31337))
+      await store.getState().checkPendingTransactions(makeClient({ [TX_HASH]: makeReceipt({ logs: [] }) }, 31337))
 
-      expect(store.transactions[0].status).toBe('confirmed')
-      expect(store.transactions[0].result).toBeUndefined()
+      expect(store.getState().transactions[0].status).toBe('confirmed')
+      expect(store.getState().transactions[0].result).toBeUndefined()
     })
 
     it('skips transactions belonging to another chain', async () => {
       const client = makeClient({ [TX_HASH]: makeReceipt() }, 80002)
 
-      await store.checkPendingTransactions(client)
+      await store.getState().checkPendingTransactions(client)
 
-      expect(store.transactions[0].status).toBe('submitted')
+      expect(store.getState().transactions[0].status).toBe('submitted')
       expect(client.getTransactionReceipt).not.toHaveBeenCalled()
     })
 
     it('checks every chain when the client has none configured', async () => {
-      await store.checkPendingTransactions(makeClient({ [TX_HASH]: makeReceipt() }))
+      await store.getState().checkPendingTransactions(makeClient({ [TX_HASH]: makeReceipt() }))
 
-      expect(store.transactions[0].status).toBe('confirmed')
+      expect(store.getState().transactions[0].status).toBe('confirmed')
     })
 
     it('ignores transactions that are already resolved', async () => {
-      await store.updateTransactionStatus(TX_HASH, 'confirmed')
+      await store.getState().updateTransactionStatus(TX_HASH, 'confirmed')
       const client = makeClient({ [TX_HASH]: makeReceipt() }, 31337)
 
-      await store.checkPendingTransactions(client)
+      await store.getState().checkPendingTransactions(client)
 
       expect(client.getTransactionReceipt).not.toHaveBeenCalled()
     })
@@ -634,23 +638,23 @@ describe('PendingTransactionsStore', () => {
 
   describe('reset', () => {
     it('clears state and storage', async () => {
-      await store.addPendingTransaction(makePendingTransaction())
+      await store.getState().addPendingTransaction(makePendingTransaction())
 
-      await store.reset()
+      await store.getState().reset()
 
-      expect(store.transactions).toHaveLength(0)
+      expect(store.getState().transactions).toHaveLength(0)
       expect(await readStoredHashes()).toEqual([])
     })
   })
 
   describe('computed counts', () => {
     it('counts only submitted transactions as pending', async () => {
-      await store.addPendingTransaction(makePendingTransaction())
-      await store.addPendingTransaction(makePendingTransaction({ txHash: OTHER_TX_HASH, status: 'confirmed' }))
+      await store.getState().addPendingTransaction(makePendingTransaction())
+      await store.getState().addPendingTransaction(makePendingTransaction({ txHash: OTHER_TX_HASH, status: 'confirmed' }))
 
-      expect(store.pendingCount).toBe(1)
-      expect(store.hasPending).toBe(true)
-      expect(store.confirmedUnindexed.map((transaction) => transaction.txHash)).toEqual([OTHER_TX_HASH])
+      expect(selectPendingCount(store.getState())).toBe(1)
+      expect(selectHasPending(store.getState())).toBe(true)
+      expect(selectConfirmedUnindexed(store.getState()).map((transaction) => transaction.txHash)).toEqual([OTHER_TX_HASH])
     })
   })
 })

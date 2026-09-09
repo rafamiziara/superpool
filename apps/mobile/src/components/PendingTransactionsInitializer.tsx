@@ -21,10 +21,10 @@ export function PendingTransactionsInitializer() {
     let cancelled = false
 
     const recover = async () => {
-      await pendingTransactionsStore.loadFromStorage()
+      await pendingTransactionsStore.getState().loadFromStorage()
       if (cancelled || !publicClient) return
 
-      await pendingTransactionsStore.checkPendingTransactions(publicClient)
+      await pendingTransactionsStore.getState().checkPendingTransactions(publicClient)
     }
 
     // Startup recovery is best-effort: the store already swallows storage and

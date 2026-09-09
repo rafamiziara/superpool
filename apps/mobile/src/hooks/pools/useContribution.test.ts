@@ -103,7 +103,7 @@ describe('describeContributionError', () => {
 describe('useContribution', () => {
   beforeEach(async () => {
     jest.clearAllMocks()
-    await pendingTransactionsStore.reset()
+    await pendingTransactionsStore.getState().reset()
 
     mockWagmiUseAccount.mockReturnValue({
       isConnected: true,
@@ -220,8 +220,8 @@ describe('useContribution', () => {
         await result.current.contribute(makeParams())
       })
 
-      expect(pendingTransactionsStore.transactions).toHaveLength(1)
-      const [stored] = pendingTransactionsStore.transactions
+      expect(pendingTransactionsStore.getState().transactions).toHaveLength(1)
+      const [stored] = pendingTransactionsStore.getState().transactions
       expect(stored.type).toBe('CONTRIBUTE')
       expect(stored.status).toBe('submitted')
       expect(stored.chainId).toBe(LOCALHOST_CHAIN_ID)
@@ -267,7 +267,7 @@ describe('useContribution', () => {
       })
 
       expect(mockWriteContractAsync).toHaveBeenCalledWith(expect.objectContaining({ chainId: AMOY_CHAIN_ID }))
-      expect(pendingTransactionsStore.transactions[0].chainId).toBe(AMOY_CHAIN_ID)
+      expect(pendingTransactionsStore.getState().transactions[0].chainId).toBe(AMOY_CHAIN_ID)
     })
 
     it('leaves the estimate to the wallet when no client is configured', async () => {
@@ -323,7 +323,7 @@ describe('useContribution', () => {
         await result.current.contribute(makeParams({ denomination: USDC, amount: 5_000_000n }))
       })
 
-      const [stored] = pendingTransactionsStore.transactions
+      const [stored] = pendingTransactionsStore.getState().transactions
       expect(stored.denomination).toEqual(USDC)
       expect(stored.params).toEqual(expect.objectContaining({ amount: '5000000' }))
     })
@@ -362,7 +362,7 @@ describe('useContribution', () => {
       })
 
       expect(result.current.error).toBe('Transaction cancelled')
-      expect(pendingTransactionsStore.transactions).toHaveLength(0)
+      expect(pendingTransactionsStore.getState().transactions).toHaveLength(0)
       expect(result.current.isSubmitting).toBe(false)
     })
 

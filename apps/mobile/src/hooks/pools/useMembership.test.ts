@@ -73,7 +73,7 @@ function revertedWith(name: string, functionName = 'requestMembership'): Contrac
 
 beforeEach(async () => {
   jest.clearAllMocks()
-  await pendingTransactionsStore.reset()
+  await pendingTransactionsStore.getState().reset()
   mockWagmiUseAccount.mockReturnValue({
     isConnected: true,
     isConnecting: false,
@@ -154,7 +154,7 @@ describe('requestMembership', () => {
       await result.current.requestMembership(makeParams())
     })
 
-    const [transaction] = pendingTransactionsStore.transactions
+    const [transaction] = pendingTransactionsStore.getState().transactions
     expect(transaction).toMatchObject({ txHash: TX_HASH, type: 'REQUEST_MEMBERSHIP', status: 'submitted' })
     expect(transaction.params).toMatchObject({ poolId: 1, poolName: 'Neighbourhood Fund' })
   })
@@ -167,7 +167,7 @@ describe('requestMembership', () => {
       await result.current.requestMembership(makeParams())
     })
 
-    expect(pendingTransactionsStore.transactions[0].params).not.toHaveProperty('account')
+    expect(pendingTransactionsStore.getState().transactions[0].params).not.toHaveProperty('account')
   })
 
   it('should estimate before asking the user to sign', async () => {
@@ -218,7 +218,7 @@ describe('the owner’s decisions', () => {
     expect(mockWriteContractAsync).toHaveBeenCalledWith(
       expect.objectContaining({ functionName: method, args: [APPLICANT], chainId: LOCALHOST_CHAIN_ID })
     )
-    expect(pendingTransactionsStore.transactions[0]).toMatchObject({ type })
+    expect(pendingTransactionsStore.getState().transactions[0]).toMatchObject({ type })
   })
 
   it('should carry the account onto the pending record', async () => {
@@ -230,7 +230,7 @@ describe('the owner’s decisions', () => {
       await result.current.approveMember(makeDecisionParams())
     })
 
-    expect(pendingTransactionsStore.transactions[0].params).toMatchObject({ account: APPLICANT })
+    expect(pendingTransactionsStore.getState().transactions[0].params).toMatchObject({ account: APPLICANT })
   })
 
   it('should surface a decision that lost the race', async () => {
@@ -255,7 +255,7 @@ describe('leavePool', () => {
     })
 
     expect(mockWriteContractAsync).toHaveBeenCalledWith(expect.objectContaining({ functionName: 'leavePool', args: [] }))
-    expect(pendingTransactionsStore.transactions[0]).toMatchObject({ type: 'LEAVE_POOL' })
+    expect(pendingTransactionsStore.getState().transactions[0]).toMatchObject({ type: 'LEAVE_POOL' })
   })
 })
 

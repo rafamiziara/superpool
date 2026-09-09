@@ -97,7 +97,7 @@ function revertedWith(name: string, functionName = 'createLoan'): ContractFuncti
 
 beforeEach(async () => {
   jest.clearAllMocks()
-  await pendingTransactionsStore.reset()
+  await pendingTransactionsStore.getState().reset()
   mockWagmiUseAccount.mockReturnValue({
     isConnected: true,
     isConnecting: false,
@@ -254,7 +254,7 @@ describe('useLoan borrow', () => {
       await result.current.borrow(makeBorrowParams())
     })
 
-    const stored = pendingTransactionsStore.transactions.find((tx) => tx.txHash === TX_HASH)
+    const stored = pendingTransactionsStore.getState().transactions.find((tx) => tx.txHash === TX_HASH)
     expect(stored).toMatchObject({ type: 'BORROW', status: 'submitted' })
   })
 
@@ -266,7 +266,7 @@ describe('useLoan borrow', () => {
       await result.current.borrow(makeBorrowParams())
     })
 
-    const stored = pendingTransactionsStore.transactions.find((tx) => tx.txHash === TX_HASH)
+    const stored = pendingTransactionsStore.getState().transactions.find((tx) => tx.txHash === TX_HASH)
     expect(stored?.type === 'BORROW' && stored.params.loanId).toBeUndefined()
   })
 
@@ -389,7 +389,7 @@ describe('useLoan repay', () => {
       await result.current.repay(makeRepayParams())
     })
 
-    const stored = pendingTransactionsStore.transactions.find((tx) => tx.txHash === TX_HASH)
+    const stored = pendingTransactionsStore.getState().transactions.find((tx) => tx.txHash === TX_HASH)
     expect(stored).toMatchObject({ type: 'REPAY', params: { loanId: 3 } })
   })
 
@@ -507,7 +507,7 @@ describe('useLoan requestLoan', () => {
       await result.current.requestLoan(makeBorrowParams())
     })
 
-    const stored = pendingTransactionsStore.transactions.find((tx) => tx.txHash === TX_HASH)
+    const stored = pendingTransactionsStore.getState().transactions.find((tx) => tx.txHash === TX_HASH)
     expect(stored).toMatchObject({ type: 'REQUEST_LOAN', status: 'submitted' })
   })
 
@@ -519,7 +519,7 @@ describe('useLoan requestLoan', () => {
       await result.current.requestLoan(makeBorrowParams())
     })
 
-    const stored = pendingTransactionsStore.transactions.find((tx) => tx.txHash === TX_HASH)
+    const stored = pendingTransactionsStore.getState().transactions.find((tx) => tx.txHash === TX_HASH)
     expect(stored?.type === 'REQUEST_LOAN' && stored.params.loanId).toBeUndefined()
   })
 
@@ -579,7 +579,10 @@ describe('useLoan owner decisions', () => {
     })
 
     expect(mockWriteContractAsync).toHaveBeenCalledWith(expect.objectContaining({ functionName, args: [7n] }))
-    expect(pendingTransactionsStore.transactions.find((tx) => tx.txHash === TX_HASH)).toMatchObject({ type, params: { loanId: 7 } })
+    expect(pendingTransactionsStore.getState().transactions.find((tx) => tx.txHash === TX_HASH)).toMatchObject({
+      type,
+      params: { loanId: 7 },
+    })
   })
 
   it.each(['approveLoan', 'rejectLoan', 'cancelLoanRequest', 'markDefaulted'] as const)(
@@ -621,7 +624,7 @@ describe('useLoan owner decisions', () => {
       await result.current.approveLoan(makeDecisionParams({ borrower }))
     })
 
-    expect(pendingTransactionsStore.transactions.find((tx) => tx.txHash === TX_HASH)).toMatchObject({ params: { borrower } })
+    expect(pendingTransactionsStore.getState().transactions.find((tx) => tx.txHash === TX_HASH)).toMatchObject({ params: { borrower } })
   })
 
   it('should leave the borrower out of a cancellation', async () => {
@@ -632,7 +635,7 @@ describe('useLoan owner decisions', () => {
       await result.current.cancelLoanRequest(makeDecisionParams())
     })
 
-    const stored = pendingTransactionsStore.transactions.find((tx) => tx.txHash === TX_HASH)
+    const stored = pendingTransactionsStore.getState().transactions.find((tx) => tx.txHash === TX_HASH)
     expect(stored?.type === 'CANCEL_LOAN_REQUEST' && stored.params.borrower).toBeUndefined()
   })
 

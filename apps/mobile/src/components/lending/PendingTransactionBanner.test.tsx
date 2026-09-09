@@ -8,7 +8,7 @@ describe('PendingTransactionBanner', () => {
   beforeEach(async () => {
     jest.clearAllMocks()
     mockWagmiUseAccount.mockReturnValue({ isConnected: true, isConnecting: false, address: undefined, chainId: LOCALHOST_CHAIN_ID })
-    await pendingTransactionsStore.reset()
+    await pendingTransactionsStore.getState().reset()
   })
 
   it('renders nothing when there is nothing in flight', () => {
@@ -18,7 +18,7 @@ describe('PendingTransactionBanner', () => {
   })
 
   it('reports a transaction still being created', async () => {
-    await pendingTransactionsStore.addPendingTransaction(makePendingTransaction())
+    await pendingTransactionsStore.getState().addPendingTransaction(makePendingTransaction())
 
     const { getByText } = render(<PendingTransactionBanner />)
 
@@ -26,8 +26,8 @@ describe('PendingTransactionBanner', () => {
   })
 
   it('pluralises the count', async () => {
-    await pendingTransactionsStore.addPendingTransaction(makePendingTransaction())
-    await pendingTransactionsStore.addPendingTransaction(makePendingTransaction({ txHash: OTHER_TX_HASH }))
+    await pendingTransactionsStore.getState().addPendingTransaction(makePendingTransaction())
+    await pendingTransactionsStore.getState().addPendingTransaction(makePendingTransaction({ txHash: OTHER_TX_HASH }))
 
     const { getByText } = render(<PendingTransactionBanner />)
 
@@ -35,7 +35,7 @@ describe('PendingTransactionBanner', () => {
   })
 
   it('reports syncing once a transaction is confirmed', async () => {
-    await pendingTransactionsStore.addPendingTransaction(makePendingTransaction({ status: 'confirmed' }))
+    await pendingTransactionsStore.getState().addPendingTransaction(makePendingTransaction({ status: 'confirmed' }))
 
     const { getByText } = render(<PendingTransactionBanner />)
 
@@ -43,8 +43,8 @@ describe('PendingTransactionBanner', () => {
   })
 
   it('gives a failure priority over work still in progress', async () => {
-    await pendingTransactionsStore.addPendingTransaction(makePendingTransaction())
-    await pendingTransactionsStore.addPendingTransaction(makePendingTransaction({ txHash: OTHER_TX_HASH, status: 'failed' }))
+    await pendingTransactionsStore.getState().addPendingTransaction(makePendingTransaction())
+    await pendingTransactionsStore.getState().addPendingTransaction(makePendingTransaction({ txHash: OTHER_TX_HASH, status: 'failed' }))
 
     const { getByText } = render(<PendingTransactionBanner />)
 
@@ -52,7 +52,7 @@ describe('PendingTransactionBanner', () => {
   })
 
   it('ignores transactions from another chain', async () => {
-    await pendingTransactionsStore.addPendingTransaction(makePendingTransaction({ chainId: 80002 }))
+    await pendingTransactionsStore.getState().addPendingTransaction(makePendingTransaction({ chainId: 80002 }))
 
     const { queryByTestId } = render(<PendingTransactionBanner />)
 
@@ -61,8 +61,8 @@ describe('PendingTransactionBanner', () => {
 
   it('hands the newest matching transaction to the press handler', async () => {
     const onPress = jest.fn()
-    await pendingTransactionsStore.addPendingTransaction(makePendingTransaction({ timestamp: 1_000 }))
-    await pendingTransactionsStore.addPendingTransaction(makePendingTransaction({ txHash: OTHER_TX_HASH, timestamp: 2_000 }))
+    await pendingTransactionsStore.getState().addPendingTransaction(makePendingTransaction({ timestamp: 1_000 }))
+    await pendingTransactionsStore.getState().addPendingTransaction(makePendingTransaction({ txHash: OTHER_TX_HASH, timestamp: 2_000 }))
 
     const { getByTestId } = render(<PendingTransactionBanner onPress={onPress} />)
 
@@ -74,10 +74,10 @@ describe('PendingTransactionBanner', () => {
   it('hands over the failed transaction when reporting a failure', async () => {
     const onPress = jest.fn()
     // Newest overall is the submitted one, but the banner is reporting the failure.
-    await pendingTransactionsStore.addPendingTransaction(
-      makePendingTransaction({ txHash: OTHER_TX_HASH, status: 'failed', timestamp: 1_000 })
-    )
-    await pendingTransactionsStore.addPendingTransaction(makePendingTransaction({ timestamp: 2_000 }))
+    await pendingTransactionsStore
+      .getState()
+      .addPendingTransaction(makePendingTransaction({ txHash: OTHER_TX_HASH, status: 'failed', timestamp: 1_000 }))
+    await pendingTransactionsStore.getState().addPendingTransaction(makePendingTransaction({ timestamp: 2_000 }))
 
     const { getByTestId } = render(<PendingTransactionBanner onPress={onPress} />)
 

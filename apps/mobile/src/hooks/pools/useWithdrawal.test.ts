@@ -121,7 +121,7 @@ describe('describeWithdrawalError', () => {
 describe('useWithdrawal', () => {
   beforeEach(async () => {
     jest.clearAllMocks()
-    await pendingTransactionsStore.reset()
+    await pendingTransactionsStore.getState().reset()
 
     mockWagmiUseAccount.mockReturnValue({
       isConnected: true,
@@ -230,7 +230,7 @@ describe('useWithdrawal', () => {
         await result.current.withdraw(makeParams())
       })
 
-      const [recorded] = pendingTransactionsStore.transactions
+      const [recorded] = pendingTransactionsStore.getState().transactions
       expect(recorded.type).toBe('WITHDRAW')
       expect(recorded.txHash).toBe(TX_HASH)
       expect(recorded.status).toBe('submitted')
@@ -282,7 +282,7 @@ describe('useWithdrawal', () => {
 
       expect(result.current.error).toBe('The pool has lent out too much to cover that right now — try a smaller amount')
       expect(result.current.isSubmitting).toBe(false)
-      expect(pendingTransactionsStore.transactions).toHaveLength(0)
+      expect(pendingTransactionsStore.getState().transactions).toHaveLength(0)
     })
 
     it('clears the error on reset', async () => {

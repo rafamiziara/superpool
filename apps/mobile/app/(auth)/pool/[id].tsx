@@ -21,6 +21,7 @@ import {
   isDismissable,
   type PendingTransaction,
   pendingTransactionsStore,
+  usePendingTransactionsStore,
 } from '../../../src/stores/PendingTransactionsStore'
 import { poolStore } from '../../../src/stores/PoolStore'
 import { denominationFor } from '../../../src/utils/denomination'
@@ -33,8 +34,8 @@ import { bpsToPercent, formatAmount, formatDuration, sameAddress, shortAddress }
  * `triggerIndexing` removes the record only after the refresh that lists the
  * contribution has already landed, so the two never both hold it.
  */
-function pendingContributionsFor(poolId: number): ContributeTransaction[] {
-  return pendingTransactionsStore.transactions
+function pendingContributionsFor(transactions: PendingTransaction[], poolId: number): ContributeTransaction[] {
+  return transactions
     .filter((transaction): transaction is ContributeTransaction => transaction.type === 'CONTRIBUTE')
     .filter((transaction) => transaction.params.poolId === poolId)
     .sort((a, b) => b.timestamp - a.timestamp)
@@ -218,7 +219,9 @@ function PoolDetailScreen() {
   const isActiveMember = membership?.status === MemberStatus.ACTIVE
 
   /** Deposits into this pool that the backend has not indexed yet. */
-  const pending = pool ? pendingContributionsFor(pool.poolId) : []
+  // Subscribed rather than read — see PendingTransactionBanner for why.
+  const pendingTransactions = usePendingTransactionsStore((state) => state.transactions)
+  const pending = pool ? pendingContributionsFor(pendingTransactions, pool.poolId) : []
 
   /** The transaction the status modal is describing; `null` keeps it closed. */
   const [detail, setDetail] = useState<PendingTransaction | null>(null)
@@ -617,7 +620,7 @@ function PoolDetailScreen() {
             ? () => {
                 const { txHash } = detail
                 setDetail(null)
-                pendingTransactionsStore.removePendingTransaction(txHash)
+                pendingTransactionsStore.getState().removePendingTransaction(txHash)
               }
             : undefined
         }

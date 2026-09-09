@@ -132,7 +132,7 @@ describe('usePoolCreation', () => {
 
   beforeEach(async () => {
     jest.clearAllMocks()
-    await pendingTransactionsStore.reset()
+    await pendingTransactionsStore.getState().reset()
 
     mockWagmiUseAccount.mockReturnValue({
       isConnected: true,
@@ -232,8 +232,8 @@ describe('usePoolCreation', () => {
         await result.current.createPool(makeParams())
       })
 
-      expect(pendingTransactionsStore.transactions).toHaveLength(1)
-      expect(pendingTransactionsStore.transactions[0]).toMatchObject({
+      expect(pendingTransactionsStore.getState().transactions).toHaveLength(1)
+      expect(pendingTransactionsStore.getState().transactions[0]).toMatchObject({
         txHash: TX_HASH,
         chainId: LOCALHOST_CHAIN_ID,
         type: 'CREATE_POOL',
@@ -315,7 +315,7 @@ describe('usePoolCreation', () => {
       expect(result.current.error).toContain('restricted to administrators')
       expect(result.current.isPreparing).toBe(false)
       expect(mockWriteContractAsync).not.toHaveBeenCalled()
-      expect(pendingTransactionsStore.transactions).toHaveLength(0)
+      expect(pendingTransactionsStore.getState().transactions).toHaveLength(0)
     })
 
     it('reports a cancelled signature and records nothing', async () => {
@@ -328,7 +328,7 @@ describe('usePoolCreation', () => {
 
       expect(result.current.error).toBe('Transaction cancelled')
       expect(result.current.isSubmitting).toBe(false)
-      expect(pendingTransactionsStore.transactions).toHaveLength(0)
+      expect(pendingTransactionsStore.getState().transactions).toHaveLength(0)
     })
 
     it('reports an unaffordable transaction from the gas estimate', async () => {

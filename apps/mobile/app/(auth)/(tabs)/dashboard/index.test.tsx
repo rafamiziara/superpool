@@ -16,7 +16,7 @@ describe('DashboardScreen', () => {
   beforeEach(async () => {
     jest.clearAllMocks()
     mockWagmiUseAccount.mockReturnValue({ isConnected: true, isConnecting: false, address: undefined, chainId: LOCALHOST_CHAIN_ID })
-    await pendingTransactionsStore.reset()
+    await pendingTransactionsStore.getState().reset()
     await poolStore.fetchPools()
   })
 
@@ -252,7 +252,7 @@ describe('DashboardScreen', () => {
     it('reports a pool being created', async () => {
       // The dashboard has no pending pool card, so without this the pool is
       // invisible here until the backend catches up.
-      await pendingTransactionsStore.addPendingTransaction(makePendingTransaction())
+      await pendingTransactionsStore.getState().addPendingTransaction(makePendingTransaction())
 
       const { getByText } = render(<DashboardScreen />)
 
@@ -260,7 +260,7 @@ describe('DashboardScreen', () => {
     })
 
     it('opens the status modal from the banner', async () => {
-      await pendingTransactionsStore.addPendingTransaction(makePendingTransaction())
+      await pendingTransactionsStore.getState().addPendingTransaction(makePendingTransaction())
 
       const { getByTestId, getByText, queryByText } = render(<DashboardScreen />)
 

@@ -1,10 +1,9 @@
 import { FontAwesome } from '@expo/vector-icons'
-import { observer } from 'mobx-react-lite'
 import { ActivityIndicator, Pressable, Text } from 'react-native'
 import { useAccount } from 'wagmi'
 import { DEFAULT_CHAIN_ID } from '../../config/contracts'
 import { palette } from '../../constants/palette'
-import { type PendingTransaction, pendingTransactionsStore } from '../../stores/PendingTransactionsStore'
+import { type PendingTransaction, usePendingTransactionsStore } from '../../stores/PendingTransactionsStore'
 
 /**
  * What the banner says, in priority order. A failure needs attention now; work
@@ -48,16 +47,15 @@ export interface PendingTransactionBannerProps {
  * on a network the wallet is no longer on cannot progress and reporting it here
  * would only confuse.
  */
-export const PendingTransactionBanner = observer(function PendingTransactionBanner({
-  onPress,
-  className = '',
-}: PendingTransactionBannerProps) {
+export function PendingTransactionBanner({ onPress, className = '' }: PendingTransactionBannerProps) {
   const { chainId } = useAccount()
   const activeChainId = chainId ?? DEFAULT_CHAIN_ID
 
-  const relevant = pendingTransactionsStore.transactions
-    .filter((transaction) => transaction.chainId === activeChainId)
-    .sort((a, b) => b.timestamp - a.timestamp)
+  // The array reference changes on every write, and never otherwise, so this
+  // subscribes to exactly the writes that can change what the banner says.
+  const transactions = usePendingTransactionsStore((state) => state.transactions)
+
+  const relevant = transactions.filter((transaction) => transaction.chainId === activeChainId).sort((a, b) => b.timestamp - a.timestamp)
 
   const summary = describe(relevant)
   if (!summary) return null
@@ -85,4 +83,4 @@ export const PendingTransactionBanner = observer(function PendingTransactionBann
       {onPress && <FontAwesome name="chevron-right" size={12} color={hasFailed ? palette.coral : palette.mist} />}
     </Pressable>
   )
-})
+}

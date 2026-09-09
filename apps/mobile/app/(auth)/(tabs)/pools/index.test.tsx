@@ -22,7 +22,7 @@ describe('PoolsScreen', () => {
     // every suite, and resetting it would strip the implementation for good.
     mockFirebaseCallable.mockReturnValue(jest.fn().mockResolvedValue({ data: { poolId: 99, alreadyIndexed: false, stored: true } }))
     mockWagmiUseAccount.mockReturnValue({ isConnected: true, isConnecting: false, address: undefined, chainId: LOCALHOST_CHAIN_ID })
-    await pendingTransactionsStore.reset()
+    await pendingTransactionsStore.getState().reset()
     await poolStore.fetchPools()
   })
 
@@ -71,7 +71,7 @@ describe('PoolsScreen', () => {
 
   describe('pending pools', () => {
     it('shows a pending card for a submitted transaction', async () => {
-      await pendingTransactionsStore.addPendingTransaction(makePendingTransaction())
+      await pendingTransactionsStore.getState().addPendingTransaction(makePendingTransaction())
 
       const { getByTestId } = render(<PoolsScreen />)
 
@@ -81,9 +81,9 @@ describe('PoolsScreen', () => {
 
     it('shows the syncing state while a confirmed transaction is unindexed', async () => {
       failIndexing()
-      await pendingTransactionsStore.addPendingTransaction(
-        makePendingTransaction({ status: 'confirmed', result: { poolId: 99, poolAddress: '0xdef' } })
-      )
+      await pendingTransactionsStore
+        .getState()
+        .addPendingTransaction(makePendingTransaction({ status: 'confirmed', result: { poolId: 99, poolAddress: '0xdef' } }))
 
       const { getByTestId } = render(<PoolsScreen />)
 
@@ -96,9 +96,9 @@ describe('PoolsScreen', () => {
       // this proves the screen dedupes rather than the drain having removed it.
       failIndexing()
       const listed = poolStore.pools[0].poolId
-      await pendingTransactionsStore.addPendingTransaction(
-        makePendingTransaction({ status: 'confirmed', result: { poolId: listed, poolAddress: '0xdef' } })
-      )
+      await pendingTransactionsStore
+        .getState()
+        .addPendingTransaction(makePendingTransaction({ status: 'confirmed', result: { poolId: listed, poolAddress: '0xdef' } }))
 
       const { queryByTestId, getByTestId } = render(<PoolsScreen />)
 
@@ -108,7 +108,7 @@ describe('PoolsScreen', () => {
     })
 
     it('ignores pending transactions from another chain', async () => {
-      await pendingTransactionsStore.addPendingTransaction(makePendingTransaction({ chainId: 80002 }))
+      await pendingTransactionsStore.getState().addPendingTransaction(makePendingTransaction({ chainId: 80002 }))
 
       const { queryByTestId } = render(<PoolsScreen />)
 
@@ -116,19 +116,19 @@ describe('PoolsScreen', () => {
     })
 
     it('asks the backend to index transactions confirmed while the app was closed', async () => {
-      await pendingTransactionsStore.addPendingTransaction(
-        makePendingTransaction({ status: 'confirmed', result: { poolId: 99, poolAddress: '0xdef' } })
-      )
+      await pendingTransactionsStore
+        .getState()
+        .addPendingTransaction(makePendingTransaction({ status: 'confirmed', result: { poolId: 99, poolAddress: '0xdef' } }))
 
       render(<PoolsScreen />)
 
       await waitFor(() => expect(mockFirebaseCallable).toHaveBeenCalledWith(expect.anything(), 'indexPool'))
       // A successful index drops the local record; the listed pool replaces it.
-      await waitFor(() => expect(pendingTransactionsStore.transactions).toHaveLength(0))
+      await waitFor(() => expect(pendingTransactionsStore.getState().transactions).toHaveLength(0))
     })
 
     it('dismisses a failed transaction', async () => {
-      await pendingTransactionsStore.addPendingTransaction(makePendingTransaction({ status: 'failed' }))
+      await pendingTransactionsStore.getState().addPendingTransaction(makePendingTransaction({ status: 'failed' }))
 
       const { getByTestId, queryByTestId } = render(<PoolsScreen />)
 
@@ -137,11 +137,11 @@ describe('PoolsScreen', () => {
       })
 
       expect(queryByTestId(`pending-pool-card-${TX_HASH}`)).toBeNull()
-      expect(pendingTransactionsStore.transactions).toHaveLength(0)
+      expect(pendingTransactionsStore.getState().transactions).toHaveLength(0)
     })
 
     it('offers no dismiss action while a transaction is still in flight', async () => {
-      await pendingTransactionsStore.addPendingTransaction(makePendingTransaction())
+      await pendingTransactionsStore.getState().addPendingTransaction(makePendingTransaction())
 
       const { queryByTestId } = render(<PoolsScreen />)
 
@@ -149,7 +149,7 @@ describe('PoolsScreen', () => {
     })
 
     it('opens the status modal from a pending card', async () => {
-      await pendingTransactionsStore.addPendingTransaction(makePendingTransaction())
+      await pendingTransactionsStore.getState().addPendingTransaction(makePendingTransaction())
 
       const { getByTestId, getByText, queryByText } = render(<PoolsScreen />)
 
@@ -162,7 +162,7 @@ describe('PoolsScreen', () => {
     })
 
     it('removes the transaction when the modal dismisses it', async () => {
-      await pendingTransactionsStore.addPendingTransaction(makePendingTransaction({ status: 'failed' }))
+      await pendingTransactionsStore.getState().addPendingTransaction(makePendingTransaction({ status: 'failed' }))
 
       const { getByTestId, queryByTestId } = render(<PoolsScreen />)
 
@@ -172,7 +172,7 @@ describe('PoolsScreen', () => {
       })
 
       expect(queryByTestId(`pending-pool-card-${TX_HASH}`)).toBeNull()
-      expect(pendingTransactionsStore.transactions).toHaveLength(0)
+      expect(pendingTransactionsStore.getState().transactions).toHaveLength(0)
     })
   })
 
@@ -202,9 +202,9 @@ describe('PoolsScreen', () => {
       // the case pull-to-refresh exists for.
       failIndexing()
       poolStore.lastFetchedAt = null
-      await pendingTransactionsStore.addPendingTransaction(
-        makePendingTransaction({ status: 'confirmed', result: { poolId: 99, poolAddress: '0xdef' } })
-      )
+      await pendingTransactionsStore
+        .getState()
+        .addPendingTransaction(makePendingTransaction({ status: 'confirmed', result: { poolId: 99, poolAddress: '0xdef' } }))
 
       const { getByTestId } = render(<PoolsScreen />)
       // Reached through the ScrollView's prop: a RefreshControl is not rendered

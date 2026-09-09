@@ -535,13 +535,15 @@ describe('PoolDetailScreen', () => {
 
   describe('contributions still in flight', () => {
     afterEach(async () => {
-      await pendingTransactionsStore.reset()
+      await pendingTransactionsStore.getState().reset()
     })
 
     it('shows a pending deposit into this pool', async () => {
       // Until the backend has indexed it, the deposit is invisible in the
       // liquidity figure — this row is the only trace of it.
-      await pendingTransactionsStore.addPendingTransaction(makeContributeTransaction({ params: { ...CONTRIBUTION_PARAMS, poolId: 1 } }))
+      await pendingTransactionsStore
+        .getState()
+        .addPendingTransaction(makeContributeTransaction({ params: { ...CONTRIBUTION_PARAMS, poolId: 1 } }))
 
       const { getByTestId } = render(<PoolDetailScreen />)
 
@@ -550,7 +552,9 @@ describe('PoolDetailScreen', () => {
     })
 
     it('ignores deposits into other pools', async () => {
-      await pendingTransactionsStore.addPendingTransaction(makeContributeTransaction({ params: { ...CONTRIBUTION_PARAMS, poolId: 2 } }))
+      await pendingTransactionsStore
+        .getState()
+        .addPendingTransaction(makeContributeTransaction({ params: { ...CONTRIBUTION_PARAMS, poolId: 2 } }))
 
       const { queryByTestId } = render(<PoolDetailScreen />)
 
@@ -558,7 +562,7 @@ describe('PoolDetailScreen', () => {
     })
 
     it('ignores pool creations, which the pools list shows instead', async () => {
-      await pendingTransactionsStore.addPendingTransaction(makePendingTransaction())
+      await pendingTransactionsStore.getState().addPendingTransaction(makePendingTransaction())
 
       const { queryByTestId } = render(<PoolDetailScreen />)
 
@@ -566,7 +570,9 @@ describe('PoolDetailScreen', () => {
     })
 
     it('opens the status modal from a pending row', async () => {
-      await pendingTransactionsStore.addPendingTransaction(makeContributeTransaction({ params: { ...CONTRIBUTION_PARAMS, poolId: 1 } }))
+      await pendingTransactionsStore
+        .getState()
+        .addPendingTransaction(makeContributeTransaction({ params: { ...CONTRIBUTION_PARAMS, poolId: 1 } }))
 
       const { getByTestId } = render(<PoolDetailScreen />)
       fireEvent.press(getByTestId(`pending-contribution-card-${TX_HASH}`))

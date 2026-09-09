@@ -92,7 +92,7 @@ describe('describeClaimInterestError', () => {
 describe('useInterest', () => {
   beforeEach(async () => {
     jest.clearAllMocks()
-    await pendingTransactionsStore.reset()
+    await pendingTransactionsStore.getState().reset()
 
     mockWagmiUseAccount.mockReturnValue({
       isConnected: true,
@@ -200,7 +200,7 @@ describe('useInterest', () => {
         await result.current.claimInterest(makeParams())
       })
 
-      const [recorded] = pendingTransactionsStore.transactions
+      const [recorded] = pendingTransactionsStore.getState().transactions
       expect(recorded.type).toBe('CLAIM_INTEREST')
       expect(recorded.txHash).toBe(TX_HASH)
       expect(recorded.status).toBe('submitted')
@@ -240,7 +240,7 @@ describe('useInterest', () => {
 
       expect(result.current.error).toBe('The pool has lent out too much to pay your interest right now — try again once a loan is repaid')
       expect(result.current.isSubmitting).toBe(false)
-      expect(pendingTransactionsStore.transactions).toHaveLength(0)
+      expect(pendingTransactionsStore.getState().transactions).toHaveLength(0)
     })
 
     it('clears the error on reset', async () => {

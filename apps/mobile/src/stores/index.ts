@@ -24,9 +24,16 @@ export {
   extractResult,
   type PendingTransaction,
   type PendingTransactionStatus,
-  PendingTransactionsStore,
+  type PendingTransactionsActions,
+  type PendingTransactionsState,
+  type PendingTransactionsStoreApi,
+  type PendingTransactionsStoreState,
   type PendingTransactionType,
   pendingTransactionsStore,
+  selectConfirmedUnindexed,
+  selectHasPending,
+  selectPendingCount,
   type TransactionReceiptReader,
+  usePendingTransactionsStore,
 } from './PendingTransactionsStore'
 export { PoolStore, poolStore } from './PoolStore'
