@@ -1,8 +1,7 @@
-import { observer } from 'mobx-react-lite'
 import { useEffect } from 'react'
 import { useAccount, useReadContract } from 'wagmi'
 import { LendingPoolABI } from '../../constants/abis'
-import { poolStore } from '../../stores/PoolStore'
+import { poolStore, usePoolStore } from '../../stores/PoolStore'
 
 /**
  * One pool's `claimable`, read and mirrored into the store.
@@ -25,7 +24,7 @@ function ClaimableProbe({ poolId, poolAddress }: { poolId: number; poolAddress: 
   useEffect(() => {
     if (claimable === undefined) return
 
-    poolStore.setClaimable(poolId, claimable)
+    poolStore.getState().setClaimable(poolId, claimable)
   }, [claimable, poolId])
 
   return null
@@ -45,16 +44,29 @@ function ClaimableProbe({ poolId, poolAddress }: { poolId: number; poolAddress: 
  * is what makes the total right without visiting each one.
  */
 function ClaimableInterestSyncComponent() {
+  /*
+    Subscribes this component to the pool store.
+
+    The reads below go through `poolStore.getState()`, which returns current
+    state but never notifies — this call is what re-renders on a change, and it
+    is what `observer` used to do by tracing the reads. Coarser than MobX was,
+    deliberately: see `usePoolStore`.
+  */
+  usePoolStore()
+
   return (
     <>
-      {poolStore.activeMemberships.map((member) => {
-        const pool = poolStore.poolById(Number(member.poolId))
-        if (!pool?.poolAddress) return null
+      {poolStore
+        .getState()
+        .activeMemberships()
+        .map((member) => {
+          const pool = poolStore.getState().poolById(Number(member.poolId))
+          if (!pool?.poolAddress) return null
 
-        return <ClaimableProbe key={member.poolId} poolId={pool.poolId} poolAddress={pool.poolAddress as `0x${string}`} />
-      })}
+          return <ClaimableProbe key={member.poolId} poolId={pool.poolId} poolAddress={pool.poolAddress as `0x${string}`} />
+        })}
     </>
   )
 }
 
-export const ClaimableInterestSync = observer(ClaimableInterestSyncComponent)
+export const ClaimableInterestSync = ClaimableInterestSyncComponent

@@ -2,7 +2,6 @@ import { FontAwesome } from '@expo/vector-icons'
 import { MemberStatus, type NoteKind } from '@superpool/types'
 import { router, Stack, useLocalSearchParams } from 'expo-router'
 import { StatusBar } from 'expo-status-bar'
-import { observer } from 'mobx-react-lite'
 import { useState } from 'react'
 import { Pressable, ScrollView, Text, View } from 'react-native'
 import { useReadContract } from 'wagmi'
@@ -23,7 +22,7 @@ import {
   pendingTransactionsStore,
   usePendingTransactionsStore,
 } from '../../../src/stores/PendingTransactionsStore'
-import { poolStore } from '../../../src/stores/PoolStore'
+import { poolStore, usePoolStore } from '../../../src/stores/PoolStore'
 import { denominationFor } from '../../../src/utils/denomination'
 import { bpsToPercent, formatAmount, formatDuration, sameAddress, shortAddress } from '../../../src/utils/format'
 
@@ -153,8 +152,18 @@ function membershipNoticeFor(requiresMembership: boolean, status: MemberStatus |
 }
 
 function PoolDetailScreen() {
+  /*
+    Subscribes this component to the pool store.
+
+    The reads below go through `poolStore.getState()`, which returns current
+    state but never notifies — this call is what re-renders on a change, and it
+    is what `observer` used to do by tracing the reads. Coarser than MobX was,
+    deliberately: see `usePoolStore`.
+  */
+  usePoolStore()
+
   const { id } = useLocalSearchParams<{ id: string }>()
-  const pool = poolStore.poolById(Number(id))
+  const pool = poolStore.getState().poolById(Number(id))
   /**
    * Absent for a pool denominated in a token the backend could not read. Not a
    * reason to refuse the whole screen, unlike the forms: a pool's name, members
@@ -162,16 +171,16 @@ function PoolDetailScreen() {
    * as dashes rather than as guesses. The actions lead to screens that do refuse.
    */
   const denomination = pool ? denominationFor(pool) : undefined
-  const membership = pool ? poolStore.membershipFor(pool.poolId) : undefined
-  const outstandingLoan = pool ? poolStore.activeLoanFor(pool.poolId) : undefined
+  const membership = pool ? poolStore.getState().membershipFor(pool.poolId) : undefined
+  const outstandingLoan = pool ? poolStore.getState().activeLoanFor(pool.poolId) : undefined
   /** Every member's request awaiting a decision — the owner's queue, not the user's. */
-  const pendingRequests = pool ? poolStore.pendingLoansFor(pool.poolId) : []
-  const overdueLoans = pool ? poolStore.overdueLoansFor(pool.poolId) : []
-  const myRequest = pool ? poolStore.pendingLoanFor(pool.poolId) : undefined
-  const transactions = pool ? poolStore.transactionsFor(pool.poolId) : []
+  const pendingRequests = pool ? poolStore.getState().pendingLoansFor(pool.poolId) : []
+  const overdueLoans = pool ? poolStore.getState().overdueLoansFor(pool.poolId) : []
+  const myRequest = pool ? poolStore.getState().pendingLoanFor(pool.poolId) : undefined
+  const transactions = pool ? poolStore.getState().transactionsFor(pool.poolId) : []
 
   /** Who is waiting to be let in — the owner's queue, not the user's. */
-  const pendingMembers = pool ? poolStore.pendingMembersFor(pool.poolId) : []
+  const pendingMembers = pool ? poolStore.getState().pendingMembersFor(pool.poolId) : []
 
   /**
    * The register's own word on the connected wallet, which is not the same
@@ -179,7 +188,7 @@ function PoolDetailScreen() {
    * contributor to active; this one can tell a rejected applicant from a
    * stranger, and they must not see the same screen.
    */
-  const standing = pool ? poolStore.registerStandingFor(pool.poolId) : undefined
+  const standing = pool ? poolStore.getState().registerStandingFor(pool.poolId) : undefined
 
   /**
    * What the owner said, if they said anything.
@@ -191,8 +200,8 @@ function PoolDetailScreen() {
   const { noteFor } = useNotes(pool?.poolId)
   const standingKind = membership?.status ? NOTE_KIND_FOR_STANDING[membership.status] : undefined
   const decisionNote =
-    pool && standingKind && poolStore.userAddress
-      ? noteFor(`${pool.chainId}-${pool.poolId}-${poolStore.userAddress.toLowerCase()}`, standingKind)
+    pool && standingKind && poolStore.getState().userAddress()
+      ? noteFor(`${pool.chainId}-${pool.poolId}-${poolStore.getState().userAddress().toLowerCase()}`, standingKind)
       : undefined
 
   // Read from the chain, never from the indexed pool record: the owner can flip
@@ -238,7 +247,7 @@ function PoolDetailScreen() {
   }
 
   // A strict compare would hide the admin controls from the pool's own owner.
-  const isOwner = sameAddress(pool.poolOwner, poolStore.userAddress)
+  const isOwner = sameAddress(pool.poolOwner, poolStore.getState().userAddress())
 
   const notice = membershipNoticeFor(requiresMembership, membership?.status, isOwner)
 
@@ -252,7 +261,7 @@ function PoolDetailScreen() {
   const canBorrow = isActiveMember || Boolean(outstandingLoan) || Boolean(myRequest)
 
   const stats = [
-    { label: 'Liquidity', value: formatAmount(poolStore.poolLiquidity(pool.poolId), denomination) },
+    { label: 'Liquidity', value: formatAmount(poolStore.getState().poolLiquidity(pool.poolId), denomination) },
     { label: 'Max loan', value: formatAmount(pool.maxLoanAmount, denomination) },
     { label: 'Interest', value: bpsToPercent(pool.interestRate) },
     { label: 'Term', value: formatDuration(pool.loanDuration) },
@@ -629,4 +638,4 @@ function PoolDetailScreen() {
   )
 }
 
-export default observer(PoolDetailScreen)
+export default PoolDetailScreen

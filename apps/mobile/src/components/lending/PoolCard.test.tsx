@@ -52,7 +52,7 @@ function makeRequest(overrides: Partial<LoanInfo> = {}): LoanInfo {
 }
 
 afterEach(() => {
-  poolStore.loanRecords = []
+  poolStore.getState().loanRecords = []
   authStore.setState({ walletAddress: null })
 })
 
@@ -72,7 +72,7 @@ describe('PoolCard', () => {
   // -------------------------------------------------------------------------
 
   it('tells the owner when a request is waiting', () => {
-    poolStore.loanRecords = [makeRequest()]
+    poolStore.getState().loanRecords = [makeRequest()]
 
     const { getByTestId, getByText } = render(<PoolCard pool={makePool()} />)
 
@@ -81,7 +81,7 @@ describe('PoolCard', () => {
   })
 
   it('counts more than one', () => {
-    poolStore.loanRecords = [makeRequest(), makeRequest({ id: '31337-11-2', loanId: 2 })]
+    poolStore.getState().loanRecords = [makeRequest(), makeRequest({ id: '31337-11-2', loanId: 2 })]
 
     const { getByText } = render(<PoolCard pool={makePool()} />)
 
@@ -91,7 +91,7 @@ describe('PoolCard', () => {
   it('says nothing to a member who cannot act on them', () => {
     // Only the owner can approve, so only the owner is told.
     authStore.setState({ walletAddress: STRANGER })
-    poolStore.loanRecords = [makeRequest()]
+    poolStore.getState().loanRecords = [makeRequest()]
 
     const { queryByTestId } = render(<PoolCard pool={makePool()} />)
 
@@ -99,7 +99,7 @@ describe('PoolCard', () => {
   })
 
   it('ignores requests belonging to another pool', () => {
-    poolStore.loanRecords = [makeRequest({ id: '31337-12-1', poolId: 12 })]
+    poolStore.getState().loanRecords = [makeRequest({ id: '31337-12-1', poolId: 12 })]
 
     const { queryByTestId } = render(<PoolCard pool={makePool()} />)
 
@@ -107,7 +107,7 @@ describe('PoolCard', () => {
   })
 
   it('ignores loans that are already decided', () => {
-    poolStore.loanRecords = [
+    poolStore.getState().loanRecords = [
       makeRequest({ id: '31337-11-3', loanId: 3, status: 'disbursed' }),
       makeRequest({ id: '31337-11-4', loanId: 4, status: 'rejected' }),
     ]

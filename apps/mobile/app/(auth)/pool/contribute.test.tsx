@@ -79,14 +79,14 @@ describe('ContributeScreen', () => {
     mockWaitForTransaction.mockResolvedValue({ amount: parseEther('5').toString(), txHash: TX_HASH })
     mockTriggerIndexing.mockResolvedValue(undefined)
 
-    await poolStore.fetchPools()
+    await poolStore.getState().fetchPools()
   })
 
   it('renders the form for the pool in the query parameter', () => {
     render(<ContributeScreen />)
 
     expect(screen.getByTestId('contribute-screen')).toBeTruthy()
-    expect(screen.getByText(poolStore.poolById(Number(POOL_ID))!.name)).toBeTruthy()
+    expect(screen.getByText(poolStore.getState().poolById(Number(POOL_ID))!.name)).toBeTruthy()
   })
 
   it('falls back to a not-found state for a pool that is not loaded', () => {
@@ -118,8 +118,8 @@ describe('ContributeScreen', () => {
         // it travels with the transaction so the pending card can use it.
         denomination: { symbol: 'POL', decimals: 18 },
         poolId: 1,
-        poolAddress: poolStore.poolById(1)!.poolAddress,
-        poolName: poolStore.poolById(1)!.name,
+        poolAddress: poolStore.getState().poolById(1)!.poolAddress,
+        poolName: poolStore.getState().poolById(1)!.name,
         amount: parseEther('5'),
       })
       expect(mockWaitForTransaction).toHaveBeenCalledWith(TX_HASH, 'CONTRIBUTE')
@@ -212,7 +212,7 @@ describe('ContributeScreen', () => {
 
       expect(mockApprove).toHaveBeenCalledWith({
         token: TOKEN,
-        spender: poolStore.poolById(7)!.poolAddress,
+        spender: poolStore.getState().poolById(7)!.poolAddress,
         // The amount, never the maximum: a bug in the pool must not be able to
         // reach the rest of the member's balance. Six decimals, not eighteen.
         amount: 5_000_000n,

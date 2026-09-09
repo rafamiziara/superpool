@@ -1,7 +1,6 @@
 import { FontAwesome } from '@expo/vector-icons'
 import { router } from 'expo-router'
 import { StatusBar } from 'expo-status-bar'
-import { observer } from 'mobx-react-lite'
 import { useEffect, useState } from 'react'
 import { Pressable, ScrollView, Text, View } from 'react-native'
 import { useAccount } from 'wagmi'
@@ -16,13 +15,23 @@ import { TransactionStatusModal } from '../../../../src/components/lending/Trans
 import { DEFAULT_CHAIN_ID } from '../../../../src/config/contracts'
 import { palette } from '../../../../src/constants/palette'
 import { isDismissable, type PendingTransaction, pendingTransactionsStore } from '../../../../src/stores/PendingTransactionsStore'
-import { poolStore } from '../../../../src/stores/PoolStore'
+import { poolStore, usePoolStore } from '../../../../src/stores/PoolStore'
 import { daysUntil, formatAmount, formatToken } from '../../../../src/utils/format'
 
 const CARD_WIDTH = 288 // w-72
 const CARD_GAP = 16
 
 function DashboardScreen() {
+  /*
+    Subscribes this component to the pool store.
+
+    The reads below go through `poolStore.getState()`, which returns current
+    state but never notifies — this call is what re-renders on a change, and it
+    is what `observer` used to do by tracing the reads. Coarser than MobX was,
+    deliberately: see `usePoolStore`.
+  */
+  usePoolStore()
+
   const { chainId } = useAccount()
   const activeChainId = chainId ?? DEFAULT_CHAIN_ID
 
@@ -35,10 +44,11 @@ function DashboardScreen() {
     Re-runs on a chain change as well as a wallet change: every feed here is
     per chain, and a record is no exception.
   */
-  const ownAddress = poolStore.userAddress
+  const ownAddress = poolStore.getState().userAddress()
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: the histories are per chain and must reload on a switch, but `loadBorrowerHistories` takes the chain from the store rather than as an argument, so the effect never names it. See CLAUDE.md → Chains.
   useEffect(() => {
-    if (ownAddress) void poolStore.loadBorrowerHistories([ownAddress])
+    if (ownAddress) void poolStore.getState().loadBorrowerHistories([ownAddress])
   }, [ownAddress, activeChainId])
   /**
    * The headline is the chain's own coin; anything held in a token gets its own
@@ -46,11 +56,11 @@ function DashboardScreen() {
    * no oracle — a total in "POL" that quietly included USDC would be wrong by
    * whatever the rate happened to be, and wrong silently.
    */
-  const [nativeBalance, ...otherBalances] = poolStore.balancesByDenomination
+  const [nativeBalance, ...otherBalances] = poolStore.getState().balancesByDenomination()
   const nativeUnit = nativeBalance.denomination
-  const loan = poolStore.activeLoan
-  const loanPool = loan ? poolStore.poolById(Number(loan.poolId)) : undefined
-  const loanUnit = loan ? poolStore.denominationFor(Number(loan.poolId)) : undefined
+  const loan = poolStore.getState().activeLoan()
+  const loanPool = loan ? poolStore.getState().poolById(Number(loan.poolId)) : undefined
+  const loanUnit = loan ? poolStore.getState().denominationFor(Number(loan.poolId)) : undefined
   // Paid against paid-plus-owed, rather than against a fixed total: interest
   // accrues, so there is no final figure to measure progress towards. The bar
   // can therefore slip backwards while nothing is repaid, which is not a
@@ -103,29 +113,31 @@ function DashboardScreen() {
               ))}
             </View>
           )}
-          {poolStore.totalEarned > 0n && (
-            <Text className="mt-2 text-sm text-mint">+{formatAmount(poolStore.totalEarned, nativeUnit)} earned all-time</Text>
+          {poolStore.getState().totalEarned() > 0n && (
+            <Text className="mt-2 text-sm text-mint">+{formatAmount(poolStore.getState().totalEarned(), nativeUnit)} earned all-time</Text>
           )}
 
           <View className="mt-5 flex-row gap-2">
             <View className="rounded-full border-hairline border-veil bg-surface px-4 py-2">
-              <Text className="text-xs font-semibold text-fog">{poolStore.activeMemberships.length} pools</Text>
+              <Text className="text-xs font-semibold text-fog">{poolStore.getState().activeMemberships().length} pools</Text>
             </View>
             {loan && (
               <View className="rounded-full border-hairline border-veil bg-surface px-4 py-2">
                 <Text className="text-xs font-semibold text-amber">1 active loan</Text>
               </View>
             )}
-            {poolStore.pendingLoan && (
+            {poolStore.getState().pendingLoan() && (
               <View className="rounded-full border-hairline border-veil bg-surface px-4 py-2">
                 <Text className="text-xs font-semibold text-iris">1 request in review</Text>
               </View>
             )}
             {/* Your own borrowing above; what other people need from you here. */}
-            {poolStore.requestsAwaitingMyDecision > 0 && (
+            {poolStore.getState().requestsAwaitingMyDecision() > 0 && (
               <View className="rounded-full border-hairline border-veil bg-surface px-4 py-2" testID="dashboard-awaiting-chip">
                 <Text className="text-xs font-semibold text-amber">
-                  {poolStore.requestsAwaitingMyDecision === 1 ? '1 to review' : `${poolStore.requestsAwaitingMyDecision} to review`}
+                  {poolStore.getState().requestsAwaitingMyDecision() === 1
+                    ? '1 to review'
+                    : `${poolStore.getState().requestsAwaitingMyDecision()} to review`}
                 </Text>
               </View>
             )}
@@ -140,17 +152,20 @@ function DashboardScreen() {
           the queues are per pool and so is the screen that clears them, so a
           combined card would have nowhere to go when two pools are waiting.
         */}
-        {poolStore.poolsAwaitingMyDecision.length > 0 && (
+        {poolStore.getState().poolsAwaitingMyDecision().length > 0 && (
           <View className="mt-6 gap-3 px-6" testID="dashboard-approvals">
-            {poolStore.poolsAwaitingMyDecision.map(({ pool, requests }) => (
-              <ApprovalsLink
-                key={pool.poolId}
-                count={requests.length}
-                poolName={pool.name}
-                onPress={() => router.push(`/(auth)/pool/approvals?poolId=${pool.poolId}`)}
-                testID={`dashboard-approvals-${pool.poolId}`}
-              />
-            ))}
+            {poolStore
+              .getState()
+              .poolsAwaitingMyDecision()
+              .map(({ pool, requests }) => (
+                <ApprovalsLink
+                  key={pool.poolId}
+                  count={requests.length}
+                  poolName={pool.name}
+                  onPress={() => router.push(`/(auth)/pool/approvals?poolId=${pool.poolId}`)}
+                  testID={`dashboard-approvals-${pool.poolId}`}
+                />
+              ))}
           </View>
         )}
 
@@ -169,15 +184,18 @@ function DashboardScreen() {
             decelerationRate="fast"
             contentContainerClassName="gap-4 px-6 py-4"
           >
-            {poolStore.myPools.map((pool) => (
-              <PoolCard
-                key={pool.poolId}
-                pool={pool}
-                membership={poolStore.membershipFor(pool.poolId)}
-                carousel
-                onPress={() => router.push(`/(auth)/pool/${pool.poolId}`)}
-              />
-            ))}
+            {poolStore
+              .getState()
+              .myPools()
+              .map((pool) => (
+                <PoolCard
+                  key={pool.poolId}
+                  pool={pool}
+                  membership={poolStore.getState().membershipFor(pool.poolId)}
+                  carousel
+                  onPress={() => router.push(`/(auth)/pool/${pool.poolId}`)}
+                />
+              ))}
           </ScrollView>
         </View>
 
@@ -235,9 +253,9 @@ function DashboardScreen() {
           says only that there is nothing to say, which is worth reading in an
           owner's queue and is clutter on your own dashboard.
         */}
-        {!poolStore.myBorrowingHistory.isNew && (
+        {!poolStore.getState().myBorrowingHistory().isNew && (
           <View className="mt-6 px-6" testID="dashboard-borrowing-record">
-            <BorrowerHistoryPanel history={poolStore.myBorrowingHistory} voice="self" testID="dashboard-history" />
+            <BorrowerHistoryPanel history={poolStore.getState().myBorrowingHistory()} voice="self" testID="dashboard-history" />
           </View>
         )}
 
@@ -275,15 +293,19 @@ function DashboardScreen() {
           </View>
           <View className="mt-4 rounded-3xl border-continuous border-hairline border-veil bg-surface py-1">
             {/* Yours, since this sits under your own balances. */}
-            {poolStore.myActivity.slice(0, 3).map((tx) => (
-              <ActivityRow
-                key={tx.id}
-                tx={tx}
-                poolName={poolStore.poolById(Number(tx.poolId))?.name}
-                denomination={poolStore.denominationFor(Number(tx.poolId))}
-                perspective="wallet"
-              />
-            ))}
+            {poolStore
+              .getState()
+              .myActivity()
+              .slice(0, 3)
+              .map((tx) => (
+                <ActivityRow
+                  key={tx.id}
+                  tx={tx}
+                  poolName={poolStore.getState().poolById(Number(tx.poolId))?.name}
+                  denomination={poolStore.getState().denominationFor(Number(tx.poolId))}
+                  perspective="wallet"
+                />
+              ))}
           </View>
         </View>
       </ScrollView>
@@ -305,4 +327,4 @@ function DashboardScreen() {
   )
 }
 
-export default observer(DashboardScreen)
+export default DashboardScreen

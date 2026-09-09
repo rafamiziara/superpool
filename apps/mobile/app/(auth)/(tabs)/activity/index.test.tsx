@@ -13,21 +13,24 @@ const daysAgo = (n: number) => new Date(Date.now() - n * 86_400_000)
 describe('ActivityScreen', () => {
   beforeEach(async () => {
     jest.clearAllMocks()
-    await poolStore.fetchPools()
+    await poolStore.getState().fetchPools()
   })
 
   it('renders a row for every non-cancelled transaction', () => {
     const { getByTestId } = render(<ActivityScreen />)
 
     expect(getByTestId('activity-screen')).toBeTruthy()
-    for (const tx of poolStore.recentTransactions) {
+    for (const tx of poolStore.getState().recentTransactions()) {
       expect(getByTestId(`activity-row-${tx.id}`)).toBeTruthy()
     }
   })
 
   it('omits cancelled transactions', () => {
-    const [first] = poolStore.transactions
-    poolStore.transactions = [{ ...first, id: 'tx-cancelled', status: TransactionStatus.CANCELLED }, ...poolStore.transactions]
+    const [first] = poolStore.getState().transactions
+    poolStore.getState().transactions = [
+      { ...first, id: 'tx-cancelled', status: TransactionStatus.CANCELLED },
+      ...poolStore.getState().transactions,
+    ]
 
     const { queryByTestId } = render(<ActivityScreen />)
 
@@ -37,12 +40,12 @@ describe('ActivityScreen', () => {
   it('groups transactions under relative day headings', () => {
     const base = {
       poolId: '1',
-      from: poolStore.userAddress,
+      from: poolStore.getState().userAddress(),
       type: TransactionType.CONTRIBUTION,
       amount: 1n,
       status: TransactionStatus.CONFIRMED,
     }
-    poolStore.transactions = [
+    poolStore.getState().transactions = [
       { ...base, id: 'tx-today', createdAt: minutesAgo(10) },
       { ...base, id: 'tx-yesterday', createdAt: daysAgo(1) },
       { ...base, id: 'tx-this-week', createdAt: daysAgo(3) },
@@ -60,12 +63,12 @@ describe('ActivityScreen', () => {
   it('collects same-day transactions into one group', () => {
     const base = {
       poolId: '1',
-      from: poolStore.userAddress,
+      from: poolStore.getState().userAddress(),
       type: TransactionType.CONTRIBUTION,
       amount: 1n,
       status: TransactionStatus.CONFIRMED,
     }
-    poolStore.transactions = [
+    poolStore.getState().transactions = [
       { ...base, id: 'tx-a', createdAt: minutesAgo(5) },
       { ...base, id: 'tx-b', createdAt: minutesAgo(30) },
     ]

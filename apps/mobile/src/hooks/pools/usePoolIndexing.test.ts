@@ -21,13 +21,12 @@ jest.mock('../../config/contracts', () => ({
   getPoolFactoryAddress: jest.fn(),
 }))
 
-// Replaced wholesale rather than spied on: MobX defines store actions as
-// non-configurable, so jest.spyOn cannot redefine them.
-jest.mock('../../stores/PoolStore', () => ({
-  poolStore: { refreshPools: jest.fn() },
-}))
-
-const refreshPools = jest.mocked(poolStore.refreshPools)
+/*
+  Spied on where it lives rather than replaced wholesale. That used to be
+  impossible: MobX defined store actions as non-configurable, so `jest.spyOn`
+  could not redefine them. Zustand keeps them as ordinary properties.
+*/
+const refreshPools = jest.spyOn(poolStore.getState(), 'refreshPools').mockResolvedValue(undefined)
 
 /**
  * Indexing only ever runs against a record the chain has already confirmed, so

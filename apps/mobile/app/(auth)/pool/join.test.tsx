@@ -47,7 +47,7 @@ function standing(status: MemberInfo['status']): MemberInfo {
   return {
     id: `31337-1-${MOCK_USER_ADDRESS.toLowerCase()}`,
     poolId: 1,
-    poolAddress: poolStore.poolById(1)!.poolAddress,
+    poolAddress: poolStore.getState().poolById(1)!.poolAddress,
     account: MOCK_USER_ADDRESS.toLowerCase(),
     status,
     joinedAt: '2026-08-11T09:00:00.000Z',
@@ -65,12 +65,12 @@ beforeEach(async () => {
   mockTriggerIndexing.mockResolvedValue(undefined)
   mockLocalSearchParams.mockReturnValue({ poolId: POOL_ID })
   authStore.setState({ walletAddress: MOCK_USER_ADDRESS })
-  await poolStore.fetchPools()
-  poolStore.memberRecords = []
+  await poolStore.getState().fetchPools()
+  poolStore.getState().memberRecords = []
 })
 
 afterEach(() => {
-  poolStore.memberRecords = []
+  poolStore.getState().memberRecords = []
   authStore.setState({ walletAddress: null })
 })
 
@@ -129,7 +129,7 @@ describe('JoinPoolScreen', () => {
     })
 
     expect(mockRequestMembership).toHaveBeenCalledWith(
-      expect.objectContaining({ poolId: 1, poolAddress: poolStore.poolById(1)!.poolAddress })
+      expect.objectContaining({ poolId: 1, poolAddress: poolStore.getState().poolById(1)!.poolAddress })
     )
   })
 
@@ -159,7 +159,7 @@ describe('JoinPoolScreen', () => {
   })
 
   it('does not ask twice while a request is already waiting', async () => {
-    poolStore.memberRecords = [standing('requested')]
+    poolStore.getState().memberRecords = [standing('requested')]
     const { getByTestId } = render(<JoinPoolScreen />)
 
     await act(async () => {
@@ -172,7 +172,7 @@ describe('JoinPoolScreen', () => {
   it('tells a rejected applicant they may ask again', () => {
     // A rejected applicant is not a stranger, and the screen must not pretend
     // their first attempt never happened.
-    poolStore.memberRecords = [standing('rejected')]
+    poolStore.getState().memberRecords = [standing('rejected')]
 
     const { getByTestId } = render(<JoinPoolScreen />)
 
@@ -181,7 +181,7 @@ describe('JoinPoolScreen', () => {
   })
 
   it('reassures a removed member that their balance is still theirs', () => {
-    poolStore.memberRecords = [standing('removed')]
+    poolStore.getState().memberRecords = [standing('removed')]
 
     const { getByTestId } = render(<JoinPoolScreen />)
 

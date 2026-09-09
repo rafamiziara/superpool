@@ -36,4 +36,12 @@ export {
   type TransactionReceiptReader,
   usePendingTransactionsStore,
 } from './PendingTransactionsStore'
-export { PoolStore, poolStore } from './PoolStore'
+export {
+  createPoolStore,
+  type PoolActions,
+  type PoolState,
+  type PoolStoreApi,
+  type PoolStoreState,
+  poolStore,
+  usePoolStore,
+} from './PoolStore'

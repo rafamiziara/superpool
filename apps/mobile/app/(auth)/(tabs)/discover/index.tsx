@@ -1,7 +1,6 @@
 import { FontAwesome } from '@expo/vector-icons'
 import { router } from 'expo-router'
 import { StatusBar } from 'expo-status-bar'
-import { observer } from 'mobx-react-lite'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { ActivityIndicator, Pressable, RefreshControl, ScrollView, Text, TextInput, View } from 'react-native'
 import { useAccount } from 'wagmi'
@@ -9,7 +8,7 @@ import { DiscoverPoolCard } from '../../../../src/components/lending/DiscoverPoo
 import { NetworkBadge } from '../../../../src/components/lending/NetworkBadge'
 import { DEFAULT_CHAIN_ID } from '../../../../src/config/contracts'
 import { palette } from '../../../../src/constants/palette'
-import { poolStore } from '../../../../src/stores/PoolStore'
+import { poolStore, usePoolStore } from '../../../../src/stores/PoolStore'
 import { chainName } from '../../../../src/utils/explorer'
 import { filterPools, POOL_SORT_LABELS, POOL_SORT_MODES, type PoolSortMode, sortPools } from '../../../../src/utils/poolSearch'
 
@@ -33,13 +32,23 @@ import { filterPools, POOL_SORT_LABELS, POOL_SORT_MODES, type PoolSortMode, sort
  * blocks on the network.
  */
 function DiscoverScreen() {
+  /*
+    Subscribes this component to the pool store.
+
+    The reads below go through `poolStore.getState()`, which returns current
+    state but never notifies — this call is what re-renders on a change, and it
+    is what `observer` used to do by tracing the reads. Coarser than MobX was,
+    deliberately: see `usePoolStore`.
+  */
+  usePoolStore()
+
   const { chainId } = useAccount()
   const [query, setQuery] = useState('')
   const [sort, setSort] = useState<PoolSortMode>('newest')
 
   const activeChainId = chainId ?? DEFAULT_CHAIN_ID
   const isSearching = query.trim().length > 0
-  const pools = isSearching ? poolStore.discoverableMatches : poolStore.discoverablePools
+  const pools = isSearching ? poolStore.getState().discoverableMatches() : poolStore.getState().discoverablePools()
 
   /*
     Debounced, because this is a callable and the box is typed into.
@@ -53,12 +62,12 @@ function DiscoverScreen() {
     const term = query.trim()
 
     if (!term) {
-      poolStore.clearPoolSearch()
+      poolStore.getState().clearPoolSearch()
 
       return
     }
 
-    const timer = setTimeout(() => void poolStore.searchPools(term), 300)
+    const timer = setTimeout(() => void poolStore.getState().searchPools(term), 300)
 
     return () => clearTimeout(timer)
   }, [query])
@@ -68,7 +77,7 @@ function DiscoverScreen() {
    * list that way, and `liquidity` derives a figure per pool from the event
    * lists, which is the expensive one to run over pools about to be dropped.
    */
-  const results = useMemo(() => sortPools(filterPools(pools, query), sort, poolStore.poolLiquidity), [pools, query, sort])
+  const results = useMemo(() => sortPools(filterPools(pools, query), sort, poolStore.getState().poolLiquidity), [pools, query, sort])
 
   /**
    * Same sweep-then-reload as the Pools tab. It matters more here: this list is
@@ -76,10 +85,10 @@ function DiscoverScreen() {
    * this device never had a reason to index.
    */
   const handleRefresh = useCallback(async () => {
-    await poolStore.syncAndRefresh()
+    await poolStore.getState().syncAndRefresh()
   }, [])
 
-  if (poolStore.isLoading && pools.length === 0) {
+  if (poolStore.getState().isLoading && pools.length === 0) {
     return (
       <View className="flex-1 items-center justify-center gap-4 bg-abyss" testID="discover-loading">
         <StatusBar style="light" />
@@ -91,7 +100,7 @@ function DiscoverScreen() {
 
   // Only when there is nothing cached to show. With pools on screen the same
   // failure is the banner below — see the Pools tab for the reasoning.
-  if (poolStore.hasError && pools.length === 0) {
+  if (poolStore.getState().hasError() && pools.length === 0) {
     return (
       <View className="flex-1 items-center justify-center gap-4 bg-abyss px-10" testID="discover-error">
         <StatusBar style="light" />
@@ -99,8 +108,8 @@ function DiscoverScreen() {
           <FontAwesome name="exclamation" size={20} color={palette.coral} />
         </View>
         <Text className="text-center text-base font-semibold text-snow">Could not load circles</Text>
-        <Text className="text-center text-sm text-fog">{poolStore.error}</Text>
-        <Pressable onPress={() => poolStore.fetchPools()} className="mt-2 active:opacity-70" testID="discover-error-retry">
+        <Text className="text-center text-sm text-fog">{poolStore.getState().error}</Text>
+        <Pressable onPress={() => poolStore.getState().fetchPools()} className="mt-2 active:opacity-70" testID="discover-error-retry">
           <Text className="font-semibold text-mint">Try again</Text>
         </Pressable>
       </View>
@@ -118,7 +127,7 @@ function DiscoverScreen() {
         keyboardDismissMode="on-drag"
         keyboardShouldPersistTaps="handled"
         contentContainerClassName="pb-8 pt-4"
-        refreshControl={<RefreshControl refreshing={poolStore.isRefreshing} onRefresh={handleRefresh} tintColor={palette.fog} />}
+        refreshControl={<RefreshControl refreshing={poolStore.getState().isRefreshing} onRefresh={handleRefresh} tintColor={palette.fog} />}
       >
         <View className="px-6">
           <View className="flex-row items-center gap-3 rounded-2xl border-continuous border-hairline border-veil bg-raised px-4 py-3 focus-within:border-mint">
@@ -176,12 +185,12 @@ function DiscoverScreen() {
         </ScrollView>
 
         <View className="mt-5 gap-4 px-6">
-          {poolStore.hasError && (
+          {poolStore.getState().hasError() && (
             <View
               className="rounded-2xl border-continuous border-hairline border-coral bg-coral-deep px-4 py-3"
               testID="discover-error-banner"
             >
-              <Text className="text-sm text-coral">{poolStore.error}</Text>
+              <Text className="text-sm text-coral">{poolStore.getState().error}</Text>
             </View>
           )}
 
@@ -212,7 +221,7 @@ function DiscoverScreen() {
             the answer arrives tells the user their pool does not exist, and
             then contradicts itself a moment later.
           */}
-          {results.length === 0 && isSearching && poolStore.isSearchingPools && (
+          {results.length === 0 && isSearching && poolStore.getState().isSearchingPools && (
             <View className="items-center gap-3 py-10" testID="discover-searching">
               <ActivityIndicator colorClassName="accent-mint" />
               <Text className="text-sm text-fog">Looking across the network</Text>
@@ -220,7 +229,7 @@ function DiscoverScreen() {
           )}
 
           {results.length === 0 &&
-            !poolStore.isSearchingPools &&
+            !poolStore.getState().isSearchingPools &&
             (isSearching ? (
               <View className="items-center gap-2 py-10" testID="discover-no-results">
                 <Text className="text-base font-semibold text-snow">Nothing matches “{query.trim()}”</Text>
@@ -248,4 +257,4 @@ function DiscoverScreen() {
   )
 }
 
-export default observer(DiscoverScreen)
+export default DiscoverScreen

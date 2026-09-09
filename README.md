@@ -58,7 +58,7 @@ Designed and partly scaffolded, but **not** functional yet — the mobile screen
 - **Smart Contracts:** Solidity, Hardhat, OpenZeppelin (ERC-20, UUPS Proxies, Ownable)
 - **Multi-Chain Deployment:** EVM-compatible chains including Polygon, Ethereum, Arbitrum, Base, and BSC
 - **Frontend - Landing Page:** Next.js 16, React 19, Tailwind CSS v4
-- **Frontend - Mobile App:** React Native/Expo, Uniwind (Tailwind CSS v4), MobX state management
+- **Frontend - Mobile App:** React Native/Expo, Uniwind (Tailwind CSS v4), Zustand state management
 - **Wallet Integration:** Reown AppKit with WalletConnect protocol supporting 500+ wallets
 - **Blockchain Interaction:** Wagmi hooks, Viem, Typechain for type-safe contract bindings
 - **Backend:** Firebase Cloud Functions, Firestore, wallet-based authentication

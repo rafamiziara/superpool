@@ -76,7 +76,7 @@ describe('ClaimInterestCard', () => {
     mockClaimInterest.mockResolvedValue(TX_HASH)
     mockWaitForTransaction.mockResolvedValue({ amount: parseEther('1.5').toString(), txHash: TX_HASH })
     mockTriggerIndexing.mockResolvedValue(undefined)
-    poolStore.claimableByPool = {}
+    poolStore.getState().claimableByPool = {}
   })
 
   describe('what it shows', () => {
@@ -127,7 +127,7 @@ describe('ClaimInterestCard', () => {
       // emits nothing naming the member it credits.
       renderCard()
 
-      expect(poolStore.claimableByPool[1]).toBe(parseEther('1.5').toString())
+      expect(poolStore.getState().claimableByPool[1]).toBe(parseEther('1.5').toString())
     })
 
     it('records nothing while the chain has not answered', () => {
@@ -137,7 +137,7 @@ describe('ClaimInterestCard', () => {
 
       renderCard()
 
-      expect(poolStore.claimableByPool[1]).toBeUndefined()
+      expect(poolStore.getState().claimableByPool[1]).toBeUndefined()
     })
   })
 

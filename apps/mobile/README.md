@@ -4,7 +4,7 @@ React Native/Expo application with wallet integration and lending pool managemen
 
 ## Overview
 
-Cross-platform mobile app supporting 500+ wallets via WalletConnect with MobX state management.
+Cross-platform mobile app supporting 500+ wallets via WalletConnect with Zustand state management.
 
 ## Features
 
@@ -64,7 +64,9 @@ pnpm test
 
 ## State Management
 
-MobX singleton stores configured in `src/stores/`:
+Zustand singleton stores in `src/stores/`. Each exports the store, a `create…Store()`
+factory the tests use for isolation, and selectors for anything derived — a component
+subscribes to what a selector returns, so every dependency is named rather than traced:
 
 - **`AuthStore`** - User authentication, wallet state and session
 - **`NavigationStore`** - Auth-driven routing decisions
@@ -208,7 +210,7 @@ Configured in `src/config/wagmi.ts`:
 - **Expo Router** - File-based navigation
 - **Reown AppKit** - Wallet connection UI
 - **Wagmi/Viem** - Ethereum interactions
-- **MobX** - Reactive state management
+- **Zustand** - State management
 - **Uniwind** - Tailwind CSS v4 for React Native
 - **@superpool/types** - Shared TypeScript types
 

@@ -94,8 +94,8 @@ function outstandingLoan(overrides: Record<string, unknown> = {}) {
     id: '31337-1-3',
     loanId: 3,
     poolId: 1,
-    poolAddress: poolStore.poolById(1)!.poolAddress,
-    borrower: poolStore.userAddress,
+    poolAddress: poolStore.getState().poolById(1)!.poolAddress,
+    borrower: poolStore.getState().userAddress(),
     amount: '4000000000000000000',
     interestRate: 500,
     duration: 2_592_000,
@@ -125,12 +125,12 @@ beforeEach(async () => {
   mockWriteNote.mockResolvedValue(true)
   mockNoteFor.mockReturnValue(undefined)
   mockChainReads()
-  await poolStore.fetchPools()
-  poolStore.loanRecords = []
+  await poolStore.getState().fetchPools()
+  poolStore.getState().loanRecords = []
 })
 
 afterEach(() => {
-  poolStore.loanRecords = []
+  poolStore.getState().loanRecords = []
 })
 
 describe('BorrowScreen', () => {
@@ -262,7 +262,7 @@ describe('BorrowScreen', () => {
 
   describe('repaying', () => {
     beforeEach(() => {
-      poolStore.loanRecords = [outstandingLoan()]
+      poolStore.getState().loanRecords = [outstandingLoan()]
     })
 
     it('reminds the borrower what they said the money was for', () => {
@@ -395,7 +395,7 @@ describe('BorrowScreen', () => {
     })
 
     it('ignores a loan that has already been settled', async () => {
-      poolStore.loanRecords = [
+      poolStore.getState().loanRecords = [
         outstandingLoan({ isRepaid: true, amountRepaid: '4200000000000000000', principalOutstanding: '0', interestOutstanding: '0' }),
       ]
 
@@ -406,7 +406,7 @@ describe('BorrowScreen', () => {
     })
 
     it('ignores another wallet’s loan in the same pool', async () => {
-      poolStore.loanRecords = [outstandingLoan({ borrower: '0x0000000000000000000000000000000000000042' })]
+      poolStore.getState().loanRecords = [outstandingLoan({ borrower: '0x0000000000000000000000000000000000000042' })]
 
       const { getByTestId, queryByTestId } = render(<BorrowScreen />)
 
@@ -498,7 +498,7 @@ describe('BorrowScreen', () => {
 
   describe('a request waiting on the owner', () => {
     beforeEach(() => {
-      poolStore.loanRecords = [outstandingLoan({ loanId: 5, status: 'requested' })]
+      poolStore.getState().loanRecords = [outstandingLoan({ loanId: 5, status: 'requested' })]
     })
 
     it('shows the waiting panel instead of the form', () => {
@@ -551,7 +551,7 @@ describe('BorrowScreen', () => {
     })
 
     it('ignores another wallet’s request in the same pool', async () => {
-      poolStore.loanRecords = [outstandingLoan({ status: 'requested', borrower: '0x0000000000000000000000000000000000000042' })]
+      poolStore.getState().loanRecords = [outstandingLoan({ status: 'requested', borrower: '0x0000000000000000000000000000000000000042' })]
 
       const { getByTestId, queryByTestId } = render(<BorrowScreen />)
 
@@ -562,7 +562,7 @@ describe('BorrowScreen', () => {
     it('ignores a request that was turned down', async () => {
       // A rejection frees the borrower to ask again, so the form is what they
       // need — not a panel about a request that is over.
-      poolStore.loanRecords = [outstandingLoan({ status: 'rejected' })]
+      poolStore.getState().loanRecords = [outstandingLoan({ status: 'rejected' })]
 
       const { getByTestId, queryByTestId } = render(<BorrowScreen />)
 

@@ -2,7 +2,6 @@ import { FontAwesome } from '@expo/vector-icons'
 import type { LoanDecisionInfo } from '@superpool/types'
 import { router, Stack, useLocalSearchParams } from 'expo-router'
 import { StatusBar } from 'expo-status-bar'
-import { observer } from 'mobx-react-lite'
 import { useMemo } from 'react'
 import { ActivityIndicator, Pressable, RefreshControl, ScrollView, Text, View } from 'react-native'
 import { useReadContract } from 'wagmi'
@@ -10,7 +9,7 @@ import { UnsupportedPoolNotice } from '../../../src/components/lending/Unsupport
 import { LendingPoolABI } from '../../../src/constants/abis'
 import { palette } from '../../../src/constants/palette'
 import { useLoanDecisions } from '../../../src/hooks/pools/useLoanDecisions'
-import { poolStore } from '../../../src/stores/PoolStore'
+import { poolStore, usePoolStore } from '../../../src/stores/PoolStore'
 import { denominationFor } from '../../../src/utils/denomination'
 import { formatAmount, sameAddress, shortAddress, timeAgo } from '../../../src/utils/format'
 import { decisionSummary, loanPortfolio } from '../../../src/utils/portfolio'
@@ -59,9 +58,19 @@ const OUTCOME_STYLES: Record<LoanDecisionInfo['outcome'], { text: string; dot: s
  * view, and a member looking at a pool wants their own position instead.
  */
 function PortfolioScreen() {
+  /*
+    Subscribes this component to the pool store.
+
+    The reads below go through `poolStore.getState()`, which returns current
+    state but never notifies — this call is what re-renders on a change, and it
+    is what `observer` used to do by tracing the reads. Coarser than MobX was,
+    deliberately: see `usePoolStore`.
+  */
+  usePoolStore()
+
   const { poolId } = useLocalSearchParams<{ poolId: string }>()
 
-  const pool = poolStore.poolById(Number(poolId))
+  const pool = poolStore.getState().poolById(Number(poolId))
   const denomination = pool ? denominationFor(pool) : undefined
   const { decisions, isLoading: loadingDecisions, refresh: refreshDecisions } = useLoanDecisions(pool?.poolId)
 
@@ -79,7 +88,7 @@ function PortfolioScreen() {
     query: { enabled: Boolean(pool?.poolAddress) },
   })
 
-  const loans = pool ? poolStore.loanRecords.filter((loan) => loan.poolId === pool.poolId) : []
+  const loans = pool ? poolStore.getState().loanRecords.filter((loan) => loan.poolId === pool.poolId) : []
   const loanKey = loans.map((loan) => `${loan.id}:${loan.status}:${loan.amountRepaid}`).join(',')
 
   /*
@@ -87,18 +96,15 @@ function PortfolioScreen() {
     other about which loans are late — and so a re-render mid-second cannot
     move a loan between two tiles.
   */
-  const portfolio = useMemo(
-    () => loanPortfolio(loans, Date.now()),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [loanKey]
-  )
+  // biome-ignore lint/correctness/useExhaustiveDependencies: `loanKey` stands in for `loans`, which is rebuilt on every render — see above.
+  const portfolio = useMemo(() => loanPortfolio(loans, Date.now()), [loanKey])
 
   const summary = useMemo(() => decisionSummary(decisions), [decisions])
 
   // Outstanding comes from the store rather than from `loanPortfolio`: it
   // projects accrued interest forward per second, which is arithmetic that
   // belongs in one place.
-  const outstanding = pool ? poolStore.outstandingDebt(pool.poolId) : 0n
+  const outstanding = pool ? poolStore.getState().outstandingDebt(pool.poolId) : 0n
   const liquidity = typeof available === 'bigint' ? available : undefined
 
   /*
@@ -123,7 +129,7 @@ function PortfolioScreen() {
     draws this: a deep link can open the screen on a cold start, before
     `fetchPools` has answered.
   */
-  if (!pool && poolStore.isLoading) {
+  if (!pool && poolStore.getState().isLoading) {
     return (
       <View className="flex-1 items-center justify-center gap-4 bg-abyss" testID="portfolio-loading">
         <Stack.Screen options={{ title: 'Lending' }} />
@@ -160,7 +166,7 @@ function PortfolioScreen() {
     )
   }
 
-  if (!sameAddress(pool.poolOwner, poolStore.userAddress)) {
+  if (!sameAddress(pool.poolOwner, poolStore.getState().userAddress())) {
     return (
       <View className="flex-1 items-center justify-center gap-4 bg-abyss px-10" testID="portfolio-not-owner">
         <Stack.Screen options={{ title: 'Lending' }} />
@@ -204,9 +210,9 @@ function PortfolioScreen() {
         contentContainerClassName="gap-6 px-6 pb-16 pt-4"
         refreshControl={
           <RefreshControl
-            refreshing={poolStore.isRefreshing || loadingDecisions}
+            refreshing={poolStore.getState().isRefreshing || loadingDecisions}
             onRefresh={() => {
-              void poolStore.syncAndRefresh()
+              void poolStore.getState().syncAndRefresh()
               void refreshDecisions()
               void refetchAvailable()
             }}
@@ -352,4 +358,4 @@ function PortfolioScreen() {
   )
 }
 
-export default observer(PortfolioScreen)
+export default PortfolioScreen

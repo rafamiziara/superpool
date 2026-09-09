@@ -1,10 +1,9 @@
 import { FontAwesome } from '@expo/vector-icons'
 import type { PoolInfo, PoolMember } from '@superpool/types'
 import { MemberStatus } from '@superpool/types'
-import { observer } from 'mobx-react-lite'
 import { Pressable, Text, View } from 'react-native'
 import { palette } from '../../constants/palette'
-import { poolStore } from '../../stores/PoolStore'
+import { poolStore, usePoolStore } from '../../stores/PoolStore'
 import { denominationFor } from '../../utils/denomination'
 import { bpsToPercent, formatAmount, formatDuration, sameAddress } from '../../utils/format'
 
@@ -34,12 +33,22 @@ interface PoolCardProps {
  * which is how a request lands and the card carries on saying nothing.
  */
 function PoolCardComponent({ pool, membership, onPress, carousel = false }: PoolCardProps) {
+  /*
+    Subscribes this component to the pool store.
+
+    The reads below go through `poolStore.getState()`, which returns current
+    state but never notifies — this call is what re-renders on a change, and it
+    is what `observer` used to do by tracing the reads. Coarser than MobX was,
+    deliberately: see `usePoolStore`.
+  */
+  usePoolStore()
+
   const accent = accentStyles[ACCENT_CYCLE[pool.poolId % ACCENT_CYCLE.length]]
   const denomination = denominationFor(pool)
-  const isOwner = sameAddress(pool.poolOwner, poolStore.userAddress)
+  const isOwner = sameAddress(pool.poolOwner, poolStore.getState().userAddress())
   const isPending = membership?.status === MemberStatus.PENDING
   // Only the owner can act on these, so only the owner is told about them.
-  const awaiting = isOwner ? poolStore.pendingLoansFor(pool.poolId).length : 0
+  const awaiting = isOwner ? poolStore.getState().pendingLoansFor(pool.poolId).length : 0
 
   return (
     <Pressable
@@ -121,4 +130,4 @@ function PoolCardComponent({ pool, membership, onPress, carousel = false }: Pool
   )
 }
 
-export const PoolCard = observer(PoolCardComponent)
+export const PoolCard = PoolCardComponent

@@ -59,7 +59,7 @@ function lateLoan(overrides: Partial<LoanInfo> = {}, overdueBy = 5 * DAY): LoanI
     id: '31337-2-5',
     loanId: 5,
     poolId: 2,
-    poolAddress: poolStore.poolById(2)!.poolAddress,
+    poolAddress: poolStore.getState().poolById(2)!.poolAddress,
     borrower: STRANGER,
     amount: '4000000000000000000',
     interestRate: 500,
@@ -81,7 +81,7 @@ function lateLoan(overrides: Partial<LoanInfo> = {}, overdueBy = 5 * DAY): LoanI
 function withIndexedLoans(records: LoanInfo[]) {
   delete process.env.EXPO_PUBLIC_USE_MOCK_POOLS
   authStore.setState({ walletAddress: MOCK_USER_ADDRESS })
-  poolStore.loanRecords = records
+  poolStore.getState().loanRecords = records
 }
 
 beforeEach(async () => {
@@ -96,14 +96,14 @@ beforeEach(async () => {
   // The grace period and the outstanding balance both come through here.
   mockWagmiUseReadContract.mockReturnValue({ data: 0n, refetch: jest.fn() })
   authStore.setState({ walletAddress: null })
-  await poolStore.fetchPools()
-  poolStore.loanRecords = []
+  await poolStore.getState().fetchPools()
+  poolStore.getState().loanRecords = []
 })
 
 afterEach(() => {
   process.env.EXPO_PUBLIC_USE_MOCK_POOLS = 'true'
   authStore.setState({ walletAddress: null })
-  poolStore.loanRecords = []
+  poolStore.getState().loanRecords = []
 })
 
 describe('OverdueLoansScreen', () => {
@@ -146,7 +146,7 @@ describe('OverdueLoansScreen', () => {
     // `markDefaulted` is `onlyOwner`, so anyone else would be offered a
     // transaction that reverts.
     mockLocalSearchParams.mockReturnValue({ poolId: POOL_I_DO_NOT_OWN })
-    withIndexedLoans([lateLoan({ poolId: 1, poolAddress: poolStore.poolById(1)!.poolAddress })])
+    withIndexedLoans([lateLoan({ poolId: 1, poolAddress: poolStore.getState().poolById(1)!.poolAddress })])
 
     const { getByTestId } = render(<OverdueLoansScreen />)
 

@@ -1,9 +1,8 @@
 import type { Transaction } from '@superpool/types'
 import { StatusBar } from 'expo-status-bar'
-import { observer } from 'mobx-react-lite'
 import { ScrollView, Text, View } from 'react-native'
 import { ActivityRow } from '../../../../src/components/lending/ActivityRow'
-import { poolStore } from '../../../../src/stores/PoolStore'
+import { poolStore, usePoolStore } from '../../../../src/stores/PoolStore'
 
 function groupLabel(date: Date): string {
   const days = Math.floor((Date.now() - date.getTime()) / 86_400_000)
@@ -28,9 +27,19 @@ function groupTransactions(transactions: Transaction[]): { label: string; items:
 }
 
 function ActivityScreen() {
+  /*
+    Subscribes this component to the pool store.
+
+    The reads below go through `poolStore.getState()`, which returns current
+    state but never notifies — this call is what re-renders on a change, and it
+    is what `observer` used to do by tracing the reads. Coarser than MobX was,
+    deliberately: see `usePoolStore`.
+  */
+  usePoolStore()
+
   // The user's own, not every pool's: the empty state below promises this is
   // about them, and the rows are signed from their wallet's side to match.
-  const groups = groupTransactions(poolStore.myActivity)
+  const groups = groupTransactions(poolStore.getState().myActivity())
 
   return (
     <View className="flex-1 bg-abyss" testID="activity-screen">
@@ -59,8 +68,8 @@ function ActivityScreen() {
                   <ActivityRow
                     key={tx.id}
                     tx={tx}
-                    poolName={poolStore.poolById(Number(tx.poolId))?.name}
-                    denomination={poolStore.denominationFor(Number(tx.poolId))}
+                    poolName={poolStore.getState().poolById(Number(tx.poolId))?.name}
+                    denomination={poolStore.getState().denominationFor(Number(tx.poolId))}
                     perspective="wallet"
                   />
                 ))}
@@ -73,4 +82,4 @@ function ActivityScreen() {
   )
 }
 
-export default observer(ActivityScreen)
+export default ActivityScreen

@@ -24,13 +24,14 @@ export default function AuthLayout() {
    * new ones load would show a list that is wrong rather than merely stale.
    */
   useEffect(() => {
+    // The chain is passed rather than left to the store's default, so that the
+    // dependency below is one the effect genuinely reads. The store resolves
+    // the same value when it is absent, so this changes nothing but the record
+    // of intent. Dropping it is the documented bug: the store went on serving
+    // the chain the user had just left. See CLAUDE.md → Chains.
     if (isAuthenticated) {
-      poolStore.fetchPools()
+      poolStore.getState().fetchPools({ chainId: chainId ?? undefined })
     }
-    // `chainId` is an ordinary subscribed value now, so it is an ordinary
-    // dependency and the exhaustive-deps rule agrees with it. Dropping it is
-    // the documented bug: the store went on serving the chain the user had
-    // just left. See CLAUDE.md → Chains.
   }, [isAuthenticated, chainId])
 
   // Redirect protection - this should not happen due to NavigationStore

@@ -69,7 +69,7 @@ function makeRequest(overrides: Partial<LoanInfo> = {}): LoanInfo {
     id: '31337-2-5',
     loanId: 5,
     poolId: 2,
-    poolAddress: poolStore.poolById(2)!.poolAddress,
+    poolAddress: poolStore.getState().poolById(2)!.poolAddress,
     borrower: STRANGER,
     amount: '4000000000000000000',
     interestRate: 500,
@@ -99,7 +99,7 @@ function makeRequest(overrides: Partial<LoanInfo> = {}): LoanInfo {
 function withIndexedLoans(records: LoanInfo[]) {
   delete process.env.EXPO_PUBLIC_USE_MOCK_POOLS
   authStore.setState({ walletAddress: MOCK_USER_ADDRESS })
-  poolStore.loanRecords = records
+  poolStore.getState().loanRecords = records
 }
 
 beforeEach(async () => {
@@ -115,13 +115,13 @@ beforeEach(async () => {
   mockAssessments = {}
   mockWagmiUseReadContract.mockReturnValue({ data: 100_000_000_000_000_000_000n, refetch: jest.fn().mockResolvedValue({ data: 0n }) })
   authStore.setState({ walletAddress: null })
-  await poolStore.fetchPools()
-  poolStore.loanRecords = []
+  await poolStore.getState().fetchPools()
+  poolStore.getState().loanRecords = []
 })
 
 afterEach(() => {
   process.env.EXPO_PUBLIC_USE_MOCK_POOLS = 'true'
-  poolStore.loanRecords = []
+  poolStore.getState().loanRecords = []
   authStore.setState({ walletAddress: null })
 })
 
@@ -141,19 +141,19 @@ describe('ApprovalsScreen', () => {
   // question nothing has resolved yet.
   it('reads as loading, not as missing, while the pools are still arriving', () => {
     mockLocalSearchParams.mockReturnValue({ poolId: '9999' })
-    poolStore.isLoading = true
+    poolStore.getState().isLoading = true
 
     const { getByTestId, queryByTestId } = render(<ApprovalsScreen />)
 
     expect(getByTestId('approvals-loading')).toBeTruthy()
     expect(queryByTestId('approvals-pool-not-found')).toBeNull()
 
-    poolStore.isLoading = false
+    poolStore.getState().isLoading = false
   })
 
   it('says the pool is missing once the load has finished', () => {
     mockLocalSearchParams.mockReturnValue({ poolId: '9999' })
-    poolStore.isLoading = false
+    poolStore.getState().isLoading = false
 
     const { getByTestId } = render(<ApprovalsScreen />)
 
@@ -164,7 +164,7 @@ describe('ApprovalsScreen', () => {
     // `approveLoan` and `rejectLoan` are `onlyOwner`, so showing the queue would
     // invite a transaction that reverts.
     mockLocalSearchParams.mockReturnValue({ poolId: POOL_I_DO_NOT_OWN })
-    poolStore.loanRecords = [makeRequest({ id: '31337-1-5', poolId: 1 })]
+    poolStore.getState().loanRecords = [makeRequest({ id: '31337-1-5', poolId: 1 })]
 
     const { getByTestId, queryByTestId } = render(<ApprovalsScreen />)
 
@@ -223,7 +223,7 @@ describe('ApprovalsScreen', () => {
   it('lists every member’s request, not just the owner’s own', () => {
     // The whole point of the screen: the owner is deciding on other people's
     // requests, so filtering by the connected wallet would empty it.
-    poolStore.loanRecords = [makeRequest(), makeRequest({ id: '31337-2-6', loanId: 6 })]
+    poolStore.getState().loanRecords = [makeRequest(), makeRequest({ id: '31337-2-6', loanId: 6 })]
 
     const { getByTestId } = render(<ApprovalsScreen />)
 
@@ -232,7 +232,7 @@ describe('ApprovalsScreen', () => {
   })
 
   it('leaves out loans that are already disbursed or decided', () => {
-    poolStore.loanRecords = [
+    poolStore.getState().loanRecords = [
       makeRequest(),
       makeRequest({ id: '31337-2-7', loanId: 7, status: 'disbursed' }),
       makeRequest({ id: '31337-2-8', loanId: 8, status: 'rejected' }),
@@ -246,7 +246,7 @@ describe('ApprovalsScreen', () => {
   })
 
   it('leaves out another pool’s requests', () => {
-    poolStore.loanRecords = [makeRequest({ id: '31337-3-5', poolId: 3 })]
+    poolStore.getState().loanRecords = [makeRequest({ id: '31337-3-5', poolId: 3 })]
 
     const { getByTestId } = render(<ApprovalsScreen />)
 
@@ -275,7 +275,7 @@ describe('ApprovalsScreen', () => {
     it('answers the longest wait first', () => {
       // The default, and the reason it is the default: served newest-first,
       // whoever asked earliest is pushed down every time somebody new asks.
-      poolStore.loanRecords = queue()
+      poolStore.getState().loanRecords = queue()
 
       const { getAllByTestId } = render(<ApprovalsScreen />)
 
@@ -286,7 +286,7 @@ describe('ApprovalsScreen', () => {
       // Deliberately not the waiting order: the smallest request here is also
       // the middle one by age, so an order that did nothing would still pass
       // the default case above.
-      poolStore.loanRecords = queue()
+      poolStore.getState().loanRecords = queue()
 
       const { getAllByTestId, getByTestId } = render(<ApprovalsScreen />)
       fireEvent.press(getByTestId('approvals-order-largest'))
@@ -302,7 +302,7 @@ describe('ApprovalsScreen', () => {
       // Nothing here ranks borrowers. An order by assessment band or by
       // borrowing history is a score with the arithmetic hidden, and this
       // project refused to build a score.
-      poolStore.loanRecords = queue()
+      poolStore.getState().loanRecords = queue()
 
       const { getByTestId, queryByTestId } = render(<ApprovalsScreen />)
 
@@ -315,7 +315,7 @@ describe('ApprovalsScreen', () => {
     it('hides the control when there is nothing to order', () => {
       // One request has no order, and the row would read as a setting to
       // understand before deciding anything.
-      poolStore.loanRecords = [makeRequest()]
+      poolStore.getState().loanRecords = [makeRequest()]
 
       const { queryByTestId } = render(<ApprovalsScreen />)
 
@@ -325,7 +325,7 @@ describe('ApprovalsScreen', () => {
 
   describe('deciding', () => {
     beforeEach(() => {
-      poolStore.loanRecords = [makeRequest()]
+      poolStore.getState().loanRecords = [makeRequest()]
     })
 
     it('approves with the loan id and names the borrower', async () => {
@@ -397,7 +397,7 @@ describe('ApprovalsScreen', () => {
           observations: [],
           questions: [],
           limitations: ['No purpose was stated.'],
-          inputs: { amount: 4, liquidity: 100, symbol: 'POL', hadPurpose: false, borrower: poolStore.borrowerHistory(STRANGER) },
+          inputs: { amount: 4, liquidity: 100, symbol: 'POL', hadPurpose: false, borrower: poolStore.getState().borrowerHistory(STRANGER) },
           createdAt: new Date().toISOString(),
         },
       }

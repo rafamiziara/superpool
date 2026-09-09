@@ -19,12 +19,6 @@ jest.mock('@reown/appkit-wagmi-react-native', () => ({
   `chainId`, which is the regression it exists to catch.
 */
 
-jest.mock('../../src/stores/PoolStore', () => ({
-  poolStore: {
-    fetchPools: jest.fn(),
-  },
-}))
-
 // Mock Stack component
 jest.mock('expo-router', () => {
   const MockStack = (_props: { children?: React.ReactNode; screenOptions?: Record<string, unknown> }) => null
@@ -37,7 +31,8 @@ jest.mock('expo-router', () => {
   }
 })
 
-const mockFetchPools = poolStore.fetchPools as jest.Mock
+// Spied on the real store — see usePoolIndexing's test for why that is possible now.
+const mockFetchPools = jest.spyOn(poolStore.getState(), 'fetchPools').mockResolvedValue(undefined)
 
 const TEST_USER = {
   walletAddress: '0x123456789',

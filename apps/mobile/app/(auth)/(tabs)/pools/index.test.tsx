@@ -23,14 +23,14 @@ describe('PoolsScreen', () => {
     mockFirebaseCallable.mockReturnValue(jest.fn().mockResolvedValue({ data: { poolId: 99, alreadyIndexed: false, stored: true } }))
     mockWagmiUseAccount.mockReturnValue({ isConnected: true, isConnecting: false, address: undefined, chainId: LOCALHOST_CHAIN_ID })
     await pendingTransactionsStore.getState().reset()
-    await poolStore.fetchPools()
+    await poolStore.getState().fetchPools()
   })
 
   it('renders a card for every pool the user belongs to', () => {
     const { getByTestId } = render(<PoolsScreen />)
 
     expect(getByTestId('pools-screen')).toBeTruthy()
-    for (const pool of poolStore.myPools) {
+    for (const pool of poolStore.getState().myPools()) {
       expect(getByTestId(`pool-card-${pool.poolId}`)).toBeTruthy()
     }
   })
@@ -38,15 +38,15 @@ describe('PoolsScreen', () => {
   it('pluralises the membership count', () => {
     const { getByText } = render(<PoolsScreen />)
 
-    expect(getByText(`${poolStore.myPools.length} circles you're part of`)).toBeTruthy()
+    expect(getByText(`${poolStore.getState().myPools().length} circles you're part of`)).toBeTruthy()
   })
 
   it('uses the singular form for a single pool', () => {
     // myPools counts membership *or* ownership, so both have to be trimmed to
     // leave exactly one: mock pool 2 is owned by the mock user. Memberships are
     // derived from contributions now, so trimming those is what shortens them.
-    poolStore.pools = poolStore.pools.slice(0, 1)
-    poolStore.contributions = []
+    poolStore.getState().pools = poolStore.getState().pools.slice(0, 1)
+    poolStore.getState().contributions = []
 
     const { getByText } = render(<PoolsScreen />)
 
@@ -95,7 +95,7 @@ describe('PoolsScreen', () => {
       // The record is deliberately still in the store — indexing fails here — so
       // this proves the screen dedupes rather than the drain having removed it.
       failIndexing()
-      const listed = poolStore.pools[0].poolId
+      const listed = poolStore.getState().pools[0].poolId
       await pendingTransactionsStore
         .getState()
         .addPendingTransaction(makePendingTransaction({ status: 'confirmed', result: { poolId: listed, poolAddress: '0xdef' } }))
@@ -178,8 +178,8 @@ describe('PoolsScreen', () => {
 
   describe('load states', () => {
     it('shows a loading state on the first load', () => {
-      poolStore.reset()
-      poolStore.isLoading = true
+      poolStore.getState().reset()
+      poolStore.getState().isLoading = true
 
       const { getByTestId } = render(<PoolsScreen />)
 
@@ -187,21 +187,21 @@ describe('PoolsScreen', () => {
     })
 
     it('keeps the list on screen while a refresh runs', () => {
-      poolStore.isRefreshing = true
+      poolStore.getState().isRefreshing = true
 
       const { getByTestId, queryByTestId } = render(<PoolsScreen />)
 
       expect(queryByTestId('pools-loading')).toBeNull()
       expect(getByTestId('pool-card-1')).toBeTruthy()
 
-      poolStore.isRefreshing = false
+      poolStore.getState().isRefreshing = false
     })
 
     it('refreshes pools and drains confirmed transactions on pull-to-refresh', async () => {
       // Indexing fails on mount so the record is still there to retry, which is
       // the case pull-to-refresh exists for.
       failIndexing()
-      poolStore.lastFetchedAt = null
+      poolStore.getState().lastFetchedAt = null
       await pendingTransactionsStore
         .getState()
         .addPendingTransaction(makePendingTransaction({ status: 'confirmed', result: { poolId: 99, poolAddress: '0xdef' } }))
@@ -217,7 +217,7 @@ describe('PoolsScreen', () => {
         await onRefresh()
       })
 
-      expect(poolStore.lastFetchedAt).not.toBeNull()
+      expect(poolStore.getState().lastFetchedAt).not.toBeNull()
       expect(mockFirebaseCallable).toHaveBeenCalledWith(expect.anything(), 'indexPool')
     })
 
@@ -252,7 +252,7 @@ describe('PoolsScreen', () => {
     })
 
     it('shows an empty state when there is nothing to list', () => {
-      poolStore.reset()
+      poolStore.getState().reset()
 
       const { getByTestId, queryByText } = render(<PoolsScreen />)
 
@@ -265,7 +265,7 @@ describe('PoolsScreen', () => {
     it('names the chain that has nothing on it', () => {
       // With several networks configured, an empty list is as likely to mean
       // the wallet is on the wrong one as it is to mean there is nothing.
-      poolStore.reset()
+      poolStore.getState().reset()
 
       const { getByText } = render(<PoolsScreen />)
 
@@ -295,7 +295,7 @@ describe('PoolsScreen', () => {
     it('stays on screen when the list is empty', () => {
       // The case it exists for: "no circles" says nothing until you know which
       // chain has none of them.
-      poolStore.reset()
+      poolStore.getState().reset()
 
       const { getByTestId } = render(<PoolsScreen />)
 
@@ -305,8 +305,8 @@ describe('PoolsScreen', () => {
 
   describe('errors', () => {
     it('takes over the screen when the load failed with nothing cached', () => {
-      poolStore.reset()
-      poolStore.error = 'Could not reach SuperPool'
+      poolStore.getState().reset()
+      poolStore.getState().error = 'Could not reach SuperPool'
 
       const { getByTestId, getByText } = render(<PoolsScreen />)
 
@@ -315,8 +315,8 @@ describe('PoolsScreen', () => {
     })
 
     it('retries the load from the error state', async () => {
-      poolStore.reset()
-      poolStore.error = 'Could not reach SuperPool'
+      poolStore.getState().reset()
+      poolStore.getState().error = 'Could not reach SuperPool'
 
       const { getByTestId } = render(<PoolsScreen />)
 
@@ -325,11 +325,11 @@ describe('PoolsScreen', () => {
       })
 
       expect(getByTestId('pools-screen')).toBeTruthy()
-      expect(poolStore.error).toBeNull()
+      expect(poolStore.getState().error).toBeNull()
     })
 
     it('degrades to a banner when pools are already on screen', () => {
-      poolStore.error = 'Could not reach SuperPool'
+      poolStore.getState().error = 'Could not reach SuperPool'
 
       const { getByTestId, queryByTestId } = render(<PoolsScreen />)
 

@@ -1,5 +1,4 @@
 import { FontAwesome } from '@expo/vector-icons'
-import { observer } from 'mobx-react-lite'
 import { useEffect, useState } from 'react'
 import { ActivityIndicator, Pressable, Text, View } from 'react-native'
 import { useAccount, useReadContract } from 'wagmi'
@@ -8,7 +7,7 @@ import { palette } from '../../constants/palette'
 import { useInterest } from '../../hooks/pools/useInterest'
 import { usePoolIndexing } from '../../hooks/pools/usePoolIndexing'
 import { useTransactionMonitoring } from '../../hooks/pools/useTransactionMonitoring'
-import { poolStore } from '../../stores/PoolStore'
+import { poolStore, usePoolStore } from '../../stores/PoolStore'
 import type { Denomination } from '../../utils/denomination'
 import { formatAmount } from '../../utils/format'
 
@@ -54,6 +53,16 @@ function ClaimInterestCardComponent({
   denomination,
   testID = 'claim-interest-card',
 }: ClaimInterestCardProps) {
+  /*
+    Subscribes this component to the pool store.
+
+    The reads below go through `poolStore.getState()`, which returns current
+    state but never notifies — this call is what re-renders on a change, and it
+    is what `observer` used to do by tracing the reads. Coarser than MobX was,
+    deliberately: see `usePoolStore`.
+  */
+  usePoolStore()
+
   const { address } = useAccount()
 
   const { claimInterest, error: claimError, reset } = useInterest()
@@ -77,7 +86,7 @@ function ClaimInterestCardComponent({
   useEffect(() => {
     if (claimable === undefined) return
 
-    poolStore.setClaimable(poolId, claimable)
+    poolStore.getState().setClaimable(poolId, claimable)
   }, [claimable, poolId])
 
   const amount = claimable ?? 0n
@@ -184,4 +193,4 @@ function ClaimInterestCardComponent({
   )
 }
 
-export const ClaimInterestCard = observer(ClaimInterestCardComponent)
+export const ClaimInterestCard = ClaimInterestCardComponent

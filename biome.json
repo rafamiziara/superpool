@@ -38,7 +38,7 @@
   "linter": {
     "rules": {
       "correctness": {
-        "useExhaustiveDependencies": "warn",
+        "useExhaustiveDependencies": "error",
         "useHookAtTopLevel": "error"
       },
       "complexity": {

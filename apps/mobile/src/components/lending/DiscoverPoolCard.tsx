@@ -1,9 +1,8 @@
 import { FontAwesome } from '@expo/vector-icons'
 import type { PoolInfo } from '@superpool/types'
-import { observer } from 'mobx-react-lite'
 import { Pressable, Text, View } from 'react-native'
 import { palette } from '../../constants/palette'
-import { poolStore } from '../../stores/PoolStore'
+import { poolStore, usePoolStore } from '../../stores/PoolStore'
 import { denominationFor } from '../../utils/denomination'
 import { bpsToPercent, formatAmount, formatDuration, timeAgo } from '../../utils/format'
 
@@ -43,10 +42,20 @@ interface DiscoverPoolCardProps {
  * store's events, which arrive after the first render.
  */
 function DiscoverPoolCardComponent({ pool, onPress }: DiscoverPoolCardProps) {
+  /*
+    Subscribes this component to the pool store.
+
+    The reads below go through `poolStore.getState()`, which returns current
+    state but never notifies — this call is what re-renders on a change, and it
+    is what `observer` used to do by tracing the reads. Coarser than MobX was,
+    deliberately: see `usePoolStore`.
+  */
+  usePoolStore()
+
   const accent = accentStyles[ACCENT_CYCLE[pool.poolId % ACCENT_CYCLE.length]]
   const denomination = denominationFor(pool)
-  const liquidity = poolStore.poolLiquidity(pool.poolId)
-  const members = poolStore.memberCountFor(pool.poolId)
+  const liquidity = poolStore.getState().poolLiquidity(pool.poolId)
+  const members = poolStore.getState().memberCountFor(pool.poolId)
 
   return (
     <Pressable
@@ -100,4 +109,4 @@ function DiscoverPoolCardComponent({ pool, onPress }: DiscoverPoolCardProps) {
   )
 }
 
-export const DiscoverPoolCard = observer(DiscoverPoolCardComponent)
+export const DiscoverPoolCard = DiscoverPoolCardComponent

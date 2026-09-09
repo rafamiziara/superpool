@@ -1,7 +1,6 @@
 import { FontAwesome } from '@expo/vector-icons'
 import { router, Stack, useLocalSearchParams } from 'expo-router'
 import { StatusBar } from 'expo-status-bar'
-import { observer } from 'mobx-react-lite'
 import { useState } from 'react'
 import { ActivityIndicator, Pressable, ScrollView, Text, View } from 'react-native'
 import { useAccount, useBalance, useReadContract } from 'wagmi'
@@ -13,7 +12,7 @@ import { useContribution } from '../../../src/hooks/pools/useContribution'
 import { usePoolIndexing } from '../../../src/hooks/pools/usePoolIndexing'
 import { useTokenApproval } from '../../../src/hooks/pools/useTokenApproval'
 import { useTransactionMonitoring } from '../../../src/hooks/pools/useTransactionMonitoring'
-import { poolStore } from '../../../src/stores/PoolStore'
+import { poolStore, usePoolStore } from '../../../src/stores/PoolStore'
 import { denominationFor, isNative } from '../../../src/utils/denomination'
 import { formatAmount } from '../../../src/utils/format'
 
@@ -43,6 +42,16 @@ const STAGE_MESSAGES: Record<Exclude<Stage, 'form' | 'done'>, string> = {
  * holding only an id.
  */
 function ContributeScreen() {
+  /*
+    Subscribes this component to the pool store.
+
+    The reads below go through `poolStore.getState()`, which returns current
+    state but never notifies — this call is what re-renders on a change, and it
+    is what `observer` used to do by tracing the reads. Coarser than MobX was,
+    deliberately: see `usePoolStore`.
+  */
+  usePoolStore()
+
   const { poolId } = useLocalSearchParams<{ poolId: string }>()
   const { address } = useAccount()
   const { data: balance } = useBalance({ address })
@@ -56,9 +65,9 @@ function ContributeScreen() {
   const [failure, setFailure] = useState<string | null>(null)
   const [contributed, setContributed] = useState<bigint | null>(null)
 
-  const pool = poolStore.poolById(Number(poolId))
+  const pool = poolStore.getState().poolById(Number(poolId))
   const denomination = pool ? denominationFor(pool) : undefined
-  const membership = pool ? poolStore.membershipFor(pool.poolId) : undefined
+  const membership = pool ? poolStore.getState().membershipFor(pool.poolId) : undefined
 
   /**
    * The balance the form warns against has to be in the pool's own unit: a
@@ -244,4 +253,4 @@ function ContributeScreen() {
   )
 }
 
-export default observer(ContributeScreen)
+export default ContributeScreen

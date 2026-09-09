@@ -60,18 +60,18 @@ beforeEach(() => {
   // Mock mode short-circuits `memberships` to the fixtures, which would ignore
   // everything these tests set up.
   delete process.env.EXPO_PUBLIC_USE_MOCK_POOLS
-  poolStore.pools = [makePool()]
-  poolStore.memberRecords = []
-  poolStore.contributions = []
-  poolStore.withdrawals = []
+  poolStore.getState().pools = [makePool()]
+  poolStore.getState().memberRecords = []
+  poolStore.getState().contributions = []
+  poolStore.getState().withdrawals = []
 })
 
 afterEach(() => {
   process.env.EXPO_PUBLIC_USE_MOCK_POOLS = 'true'
-  poolStore.pools = []
-  poolStore.memberRecords = []
-  poolStore.contributions = []
-  poolStore.withdrawals = []
+  poolStore.getState().pools = []
+  poolStore.getState().memberRecords = []
+  poolStore.getState().contributions = []
+  poolStore.getState().withdrawals = []
 })
 
 describe('DiscoverPoolCard', () => {
@@ -92,7 +92,7 @@ describe('DiscoverPoolCard', () => {
   // -------------------------------------------------------------------------
 
   it('shows the pool’s liquidity rather than the user’s position', () => {
-    poolStore.contributions = [makeContribution(STRANGER, parseEther('40'))]
+    poolStore.getState().contributions = [makeContribution(STRANGER, parseEther('40'))]
 
     const { getByTestId } = render(<DiscoverPoolCard pool={makePool()} />)
 
@@ -100,7 +100,7 @@ describe('DiscoverPoolCard', () => {
   })
 
   it('counts the members behind that liquidity', () => {
-    poolStore.memberRecords = [makeMember(STRANGER), makeMember(OTHER)]
+    poolStore.getState().memberRecords = [makeMember(STRANGER), makeMember(OTHER)]
 
     const { getByTestId } = render(<DiscoverPoolCard pool={makePool()} />)
 
@@ -108,7 +108,7 @@ describe('DiscoverPoolCard', () => {
   })
 
   it('uses the singular for one member', () => {
-    poolStore.memberRecords = [makeMember(STRANGER)]
+    poolStore.getState().memberRecords = [makeMember(STRANGER)]
 
     const { getByTestId } = render(<DiscoverPoolCard pool={makePool()} />)
 
@@ -123,7 +123,7 @@ describe('DiscoverPoolCard', () => {
   })
 
   it('does not count an applicant as a member', () => {
-    poolStore.memberRecords = [makeMember(STRANGER, 'active'), makeMember(OTHER, 'requested')]
+    poolStore.getState().memberRecords = [makeMember(STRANGER, 'active'), makeMember(OTHER, 'requested')]
 
     const { getByTestId } = render(<DiscoverPoolCard pool={makePool()} />)
 
@@ -131,8 +131,8 @@ describe('DiscoverPoolCard', () => {
   })
 
   it('reports what is left after a withdrawal', () => {
-    poolStore.contributions = [makeContribution(STRANGER, parseEther('40'))]
-    poolStore.withdrawals = [
+    poolStore.getState().contributions = [makeContribution(STRANGER, parseEther('40'))]
+    poolStore.getState().withdrawals = [
       {
         id: '31337-0xccc-0',
         poolId: 11,

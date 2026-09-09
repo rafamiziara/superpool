@@ -30,7 +30,7 @@ function makeLoan(overrides: Partial<LoanInfo> = {}): LoanInfo {
     id: '31337-2-1',
     loanId: 1,
     poolId: 2,
-    poolAddress: poolStore.poolById(2)!.poolAddress,
+    poolAddress: poolStore.getState().poolById(2)!.poolAddress,
     borrower: BORROWER,
     amount: '1000000000000000000',
     interestRate: 500,
@@ -53,7 +53,7 @@ function makeDecision(overrides: Partial<LoanDecisionInfo> = {}): LoanDecisionIn
     id: '31337-0xaaa-0',
     loanId: 1,
     poolId: 2,
-    poolAddress: poolStore.poolById(2)!.poolAddress,
+    poolAddress: poolStore.getState().poolById(2)!.poolAddress,
     borrower: BORROWER,
     amount: '1000000000000000000',
     outcome: 'approved',
@@ -74,20 +74,20 @@ beforeEach(async () => {
   mockLocalSearchParams.mockReturnValue({ poolId: POOL_ID })
   mockWagmiUseReadContract.mockReturnValue({ data: 4_000_000_000_000_000_000n, refetch: jest.fn() })
   authStore.setState({ walletAddress: null })
-  await poolStore.fetchPools()
-  poolStore.loanRecords = []
+  await poolStore.getState().fetchPools()
+  poolStore.getState().loanRecords = []
 })
 
 afterEach(() => {
   process.env.EXPO_PUBLIC_USE_MOCK_POOLS = 'true'
-  poolStore.loanRecords = []
+  poolStore.getState().loanRecords = []
   authStore.setState({ walletAddress: null })
 })
 
 describe('PortfolioScreen', () => {
   it('says so when the pool is not available', () => {
     mockLocalSearchParams.mockReturnValue({ poolId: '9999' })
-    poolStore.isLoading = false
+    poolStore.getState().isLoading = false
 
     const { getByTestId } = render(<PortfolioScreen />)
 
@@ -96,13 +96,13 @@ describe('PortfolioScreen', () => {
 
   it('reads as loading, not as missing, while the pools are still arriving', () => {
     mockLocalSearchParams.mockReturnValue({ poolId: '9999' })
-    poolStore.isLoading = true
+    poolStore.getState().isLoading = true
 
     const { getByTestId } = render(<PortfolioScreen />)
 
     expect(getByTestId('portfolio-loading')).toBeTruthy()
 
-    poolStore.isLoading = false
+    poolStore.getState().isLoading = false
   })
 
   it('turns away anyone who is not the pool owner', () => {
@@ -116,7 +116,7 @@ describe('PortfolioScreen', () => {
   })
 
   it('reports what is out on loan and what is still in the pool', () => {
-    poolStore.loanRecords = [makeLoan()]
+    poolStore.getState().loanRecords = [makeLoan()]
 
     const { getByTestId } = render(<PortfolioScreen />)
 
@@ -130,7 +130,7 @@ describe('PortfolioScreen', () => {
     // Overdue is arithmetic anyone can do; a default is the owner saying so.
     // A screen that reported one as the other would accuse a borrower of
     // something nobody decided.
-    poolStore.loanRecords = [
+    poolStore.getState().loanRecords = [
       makeLoan({ id: '31337-2-1', loanId: 1 }),
       makeLoan({ id: '31337-2-2', loanId: 2, startedAt: new Date(Date.now() - 60 * DAY).toISOString() }),
       makeLoan({ id: '31337-2-3', loanId: 3, status: 'defaulted', startedAt: new Date(Date.now() - 60 * DAY).toISOString() }),
@@ -144,7 +144,7 @@ describe('PortfolioScreen', () => {
   })
 
   it('says when a defaulted loan was paid back after all', () => {
-    poolStore.loanRecords = [
+    poolStore.getState().loanRecords = [
       makeLoan({
         status: 'defaulted',
         isRepaid: true,
@@ -163,7 +163,7 @@ describe('PortfolioScreen', () => {
   it('counts what was lent, never what was asked for', () => {
     // A request and a refusal moved no money; counting either as lending
     // would report a pool as having paid out what it turned down.
-    poolStore.loanRecords = [
+    poolStore.getState().loanRecords = [
       makeLoan({ id: '31337-2-1', loanId: 1, amount: '1000000000000000000' }),
       makeLoan({ id: '31337-2-2', loanId: 2, status: 'requested', amount: '9000000000000000000' }),
       makeLoan({ id: '31337-2-3', loanId: 3, status: 'rejected', amount: '5000000000000000000' }),

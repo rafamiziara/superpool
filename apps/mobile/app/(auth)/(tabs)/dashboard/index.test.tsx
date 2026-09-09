@@ -17,7 +17,7 @@ describe('DashboardScreen', () => {
     jest.clearAllMocks()
     mockWagmiUseAccount.mockReturnValue({ isConnected: true, isConnecting: false, address: undefined, chainId: LOCALHOST_CHAIN_ID })
     await pendingTransactionsStore.getState().reset()
-    await poolStore.fetchPools()
+    await poolStore.getState().fetchPools()
   })
 
   it('renders the dashboard structure', () => {
@@ -47,19 +47,19 @@ describe('DashboardScreen', () => {
   })
 
   it('shows lifetime earnings once a pool has credited some', () => {
-    poolStore.setClaimable(1, 2_500_000_000_000_000_000n)
+    poolStore.getState().setClaimable(1, 2_500_000_000_000_000_000n)
 
     const { getByText } = render(<DashboardScreen />)
 
     expect(getByText('+2.5 POL earned all-time')).toBeTruthy()
 
-    poolStore.claimableByPool = {}
+    poolStore.getState().claimableByPool = {}
   })
 
   it('renders a macro-card per joined pool', () => {
     const { getByTestId } = render(<DashboardScreen />)
 
-    for (const pool of poolStore.myPools) {
+    for (const pool of poolStore.getState().myPools()) {
       expect(getByTestId(`pool-card-${pool.poolId}`)).toBeTruthy()
     }
   })
@@ -85,7 +85,7 @@ describe('DashboardScreen', () => {
   it('leaves the record out for someone who has never borrowed', () => {
     // On an owner's queue "nothing to go on" is worth reading. On your own
     // dashboard it is a panel that exists to say it has nothing to say.
-    poolStore.loanRecords = []
+    poolStore.getState().loanRecords = []
     const restore = MOCK_LOANS.splice(0, MOCK_LOANS.length)
 
     const { queryByTestId } = render(<DashboardScreen />)
@@ -116,7 +116,7 @@ describe('DashboardScreen', () => {
     // Both buttons lead to the same screen: with a loan open there is nothing
     // to choose between borrowing and repaying, so the screen decides.
     const { getByTestId } = render(<DashboardScreen />)
-    const poolId = poolStore.activeLoan!.poolId
+    const poolId = poolStore.getState().activeLoan()!.poolId
 
     fireEvent.press(getByTestId('repay-button'))
     expect(mockRouterPush).toHaveBeenCalledWith(`/(auth)/pool/borrow?poolId=${poolId}`)
@@ -126,7 +126,7 @@ describe('DashboardScreen', () => {
   })
 
   it('sends someone with no loan to the pools list to pick one', () => {
-    poolStore.loanRecords = []
+    poolStore.getState().loanRecords = []
     const restore = MOCK_LOANS.splice(0, MOCK_LOANS.length)
 
     const { getByTestId } = render(<DashboardScreen />)
@@ -157,7 +157,7 @@ describe('DashboardScreen', () => {
 
   it('hides the loan section when the user has no active loan', () => {
     // `loans` is derived now, so the fixtures behind it are what has to go.
-    poolStore.loanRecords = []
+    poolStore.getState().loanRecords = []
     const restore = MOCK_LOANS.splice(0, MOCK_LOANS.length)
 
     const { queryByTestId } = render(<DashboardScreen />)
@@ -182,7 +182,7 @@ describe('DashboardScreen', () => {
         id: '31337-2-5',
         loanId: 5,
         poolId: 2,
-        poolAddress: poolStore.poolById(2)!.poolAddress,
+        poolAddress: poolStore.getState().poolById(2)!.poolAddress,
         borrower: '0x0000000000000000000000000000000000000042',
         amount: '4000000000000000000',
         interestRate: 500,
@@ -201,7 +201,7 @@ describe('DashboardScreen', () => {
     }
 
     it('surfaces them on the dashboard, not only inside the pool', () => {
-      poolStore.loanRecords = [requestOnMyPool()]
+      poolStore.getState().loanRecords = [requestOnMyPool()]
 
       const { getByTestId } = render(<DashboardScreen />)
 
@@ -210,7 +210,7 @@ describe('DashboardScreen', () => {
     })
 
     it('opens the queue for the pool the request belongs to', () => {
-      poolStore.loanRecords = [requestOnMyPool()]
+      poolStore.getState().loanRecords = [requestOnMyPool()]
 
       const { getByTestId } = render(<DashboardScreen />)
       fireEvent.press(getByTestId('dashboard-approvals-2'))
@@ -222,9 +222,9 @@ describe('DashboardScreen', () => {
       // A single summary would have nowhere to go with two pools waiting: the
       // queue and the screen that clears it are both per pool. Only pool 2 is
       // owned by the mock user, so the second one is added here.
-      const second = { ...poolStore.poolById(2)!, poolId: 99, name: 'Second Circle' }
-      poolStore.pools = [...poolStore.pools, second]
-      poolStore.loanRecords = [requestOnMyPool(), requestOnMyPool({ id: '31337-99-1', poolId: 99, loanId: 1 })]
+      const second = { ...poolStore.getState().poolById(2)!, poolId: 99, name: 'Second Circle' }
+      poolStore.getState().pools = [...poolStore.getState().pools, second]
+      poolStore.getState().loanRecords = [requestOnMyPool(), requestOnMyPool({ id: '31337-99-1', poolId: 99, loanId: 1 })]
 
       const { getByTestId } = render(<DashboardScreen />)
 
@@ -233,7 +233,7 @@ describe('DashboardScreen', () => {
     })
 
     it('stays silent when nothing is waiting', () => {
-      poolStore.loanRecords = []
+      poolStore.getState().loanRecords = []
 
       const { queryByTestId } = render(<DashboardScreen />)
 

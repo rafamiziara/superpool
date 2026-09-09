@@ -39,7 +39,7 @@ describe('PoolDetailScreen', () => {
   beforeEach(async () => {
     jest.clearAllMocks()
     mockLocalSearchParams.mockReturnValue({ id: OTHER_OWNED })
-    await poolStore.fetchPools()
+    await poolStore.getState().fetchPools()
   })
 
   it('renders the pool detail for the route param', () => {
@@ -47,7 +47,7 @@ describe('PoolDetailScreen', () => {
 
     // The pool name is header config (`Stack.Screen options`), so assert on body copy.
     expect(getByTestId('pool-detail-screen')).toBeTruthy()
-    expect(getByText(poolStore.poolById(Number(OTHER_OWNED))!.description)).toBeTruthy()
+    expect(getByText(poolStore.getState().poolById(Number(OTHER_OWNED))!.description)).toBeTruthy()
   })
 
   it('shows the contract-derived stats', () => {
@@ -97,7 +97,7 @@ describe('PoolDetailScreen', () => {
     const { getByText, getByTestId } = render(<PoolDetailScreen />)
 
     expect(getByText('Pool activity')).toBeTruthy()
-    for (const tx of poolStore.transactionsFor(Number(OTHER_OWNED))) {
+    for (const tx of poolStore.getState().transactionsFor(Number(OTHER_OWNED))) {
       expect(getByTestId(`activity-row-${tx.id}`)).toBeTruthy()
     }
   })
@@ -130,7 +130,7 @@ describe('PoolDetailScreen', () => {
 
   describe('loan requests waiting on the owner', () => {
     afterEach(() => {
-      poolStore.loanRecords = []
+      poolStore.getState().loanRecords = []
     })
 
     function pendingRequest(overrides: Record<string, unknown> = {}) {
@@ -138,7 +138,7 @@ describe('PoolDetailScreen', () => {
         id: '31337-2-5',
         loanId: 5,
         poolId: 2,
-        poolAddress: poolStore.poolById(2)!.poolAddress,
+        poolAddress: poolStore.getState().poolById(2)!.poolAddress,
         borrower: '0x0000000000000000000000000000000000000042',
         amount: '4000000000000000000',
         interestRate: 500,
@@ -158,7 +158,7 @@ describe('PoolDetailScreen', () => {
 
     it('offers the queue to the owner when something is waiting', () => {
       mockLocalSearchParams.mockReturnValue({ id: SELF_OWNED })
-      poolStore.loanRecords = [pendingRequest()]
+      poolStore.getState().loanRecords = [pendingRequest()]
 
       const { getByTestId } = render(<PoolDetailScreen />)
 
@@ -169,7 +169,7 @@ describe('PoolDetailScreen', () => {
 
     it('counts every member’s request, not the owner’s own', () => {
       mockLocalSearchParams.mockReturnValue({ id: SELF_OWNED })
-      poolStore.loanRecords = [pendingRequest(), pendingRequest({ id: '31337-2-6', loanId: 6 })]
+      poolStore.getState().loanRecords = [pendingRequest(), pendingRequest({ id: '31337-2-6', loanId: 6 })]
 
       const { getByText } = render(<PoolDetailScreen />)
 
@@ -189,7 +189,7 @@ describe('PoolDetailScreen', () => {
     it('stays hidden from anyone who is not the owner', () => {
       // Deciding is `onlyOwner`; offering it to a member invites a revert.
       mockLocalSearchParams.mockReturnValue({ id: OTHER_OWNED })
-      poolStore.loanRecords = [pendingRequest({ id: '31337-1-5', poolId: 1 })]
+      poolStore.getState().loanRecords = [pendingRequest({ id: '31337-1-5', poolId: 1 })]
 
       const { queryByTestId } = render(<PoolDetailScreen />)
 
@@ -198,7 +198,7 @@ describe('PoolDetailScreen', () => {
 
     it('sends the borrower to their own request rather than a new one', () => {
       mockLocalSearchParams.mockReturnValue({ id: SELF_OWNED })
-      poolStore.loanRecords = [pendingRequest({ borrower: poolStore.userAddress })]
+      poolStore.getState().loanRecords = [pendingRequest({ borrower: poolStore.getState().userAddress() })]
 
       const { getByText } = render(<PoolDetailScreen />)
 
@@ -269,12 +269,12 @@ describe('PoolDetailScreen', () => {
      * Put the connected wallet in a standing the fixtures do not carry.
      *
      * Mock mode serves `MOCK_MEMBERSHIPS` wholesale and never consults the
-     * register, so `poolStore.memberRecords` — how the owner-side screens do
+     * register, so `poolStore.getState().memberRecords` — how the owner-side screens do
      * this — has no effect on what the user is told about themselves.
      */
     function givenStanding(poolId: string, status: MemberStatus, currentBalance = 0n): void {
       MOCK_MEMBERSHIPS.push({
-        walletAddress: poolStore.userAddress,
+        walletAddress: poolStore.getState().userAddress(),
         poolId,
         joinedAt: new Date(),
         totalContributed: currentBalance,
@@ -286,7 +286,7 @@ describe('PoolDetailScreen', () => {
 
     afterEach(() => {
       MOCK_MEMBERSHIPS.length = FIXTURE_MEMBERSHIPS
-      poolStore.loanRecords = []
+      poolStore.getState().loanRecords = []
       // The module default: no read has answered, which decodes to an open pool.
       mockWagmiUseReadContract.mockImplementation(() => ({
         data: undefined,
@@ -400,13 +400,13 @@ describe('PoolDetailScreen', () => {
         // `myRequest` outlives the standing that produced it, and repayment is
         // ungated for the same reason: a removed borrower still owes the pool.
         mockLocalSearchParams.mockReturnValue({ id: STRANGER_POOL })
-        poolStore.loanRecords = [
+        poolStore.getState().loanRecords = [
           {
             id: '31337-5-1',
             loanId: 1,
             poolId: 5,
-            poolAddress: poolStore.poolById(5)!.poolAddress,
-            borrower: poolStore.userAddress,
+            poolAddress: poolStore.getState().poolById(5)!.poolAddress,
+            borrower: poolStore.getState().userAddress(),
             amount: '4000000000000000000',
             interestRate: 500,
             duration: 2_592_000,
@@ -493,7 +493,10 @@ describe('PoolDetailScreen', () => {
 
         render(<PoolDetailScreen />)
 
-        expect(mockNoteFor).toHaveBeenCalledWith(expect.stringContaining(poolStore.userAddress.toLowerCase()), 'membership_rejected')
+        expect(mockNoteFor).toHaveBeenCalledWith(
+          expect.stringContaining(poolStore.getState().userAddress().toLowerCase()),
+          'membership_rejected'
+        )
       })
 
       it('shows nothing where nobody wrote a reason', () => {

@@ -84,7 +84,7 @@ export const usePoolIndexing = (): UsePoolIndexingReturn => {
         // Refresh before dropping the pending record, so the result never
         // disappears from the UI in the gap between the two. `refreshPools`
         // reloads contributions in the same pass, so both types are covered.
-        await poolStore.refreshPools()
+        await poolStore.getState().refreshPools()
         await pendingTransactionsStore.getState().removePendingTransaction(txHash)
       } catch (error) {
         // Deliberately not surfaced — see the note on this hook.

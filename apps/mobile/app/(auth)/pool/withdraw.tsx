@@ -1,7 +1,6 @@
 import { FontAwesome } from '@expo/vector-icons'
 import { router, Stack, useLocalSearchParams } from 'expo-router'
 import { StatusBar } from 'expo-status-bar'
-import { observer } from 'mobx-react-lite'
 import { useState } from 'react'
 import { ActivityIndicator, Pressable, ScrollView, Text, View } from 'react-native'
 import { useAccount, useReadContract } from 'wagmi'
@@ -12,7 +11,7 @@ import { palette } from '../../../src/constants/palette'
 import { usePoolIndexing } from '../../../src/hooks/pools/usePoolIndexing'
 import { useTransactionMonitoring } from '../../../src/hooks/pools/useTransactionMonitoring'
 import { useWithdrawal } from '../../../src/hooks/pools/useWithdrawal'
-import { poolStore } from '../../../src/stores/PoolStore'
+import { poolStore, usePoolStore } from '../../../src/stores/PoolStore'
 import { denominationFor } from '../../../src/utils/denomination'
 import { formatAmount } from '../../../src/utils/format'
 
@@ -33,6 +32,16 @@ const STAGE_MESSAGES: Record<Exclude<Stage, 'form' | 'done'>, string> = {
  * which is what lets the screen be reached from anywhere holding only an id.
  */
 function WithdrawScreen() {
+  /*
+    Subscribes this component to the pool store.
+
+    The reads below go through `poolStore.getState()`, which returns current
+    state but never notifies — this call is what re-renders on a change, and it
+    is what `observer` used to do by tracing the reads. Coarser than MobX was,
+    deliberately: see `usePoolStore`.
+  */
+  usePoolStore()
+
   const { poolId } = useLocalSearchParams<{ poolId: string }>()
   const { address } = useAccount()
 
@@ -44,7 +53,7 @@ function WithdrawScreen() {
   const [failure, setFailure] = useState<string | null>(null)
   const [withdrawn, setWithdrawn] = useState<bigint | null>(null)
 
-  const pool = poolStore.poolById(Number(poolId))
+  const pool = poolStore.getState().poolById(Number(poolId))
   const denomination = pool ? denominationFor(pool) : undefined
 
   // Read from the chain, not from PoolStore. Memberships are derived from
@@ -235,4 +244,4 @@ function WithdrawScreen() {
   )
 }
 
-export default observer(WithdrawScreen)
+export default WithdrawScreen

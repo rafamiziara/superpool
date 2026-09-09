@@ -1,7 +1,6 @@
 import { FontAwesome } from '@expo/vector-icons'
 import { router, Stack, useLocalSearchParams } from 'expo-router'
 import { StatusBar } from 'expo-status-bar'
-import { observer } from 'mobx-react-lite'
 import { useState } from 'react'
 import { ActivityIndicator, Pressable, ScrollView, Text, View } from 'react-native'
 import { useReadContract } from 'wagmi'
@@ -18,7 +17,7 @@ import { usePoolIndexing } from '../../../src/hooks/pools/usePoolIndexing'
 import { useTokenApproval } from '../../../src/hooks/pools/useTokenApproval'
 import { useTransactionMonitoring } from '../../../src/hooks/pools/useTransactionMonitoring'
 import type { LoanTransactionType } from '../../../src/stores/PendingTransactionsStore'
-import { poolStore } from '../../../src/stores/PoolStore'
+import { poolStore, usePoolStore } from '../../../src/stores/PoolStore'
 import { type Denomination, denominationFor, isNative } from '../../../src/utils/denomination'
 import { formatAmount } from '../../../src/utils/format'
 
@@ -78,6 +77,16 @@ function successSummary(outcome: Outcome, amount: bigint, poolName: string, deno
  * outstanding loan to repay, a request waiting on the owner, or the form.
  */
 function BorrowScreen() {
+  /*
+    Subscribes this component to the pool store.
+
+    The reads below go through `poolStore.getState()`, which returns current
+    state but never notifies — this call is what re-renders on a change, and it
+    is what `observer` used to do by tracing the reads. Coarser than MobX was,
+    deliberately: see `usePoolStore`.
+  */
+  usePoolStore()
+
   const { poolId } = useLocalSearchParams<{ poolId: string }>()
 
   const { borrow, requestLoan, repay, cancelLoanRequest, error: loanError, reset } = useLoan()
@@ -89,10 +98,10 @@ function BorrowScreen() {
   const [failure, setFailure] = useState<string | null>(null)
   const [settled, setSettled] = useState<{ amount: bigint; outcome: Outcome; closedTheLoan: boolean } | null>(null)
 
-  const pool = poolStore.poolById(Number(poolId))
+  const pool = poolStore.getState().poolById(Number(poolId))
   const denomination = pool ? denominationFor(pool) : undefined
-  const outstanding = pool ? poolStore.activeLoanFor(pool.poolId) : undefined
-  const pendingRequest = pool ? poolStore.pendingLoanFor(pool.poolId) : undefined
+  const outstanding = pool ? poolStore.getState().activeLoanFor(pool.poolId) : undefined
+  const pendingRequest = pool ? poolStore.getState().pendingLoanFor(pool.poolId) : undefined
 
   const { noteFor, writeNote } = useNotes(pool?.poolId)
   const ownLoan = outstanding ?? pendingRequest
@@ -496,4 +505,4 @@ function BorrowScreen() {
   )
 }
 
-export default observer(BorrowScreen)
+export default BorrowScreen

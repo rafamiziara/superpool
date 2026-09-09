@@ -2,7 +2,6 @@ import { FontAwesome } from '@expo/vector-icons'
 import type { MemberInfo } from '@superpool/types'
 import { router, Stack, useLocalSearchParams } from 'expo-router'
 import { StatusBar } from 'expo-status-bar'
-import { observer } from 'mobx-react-lite'
 import { useState } from 'react'
 import { ActivityIndicator, Pressable, RefreshControl, ScrollView, Text, View } from 'react-native'
 import { NoteField } from '../../../src/components/lending/NoteField'
@@ -11,7 +10,7 @@ import { useMembership } from '../../../src/hooks/pools/useMembership'
 import { useNotes } from '../../../src/hooks/pools/useNotes'
 import { usePoolIndexing } from '../../../src/hooks/pools/usePoolIndexing'
 import { useTransactionMonitoring } from '../../../src/hooks/pools/useTransactionMonitoring'
-import { poolStore } from '../../../src/stores/PoolStore'
+import { poolStore, usePoolStore } from '../../../src/stores/PoolStore'
 import { denominationFor } from '../../../src/utils/denomination'
 import { formatAmount, sameAddress, shortAddress } from '../../../src/utils/format'
 
@@ -51,6 +50,16 @@ const NOTE_KIND = {
  * prompts racing for one nonce.
  */
 function MembersScreen() {
+  /*
+    Subscribes this component to the pool store.
+
+    The reads below go through `poolStore.getState()`, which returns current
+    state but never notifies — this call is what re-renders on a change, and it
+    is what `observer` used to do by tracing the reads. Coarser than MobX was,
+    deliberately: see `usePoolStore`.
+  */
+  usePoolStore()
+
   const { poolId } = useLocalSearchParams<{ poolId: string }>()
 
   const { approveMember, rejectMember, removeMember, error: membershipError, reset } = useMembership()
@@ -70,10 +79,10 @@ function MembersScreen() {
    */
   const [removing, setRemoving] = useState<string | null>(null)
 
-  const pool = poolStore.poolById(Number(poolId))
+  const pool = poolStore.getState().poolById(Number(poolId))
   const { noteFor, writeNote } = useNotes(pool?.poolId)
   const denomination = pool ? denominationFor(pool) : undefined
-  const waiting = pool ? poolStore.pendingMembersFor(pool.poolId) : []
+  const waiting = pool ? poolStore.getState().pendingMembersFor(pool.poolId) : []
 
   /**
    * Everyone actually in the pool, from the register rather than from
@@ -87,13 +96,16 @@ function MembersScreen() {
    * place they exist.
    */
   const members = pool
-    ? poolStore.memberRecords
-        .filter((member) => member.poolId === pool.poolId && member.status === 'active')
+    ? poolStore
+        .getState()
+        .memberRecords.filter((member) => member.poolId === pool.poolId && member.status === 'active')
         .map((member) => ({
           account: member.account,
-          balance: poolStore.memberships.find(
-            (derived) => derived.poolId === String(pool.poolId) && sameAddress(derived.walletAddress, member.account)
-          )?.currentBalance,
+          balance: poolStore
+            .getState()
+            .memberships()
+            .find((derived) => derived.poolId === String(pool.poolId) && sameAddress(derived.walletAddress, member.account))
+            ?.currentBalance,
         }))
     : []
 
@@ -160,13 +172,13 @@ function MembersScreen() {
 
     // The reload is what moves the row: the applicant leaves `pendingMembersFor`
     // once the backend has re-read the register, and nothing else would.
-    await poolStore.refreshPools()
+    await poolStore.getState().refreshPools()
 
     setStage('idle')
   }
 
   // Still loading is not the same as not there — see the note in approvals.tsx.
-  if (!pool && poolStore.isLoading) {
+  if (!pool && poolStore.getState().isLoading) {
     return (
       <View className="flex-1 items-center justify-center gap-4 bg-abyss" testID="members-loading">
         <Stack.Screen options={{ title: 'Members' }} />
@@ -195,7 +207,7 @@ function MembersScreen() {
   // Every call on this screen is `onlyOwner`, so showing it to anyone else would
   // be an invitation to a transaction that reverts. Compared case-insensitively
   // — a strict compare would lock the owner out of their own pool.
-  if (!sameAddress(pool.poolOwner, poolStore.userAddress)) {
+  if (!sameAddress(pool.poolOwner, poolStore.getState().userAddress())) {
     return (
       <View className="flex-1 items-center justify-center gap-4 bg-abyss px-10" testID="members-not-owner">
         <Stack.Screen options={{ title: 'Members' }} />
@@ -222,8 +234,8 @@ function MembersScreen() {
         contentContainerClassName="gap-6 px-6 pb-16 pt-4"
         refreshControl={
           <RefreshControl
-            refreshing={poolStore.isRefreshing}
-            onRefresh={() => poolStore.syncAndRefresh()}
+            refreshing={poolStore.getState().isRefreshing}
+            onRefresh={() => poolStore.getState().syncAndRefresh()}
             tintColor={palette.mint}
             colors={[palette.mint]}
           />
@@ -386,4 +398,4 @@ function MembersScreen() {
   )
 }
 
-export default observer(MembersScreen)
+export default MembersScreen

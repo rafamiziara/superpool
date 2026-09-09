@@ -78,11 +78,10 @@ pnpm typecheck      # TypeScript type checking
 ### Mobile App (`apps/mobile/`)
 
 ```bash
-pnpm start           # Start Expo development server (with MobX stores)
+pnpm start           # Start Expo development server
 pnpm android         # Run on Android
 pnpm ios             # Run on iOS
 pnpm web             # Run on web
-# MobX stores auto-configure on app startup via mobxConfig.ts
 ```
 
 ### Shared Packages
@@ -146,14 +145,14 @@ For project structure overview, see the [Architecture section in README.md](READ
 **Mobile Application:**
 
 - **Wallet Integration**: Reown AppKit with WalletConnect for multi-wallet support (500+ wallets)
-- **State Management**: MobX reactive stores with centralized state management
+- **State Management**: Zustand stores, with derived values as selectors
 - **Styling**: Uniwind (Tailwind CSS v4) with theme tokens in global.css
 - **Icons**: FontAwesome via `@expo/vector-icons` (wallet, users, shield, etc.)
 - **Chain Support**: Ethereum Mainnet, Polygon, Arbitrum, Base, BSC, Polygon Amoy, Localhost (dev mode)
 - **Firebase Integration**: Authentication, Firestore, Cloud Functions
 - **Architecture**: Expo Router with TypeScript and shared type definitions
 - **Store Architecture**: AuthStore, NavigationStore, PoolStore, PendingTransactionsStore singletons in `src/stores/`
-- **React Integration**: mobx-react-lite with observer components and React Context
+- **React Integration**: components subscribe through the stores' own hooks; there are no observers
 - **Configuration**: React Native batching, development mode validation
 - **Assets**: References shared onboarding illustrations and brand assets
 
@@ -497,7 +496,7 @@ Comprehensive interfaces for type safety:
 - **Blockchain**: Solidity, Hardhat, OpenZeppelin, Multi-chain (Polygon, Ethereum, Arbitrum, Base, BSC)
 - **Backend**: Firebase Cloud Functions, TypeScript, Ethers.js
 - **Frontend**: Next.js 16, React Native, Expo, Wagmi, Viem, Reown AppKit
-- **State Management**: MobX, mobx-react-lite for reactive state management
+- **State Management**: Zustand
 - **Styling**: Tailwind CSS v4 (web + mobile via Uniwind), shared design system
 - **Icons**: FontAwesome (@expo/vector-icons for mobile)
 - **Development**: pnpm workspaces, TypeScript project references. Tests: Vitest everywhere except mobile, which keeps jest-expo — it transforms through Babel, never touches the TypeScript API, and is the only supported path for the React Native transform and Expo module mocking
@@ -1370,12 +1369,14 @@ separate** — Biome does not do Solidity.
 Four scoped overrides, each for a case the analyser gets wrong rather than a rule being
 dodged:
 
-- **`useExhaustiveDependencies` is a warning**, carried over verbatim from
-  `eslint-plugin-react-hooks`. The rule does not understand MobX: reading an observable
-  during an `observer` component's render *does* re-subscribe, so its "outer scope values
-  aren't valid dependencies" is false here — and this file records the bug caused by
-  dropping `authStore.chainId`. **When superpool moves to Zustand the rule becomes
-  correct and should be promoted to an error.**
+- **`useExhaustiveDependencies` is an error**, promoted when the stores moved to Zustand.
+  It was a warning because the rule does not understand MobX — reading an observable
+  during an `observer` component's render *does* re-subscribe — and nothing traces reads
+  any more, so the rule is now right. Three sites suppress it individually, each with its
+  reason: two memos keyed on a joined id string because the array they derive from is
+  rebuilt every render, and the dashboard's borrower histories, which are per chain but
+  take the chain from the store rather than as an argument. A suppression that names its
+  reason is the point; the blanket warning hid all three.
 - **`useArrowFunction` is off, repo-wide.** Its autofix rewrote 472 function expressions
   and broke two things at once: a mocked constructor (`new MastraClient(...)` — an arrow
   cannot be constructed, and the backend suite caught it) and every Mocha `function ()`

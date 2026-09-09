@@ -14,7 +14,7 @@ describe('DiscoverScreen', () => {
     jest.clearAllMocks()
     mockFirebaseCallable.mockReturnValue(jest.fn().mockResolvedValue({ data: {} }))
     mockWagmiUseAccount.mockReturnValue({ isConnected: true, isConnecting: false, address: undefined, chainId: LOCALHOST_CHAIN_ID })
-    await poolStore.fetchPools()
+    await poolStore.getState().fetchPools()
   })
 
   // The mock user belongs to pools 1–4 and to neither 5 nor 6, which is what
@@ -23,10 +23,10 @@ describe('DiscoverScreen', () => {
     const { getByTestId, queryByTestId } = render(<DiscoverScreen />)
 
     expect(getByTestId('discover-screen')).toBeTruthy()
-    for (const pool of poolStore.discoverablePools) {
+    for (const pool of poolStore.getState().discoverablePools()) {
       expect(getByTestId(`discover-pool-card-${pool.poolId}`)).toBeTruthy()
     }
-    for (const pool of poolStore.myPools) {
+    for (const pool of poolStore.getState().myPools()) {
       expect(queryByTestId(`discover-pool-card-${pool.poolId}`)).toBeNull()
     }
   })
@@ -34,11 +34,13 @@ describe('DiscoverScreen', () => {
   it('counts what it is showing', () => {
     const { getByTestId } = render(<DiscoverScreen />)
 
-    expect(getByTestId('discover-count')).toHaveTextContent(`${poolStore.discoverablePools.length} circles you have not joined`)
+    expect(getByTestId('discover-count')).toHaveTextContent(
+      `${poolStore.getState().discoverablePools().length} circles you have not joined`
+    )
   })
 
   it('opens the pool detail screen when a card is pressed', () => {
-    const target = poolStore.discoverablePools[0]
+    const target = poolStore.getState().discoverablePools()[0]
 
     const { getByTestId } = render(<DiscoverScreen />)
 
@@ -164,7 +166,7 @@ describe('DiscoverScreen', () => {
 
   describe('empty', () => {
     it('says the user is in everything, rather than that nothing exists', () => {
-      poolStore.pools = poolStore.myPools
+      poolStore.getState().pools = poolStore.getState().myPools()
 
       const { getByTestId, queryByTestId } = render(<DiscoverScreen />)
 
@@ -173,7 +175,7 @@ describe('DiscoverScreen', () => {
     })
 
     it('offers creating a pool as the way out', () => {
-      poolStore.pools = poolStore.myPools
+      poolStore.getState().pools = poolStore.getState().myPools()
 
       const { getByTestId } = render(<DiscoverScreen />)
 
@@ -183,7 +185,7 @@ describe('DiscoverScreen', () => {
     })
 
     it('names the chain it found nothing on', () => {
-      poolStore.pools = poolStore.myPools
+      poolStore.getState().pools = poolStore.getState().myPools()
 
       const { getByText } = render(<DiscoverScreen />)
 
@@ -254,7 +256,7 @@ describe('DiscoverScreen', () => {
     afterEach(() => {
       jest.useRealTimers()
       process.env.EXPO_PUBLIC_USE_MOCK_POOLS = 'true'
-      poolStore.clearPoolSearch()
+      poolStore.getState().clearPoolSearch()
     })
 
     it('asks the backend once for a word rather than once per keystroke', async () => {

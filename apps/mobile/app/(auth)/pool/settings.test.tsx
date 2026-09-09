@@ -53,7 +53,7 @@ function pendingRequest(overrides: Partial<LoanInfo> = {}): LoanInfo {
     id: '31337-2-5',
     loanId: 5,
     poolId: 2,
-    poolAddress: poolStore.poolById(2)!.poolAddress,
+    poolAddress: poolStore.getState().poolById(2)!.poolAddress,
     borrower: '0x0000000000000000000000000000000000000042',
     amount: '4000000000000000000',
     interestRate: 500,
@@ -80,12 +80,12 @@ beforeEach(async () => {
   mockLocalSearchParams.mockReturnValue({ poolId: POOL_ID })
   mockConfig()
   authStore.setState({ walletAddress: null })
-  await poolStore.fetchPools()
-  poolStore.loanRecords = []
+  await poolStore.getState().fetchPools()
+  poolStore.getState().loanRecords = []
 })
 
 afterEach(() => {
-  poolStore.loanRecords = []
+  poolStore.getState().loanRecords = []
   authStore.setState({ walletAddress: null })
 })
 
@@ -166,7 +166,7 @@ describe('PoolSettingsScreen', () => {
       })
 
       expect(mockSetRequiresApproval).toHaveBeenCalledWith(
-        expect.objectContaining({ poolAddress: poolStore.poolById(2)!.poolAddress, requiresApproval: true })
+        expect.objectContaining({ poolAddress: poolStore.getState().poolById(2)!.poolAddress, requiresApproval: true })
       )
     })
 
@@ -242,7 +242,7 @@ describe('PoolSettingsScreen', () => {
       })
 
       expect(mockSetRequiresMembership).toHaveBeenCalledWith(
-        expect.objectContaining({ poolAddress: poolStore.poolById(2)!.poolAddress, requiresMembership: true })
+        expect.objectContaining({ poolAddress: poolStore.getState().poolById(2)!.poolAddress, requiresMembership: true })
       )
     })
 
@@ -283,7 +283,7 @@ describe('PoolSettingsScreen', () => {
     it('warns that turning approval off leaves requests waiting', () => {
       // The contract is deliberate about this: the owner still has to decide.
       mockConfig({ requiresApproval: true })
-      poolStore.loanRecords = [pendingRequest()]
+      poolStore.getState().loanRecords = [pendingRequest()]
 
       const { getByText } = render(<PoolSettingsScreen />)
 
@@ -292,7 +292,7 @@ describe('PoolSettingsScreen', () => {
 
     it('counts more than one', () => {
       mockConfig({ requiresApproval: true })
-      poolStore.loanRecords = [pendingRequest(), pendingRequest({ id: '31337-2-6', loanId: 6 })]
+      poolStore.getState().loanRecords = [pendingRequest(), pendingRequest({ id: '31337-2-6', loanId: 6 })]
 
       const { getByText } = render(<PoolSettingsScreen />)
 

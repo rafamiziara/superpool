@@ -4,41 +4,46 @@ import { parseEther } from 'viem'
 import { mockFirebaseCallable } from '../__tests__/mocks'
 import { MOCK_USER_ADDRESS } from '../mocks/lending'
 import { authStore } from './AuthStore'
-import { PoolStore } from './PoolStore'
+import { createPoolStore, type PoolStoreApi } from './PoolStore'
 
 describe('PoolStore', () => {
-  let store: PoolStore
+  let store: PoolStoreApi
 
   beforeEach(async () => {
-    store = new PoolStore()
-    await store.fetchPools()
+    store = createPoolStore()
+    await store.getState().fetchPools()
   })
 
   it('starts empty before loading', () => {
-    expect(new PoolStore().pools).toHaveLength(0)
+    expect(createPoolStore().getState().pools).toHaveLength(0)
   })
 
   it('loads pools, memberships, loans and transactions', () => {
-    expect(store.pools.length).toBeGreaterThan(0)
-    expect(store.memberships.length).toBeGreaterThan(0)
-    expect(store.loans.length).toBeGreaterThan(0)
-    expect(store.transactions.length).toBeGreaterThan(0)
-    expect(store.isLoading).toBe(false)
+    expect(store.getState().pools.length).toBeGreaterThan(0)
+    expect(store.getState().memberships().length).toBeGreaterThan(0)
+    expect(store.getState().loans().length).toBeGreaterThan(0)
+    expect(store.getState().transactions.length).toBeGreaterThan(0)
+    expect(store.getState().isLoading).toBe(false)
   })
 
   it('exposes the pools the user belongs to', () => {
-    expect(store.myPools.map((pool) => pool.poolId)).toEqual([1, 2, 3, 4, 7])
+    expect(
+      store
+        .getState()
+        .myPools()
+        .map((pool) => pool.poolId)
+    ).toEqual([1, 2, 3, 4, 7])
   })
 
   it('sums balances of active memberships only, in the chain’s own coin', () => {
     // 195.4 + 331.2 + 75 (pending membership excluded). Pool 7 is denominated
     // in USDC and is deliberately not in this figure: adding 1,214 USDC to a
     // POL total would be wrong by whatever the exchange rate happens to be.
-    expect(store.totalBalance).toBe(parseEther('601.6'))
+    expect(store.getState().totalBalance()).toBe(parseEther('601.6'))
   })
 
   it('reports a balance per unit rather than one impossible total', () => {
-    const balances = store.balancesByDenomination
+    const balances = store.getState().balancesByDenomination()
 
     expect(balances).toEqual([
       { denomination: { symbol: 'POL', decimals: 18 }, total: parseEther('601.6') },
@@ -49,10 +54,10 @@ describe('PoolStore', () => {
   it('keeps the chain’s own coin first and present even with nothing in it', () => {
     // The dashboard's headline figure. A headline that vanishes because the
     // user holds no POL reads as having lost the money.
-    const empty = new PoolStore()
+    const empty = createPoolStore()
 
-    expect(empty.balancesByDenomination).toEqual([{ denomination: { symbol: 'POL', decimals: 18 }, total: 0n }])
-    expect(empty.totalBalance).toBe(0n)
+    expect(empty.getState().balancesByDenomination()).toEqual([{ denomination: { symbol: 'POL', decimals: 18 }, total: 0n }])
+    expect(empty.getState().totalBalance()).toBe(0n)
   })
 
   it('keeps lifetime earnings in the unit the headline is in', () => {
@@ -60,9 +65,9 @@ describe('PoolStore', () => {
     // cannot be added to one from a POL pool — the same reason `totalBalance`
     // is native-only. The dashboard shows this figure beside the native
     // headline, so native is the unit it has to be in.
-    store.claimableByPool = { 1: parseEther('2').toString(), 7: '5000000' }
+    store.getState().claimableByPool = { 1: parseEther('2').toString(), 7: '5000000' }
 
-    expect(store.claimableInterest).toBe(parseEther('2'))
+    expect(store.getState().claimableInterest()).toBe(parseEther('2'))
   })
 
   it('reports no earnings until something says otherwise', () => {
@@ -70,14 +75,14 @@ describe('PoolStore', () => {
     // contributed — that was a stand-in for accounting the contract did not
     // have. It is claims plus what the chain says is still claimable, and the
     // mock fixtures carry neither.
-    expect(store.totalEarned).toBe(0n)
+    expect(store.getState().totalEarned()).toBe(0n)
   })
 
   it('adds what is still claimable to what has already been claimed', () => {
     // The two must be added, not chosen between: claiming moves an amount from
     // one to the other, so reporting either alone would make lifetime earnings
     // drop the moment someone takes their money.
-    store.interestClaims = [
+    store.getState().interestClaims = [
       {
         id: '31337-0xaaa-0',
         poolId: 1,
@@ -91,15 +96,15 @@ describe('PoolStore', () => {
         claimedAt: '2026-08-12T00:00:00.000Z',
       },
     ]
-    store.setClaimable(1, parseEther('3'))
+    store.getState().setClaimable(1, parseEther('3'))
 
-    expect(store.claimedInterest).toBe(parseEther('2'))
-    expect(store.claimableInterest).toBe(parseEther('3'))
-    expect(store.totalEarned).toBe(parseEther('5'))
+    expect(store.getState().claimedInterest()).toBe(parseEther('2'))
+    expect(store.getState().claimableInterest()).toBe(parseEther('3'))
+    expect(store.getState().totalEarned()).toBe(parseEther('5'))
   })
 
   it("ignores another wallet's claims", () => {
-    store.interestClaims = [
+    store.getState().interestClaims = [
       {
         id: '31337-0xbbb-0',
         poolId: 1,
@@ -114,33 +119,41 @@ describe('PoolStore', () => {
       },
     ]
 
-    expect(store.totalEarned).toBe(0n)
+    expect(store.getState().totalEarned()).toBe(0n)
   })
 
   it('finds the active (disbursed) loan for the user', () => {
-    const loan = store.activeLoan
+    const loan = store.getState().activeLoan()
     expect(loan?.status).toBe(LoanStatus.DISBURSED)
     expect(loan?.borrower).toBe(MOCK_USER_ADDRESS)
   })
 
   it('finds the pending loan request', () => {
-    expect(store.pendingLoan?.status).toBe(LoanStatus.REQUESTED)
+    expect(store.getState().pendingLoan()?.status).toBe(LoanStatus.REQUESTED)
   })
 
   it('looks up pools and memberships by id', () => {
-    expect(store.poolById(2)?.name).toBe('Family Circle')
-    expect(store.poolById(99)).toBeUndefined()
-    expect(store.membershipFor(4)?.status).toBe(MemberStatus.PENDING)
+    expect(store.getState().poolById(2)?.name).toBe('Family Circle')
+    expect(store.getState().poolById(99)).toBeUndefined()
+    expect(store.getState().membershipFor(4)?.status).toBe(MemberStatus.PENDING)
   })
 
   it('sorts recent transactions newest first', () => {
-    const times = store.recentTransactions.map((tx) => tx.createdAt.getTime())
+    const times = store
+      .getState()
+      .recentTransactions()
+      .map((tx) => tx.createdAt.getTime())
     expect(times).toEqual([...times].sort((a, b) => b - a))
   })
 
   it('filters transactions by pool', () => {
-    expect(store.transactionsFor(2).every((tx) => tx.poolId === '2')).toBe(true)
-    expect(store.transactionsFor(2).length).toBeGreaterThan(0)
+    expect(
+      store
+        .getState()
+        .transactionsFor(2)
+        .every((tx) => tx.poolId === '2')
+    ).toBe(true)
+    expect(store.getState().transactionsFor(2).length).toBeGreaterThan(0)
   })
 })
 
@@ -211,7 +224,7 @@ const LIVE_WITHDRAWAL = {
 }
 
 describe('PoolStore against listPools', () => {
-  let store: PoolStore
+  let store: PoolStoreApi
   let listPoolsCallable: jest.Mock
   let listContributionsCallable: jest.Mock
   let listWithdrawalsCallable: jest.Mock
@@ -223,7 +236,7 @@ describe('PoolStore against listPools', () => {
     authStore.setState({ walletAddress: null })
     authStore.setState({ chainId: 31337 })
 
-    store = new PoolStore()
+    store = createPoolStore()
     listPoolsCallable = jest.fn().mockResolvedValue({
       data: { pools: [LIVE_POOL], totalCount: 1, page: 1, limit: 50, hasNextPage: false, hasPreviousPage: false },
     })
@@ -249,14 +262,14 @@ describe('PoolStore against listPools', () => {
   })
 
   it('asks the backend for the connected chain', async () => {
-    await store.fetchPools()
+    await store.getState().fetchPools()
 
     expect(mockFirebaseCallable).toHaveBeenCalledWith(expect.anything(), 'listPools')
     expect(listPoolsCallable).toHaveBeenCalledWith({ chainId: 31337, activeOnly: true, limit: 50 })
   })
 
   it('lets the caller override the defaults', async () => {
-    await store.fetchPools({ activeOnly: false, limit: 10, ownerAddress: '0x70997970C51812dc3A010C7d01b50e0d17dc79C8' })
+    await store.getState().fetchPools({ activeOnly: false, limit: 10, ownerAddress: '0x70997970C51812dc3A010C7d01b50e0d17dc79C8' })
 
     expect(listPoolsCallable).toHaveBeenCalledWith({
       chainId: 31337,
@@ -273,7 +286,7 @@ describe('PoolStore against listPools', () => {
     it('sends the term as typed, on the connected chain', async () => {
       // Raw rather than normalised: the backend folds it the same way it built
       // the tokens, so there is one implementation rather than two.
-      await store.searchPools('Builders')
+      await store.getState().searchPools('Builders')
 
       expect(listPoolsCallable).toHaveBeenCalledWith({ chainId: 31337, activeOnly: true, limit: 50, searchTerm: 'Builders' })
     })
@@ -282,19 +295,19 @@ describe('PoolStore against listPools', () => {
       // `pools` is what every balance, liquidity figure and `myPools` derives
       // from. Replacing it with a search result would empty the Pools tab while
       // somebody typed in Discover.
-      await store.fetchPools()
+      await store.getState().fetchPools()
       listPoolsCallable.mockResolvedValue({
         data: { pools: [REMOTE_POOL], totalCount: 1, page: 1, limit: 50, hasNextPage: false, hasPreviousPage: false },
       })
 
-      await store.searchPools('builders')
+      await store.getState().searchPools('builders')
 
-      expect(store.pools.map((pool) => pool.poolId)).toEqual([12])
-      expect(store.poolSearchResults.map((pool) => pool.poolId)).toEqual([99])
+      expect(store.getState().pools.map((pool) => pool.poolId)).toEqual([12])
+      expect(store.getState().poolSearchResults.map((pool) => pool.poolId)).toEqual([99])
     })
 
     it('offers the loaded page and the results together, without repeating one', async () => {
-      await store.fetchPools()
+      await store.getState().fetchPools()
       listPoolsCallable.mockResolvedValue({
         data: {
           pools: [LIVE_POOL, REMOTE_POOL],
@@ -306,9 +319,14 @@ describe('PoolStore against listPools', () => {
         },
       })
 
-      await store.searchPools('pool')
+      await store.getState().searchPools('pool')
 
-      expect(store.discoverableMatches.map((pool) => pool.poolId)).toEqual([12, 99])
+      expect(
+        store
+          .getState()
+          .discoverableMatches()
+          .map((pool) => pool.poolId)
+      ).toEqual([12, 99])
     })
 
     it('never surfaces a pool the user is already in', async () => {
@@ -316,15 +334,20 @@ describe('PoolStore against listPools', () => {
       // how a pool the user belongs to would otherwise leak into a list of
       // strangers.
       authStore.setState({ walletAddress: LIVE_POOL.poolOwner })
-      await store.fetchPools()
+      await store.getState().fetchPools()
       listPoolsCallable.mockResolvedValue({
         data: { pools: [LIVE_POOL], totalCount: 1, page: 1, limit: 50, hasNextPage: false, hasPreviousPage: false },
       })
 
-      await store.searchPools('live')
+      await store.getState().searchPools('live')
 
-      expect(store.myPools.map((pool) => pool.poolId)).toEqual([12])
-      expect(store.discoverableMatches).toEqual([])
+      expect(
+        store
+          .getState()
+          .myPools()
+          .map((pool) => pool.poolId)
+      ).toEqual([12])
+      expect(store.getState().discoverableMatches()).toEqual([])
     })
 
     it('keeps the previous results when a search fails', async () => {
@@ -334,95 +357,99 @@ describe('PoolStore against listPools', () => {
       listPoolsCallable.mockResolvedValue({
         data: { pools: [REMOTE_POOL], totalCount: 1, page: 1, limit: 50, hasNextPage: false, hasPreviousPage: false },
       })
-      await store.searchPools('builders')
+      await store.getState().searchPools('builders')
 
       listPoolsCallable.mockRejectedValue(new Error('functions/unavailable'))
-      await store.searchPools('builder')
+      await store.getState().searchPools('builder')
 
-      expect(store.poolSearchResults.map((pool) => pool.poolId)).toEqual([99])
-      expect(store.error).toBeNull()
+      expect(store.getState().poolSearchResults.map((pool) => pool.poolId)).toEqual([99])
+      expect(store.getState().error).toBeNull()
     })
 
     it('forgets the results when the box is emptied', async () => {
       listPoolsCallable.mockResolvedValue({
         data: { pools: [REMOTE_POOL], totalCount: 1, page: 1, limit: 50, hasNextPage: false, hasPreviousPage: false },
       })
-      await store.searchPools('builders')
+      await store.getState().searchPools('builders')
 
-      store.clearPoolSearch()
+      store.getState().clearPoolSearch()
 
-      expect(store.poolSearchResults).toEqual([])
+      expect(store.getState().poolSearchResults).toEqual([])
     })
 
     it('reports when a search is in flight, without blanking the list', async () => {
       let release: (value: unknown) => void = () => {}
       listPoolsCallable.mockImplementation(() => new Promise((resolve) => (release = resolve)))
 
-      const pending = store.searchPools('builders')
+      const pending = store.getState().searchPools('builders')
 
-      expect(store.isSearchingPools).toBe(true)
-      expect(store.isLoading).toBe(false)
+      expect(store.getState().isSearchingPools).toBe(true)
+      expect(store.getState().isLoading).toBe(false)
 
       release({ data: { pools: [], totalCount: 0, page: 1, limit: 50, hasNextPage: false, hasPreviousPage: false } })
       await pending
 
-      expect(store.isSearchingPools).toBe(false)
+      expect(store.getState().isSearchingPools).toBe(false)
     })
   })
 
   it('stores what the backend returned', async () => {
-    await store.fetchPools()
+    await store.getState().fetchPools()
 
-    expect(store.pools).toHaveLength(1)
-    expect(store.pools[0].name).toBe('Live Pool')
-    expect(store.poolCount).toBe(1)
-    expect(store.isEmpty).toBe(false)
-    expect(store.lastFetchedAt).toBeInstanceOf(Date)
+    expect(store.getState().pools).toHaveLength(1)
+    expect(store.getState().pools[0].name).toBe('Live Pool')
+    expect(store.getState().poolCount()).toBe(1)
+    expect(store.getState().isEmpty()).toBe(false)
+    expect(store.getState().lastFetchedAt).toBeInstanceOf(Date)
   })
 
   it('keeps createdAt as the ISO string the callable sends', async () => {
-    await store.fetchPools()
+    await store.getState().fetchPools()
 
     // Not a Date: a Date returned from a callable serialises to `{}`, so the
     // wire type is a string and stays one.
-    expect(store.pools[0].createdAt).toBe(LIVE_POOL.createdAt)
-    expect(new Date(store.pools[0].createdAt).getTime()).not.toBeNaN()
+    expect(store.getState().pools[0].createdAt).toBe(LIVE_POOL.createdAt)
+    expect(new Date(store.getState().pools[0].createdAt).getTime()).not.toBeNaN()
   })
 
   it('reports a failure instead of throwing at the screen', async () => {
     listPoolsCallable.mockRejectedValue(new Error('functions/unavailable'))
 
-    await expect(store.fetchPools()).resolves.toBeUndefined()
+    await expect(store.getState().fetchPools()).resolves.toBeUndefined()
 
-    expect(store.error).toBe('functions/unavailable')
-    expect(store.hasError).toBe(true)
-    expect(store.isLoading).toBe(false)
-    expect(store.pools).toHaveLength(0)
-    expect(store.isEmpty).toBe(true)
+    expect(store.getState().error).toBe('functions/unavailable')
+    expect(store.getState().hasError()).toBe(true)
+    expect(store.getState().isLoading).toBe(false)
+    expect(store.getState().pools).toHaveLength(0)
+    expect(store.getState().isEmpty()).toBe(true)
   })
 
   it('clears a previous failure on the next attempt', async () => {
     listPoolsCallable.mockRejectedValueOnce(new Error('functions/unavailable'))
-    await store.fetchPools()
-    expect(store.hasError).toBe(true)
+    await store.getState().fetchPools()
+    expect(store.getState().hasError()).toBe(true)
 
-    await store.fetchPools()
+    await store.getState().fetchPools()
 
-    expect(store.hasError).toBe(false)
-    expect(store.pools).toHaveLength(1)
+    expect(store.getState().hasError()).toBe(false)
+    expect(store.getState().pools).toHaveLength(1)
   })
 
   it('keeps the list on screen while refreshing', async () => {
-    await store.fetchPools()
+    await store.getState().fetchPools()
     let seenDuringRefresh: { pools: number; isRefreshing: boolean; isLoading: boolean } | null = null
     listPoolsCallable.mockImplementation(() => {
-      seenDuringRefresh = { pools: store.pools.length, isRefreshing: store.isRefreshing, isLoading: store.isLoading }
+      seenDuringRefresh = {
+        pools: store.getState().pools.length,
+        isRefreshing: store.getState().isRefreshing,
+        isLoading: store.getState().isLoading,
+      }
       return Promise.resolve({
         data: { pools: [LIVE_POOL], totalCount: 1, page: 1, limit: 50, hasNextPage: false, hasPreviousPage: false },
       })
     })
 
-    await store.refreshPools()
+    await store.getState().refreshPools()
 
     expect(seenDuringRefresh).toEqual({ pools: 1, isRefreshing: true, isLoading: false })
   })
@@ -430,41 +457,46 @@ describe('PoolStore against listPools', () => {
   it('counts a pool the connected wallet owns as one of mine, whatever the casing', async () => {
     authStore.setState({ walletAddress: '0x90F79bf6EB2c4f870365E785982E1f101E93b906' })
 
-    await store.fetchPools()
+    await store.getState().fetchPools()
 
-    expect(store.myPools.map((pool) => pool.poolId)).toEqual([12])
+    expect(
+      store
+        .getState()
+        .myPools()
+        .map((pool) => pool.poolId)
+    ).toEqual([12])
   })
 
   it('does not claim pools owned by someone else', async () => {
     authStore.setState({ walletAddress: '0x0000000000000000000000000000000000000001' })
 
-    await store.fetchPools()
+    await store.getState().fetchPools()
 
-    expect(store.myPools).toHaveLength(0)
+    expect(store.getState().myPools()).toHaveLength(0)
   })
 
   it('claims nothing when no wallet is connected', async () => {
-    await store.fetchPools()
+    await store.getState().fetchPools()
 
-    expect(store.userAddress).toBe('')
-    expect(store.myPools).toHaveLength(0)
+    expect(store.getState().userAddress()).toBe('')
+    expect(store.getState().myPools()).toHaveLength(0)
   })
 
   it('reset clears everything', async () => {
-    await store.fetchPools()
+    await store.getState().fetchPools()
 
-    store.reset()
+    store.getState().reset()
 
-    expect(store.pools).toHaveLength(0)
-    expect(store.memberships).toHaveLength(0)
-    expect(store.lastFetchedAt).toBeNull()
-    expect(store.error).toBeNull()
+    expect(store.getState().pools).toHaveLength(0)
+    expect(store.getState().memberships()).toHaveLength(0)
+    expect(store.getState().lastFetchedAt).toBeNull()
+    expect(store.getState().error).toBeNull()
   })
 
   it('falls back to the default chain when the wallet reports none', async () => {
     authStore.setState({ chainId: null })
 
-    await store.fetchPools()
+    await store.getState().fetchPools()
 
     expect(listPoolsCallable).toHaveBeenCalledWith(expect.objectContaining({ chainId: 31337 }))
   })
@@ -474,10 +506,10 @@ describe('PoolStore against listPools', () => {
       data: { pools: [] as PoolInfo[], totalCount: 0, page: 1, limit: 50, hasNextPage: false, hasPreviousPage: false },
     })
 
-    await store.fetchPools()
+    await store.getState().fetchPools()
 
-    expect(store.isEmpty).toBe(true)
-    expect(store.hasError).toBe(false)
+    expect(store.getState().isEmpty()).toBe(true)
+    expect(store.getState().hasError()).toBe(false)
   })
 })
 
@@ -489,7 +521,7 @@ describe('PoolStore contributions', () => {
   const CONTRIBUTOR = LIVE_CONTRIBUTION.contributor
   const OTHER_WALLET = '0x0000000000000000000000000000000000000009'
 
-  let store: PoolStore
+  let store: PoolStoreApi
   let listContributionsCallable: jest.Mock
   let listWithdrawalsCallable: jest.Mock
   let listMembersCallable: jest.Mock
@@ -502,7 +534,7 @@ describe('PoolStore contributions', () => {
     listWithdrawalsCallable.mockResolvedValue({
       data: { withdrawals, totalCount: withdrawals.length, limit: 50 },
     })
-    await store.fetchPools()
+    await store.getState().fetchPools()
   }
 
   beforeEach(() => {
@@ -512,7 +544,7 @@ describe('PoolStore contributions', () => {
     authStore.setState({ walletAddress: null })
     authStore.setState({ chainId: 31337 })
 
-    store = new PoolStore()
+    store = createPoolStore()
     const listPoolsCallable = jest.fn().mockResolvedValue({
       data: { pools: [LIVE_POOL], totalCount: 1, page: 1, limit: 50, hasNextPage: false, hasPreviousPage: false },
     })
@@ -534,7 +566,7 @@ describe('PoolStore contributions', () => {
   })
 
   it('asks the backend for the connected chain', async () => {
-    await store.fetchPools()
+    await store.getState().fetchPools()
 
     expect(mockFirebaseCallable).toHaveBeenCalledWith(expect.anything(), 'listContributions')
     expect(listContributionsCallable).toHaveBeenCalledWith({ chainId: 31337, limit: 50 })
@@ -543,7 +575,7 @@ describe('PoolStore contributions', () => {
   it('does not filter by wallet, so other members count towards pool liquidity', async () => {
     // A pool's liquidity is what everyone put in, and it is shown on pools the
     // user has not contributed to.
-    await store.fetchPools()
+    await store.getState().fetchPools()
 
     expect(listContributionsCallable).toHaveBeenCalledWith(expect.not.objectContaining({ contributor: expect.anything() }))
   })
@@ -554,20 +586,20 @@ describe('PoolStore contributions', () => {
       { ...LIVE_CONTRIBUTION, id: '31337-0xcccc-0', transactionHash: '0xcccc', contributor: OTHER_WALLET, amount: '3000000000000000000' },
     ])
 
-    expect(store.poolLiquidity(12)).toBe(parseEther('5'))
+    expect(store.getState().poolLiquidity(12)).toBe(parseEther('5'))
   })
 
   it('reports zero liquidity for a pool nobody has funded', async () => {
     await loadWith([])
 
-    expect(store.poolLiquidity(12)).toBe(0n)
+    expect(store.getState().poolLiquidity(12)).toBe(0n)
   })
 
   it('lists the contributions into one pool', async () => {
     await loadWith([LIVE_CONTRIBUTION, { ...LIVE_CONTRIBUTION, id: 'other', poolId: 99 }])
 
-    expect(store.contributionsFor(12)).toHaveLength(1)
-    expect(store.contributionsFor(12)[0].id).toBe(LIVE_CONTRIBUTION.id)
+    expect(store.getState().contributionsFor(12)).toHaveLength(1)
+    expect(store.getState().contributionsFor(12)[0].id).toBe(LIVE_CONTRIBUTION.id)
   })
 
   it('derives a membership from a contribution', async () => {
@@ -576,7 +608,7 @@ describe('PoolStore contributions', () => {
     authStore.setState({ walletAddress: CONTRIBUTOR })
     await loadWith([LIVE_CONTRIBUTION])
 
-    const membership = store.membershipFor(12)
+    const membership = store.getState().membershipFor(12)
     expect(membership?.totalContributed).toBe(parseEther('2'))
     expect(membership?.currentBalance).toBe(parseEther('2'))
     expect(membership?.status).toBe(MemberStatus.ACTIVE)
@@ -589,8 +621,8 @@ describe('PoolStore contributions', () => {
       { ...LIVE_CONTRIBUTION, id: '31337-0xdddd-0', transactionHash: '0xdddd', amount: '1000000000000000000' },
     ])
 
-    expect(store.memberships).toHaveLength(1)
-    expect(store.membershipFor(12)?.totalContributed).toBe(parseEther('3'))
+    expect(store.getState().memberships()).toHaveLength(1)
+    expect(store.getState().membershipFor(12)?.totalContributed).toBe(parseEther('3'))
   })
 
   it('dates a membership from the first deposit, not the most recent', async () => {
@@ -600,13 +632,13 @@ describe('PoolStore contributions', () => {
       { ...LIVE_CONTRIBUTION, id: 'earlier', transactionHash: '0xeeee', contributedAt: '2026-01-01T00:00:00.000Z' },
     ])
 
-    expect(store.membershipFor(12)?.joinedAt).toEqual(new Date('2026-01-01T00:00:00.000Z'))
+    expect(store.getState().membershipFor(12)?.joinedAt).toEqual(new Date('2026-01-01T00:00:00.000Z'))
   })
 
   it('keeps one membership per wallet per pool', async () => {
     await loadWith([LIVE_CONTRIBUTION, { ...LIVE_CONTRIBUTION, id: 'other-wallet', contributor: OTHER_WALLET }])
 
-    expect(store.memberships).toHaveLength(2)
+    expect(store.getState().memberships()).toHaveLength(2)
   })
 
   it('matches the connected wallet case-insensitively', async () => {
@@ -614,28 +646,28 @@ describe('PoolStore contributions', () => {
     authStore.setState({ walletAddress: '0x90F79bf6EB2c4f870365E785982E1f101E93b906' })
     await loadWith([LIVE_CONTRIBUTION])
 
-    expect(store.membershipFor(12)).toBeDefined()
+    expect(store.getState().membershipFor(12)).toBeDefined()
   })
 
   it('marks the pool owner as an admin of their own pool', async () => {
     // LIVE_POOL's owner is the contributor in this fixture.
     await loadWith([LIVE_CONTRIBUTION])
 
-    expect(store.memberships[0].isAdmin).toBe(true)
+    expect(store.getState().memberships()[0].isAdmin).toBe(true)
   })
 
   it('does not mark an ordinary contributor as an admin', async () => {
     await loadWith([{ ...LIVE_CONTRIBUTION, contributor: OTHER_WALLET }])
 
-    expect(store.memberships[0].isAdmin).toBe(false)
+    expect(store.getState().memberships()[0].isAdmin).toBe(false)
   })
 
   it('shows a contribution as activity instead of a fixture', async () => {
     // Activity used to be MOCK_TRANSACTIONS regardless of what was indexed.
     await loadWith([LIVE_CONTRIBUTION])
 
-    expect(store.recentTransactions).toHaveLength(1)
-    const [activity] = store.recentTransactions
+    expect(store.getState().recentTransactions()).toHaveLength(1)
+    const [activity] = store.getState().recentTransactions()
     expect(activity.id).toBe(LIVE_CONTRIBUTION.id)
     expect(activity.type).toBe(TransactionType.CONTRIBUTION)
     expect(activity.status).toBe(TransactionStatus.CONFIRMED)
@@ -649,7 +681,7 @@ describe('PoolStore contributions', () => {
   it('shows no activity when nothing has been indexed', async () => {
     await loadWith([])
 
-    expect(store.recentTransactions).toEqual([])
+    expect(store.getState().recentTransactions()).toEqual([])
   })
 
   it('sorts derived activity newest first', async () => {
@@ -658,13 +690,23 @@ describe('PoolStore contributions', () => {
       { ...LIVE_CONTRIBUTION, id: 'earlier', transactionHash: '0xeeee', contributedAt: '2026-01-01T00:00:00.000Z' },
     ])
 
-    expect(store.recentTransactions.map((tx) => tx.id)).toEqual([LIVE_CONTRIBUTION.id, 'earlier'])
+    expect(
+      store
+        .getState()
+        .recentTransactions()
+        .map((tx) => tx.id)
+    ).toEqual([LIVE_CONTRIBUTION.id, 'earlier'])
   })
 
   it('filters derived activity by pool', async () => {
     await loadWith([LIVE_CONTRIBUTION, { ...LIVE_CONTRIBUTION, id: 'other-pool', poolId: 99 }])
 
-    expect(store.transactionsFor(12).map((tx) => tx.id)).toEqual([LIVE_CONTRIBUTION.id])
+    expect(
+      store
+        .getState()
+        .transactionsFor(12)
+        .map((tx) => tx.id)
+    ).toEqual([LIVE_CONTRIBUTION.id])
   })
 
   // -------------------------------------------------------------------------
@@ -672,7 +714,7 @@ describe('PoolStore contributions', () => {
   // -------------------------------------------------------------------------
 
   it('asks for withdrawals on the same chain as the contributions', async () => {
-    await store.fetchPools()
+    await store.getState().fetchPools()
 
     expect(mockFirebaseCallable).toHaveBeenCalledWith(expect.anything(), 'listWithdrawals')
     expect(listWithdrawalsCallable).toHaveBeenCalledWith({ chainId: 31337, limit: 50 })
@@ -684,7 +726,7 @@ describe('PoolStore contributions', () => {
     authStore.setState({ walletAddress: CONTRIBUTOR })
     await loadWith([LIVE_CONTRIBUTION], [LIVE_WITHDRAWAL])
 
-    const membership = store.membershipFor(12)
+    const membership = store.getState().membershipFor(12)
     expect(membership?.totalContributed).toBe(parseEther('2'))
     expect(membership?.currentBalance).toBe(parseEther('1.5'))
   })
@@ -692,7 +734,7 @@ describe('PoolStore contributions', () => {
   it('subtracts withdrawals from a pool’s liquidity', async () => {
     await loadWith([LIVE_CONTRIBUTION], [LIVE_WITHDRAWAL])
 
-    expect(store.poolLiquidity(12)).toBe(parseEther('1.5'))
+    expect(store.getState().poolLiquidity(12)).toBe(parseEther('1.5'))
   })
 
   it('never reports negative liquidity when a deposit has fallen off the page', async () => {
@@ -700,19 +742,19 @@ describe('PoolStore contributions', () => {
     // the deposit that funded it. A low figure beats a negative one.
     await loadWith([], [LIVE_WITHDRAWAL])
 
-    expect(store.poolLiquidity(12)).toBe(0n)
+    expect(store.getState().poolLiquidity(12)).toBe(0n)
   })
 
   it('ignores a withdrawal with no matching membership rather than inventing one', async () => {
     await loadWith([], [LIVE_WITHDRAWAL])
 
-    expect(store.memberships).toHaveLength(0)
+    expect(store.getState().memberships()).toHaveLength(0)
   })
 
   it('never lets a balance go below zero', async () => {
     await loadWith([LIVE_CONTRIBUTION], [{ ...LIVE_WITHDRAWAL, amount: '99000000000000000000' }])
 
-    expect(store.memberships[0].currentBalance).toBe(0n)
+    expect(store.getState().memberships()[0].currentBalance).toBe(0n)
   })
 
   it('matches a withdrawal to its member case-insensitively', async () => {
@@ -720,7 +762,7 @@ describe('PoolStore contributions', () => {
     authStore.setState({ walletAddress: CONTRIBUTOR })
     await loadWith([LIVE_CONTRIBUTION], [{ ...LIVE_WITHDRAWAL, member: '0x90F79bf6EB2c4f870365E785982E1f101E93b906' }])
 
-    expect(store.membershipFor(12)?.currentBalance).toBe(parseEther('1.5'))
+    expect(store.getState().membershipFor(12)?.currentBalance).toBe(parseEther('1.5'))
   })
 
   it('reports no earnings rather than negative ones after a withdrawal', async () => {
@@ -729,14 +771,14 @@ describe('PoolStore contributions', () => {
     authStore.setState({ walletAddress: CONTRIBUTOR })
     await loadWith([LIVE_CONTRIBUTION], [LIVE_WITHDRAWAL])
 
-    expect(store.totalBalance).toBe(parseEther('1.5'))
-    expect(store.totalEarned).toBe(0n)
+    expect(store.getState().totalBalance()).toBe(parseEther('1.5'))
+    expect(store.getState().totalEarned()).toBe(0n)
   })
 
   it('shows a withdrawal as activity, distinct from a contribution', async () => {
     await loadWith([LIVE_CONTRIBUTION], [LIVE_WITHDRAWAL])
 
-    const activity = store.recentTransactions
+    const activity = store.getState().recentTransactions()
     expect(activity).toHaveLength(2)
     // Newest first: the withdrawal is an hour after the deposit.
     expect(activity[0].type).toBe(TransactionType.WITHDRAWAL)
@@ -749,26 +791,31 @@ describe('PoolStore contributions', () => {
     listContributionsCallable.mockResolvedValue({ data: { contributions: [LIVE_CONTRIBUTION], totalCount: 1, limit: 50 } })
     listWithdrawalsCallable.mockResolvedValue({ data: { totalCount: 0, limit: 50 } })
 
-    await store.fetchPools()
+    await store.getState().fetchPools()
 
-    expect(store.withdrawals).toEqual([])
-    expect(store.poolLiquidity(12)).toBe(parseEther('2'))
+    expect(store.getState().withdrawals).toEqual([])
+    expect(store.getState().poolLiquidity(12)).toBe(parseEther('2'))
   })
 
   it('counts a pool the user contributed to as one of mine', async () => {
     authStore.setState({ walletAddress: OTHER_WALLET })
     await loadWith([{ ...LIVE_CONTRIBUTION, contributor: OTHER_WALLET }])
 
-    expect(store.myPools.map((pool) => pool.poolId)).toEqual([12])
+    expect(
+      store
+        .getState()
+        .myPools()
+        .map((pool) => pool.poolId)
+    ).toEqual([12])
   })
 
   it('adds the user’s balance to the dashboard total', async () => {
     authStore.setState({ walletAddress: OTHER_WALLET })
     await loadWith([{ ...LIVE_CONTRIBUTION, contributor: OTHER_WALLET }])
 
-    expect(store.totalBalance).toBe(parseEther('2'))
+    expect(store.getState().totalBalance()).toBe(parseEther('2'))
     // No interest accrues yet, so a balance is exactly what was put in.
-    expect(store.totalEarned).toBe(0n)
+    expect(store.getState().totalEarned()).toBe(0n)
   })
 
   // -------------------------------------------------------------------------
@@ -782,10 +829,10 @@ describe('PoolStore contributions', () => {
     })
     await loadWith([LIVE_CONTRIBUTION])
 
-    expect(store.memberships).toHaveLength(1)
-    expect(store.memberships[0].status).toBe(MemberStatus.SUSPENDED)
+    expect(store.getState().memberships()).toHaveLength(1)
+    expect(store.getState().memberships()[0].status).toBe(MemberStatus.SUSPENDED)
     // Removal takes away what you may do next, never what you already put in.
-    expect(store.memberships[0].currentBalance).toBe(parseEther('2'))
+    expect(store.getState().memberships()[0].currentBalance).toBe(parseEther('2'))
   })
 
   it('keeps a removed member’s balance on their own dashboard', async () => {
@@ -797,7 +844,7 @@ describe('PoolStore contributions', () => {
     })
     await loadWith([LIVE_CONTRIBUTION])
 
-    expect(store.totalBalance).toBe(parseEther('2'))
+    expect(store.getState().totalBalance()).toBe(parseEther('2'))
   })
 
   it('lists a member the owner admitted who has not funded anything', async () => {
@@ -809,8 +856,8 @@ describe('PoolStore contributions', () => {
     })
     await loadWith([])
 
-    expect(store.membershipFor(12)?.currentBalance).toBe(0n)
-    expect(store.membershipFor(12)?.status).toBe(MemberStatus.ACTIVE)
+    expect(store.getState().membershipFor(12)?.currentBalance).toBe(0n)
+    expect(store.getState().membershipFor(12)?.status).toBe(MemberStatus.ACTIVE)
   })
 
   it('maps each register status to the app’s enum', async () => {
@@ -824,7 +871,7 @@ describe('PoolStore contributions', () => {
       listMembersCallable.mockResolvedValue({ data: { members: [{ ...LIVE_MEMBER, status: chain }], totalCount: 1, limit: 50 } })
       await loadWith([])
 
-      expect(store.memberships[0].status).toBe(expected)
+      expect(store.getState().memberships()[0].status).toBe(expected)
     }
   })
 
@@ -833,7 +880,7 @@ describe('PoolStore contributions', () => {
     // the sweep has not swept yet. Depositing has always meant membership.
     await loadWith([LIVE_CONTRIBUTION])
 
-    expect(store.memberships[0].status).toBe(MemberStatus.ACTIVE)
+    expect(store.getState().memberships()[0].status).toBe(MemberStatus.ACTIVE)
   })
 
   it('matches the register to its contributions case-insensitively', async () => {
@@ -843,17 +890,17 @@ describe('PoolStore contributions', () => {
     await loadWith([LIVE_CONTRIBUTION])
 
     // One member, not two: a case mismatch would double them.
-    expect(store.memberships).toHaveLength(1)
-    expect(store.memberships[0].currentBalance).toBe(parseEther('2'))
+    expect(store.getState().memberships()).toHaveLength(1)
+    expect(store.getState().memberships()[0].currentBalance).toBe(parseEther('2'))
   })
 
   it('survives a response with no members field', async () => {
     listMembersCallable.mockResolvedValue({ data: { totalCount: 0, limit: 50 } })
 
-    await store.fetchPools()
+    await store.getState().fetchPools()
 
-    expect(store.memberRecords).toEqual([])
-    expect(store.hasError).toBe(false)
+    expect(store.getState().memberRecords).toEqual([])
+    expect(store.getState().hasError()).toBe(false)
   })
 
   it('survives a response with no contributions field', async () => {
@@ -861,11 +908,11 @@ describe('PoolStore contributions', () => {
     // response must not take the screen down.
     listContributionsCallable.mockResolvedValue({ data: { totalCount: 0, limit: 50 } })
 
-    await store.fetchPools()
+    await store.getState().fetchPools()
 
-    expect(store.contributions).toEqual([])
-    expect(store.memberships).toEqual([])
-    expect(store.hasError).toBe(false)
+    expect(store.getState().contributions).toEqual([])
+    expect(store.getState().memberships()).toEqual([])
+    expect(store.getState().hasError()).toBe(false)
   })
 })
 
@@ -885,7 +932,7 @@ const SWEEP_RESULT = {
 }
 
 describe('PoolStore chain sync', () => {
-  let store: PoolStore
+  let store: PoolStoreApi
   let listPoolsCallable: jest.Mock
   let syncCallable: jest.Mock
   /** Every callable invoked, in order, so ordering can be asserted. */
@@ -899,7 +946,7 @@ describe('PoolStore chain sync', () => {
     authStore.setState({ chainId: 31337 })
     calls = []
 
-    store = new PoolStore()
+    store = createPoolStore()
     listPoolsCallable = jest.fn().mockImplementation(() => {
       calls.push('listPools')
       return Promise.resolve({
@@ -932,14 +979,14 @@ describe('PoolStore chain sync', () => {
   it('sweeps the chain before listing, so one pull is enough', async () => {
     // Listing first would show what Firestore already had and only surface the
     // swept events on the next pull.
-    await store.syncAndRefresh()
+    await store.getState().syncAndRefresh()
 
     expect(calls[0]).toBe('syncPoolEventsNow')
     expect(calls).toContain('listPools')
   })
 
   it('sweeps the connected chain', async () => {
-    await store.syncAndRefresh()
+    await store.getState().syncAndRefresh()
 
     expect(mockFirebaseCallable).toHaveBeenCalledWith(expect.anything(), 'syncPoolEventsNow')
     expect(syncCallable).toHaveBeenCalledWith({ chainId: 31337 })
@@ -948,7 +995,7 @@ describe('PoolStore chain sync', () => {
   it('falls back to the default chain when the wallet reports none', async () => {
     authStore.setState({ chainId: null })
 
-    await store.syncAndRefresh()
+    await store.getState().syncAndRefresh()
 
     expect(syncCallable).toHaveBeenCalledWith({ chainId: 31337 })
   })
@@ -958,14 +1005,14 @@ describe('PoolStore chain sync', () => {
     // slower half of the refresh.
     let refreshingDuringSweep: boolean | null = null
     syncCallable.mockImplementation(() => {
-      refreshingDuringSweep = store.isRefreshing
+      refreshingDuringSweep = store.getState().isRefreshing
       return Promise.resolve({ data: SWEEP_RESULT })
     })
 
-    await store.syncAndRefresh()
+    await store.getState().syncAndRefresh()
 
     expect(refreshingDuringSweep).toBe(true)
-    expect(store.isRefreshing).toBe(false)
+    expect(store.getState().isRefreshing).toBe(false)
   })
 
   it('still lists what is indexed when the sweep fails', async () => {
@@ -973,22 +1020,22 @@ describe('PoolStore chain sync', () => {
     // on; the pools already in Firestore are still worth showing.
     syncCallable.mockRejectedValue(new Error('functions/internal'))
 
-    await expect(store.syncAndRefresh()).resolves.toBeUndefined()
+    await expect(store.getState().syncAndRefresh()).resolves.toBeUndefined()
 
-    expect(store.pools).toHaveLength(1)
-    expect(store.hasError).toBe(false)
-    expect(store.isRefreshing).toBe(false)
+    expect(store.getState().pools).toHaveLength(1)
+    expect(store.getState().hasError()).toBe(false)
+    expect(store.getState().isRefreshing).toBe(false)
   })
 
   it('leaves the list on screen while it sweeps', async () => {
-    await store.fetchPools()
+    await store.getState().fetchPools()
     let poolsDuringSweep: number | null = null
     syncCallable.mockImplementation(() => {
-      poolsDuringSweep = store.pools.length
+      poolsDuringSweep = store.getState().pools.length
       return Promise.resolve({ data: SWEEP_RESULT })
     })
 
-    await store.syncAndRefresh()
+    await store.getState().syncAndRefresh()
 
     expect(poolsDuringSweep).toBe(1)
   })
@@ -997,7 +1044,7 @@ describe('PoolStore chain sync', () => {
     // Mock mode exists to work on the UI with no emulators running.
     process.env.EXPO_PUBLIC_USE_MOCK_POOLS = 'true'
 
-    await store.syncAndRefresh()
+    await store.getState().syncAndRefresh()
 
     expect(syncCallable).not.toHaveBeenCalled()
   })
@@ -1005,7 +1052,7 @@ describe('PoolStore chain sync', () => {
   it('does not sweep on an ordinary refresh', async () => {
     // `refreshPools` also runs straight after a transaction the app indexed
     // itself, where a sweep is a slow way to re-fetch finished work.
-    await store.refreshPools()
+    await store.getState().refreshPools()
 
     expect(syncCallable).not.toHaveBeenCalled()
     expect(calls).toEqual(['listPools'])
@@ -1032,14 +1079,14 @@ const POOL_I_FUNDED = { ...LIVE_POOL, poolId: 31, name: 'Mine By Deposit', poolO
 const POOL_THEIRS = { ...LIVE_POOL, poolId: 32, name: 'Not Mine', poolOwner: STRANGER_WALLET, createdBy: STRANGER_WALLET }
 
 describe('PoolStore myPools', () => {
-  let store: PoolStore
+  let store: PoolStoreApi
   let listContributionsCallable: jest.Mock
 
   async function loadWithContributions(contributions: (typeof LIVE_CONTRIBUTION)[]) {
     listContributionsCallable.mockResolvedValue({
       data: { contributions, totalCount: contributions.length, limit: 50 },
     })
-    await store.fetchPools()
+    await store.getState().fetchPools()
   }
 
   beforeEach(() => {
@@ -1049,7 +1096,7 @@ describe('PoolStore myPools', () => {
     authStore.setState({ walletAddress: USER_WALLET })
     authStore.setState({ chainId: 31337 })
 
-    store = new PoolStore()
+    store = createPoolStore()
     const listPoolsCallable = jest.fn().mockResolvedValue({
       data: {
         pools: [POOL_I_OWN, POOL_I_FUNDED, POOL_THEIRS],
@@ -1083,20 +1130,35 @@ describe('PoolStore myPools', () => {
       { ...LIVE_CONTRIBUTION, id: '31337-0xdddd-0', poolId: 32, contributor: STRANGER_WALLET },
     ])
 
-    expect(store.myPools.map((pool) => pool.poolId)).toEqual([30, 31])
+    expect(
+      store
+        .getState()
+        .myPools()
+        .map((pool) => pool.poolId)
+    ).toEqual([30, 31])
   })
 
   it('claims a pool the user owns even with no deposits in it', async () => {
     // A pool you just created is yours to see before any membership exists.
     await loadWithContributions([])
 
-    expect(store.myPools.map((pool) => pool.poolId)).toEqual([30])
+    expect(
+      store
+        .getState()
+        .myPools()
+        .map((pool) => pool.poolId)
+    ).toEqual([30])
   })
 
   it('claims a pool the user funded but does not own', async () => {
     await loadWithContributions([{ ...LIVE_CONTRIBUTION, poolId: 31, contributor: USER_WALLET }])
 
-    expect(store.myPools.map((pool) => pool.poolId)).toEqual([30, 31])
+    expect(
+      store
+        .getState()
+        .myPools()
+        .map((pool) => pool.poolId)
+    ).toEqual([30, 31])
   })
 
   it('matches the depositor case-insensitively', async () => {
@@ -1104,7 +1166,12 @@ describe('PoolStore myPools', () => {
     authStore.setState({ walletAddress: '0x15D34AAf54267DB7D7c367839AAf71A00a2C6A65' })
     await loadWithContributions([{ ...LIVE_CONTRIBUTION, poolId: 31, contributor: USER_WALLET }])
 
-    expect(store.myPools.map((pool) => pool.poolId)).toEqual([30, 31])
+    expect(
+      store
+        .getState()
+        .myPools()
+        .map((pool) => pool.poolId)
+    ).toEqual([30, 31])
   })
 
   it('claims nothing when every pool belongs to someone else', async () => {
@@ -1114,7 +1181,7 @@ describe('PoolStore myPools', () => {
       { ...LIVE_CONTRIBUTION, id: '31337-0xdddd-0', poolId: 32, contributor: STRANGER_WALLET },
     ])
 
-    expect(store.myPools).toEqual([])
+    expect(store.getState().myPools()).toEqual([])
   })
 
   it('still counts every depositor towards pool liquidity', async () => {
@@ -1122,8 +1189,13 @@ describe('PoolStore myPools', () => {
     // source would make other people's pools read as empty.
     await loadWithContributions([{ ...LIVE_CONTRIBUTION, poolId: 32, contributor: STRANGER_WALLET, amount: parseEther('7').toString() }])
 
-    expect(store.poolLiquidity(32)).toBe(parseEther('7'))
-    expect(store.myPools.map((pool) => pool.poolId)).toEqual([30])
+    expect(store.getState().poolLiquidity(32)).toBe(parseEther('7'))
+    expect(
+      store
+        .getState()
+        .myPools()
+        .map((pool) => pool.poolId)
+    ).toEqual([30])
   })
 })
 
@@ -1138,7 +1210,7 @@ describe('PoolStore myPools', () => {
 // ---------------------------------------------------------------------------
 
 describe('PoolStore discoverablePools', () => {
-  let store: PoolStore
+  let store: PoolStoreApi
   let listContributionsCallable: jest.Mock
   let listMembersCallable: jest.Mock
 
@@ -1147,7 +1219,7 @@ describe('PoolStore discoverablePools', () => {
       data: { contributions, totalCount: contributions.length, limit: 50 },
     })
     listMembersCallable.mockResolvedValue({ data: { members, totalCount: members.length, limit: 50 } })
-    await store.fetchPools()
+    await store.getState().fetchPools()
   }
 
   function member(poolId: number, account: string, status: MemberInfo['status']): MemberInfo {
@@ -1171,7 +1243,7 @@ describe('PoolStore discoverablePools', () => {
     authStore.setState({ walletAddress: USER_WALLET })
     authStore.setState({ chainId: 31337 })
 
-    store = new PoolStore()
+    store = createPoolStore()
     const listPoolsCallable = jest.fn().mockResolvedValue({
       data: {
         pools: [POOL_I_OWN, POOL_I_FUNDED, POOL_THEIRS],
@@ -1202,13 +1274,23 @@ describe('PoolStore discoverablePools', () => {
   it('offers the pools the user has no standing in', async () => {
     await loadWith([{ ...LIVE_CONTRIBUTION, poolId: 31, contributor: USER_WALLET }])
 
-    expect(store.discoverablePools.map((pool) => pool.poolId)).toEqual([32])
+    expect(
+      store
+        .getState()
+        .discoverablePools()
+        .map((pool) => pool.poolId)
+    ).toEqual([32])
   })
 
   it('never offers a pool the user owns', async () => {
     await loadWith([])
 
-    expect(store.discoverablePools.map((pool) => pool.poolId)).toEqual([31, 32])
+    expect(
+      store
+        .getState()
+        .discoverablePools()
+        .map((pool) => pool.poolId)
+    ).toEqual([31, 32])
   })
 
   // The partition. Anything in one list must be absent from the other, or a
@@ -1216,8 +1298,14 @@ describe('PoolStore discoverablePools', () => {
   it('partitions the chain with myPools', async () => {
     await loadWith([{ ...LIVE_CONTRIBUTION, poolId: 31, contributor: USER_WALLET }])
 
-    const mine = store.myPools.map((pool) => pool.poolId)
-    const theirs = store.discoverablePools.map((pool) => pool.poolId)
+    const mine = store
+      .getState()
+      .myPools()
+      .map((pool) => pool.poolId)
+    const theirs = store
+      .getState()
+      .discoverablePools()
+      .map((pool) => pool.poolId)
 
     expect([...mine, ...theirs].sort()).toEqual([30, 31, 32])
     expect(mine.filter((poolId) => theirs.includes(poolId))).toEqual([])
@@ -1227,7 +1315,12 @@ describe('PoolStore discoverablePools', () => {
     // Discover cannot say "waiting to be let in"; the Pools tab can.
     await loadWith([], [member(32, USER_WALLET, 'requested')])
 
-    expect(store.discoverablePools.map((pool) => pool.poolId)).toEqual([31])
+    expect(
+      store
+        .getState()
+        .discoverablePools()
+        .map((pool) => pool.poolId)
+    ).toEqual([31])
   })
 
   it('drops a pool that turned the user down', async () => {
@@ -1235,13 +1328,23 @@ describe('PoolStore discoverablePools', () => {
     // again", which only makes sense where the rejection is visible.
     await loadWith([], [member(32, USER_WALLET, 'rejected')])
 
-    expect(store.discoverablePools.map((pool) => pool.poolId)).toEqual([31])
+    expect(
+      store
+        .getState()
+        .discoverablePools()
+        .map((pool) => pool.poolId)
+    ).toEqual([31])
   })
 
   it('drops a pool the user was removed from', async () => {
     await loadWith([], [member(32, USER_WALLET, 'removed')])
 
-    expect(store.discoverablePools.map((pool) => pool.poolId)).toEqual([31])
+    expect(
+      store
+        .getState()
+        .discoverablePools()
+        .map((pool) => pool.poolId)
+    ).toEqual([31])
   })
 
   it('ignores other people’s standings', async () => {
@@ -1249,14 +1352,24 @@ describe('PoolStore discoverablePools', () => {
     // hides pools because a stranger joined them.
     await loadWith([], [member(31, STRANGER_WALLET, 'active'), member(32, STRANGER_WALLET, 'active')])
 
-    expect(store.discoverablePools.map((pool) => pool.poolId)).toEqual([31, 32])
+    expect(
+      store
+        .getState()
+        .discoverablePools()
+        .map((pool) => pool.poolId)
+    ).toEqual([31, 32])
   })
 
   it('matches the user case-insensitively', async () => {
     authStore.setState({ walletAddress: USER_WALLET.toUpperCase().replace('0X', '0x') })
     await loadWith([], [member(32, USER_WALLET, 'active')])
 
-    expect(store.discoverablePools.map((pool) => pool.poolId)).toEqual([31])
+    expect(
+      store
+        .getState()
+        .discoverablePools()
+        .map((pool) => pool.poolId)
+    ).toEqual([31])
   })
 
   it('offers nothing when the user is in every pool', async () => {
@@ -1268,26 +1381,26 @@ describe('PoolStore discoverablePools', () => {
       []
     )
 
-    expect(store.discoverablePools).toEqual([])
+    expect(store.getState().discoverablePools()).toEqual([])
   })
 
   describe('memberCountFor', () => {
     it('counts the active members of a pool the user is not in', async () => {
       await loadWith([], [member(32, STRANGER_WALLET, 'active'), member(32, '0x00000000000000000000000000000000000000aa', 'active')])
 
-      expect(store.memberCountFor(32)).toBe(2)
+      expect(store.getState().memberCountFor(32)).toBe(2)
     })
 
     it('counts a depositor with no register entry, which is what depositing has always meant', async () => {
       await loadWith([{ ...LIVE_CONTRIBUTION, poolId: 32, contributor: STRANGER_WALLET }])
 
-      expect(store.memberCountFor(32)).toBe(1)
+      expect(store.getState().memberCountFor(32)).toBe(1)
     })
 
     it('does not count an applicant who has not been let in', async () => {
       await loadWith([], [member(32, STRANGER_WALLET, 'requested')])
 
-      expect(store.memberCountFor(32)).toBe(0)
+      expect(store.getState().memberCountFor(32)).toBe(0)
     })
 
     it('does not count someone rejected, removed or gone', async () => {
@@ -1300,19 +1413,19 @@ describe('PoolStore discoverablePools', () => {
         ]
       )
 
-      expect(store.memberCountFor(32)).toBe(0)
+      expect(store.getState().memberCountFor(32)).toBe(0)
     })
 
     it('counts only the pool asked about', async () => {
       await loadWith([], [member(31, STRANGER_WALLET, 'active'), member(32, STRANGER_WALLET, 'active')])
 
-      expect(store.memberCountFor(32)).toBe(1)
+      expect(store.getState().memberCountFor(32)).toBe(1)
     })
 
     it('is zero for a pool nobody has joined', async () => {
       await loadWith([])
 
-      expect(store.memberCountFor(32)).toBe(0)
+      expect(store.getState().memberCountFor(32)).toBe(0)
     })
   })
 })
@@ -1394,7 +1507,7 @@ function settled(overrides: { id: string; loanId: number; repaidAt?: Date; borro
 }
 
 describe('PoolStore loan states', () => {
-  let store: PoolStore
+  let store: PoolStoreApi
   let listLoansCallable: jest.Mock
   let listContributionsCallable: jest.Mock
   let listLoanRepaymentsCallable: jest.Mock
@@ -1402,13 +1515,13 @@ describe('PoolStore loan states', () => {
 
   async function loadWithLoans(loans: LoanInfo[]) {
     listLoansCallable.mockResolvedValue({ data: { loans, totalCount: loans.length, limit: 50 } })
-    await store.fetchPools()
+    await store.getState().fetchPools()
   }
 
   async function loadWithRepayments(loans: LoanInfo[], repayments: LoanRepaymentInfo[]) {
     listLoansCallable.mockResolvedValue({ data: { loans, totalCount: loans.length, limit: 50 } })
     listLoanRepaymentsCallable.mockResolvedValue({ data: { repayments, totalCount: repayments.length, limit: 50 } })
-    await store.fetchPools()
+    await store.getState().fetchPools()
   }
 
   beforeEach(() => {
@@ -1418,7 +1531,7 @@ describe('PoolStore loan states', () => {
     authStore.setState({ walletAddress: USER_WALLET })
     authStore.setState({ chainId: 31337 })
 
-    store = new PoolStore()
+    store = createPoolStore()
     listLoansCallable = jest.fn().mockResolvedValue({ data: { loans: [], totalCount: 0, limit: 50 } })
     listContributionsCallable = jest.fn().mockResolvedValue({ data: { contributions: [], totalCount: 0, limit: 50 } })
     listLoanRepaymentsCallable = jest.fn().mockResolvedValue({ data: { repayments: [], totalCount: 0, limit: 50 } })
@@ -1446,32 +1559,32 @@ describe('PoolStore loan states', () => {
     // The regression: a pending request has `isRepaid === false` too.
     await loadWithLoans([REQUESTED_LOAN])
 
-    expect(store.activeLoanFor(12)).toBeUndefined()
+    expect(store.getState().activeLoanFor(12)).toBeUndefined()
   })
 
   it('finds the disbursed loan to repay', async () => {
     await loadWithLoans([LIVE_LOAN])
 
-    expect(store.activeLoanFor(12)?.loanId).toBe(1)
+    expect(store.getState().activeLoanFor(12)?.loanId).toBe(1)
   })
 
   it('leaves a repaid loan out of the repay panel', async () => {
     await loadWithLoans([REPAID_LOAN])
 
-    expect(store.activeLoanFor(12)).toBeUndefined()
+    expect(store.getState().activeLoanFor(12)).toBeUndefined()
   })
 
   it('leaves a rejected request out of both panels', async () => {
     await loadWithLoans([REJECTED_LOAN])
 
-    expect(store.activeLoanFor(12)).toBeUndefined()
-    expect(store.pendingLoanFor(12)).toBeUndefined()
+    expect(store.getState().activeLoanFor(12)).toBeUndefined()
+    expect(store.getState().pendingLoanFor(12)).toBeUndefined()
   })
 
   it('finds the request waiting on the owner, with its id to cancel', async () => {
     await loadWithLoans([REQUESTED_LOAN])
 
-    expect(store.pendingLoanFor(12)?.loanId).toBe(2)
+    expect(store.getState().pendingLoanFor(12)?.loanId).toBe(2)
   })
 
   it('matches the borrower case-insensitively', async () => {
@@ -1479,14 +1592,14 @@ describe('PoolStore loan states', () => {
     authStore.setState({ walletAddress: '0x15D34AAf54267DB7D7c367839AAf71A00a2C6A65' })
     await loadWithLoans([LIVE_LOAN, REQUESTED_LOAN])
 
-    expect(store.activeLoanFor(12)?.loanId).toBe(1)
-    expect(store.pendingLoanFor(12)?.loanId).toBe(2)
+    expect(store.getState().activeLoanFor(12)?.loanId).toBe(1)
+    expect(store.getState().pendingLoanFor(12)?.loanId).toBe(2)
   })
 
   it('does not claim another wallet’s loan', async () => {
     await loadWithLoans([{ ...LIVE_LOAN, borrower: STRANGER_WALLET }])
 
-    expect(store.activeLoanFor(12)).toBeUndefined()
+    expect(store.getState().activeLoanFor(12)).toBeUndefined()
   })
 
   it('counts only disbursed loans as owed', async () => {
@@ -1497,7 +1610,7 @@ describe('PoolStore loan states', () => {
     // has accrued nothing, so it is the 3 POL borrowed.
     await loadWithLoans([LIVE_LOAN, REQUESTED_LOAN, REJECTED_LOAN, REPAID_LOAN])
 
-    expect(store.outstandingDebt(12)).toBe(parseEther('3'))
+    expect(store.getState().outstandingDebt(12)).toBe(parseEther('3'))
   })
 
   it('nets off what a borrower has already paid back', async () => {
@@ -1516,7 +1629,7 @@ describe('PoolStore loan states', () => {
       },
     ])
 
-    expect(store.outstandingDebt(12)).toBe(parseEther('1.15'))
+    expect(store.getState().outstandingDebt(12)).toBe(parseEther('1.15'))
   })
 
   /**
@@ -1534,7 +1647,7 @@ describe('PoolStore loan states', () => {
 
     await loadWithLoans([{ ...LIVE_LOAN, accruedAt: accruedAt.toISOString() }])
 
-    expect(store.outstandingDebt(12)).toBe(parseEther('3.075'))
+    expect(store.getState().outstandingDebt(12)).toBe(parseEther('3.075'))
 
     jest.spyOn(Date, 'now').mockRestore()
   })
@@ -1548,7 +1661,7 @@ describe('PoolStore loan states', () => {
 
     await loadWithLoans([{ ...LIVE_LOAN, interestOutstanding: parseEther('0.15').toString() }])
 
-    expect(store.outstandingDebt(12)).toBe(parseEther('3.15'))
+    expect(store.getState().outstandingDebt(12)).toBe(parseEther('3.15'))
 
     jest.spyOn(Date, 'now').mockRestore()
   })
@@ -1559,7 +1672,7 @@ describe('PoolStore loan states', () => {
 
     await loadWithLoans([{ ...LIVE_LOAN, accruedAt: accruedAt.toISOString() }])
 
-    expect(store.outstandingDebt(12)).toBe(parseEther('3'))
+    expect(store.getState().outstandingDebt(12)).toBe(parseEther('3'))
 
     jest.spyOn(Date, 'now').mockRestore()
   })
@@ -1569,24 +1682,29 @@ describe('PoolStore loan states', () => {
     // is deciding on other people's requests.
     await loadWithLoans([REQUESTED_LOAN, { ...REQUESTED_LOAN, id: '31337-12-5', loanId: 5, borrower: STRANGER_WALLET }, LIVE_LOAN])
 
-    expect(store.pendingLoansFor(12).map((loan) => loan.loanId)).toEqual([2, 5])
+    expect(
+      store
+        .getState()
+        .pendingLoansFor(12)
+        .map((loan) => loan.loanId)
+    ).toEqual([2, 5])
   })
 
   it('maps each chain state to the app’s status', async () => {
     await loadWithLoans([LIVE_LOAN, REQUESTED_LOAN, REJECTED_LOAN, REPAID_LOAN])
 
-    expect(store.loans.map((loan) => loan.status)).toEqual([
-      LoanStatus.DISBURSED,
-      LoanStatus.REQUESTED,
-      LoanStatus.REJECTED,
-      LoanStatus.REPAID,
-    ])
+    expect(
+      store
+        .getState()
+        .loans()
+        .map((loan) => loan.status)
+    ).toEqual([LoanStatus.DISBURSED, LoanStatus.REQUESTED, LoanStatus.REJECTED, LoanStatus.REPAID])
   })
 
   it('dates approval and disbursement only once funds have moved', async () => {
     await loadWithLoans([REQUESTED_LOAN])
 
-    const [loan] = store.loans
+    const [loan] = store.getState().loans()
     expect(loan.requestedAt).toEqual(new Date(REQUESTED_LOAN.startedAt))
     expect(loan.approvedAt).toBeUndefined()
     expect(loan.disbursedAt).toBeUndefined()
@@ -1598,21 +1716,21 @@ describe('PoolStore loan states', () => {
     // `isRepaid` is false either way; only a disbursed loan can be settled.
     await loadWithLoans([REQUESTED_LOAN])
 
-    expect(store.loans[0].amountRepaid).toBe(0n)
+    expect(store.getState().loans()[0].amountRepaid).toBe(0n)
   })
 
   it('surfaces the request as the user’s pending loan', async () => {
     await loadWithLoans([REQUESTED_LOAN])
 
-    expect(store.pendingLoan?.id).toBe(REQUESTED_LOAN.id)
-    expect(store.activeLoan).toBeUndefined()
+    expect(store.getState().pendingLoan()?.id).toBe(REQUESTED_LOAN.id)
+    expect(store.getState().activeLoan()).toBeUndefined()
   })
 
   it('carries the chain’s repayment stamp into the app’s loan', async () => {
     const repaidAt = new Date('2026-08-15T09:00:00.000Z')
     await loadWithLoans([settled({ id: '31337-12-9', loanId: 9, repaidAt })])
 
-    expect(store.loans[0].repaidAt).toEqual(repaidAt)
+    expect(store.getState().loans()[0].repaidAt).toEqual(repaidAt)
   })
 
   // -------------------------------------------------------------------------
@@ -1629,7 +1747,7 @@ describe('PoolStore loan states', () => {
       // exists for: zero of zero is a first-time borrower, not the worst kind.
       await loadWithLoans([])
 
-      const history = store.borrowerHistory(USER_WALLET)
+      const history = store.getState().borrowerHistory(USER_WALLET)
 
       expect(history.isNew).toBe(true)
       expect(history).toMatchObject({ total: 0, repaid: 0, late: 0, overdue: 0 })
@@ -1639,7 +1757,7 @@ describe('PoolStore loan states', () => {
       const repaidAt = new Date(DUE_AT.getTime() - 24 * 60 * 60 * 1000)
       await loadWithLoans([settled({ id: '31337-12-9', loanId: 9, repaidAt })])
 
-      expect(store.borrowerHistory(USER_WALLET)).toMatchObject({ total: 1, repaid: 1, onTime: 1, late: 0, isNew: false })
+      expect(store.getState().borrowerHistory(USER_WALLET)).toMatchObject({ total: 1, repaid: 1, onTime: 1, late: 0, isNew: false })
     })
 
     it('counts a repayment after the term as late', async () => {
@@ -1648,7 +1766,7 @@ describe('PoolStore loan states', () => {
       const repaidAt = new Date(DUE_AT.getTime() + 24 * 60 * 60 * 1000)
       await loadWithLoans([settled({ id: '31337-12-9', loanId: 9, repaidAt })])
 
-      expect(store.borrowerHistory(USER_WALLET)).toMatchObject({ total: 1, repaid: 1, onTime: 0, late: 1 })
+      expect(store.getState().borrowerHistory(USER_WALLET)).toMatchObject({ total: 1, repaid: 1, onTime: 0, late: 1 })
     })
 
     it('refuses to call an undated repayment on time', async () => {
@@ -1656,7 +1774,7 @@ describe('PoolStore loan states', () => {
       // time would invent a fact; counting it late would slander a borrower.
       await loadWithLoans([settled({ id: '31337-12-9', loanId: 9 })])
 
-      expect(store.borrowerHistory(USER_WALLET)).toMatchObject({ repaid: 1, undated: 1, onTime: 0, late: 0 })
+      expect(store.getState().borrowerHistory(USER_WALLET)).toMatchObject({ repaid: 1, undated: 1, onTime: 0, late: 0 })
     })
 
     it('separates what is still owed from what is overdue', async () => {
@@ -1664,7 +1782,7 @@ describe('PoolStore loan states', () => {
       const freshlyBorrowed: LoanInfo = { ...LIVE_LOAN, id: '31337-12-7', loanId: 7, startedAt: new Date().toISOString() }
       await loadWithLoans([longSinceDue, freshlyBorrowed])
 
-      expect(store.borrowerHistory(USER_WALLET)).toMatchObject({ total: 2, outstanding: 2, overdue: 1 })
+      expect(store.getState().borrowerHistory(USER_WALLET)).toMatchObject({ total: 2, outstanding: 2, overdue: 1 })
     })
 
     it('ignores requests and rejections entirely', async () => {
@@ -1672,14 +1790,14 @@ describe('PoolStore loan states', () => {
       // about the owner who turned it down, not about the borrower.
       await loadWithLoans([REQUESTED_LOAN, REJECTED_LOAN])
 
-      expect(store.borrowerHistory(USER_WALLET)).toMatchObject({ total: 0, isNew: true })
+      expect(store.getState().borrowerHistory(USER_WALLET)).toMatchObject({ total: 0, isNew: true })
     })
 
     it('does not mix two borrowers together', async () => {
       await loadWithLoans([LIVE_LOAN, settled({ id: '31337-12-6', loanId: 6, borrower: STRANGER_WALLET, repaidAt: DUE_AT })])
 
-      expect(store.borrowerHistory(USER_WALLET)).toMatchObject({ total: 1, outstanding: 1, repaid: 0 })
-      expect(store.borrowerHistory(STRANGER_WALLET)).toMatchObject({ total: 1, repaid: 1, onTime: 1 })
+      expect(store.getState().borrowerHistory(USER_WALLET)).toMatchObject({ total: 1, outstanding: 1, repaid: 0 })
+      expect(store.getState().borrowerHistory(STRANGER_WALLET)).toMatchObject({ total: 1, repaid: 1, onTime: 1 })
     })
 
     it('matches the borrower case-insensitively', async () => {
@@ -1687,13 +1805,13 @@ describe('PoolStore loan states', () => {
       // while the indexer stores it lowercased.
       await loadWithLoans([REPAID_LOAN])
 
-      expect(store.borrowerHistory('0x15D34AAf54267DB7D7c367839AAf71A00a2C6A65')).toMatchObject({ total: 1, repaid: 1 })
+      expect(store.getState().borrowerHistory('0x15D34AAf54267DB7D7c367839AAf71A00a2C6A65')).toMatchObject({ total: 1, repaid: 1 })
     })
 
     it('reports the connected wallet’s own record', async () => {
       await loadWithLoans([REPAID_LOAN])
 
-      expect(store.myBorrowingHistory).toMatchObject({ total: 1, repaid: 1, isNew: false })
+      expect(store.getState().myBorrowingHistory()).toMatchObject({ total: 1, repaid: 1, isNew: false })
     })
   })
 
@@ -1712,11 +1830,11 @@ describe('PoolStore loan states', () => {
 
     async function summarise(histories: Record<string, unknown>) {
       listBorrowerHistoriesCallable.mockResolvedValue({ data: { histories, asOf: '2026-08-18T09:00:00.000Z' } })
-      await store.loadBorrowerHistories([USER_WALLET])
+      await store.getState().loadBorrowerHistories([USER_WALLET])
     }
 
     it('asks the backend for the wallets it was given', async () => {
-      await store.loadBorrowerHistories([USER_WALLET, STRANGER_WALLET])
+      await store.getState().loadBorrowerHistories([USER_WALLET, STRANGER_WALLET])
 
       expect(listBorrowerHistoriesCallable).toHaveBeenCalledWith({
         chainId: 31337,
@@ -1726,17 +1844,17 @@ describe('PoolStore loan states', () => {
 
     it('prefers the summary over the page it could derive', async () => {
       await loadWithLoans([REPAID_LOAN])
-      expect(store.borrowerHistory(USER_WALLET)).toMatchObject({ total: 1 })
+      expect(store.getState().borrowerHistory(USER_WALLET)).toMatchObject({ total: 1 })
 
       await summarise({ [USER_WALLET.toLowerCase()]: SUMMARISED })
 
-      expect(store.borrowerHistory(USER_WALLET)).toEqual(SUMMARISED)
+      expect(store.getState().borrowerHistory(USER_WALLET)).toEqual(SUMMARISED)
     })
 
     it('matches the summary case-insensitively, as every address here is', async () => {
       await summarise({ [USER_WALLET.toLowerCase()]: SUMMARISED })
 
-      expect(store.borrowerHistory(USER_WALLET.toUpperCase())).toEqual(SUMMARISED)
+      expect(store.getState().borrowerHistory(USER_WALLET.toUpperCase())).toEqual(SUMMARISED)
     })
 
     // Nothing waits on this: the derivation is on screen until it answers, and
@@ -1746,7 +1864,7 @@ describe('PoolStore loan states', () => {
 
       await summarise({ [STRANGER_WALLET.toLowerCase()]: SUMMARISED })
 
-      expect(store.borrowerHistory(USER_WALLET)).toMatchObject({ total: 1, repaid: 1 })
+      expect(store.getState().borrowerHistory(USER_WALLET)).toMatchObject({ total: 1, repaid: 1 })
     })
 
     // Silent like `triggerIndexing`: the fallback is the figure the app showed
@@ -1756,20 +1874,20 @@ describe('PoolStore loan states', () => {
       await loadWithLoans([REPAID_LOAN])
       listBorrowerHistoriesCallable.mockRejectedValue(new Error('offline'))
 
-      await store.loadBorrowerHistories([USER_WALLET])
+      await store.getState().loadBorrowerHistories([USER_WALLET])
 
-      expect(store.borrowerHistory(USER_WALLET)).toMatchObject({ total: 1 })
-      expect(store.error).toBeNull()
+      expect(store.getState().borrowerHistory(USER_WALLET)).toMatchObject({ total: 1 })
+      expect(store.getState().error).toBeNull()
     })
 
     it('asks about each wallet once, however many times it was named', async () => {
-      await store.loadBorrowerHistories([USER_WALLET, USER_WALLET.toUpperCase(), ''])
+      await store.getState().loadBorrowerHistories([USER_WALLET, USER_WALLET.toUpperCase(), ''])
 
       expect(listBorrowerHistoriesCallable).toHaveBeenCalledWith(expect.objectContaining({ borrowers: [USER_WALLET.toLowerCase()] }))
     })
 
     it('asks nothing when there is nobody to ask about', async () => {
-      await store.loadBorrowerHistories([])
+      await store.getState().loadBorrowerHistories([])
 
       expect(listBorrowerHistoriesCallable).not.toHaveBeenCalled()
     })
@@ -1778,7 +1896,7 @@ describe('PoolStore loan states', () => {
     it('does not ask at all on mock data', async () => {
       process.env.EXPO_PUBLIC_USE_MOCK_POOLS = 'true'
 
-      await store.loadBorrowerHistories([USER_WALLET])
+      await store.getState().loadBorrowerHistories([USER_WALLET])
 
       expect(listBorrowerHistoriesCallable).not.toHaveBeenCalled()
     })
@@ -1786,7 +1904,7 @@ describe('PoolStore loan states', () => {
     it('clips a queue longer than one call may summarise', async () => {
       const many = Array.from({ length: 30 }, (_, index) => `0x${String(index).padStart(40, '0')}`)
 
-      await store.loadBorrowerHistories(many)
+      await store.getState().loadBorrowerHistories(many)
 
       expect(listBorrowerHistoriesCallable.mock.calls[0][0].borrowers).toHaveLength(25)
     })
@@ -1806,7 +1924,7 @@ describe('PoolStore loan states', () => {
     it('shows a disbursed loan as money leaving the pool', async () => {
       await loadWithLoans([LIVE_LOAN])
 
-      const [row] = store.loanActivity
+      const [row] = store.getState().loanActivity()
       expect(row.type).toBe(TransactionType.LOAN_DISBURSEMENT)
       expect(row.amount).toBe(parseEther('3'))
       expect(row.from).toBe(LIVE_LOAN.poolAddress)
@@ -1818,7 +1936,7 @@ describe('PoolStore loan states', () => {
       // request is on chain the moment it is made.
       await loadWithLoans([REQUESTED_LOAN])
 
-      const [row] = store.loanActivity
+      const [row] = store.getState().loanActivity()
       expect(row.type).toBe(TransactionType.LOAN_REQUEST)
       expect(row.status).toBe(TransactionStatus.PENDING)
     })
@@ -1827,8 +1945,8 @@ describe('PoolStore loan states', () => {
       // Nothing moves, so the direction only states who is asking whom.
       await loadWithLoans([REQUESTED_LOAN])
 
-      expect(store.loanActivity[0].from).toBe(REQUESTED_LOAN.borrower)
-      expect(store.loanActivity[0].to).toBe(REQUESTED_LOAN.poolAddress)
+      expect(store.getState().loanActivity()[0].from).toBe(REQUESTED_LOAN.borrower)
+      expect(store.getState().loanActivity()[0].to).toBe(REQUESTED_LOAN.poolAddress)
     })
 
     it('leaves a rejected request out', async () => {
@@ -1836,7 +1954,7 @@ describe('PoolStore loan states', () => {
       // it is still waiting.
       await loadWithLoans([REJECTED_LOAN])
 
-      expect(store.loanActivity).toEqual([])
+      expect(store.getState().loanActivity()).toEqual([])
     })
 
     it('leaves money coming back to the loan repayment feed', async () => {
@@ -1846,7 +1964,12 @@ describe('PoolStore loan states', () => {
       // row at all, and the last would claim the whole debt.
       await loadWithLoans([settled({ id: '31337-12-5', loanId: 5, repaidAt: DUE_AT })])
 
-      expect(store.loanActivity.map((tx) => tx.type)).toEqual([TransactionType.LOAN_DISBURSEMENT])
+      expect(
+        store
+          .getState()
+          .loanActivity()
+          .map((tx) => tx.type)
+      ).toEqual([TransactionType.LOAN_DISBURSEMENT])
     })
 
     it('never gives a request a repayment row', async () => {
@@ -1854,7 +1977,12 @@ describe('PoolStore loan states', () => {
       // funded has nothing to give back.
       await loadWithLoans([{ ...REQUESTED_LOAN, isRepaid: true, repaidAt: DUE_AT.toISOString() }])
 
-      expect(store.loanActivity.map((tx) => tx.type)).toEqual([TransactionType.LOAN_REQUEST])
+      expect(
+        store
+          .getState()
+          .loanActivity()
+          .map((tx) => tx.type)
+      ).toEqual([TransactionType.LOAN_REQUEST])
     })
 
     it('produces one row per loan that moved', async () => {
@@ -1867,7 +1995,7 @@ describe('PoolStore loan states', () => {
       ])
 
       // Live 1, request 1, rejected 0, repaid 1 each — the disbursement.
-      expect(store.loanActivity).toHaveLength(4)
+      expect(store.getState().loanActivity()).toHaveLength(4)
     })
   })
 
@@ -1909,7 +2037,7 @@ describe('PoolStore loan states', () => {
     it('shows a payment as money returning to the pool', async () => {
       await loadWithRepayments([LIVE_LOAN], [FIRST_INSTALMENT])
 
-      const [repayment] = store.loanRepaymentActivity
+      const [repayment] = store.getState().loanRepaymentActivity()
       expect(repayment.type).toBe(TransactionType.LOAN_REPAYMENT)
       expect(repayment.from).toBe(USER_WALLET)
       expect(repayment.to).toBe(LIVE_LOAN.poolAddress)
@@ -1921,16 +2049,23 @@ describe('PoolStore loan states', () => {
       // be a single row for 3.15 POL, dated when the last one landed.
       await loadWithRepayments([settled({ id: '31337-12-1', loanId: 1 })], [FIRST_INSTALMENT, FINAL_INSTALMENT])
 
-      expect(store.loanRepaymentActivity.map((tx) => tx.amount)).toEqual([parseEther('2'), parseEther('1.15')])
+      expect(
+        store
+          .getState()
+          .loanRepaymentActivity()
+          .map((tx) => tx.amount)
+      ).toEqual([parseEther('2'), parseEther('1.15')])
     })
 
     it('dates each payment by its own block', async () => {
       await loadWithRepayments([settled({ id: '31337-12-1', loanId: 1 })], [FIRST_INSTALMENT, FINAL_INSTALMENT])
 
-      expect(store.loanRepaymentActivity.map((tx) => tx.createdAt)).toEqual([
-        new Date('2026-08-14T09:00:00.000Z'),
-        new Date('2026-08-21T09:00:00.000Z'),
-      ])
+      expect(
+        store
+          .getState()
+          .loanRepaymentActivity()
+          .map((tx) => tx.createdAt)
+      ).toEqual([new Date('2026-08-14T09:00:00.000Z'), new Date('2026-08-21T09:00:00.000Z')])
     })
 
     it('links each payment to its own transaction', async () => {
@@ -1938,7 +2073,7 @@ describe('PoolStore loan states', () => {
       // so a repayment derived from it had to carry no link at all.
       await loadWithRepayments([LIVE_LOAN], [FIRST_INSTALMENT])
 
-      const [repayment] = store.loanRepaymentActivity
+      const [repayment] = store.getState().loanRepaymentActivity()
       expect(repayment.txHash).toBe('0xf1')
       expect(repayment.blockNumber).toBe(300)
     })
@@ -1946,7 +2081,12 @@ describe('PoolStore loan states', () => {
     it('reaches the pool’s activity feed alongside the disbursement', async () => {
       await loadWithRepayments([LIVE_LOAN], [FIRST_INSTALMENT])
 
-      expect(store.transactionsFor(12).map((tx) => tx.type)).toEqual([TransactionType.LOAN_REPAYMENT, TransactionType.LOAN_DISBURSEMENT])
+      expect(
+        store
+          .getState()
+          .transactionsFor(12)
+          .map((tx) => tx.type)
+      ).toEqual([TransactionType.LOAN_REPAYMENT, TransactionType.LOAN_DISBURSEMENT])
     })
 
     it('counts as the borrower’s own activity', async () => {
@@ -1954,13 +2094,18 @@ describe('PoolStore loan states', () => {
       // negative — which needs the row to be matched on `from`.
       await loadWithRepayments([LIVE_LOAN], [FIRST_INSTALMENT])
 
-      expect(store.myActivity.map((tx) => tx.type)).toContain(TransactionType.LOAN_REPAYMENT)
+      expect(
+        store
+          .getState()
+          .myActivity()
+          .map((tx) => tx.type)
+      ).toContain(TransactionType.LOAN_REPAYMENT)
     })
 
     it('is empty when nothing has been paid back', async () => {
       await loadWithRepayments([LIVE_LOAN], [])
 
-      expect(store.loanRepaymentActivity).toEqual([])
+      expect(store.getState().loanRepaymentActivity()).toEqual([])
     })
   })
 
@@ -1969,7 +2114,12 @@ describe('PoolStore loan states', () => {
       // The regression: loans were indexed and shown everywhere except here.
       await loadWithLoans([LIVE_LOAN])
 
-      expect(store.transactionsFor(12).map((tx) => tx.type)).toContain(TransactionType.LOAN_DISBURSEMENT)
+      expect(
+        store
+          .getState()
+          .transactionsFor(12)
+          .map((tx) => tx.type)
+      ).toContain(TransactionType.LOAN_DISBURSEMENT)
     })
 
     it('merges with contributions in date order', async () => {
@@ -1978,9 +2128,12 @@ describe('PoolStore loan states', () => {
       })
       await loadWithLoans([LIVE_LOAN])
 
-      const times = store.recentTransactions.map((tx) => tx.createdAt.getTime())
+      const times = store
+        .getState()
+        .recentTransactions()
+        .map((tx) => tx.createdAt.getTime())
       expect(times).toEqual([...times].sort((a, b) => b - a))
-      expect(store.recentTransactions).toHaveLength(2)
+      expect(store.getState().recentTransactions()).toHaveLength(2)
     })
 
     it('narrows to the connected wallet for a personal feed', async () => {
@@ -1988,8 +2141,13 @@ describe('PoolStore loan states', () => {
       // activity" has to filter, or it shows strangers' deposits as yours.
       await loadWithLoans([LIVE_LOAN, { ...LIVE_LOAN, id: '31337-12-9', loanId: 9, borrower: STRANGER_WALLET }])
 
-      expect(store.recentTransactions).toHaveLength(2)
-      expect(store.myActivity.map((tx) => tx.id)).toEqual([LIVE_LOAN.id])
+      expect(store.getState().recentTransactions()).toHaveLength(2)
+      expect(
+        store
+          .getState()
+          .myActivity()
+          .map((tx) => tx.id)
+      ).toEqual([LIVE_LOAN.id])
     })
 
     it('matches the member on whichever end of the row they are', async () => {
@@ -1999,22 +2157,22 @@ describe('PoolStore loan states', () => {
       })
       await loadWithLoans([LIVE_LOAN])
 
-      expect(store.myActivity).toHaveLength(2)
+      expect(store.getState().myActivity()).toHaveLength(2)
     })
 
     it('is empty with no wallet connected, rather than everything', async () => {
       authStore.setState({ walletAddress: null })
       await loadWithLoans([LIVE_LOAN])
 
-      expect(store.recentTransactions.length).toBeGreaterThan(0)
-      expect(store.myActivity).toEqual([])
+      expect(store.getState().recentTransactions().length).toBeGreaterThan(0)
+      expect(store.getState().myActivity()).toEqual([])
     })
 
     it('matches the wallet case-insensitively', async () => {
       authStore.setState({ walletAddress: USER_WALLET.toUpperCase().replace('0X', '0x') })
       await loadWithLoans([LIVE_LOAN])
 
-      expect(store.myActivity).toHaveLength(1)
+      expect(store.getState().myActivity()).toHaveLength(1)
     })
 
     it('lists the pools with somebody waiting on the user', async () => {
@@ -2023,23 +2181,28 @@ describe('PoolStore loan states', () => {
       authStore.setState({ walletAddress: LIVE_POOL.poolOwner })
       await loadWithLoans([REQUESTED_LOAN, { ...REQUESTED_LOAN, id: '31337-12-7', loanId: 7, borrower: STRANGER_WALLET }])
 
-      expect(store.poolsAwaitingMyDecision.map((entry) => entry.pool.poolId)).toEqual([12])
-      expect(store.requestsAwaitingMyDecision).toBe(2)
+      expect(
+        store
+          .getState()
+          .poolsAwaitingMyDecision()
+          .map((entry) => entry.pool.poolId)
+      ).toEqual([12])
+      expect(store.getState().requestsAwaitingMyDecision()).toBe(2)
     })
 
     it('says nothing is waiting on a pool the user does not own', async () => {
       authStore.setState({ walletAddress: STRANGER_WALLET })
       await loadWithLoans([REQUESTED_LOAN])
 
-      expect(store.poolsAwaitingMyDecision).toEqual([])
-      expect(store.requestsAwaitingMyDecision).toBe(0)
+      expect(store.getState().poolsAwaitingMyDecision()).toEqual([])
+      expect(store.getState().requestsAwaitingMyDecision()).toBe(0)
     })
 
     it('counts only requests, not loans already decided', async () => {
       authStore.setState({ walletAddress: LIVE_POOL.poolOwner })
       await loadWithLoans([REQUESTED_LOAN, LIVE_LOAN, REJECTED_LOAN, REPAID_LOAN])
 
-      expect(store.requestsAwaitingMyDecision).toBe(1)
+      expect(store.getState().requestsAwaitingMyDecision()).toBe(1)
     })
 
     it('does not collide with a contribution id', async () => {
@@ -2048,7 +2211,10 @@ describe('PoolStore loan states', () => {
       listContributionsCallable.mockResolvedValue({ data: { contributions: [LIVE_CONTRIBUTION], totalCount: 1, limit: 50 } })
       await loadWithLoans([LIVE_LOAN])
 
-      const ids = store.recentTransactions.map((tx) => tx.id)
+      const ids = store
+        .getState()
+        .recentTransactions()
+        .map((tx) => tx.id)
       expect(new Set(ids).size).toBe(ids.length)
     })
   })
@@ -2059,12 +2225,12 @@ describe('PoolStore loan states', () => {
 // ---------------------------------------------------------------------------
 
 describe('PoolStore and a defaulted loan', () => {
-  let store: PoolStore
+  let store: PoolStoreApi
   let listLoansCallable: jest.Mock
 
   async function loadWithLoans(loans: LoanInfo[]) {
     listLoansCallable.mockResolvedValue({ data: { loans, totalCount: loans.length, limit: 50 } })
-    await store.fetchPools()
+    await store.getState().fetchPools()
   }
 
   /** Puts the clock a minute past `LIVE_LOAN`'s due date. */
@@ -2079,7 +2245,7 @@ describe('PoolStore and a defaulted loan', () => {
     authStore.setState({ walletAddress: USER_WALLET })
     authStore.setState({ chainId: 31337 })
 
-    store = new PoolStore()
+    store = createPoolStore()
     listLoansCallable = jest.fn().mockResolvedValue({ data: { loans: [], totalCount: 0, limit: 50 } })
     mockFirebaseCallable.mockImplementation((_functions?: unknown, name?: string) => {
       if (name === 'listLoans') return listLoansCallable
@@ -2103,13 +2269,13 @@ describe('PoolStore and a defaulted loan', () => {
   it('maps the chain state to the app’s status', async () => {
     await loadWithLoans([DEFAULTED_LOAN])
 
-    expect(store.loans[0].status).toBe(LoanStatus.DEFAULTED)
+    expect(store.getState().loans()[0].status).toBe(LoanStatus.DEFAULTED)
   })
 
   it('carries the date the declaration was made', async () => {
     await loadWithLoans([DEFAULTED_LOAN])
 
-    expect(store.loans[0].defaultedAt).toEqual(new Date(DEFAULTED_LOAN.defaultedAt!))
+    expect(store.getState().loans()[0].defaultedAt).toEqual(new Date(DEFAULTED_LOAN.defaultedAt!))
   })
 
   it('reads as settled once it is paid, and keeps the declaration', async () => {
@@ -2117,8 +2283,8 @@ describe('PoolStore and a defaulted loan', () => {
     // from never having been late. Collapsing them to one status loses it.
     await loadWithLoans([{ ...DEFAULTED_LOAN, isRepaid: true, amountRepaid: parseEther('3.15').toString() }])
 
-    expect(store.loans[0].status).toBe(LoanStatus.REPAID)
-    expect(store.loans[0].defaultedAt).toBeDefined()
+    expect(store.getState().loans()[0].status).toBe(LoanStatus.REPAID)
+    expect(store.getState().loans()[0].defaultedAt).toBeDefined()
   })
 
   describe('what it must not lose', () => {
@@ -2128,7 +2294,7 @@ describe('PoolStore and a defaulted loan', () => {
       // exactly the loans where those matter most.
       await loadWithLoans([{ ...DEFAULTED_LOAN, amountRepaid: parseEther('1').toString() }])
 
-      const [loan] = store.loans
+      const [loan] = store.getState().loans()
       expect(loan.amountRepaid).toBe(parseEther('1'))
       expect(loan.dueDate).toEqual(DUE_AT)
       expect(loan.disbursedAt).toBeDefined()
@@ -2140,8 +2306,8 @@ describe('PoolStore and a defaulted loan', () => {
       // declared.
       await loadWithLoans([DEFAULTED_LOAN])
 
-      expect(store.activeLoanFor(12)?.loanId).toBe(6)
-      expect(store.activeLoan?.id).toBe(DEFAULTED_LOAN.id)
+      expect(store.getState().activeLoanFor(12)?.loanId).toBe(6)
+      expect(store.getState().activeLoan()?.id).toBe(DEFAULTED_LOAN.id)
     })
   })
 
@@ -2152,13 +2318,13 @@ describe('PoolStore and a defaulted loan', () => {
         { ...DEFAULTED_LOAN, id: '31337-12-7', loanId: 7, isRepaid: true, amountRepaid: parseEther('3.15').toString() },
       ])
 
-      expect(store.borrowerHistory(USER_WALLET).defaulted).toBe(2)
+      expect(store.getState().borrowerHistory(USER_WALLET).defaulted).toBe(2)
     })
 
     it('counts a declared loan as borrowed and still owed', async () => {
       await loadWithLoans([DEFAULTED_LOAN])
 
-      const history = store.borrowerHistory(USER_WALLET)
+      const history = store.getState().borrowerHistory(USER_WALLET)
       expect(history.total).toBe(1)
       expect(history.outstanding).toBe(1)
       expect(history.isNew).toBe(false)
@@ -2167,7 +2333,7 @@ describe('PoolStore and a defaulted loan', () => {
     it('reports nothing declared for a borrower nobody judged', async () => {
       await loadWithLoans([LIVE_LOAN])
 
-      expect(store.borrowerHistory(USER_WALLET).defaulted).toBe(0)
+      expect(store.getState().borrowerHistory(USER_WALLET).defaulted).toBe(0)
     })
   })
 
@@ -2178,28 +2344,33 @@ describe('PoolStore and a defaulted loan', () => {
       await loadWithLoans([LIVE_LOAN])
       afterDue()
 
-      expect(store.overdueLoansFor(12).map((loan) => loan.loanId)).toEqual([1])
+      expect(
+        store
+          .getState()
+          .overdueLoansFor(12)
+          .map((loan) => loan.loanId)
+      ).toEqual([1])
     })
 
     it('leaves out a loan still inside its term', async () => {
       await loadWithLoans([LIVE_LOAN])
       afterDue(-60_000)
 
-      expect(store.overdueLoansFor(12)).toEqual([])
+      expect(store.getState().overdueLoansFor(12)).toEqual([])
     })
 
     it('leaves out a request nobody funded, however old', async () => {
       await loadWithLoans([REQUESTED_LOAN, REJECTED_LOAN])
       afterDue(365 * 24 * 60 * 60 * 1000)
 
-      expect(store.overdueLoansFor(12)).toEqual([])
+      expect(store.getState().overdueLoansFor(12)).toEqual([])
     })
 
     it('leaves out a debt that was settled', async () => {
       await loadWithLoans([REPAID_LOAN])
       afterDue()
 
-      expect(store.overdueLoansFor(12)).toEqual([])
+      expect(store.getState().overdueLoansFor(12)).toEqual([])
     })
 
     it('keeps a loan that has already been declared', async () => {
@@ -2208,7 +2379,12 @@ describe('PoolStore and a defaulted loan', () => {
       await loadWithLoans([DEFAULTED_LOAN])
       afterDue()
 
-      expect(store.overdueLoansFor(12).map((loan) => loan.loanId)).toEqual([6])
+      expect(
+        store
+          .getState()
+          .overdueLoansFor(12)
+          .map((loan) => loan.loanId)
+      ).toEqual([6])
     })
 
     it('puts the longest-overdue debt first', async () => {
@@ -2223,7 +2399,12 @@ describe('PoolStore and a defaulted loan', () => {
       await loadWithLoans([LIVE_LOAN, older])
       afterDue()
 
-      expect(store.overdueLoansFor(12).map((loan) => loan.loanId)).toEqual([8, 1])
+      expect(
+        store
+          .getState()
+          .overdueLoansFor(12)
+          .map((loan) => loan.loanId)
+      ).toEqual([8, 1])
     })
   })
 
@@ -2232,14 +2413,19 @@ describe('PoolStore and a defaulted loan', () => {
       await loadWithLoans([LIVE_LOAN, DEFAULTED_LOAN])
       afterDue()
 
-      expect(store.myOverdueLoans.map((loan) => loan.id)).toEqual([LIVE_LOAN.id, DEFAULTED_LOAN.id])
+      expect(
+        store
+          .getState()
+          .myOverdueLoans()
+          .map((loan) => loan.id)
+      ).toEqual([LIVE_LOAN.id, DEFAULTED_LOAN.id])
     })
 
     it('leaves out somebody else’s', async () => {
       await loadWithLoans([{ ...LIVE_LOAN, borrower: STRANGER_WALLET }])
       afterDue()
 
-      expect(store.myOverdueLoans).toEqual([])
+      expect(store.getState().myOverdueLoans()).toEqual([])
     })
   })
 })

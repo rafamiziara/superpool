@@ -81,7 +81,7 @@ describe('WithdrawScreen', () => {
     mockWaitForTransaction.mockResolvedValue({ amount: parseEther('5').toString(), txHash: TX_HASH })
     mockTriggerIndexing.mockResolvedValue(undefined)
 
-    await poolStore.fetchPools()
+    await poolStore.getState().fetchPools()
   })
 
   it('renders the form for the pool in the query parameter', () => {

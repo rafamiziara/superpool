@@ -1,7 +1,6 @@
 import { FontAwesome } from '@expo/vector-icons'
 import { router, Stack, useLocalSearchParams } from 'expo-router'
 import { StatusBar } from 'expo-status-bar'
-import { observer } from 'mobx-react-lite'
 import { useState } from 'react'
 import { ActivityIndicator, Pressable, ScrollView, Text, View } from 'react-native'
 import { useReadContract } from 'wagmi'
@@ -10,7 +9,7 @@ import { palette } from '../../../src/constants/palette'
 import { useMembership } from '../../../src/hooks/pools/useMembership'
 import { usePoolIndexing } from '../../../src/hooks/pools/usePoolIndexing'
 import { useTransactionMonitoring } from '../../../src/hooks/pools/useTransactionMonitoring'
-import { poolStore } from '../../../src/stores/PoolStore'
+import { poolStore, usePoolStore } from '../../../src/stores/PoolStore'
 
 type Stage = 'idle' | 'submitting' | 'confirming' | 'indexing' | 'done'
 
@@ -31,6 +30,16 @@ const STAGE_MESSAGES: Record<Exclude<Stage, 'idle' | 'done'>, string> = {
  * whole screen is an explanation and a button.
  */
 function JoinPoolScreen() {
+  /*
+    Subscribes this component to the pool store.
+
+    The reads below go through `poolStore.getState()`, which returns current
+    state but never notifies — this call is what re-renders on a change, and it
+    is what `observer` used to do by tracing the reads. Coarser than MobX was,
+    deliberately: see `usePoolStore`.
+  */
+  usePoolStore()
+
   const { poolId } = useLocalSearchParams<{ poolId: string }>()
 
   const { requestMembership, error: membershipError, reset } = useMembership()
@@ -40,8 +49,8 @@ function JoinPoolScreen() {
   const [stage, setStage] = useState<Stage>('idle')
   const [failure, setFailure] = useState<string | null>(null)
 
-  const pool = poolStore.poolById(Number(poolId))
-  const standing = pool ? poolStore.registerStandingFor(pool.poolId) : undefined
+  const pool = poolStore.getState().poolById(Number(poolId))
+  const standing = pool ? poolStore.getState().registerStandingFor(pool.poolId) : undefined
 
   // From the chain, never from the indexed record — same rule as the pool
   // screen. It changes what this screen means rather than whether it works:
@@ -93,7 +102,7 @@ function JoinPoolScreen() {
 
     setStage('indexing')
     await triggerIndexing(txHash, 'REQUEST_MEMBERSHIP')
-    await poolStore.refreshPools()
+    await poolStore.getState().refreshPools()
 
     setStage('done')
   }
@@ -208,4 +217,4 @@ function JoinPoolScreen() {
   )
 }
 
-export default observer(JoinPoolScreen)
+export default JoinPoolScreen

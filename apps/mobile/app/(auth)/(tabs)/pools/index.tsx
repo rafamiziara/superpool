@@ -1,7 +1,6 @@
 import { FontAwesome } from '@expo/vector-icons'
 import { router } from 'expo-router'
 import { StatusBar } from 'expo-status-bar'
-import { observer } from 'mobx-react-lite'
 import { useCallback, useEffect, useState } from 'react'
 import { ActivityIndicator, Pressable, RefreshControl, ScrollView, Text, View } from 'react-native'
 import { useAccount } from 'wagmi'
@@ -20,7 +19,7 @@ import {
   selectConfirmedUnindexed,
   usePendingTransactionsStore,
 } from '../../../../src/stores/PendingTransactionsStore'
-import { poolStore } from '../../../../src/stores/PoolStore'
+import { poolStore, usePoolStore } from '../../../../src/stores/PoolStore'
 import { chainName } from '../../../../src/utils/explorer'
 
 /**
@@ -36,7 +35,7 @@ import { chainName } from '../../../../src/utils/explorer'
  * produced can be listed until it is mined.
  */
 function unlistedPoolCreations(transactions: PendingTransaction[], chainId: number): CreatePoolTransaction[] {
-  const listed = new Set(poolStore.pools.map((pool) => pool.poolId))
+  const listed = new Set(poolStore.getState().pools.map((pool) => pool.poolId))
 
   return transactions
     .filter((transaction): transaction is CreatePoolTransaction => transaction.type === 'CREATE_POOL')
@@ -46,11 +45,21 @@ function unlistedPoolCreations(transactions: PendingTransaction[], chainId: numb
 }
 
 function PoolsScreen() {
+  /*
+    Subscribes this component to the pool store.
+
+    The reads below go through `poolStore.getState()`, which returns current
+    state but never notifies — this call is what re-renders on a change, and it
+    is what `observer` used to do by tracing the reads. Coarser than MobX was,
+    deliberately: see `usePoolStore`.
+  */
+  usePoolStore()
+
   const { chainId } = useAccount()
   const { indexConfirmed } = usePoolIndexing()
 
   const activeChainId = chainId ?? DEFAULT_CHAIN_ID
-  const pools = poolStore.myPools
+  const pools = poolStore.getState().myPools()
   // Subscribed rather than read: this used to be a MobX observable read inside
   // an `observer`, which is what re-rendered the screen when a creation landed.
   const transactions = usePendingTransactionsStore((state) => state.transactions)
@@ -98,13 +107,13 @@ function PoolsScreen() {
    * pool the sweep had just listed.
    */
   const handleRefresh = useCallback(async () => {
-    await poolStore.syncAndRefresh()
+    await poolStore.getState().syncAndRefresh()
     await indexConfirmed()
   }, [indexConfirmed])
 
   const isEmpty = pools.length === 0 && pending.length === 0
 
-  if (poolStore.isLoading && isEmpty) {
+  if (poolStore.getState().isLoading && isEmpty) {
     return (
       <View className="flex-1 items-center justify-center gap-4 bg-abyss" testID="pools-loading">
         <StatusBar style="light" />
@@ -118,7 +127,7 @@ function PoolsScreen() {
   // it becomes the error. With pools on screen the same failure is a banner
   // below, because tearing down good data to report a failed refresh is worse
   // than showing it slightly stale.
-  if (poolStore.hasError && isEmpty) {
+  if (poolStore.getState().hasError() && isEmpty) {
     return (
       <View className="flex-1 items-center justify-center gap-4 bg-abyss px-10" testID="pools-error">
         <StatusBar style="light" />
@@ -126,8 +135,8 @@ function PoolsScreen() {
           <FontAwesome name="exclamation" size={20} color={palette.coral} />
         </View>
         <Text className="text-center text-base font-semibold text-snow">Could not load your circles</Text>
-        <Text className="text-center text-sm text-fog">{poolStore.error}</Text>
-        <Pressable onPress={() => poolStore.fetchPools()} className="mt-2 active:opacity-70" testID="pools-error-retry">
+        <Text className="text-center text-sm text-fog">{poolStore.getState().error}</Text>
+        <Pressable onPress={() => poolStore.getState().fetchPools()} className="mt-2 active:opacity-70" testID="pools-error-retry">
           <Text className="font-semibold text-mint">Try again</Text>
         </Pressable>
       </View>
@@ -143,7 +152,7 @@ function PoolsScreen() {
         showsVerticalScrollIndicator={false}
         contentInsetAdjustmentBehavior="automatic"
         contentContainerClassName="pb-8 pt-4"
-        refreshControl={<RefreshControl refreshing={poolStore.isRefreshing} onRefresh={handleRefresh} tintColor={palette.fog} />}
+        refreshControl={<RefreshControl refreshing={poolStore.getState().isRefreshing} onRefresh={handleRefresh} tintColor={palette.fog} />}
       >
         {/*
           The badge stays when the list is empty — that is the case it exists
@@ -162,12 +171,12 @@ function PoolsScreen() {
         </View>
 
         <View className="mt-4 gap-4 px-6">
-          {poolStore.hasError && (
+          {poolStore.getState().hasError() && (
             <View
               className="rounded-2xl border-continuous border-hairline border-coral bg-coral-deep px-4 py-3"
               testID="pools-error-banner"
             >
-              <Text className="text-sm text-coral">{poolStore.error}</Text>
+              <Text className="text-sm text-coral">{poolStore.getState().error}</Text>
             </View>
           )}
 
@@ -184,7 +193,7 @@ function PoolsScreen() {
             <PoolCard
               key={pool.poolId}
               pool={pool}
-              membership={poolStore.membershipFor(pool.poolId)}
+              membership={poolStore.getState().membershipFor(pool.poolId)}
               onPress={() => router.push(`/(auth)/pool/${pool.poolId}`)}
             />
           ))}
@@ -233,4 +242,4 @@ function PoolsScreen() {
   )
 }
 
-export default observer(PoolsScreen)
+export default PoolsScreen

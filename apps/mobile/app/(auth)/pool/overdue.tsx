@@ -2,7 +2,6 @@ import { FontAwesome } from '@expo/vector-icons'
 import type { LoanInfo } from '@superpool/types'
 import { router, Stack, useLocalSearchParams } from 'expo-router'
 import { StatusBar } from 'expo-status-bar'
-import { observer } from 'mobx-react-lite'
 import { useEffect, useState } from 'react'
 import { ActivityIndicator, Pressable, RefreshControl, ScrollView, Text, View } from 'react-native'
 import { useReadContract } from 'wagmi'
@@ -14,7 +13,7 @@ import { useLoan } from '../../../src/hooks/pools/useLoan'
 import { useNotes } from '../../../src/hooks/pools/useNotes'
 import { usePoolIndexing } from '../../../src/hooks/pools/usePoolIndexing'
 import { useTransactionMonitoring } from '../../../src/hooks/pools/useTransactionMonitoring'
-import { poolStore } from '../../../src/stores/PoolStore'
+import { poolStore, usePoolStore } from '../../../src/stores/PoolStore'
 import { denominationFor } from '../../../src/utils/denomination'
 import { sameAddress } from '../../../src/utils/format'
 
@@ -50,6 +49,16 @@ const STAGE_MESSAGES: Record<Exclude<Stage, 'idle'>, string> = {
  * the debt stays, the interest goes on accruing, and nothing is seized.
  */
 function OverdueLoansScreen() {
+  /*
+    Subscribes this component to the pool store.
+
+    The reads below go through `poolStore.getState()`, which returns current
+    state but never notifies — this call is what re-renders on a change, and it
+    is what `observer` used to do by tracing the reads. Coarser than MobX was,
+    deliberately: see `usePoolStore`.
+  */
+  usePoolStore()
+
   const { poolId } = useLocalSearchParams<{ poolId: string }>()
 
   const { markDefaulted, error: loanError, reset } = useLoan()
@@ -63,10 +72,10 @@ function OverdueLoansScreen() {
   /** Keyed by loan, so a half-typed reason survives the list re-rendering. */
   const [reasons, setReasons] = useState<Record<number, string>>({})
 
-  const pool = poolStore.poolById(Number(poolId))
+  const pool = poolStore.getState().poolById(Number(poolId))
   const { noteFor, writeNote } = useNotes(pool?.poolId)
   const denomination = pool ? denominationFor(pool) : undefined
-  const loans = pool ? poolStore.overdueLoansFor(pool.poolId) : []
+  const loans = pool ? poolStore.getState().overdueLoansFor(pool.poolId) : []
 
   /*
     How long past its term the owner said they would wait.
@@ -97,7 +106,7 @@ function OverdueLoansScreen() {
     derivation is on screen until this answers, so nothing waits.
   */
   useEffect(() => {
-    if (borrowerKey) void poolStore.loadBorrowerHistories(borrowerKey.split(','))
+    if (borrowerKey) void poolStore.getState().loadBorrowerHistories(borrowerKey.split(','))
   }, [borrowerKey])
 
   const declare = async (loan: LoanInfo) => {
@@ -161,7 +170,7 @@ function OverdueLoansScreen() {
     connected wallet for a moment, and answering "only the owner can do this"
     to the owner would be a definitive answer to an unresolved question.
   */
-  if (!pool && poolStore.isLoading) {
+  if (!pool && poolStore.getState().isLoading) {
     return (
       <View className="flex-1 items-center justify-center gap-4 bg-abyss" testID="overdue-loading">
         <Stack.Screen options={{ title: 'Late loans' }} />
@@ -202,7 +211,7 @@ function OverdueLoansScreen() {
   // `markDefaulted` is `onlyOwner`, so showing the action to anybody else would
   // be an invitation to a transaction that reverts. Compared case-insensitively
   // — a strict compare would lock the owner out of their own pool.
-  if (!sameAddress(pool.poolOwner, poolStore.userAddress)) {
+  if (!sameAddress(pool.poolOwner, poolStore.getState().userAddress())) {
     return (
       <View className="flex-1 items-center justify-center gap-4 bg-abyss px-10" testID="overdue-not-owner">
         <Stack.Screen options={{ title: 'Late loans' }} />
@@ -229,8 +238,8 @@ function OverdueLoansScreen() {
         contentContainerClassName="gap-6 px-6 pb-16 pt-4"
         refreshControl={
           <RefreshControl
-            refreshing={poolStore.isRefreshing}
-            onRefresh={() => poolStore.syncAndRefresh()}
+            refreshing={poolStore.getState().isRefreshing}
+            onRefresh={() => poolStore.getState().syncAndRefresh()}
             tintColor={palette.mint}
             colors={[palette.mint]}
           />
@@ -288,7 +297,7 @@ function OverdueLoansScreen() {
               gracePeriod={typeof gracePeriod === 'bigint' ? Number(gracePeriod) : 0}
               // Read here rather than inside the card, so the card stays
               // presentational; only the store knows this borrower's other loans.
-              history={poolStore.borrowerHistory(loan.borrower)}
+              history={poolStore.getState().borrowerHistory(loan.borrower)}
               purpose={noteFor(loan.id, 'loan_purpose')}
               reason={reasons[loan.loanId] ?? ''}
               onChangeReason={(text) => setReasons((current) => ({ ...current, [loan.loanId]: text }))}
@@ -318,4 +327,4 @@ function formatDuration(seconds: number): string {
   return `${Math.max(1, Math.floor(seconds / 60))} minutes`
 }
 
-export default observer(OverdueLoansScreen)
+export default OverdueLoansScreen

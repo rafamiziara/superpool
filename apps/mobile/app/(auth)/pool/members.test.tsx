@@ -57,7 +57,7 @@ function member(account: string, status: MemberInfo['status']): MemberInfo {
   return {
     id: `31337-2-${account.toLowerCase()}`,
     poolId: 2,
-    poolAddress: poolStore.poolById(2)!.poolAddress,
+    poolAddress: poolStore.getState().poolById(2)!.poolAddress,
     account: account.toLowerCase(),
     status,
     joinedAt: '2026-08-11T09:00:00.000Z',
@@ -78,12 +78,12 @@ beforeEach(async () => {
   mockWriteNote.mockResolvedValue(true)
   mockLocalSearchParams.mockReturnValue({ poolId: POOL_ID })
   authStore.setState({ walletAddress: MOCK_USER_ADDRESS })
-  await poolStore.fetchPools()
-  poolStore.memberRecords = []
+  await poolStore.getState().fetchPools()
+  poolStore.getState().memberRecords = []
 })
 
 afterEach(() => {
-  poolStore.memberRecords = []
+  poolStore.getState().memberRecords = []
   authStore.setState({ walletAddress: null })
 })
 
@@ -116,7 +116,7 @@ describe('MembersScreen', () => {
   })
 
   it('lists whoever is waiting', () => {
-    poolStore.memberRecords = [member(APPLICANT, 'requested')]
+    poolStore.getState().memberRecords = [member(APPLICANT, 'requested')]
 
     const { getByTestId } = render(<MembersScreen />)
 
@@ -126,7 +126,7 @@ describe('MembersScreen', () => {
 
   it('leaves decided applicants out of the queue', () => {
     // The record stays as history; only `requested` is work for the owner.
-    poolStore.memberRecords = [member(APPLICANT, 'rejected'), member('0x0000000000000000000000000000000000000043', 'removed')]
+    poolStore.getState().memberRecords = [member(APPLICANT, 'rejected'), member('0x0000000000000000000000000000000000000043', 'removed')]
 
     const { queryByTestId } = render(<MembersScreen />)
 
@@ -134,7 +134,7 @@ describe('MembersScreen', () => {
   })
 
   it('admits an applicant', async () => {
-    poolStore.memberRecords = [member(APPLICANT, 'requested')]
+    poolStore.getState().memberRecords = [member(APPLICANT, 'requested')]
     const { getByTestId } = render(<MembersScreen />)
 
     await act(async () => {
@@ -145,7 +145,7 @@ describe('MembersScreen', () => {
   })
 
   it('turns an applicant down', async () => {
-    poolStore.memberRecords = [member(APPLICANT, 'requested')]
+    poolStore.getState().memberRecords = [member(APPLICANT, 'requested')]
     const { getByTestId } = render(<MembersScreen />)
 
     await act(async () => {
@@ -156,7 +156,7 @@ describe('MembersScreen', () => {
   })
 
   it('confirms and indexes in order', async () => {
-    poolStore.memberRecords = [member(APPLICANT, 'requested')]
+    poolStore.getState().memberRecords = [member(APPLICANT, 'requested')]
     const { getByTestId } = render(<MembersScreen />)
 
     await act(async () => {
@@ -169,7 +169,7 @@ describe('MembersScreen', () => {
 
   it('does not index a decision that never confirmed', async () => {
     mockWaitForTransaction.mockRejectedValue(new Error('timed out'))
-    poolStore.memberRecords = [member(APPLICANT, 'requested')]
+    poolStore.getState().memberRecords = [member(APPLICANT, 'requested')]
     const { getByTestId } = render(<MembersScreen />)
 
     await act(async () => {
@@ -183,7 +183,7 @@ describe('MembersScreen', () => {
   // Removal asks twice. The roster is a list to read, and a destructive action
   // one tap deep on a row somebody was scrolling past is the wrong shape.
   it('removes a member, once it has been confirmed', async () => {
-    poolStore.memberRecords = [member(APPLICANT, 'active')]
+    poolStore.getState().memberRecords = [member(APPLICANT, 'active')]
     const { getByTestId } = render(<MembersScreen />)
 
     await act(async () => {
@@ -200,7 +200,7 @@ describe('MembersScreen', () => {
   })
 
   it('lets the owner back out of a removal they opened', async () => {
-    poolStore.memberRecords = [member(APPLICANT, 'active')]
+    poolStore.getState().memberRecords = [member(APPLICANT, 'active')]
     const { getByTestId, queryByTestId } = render(<MembersScreen />)
 
     await act(async () => {
@@ -215,7 +215,7 @@ describe('MembersScreen', () => {
 
   // Before the transaction, so the indexer has it to quote when it tells them.
   it('writes the reason before sending the decision', async () => {
-    poolStore.memberRecords = [member(APPLICANT, 'requested')]
+    poolStore.getState().memberRecords = [member(APPLICANT, 'requested')]
     const { getByTestId } = render(<MembersScreen />)
 
     fireEvent.changeText(getByTestId(`members-reason-${APPLICANT.toLowerCase()}-input`), 'We are full this season.')
@@ -229,7 +229,7 @@ describe('MembersScreen', () => {
   })
 
   it('writes nothing when the owner said nothing', async () => {
-    poolStore.memberRecords = [member(APPLICANT, 'requested')]
+    poolStore.getState().memberRecords = [member(APPLICANT, 'requested')]
     const { getByTestId } = render(<MembersScreen />)
 
     await act(async () => {
@@ -240,7 +240,7 @@ describe('MembersScreen', () => {
   })
 
   it('does not offer to remove the owner from their own pool', () => {
-    poolStore.memberRecords = [member(MOCK_USER_ADDRESS, 'active')]
+    poolStore.getState().memberRecords = [member(MOCK_USER_ADDRESS, 'active')]
 
     const { queryByTestId, getByText } = render(<MembersScreen />)
 
@@ -269,19 +269,19 @@ describe('MembersScreen', () => {
   // question nothing has resolved yet.
   it('reads as loading, not as missing, while the pools are still arriving', () => {
     mockLocalSearchParams.mockReturnValue({ poolId: '9999' })
-    poolStore.isLoading = true
+    poolStore.getState().isLoading = true
 
     const { getByTestId, queryByTestId } = render(<MembersScreen />)
 
     expect(getByTestId('members-loading')).toBeTruthy()
     expect(queryByTestId('members-pool-not-found')).toBeNull()
 
-    poolStore.isLoading = false
+    poolStore.getState().isLoading = false
   })
 
   it('says the pool is missing once the load has finished', () => {
     mockLocalSearchParams.mockReturnValue({ poolId: '9999' })
-    poolStore.isLoading = false
+    poolStore.getState().isLoading = false
 
     const { getByTestId } = render(<MembersScreen />)
 
