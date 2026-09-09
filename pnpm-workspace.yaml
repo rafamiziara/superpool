@@ -3,3 +3,27 @@ packages:
   - packages/*
 
 nodeLinker: hoisted
+
+# The @rm30/* config packages are published from hq/cli and consumed here immediately.
+# pnpm's default supply-chain policy holds a package for 1440 minutes before it may be
+# installed, which is the right default for third-party code but blocks our own packages
+# for a day after every publish. Excluded by scope only; the policy still covers the rest.
+minimumReleaseAgeExclude:
+  - '@rm30/*'
+
+# pnpm 12 requires an explicit decision per dependency that ships a build script, where
+# pnpm 10 silently skipped them all. Every one of these was already being skipped, and the
+# full suite passes that way — backend 1093 tests, contracts, mobile 1590 — so `false`
+# records the behaviour that is actually verified. Turning one on is a deliberate act:
+# esbuild and sharp ship prebuilt binaries through optional deps and do not need theirs.
+allowBuilds:
+  '@firebase/util': false
+  bufferutil: false
+  core-js: false
+  esbuild: false
+  keccak: false
+  protobufjs: false
+  secp256k1: false
+  sharp: false
+  unrs-resolver: false
+  utf-8-validate: false
