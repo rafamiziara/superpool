@@ -1,0 +1,19 @@
+{
+  // Named `tsconfig.shared.json` rather than `tsconfig.base.json`, and the name is
+  // load-bearing. Mastra's deployer walks from its entry file to the filesystem root
+  // looking for a `tsconfig.json` or `tsconfig.base.json` to hand to `typescript-paths`,
+  // and it treats *any* config carrying an `extends` as one that might declare `paths`.
+  // typescript-paths reads `ts.sys`, which TypeScript 7 does not ship, so being found is
+  // fatal to `mastra build`. Nothing here declares `paths`; the `extends` below is enough
+  // to be picked. Renaming it out of those two filenames is what keeps the build green.
+  // Adding an `extends` to the root `tsconfig.json` would bring the failure straight back.
+  "extends": "@rm30/tsconfig/base.json",
+  "compilerOptions": {
+    // Nothing in this repo emits from here any more — packages/types is source-direct
+    // and only type-checks. Kept as the seam for future workspace packages.
+    "noEmit": true,
+    "jsx": "react-jsx",
+    "types": []
+  },
+  "exclude": ["node_modules", "dist", "build", "coverage", "**/*.test.*", "**/*.spec.*"]
+}

@@ -307,17 +307,17 @@ importers:
   packages/agents:
     dependencies:
       '@mastra/auth':
-        specifier: ^1.0.0
-        version: 1.1.2(supports-color@8.1.1)
+        specifier: ^1.1.3
+        version: 1.1.3(supports-color@8.1.1)
       '@mastra/core':
-        specifier: ^1.40.0
-        version: 1.59.0(@grpc/grpc-js@1.14.3)(bufferutil@4.1.0)(express@4.22.1(supports-color@8.1.1))(supports-color@8.1.1)(utf-8-validate@6.0.6)(zod@4.4.3)
+        specifier: ^1.65.0
+        version: 1.65.0(@grpc/grpc-js@1.14.3)(bufferutil@4.1.0)(express@4.22.1(supports-color@8.1.1))(supports-color@8.1.1)(utf-8-validate@6.0.6)(zod@4.4.3)
       '@mastra/libsql':
-        specifier: ^1.12.0
-        version: 1.20.0(@mastra/core@1.59.0(@grpc/grpc-js@1.14.3)(bufferutil@4.1.0)(express@4.22.1(supports-color@8.1.1))(supports-color@8.1.1)(utf-8-validate@6.0.6)(zod@4.4.3))(bufferutil@4.1.0)(utf-8-validate@6.0.6)
+        specifier: ^1.22.4
+        version: 1.22.4(@mastra/core@1.65.0(@grpc/grpc-js@1.14.3)(bufferutil@4.1.0)(express@4.22.1(supports-color@8.1.1))(supports-color@8.1.1)(utf-8-validate@6.0.6)(zod@4.4.3))(bufferutil@4.1.0)(utf-8-validate@6.0.6)
       '@mastra/loggers':
-        specifier: ^1.1.2
-        version: 1.2.0(@mastra/core@1.59.0(@grpc/grpc-js@1.14.3)(bufferutil@4.1.0)(express@4.22.1(supports-color@8.1.1))(supports-color@8.1.1)(utf-8-validate@6.0.6)(zod@4.4.3))
+        specifier: ^1.3.1
+        version: 1.3.1(@mastra/core@1.65.0(@grpc/grpc-js@1.14.3)(bufferutil@4.1.0)(express@4.22.1(supports-color@8.1.1))(supports-color@8.1.1)(utf-8-validate@6.0.6)(zod@4.4.3))
       zod:
         specifier: ^4.4.3
         version: 4.4.3
@@ -329,8 +329,8 @@ importers:
         specifier: ^17.3.1
         version: 17.3.1
       mastra:
-        specifier: ^1.11.0
-        version: 1.25.0(@hono/node-server@1.19.17(hono@4.13.3))(@mastra/core@1.59.0(@grpc/grpc-js@1.14.3)(bufferutil@4.1.0)(express@4.22.1(supports-color@8.1.1))(supports-color@8.1.1)(utf-8-validate@6.0.6)(zod@4.4.3))(bufferutil@4.1.0)(supports-color@8.1.1)(typescript@7.0.2)(utf-8-validate@6.0.6)(zod@4.4.3)
+        specifier: ^1.28.0
+        version: 1.28.0(@hono/node-server@1.19.17(hono@4.13.3))(@mastra/core@1.65.0(@grpc/grpc-js@1.14.3)(bufferutil@4.1.0)(express@4.22.1(supports-color@8.1.1))(supports-color@8.1.1)(utf-8-validate@6.0.6)(zod@4.4.3))(bufferutil@4.1.0)(supports-color@8.1.1)(typescript@7.0.2)(utf-8-validate@6.0.6)(zod@4.4.3)
       tsx:
         specifier: ^4.23.12
         version: 4.23.12
@@ -2522,8 +2522,8 @@ packages:
     resolution: {integrity: sha512-qC72D4+CDdjGqJvkFMMEAtancHUQ7/d/tAiHf64z8MopFDmcrtbcJuerDtFceuAfQJ2pDSfCKCtbqoGBNnwg0w==}
     engines: {node: '>=8'}
 
-  '@mastra/auth@1.1.2':
-    resolution: {integrity: sha512-eGyfIxEnWpYWI+4PwPWcAvgHwraBK67gHNZ2b+clKjHsPSBiv+412qcCcTlYideif9sjXzv1crlERg/dwX1r2g==}
+  '@mastra/auth@1.1.3':
+    resolution: {integrity: sha512-o6VST4vy6MHTgVFCADx0o36tqPumqCVsSy5tnvYzSEMUP850//R7RmBx0Lh0ttYebUxLb3SWyn8jVNvcFhgFPA==}
     engines: {node: '>=22.13.0'}
 
   '@mastra/client-js@1.40.0':
@@ -2538,20 +2538,26 @@ packages:
     peerDependencies:
       zod: ^3.25.0 || ^4.0.0
 
-  '@mastra/deployer@1.59.0':
-    resolution: {integrity: sha512-76OliU5hcLlnvfez4ciD9nqVNiO8HcmWUrkOqd8GIYLscMV+Co5UtEi56pp5hSe8UvAQCD5RJJez4ZF65BqREA==}
+  '@mastra/core@1.65.0':
+    resolution: {integrity: sha512-FHis85lEo19XkpSfFcyVsTnm7HROzSEIr1zpwhs3ApaCpJNZJaBAyxZ5IEPUyZMd2QT1N+qFTC6yMGijHMLt0w==}
+    engines: {node: '>=22.13.0'}
+    peerDependencies:
+      zod: ^3.25.0 || ^4.0.0
+
+  '@mastra/deployer@1.65.0':
+    resolution: {integrity: sha512-mTxSpsXCWzkhsx1cmR9Yyilk5J1BYd7YbAdxQmlgVaxLlZumSBJ5cbHOTc7jjIYrEvw25dpk6mTmvirRnwDvpg==}
     engines: {node: '>=22.13.0'}
     peerDependencies:
       '@mastra/core': '>=1.50.0-0 <2.0.0-0'
 
-  '@mastra/libsql@1.20.0':
-    resolution: {integrity: sha512-8yLoR43E/vON0Mv611RvjToVfo2kXTaziwVwCscKPBW7nYYcSb5ZT/Bq6W5CC0+Qy4pYGYrrsxZb1xEuU2Fd0g==}
+  '@mastra/libsql@1.22.4':
+    resolution: {integrity: sha512-vb3fCn+5PtRoJLswGBm5H6N8XbNul2yxrodOYTpdPN16jPABYJ/aK/UTY6/xMdfC0OgJA/DKA23yQGXywUveLw==}
     engines: {node: '>=22.13.0'}
     peerDependencies:
-      '@mastra/core': '>=1.51.0-0 <2.0.0-0'
+      '@mastra/core': '>=1.63.1-0 <2.0.0-0'
 
-  '@mastra/loggers@1.2.0':
-    resolution: {integrity: sha512-1RJO8XsMgVsTC+NviJ0jGMK01Y5zCqSzFNnOH9D1swOUfX8DMviyAJzxJUmkWbhSrDxmeo/KKmFzRK8zzk4XYA==}
+  '@mastra/loggers@1.3.1':
+    resolution: {integrity: sha512-+Si2AQO7cEGWqIWu9RyzErW1/5VilAY98yCL+ISbR26tLF8NZ6AM9r874i7rX8jk29eUbJKNcVd6asgM6JJOBA==}
     engines: {node: '>=22.13.0'}
     peerDependencies:
       '@mastra/core': '>=1.0.0-0 <2.0.0-0'
@@ -2562,8 +2568,14 @@ packages:
     peerDependencies:
       zod: ^3.25.0 || ^4.0.0
 
-  '@mastra/server@1.59.0':
-    resolution: {integrity: sha512-3pgKj+w44JtPahzb1nFnAkKRTGM3NB1TXBxKyqNZ3nWsgIGelajQxVJC6423sgu2SG7cz01lXBItwZjRfLucJg==}
+  '@mastra/schema-compat@1.3.9':
+    resolution: {integrity: sha512-9qoxJzODLwUwGod2g5nv6yT7Nd2ImSAydz+699Gvxj8u8Jwg6icBMbS7cqk/DFQZlZvJED0N0w6kxkp+Ay/qcg==}
+    engines: {node: '>=22.13.0'}
+    peerDependencies:
+      zod: ^3.25.0 || ^4.0.0
+
+  '@mastra/server@1.65.0':
+    resolution: {integrity: sha512-hHklFTwOZjiUnm71RrzdaTiZuwtKpblC68RhITxlB4+Y0kAQBHMNtQ/lFpsMz0NlEZtzdG9X+7zQbFh+QmwO8Q==}
     engines: {node: '>=22.13.0'}
     peerDependencies:
       '@mastra/core': '>=1.50.0-0 <2.0.0-0'
@@ -2666,6 +2678,7 @@ packages:
     engines: {node: ^22.20 || ^24.12 || >=25}
     cpu: [x64]
     os: [linux]
+    libc: [glibc]
 
   '@neon-rs/load@0.0.4':
     resolution: {integrity: sha512-kTPhdZyTQxB+2wpiRcFWrDcejc4JI6tkPuS7UZCG4l6Zvc5kU/gGQ/ozvHTh1XR5tS+UlfAfGuPajjzQjCiHCw==}
@@ -3599,15 +3612,6 @@ packages:
   '@rolldown/pluginutils@1.0.1':
     resolution: {integrity: sha512-2j9bGt5Jh8hj+vPtgzPtl72j0yRxHAyumoo6TNfAjsLB04UtpSvPbPcDcBMxz7n+9CYB0c1GxQFxYRg2jimqGw==}
 
-  '@rollup/plugin-alias@6.0.0':
-    resolution: {integrity: sha512-tPCzJOtS7uuVZd+xPhoy5W4vThe6KWXNmsFCNktaAh5RTqcLiSfT4huPQIXkgJ6YCOjJHvecOAzQxLFhPxKr+g==}
-    engines: {node: '>=20.19.0'}
-    peerDependencies:
-      rollup: '>=4.0.0'
-    peerDependenciesMeta:
-      rollup:
-        optional: true
-
   '@rollup/plugin-commonjs@29.0.2':
     resolution: {integrity: sha512-S/ggWH1LU7jTyi9DxZOKyxpVd4hF/OZ0JrEbeLjXk/DFXwRny0tjD2c992zOUYQobLrVkRVMDdmHP16HKP7GRg==}
     engines: {node: '>=16.0.0 || 14 >= 14.17'}
@@ -3696,66 +3700,79 @@ packages:
     resolution: {integrity: sha512-81wiiX3v7aqy+T+bT61TJ78yJjRquqFFTTbAPt08imfQQzkPIW8t6aJbkTagtCCrXMNc9D66+geqlK7ydLPNqA==}
     cpu: [arm]
     os: [linux]
+    libc: [glibc]
 
   '@rollup/rollup-linux-arm-musleabihf@4.62.4':
     resolution: {integrity: sha512-9kmDIvNZqdoHOBZgNtpTBeLWYO/LVipM3H/j62P8848/l/VPEQL6N3uxU9pvP1oZAsXyC2MEnFP3ovRjo7WYNQ==}
     cpu: [arm]
     os: [linux]
+    libc: [musl]
 
   '@rollup/rollup-linux-arm64-gnu@4.62.4':
     resolution: {integrity: sha512-CcnXHWnXg69g+DX5VWL3FHts3qMRN2uVEHX+BZvGLdd07/gXkn3ePjYtO1LDJvxkGKVHMclKBRa1QUTH+6toYQ==}
     cpu: [arm64]
     os: [linux]
+    libc: [glibc]
 
   '@rollup/rollup-linux-arm64-musl@4.62.4':
     resolution: {integrity: sha512-iFOibiHnTRuhrWLlRsOQFdZJJIa7S8OwkneJr4ocALP16u5yk6lWLINFwhHaEqBFMsKDUZofLkGos7+CPzGB3g==}
     cpu: [arm64]
     os: [linux]
+    libc: [musl]
 
   '@rollup/rollup-linux-loong64-gnu@4.62.4':
     resolution: {integrity: sha512-XnWYMI7euHlb5a871xPja+Gm7DRCFU+FGRrtS2sMq9N8FvqtpagUy6gD4YOemC5MRk9xbh8+jYMEJbigFQwsgA==}
     cpu: [loong64]
     os: [linux]
+    libc: [glibc]
 
   '@rollup/rollup-linux-loong64-musl@4.62.4':
     resolution: {integrity: sha512-qGDAlO0U8xedCcsdRm9oaoQY8DAx/QT7uIxJWhCdx0ceIWX783UC9QSYkdpzAe29wNiVfp24+bZdQmn49o45SQ==}
     cpu: [loong64]
     os: [linux]
+    libc: [musl]
 
   '@rollup/rollup-linux-ppc64-gnu@4.62.4':
     resolution: {integrity: sha512-ru4H6ezD7ysA5EiEK6qkkaEb4modH8CTej6kUy/gQi20u3kB3G7Zn8snXXkeJSCOFKG/rbPPtM/+9Wgas1961w==}
     cpu: [ppc64]
     os: [linux]
+    libc: [glibc]
 
   '@rollup/rollup-linux-ppc64-musl@4.62.4':
     resolution: {integrity: sha512-2W4MO5WQVJnbJaZdvDb9rhBDuFU1nKIepPFpJUBsTh2k1YY2g+ODViaWuyOAjQ5cOP7NvrvLzt3wvHOoiAvc7w==}
     cpu: [ppc64]
     os: [linux]
+    libc: [musl]
 
   '@rollup/rollup-linux-riscv64-gnu@4.62.4':
     resolution: {integrity: sha512-+fxjfuoAmVMCYV5QyjoIpu0cp5DOiOTeqYFk1AVaxGr+/ravWLX89XfQmptsoWcaVy/TGf2hexzbUOrCQIL1CQ==}
     cpu: [riscv64]
     os: [linux]
+    libc: [glibc]
 
   '@rollup/rollup-linux-riscv64-musl@4.62.4':
     resolution: {integrity: sha512-jTn8JfHGL4djjFxPuM06LmNUJDsst2jeVlsd9OmIH6zc5sC9K6rIuO4YajXatLUpBmBKl6b35ro1QZocLi+tcA==}
     cpu: [riscv64]
     os: [linux]
+    libc: [musl]
 
   '@rollup/rollup-linux-s390x-gnu@4.62.4':
     resolution: {integrity: sha512-oCJCJL4pXsoDcP2QZ+JVlPTIRc6266zsIaeJJsWImmF7HO0W8nb6HuSgZlMWxJwaPf8ehbSw8yo0EUw925hKsA==}
     cpu: [s390x]
     os: [linux]
+    libc: [glibc]
 
   '@rollup/rollup-linux-x64-gnu@4.62.4':
     resolution: {integrity: sha512-W69hukhZ3KKNRCaMIEzKvcFye42hh0FE1+YoYaf5+Ikacuftoco6yO/xouz0hc5d5W/s3yBro5jRiuEE/Q5vUw==}
     cpu: [x64]
     os: [linux]
+    libc: [glibc]
 
   '@rollup/rollup-linux-x64-musl@4.62.4':
     resolution: {integrity: sha512-qiXbGG2jkjXhzXpsFZSR2Xpb8DN/UaxYsbb/STbuR/6fpaDgRmmaq1B/LmtF2wQFOFOSsK2jdE0RZ3a0zHn4QA==}
     cpu: [x64]
     os: [linux]
+    libc: [musl]
 
   '@rollup/rollup-openbsd-x64@4.62.4':
     resolution: {integrity: sha512-nWeM//hxv8mIo6jD7Hu4o48DVmV9pbV6gsKaWU+4NFyqHoPKwrkRiZGLKUhOBk8qNmDmpwFtPKg80Bo/Tn4xiQ==}
@@ -4774,9 +4791,6 @@ packages:
   '@types/deep-eql@4.0.2':
     resolution: {integrity: sha512-c9h9dVVMigMPc4bwTvC5dxqtqJZwQPePsWjPlpSOnojbor6pGqdk541lfA7AqFQr5pB1BRdq0juY9db81BwyFw==}
 
-  '@types/estree@1.0.8':
-    resolution: {integrity: sha512-dWHzHa2WqEXI/O1E9OjrocMTKJl2mSrEolh1Iomrv6U+JuNwaHXsXx9bLu5gG7BUWFIN0skIQJQ/L1rIex4X6w==}
-
   '@types/estree@1.0.9':
     resolution: {integrity: sha512-GhdPgy1el4/ImP05X05Uw4cw2/M93BCUmnEvWZNStlCzEKME4Fkk+YpoA5OiHNQmoS7Cafb8Xa3Pya8m1Qrzeg==}
 
@@ -5210,9 +5224,6 @@ packages:
     engines: {node: '>=10.0.0'}
     deprecated: this version has critical issues, please update to the latest version
 
-  '@zeit/schemas@2.36.0':
-    resolution: {integrity: sha512-7kjMwcChYEzMKjeex9ZFXkt1AyNov9R5HZtjBKVsmVpw7pa7ZtlCGvCBC2vnnXctaYN+aRI61HjIqeetZW5ROg==}
-
   abab@2.0.6:
     resolution: {integrity: sha512-j2afSsaIENvHZN2B8GOpF566vZ5WVk5opAiMTvWgaQT8DkbOqsTfvNAvHoRGU2zzP8cPoqys+xHTRDWW8L+/BA==}
     deprecated: Use your platform's native atob() and btoa() methods instead
@@ -5322,9 +5333,6 @@ packages:
   anser@1.4.10:
     resolution: {integrity: sha512-hCv9AqTQ8ycjpSd3upOJd7vFwW1JaoYQ7tpham03GJ1ca8/65rqn0RpaWpItOAd6ylW9wAw6luXYPJIyPFVOww==}
 
-  ansi-align@3.0.1:
-    resolution: {integrity: sha512-IOfwwBF5iczOjp/WeY4YxyjqAFMQoZufdQWDd19SEExbVLNXqvpzSJ/M7Za4/sCPmQ0+GRquoA7bGcINcxew6w==}
-
   ansi-colors@4.1.3:
     resolution: {integrity: sha512-/6w/C21Pm1A7aZitlI5Ni/2J6FFQN8i1Cvz3kHABAAbw93v/NlvKdVOqz7CCWz/3iv/JplRSEEZ83XION15ovw==}
     engines: {node: '>=6'}
@@ -5375,9 +5383,6 @@ packages:
   append-transform@2.0.0:
     resolution: {integrity: sha512-7yeyCEurROLQJFv5Xj4lEGTy0borxepjFv1g22oAdqFu//SrAlDl1O1Nxx15SH1RoliUml6p8dwJW9jvZughhg==}
     engines: {node: '>=8'}
-
-  arch@2.2.0:
-    resolution: {integrity: sha512-Of/R0wqp83cgHozfIYLbBMnej79U/SVGOOyuB3VVFv1NRM/PSFMK12x9KVtiYzJqmnU5WR2qp0Z5rHb7sWGnFQ==}
 
   archiver@8.0.0:
     resolution: {integrity: sha512-fV1orZfsnPn9BaSByR/qE67rJCLJEy2Ox5bq7nJh+jquWaNh6Sfec75kJ2T6PtdGUbPQlrVoSVCEOa5SdiTQ1g==}
@@ -5702,10 +5707,6 @@ packages:
   bowser@2.14.1:
     resolution: {integrity: sha512-tzPjzCxygAKWFOJP011oxFHs57HzIhOEracIgAePE4pqB3LikALKnSzUyU4MGs9/iCEUuHlAJTjTc5M+u7YEGg==}
 
-  boxen@7.0.0:
-    resolution: {integrity: sha512-j//dBVuyacJbvW+tvZ9HuH03fZ46QcaKvvhZickZqtB271DxJ7SNRSNxrV/dZX0085m7hISRZWbzWlJvx/rHSg==}
-    engines: {node: '>=14.16'}
-
   bplist-creator@0.1.0:
     resolution: {integrity: sha512-sXaHZicyEEmY86WyueLTQesbeoH/mquvarJaQNbjuOQO+7gbFcDEWqKmcWA4cOTLzFlfgvkiVxolk1k5bBIpmg==}
 
@@ -5843,10 +5844,6 @@ packages:
     resolution: {integrity: sha512-Gmy6FhYlCY7uOElZUSbxo2UCDH8owEk996gkbrpsgGtrJLM3J7jGxl9Ic7Qwwj4ivOE5AWZWRMecDdF7hqGjFA==}
     engines: {node: '>=10'}
 
-  camelcase@7.0.1:
-    resolution: {integrity: sha512-xlx1yCK2Oc1APsPXDL2LdlNP6+uu8OCDdhOBSVT279M/S+y75O30C2VuD8T2ogdePBBl7PfPF4504tnLgX3zfw==}
-    engines: {node: '>=14.16'}
-
   caniuse-lite@1.0.30001777:
     resolution: {integrity: sha512-tmN+fJxroPndC74efCdp12j+0rk0RHwV5Jwa1zWaFVyw2ZxAuPeG8ZgWC3Wz7uSjT3qMRQ5XHZ4COgQmsCMJAQ==}
 
@@ -5877,10 +5874,6 @@ packages:
     resolution: {integrity: sha512-NUPRluOfOiTKBKvWPtSD4PhFvWCqOi0BGStNWs57X9js7XGTprSmFoz5F0tWhR4WPjNeR9jXqdC7/UpSJTnlRg==}
     engines: {node: '>=18'}
 
-  chalk-template@0.4.0:
-    resolution: {integrity: sha512-/ghrgmhfY8RaSdeo43hNXxpoHAtxdbskUHjPpfqUWGttFgycUhYPGx3YZBCnUCvOa7Doivn1IZec3DEGFoMgLg==}
-    engines: {node: '>=12'}
-
   chalk@2.4.2:
     resolution: {integrity: sha512-Mti+f9lpJNcwF4tWV8/OrTTtF1gZi+f8FqlyAdouralcFWFQWF2+NgCHShjkCb+IFBLq9buZwE1xckQU4peSuQ==}
     engines: {node: '>=4'}
@@ -5892,10 +5885,6 @@ packages:
   chalk@4.1.2:
     resolution: {integrity: sha512-oKnbhFyRIXpUuez8iBMmyEa4nbj4IOQyuhc/wy9kY7/WVPcwIO9VA668Pu8RkO7+0G76SLROeyw9CpQ061i4mA==}
     engines: {node: '>=10'}
-
-  chalk@5.0.1:
-    resolution: {integrity: sha512-Fo07WOYGqMfCWHOzSXOt2CxDbC6skS/jO9ynEcmpANMoPrD+W1r1K6Vx7iNm+AQmETU1Xr2t+n8nzkV9t6xh3w==}
-    engines: {node: ^12.17.0 || ^14.13 || >=16.0.0}
 
   chalk@5.6.2:
     resolution: {integrity: sha512-7NzBL0rN6fMUW+f7A6Io4h40qQlG+xGmtMxfbnH/K7TAtt8JQWVQK+6g0UXKMeVJoyV5EkkNsErQ8pVD3bLHbA==}
@@ -5975,10 +5964,6 @@ packages:
     resolution: {integrity: sha512-4diC9HaTE+KRAMWhDhrGOECgWZxoevMc5TlkObMqNSsVU62PYzXZ/SMTjzyGAFF1YusgxGcSWTEXBhp0CPwQ1A==}
     engines: {node: '>=6'}
 
-  cli-boxes@3.0.0:
-    resolution: {integrity: sha512-/lzGpEWL/8PfI0BmBOPRwp0c/wFNX1RdUML3jK/RcSBA9T8mZDdQpqYBKtCFTOfQbwPqWEOpjqW+Fnayc0969g==}
-    engines: {node: '>=10'}
-
   cli-cursor@2.1.0:
     resolution: {integrity: sha512-8lgKz8LmCRYZZQDpRyT2m5rKJ08TnU4tR9FFFW2rxpxR1FzWi4PQ/NfyODchAatHaUgnSPVcx/R5w6NuTBzFiw==}
     engines: {node: '>=4'}
@@ -5989,10 +5974,6 @@ packages:
 
   client-only@0.0.1:
     resolution: {integrity: sha512-IV3Ou0jSMzZrd3pZ48nLkT9DA7Ag1pnPzaiQhpW7c3RbcqqzvzzVu+L8gfqMp/8IM2MQtSiqaCxrrcfu8I8rMA==}
-
-  clipboardy@3.0.0:
-    resolution: {integrity: sha512-Su+uU5sr1jkUy1sGRpLKjKrvEOVXgSgiSInwa/qeID6aJ07yh+5NWc3h2QfjHjBnfX4LhtFcuAWKUsJ3r+fjbg==}
-    engines: {node: ^12.20.0 || ^14.13.1 || >=16.0.0}
 
   cliui@6.0.0:
     resolution: {integrity: sha512-t6wbgtoCXvAzst7QgXxJYqPt0usEfbgQdftEPbLL/cvv6HPE5VgvqCuAIDR0NgU52ds6rFwqrgakNLrHEjCbrQ==}
@@ -7726,10 +7707,6 @@ packages:
     resolution: {integrity: sha512-h5PpgXkWitc38BBMYawTYMWJHFZJVnBquFE57xFpjB8pJFiF6gZ+bU+WyI/yqXiFR5mdLsgYNaPe8uao6Uv9Og==}
     engines: {node: '>=0.10.0'}
 
-  is-port-reachable@4.0.0:
-    resolution: {integrity: sha512-9UoipoxYmSk6Xy7QFgRv2HDyaysmgSG75TFQs6S+3pDM7ZhKTF/bskZV+0UlABHzKjNVhPjYCLfeZUEg1wXxig==}
-    engines: {node: ^12.20.0 || ^14.13.1 || >=16.0.0}
-
   is-posix-bracket@0.1.1:
     resolution: {integrity: sha512-Yu68oeXJ7LeWNmZ3Zov/xg/oDBnBK2RNxwYY1ilNJX+tKKZqgPK+qOn/Gs9jEu66KDY9Netf5XLKNGzas/vPfQ==}
     engines: {node: '>=0.10.0'}
@@ -8639,8 +8616,8 @@ packages:
   marky@1.3.0:
     resolution: {integrity: sha512-ocnPZQLNpvbedwTy9kNrQEsknEfgvcLMvOtz3sFeWApDq1MXH1TqkCIx58xlpESsfwQOnuBO9beyQuNGzVvuhQ==}
 
-  mastra@1.25.0:
-    resolution: {integrity: sha512-agvmepSDr7sKV9T8/B3Yc4rfQoRZaB7nXcLcVobXz73BkRD/dOtiq4wt8CumUVt/wE5zv/X/B+QDQ1sFbNTc+g==}
+  mastra@1.28.0:
+    resolution: {integrity: sha512-OkYn0FgNvhvDtPoWg99U7SQs0XOtdlhjpRZYMnB0KbD95nc0DI3Ni9VYM2HZNV2IJFnIzASQb/3IfiGXVsUKFA==}
     engines: {node: '>=22.13.0'}
     hasBin: true
     peerDependencies:
@@ -10020,16 +9997,9 @@ packages:
     resolution: {integrity: sha512-0ghuzq67LI9bLXpOX/ISfve/Mq33a4aFRzoQYhnnok1JOFpmE/A2TBGkNVenOGEeSBCjIiWcc6MVOG5HEQv0sA==}
     engines: {node: '>=4'}
 
-  registry-auth-token@3.3.2:
-    resolution: {integrity: sha512-JL39c60XlzCVgNrO+qq68FoNb56w/m7JYvGR2jT5iR1xBrUA3Mfx5Twk5rqTThPmQKMWydGmq8oFtDlxfrmxnQ==}
-
   registry-auth-token@5.1.1:
     resolution: {integrity: sha512-P7B4+jq8DeD2nMsAcdfaqHbssgHtZ7Z5+++a5ask90fvmJ8p5je4mOa+wzu+DB4vQ5tdJV/xywY+UnVFeQLV5Q==}
     engines: {node: '>=14'}
-
-  registry-url@3.1.0:
-    resolution: {integrity: sha512-ZbgR5aZEdf4UKZVBPYIgaglBmSF2Hi94s2PcIHhRGFjKYu+chjJdYfHn4rt3hB6eCKLJ8giVIIfgMa1ehDfZKA==}
-    engines: {node: '>=0.10.0'}
 
   registry-url@6.0.1:
     resolution: {integrity: sha512-+crtS5QjFRqFCoQmvGduwYWEBng99ZvmFvF+cUJkGYF1L1BfU8C6Zp9T7f5vPAwyLkUExpvK+ANVZmGU49qi4Q==}
@@ -10273,11 +10243,6 @@ packages:
   serve-static@1.16.3:
     resolution: {integrity: sha512-x0RTqQel6g5SY7Lg6ZreMmsOzncHFU7nhnRWkKgWuMTu5NN0DR5oruckMqRvacAN9d5w6ARnRBXl9xhDCgfMeA==}
     engines: {node: '>= 0.8.0'}
-
-  serve@14.2.6:
-    resolution: {integrity: sha512-QEjUSA+sD4Rotm1znR8s50YqA3kYpRGPmtd5GlFxbaL9n/FdUNbqMhxClqdditSk0LlZyA/dhud6XNRTOC9x2Q==}
-    engines: {node: '>= 14'}
-    hasBin: true
 
   server-only@0.0.1:
     resolution: {integrity: sha512-qepMx2JxAa5jjfzxG79yPPq+8BuFToHd1hm7kI+Z4zAq1ftQiP7HcxMhDDItrbtwVeLg/cY2JnKnrcFkmiswNA==}
@@ -10855,10 +10820,6 @@ packages:
     resolution: {integrity: sha512-4dbzIzqvjtgiM5rw1k5rEHtBANKmdudhGyBEajN01fEyhaAIhsoKNy6y7+IN93IfpFtwY9iqi7kD+xwKhQsNJA==}
     engines: {node: '>=8'}
 
-  type-fest@2.19.0:
-    resolution: {integrity: sha512-RAH822pAdBgcNMAfWnCBU3CFZcfZ/i1eZjwFU/dsLKumyuuP3niueg2UAukXYF0E2AAoc82ZSSf9J0WQBinzHA==}
-    engines: {node: '>=12.20'}
-
   type-is@1.6.18:
     resolution: {integrity: sha512-TkRKr9sUTxEH8MdfuCSP7VizJyzRNMjj2J2do2Jr3Kym598JVdEksuzPQCnlFPW4ky9Q+iA+ma9BGm06XQBy8g==}
     engines: {node: '>= 0.6'}
@@ -11074,9 +11035,6 @@ packages:
     hasBin: true
     peerDependencies:
       browserslist: '>= 4.21.0'
-
-  update-check@1.5.4:
-    resolution: {integrity: sha512-5YHsflzHP4t1G+8WGPlvKbJEbAJGCgw+Em+dGR1KmBUbr1J36SJBqlHLjR7oob7sco5hWHGQVcr9B2poIVDDTQ==}
 
   uri-js@4.4.1:
     resolution: {integrity: sha512-7rKUyy33Q1yc98pQ1DAmLtwX109F7TIfWlW1Ydo8Wl1ii1SeHieeh0HHfPeL2fMXK6z0s8ecKs9frCuLJvndBg==}
@@ -11410,10 +11368,6 @@ packages:
     resolution: {integrity: sha512-hUrmaWBdVDcxvYqnyh09zunKzROWjbZTiNy8dBEjkS7ehEDQibXJ7XvlmtbwuTclUiIyN+CyXQD4Vmko8fNm8w==}
     engines: {node: '>=8'}
     hasBin: true
-
-  widest-line@4.0.1:
-    resolution: {integrity: sha512-o0cyEG0e8GPzT4iGHphIOh0cJOV8fivsXxddQasHPHfoZf1ZexrfeA21w2NaEN1RHE+fXlfISmOE8R9N3u3Qig==}
-    engines: {node: '>=12'}
 
   wordwrapjs@4.0.1:
     resolution: {integrity: sha512-kKlNACbvHrkpIw6oPeYDSmdCTu2hdMHoyXLTcUKala++lx5Y+wjJ/e474Jqv5abnVmwxw08DiTuHmw69lJGksA==}
@@ -14563,7 +14517,7 @@ snapshots:
     dependencies:
       '@lukeed/csprng': 1.1.0
 
-  '@mastra/auth@1.1.2(supports-color@8.1.1)':
+  '@mastra/auth@1.1.3(supports-color@8.1.1)':
     dependencies:
       jsonwebtoken: 9.0.3
       jwks-rsa: 3.2.2(supports-color@8.1.1)
@@ -14637,16 +14591,60 @@ snapshots:
       - utf-8-validate
       - workflow
 
-  '@mastra/deployer@1.59.0(@hono/node-server@1.19.17(hono@4.13.3))(@mastra/core@1.59.0(@grpc/grpc-js@1.14.3)(bufferutil@4.1.0)(express@4.22.1(supports-color@8.1.1))(supports-color@8.1.1)(utf-8-validate@6.0.6)(zod@4.4.3))(bufferutil@4.1.0)(supports-color@8.1.1)(typescript@7.0.2)(utf-8-validate@6.0.6)(zod@4.4.3)':
+  '@mastra/core@1.65.0(@grpc/grpc-js@1.14.3)(bufferutil@4.1.0)(express@4.22.1(supports-color@8.1.1))(supports-color@8.1.1)(utf-8-validate@6.0.6)(zod@4.4.3)':
+    dependencies:
+      '@a2a-js/sdk-v0_3': '@a2a-js/sdk@0.3.14(@grpc/grpc-js@1.14.3)(express@4.22.1(supports-color@8.1.1))'
+      '@a2a-js/sdk-v1': '@a2a-js/sdk@1.0.1(@grpc/grpc-js@1.14.3)(express@4.22.1(supports-color@8.1.1))'
+      '@ai-sdk/provider-utils-v6': '@ai-sdk/provider-utils@4.0.40(zod@4.4.3)'
+      '@ai-sdk/provider-utils-v7': '@ai-sdk/provider-utils@5.0.13(zod@4.4.3)'
+      '@ai-sdk/provider-v5': '@ai-sdk/provider@2.0.3'
+      '@ai-sdk/provider-v6': '@ai-sdk/provider@3.0.14'
+      '@ai-sdk/provider-v7': '@ai-sdk/provider@4.0.4'
+      '@isaacs/ttlcache': 2.1.5
+      '@lukeed/uuid': 2.0.1
+      '@mastra/schema-compat': 1.3.9(zod@4.4.3)
+      '@modelcontextprotocol/server': 2.0.0
+      '@sindresorhus/slugify': 2.2.1
+      '@standard-schema/spec': 1.1.0
+      ajv: 8.20.0
+      chat: 4.38.1(supports-color@8.1.1)(zod@4.4.3)
+      croner: 10.0.1
+      dotenv: 17.3.1
+      execa: 9.6.1
+      fastq: 1.20.1
+      gray-matter: 4.0.3
+      ignore: 7.0.5
+      jpeg-js: 0.4.4
+      json-schema: 0.4.0
+      lru-cache: 11.5.2
+      p-map: 7.0.6
+      p-retry: 7.1.1
+      picomatch: 4.0.7
+      posthog-node: 5.49.1
+      tokenx: 1.6.0
+      ws: 8.21.3(bufferutil@4.1.0)(utf-8-validate@6.0.6)
+      xxhash-wasm: 1.1.0
+      zod: 4.4.3
+    transitivePeerDependencies:
+      - '@bufbuild/protobuf'
+      - '@grpc/grpc-js'
+      - ai
+      - bufferutil
+      - express
+      - rxjs
+      - supports-color
+      - utf-8-validate
+      - workflow
+
+  '@mastra/deployer@1.65.0(@hono/node-server@1.19.17(hono@4.13.3))(@mastra/core@1.65.0(@grpc/grpc-js@1.14.3)(bufferutil@4.1.0)(express@4.22.1(supports-color@8.1.1))(supports-color@8.1.1)(utf-8-validate@6.0.6)(zod@4.4.3))(bufferutil@4.1.0)(supports-color@8.1.1)(typescript@7.0.2)(utf-8-validate@6.0.6)(zod@4.4.3)':
     dependencies:
       '@babel/core': 8.0.1
       '@babel/preset-typescript': 8.0.1(@babel/core@8.0.1)
       '@babel/traverse': 8.0.4
       '@hono/node-ws': 1.3.1(@hono/node-server@1.19.17(hono@4.13.3))(bufferutil@4.1.0)(hono@4.13.3)(utf-8-validate@6.0.6)
-      '@mastra/core': 1.59.0(@grpc/grpc-js@1.14.3)(bufferutil@4.1.0)(express@4.22.1(supports-color@8.1.1))(supports-color@8.1.1)(utf-8-validate@6.0.6)(zod@4.4.3)
-      '@mastra/server': 1.59.0(@mastra/core@1.59.0(@grpc/grpc-js@1.14.3)(bufferutil@4.1.0)(express@4.22.1(supports-color@8.1.1))(supports-color@8.1.1)(utf-8-validate@6.0.6)(zod@4.4.3))(zod@4.4.3)
+      '@mastra/core': 1.65.0(@grpc/grpc-js@1.14.3)(bufferutil@4.1.0)(express@4.22.1(supports-color@8.1.1))(supports-color@8.1.1)(utf-8-validate@6.0.6)(zod@4.4.3)
+      '@mastra/server': 1.65.0(@mastra/core@1.65.0(@grpc/grpc-js@1.14.3)(bufferutil@4.1.0)(express@4.22.1(supports-color@8.1.1))(supports-color@8.1.1)(utf-8-validate@6.0.6)(zod@4.4.3))(zod@4.4.3)
       '@optimize-lodash/rollup-plugin': 5.1.0(rollup@4.62.4)
-      '@rollup/plugin-alias': 6.0.0(rollup@4.62.4)
       '@rollup/plugin-commonjs': 29.0.2(rollup@4.62.4)
       '@rollup/plugin-esm-shim': 0.1.8(rollup@4.62.4)
       '@rollup/plugin-json': 6.1.0(rollup@4.62.4)
@@ -14676,17 +14674,17 @@ snapshots:
       - utf-8-validate
       - zod
 
-  '@mastra/libsql@1.20.0(@mastra/core@1.59.0(@grpc/grpc-js@1.14.3)(bufferutil@4.1.0)(express@4.22.1(supports-color@8.1.1))(supports-color@8.1.1)(utf-8-validate@6.0.6)(zod@4.4.3))(bufferutil@4.1.0)(utf-8-validate@6.0.6)':
+  '@mastra/libsql@1.22.4(@mastra/core@1.65.0(@grpc/grpc-js@1.14.3)(bufferutil@4.1.0)(express@4.22.1(supports-color@8.1.1))(supports-color@8.1.1)(utf-8-validate@6.0.6)(zod@4.4.3))(bufferutil@4.1.0)(utf-8-validate@6.0.6)':
     dependencies:
       '@libsql/client': 0.17.4(bufferutil@4.1.0)(utf-8-validate@6.0.6)
-      '@mastra/core': 1.59.0(@grpc/grpc-js@1.14.3)(bufferutil@4.1.0)(express@4.22.1(supports-color@8.1.1))(supports-color@8.1.1)(utf-8-validate@6.0.6)(zod@4.4.3)
+      '@mastra/core': 1.65.0(@grpc/grpc-js@1.14.3)(bufferutil@4.1.0)(express@4.22.1(supports-color@8.1.1))(supports-color@8.1.1)(utf-8-validate@6.0.6)(zod@4.4.3)
     transitivePeerDependencies:
       - bufferutil
       - utf-8-validate
 
-  '@mastra/loggers@1.2.0(@mastra/core@1.59.0(@grpc/grpc-js@1.14.3)(bufferutil@4.1.0)(express@4.22.1(supports-color@8.1.1))(supports-color@8.1.1)(utf-8-validate@6.0.6)(zod@4.4.3))':
+  '@mastra/loggers@1.3.1(@mastra/core@1.65.0(@grpc/grpc-js@1.14.3)(bufferutil@4.1.0)(express@4.22.1(supports-color@8.1.1))(supports-color@8.1.1)(utf-8-validate@6.0.6)(zod@4.4.3))':
     dependencies:
-      '@mastra/core': 1.59.0(@grpc/grpc-js@1.14.3)(bufferutil@4.1.0)(express@4.22.1(supports-color@8.1.1))(supports-color@8.1.1)(utf-8-validate@6.0.6)(zod@4.4.3)
+      '@mastra/core': 1.65.0(@grpc/grpc-js@1.14.3)(bufferutil@4.1.0)(express@4.22.1(supports-color@8.1.1))(supports-color@8.1.1)(utf-8-validate@6.0.6)(zod@4.4.3)
       pino: 10.3.1
       pino-pretty: 13.1.3
 
@@ -14696,9 +14694,15 @@ snapshots:
       zod: 4.4.3
       zod-from-json-schema: 0.5.6
 
-  '@mastra/server@1.59.0(@mastra/core@1.59.0(@grpc/grpc-js@1.14.3)(bufferutil@4.1.0)(express@4.22.1(supports-color@8.1.1))(supports-color@8.1.1)(utf-8-validate@6.0.6)(zod@4.4.3))(zod@4.4.3)':
+  '@mastra/schema-compat@1.3.9(zod@4.4.3)':
     dependencies:
-      '@mastra/core': 1.59.0(@grpc/grpc-js@1.14.3)(bufferutil@4.1.0)(express@4.22.1(supports-color@8.1.1))(supports-color@8.1.1)(utf-8-validate@6.0.6)(zod@4.4.3)
+      json-schema-to-zod: 2.8.1
+      zod: 4.4.3
+      zod-from-json-schema: 0.5.6
+
+  '@mastra/server@1.65.0(@mastra/core@1.65.0(@grpc/grpc-js@1.14.3)(bufferutil@4.1.0)(express@4.22.1(supports-color@8.1.1))(supports-color@8.1.1)(utf-8-validate@6.0.6)(zod@4.4.3))(zod@4.4.3)':
+    dependencies:
+      '@mastra/core': 1.65.0(@grpc/grpc-js@1.14.3)(bufferutil@4.1.0)(express@4.22.1(supports-color@8.1.1))(supports-color@8.1.1)(utf-8-validate@6.0.6)(zod@4.4.3)
       hono: 4.13.3
       zod: 4.4.3
 
@@ -16128,19 +16132,15 @@ snapshots:
 
   '@rolldown/pluginutils@1.0.1': {}
 
-  '@rollup/plugin-alias@6.0.0(rollup@4.62.4)':
-    optionalDependencies:
-      rollup: 4.62.4
-
   '@rollup/plugin-commonjs@29.0.2(rollup@4.62.4)':
     dependencies:
       '@rollup/pluginutils': 5.4.0(rollup@4.62.4)
       commondir: 1.0.1
       estree-walker: 2.0.2
-      fdir: 6.5.0(picomatch@4.0.5)
+      fdir: 6.5.0(picomatch@4.0.7)
       is-reference: 1.2.1
       magic-string: 0.30.21
-      picomatch: 4.0.5
+      picomatch: 4.0.7
     optionalDependencies:
       rollup: 4.62.4
 
@@ -16173,9 +16173,9 @@ snapshots:
 
   '@rollup/pluginutils@5.4.0(rollup@4.62.4)':
     dependencies:
-      '@types/estree': 1.0.8
+      '@types/estree': 1.0.9
       estree-walker: 2.0.2
-      picomatch: 4.0.5
+      picomatch: 4.0.7
     optionalDependencies:
       rollup: 4.62.4
 
@@ -17444,8 +17444,6 @@ snapshots:
 
   '@types/deep-eql@4.0.2': {}
 
-  '@types/estree@1.0.8': {}
-
   '@types/estree@1.0.9': {}
 
   '@types/express-serve-static-core@4.19.8':
@@ -18334,8 +18332,6 @@ snapshots:
 
   '@xmldom/xmldom@0.8.11': {}
 
-  '@zeit/schemas@2.36.0': {}
-
   abab@2.0.6: {}
 
   abitype@1.0.6(typescript@7.0.2)(zod@3.25.76):
@@ -18448,10 +18444,6 @@ snapshots:
 
   anser@1.4.10: {}
 
-  ansi-align@3.0.1:
-    dependencies:
-      string-width: 4.2.3
-
   ansi-colors@4.1.3: {}
 
   ansi-escapes@4.3.2:
@@ -18491,8 +18483,6 @@ snapshots:
   append-transform@2.0.0:
     dependencies:
       default-require-extensions: 3.0.1
-
-  arch@2.2.0: {}
 
   archiver@8.0.0:
     dependencies:
@@ -18884,17 +18874,6 @@ snapshots:
 
   bowser@2.14.1: {}
 
-  boxen@7.0.0:
-    dependencies:
-      ansi-align: 3.0.1
-      camelcase: 7.0.1
-      chalk: 5.6.2
-      cli-boxes: 3.0.0
-      string-width: 5.1.2
-      type-fest: 2.19.0
-      widest-line: 4.0.1
-      wrap-ansi: 8.1.0
-
   bplist-creator@0.1.0:
     dependencies:
       stream-buffers: 2.2.0
@@ -19074,8 +19053,6 @@ snapshots:
 
   camelcase@6.3.0: {}
 
-  camelcase@7.0.1: {}
-
   caniuse-lite@1.0.30001777: {}
 
   canonicalize@1.0.8: {}
@@ -19105,10 +19082,6 @@ snapshots:
 
   chai@6.2.2: {}
 
-  chalk-template@0.4.0:
-    dependencies:
-      chalk: 4.1.2
-
   chalk@2.4.2:
     dependencies:
       ansi-styles: 3.2.1
@@ -19124,8 +19097,6 @@ snapshots:
     dependencies:
       ansi-styles: 4.3.0
       supports-color: 7.2.0
-
-  chalk@5.0.1: {}
 
   chalk@5.6.2: {}
 
@@ -19216,8 +19187,6 @@ snapshots:
 
   clean-stack@2.2.0: {}
 
-  cli-boxes@3.0.0: {}
-
   cli-cursor@2.1.0:
     dependencies:
       restore-cursor: 2.0.0
@@ -19225,12 +19194,6 @@ snapshots:
   cli-spinners@2.9.2: {}
 
   client-only@0.0.1: {}
-
-  clipboardy@3.0.0:
-    dependencies:
-      arch: 2.2.0
-      execa: 5.1.1
-      is-wsl: 2.2.0
 
   cliui@6.0.0:
     dependencies:
@@ -20433,10 +20396,6 @@ snapshots:
     dependencies:
       bser: 2.1.1
 
-  fdir@6.5.0(picomatch@4.0.5):
-    optionalDependencies:
-      picomatch: 4.0.5
-
   fdir@6.5.0(picomatch@4.0.7):
     optionalDependencies:
       picomatch: 4.0.7
@@ -21235,8 +21194,6 @@ snapshots:
     dependencies:
       isobject: 3.0.1
 
-  is-port-reachable@4.0.0: {}
-
   is-posix-bracket@0.1.1: {}
 
   is-potential-custom-element-name@1.0.1: {}
@@ -21245,7 +21202,7 @@ snapshots:
 
   is-reference@1.2.1:
     dependencies:
-      '@types/estree': 1.0.8
+      '@types/estree': 1.0.9
 
   is-regex@1.2.1:
     dependencies:
@@ -22310,15 +22267,15 @@ snapshots:
 
   marky@1.3.0: {}
 
-  mastra@1.25.0(@hono/node-server@1.19.17(hono@4.13.3))(@mastra/core@1.59.0(@grpc/grpc-js@1.14.3)(bufferutil@4.1.0)(express@4.22.1(supports-color@8.1.1))(supports-color@8.1.1)(utf-8-validate@6.0.6)(zod@4.4.3))(bufferutil@4.1.0)(supports-color@8.1.1)(typescript@7.0.2)(utf-8-validate@6.0.6)(zod@4.4.3):
+  mastra@1.28.0(@hono/node-server@1.19.17(hono@4.13.3))(@mastra/core@1.65.0(@grpc/grpc-js@1.14.3)(bufferutil@4.1.0)(express@4.22.1(supports-color@8.1.1))(supports-color@8.1.1)(utf-8-validate@6.0.6)(zod@4.4.3))(bufferutil@4.1.0)(supports-color@8.1.1)(typescript@7.0.2)(utf-8-validate@6.0.6)(zod@4.4.3):
     dependencies:
       '@babel/parser': 8.0.4
       '@babel/types': 8.0.4
       '@clack/prompts': 1.7.0
       '@expo/devcert': 1.2.1(supports-color@8.1.1)
-      '@mastra/core': 1.59.0(@grpc/grpc-js@1.14.3)(bufferutil@4.1.0)(express@4.22.1(supports-color@8.1.1))(supports-color@8.1.1)(utf-8-validate@6.0.6)(zod@4.4.3)
-      '@mastra/deployer': 1.59.0(@hono/node-server@1.19.17(hono@4.13.3))(@mastra/core@1.59.0(@grpc/grpc-js@1.14.3)(bufferutil@4.1.0)(express@4.22.1(supports-color@8.1.1))(supports-color@8.1.1)(utf-8-validate@6.0.6)(zod@4.4.3))(bufferutil@4.1.0)(supports-color@8.1.1)(typescript@7.0.2)(utf-8-validate@6.0.6)(zod@4.4.3)
-      '@mastra/loggers': 1.2.0(@mastra/core@1.59.0(@grpc/grpc-js@1.14.3)(bufferutil@4.1.0)(express@4.22.1(supports-color@8.1.1))(supports-color@8.1.1)(utf-8-validate@6.0.6)(zod@4.4.3))
+      '@mastra/core': 1.65.0(@grpc/grpc-js@1.14.3)(bufferutil@4.1.0)(express@4.22.1(supports-color@8.1.1))(supports-color@8.1.1)(utf-8-validate@6.0.6)(zod@4.4.3)
+      '@mastra/deployer': 1.65.0(@hono/node-server@1.19.17(hono@4.13.3))(@mastra/core@1.65.0(@grpc/grpc-js@1.14.3)(bufferutil@4.1.0)(express@4.22.1(supports-color@8.1.1))(supports-color@8.1.1)(utf-8-validate@6.0.6)(zod@4.4.3))(bufferutil@4.1.0)(supports-color@8.1.1)(typescript@7.0.2)(utf-8-validate@6.0.6)(zod@4.4.3)
+      '@mastra/loggers': 1.3.1(@mastra/core@1.65.0(@grpc/grpc-js@1.14.3)(bufferutil@4.1.0)(express@4.22.1(supports-color@8.1.1))(supports-color@8.1.1)(utf-8-validate@6.0.6)(zod@4.4.3))
       archiver: 8.0.0
       commander: 14.0.3
       dotenv: 17.3.1
@@ -22329,10 +22286,8 @@ snapshots:
       openapi-fetch: 0.17.0
       picocolors: 1.1.1
       posthog-node: 5.49.1
-      semver: 7.7.4
-      serve: 14.2.6(supports-color@8.1.1)
+      semver: 7.8.5
       serve-handler: 6.1.7
-      shell-quote: 1.8.3
       strip-json-comments: 5.0.3
       tinyglobby: 0.2.17
       yocto-spinner: 1.2.2
@@ -24238,7 +24193,7 @@ snapshots:
 
   readdir-glob@3.0.0:
     dependencies:
-      minimatch: 10.2.4
+      minimatch: 10.2.6
 
   readdirp@2.2.1(supports-color@8.1.1):
     dependencies:
@@ -24293,18 +24248,9 @@ snapshots:
       unicode-match-property-ecmascript: 2.0.0
       unicode-match-property-value-ecmascript: 2.2.1
 
-  registry-auth-token@3.3.2:
-    dependencies:
-      rc: 1.2.8
-      safe-buffer: 5.2.1
-
   registry-auth-token@5.1.1:
     dependencies:
       '@pnpm/npm-conf': 3.0.2
-
-  registry-url@3.1.0:
-    dependencies:
-      rc: 1.2.8
 
   registry-url@6.0.1:
     dependencies:
@@ -24605,22 +24551,6 @@ snapshots:
       escape-html: 1.0.3
       parseurl: 1.3.3
       send: 0.19.2(supports-color@8.1.1)
-    transitivePeerDependencies:
-      - supports-color
-
-  serve@14.2.6(supports-color@8.1.1):
-    dependencies:
-      '@zeit/schemas': 2.36.0
-      ajv: 8.18.0
-      arg: 5.0.2
-      boxen: 7.0.0
-      chalk: 5.0.1
-      chalk-template: 0.4.0
-      clipboardy: 3.0.0
-      compression: 1.8.1(supports-color@8.1.1)
-      is-port-reachable: 4.0.0
-      serve-handler: 6.1.7
-      update-check: 1.5.4
     transitivePeerDependencies:
       - supports-color
 
@@ -25280,8 +25210,6 @@ snapshots:
 
   type-fest@0.8.1: {}
 
-  type-fest@2.19.0: {}
-
   type-is@1.6.18:
     dependencies:
       media-typer: 0.3.0
@@ -25441,7 +25369,7 @@ snapshots:
   unplugin-utils@0.2.5:
     dependencies:
       pathe: 2.0.3
-      picomatch: 4.0.5
+      picomatch: 4.0.7
 
   unset-value@1.0.0:
     dependencies:
@@ -25466,11 +25394,6 @@ snapshots:
       browserslist: 4.28.1
       escalade: 3.2.0
       picocolors: 1.1.1
-
-  update-check@1.5.4:
-    dependencies:
-      registry-auth-token: 3.3.2
-      registry-url: 3.1.0
 
   uri-js@4.4.1:
     dependencies:
@@ -25874,10 +25797,6 @@ snapshots:
     dependencies:
       siginfo: 2.0.0
       stackback: 0.0.2
-
-  widest-line@4.0.1:
-    dependencies:
-      string-width: 5.1.2
 
   wordwrapjs@4.0.1:
     dependencies:

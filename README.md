@@ -83,7 +83,7 @@ superpool/
 ├── .gitignore
 ├── pnpm-workspace.yaml
 ├── tsconfig.json
-├── tsconfig.base.json
+├── tsconfig.shared.json
 ├── README.md
 ├── CLAUDE.md
 └── package.json (root)
