@@ -1,7 +1,3 @@
-// Resolved through the package's `import` condition: this file emits CommonJS, but the
-// types being borrowed are the ESM ones. See `clientFor` for why the value is loaded
-// dynamically rather than imported here.
-import type { MastraClient } from '@mastra/client-js' with { 'resolution-mode': 'import' }
 import { logger } from 'firebase-functions/v2'
 import * as jwt from 'jsonwebtoken'
 
@@ -81,7 +77,11 @@ export function signServiceToken(secret: string): string {
   return jwt.sign({ sub: 'superpool-backend' }, secret, { expiresIn: TOKEN_TTL_SECONDS, algorithm: 'HS256' })
 }
 
-export async function clientFor(config: AgentServiceConfig, timeoutMs: number): Promise<MastraClient> {
+// The return type is inferred rather than written. Naming it would need a type-only import
+// of `@mastra/client-js`, which declares "type": "module" — and from a CommonJS file that
+// import needs a `resolution-mode` attribute, which TypeScript requires and Biome rejects
+// outright (noTypeOnlyImportAttributes). Inference sidesteps both and stays accurate.
+export async function clientFor(config: AgentServiceConfig, timeoutMs: number) {
   // `@mastra/client-js` is ESM-only by declaration ("type": "module"), and this package
   // emits CommonJS for the Functions runtime. It does ship dist/index.cjs, but its
   // `require` export condition points `types` at an ESM .d.ts, so under
