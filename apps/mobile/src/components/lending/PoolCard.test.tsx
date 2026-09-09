@@ -53,7 +53,7 @@ function makeRequest(overrides: Partial<LoanInfo> = {}): LoanInfo {
 
 afterEach(() => {
   poolStore.loanRecords = []
-  authStore.walletAddress = null
+  authStore.setState({ walletAddress: null })
 })
 
 describe('PoolCard', () => {
@@ -90,7 +90,7 @@ describe('PoolCard', () => {
 
   it('says nothing to a member who cannot act on them', () => {
     // Only the owner can approve, so only the owner is told.
-    authStore.walletAddress = STRANGER
+    authStore.setState({ walletAddress: STRANGER })
     poolStore.loanRecords = [makeRequest()]
 
     const { queryByTestId } = render(<PoolCard pool={makePool()} />)

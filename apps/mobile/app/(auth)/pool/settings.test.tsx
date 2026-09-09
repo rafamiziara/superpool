@@ -79,14 +79,14 @@ beforeEach(async () => {
   mockSetRequiresMembership.mockResolvedValue('0xabc')
   mockLocalSearchParams.mockReturnValue({ poolId: POOL_ID })
   mockConfig()
-  authStore.walletAddress = null
+  authStore.setState({ walletAddress: null })
   await poolStore.fetchPools()
   poolStore.loanRecords = []
 })
 
 afterEach(() => {
   poolStore.loanRecords = []
-  authStore.walletAddress = null
+  authStore.setState({ walletAddress: null })
 })
 
 describe('PoolSettingsScreen', () => {
@@ -111,7 +111,7 @@ describe('PoolSettingsScreen', () => {
 
   it('lets the owner in whatever case their wallet reports', () => {
     // Indexed addresses are lowercased; a connected wallet is checksummed.
-    authStore.walletAddress = MOCK_USER_ADDRESS.toLowerCase()
+    authStore.setState({ walletAddress: MOCK_USER_ADDRESS.toLowerCase() })
 
     const { getByTestId } = render(<PoolSettingsScreen />)
 

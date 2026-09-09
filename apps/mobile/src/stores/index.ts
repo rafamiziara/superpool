@@ -1,5 +1,17 @@
-export { AuthStore, authStore } from './AuthStore'
-export { NavigationStore, navigationStore } from './NavigationStore'
+export {
+  type AuthActions,
+  type AuthLock,
+  type AuthState,
+  type AuthStoreApi,
+  type AuthStoreState,
+  authStore,
+  createAuthStore,
+  selectIsAuthenticating,
+  selectIsFullyInitialized,
+  selectProgress,
+  useAuthStore,
+} from './AuthStore'
+export { type AppRoute, NavigationStore, navigationStore, selectTargetRoute, useTargetRoute } from './NavigationStore'
 export {
   type ContributeParams,
   type ContributeResult,

@@ -48,7 +48,8 @@
     "uniwind": "^1.9.0",
     "viem": "^2.56.3",
     "wagmi": "^2.19.5",
-    "zod": "^4.4.3"
+    "zod": "^4.4.3",
+    "zustand": "^5.0.15"
   },
   "devDependencies": {
     "@rm30/metro-config": "^0.1.0",

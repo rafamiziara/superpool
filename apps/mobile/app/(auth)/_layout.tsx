@@ -1,13 +1,13 @@
 import { Stack } from 'expo-router'
-import { observer } from 'mobx-react-lite'
 import { useEffect } from 'react'
 import { Text, View } from 'react-native'
 import { darkHeader } from '../../src/constants/navigation'
-import { authStore } from '../../src/stores/AuthStore'
+import { useAuthStore } from '../../src/stores/AuthStore'
 import { poolStore } from '../../src/stores/PoolStore'
 
-export default observer(function AuthLayout() {
-  const isAuthenticated = authStore.isWalletConnected && !!authStore.user
+export default function AuthLayout() {
+  const isAuthenticated = useAuthStore((state) => state.isWalletConnected && !!state.user)
+  const chainId = useAuthStore((state) => state.chainId)
 
   /**
    * Reloads on a network switch as well as on sign-in.
@@ -27,15 +27,11 @@ export default observer(function AuthLayout() {
     if (isAuthenticated) {
       poolStore.fetchPools()
     }
-    /*
-      eslint-disable-next-line react-hooks/exhaustive-deps --
-      `authStore.chainId` is a MobX observable read inside an `observer`
-      component, so the read subscribes and a change *does* re-render — which
-      is the opposite of the rule's "outer scope values aren't valid
-      dependencies". Dropping it is the documented bug: the store went on
-      serving the chain the user had just left. See CLAUDE.md → Chains.
-    */
-  }, [isAuthenticated, authStore.chainId])
+    // `chainId` is an ordinary subscribed value now, so it is an ordinary
+    // dependency and the exhaustive-deps rule agrees with it. Dropping it is
+    // the documented bug: the store went on serving the chain the user had
+    // just left. See CLAUDE.md → Chains.
+  }, [isAuthenticated, chainId])
 
   // Redirect protection - this should not happen due to NavigationStore
   // but provides a fallback if someone tries to access auth routes directly
@@ -59,4 +55,4 @@ export default observer(function AuthLayout() {
       <Stack.Screen name="pool/create" options={{ headerBackButtonDisplayMode: 'minimal', title: 'New pool' }} />
     </Stack>
   )
-})
+}

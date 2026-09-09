@@ -11,32 +11,32 @@ jest.mock('../config/firebase', () => ({
   },
 }))
 
-// Mock AuthStore (not covered by global mocks)
-jest.mock('../stores/AuthStore', () => ({
-  authStore: {
-    user: null,
-    initializeFirebaseState: jest.fn(),
-    setUser: jest.fn(),
-  },
-}))
-
+/*
+  The real store is used rather than a stand-in object — see WalletListener's
+  test for why. `user` is set through the store's own API.
+*/
 // Mock console methods
 const mockConsoleLog = jest.spyOn(console, 'log').mockImplementation(() => {})
 
 describe('FirebaseInitializer', () => {
   const mockOnAuthStateChanged = mockFirebaseAuth.onAuthStateChanged as jest.Mock
   const mockAuthStateReady = FIREBASE_AUTH.authStateReady as jest.Mock
-  const mockInitializeFirebaseState = authStore.initializeFirebaseState as jest.Mock
-  const mockSetUser = authStore.setUser as jest.Mock
+  let mockInitializeFirebaseState: jest.SpyInstance
+  let mockSetUser: jest.SpyInstance
 
   beforeEach(() => {
     jest.clearAllMocks()
     mockConsoleLog.mockClear()
 
     // Reset authStore state
-    Object.assign(authStore, {
-      user: null,
-    })
+    authStore.setState({ user: null, hasInitializedFirebase: false })
+    mockInitializeFirebaseState = jest.spyOn(authStore.getState(), 'initializeFirebaseState')
+    mockSetUser = jest.spyOn(authStore.getState(), 'setUser')
+  })
+
+  afterEach(() => {
+    mockInitializeFirebaseState.mockRestore()
+    mockSetUser.mockRestore()
   })
 
   afterAll(() => {
@@ -116,7 +116,7 @@ describe('FirebaseInitializer', () => {
           updatedAt: 1234567890,
           deviceId: 'device-123',
         }
-        Object.assign(authStore, { user: existingUser })
+        authStore.setState({ user: existingUser })
 
         const firebaseUser: { uid: string } = {
           uid: 'test-wallet-123',
@@ -131,7 +131,7 @@ describe('FirebaseInitializer', () => {
       })
 
       it('should create basic user when no existing user (lines 30-38)', () => {
-        Object.assign(authStore, { user: null })
+        authStore.setState({ user: null })
 
         const firebaseUser = {
           uid: 'new-wallet-456',
@@ -157,7 +157,7 @@ describe('FirebaseInitializer', () => {
           updatedAt: 1234567890,
           deviceId: 'device-123',
         }
-        Object.assign(authStore, { user: existingUser })
+        authStore.setState({ user: existingUser })
 
         const firebaseUser = {
           uid: 'new-wallet-456',

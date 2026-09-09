@@ -77,14 +77,14 @@ beforeEach(async () => {
   mockTriggerIndexing.mockResolvedValue(undefined)
   mockWriteNote.mockResolvedValue(true)
   mockLocalSearchParams.mockReturnValue({ poolId: POOL_ID })
-  authStore.walletAddress = MOCK_USER_ADDRESS
+  authStore.setState({ walletAddress: MOCK_USER_ADDRESS })
   await poolStore.fetchPools()
   poolStore.memberRecords = []
 })
 
 afterEach(() => {
   poolStore.memberRecords = []
-  authStore.walletAddress = null
+  authStore.setState({ walletAddress: null })
 })
 
 describe('MembersScreen', () => {
@@ -108,7 +108,7 @@ describe('MembersScreen', () => {
   })
 
   it('lets the owner in whatever case their wallet reports', () => {
-    authStore.walletAddress = MOCK_USER_ADDRESS.toLowerCase()
+    authStore.setState({ walletAddress: MOCK_USER_ADDRESS.toLowerCase() })
 
     const { getByTestId } = render(<MembersScreen />)
 

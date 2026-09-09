@@ -1,15 +1,15 @@
 import type { User } from '@superpool/types'
 import { router } from 'expo-router'
 import { signOut } from 'firebase/auth'
-import { makeAutoObservable, reaction } from 'mobx'
+import { shallow } from 'zustand/shallow'
 import { FIREBASE_AUTH } from '../config/firebase'
 import { logger } from '../utils/logger'
-import { authStore } from './AuthStore'
+import { type AuthState, authStore, selectIsAuthenticating, selectIsFullyInitialized, useAuthStore } from './AuthStore'
 
 export type AppRoute = '/onboarding' | '/connecting' | '/(auth)/dashboard'
 
 interface NavigationState {
-  user: { walletAddress: string } | null
+  user: User | null
   isAuthenticating: boolean
   isWalletConnected: boolean
   walletAddress: string | null
@@ -36,6 +36,29 @@ function resolveRoute(state: NavigationState): { route: AppRoute | null; reason:
   return { route: '/(auth)/dashboard', reason: `wallet connected and user authenticated: ${state.walletAddress}` }
 }
 
+/** The slice of auth state navigation depends on, and nothing more. */
+const selectNavigationState = (state: AuthState): NavigationState => ({
+  user: state.user,
+  isAuthenticating: selectIsAuthenticating(state),
+  isWalletConnected: state.isWalletConnected,
+  walletAddress: state.walletAddress,
+  isFullyInitialized: selectIsFullyInitialized(state),
+})
+
+/**
+ * The route the current auth state calls for, or null while it cannot be
+ * decided.
+ *
+ * This is a selector rather than a getter on the store because that is the only
+ * way a component can subscribe to it. MobX used to trace the reads inside the
+ * getter and subscribe the `observer` to each one; Zustand subscribes to what
+ * the selector returns, so the dependency has to be written down.
+ */
+export const selectTargetRoute = (state: AuthState): AppRoute | null => resolveRoute(selectNavigationState(state)).route
+
+/** `selectTargetRoute`, bound to the singleton, for components. */
+export const useTargetRoute = (): AppRoute | null => useAuthStore(selectTargetRoute)
+
 export class NavigationStore {
   // Current state tracking
   private hasInitialized = false
@@ -51,29 +74,40 @@ export class NavigationStore {
    */
   private lastRoute: AppRoute | null = null
 
-  constructor() {
-    makeAutoObservable(this)
+  private unsubscribe: (() => void) | null = null
 
+  private disposed = false
+
+  constructor() {
     // Set up reactive navigation after stores are ready
     setTimeout(() => this.initializeReactiveNavigation(), 100)
   }
 
   private initializeReactiveNavigation() {
-    // React to auth and wallet state changes from AuthStore
-    reaction(
-      () => ({
-        user: authStore.user,
-        isAuthenticating: authStore.isAuthenticating,
-        isWalletConnected: authStore.isWalletConnected,
-        walletAddress: authStore.walletAddress,
-        isFullyInitialized: authStore.isFullyInitialized,
-      }),
+    // The constructor's timer can outlive a `dispose()`, and subscribing then
+    // would leave a listener nothing holds a handle to.
+    if (this.disposed) return
+
+    /*
+      MobX's `reaction` passed `undefined` as the previous value on the
+      `fireImmediately` call; Zustand passes the current value as its own
+      previous. Both `handleAuthTransition` and `handleWalletStateChanges` test
+      `!previousState` to recognise that first call, so the distinction is
+      preserved here rather than in each of them.
+    */
+    let isFirstFire = true
+
+    this.unsubscribe = authStore.subscribe(
+      selectNavigationState,
       (currentState, previousState) => {
+        const previous = isFirstFire ? undefined : previousState
+        isFirstFire = false
+
         logger.debug('🧭 NavigationStore: State changed', {
           hasUser: !!currentState.user,
           userWallet: currentState.user?.walletAddress,
           isAuthenticating: currentState.isAuthenticating,
-          wasAuthenticating: previousState?.isAuthenticating,
+          wasAuthenticating: previous?.isAuthenticating,
           walletConnected: currentState.isWalletConnected,
           walletAddress: currentState.walletAddress,
           isFullyInitialized: currentState.isFullyInitialized,
@@ -83,15 +117,25 @@ export class NavigationStore {
         this.navigateBasedOnCurrentState(currentState)
 
         // Note the authentication transition (logged, never toasted)
-        this.handleAuthTransition(currentState, previousState)
+        this.handleAuthTransition(currentState, previous)
 
         // Handle wallet disconnection if needed
-        this.handleWalletStateChanges(currentState, previousState)
+        this.handleWalletStateChanges(currentState, previous)
       },
-      { fireImmediately: true }
+      // Without this the selector's fresh object would differ every time and
+      // the listener would run on changes it does not care about, such as
+      // `chainId`.
+      { equalityFn: shallow, fireImmediately: true }
     )
 
     logger.debug('🧭 NavigationStore: Reactive navigation initialized')
+  }
+
+  /** Stop reacting. Exists for tests and for symmetry with the subscription. */
+  dispose() {
+    this.disposed = true
+    this.unsubscribe?.()
+    this.unsubscribe = null
   }
 
   /**
@@ -100,17 +144,13 @@ export class NavigationStore {
    * Exposed because a screen change is not always preceded by a state change:
    * the wallet returns to the app through a bare `superpool://` deep link,
    * which lands on `/` with the wallet still connected and the user still
-   * authenticated. The reaction below only fires on change, so the index screen
-   * would sit there forever unless it can ask where it should be.
+   * authenticated. The subscription below only fires on change, so the index
+   * screen would sit there forever unless it can ask where it should be.
+   *
+   * Components should use `useTargetRoute`, which subscribes; this reads once.
    */
   get targetRoute(): AppRoute | null {
-    return resolveRoute({
-      user: authStore.user,
-      isAuthenticating: authStore.isAuthenticating,
-      isWalletConnected: authStore.isWalletConnected,
-      walletAddress: authStore.walletAddress,
-      isFullyInitialized: authStore.isFullyInitialized,
-    }).route
+    return selectTargetRoute(authStore.getState())
   }
 
   private navigateBasedOnCurrentState(currentState: NavigationState) {
@@ -119,9 +159,10 @@ export class NavigationStore {
     if (!targetRoute) {
       // Wait for both wallet and Firebase to initialize before making navigation decisions
       if (!currentState.isFullyInitialized) {
+        const { hasInitializedWallet, hasInitializedFirebase } = authStore.getState()
         logger.debug('🧭 NavigationStore: Waiting for initialization...', {
-          walletInit: authStore.hasInitializedWallet,
-          firebaseInit: authStore.hasInitializedFirebase,
+          walletInit: hasInitializedWallet,
+          firebaseInit: hasInitializedFirebase,
         })
       } else {
         logger.debug('🧭 NavigationStore: Skipping navigation - auth in progress')
@@ -133,11 +174,11 @@ export class NavigationStore {
       Never replace a route with itself.
 
       `router.replace` re-mounts the screen, so sending the user to where they
-      already are is a visible flicker rather than a no-op — and the reaction
-      fires more often than the route actually changes. Closing the AppKit
-      modal is one such moment: it flips wagmi's `isConnecting`, which runs
-      `WalletListener`'s effect and rewrites the wallet state this reaction
-      watches.
+      already are is a visible flicker rather than a no-op — and the
+      subscription fires more often than the route actually changes. Closing
+      the AppKit modal is one such moment: it flips wagmi's `isConnecting`,
+      which runs `WalletListener`'s effect and rewrites the wallet state this
+      subscription watches.
 
       It also stops the store dragging someone off a sub-screen. Standing on
       `pool/[id]`, an unrelated state change still resolves to
@@ -183,7 +224,7 @@ export class NavigationStore {
     currentState: { user: User | null; isAuthenticating: boolean },
     previousState: { user: User | null; isAuthenticating: boolean } | undefined
   ) {
-    // The first reaction fires with `fireImmediately`, so it is not a transition.
+    // The first fire is immediate, so it is not a transition.
     if (!previousState || !this.hasInitialized) {
       this.hasInitialized = true
       return
@@ -195,7 +236,7 @@ export class NavigationStore {
   }
 
   /**
-   * Handle wallet state changes from the AuthStore reaction.
+   * Handle wallet state changes from the AuthStore subscription.
    *
    * **Connecting and disconnecting are announced by the screen change, not by a
    * toast.** Both are acts the user just performed, and both move them
@@ -232,7 +273,7 @@ export class NavigationStore {
     logger.debug('🔌 NavigationStore: Handling wallet disconnection')
 
     // Reset auth store (but not wallet state - that's already updated)
-    authStore.reset()
+    authStore.getState().reset()
 
     // Sign out from Firebase if user is signed in
     try {

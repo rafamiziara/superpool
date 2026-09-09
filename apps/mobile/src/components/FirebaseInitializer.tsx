@@ -15,7 +15,7 @@ export function FirebaseInitializer() {
     // Wait for Firebase to determine initial auth state before marking as initialized
     FIREBASE_AUTH.authStateReady().then(() => {
       logger.debug('🔥 Firebase auth state ready - marking as initialized')
-      authStore.initializeFirebaseState()
+      authStore.getState().initializeFirebaseState()
     })
 
     // Set up listener for ongoing auth state changes
@@ -24,7 +24,7 @@ export function FirebaseInitializer() {
         logger.debug('🔥 Firebase auth state: User authenticated', firebaseUser.uid)
 
         // Check if we already have user data in AuthStore
-        const existingUser = authStore.user
+        const existingUser = authStore.getState().user
         if (existingUser && sameAddress(existingUser.walletAddress, firebaseUser.uid)) {
           // User data already exists and matches - keep existing data
           logger.debug('🔥 Using existing user data from AuthStore')
@@ -36,12 +36,12 @@ export function FirebaseInitializer() {
             updatedAt: Date.now(),
             deviceId: '',
           }
-          authStore.setUser(basicUser)
+          authStore.getState().setUser(basicUser)
           logger.debug('🔥 Set basic user from Firebase:', firebaseUser.uid)
         }
       } else {
         // No Firebase user - clear user state
-        authStore.setUser(null)
+        authStore.getState().setUser(null)
         logger.debug('🔥 Firebase auth state: User not authenticated')
       }
     })

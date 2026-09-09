@@ -220,8 +220,8 @@ describe('PoolStore against listPools', () => {
     jest.clearAllMocks()
     delete process.env.EXPO_PUBLIC_USE_MOCK_POOLS
 
-    authStore.walletAddress = null
-    authStore.chainId = 31337
+    authStore.setState({ walletAddress: null })
+    authStore.setState({ chainId: 31337 })
 
     store = new PoolStore()
     listPoolsCallable = jest.fn().mockResolvedValue({
@@ -244,8 +244,8 @@ describe('PoolStore against listPools', () => {
 
   afterEach(() => {
     process.env.EXPO_PUBLIC_USE_MOCK_POOLS = 'true'
-    authStore.walletAddress = null
-    authStore.chainId = null
+    authStore.setState({ walletAddress: null })
+    authStore.setState({ chainId: null })
   })
 
   it('asks the backend for the connected chain', async () => {
@@ -315,7 +315,7 @@ describe('PoolStore against listPools', () => {
       // The partition Discover and Pools are defined by. A search is exactly
       // how a pool the user belongs to would otherwise leak into a list of
       // strangers.
-      authStore.walletAddress = LIVE_POOL.poolOwner
+      authStore.setState({ walletAddress: LIVE_POOL.poolOwner })
       await store.fetchPools()
       listPoolsCallable.mockResolvedValue({
         data: { pools: [LIVE_POOL], totalCount: 1, page: 1, limit: 50, hasNextPage: false, hasPreviousPage: false },
@@ -428,7 +428,7 @@ describe('PoolStore against listPools', () => {
   })
 
   it('counts a pool the connected wallet owns as one of mine, whatever the casing', async () => {
-    authStore.walletAddress = '0x90F79bf6EB2c4f870365E785982E1f101E93b906'
+    authStore.setState({ walletAddress: '0x90F79bf6EB2c4f870365E785982E1f101E93b906' })
 
     await store.fetchPools()
 
@@ -436,7 +436,7 @@ describe('PoolStore against listPools', () => {
   })
 
   it('does not claim pools owned by someone else', async () => {
-    authStore.walletAddress = '0x0000000000000000000000000000000000000001'
+    authStore.setState({ walletAddress: '0x0000000000000000000000000000000000000001' })
 
     await store.fetchPools()
 
@@ -462,7 +462,7 @@ describe('PoolStore against listPools', () => {
   })
 
   it('falls back to the default chain when the wallet reports none', async () => {
-    authStore.chainId = null
+    authStore.setState({ chainId: null })
 
     await store.fetchPools()
 
@@ -509,8 +509,8 @@ describe('PoolStore contributions', () => {
     jest.clearAllMocks()
     delete process.env.EXPO_PUBLIC_USE_MOCK_POOLS
 
-    authStore.walletAddress = null
-    authStore.chainId = 31337
+    authStore.setState({ walletAddress: null })
+    authStore.setState({ chainId: 31337 })
 
     store = new PoolStore()
     const listPoolsCallable = jest.fn().mockResolvedValue({
@@ -529,8 +529,8 @@ describe('PoolStore contributions', () => {
 
   afterEach(() => {
     process.env.EXPO_PUBLIC_USE_MOCK_POOLS = 'true'
-    authStore.walletAddress = null
-    authStore.chainId = null
+    authStore.setState({ walletAddress: null })
+    authStore.setState({ chainId: null })
   })
 
   it('asks the backend for the connected chain', async () => {
@@ -573,7 +573,7 @@ describe('PoolStore contributions', () => {
   it('derives a membership from a contribution', async () => {
     // There is no membership register on chain, so funding a pool is what makes
     // someone a member of it.
-    authStore.walletAddress = CONTRIBUTOR
+    authStore.setState({ walletAddress: CONTRIBUTOR })
     await loadWith([LIVE_CONTRIBUTION])
 
     const membership = store.membershipFor(12)
@@ -583,7 +583,7 @@ describe('PoolStore contributions', () => {
   })
 
   it('sums repeat deposits into one membership', async () => {
-    authStore.walletAddress = CONTRIBUTOR
+    authStore.setState({ walletAddress: CONTRIBUTOR })
     await loadWith([
       LIVE_CONTRIBUTION,
       { ...LIVE_CONTRIBUTION, id: '31337-0xdddd-0', transactionHash: '0xdddd', amount: '1000000000000000000' },
@@ -594,7 +594,7 @@ describe('PoolStore contributions', () => {
   })
 
   it('dates a membership from the first deposit, not the most recent', async () => {
-    authStore.walletAddress = CONTRIBUTOR
+    authStore.setState({ walletAddress: CONTRIBUTOR })
     await loadWith([
       LIVE_CONTRIBUTION,
       { ...LIVE_CONTRIBUTION, id: 'earlier', transactionHash: '0xeeee', contributedAt: '2026-01-01T00:00:00.000Z' },
@@ -611,7 +611,7 @@ describe('PoolStore contributions', () => {
 
   it('matches the connected wallet case-insensitively', async () => {
     // The indexer stores addresses lowercased; wallets report them checksummed.
-    authStore.walletAddress = '0x90F79bf6EB2c4f870365E785982E1f101E93b906'
+    authStore.setState({ walletAddress: '0x90F79bf6EB2c4f870365E785982E1f101E93b906' })
     await loadWith([LIVE_CONTRIBUTION])
 
     expect(store.membershipFor(12)).toBeDefined()
@@ -681,7 +681,7 @@ describe('PoolStore contributions', () => {
   it('subtracts a withdrawal from the balance but not from what was contributed', async () => {
     // The two are kept apart so a member who took everything out still reads as
     // one, and so earnings are not confused with a withdrawal.
-    authStore.walletAddress = CONTRIBUTOR
+    authStore.setState({ walletAddress: CONTRIBUTOR })
     await loadWith([LIVE_CONTRIBUTION], [LIVE_WITHDRAWAL])
 
     const membership = store.membershipFor(12)
@@ -717,7 +717,7 @@ describe('PoolStore contributions', () => {
 
   it('matches a withdrawal to its member case-insensitively', async () => {
     // The indexer lowercases, but a fixture or a future writer may not.
-    authStore.walletAddress = CONTRIBUTOR
+    authStore.setState({ walletAddress: CONTRIBUTOR })
     await loadWith([LIVE_CONTRIBUTION], [{ ...LIVE_WITHDRAWAL, member: '0x90F79bf6EB2c4f870365E785982E1f101E93b906' }])
 
     expect(store.membershipFor(12)?.currentBalance).toBe(parseEther('1.5'))
@@ -726,7 +726,7 @@ describe('PoolStore contributions', () => {
   it('reports no earnings rather than negative ones after a withdrawal', async () => {
     // Interest reaches the pool but the contract cannot distribute it, so there
     // is nothing to credit — and a withdrawal must not read as a loss.
-    authStore.walletAddress = CONTRIBUTOR
+    authStore.setState({ walletAddress: CONTRIBUTOR })
     await loadWith([LIVE_CONTRIBUTION], [LIVE_WITHDRAWAL])
 
     expect(store.totalBalance).toBe(parseEther('1.5'))
@@ -756,14 +756,14 @@ describe('PoolStore contributions', () => {
   })
 
   it('counts a pool the user contributed to as one of mine', async () => {
-    authStore.walletAddress = OTHER_WALLET
+    authStore.setState({ walletAddress: OTHER_WALLET })
     await loadWith([{ ...LIVE_CONTRIBUTION, contributor: OTHER_WALLET }])
 
     expect(store.myPools.map((pool) => pool.poolId)).toEqual([12])
   })
 
   it('adds the user’s balance to the dashboard total', async () => {
-    authStore.walletAddress = OTHER_WALLET
+    authStore.setState({ walletAddress: OTHER_WALLET })
     await loadWith([{ ...LIVE_CONTRIBUTION, contributor: OTHER_WALLET }])
 
     expect(store.totalBalance).toBe(parseEther('2'))
@@ -791,7 +791,7 @@ describe('PoolStore contributions', () => {
   it('keeps a removed member’s balance on their own dashboard', async () => {
     // Filtering positions on ACTIVE alone would hide money they can still
     // withdraw, which is the worst thing that getter could do.
-    authStore.walletAddress = CONTRIBUTOR
+    authStore.setState({ walletAddress: CONTRIBUTOR })
     listMembersCallable.mockResolvedValue({
       data: { members: [{ ...LIVE_MEMBER, status: 'removed' }], totalCount: 1, limit: 50 },
     })
@@ -803,7 +803,7 @@ describe('PoolStore contributions', () => {
   it('lists a member the owner admitted who has not funded anything', async () => {
     // Only reachable through the register: there is no contribution to derive
     // this person from.
-    authStore.walletAddress = OTHER_WALLET
+    authStore.setState({ walletAddress: OTHER_WALLET })
     listMembersCallable.mockResolvedValue({
       data: { members: [{ ...LIVE_MEMBER, account: OTHER_WALLET, status: 'active' }], totalCount: 1, limit: 50 },
     })
@@ -895,8 +895,8 @@ describe('PoolStore chain sync', () => {
     jest.clearAllMocks()
     delete process.env.EXPO_PUBLIC_USE_MOCK_POOLS
 
-    authStore.walletAddress = null
-    authStore.chainId = 31337
+    authStore.setState({ walletAddress: null })
+    authStore.setState({ chainId: 31337 })
     calls = []
 
     store = new PoolStore()
@@ -925,8 +925,8 @@ describe('PoolStore chain sync', () => {
 
   afterEach(() => {
     process.env.EXPO_PUBLIC_USE_MOCK_POOLS = 'true'
-    authStore.walletAddress = null
-    authStore.chainId = null
+    authStore.setState({ walletAddress: null })
+    authStore.setState({ chainId: null })
   })
 
   it('sweeps the chain before listing, so one pull is enough', async () => {
@@ -946,7 +946,7 @@ describe('PoolStore chain sync', () => {
   })
 
   it('falls back to the default chain when the wallet reports none', async () => {
-    authStore.chainId = null
+    authStore.setState({ chainId: null })
 
     await store.syncAndRefresh()
 
@@ -1046,8 +1046,8 @@ describe('PoolStore myPools', () => {
     jest.clearAllMocks()
     delete process.env.EXPO_PUBLIC_USE_MOCK_POOLS
 
-    authStore.walletAddress = USER_WALLET
-    authStore.chainId = 31337
+    authStore.setState({ walletAddress: USER_WALLET })
+    authStore.setState({ chainId: 31337 })
 
     store = new PoolStore()
     const listPoolsCallable = jest.fn().mockResolvedValue({
@@ -1071,8 +1071,8 @@ describe('PoolStore myPools', () => {
 
   afterEach(() => {
     process.env.EXPO_PUBLIC_USE_MOCK_POOLS = 'true'
-    authStore.walletAddress = null
-    authStore.chainId = null
+    authStore.setState({ walletAddress: null })
+    authStore.setState({ chainId: null })
   })
 
   it('does not claim a pool just because someone else funded it', async () => {
@@ -1101,14 +1101,14 @@ describe('PoolStore myPools', () => {
 
   it('matches the depositor case-insensitively', async () => {
     // Contributions are stored lowercased; a connected wallet is checksummed.
-    authStore.walletAddress = '0x15D34AAf54267DB7D7c367839AAf71A00a2C6A65'
+    authStore.setState({ walletAddress: '0x15D34AAf54267DB7D7c367839AAf71A00a2C6A65' })
     await loadWithContributions([{ ...LIVE_CONTRIBUTION, poolId: 31, contributor: USER_WALLET }])
 
     expect(store.myPools.map((pool) => pool.poolId)).toEqual([30, 31])
   })
 
   it('claims nothing when every pool belongs to someone else', async () => {
-    authStore.walletAddress = '0x0000000000000000000000000000000000000099'
+    authStore.setState({ walletAddress: '0x0000000000000000000000000000000000000099' })
     await loadWithContributions([
       { ...LIVE_CONTRIBUTION, poolId: 31, contributor: STRANGER_WALLET },
       { ...LIVE_CONTRIBUTION, id: '31337-0xdddd-0', poolId: 32, contributor: STRANGER_WALLET },
@@ -1168,8 +1168,8 @@ describe('PoolStore discoverablePools', () => {
     jest.clearAllMocks()
     delete process.env.EXPO_PUBLIC_USE_MOCK_POOLS
 
-    authStore.walletAddress = USER_WALLET
-    authStore.chainId = 31337
+    authStore.setState({ walletAddress: USER_WALLET })
+    authStore.setState({ chainId: 31337 })
 
     store = new PoolStore()
     const listPoolsCallable = jest.fn().mockResolvedValue({
@@ -1195,8 +1195,8 @@ describe('PoolStore discoverablePools', () => {
 
   afterEach(() => {
     process.env.EXPO_PUBLIC_USE_MOCK_POOLS = 'true'
-    authStore.walletAddress = null
-    authStore.chainId = null
+    authStore.setState({ walletAddress: null })
+    authStore.setState({ chainId: null })
   })
 
   it('offers the pools the user has no standing in', async () => {
@@ -1253,7 +1253,7 @@ describe('PoolStore discoverablePools', () => {
   })
 
   it('matches the user case-insensitively', async () => {
-    authStore.walletAddress = USER_WALLET.toUpperCase().replace('0X', '0x')
+    authStore.setState({ walletAddress: USER_WALLET.toUpperCase().replace('0X', '0x') })
     await loadWith([], [member(32, USER_WALLET, 'active')])
 
     expect(store.discoverablePools.map((pool) => pool.poolId)).toEqual([31])
@@ -1415,8 +1415,8 @@ describe('PoolStore loan states', () => {
     jest.clearAllMocks()
     delete process.env.EXPO_PUBLIC_USE_MOCK_POOLS
 
-    authStore.walletAddress = USER_WALLET
-    authStore.chainId = 31337
+    authStore.setState({ walletAddress: USER_WALLET })
+    authStore.setState({ chainId: 31337 })
 
     store = new PoolStore()
     listLoansCallable = jest.fn().mockResolvedValue({ data: { loans: [], totalCount: 0, limit: 50 } })
@@ -1438,8 +1438,8 @@ describe('PoolStore loan states', () => {
 
   afterEach(() => {
     process.env.EXPO_PUBLIC_USE_MOCK_POOLS = 'true'
-    authStore.walletAddress = null
-    authStore.chainId = null
+    authStore.setState({ walletAddress: null })
+    authStore.setState({ chainId: null })
   })
 
   it('does not offer to repay a request that was never funded', async () => {
@@ -1476,7 +1476,7 @@ describe('PoolStore loan states', () => {
 
   it('matches the borrower case-insensitively', async () => {
     // Loans are stored lowercased; a connected wallet is checksummed.
-    authStore.walletAddress = '0x15D34AAf54267DB7D7c367839AAf71A00a2C6A65'
+    authStore.setState({ walletAddress: '0x15D34AAf54267DB7D7c367839AAf71A00a2C6A65' })
     await loadWithLoans([LIVE_LOAN, REQUESTED_LOAN])
 
     expect(store.activeLoanFor(12)?.loanId).toBe(1)
@@ -2003,7 +2003,7 @@ describe('PoolStore loan states', () => {
     })
 
     it('is empty with no wallet connected, rather than everything', async () => {
-      authStore.walletAddress = null
+      authStore.setState({ walletAddress: null })
       await loadWithLoans([LIVE_LOAN])
 
       expect(store.recentTransactions.length).toBeGreaterThan(0)
@@ -2011,7 +2011,7 @@ describe('PoolStore loan states', () => {
     })
 
     it('matches the wallet case-insensitively', async () => {
-      authStore.walletAddress = USER_WALLET.toUpperCase().replace('0X', '0x')
+      authStore.setState({ walletAddress: USER_WALLET.toUpperCase().replace('0X', '0x') })
       await loadWithLoans([LIVE_LOAN])
 
       expect(store.myActivity).toHaveLength(1)
@@ -2020,7 +2020,7 @@ describe('PoolStore loan states', () => {
     it('lists the pools with somebody waiting on the user', async () => {
       // LIVE_POOL's owner is not the user, so ownership has to be the filter —
       // being a member of a pool does not make its queue yours.
-      authStore.walletAddress = LIVE_POOL.poolOwner
+      authStore.setState({ walletAddress: LIVE_POOL.poolOwner })
       await loadWithLoans([REQUESTED_LOAN, { ...REQUESTED_LOAN, id: '31337-12-7', loanId: 7, borrower: STRANGER_WALLET }])
 
       expect(store.poolsAwaitingMyDecision.map((entry) => entry.pool.poolId)).toEqual([12])
@@ -2028,7 +2028,7 @@ describe('PoolStore loan states', () => {
     })
 
     it('says nothing is waiting on a pool the user does not own', async () => {
-      authStore.walletAddress = STRANGER_WALLET
+      authStore.setState({ walletAddress: STRANGER_WALLET })
       await loadWithLoans([REQUESTED_LOAN])
 
       expect(store.poolsAwaitingMyDecision).toEqual([])
@@ -2036,7 +2036,7 @@ describe('PoolStore loan states', () => {
     })
 
     it('counts only requests, not loans already decided', async () => {
-      authStore.walletAddress = LIVE_POOL.poolOwner
+      authStore.setState({ walletAddress: LIVE_POOL.poolOwner })
       await loadWithLoans([REQUESTED_LOAN, LIVE_LOAN, REJECTED_LOAN, REPAID_LOAN])
 
       expect(store.requestsAwaitingMyDecision).toBe(1)
@@ -2076,8 +2076,8 @@ describe('PoolStore and a defaulted loan', () => {
     jest.clearAllMocks()
     delete process.env.EXPO_PUBLIC_USE_MOCK_POOLS
 
-    authStore.walletAddress = USER_WALLET
-    authStore.chainId = 31337
+    authStore.setState({ walletAddress: USER_WALLET })
+    authStore.setState({ chainId: 31337 })
 
     store = new PoolStore()
     listLoansCallable = jest.fn().mockResolvedValue({ data: { loans: [], totalCount: 0, limit: 50 } })
@@ -2096,8 +2096,8 @@ describe('PoolStore and a defaulted loan', () => {
   afterEach(() => {
     jest.spyOn(Date, 'now').mockRestore()
     process.env.EXPO_PUBLIC_USE_MOCK_POOLS = 'true'
-    authStore.walletAddress = null
-    authStore.chainId = null
+    authStore.setState({ walletAddress: null })
+    authStore.setState({ chainId: null })
   })
 
   it('maps the chain state to the app’s status', async () => {

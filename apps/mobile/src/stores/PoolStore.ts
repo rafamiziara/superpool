@@ -32,6 +32,7 @@ import type {
 import { LoanStatus, MemberStatus, TransactionStatus, TransactionType } from '@superpool/types'
 import { httpsCallable } from 'firebase/functions'
 import { makeAutoObservable, runInAction } from 'mobx'
+import { shallow } from 'zustand/shallow'
 import { DEFAULT_CHAIN_ID } from '../config/contracts'
 import { FIREBASE_FUNCTIONS } from '../config/firebase'
 import { MOCK_LOANS, MOCK_MEMBERSHIPS, MOCK_POOLS, MOCK_TRANSACTIONS, MOCK_USER_ADDRESS } from '../mocks/lending'
@@ -280,13 +281,37 @@ export class PoolStore {
   error: string | null = null
   lastFetchedAt: Date | null = null
 
+  /**
+   * `authStore` is a Zustand store and MobX cannot observe one, so the two
+   * fields this store's computeds depend on are mirrored here instead. Zustand
+   * notifies synchronously, so the mirror is current the moment auth state
+   * changes — and every getter below stays reactive, which reading
+   * `authStore.getState()` inline would silently have stopped.
+   *
+   * When this store moves to Zustand the mirror becomes an ordinary
+   * subscription and the two fields go away.
+   */
+  authWalletAddress: string | null = null
+  authChainId: number | null = null
+
   constructor() {
     makeAutoObservable(this)
+
+    authStore.subscribe(
+      (state) => ({ walletAddress: state.walletAddress, chainId: state.chainId }),
+      ({ walletAddress, chainId }) => {
+        runInAction(() => {
+          this.authWalletAddress = walletAddress
+          this.authChainId = chainId
+        })
+      },
+      { equalityFn: shallow, fireImmediately: true }
+    )
   }
 
   /** The connected wallet, or the mock user when running on mock data. */
   get userAddress(): string {
-    if (authStore.walletAddress) return authStore.walletAddress
+    if (this.authWalletAddress) return this.authWalletAddress
 
     return usingMockPools() ? MOCK_USER_ADDRESS : ''
   }
@@ -357,7 +382,7 @@ export class PoolStore {
     try {
       const syncPoolEventsNow = httpsCallable<SyncPoolEventsRequest, SyncPoolEventsResponse>(FIREBASE_FUNCTIONS, 'syncPoolEventsNow')
 
-      const response = await syncPoolEventsNow({ chainId: params.chainId ?? authStore.chainId ?? DEFAULT_CHAIN_ID })
+      const response = await syncPoolEventsNow({ chainId: params.chainId ?? this.authChainId ?? DEFAULT_CHAIN_ID })
 
       logger.debug('🧹 Swept chain events:', response.data)
     } catch (error) {
@@ -445,7 +470,7 @@ export class PoolStore {
     const listPools = httpsCallable<ListPoolsRequest, ListPoolsResponse>(FIREBASE_FUNCTIONS, 'listPools')
 
     const response = await listPools({
-      chainId: authStore.chainId ?? DEFAULT_CHAIN_ID,
+      chainId: this.authChainId ?? DEFAULT_CHAIN_ID,
       activeOnly: true,
       limit: DEFAULT_PAGE_SIZE,
       ...params,
@@ -465,7 +490,7 @@ export class PoolStore {
     const listContributions = httpsCallable<ListContributionsRequest, ListContributionsResponse>(FIREBASE_FUNCTIONS, 'listContributions')
 
     const response = await listContributions({
-      chainId: params.chainId ?? authStore.chainId ?? DEFAULT_CHAIN_ID,
+      chainId: params.chainId ?? this.authChainId ?? DEFAULT_CHAIN_ID,
       limit: DEFAULT_PAGE_SIZE,
     })
 
@@ -484,7 +509,7 @@ export class PoolStore {
     const listWithdrawals = httpsCallable<ListWithdrawalsRequest, ListWithdrawalsResponse>(FIREBASE_FUNCTIONS, 'listWithdrawals')
 
     const response = await listWithdrawals({
-      chainId: params.chainId ?? authStore.chainId ?? DEFAULT_CHAIN_ID,
+      chainId: params.chainId ?? this.authChainId ?? DEFAULT_CHAIN_ID,
       limit: DEFAULT_PAGE_SIZE,
     })
 
@@ -504,7 +529,7 @@ export class PoolStore {
     )
 
     const response = await listInterestClaims({
-      chainId: params.chainId ?? authStore.chainId ?? DEFAULT_CHAIN_ID,
+      chainId: params.chainId ?? this.authChainId ?? DEFAULT_CHAIN_ID,
       limit: DEFAULT_PAGE_SIZE,
     })
 
@@ -521,7 +546,7 @@ export class PoolStore {
     const listLoans = httpsCallable<ListLoansRequest, ListLoansResponse>(FIREBASE_FUNCTIONS, 'listLoans')
 
     const response = await listLoans({
-      chainId: params.chainId ?? authStore.chainId ?? DEFAULT_CHAIN_ID,
+      chainId: params.chainId ?? this.authChainId ?? DEFAULT_CHAIN_ID,
       limit: DEFAULT_PAGE_SIZE,
     })
 
@@ -541,7 +566,7 @@ export class PoolStore {
     )
 
     const response = await listLoanRepayments({
-      chainId: params.chainId ?? authStore.chainId ?? DEFAULT_CHAIN_ID,
+      chainId: params.chainId ?? this.authChainId ?? DEFAULT_CHAIN_ID,
       limit: DEFAULT_PAGE_SIZE,
     })
 
@@ -560,7 +585,7 @@ export class PoolStore {
     const listMembers = httpsCallable<ListMembersRequest, ListMembersResponse>(FIREBASE_FUNCTIONS, 'listMembers')
 
     const response = await listMembers({
-      chainId: params.chainId ?? authStore.chainId ?? DEFAULT_CHAIN_ID,
+      chainId: params.chainId ?? this.authChainId ?? DEFAULT_CHAIN_ID,
       limit: DEFAULT_PAGE_SIZE,
     })
 
@@ -804,7 +829,7 @@ export class PoolStore {
     try {
       const listPools = httpsCallable<ListPoolsRequest, ListPoolsResponse>(FIREBASE_FUNCTIONS, 'listPools')
       const response = await listPools({
-        chainId: authStore.chainId ?? DEFAULT_CHAIN_ID,
+        chainId: this.authChainId ?? DEFAULT_CHAIN_ID,
         activeOnly: true,
         limit: DEFAULT_PAGE_SIZE,
         searchTerm: term,
@@ -853,7 +878,7 @@ export class PoolStore {
    * user's only position is in a token reads as having lost the money.
    */
   get balancesByDenomination(): { denomination: Denomination; total: bigint }[] {
-    const native = nativeDenomination(authStore.chainId ?? DEFAULT_CHAIN_ID)
+    const native = nativeDenomination(this.authChainId ?? DEFAULT_CHAIN_ID)
     const totals = new Map<string, { denomination: Denomination; total: bigint }>([[native.symbol, { denomination: native, total: 0n }]])
 
     for (const member of this.activeMemberships) {
@@ -1248,7 +1273,7 @@ export class PoolStore {
         'listBorrowerHistories'
       )
 
-      const response = await listBorrowerHistories({ chainId: authStore.chainId ?? DEFAULT_CHAIN_ID, borrowers: wallets })
+      const response = await listBorrowerHistories({ chainId: this.authChainId ?? DEFAULT_CHAIN_ID, borrowers: wallets })
 
       runInAction(() => {
         this.borrowerHistories = { ...this.borrowerHistories, ...response.data.histories }

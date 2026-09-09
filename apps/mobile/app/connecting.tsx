@@ -1,21 +1,34 @@
 import { AppKitButton } from '@reown/appkit-wagmi-react-native'
 import { StatusBar } from 'expo-status-bar'
-import { observer } from 'mobx-react-lite'
 import { Image, Text, View } from 'react-native'
 import { LoadingSpinner } from '../src/components/LoadingSpinner'
 import { AUTH_STEP_INFO, AUTH_STEPS } from '../src/constants/authSteps'
 import { useAutoAuth } from '../src/hooks/auth/useAutoAuth'
-import { authStore } from '../src/stores/AuthStore'
+import { selectIsAuthenticating, selectProgress, selectStepStatus, useAuthStore } from '../src/stores/AuthStore'
 
-export default observer(function ConnectingScreen() {
+export default function ConnectingScreen() {
   // Trigger authentication flow when wallet is connected
   useAutoAuth()
 
-  const { isAuthenticating, progress, error, currentStep } = authStore
+  const isAuthenticating = useAuthStore(selectIsAuthenticating)
+  const progress = useAuthStore(selectProgress)
+  const error = useAuthStore((state) => state.error)
+
+  /*
+    The three fields a step's status is made of, each subscribed separately.
+
+    `getStepStatus` used to be called on the store inside an `observer`, which
+    subscribed this screen to all three by reading them. Selecting only
+    `currentStep` here would leave the icons stale every time a step completed,
+    because `completedSteps` is what changes then.
+  */
+  const currentStep = useAuthStore((state) => state.currentStep)
+  const failedStep = useAuthStore((state) => state.failedStep)
+  const completedSteps = useAuthStore((state) => state.completedSteps)
 
   const renderStepIcon = (stepIndex: number) => {
     const step = AUTH_STEPS[stepIndex]
-    const status = authStore.getStepStatus(step)
+    const status = selectStepStatus({ currentStep, failedStep, completedSteps }, step)
 
     if (status === 'failed') {
       return (
@@ -42,7 +55,7 @@ export default observer(function ConnectingScreen() {
 
   const getStepTextColor = (stepIndex: number) => {
     const step = AUTH_STEPS[stepIndex]
-    const status = authStore.getStepStatus(step)
+    const status = selectStepStatus({ currentStep, failedStep, completedSteps }, step)
 
     if (status === 'failed') return 'text-coral'
     if (status === 'current' && isAuthenticating) return 'text-mint'
@@ -52,7 +65,7 @@ export default observer(function ConnectingScreen() {
 
   const getStepDescriptionColor = (stepIndex: number) => {
     const step = AUTH_STEPS[stepIndex]
-    const status = authStore.getStepStatus(step)
+    const status = selectStepStatus({ currentStep, failedStep, completedSteps }, step)
 
     if (status === 'failed') return 'text-coral/70'
     if (status === 'current' && isAuthenticating) return 'text-mint/70'
@@ -157,4 +170,4 @@ export default observer(function ConnectingScreen() {
       <StatusBar style="light" />
     </View>
   )
-})
+}

@@ -22,10 +22,10 @@ export function WalletListener() {
 
   useEffect(() => {
     // Mark wallet as initialized on first load
-    authStore.initializeWalletState()
+    authStore.getState().initializeWalletState()
 
     // Update AuthStore with wallet state changes
-    authStore.updateWalletState({
+    authStore.getState().updateWalletState({
       isConnected,
       address,
       chainId,

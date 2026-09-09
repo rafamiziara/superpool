@@ -17,18 +17,15 @@ jest.mock('../config/firebase', () => ({
   },
 }))
 
-jest.mock('./AuthStore', () => ({
-  authStore: {
-    user: null,
-    isAuthenticating: false,
-    isWalletConnected: false,
-    walletAddress: null,
-    isFullyInitialized: false,
-    hasInitializedWallet: false,
-    hasInitializedFirebase: false,
-    reset: jest.fn(),
-  },
-}))
+/*
+  AuthStore is deliberately NOT mocked.
+
+  It used to be replaced with a plain object, which this repo's CLAUDE.md
+  already warned made the reactivity untestable — the mock could not notify
+  anybody, so a test passed whether or not the store was subscribed to. The
+  real store is an in-memory Zustand store with no I/O, so the tests drive it
+  directly and the subscription is exercised for real.
+*/
 
 // Mock console methods
 const mockConsoleLog = jest.spyOn(console, 'log').mockImplementation(() => {})
@@ -39,6 +36,7 @@ jest.useFakeTimers()
 
 describe('NavigationStore', () => {
   let navigationStore: NavigationStore
+  let resetSpy: jest.SpyInstance
   const mockRouterReplace = router.replace as jest.Mock
   const mockSignOut = mockFirebaseAuth.signOut as jest.Mock
 
@@ -50,16 +48,17 @@ describe('NavigationStore', () => {
     // Reset FIREBASE_AUTH mock
     ;(FIREBASE_AUTH as { currentUser: { uid: string } | null }).currentUser = null
 
-    // Reset authStore state
-    Object.assign(authStore, {
+    // Reset authStore state. `isAuthenticating` and `isFullyInitialized` are
+    // derived now, so the fields underneath them are what a test sets.
+    authStore.setState({
       user: null,
-      isAuthenticating: false,
+      authLock: { isLocked: false, walletAddress: null, startTime: 0, requestId: null },
       isWalletConnected: false,
       walletAddress: null,
-      isFullyInitialized: false,
       hasInitializedWallet: false,
       hasInitializedFirebase: false,
     })
+    resetSpy = jest.spyOn(authStore.getState(), 'reset')
 
     navigationStore = new NavigationStore()
 
@@ -68,6 +67,8 @@ describe('NavigationStore', () => {
   })
 
   afterEach(() => {
+    navigationStore.dispose()
+    resetSpy.mockRestore()
     jest.useRealTimers()
     jest.useFakeTimers()
   })
@@ -94,17 +95,23 @@ describe('NavigationStore', () => {
   describe('Navigation Logic', () => {
     beforeEach(() => {
       // Set up fully initialized state
-      Object.assign(authStore, {
-        isFullyInitialized: true,
-        hasInitializedWallet: true,
-        hasInitializedFirebase: true,
-      })
+      authStore.setState({ hasInitializedWallet: true, hasInitializedFirebase: true })
+
+      /*
+        The real store notifies, where the old plain-object mock could not — so
+        the subscription has already resolved a route for the signed-out state
+        and claimed it in `lastRoute`. Let that navigation run, then forget it,
+        so each case below starts from the same clean slate it used to get for
+        free.
+      */
+      jest.advanceTimersByTime(50)
+      navigationStore['lastRoute'] = null
+      mockRouterReplace.mockClear()
+      mockConsoleLog.mockClear()
     })
 
     it('should skip navigation when authenticating', () => {
-      Object.assign(authStore, {
-        isAuthenticating: true,
-      })
+      authStore.getState().acquireAuthLock('0x123')
 
       // Trigger state change by updating authStore
       navigationStore['navigateBasedOnCurrentState']({
@@ -151,7 +158,7 @@ describe('NavigationStore', () => {
     })
 
     it('should navigate to dashboard when wallet connected and user authenticated', () => {
-      const mockUser = { walletAddress: '0x123' }
+      const mockUser = { walletAddress: '0x123', createdAt: Date.now(), updatedAt: Date.now() }
 
       navigationStore['navigateBasedOnCurrentState']({
         user: mockUser,
@@ -203,7 +210,7 @@ describe('NavigationStore', () => {
       jest.advanceTimersByTime(50)
 
       navigationStore['navigateBasedOnCurrentState']({
-        user: { walletAddress: '0x123' },
+        user: { walletAddress: '0x123', createdAt: Date.now(), updatedAt: Date.now() },
         isAuthenticating: false,
         isWalletConnected: true,
         walletAddress: '0x123',
@@ -286,7 +293,7 @@ describe('NavigationStore', () => {
 
       await navigationStore['handleWalletDisconnection']()
 
-      expect(authStore.reset).toHaveBeenCalled()
+      expect(resetSpy).toHaveBeenCalled()
       expect(mockSignOut).toHaveBeenCalledWith(FIREBASE_AUTH)
       expect(mockConsoleLog).toHaveBeenCalledWith('✅ NavigationStore: Firebase user signed out')
     })
@@ -296,7 +303,7 @@ describe('NavigationStore', () => {
 
       await navigationStore['handleWalletDisconnection']()
 
-      expect(authStore.reset).toHaveBeenCalled()
+      expect(resetSpy).toHaveBeenCalled()
       expect(mockSignOut).not.toHaveBeenCalled()
     })
 
@@ -307,7 +314,7 @@ describe('NavigationStore', () => {
       await navigationStore['handleWalletDisconnection']()
 
       expect(mockConsoleError).toHaveBeenCalledWith('❌ NavigationStore: Firebase signout failed:', expect.any(Error))
-      expect(authStore.reset).toHaveBeenCalled()
+      expect(resetSpy).toHaveBeenCalled()
     })
 
     it('should handle wallet connection', () => {

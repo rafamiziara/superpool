@@ -1,5 +1,5 @@
 import { act, renderHook } from '@testing-library/react-native'
-import { authStore } from '../../stores/AuthStore'
+import { authStore, selectIsAuthenticating } from '../../stores/AuthStore'
 import { useAutoAuth } from './useAutoAuth'
 
 // Mock Firebase config (not covered by global mocks)
@@ -63,7 +63,7 @@ describe('useAutoAuth', () => {
 
     // Reset AuthStore to clean state
     act(() => {
-      authStore.reset()
+      authStore.getState().reset()
     })
 
     // Reset mocks to default successful state
@@ -85,14 +85,14 @@ describe('useAutoAuth', () => {
   afterEach(() => {
     // Clean up AuthStore after each test
     act(() => {
-      authStore.reset()
+      authStore.getState().reset()
     })
   })
 
   describe('Authentication Guard Conditions', () => {
     it('should not authenticate when wallet is not connected', () => {
       act(() => {
-        authStore.updateWalletState({ isConnected: false, address: null, chainId: null })
+        authStore.getState().updateWalletState({ isConnected: false, address: null, chainId: null })
       })
 
       renderHook(() => useAutoAuth())
@@ -105,7 +105,7 @@ describe('useAutoAuth', () => {
 
     it('should not authenticate when wallet address is missing', () => {
       act(() => {
-        authStore.updateWalletState({ isConnected: true, address: null, chainId: 1 })
+        authStore.getState().updateWalletState({ isConnected: true, address: null, chainId: 1 })
       })
 
       renderHook(() => useAutoAuth())
@@ -117,9 +117,9 @@ describe('useAutoAuth', () => {
 
     it('should not authenticate when already authenticating', () => {
       act(() => {
-        authStore.updateWalletState({ isConnected: true, address: '0x1234567890abcdef', chainId: 1 })
-        authStore.acquireAuthLock('0x1234567890abcdef')
-        authStore.startStep('connect-wallet')
+        authStore.getState().updateWalletState({ isConnected: true, address: '0x1234567890abcdef', chainId: 1 })
+        authStore.getState().acquireAuthLock('0x1234567890abcdef')
+        authStore.getState().startStep('connect-wallet')
       })
 
       renderHook(() => useAutoAuth())
@@ -131,8 +131,8 @@ describe('useAutoAuth', () => {
 
     it('should not authenticate when there is an error', () => {
       act(() => {
-        authStore.updateWalletState({ isConnected: true, address: '0x1234567890abcdef', chainId: 1 })
-        authStore.setError('Previous error')
+        authStore.getState().updateWalletState({ isConnected: true, address: '0x1234567890abcdef', chainId: 1 })
+        authStore.getState().setError('Previous error')
       })
 
       renderHook(() => useAutoAuth())
@@ -148,7 +148,7 @@ describe('useAutoAuth', () => {
       firebase.FIREBASE_AUTH.currentUser = { uid: 'existing-user' }
 
       act(() => {
-        authStore.updateWalletState({ isConnected: true, address: '0x1234567890abcdef', chainId: 1 })
+        authStore.getState().updateWalletState({ isConnected: true, address: '0x1234567890abcdef', chainId: 1 })
       })
 
       renderHook(() => useAutoAuth())
@@ -167,8 +167,8 @@ describe('useAutoAuth', () => {
       const walletAddress = '0x1234567890abcdef'
 
       act(() => {
-        authStore.reset()
-        authStore.updateWalletState({ isConnected: true, address: walletAddress, chainId: 1 })
+        authStore.getState().reset()
+        authStore.getState().updateWalletState({ isConnected: true, address: walletAddress, chainId: 1 })
       })
 
       renderHook(() => useAutoAuth())
@@ -192,18 +192,18 @@ describe('useAutoAuth', () => {
       })
 
       // Verify final state
-      expect(authStore.user).toEqual({
+      expect(authStore.getState().user).toEqual({
         walletAddress: '0x1234567890abcdef',
         createdAt: expect.any(Number),
         updatedAt: expect.any(Number),
       })
-      expect(authStore.error).toBeNull()
-      expect(authStore.isAuthenticating).toBe(false)
+      expect(authStore.getState().error).toBeNull()
+      expect(selectIsAuthenticating(authStore.getState())).toBe(false)
     })
 
     it('should track authentication steps correctly', async () => {
       act(() => {
-        authStore.updateWalletState({ isConnected: true, address: '0x1234567890abcdef', chainId: 1 })
+        authStore.getState().updateWalletState({ isConnected: true, address: '0x1234567890abcdef', chainId: 1 })
       })
 
       renderHook(() => useAutoAuth())
@@ -213,17 +213,17 @@ describe('useAutoAuth', () => {
       })
 
       // Verify all steps were completed
-      expect(authStore.getStepStatus('connect-wallet')).toBe('completed')
-      expect(authStore.getStepStatus('acquire-lock')).toBe('completed')
-      expect(authStore.getStepStatus('generate-message')).toBe('completed')
-      expect(authStore.getStepStatus('request-signature')).toBe('completed')
-      expect(authStore.getStepStatus('verify-signature')).toBe('completed')
-      expect(authStore.getStepStatus('firebase-auth')).toBe('completed')
+      expect(authStore.getState().getStepStatus('connect-wallet')).toBe('completed')
+      expect(authStore.getState().getStepStatus('acquire-lock')).toBe('completed')
+      expect(authStore.getState().getStepStatus('generate-message')).toBe('completed')
+      expect(authStore.getState().getStepStatus('request-signature')).toBe('completed')
+      expect(authStore.getState().getStepStatus('verify-signature')).toBe('completed')
+      expect(authStore.getState().getStepStatus('firebase-auth')).toBe('completed')
     })
 
     it('should release auth lock after successful authentication', async () => {
       act(() => {
-        authStore.updateWalletState({ isConnected: true, address: '0x1234567890abcdef', chainId: 1 })
+        authStore.getState().updateWalletState({ isConnected: true, address: '0x1234567890abcdef', chainId: 1 })
       })
 
       renderHook(() => useAutoAuth())
@@ -232,7 +232,7 @@ describe('useAutoAuth', () => {
         await new Promise((resolve) => setTimeout(resolve, 0))
       })
 
-      expect(authStore.authLock.isLocked).toBe(false)
+      expect(authStore.getState().authLock.isLocked).toBe(false)
     })
   })
 
@@ -242,7 +242,7 @@ describe('useAutoAuth', () => {
       mockUseMessageGeneration.generateMessage.mockRejectedValue(new Error(errorMessage))
 
       act(() => {
-        authStore.updateWalletState({ isConnected: true, address: '0x1234567890abcdef', chainId: 1 })
+        authStore.getState().updateWalletState({ isConnected: true, address: '0x1234567890abcdef', chainId: 1 })
       })
 
       renderHook(() => useAutoAuth())
@@ -251,9 +251,9 @@ describe('useAutoAuth', () => {
         await new Promise((resolve) => setTimeout(resolve, 0))
       })
 
-      expect(authStore.error).toBe(errorMessage)
-      expect(authStore.failedStep).toBe('generate-message')
-      expect(authStore.authLock.isLocked).toBe(false) // Should release lock on error
+      expect(authStore.getState().error).toBe(errorMessage)
+      expect(authStore.getState().failedStep).toBe('generate-message')
+      expect(authStore.getState().authLock.isLocked).toBe(false) // Should release lock on error
     })
 
     it('should handle signature request error', async () => {
@@ -261,7 +261,7 @@ describe('useAutoAuth', () => {
       mockUseSignatureHandling.requestSignature.mockRejectedValue(new Error(errorMessage))
 
       act(() => {
-        authStore.updateWalletState({ isConnected: true, address: '0x1234567890abcdef', chainId: 1 })
+        authStore.getState().updateWalletState({ isConnected: true, address: '0x1234567890abcdef', chainId: 1 })
       })
 
       renderHook(() => useAutoAuth())
@@ -270,9 +270,9 @@ describe('useAutoAuth', () => {
         await new Promise((resolve) => setTimeout(resolve, 0))
       })
 
-      expect(authStore.error).toBe(errorMessage)
-      expect(authStore.failedStep).toBe('request-signature')
-      expect(authStore.authLock.isLocked).toBe(false)
+      expect(authStore.getState().error).toBe(errorMessage)
+      expect(authStore.getState().failedStep).toBe('request-signature')
+      expect(authStore.getState().authLock.isLocked).toBe(false)
     })
 
     it('should handle Firebase authentication error', async () => {
@@ -280,7 +280,7 @@ describe('useAutoAuth', () => {
       mockUseFirebaseAuth.authenticateWithSignature.mockRejectedValue(new Error(errorMessage))
 
       act(() => {
-        authStore.updateWalletState({ isConnected: true, address: '0x1234567890abcdef', chainId: 1 })
+        authStore.getState().updateWalletState({ isConnected: true, address: '0x1234567890abcdef', chainId: 1 })
       })
 
       renderHook(() => useAutoAuth())
@@ -289,16 +289,16 @@ describe('useAutoAuth', () => {
         await new Promise((resolve) => setTimeout(resolve, 0))
       })
 
-      expect(authStore.error).toBe(errorMessage)
-      expect(authStore.failedStep).toBe('firebase-auth')
-      expect(authStore.authLock.isLocked).toBe(false)
+      expect(authStore.getState().error).toBe(errorMessage)
+      expect(authStore.getState().failedStep).toBe('firebase-auth')
+      expect(authStore.getState().authLock.isLocked).toBe(false)
     })
 
     it('should handle non-Error exceptions', async () => {
       mockUseMessageGeneration.generateMessage.mockRejectedValue('String error')
 
       act(() => {
-        authStore.updateWalletState({ isConnected: true, address: '0x1234567890abcdef', chainId: 1 })
+        authStore.getState().updateWalletState({ isConnected: true, address: '0x1234567890abcdef', chainId: 1 })
       })
 
       renderHook(() => useAutoAuth())
@@ -307,8 +307,8 @@ describe('useAutoAuth', () => {
         await new Promise((resolve) => setTimeout(resolve, 0))
       })
 
-      expect(authStore.error).toBe('Auto-authentication failed')
-      expect(authStore.authLock.isLocked).toBe(false)
+      expect(authStore.getState().error).toBe('Auto-authentication failed')
+      expect(authStore.getState().authLock.isLocked).toBe(false)
     })
   })
 
@@ -316,33 +316,33 @@ describe('useAutoAuth', () => {
     it('should reset auth state when wallet disconnects', async () => {
       // Start with wallet connected and some auth state
       act(() => {
-        authStore.updateWalletState({ isConnected: true, address: '0x1234567890abcdef', chainId: 1 })
-        authStore.acquireAuthLock('0x1234567890abcdef')
-        authStore.setUser({ walletAddress: '0x1234567890abcdef', createdAt: Date.now(), updatedAt: Date.now() })
+        authStore.getState().updateWalletState({ isConnected: true, address: '0x1234567890abcdef', chainId: 1 })
+        authStore.getState().acquireAuthLock('0x1234567890abcdef')
+        authStore.getState().setUser({ walletAddress: '0x1234567890abcdef', createdAt: Date.now(), updatedAt: Date.now() })
       })
 
       const { rerender } = renderHook(() => useAutoAuth())
 
       // Disconnect wallet
       act(() => {
-        authStore.updateWalletState({ isConnected: false, address: null, chainId: null })
+        authStore.getState().updateWalletState({ isConnected: false, address: null, chainId: null })
       })
 
       // Trigger re-render to run the disconnect effect
       rerender({})
 
       // Verify state was reset
-      expect(authStore.user).toBeNull()
-      expect(authStore.authLock.isLocked).toBe(false)
-      expect(authStore.completedSteps.size).toBe(0)
-      expect(authStore.error).toBeNull()
+      expect(authStore.getState().user).toBeNull()
+      expect(authStore.getState().authLock.isLocked).toBe(false)
+      expect(authStore.getState().completedSteps.size).toBe(0)
+      expect(authStore.getState().error).toBeNull()
       expect(mockUseMessageGeneration.clearState).toHaveBeenCalled()
     })
 
     it('should not reset when wallet remains connected', async () => {
       act(() => {
-        authStore.updateWalletState({ isConnected: true, address: '0x1234567890abcdef', chainId: 1 })
-        authStore.setUser({ walletAddress: '0x1234567890abcdef', createdAt: Date.now(), updatedAt: Date.now() })
+        authStore.getState().updateWalletState({ isConnected: true, address: '0x1234567890abcdef', chainId: 1 })
+        authStore.getState().setUser({ walletAddress: '0x1234567890abcdef', createdAt: Date.now(), updatedAt: Date.now() })
       })
 
       const { rerender } = renderHook(() => useAutoAuth())
@@ -351,7 +351,7 @@ describe('useAutoAuth', () => {
       rerender({})
 
       // Verify state was NOT reset
-      expect(authStore.user).toEqual({
+      expect(authStore.getState().user).toEqual({
         walletAddress: '0x1234567890abcdef',
         createdAt: expect.any(Number),
         updatedAt: expect.any(Number),
@@ -366,8 +366,8 @@ describe('useAutoAuth', () => {
 
       // Set up wallet connection first
       act(() => {
-        authStore.reset()
-        authStore.updateWalletState({ isConnected: true, address: walletAddress, chainId: 1 })
+        authStore.getState().reset()
+        authStore.getState().updateWalletState({ isConnected: true, address: walletAddress, chainId: 1 })
       })
 
       const { rerender } = renderHook(() => useAutoAuth())
@@ -380,13 +380,13 @@ describe('useAutoAuth', () => {
       // Now simulate another instance trying to authenticate the same wallet
       // Reset wallet state to trigger effect again while lock is held
       act(() => {
-        authStore.updateWalletState({ isConnected: false, address: null, chainId: null })
+        authStore.getState().updateWalletState({ isConnected: false, address: null, chainId: null })
       })
 
       rerender({})
 
       act(() => {
-        authStore.updateWalletState({ isConnected: true, address: walletAddress, chainId: 1 })
+        authStore.getState().updateWalletState({ isConnected: true, address: walletAddress, chainId: 1 })
       })
 
       rerender({})
@@ -404,8 +404,8 @@ describe('useAutoAuth', () => {
     it('should re-run authentication when wallet address changes', async () => {
       // Test changing wallet addresses within one test
       act(() => {
-        authStore.reset()
-        authStore.updateWalletState({ isConnected: true, address: '0x1111111111111111', chainId: 1 })
+        authStore.getState().reset()
+        authStore.getState().updateWalletState({ isConnected: true, address: '0x1111111111111111', chainId: 1 })
       })
 
       const { rerender } = renderHook(() => useAutoAuth())
@@ -422,8 +422,8 @@ describe('useAutoAuth', () => {
 
       // Change wallet address by updating wallet state
       act(() => {
-        authStore.reset() // Clear auth state but keep wallet connected
-        authStore.updateWalletState({ isConnected: true, address: '0x2222222222222222', chainId: 1 })
+        authStore.getState().reset() // Clear auth state but keep wallet connected
+        authStore.getState().updateWalletState({ isConnected: true, address: '0x2222222222222222', chainId: 1 })
       })
 
       rerender({})
@@ -440,8 +440,8 @@ describe('useAutoAuth', () => {
     it('should re-run authentication when error is cleared', async () => {
       // Start with error state
       act(() => {
-        authStore.updateWalletState({ isConnected: true, address: '0x1234567890abcdef', chainId: 1 })
-        authStore.setError('Test error')
+        authStore.getState().updateWalletState({ isConnected: true, address: '0x1234567890abcdef', chainId: 1 })
+        authStore.getState().setError('Test error')
       })
 
       const { rerender } = renderHook(() => useAutoAuth())
@@ -451,7 +451,7 @@ describe('useAutoAuth', () => {
 
       // Clear error
       act(() => {
-        authStore.setError(null)
+        authStore.getState().setError(null)
       })
 
       rerender({})

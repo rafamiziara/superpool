@@ -98,7 +98,7 @@ function makeRequest(overrides: Partial<LoanInfo> = {}): LoanInfo {
  */
 function withIndexedLoans(records: LoanInfo[]) {
   delete process.env.EXPO_PUBLIC_USE_MOCK_POOLS
-  authStore.walletAddress = MOCK_USER_ADDRESS
+  authStore.setState({ walletAddress: MOCK_USER_ADDRESS })
   poolStore.loanRecords = records
 }
 
@@ -114,7 +114,7 @@ beforeEach(async () => {
   mockNoteFor.mockReturnValue(undefined)
   mockAssessments = {}
   mockWagmiUseReadContract.mockReturnValue({ data: 100_000_000_000_000_000_000n, refetch: jest.fn().mockResolvedValue({ data: 0n }) })
-  authStore.walletAddress = null
+  authStore.setState({ walletAddress: null })
   await poolStore.fetchPools()
   poolStore.loanRecords = []
 })
@@ -122,7 +122,7 @@ beforeEach(async () => {
 afterEach(() => {
   process.env.EXPO_PUBLIC_USE_MOCK_POOLS = 'true'
   poolStore.loanRecords = []
-  authStore.walletAddress = null
+  authStore.setState({ walletAddress: null })
 })
 
 describe('ApprovalsScreen', () => {
@@ -175,7 +175,7 @@ describe('ApprovalsScreen', () => {
   it('lets the owner in whatever case their wallet reports', () => {
     // Indexed addresses are lowercased; a connected wallet is checksummed. A
     // strict compare would lock an owner out of their own pool.
-    authStore.walletAddress = MOCK_USER_ADDRESS.toLowerCase()
+    authStore.setState({ walletAddress: MOCK_USER_ADDRESS.toLowerCase() })
 
     const { getByTestId } = render(<ApprovalsScreen />)
 

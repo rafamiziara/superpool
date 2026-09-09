@@ -64,14 +64,14 @@ beforeEach(async () => {
   mockWaitForTransaction.mockResolvedValue({ account: MOCK_USER_ADDRESS, txHash: TX_HASH })
   mockTriggerIndexing.mockResolvedValue(undefined)
   mockLocalSearchParams.mockReturnValue({ poolId: POOL_ID })
-  authStore.walletAddress = MOCK_USER_ADDRESS
+  authStore.setState({ walletAddress: MOCK_USER_ADDRESS })
   await poolStore.fetchPools()
   poolStore.memberRecords = []
 })
 
 afterEach(() => {
   poolStore.memberRecords = []
-  authStore.walletAddress = null
+  authStore.setState({ walletAddress: null })
 })
 
 describe('JoinPoolScreen', () => {

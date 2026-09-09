@@ -1,14 +1,17 @@
 import { Redirect } from 'expo-router'
-import { observer } from 'mobx-react-lite'
 import { Image, View } from 'react-native'
-import { navigationStore } from '../src/stores/NavigationStore'
+import { useTargetRoute } from '../src/stores/NavigationStore'
 
-export default observer(function NavigationController() {
-  // Redirect rather than wait to be redirected. NavigationStore's reaction only
-  // fires when auth state changes, and this screen is also reached without one:
-  // the wallet's return deep link is a bare `superpool://`, which lands here
-  // with nothing about the session having changed.
-  const targetRoute = navigationStore.targetRoute
+export default function NavigationController() {
+  // Redirect rather than wait to be redirected. NavigationStore's subscription
+  // only fires when auth state changes, and this screen is also reached without
+  // one: the wallet's return deep link is a bare `superpool://`, which lands
+  // here with nothing about the session having changed.
+  //
+  // A selector rather than a read, so the screen is subscribed to the auth
+  // state the route is derived from — MobX used to trace that through the
+  // store's getter, and Zustand needs it named.
+  const targetRoute = useTargetRoute()
 
   if (targetRoute) {
     return <Redirect href={targetRoute} />
@@ -26,4 +29,4 @@ export default observer(function NavigationController() {
       />
     </View>
   )
-})
+}

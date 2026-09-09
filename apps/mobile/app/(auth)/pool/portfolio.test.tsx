@@ -73,7 +73,7 @@ beforeEach(async () => {
   mockLoadingDecisions = false
   mockLocalSearchParams.mockReturnValue({ poolId: POOL_ID })
   mockWagmiUseReadContract.mockReturnValue({ data: 4_000_000_000_000_000_000n, refetch: jest.fn() })
-  authStore.walletAddress = null
+  authStore.setState({ walletAddress: null })
   await poolStore.fetchPools()
   poolStore.loanRecords = []
 })
@@ -81,7 +81,7 @@ beforeEach(async () => {
 afterEach(() => {
   process.env.EXPO_PUBLIC_USE_MOCK_POOLS = 'true'
   poolStore.loanRecords = []
-  authStore.walletAddress = null
+  authStore.setState({ walletAddress: null })
 })
 
 describe('PortfolioScreen', () => {

@@ -25,17 +25,17 @@ describe('ConnectingScreen', () => {
 
     // Reset AuthStore to default test state
     act(() => {
-      authStore.reset()
-      authStore.acquireAuthLock('0x1234567890abcdef')
-      authStore.startStep('generate-message')
-      authStore.completeStep('connect-wallet')
+      authStore.getState().reset()
+      authStore.getState().acquireAuthLock('0x1234567890abcdef')
+      authStore.getState().startStep('generate-message')
+      authStore.getState().completeStep('connect-wallet')
     })
   })
 
   afterEach(() => {
     // Clean up AuthStore after each test
     act(() => {
-      authStore.reset()
+      authStore.getState().reset()
     })
   })
 
@@ -70,8 +70,8 @@ describe('ConnectingScreen', () => {
 
   it('should show error status when error occurs', () => {
     act(() => {
-      authStore.reset()
-      authStore.failStep('request-signature', 'User rejected signature')
+      authStore.getState().reset()
+      authStore.getState().failStep('request-signature', 'User rejected signature')
     })
 
     const { getByTestId, getByText } = render(<ConnectingScreen />)
@@ -108,10 +108,10 @@ describe('ConnectingScreen', () => {
   it('should show correct step based on progress', () => {
     // Set up store with specific progress state
     act(() => {
-      authStore.reset()
-      authStore.acquireAuthLock('0x1234567890abcdef')
-      authStore.completeStep('connect-wallet')
-      authStore.startStep('generate-message')
+      authStore.getState().reset()
+      authStore.getState().acquireAuthLock('0x1234567890abcdef')
+      authStore.getState().completeStep('connect-wallet')
+      authStore.getState().startStep('generate-message')
     })
 
     const { getByTestId } = render(<ConnectingScreen />)
@@ -129,8 +129,8 @@ describe('ConnectingScreen', () => {
 
   it('should show error icon for failed step', () => {
     act(() => {
-      authStore.reset()
-      authStore.failStep('request-signature', 'Signature failed')
+      authStore.getState().reset()
+      authStore.getState().failStep('request-signature', 'Signature failed')
     })
 
     const { getByTestId } = render(<ConnectingScreen />)
@@ -142,9 +142,9 @@ describe('ConnectingScreen', () => {
 
   it('should show signature prompt at correct progress', () => {
     act(() => {
-      authStore.reset()
-      authStore.acquireAuthLock('0x1234567890abcdef')
-      authStore.startStep('request-signature')
+      authStore.getState().reset()
+      authStore.getState().acquireAuthLock('0x1234567890abcdef')
+      authStore.getState().startStep('request-signature')
     })
 
     const { getByTestId, getByText } = render(<ConnectingScreen />)
@@ -155,10 +155,10 @@ describe('ConnectingScreen', () => {
 
   it('should show progress message during authentication', () => {
     act(() => {
-      authStore.reset()
-      authStore.acquireAuthLock('0x1234567890abcdef')
-      authStore.completeStep('connect-wallet')
-      authStore.startStep('generate-message')
+      authStore.getState().reset()
+      authStore.getState().acquireAuthLock('0x1234567890abcdef')
+      authStore.getState().completeStep('connect-wallet')
+      authStore.getState().startStep('generate-message')
     })
 
     const { getByTestId, getByText } = render(<ConnectingScreen />)
@@ -170,7 +170,7 @@ describe('ConnectingScreen', () => {
 
   it('should show empty status when not authenticating', () => {
     act(() => {
-      authStore.reset() // This should put store in non-authenticating state
+      authStore.getState().reset() // This should put store in non-authenticating state
     })
 
     const { queryByTestId } = render(<ConnectingScreen />)
@@ -184,11 +184,11 @@ describe('ConnectingScreen', () => {
   describe('Step Icons', () => {
     it('should show loading spinner for current step', () => {
       act(() => {
-        authStore.reset()
-        authStore.acquireAuthLock('0x1234567890abcdef')
-        authStore.completeStep('connect-wallet')
-        authStore.completeStep('acquire-lock')
-        authStore.startStep('generate-message')
+        authStore.getState().reset()
+        authStore.getState().acquireAuthLock('0x1234567890abcdef')
+        authStore.getState().completeStep('connect-wallet')
+        authStore.getState().completeStep('acquire-lock')
+        authStore.getState().startStep('generate-message')
       })
 
       const { getByTestId } = render(<ConnectingScreen />)
@@ -199,12 +199,12 @@ describe('ConnectingScreen', () => {
 
     it('should show success icon for completed steps', () => {
       act(() => {
-        authStore.reset()
-        authStore.acquireAuthLock('0x1234567890abcdef')
-        authStore.completeStep('connect-wallet')
-        authStore.completeStep('acquire-lock')
-        authStore.completeStep('generate-message')
-        authStore.startStep('request-signature')
+        authStore.getState().reset()
+        authStore.getState().acquireAuthLock('0x1234567890abcdef')
+        authStore.getState().completeStep('connect-wallet')
+        authStore.getState().completeStep('acquire-lock')
+        authStore.getState().completeStep('generate-message')
+        authStore.getState().startStep('request-signature')
       })
 
       const { getByTestId } = render(<ConnectingScreen />)
@@ -217,10 +217,10 @@ describe('ConnectingScreen', () => {
 
     it('should show pending dots for future steps', () => {
       act(() => {
-        authStore.reset()
-        authStore.acquireAuthLock('0x1234567890abcdef')
-        authStore.completeStep('connect-wallet')
-        authStore.startStep('acquire-lock')
+        authStore.getState().reset()
+        authStore.getState().acquireAuthLock('0x1234567890abcdef')
+        authStore.getState().completeStep('connect-wallet')
+        authStore.getState().startStep('acquire-lock')
       })
 
       const { getByTestId } = render(<ConnectingScreen />)
@@ -236,9 +236,9 @@ describe('ConnectingScreen', () => {
   describe('Progress Mapping', () => {
     it('should map progress 0% to step 0', () => {
       act(() => {
-        authStore.reset()
-        authStore.acquireAuthLock('0x1234567890abcdef')
-        authStore.startStep('connect-wallet')
+        authStore.getState().reset()
+        authStore.getState().acquireAuthLock('0x1234567890abcdef')
+        authStore.getState().startStep('connect-wallet')
       })
 
       const { getByTestId } = render(<ConnectingScreen />)
@@ -248,15 +248,15 @@ describe('ConnectingScreen', () => {
 
     it('should map progress 100% to last step', () => {
       act(() => {
-        authStore.reset()
-        authStore.acquireAuthLock('0x1234567890abcdef')
+        authStore.getState().reset()
+        authStore.getState().acquireAuthLock('0x1234567890abcdef')
         // Complete all steps except last
-        authStore.completeStep('connect-wallet')
-        authStore.completeStep('acquire-lock')
-        authStore.completeStep('generate-message')
-        authStore.completeStep('request-signature')
-        authStore.completeStep('verify-signature')
-        authStore.startStep('firebase-auth')
+        authStore.getState().completeStep('connect-wallet')
+        authStore.getState().completeStep('acquire-lock')
+        authStore.getState().completeStep('generate-message')
+        authStore.getState().completeStep('request-signature')
+        authStore.getState().completeStep('verify-signature')
+        authStore.getState().startStep('firebase-auth')
       })
 
       const { getByTestId } = render(<ConnectingScreen />)
@@ -276,11 +276,19 @@ describe('ConnectingScreen', () => {
 
       testCases.forEach(({ stepName, expectedStep }) => {
         act(() => {
-          authStore.reset()
-          authStore.acquireAuthLock('0x1234567890abcdef')
-          authStore.startStep(
-            stepName as 'connect-wallet' | 'acquire-lock' | 'generate-message' | 'request-signature' | 'verify-signature' | 'firebase-auth'
-          )
+          authStore.getState().reset()
+          authStore.getState().acquireAuthLock('0x1234567890abcdef')
+          authStore
+            .getState()
+            .startStep(
+              stepName as
+                | 'connect-wallet'
+                | 'acquire-lock'
+                | 'generate-message'
+                | 'request-signature'
+                | 'verify-signature'
+                | 'firebase-auth'
+            )
         })
 
         const { getByTestId } = render(<ConnectingScreen />)

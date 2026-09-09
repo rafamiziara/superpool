@@ -80,7 +80,7 @@ function lateLoan(overrides: Partial<LoanInfo> = {}, overdueBy = 5 * DAY): LoanI
 /** Load loans the way the live app does — see the note in `approvals.test.tsx`. */
 function withIndexedLoans(records: LoanInfo[]) {
   delete process.env.EXPO_PUBLIC_USE_MOCK_POOLS
-  authStore.walletAddress = MOCK_USER_ADDRESS
+  authStore.setState({ walletAddress: MOCK_USER_ADDRESS })
   poolStore.loanRecords = records
 }
 
@@ -95,14 +95,14 @@ beforeEach(async () => {
   mockNoteFor.mockReturnValue(undefined)
   // The grace period and the outstanding balance both come through here.
   mockWagmiUseReadContract.mockReturnValue({ data: 0n, refetch: jest.fn() })
-  authStore.walletAddress = null
+  authStore.setState({ walletAddress: null })
   await poolStore.fetchPools()
   poolStore.loanRecords = []
 })
 
 afterEach(() => {
   process.env.EXPO_PUBLIC_USE_MOCK_POOLS = 'true'
-  authStore.walletAddress = null
+  authStore.setState({ walletAddress: null })
   poolStore.loanRecords = []
 })
 

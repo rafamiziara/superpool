@@ -17,20 +17,20 @@ function connected(address: `0x${string}`) {
 
 const DISCONNECTED = { address: undefined, chainId: undefined, isConnected: false, isConnecting: false }
 
-// Mock AuthStore (not covered by global mocks)
-jest.mock('../stores/AuthStore', () => ({
-  authStore: {
-    initializeWalletState: jest.fn(),
-    updateWalletState: jest.fn(),
-  },
-}))
-
+/*
+  The real store is used rather than a stand-in object: it is in-memory with no
+  I/O, and the two actions are spied on where they live. A plain-object mock
+  cannot be reached through `getState()` anyway, which is how the component
+  talks to the store now.
+*/
 describe('WalletListener', () => {
-  const mockInitializeWalletState = authStore.initializeWalletState as jest.Mock
-  const mockUpdateWalletState = authStore.updateWalletState as jest.Mock
+  let mockInitializeWalletState: jest.SpyInstance
+  let mockUpdateWalletState: jest.SpyInstance
 
   beforeEach(() => {
     jest.clearAllMocks()
+    mockInitializeWalletState = jest.spyOn(authStore.getState(), 'initializeWalletState')
+    mockUpdateWalletState = jest.spyOn(authStore.getState(), 'updateWalletState')
 
     // Default useAccount return value
     mockWagmiUseAccount.mockReturnValue({
@@ -39,6 +39,12 @@ describe('WalletListener', () => {
       isConnected: false,
       isConnecting: false,
     })
+  })
+
+  afterEach(() => {
+    mockInitializeWalletState.mockRestore()
+    mockUpdateWalletState.mockRestore()
+    authStore.getState().resetWalletState()
   })
 
   describe('Component Rendering', () => {
