@@ -18,7 +18,7 @@ env:
 
 jobs:
   quality:
-    name: Lint, format & type-check
+    name: Lint, format & typecheck
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -44,12 +44,7 @@ jobs:
         run: pnpm lint:sol
 
       - name: Type-check all packages
-        run: |
-          pnpm --filter @superpool/types type-check
-          pnpm --filter backend type-check
-          pnpm --filter contracts type-check
-          pnpm --filter mobile type-check
-          pnpm --filter @superpool/landing type-check
+        run: pnpm typecheck
 
   test:
     name: Test (${{ matrix.package }})

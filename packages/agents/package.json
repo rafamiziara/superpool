@@ -13,7 +13,7 @@
     "start": "mastra start",
     "test": "vitest run",
     "eval": "tsx src/mastra/evals/run.ts",
-    "type-check": "tsc --noEmit",
+    "typecheck": "tsc --noEmit",
     "test:watch": "vitest"
   },
   "dependencies": {

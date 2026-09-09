@@ -180,7 +180,7 @@ pnpm build
 pnpm dev
 
 # Type check
-pnpm type-check
+pnpm typecheck
 ```
 
 ## 📱 Cross-Platform Compatibility

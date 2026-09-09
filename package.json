@@ -9,6 +9,8 @@
     "dev:backend": "node scripts/dev-environment.js",
     "check": "biome check .",
     "check:fix": "biome check --write .",
+    "build": "turbo run build",
+    "typecheck": "turbo run typecheck",
     "test": "pnpm run test:backend && pnpm run test:contracts && pnpm run test:mobile",
     "test:backend": "pnpm --filter backend test",
     "test:contracts": "pnpm --filter contracts test",
@@ -31,6 +33,7 @@
     "@biomejs/biome": "2.5.12",
     "@rm30/biome-config": "^0.1.0",
     "@rm30/tsconfig": "^0.1.0",
+    "turbo": "^2.10.12",
     "nyc": "^17.1.0",
     "rimraf": "^6.0.1"
   }

@@ -50,3 +50,5 @@ coverage/
 !coverage/.gitkeep
 packages/*/coverage/
 apps/*/coverage/
+# Turbo
+.turbo

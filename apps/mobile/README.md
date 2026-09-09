@@ -53,7 +53,7 @@ pnpm ios
 pnpm web
 
 # Type checking
-pnpm type-check
+pnpm typecheck
 
 # Linting
 pnpm lint

@@ -1,0 +1,22 @@
+{
+  "$schema": "https://turbo.build/schema.json",
+  "tasks": {
+    "compile": {
+      "outputs": ["artifacts/**", "cache/**", "typechain-types/**"]
+    },
+    "build": {
+      "dependsOn": ["^build"],
+      "outputs": [".next/**", "!.next/cache/**", "lib/**", "dist/**", ".mastra/output/**"]
+    },
+    "typecheck": {
+      "dependsOn": ["^typecheck", "compile"]
+    },
+    "test": {
+      "dependsOn": ["compile"]
+    },
+    "dev": {
+      "cache": false,
+      "persistent": true
+    }
+  }
+}

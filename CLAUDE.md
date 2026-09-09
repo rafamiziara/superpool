@@ -72,7 +72,7 @@ pnpm signMessage     # Sign test messages for backend auth
 pnpm dev             # Start Next.js development server (port 3001)
 pnpm build           # Build for production
 pnpm start           # Start production server
-pnpm type-check      # TypeScript type checking
+pnpm typecheck      # TypeScript type checking
 ```
 
 ### Mobile App (`apps/mobile/`)
@@ -90,7 +90,7 @@ pnpm web             # Run on web
 #### Types (`packages/types/`)
 
 ```bash
-pnpm type-check      # TypeScript type checking
+pnpm typecheck      # TypeScript type checking
 ```
 
 There is deliberately **no build**. The package is source-direct — `main`,
@@ -1350,7 +1350,7 @@ in both.
 **ALWAYS execute the following commands IN ORDER before completing any task:**
 
 1. **TypeScript Type Checking** (MANDATORY):
-   - Run `pnpm type-check` in the specific package/app worked on
+   - Run `pnpm typecheck` in the specific package/app worked on
    - Fix ALL TypeScript errors before proceeding
    - NEVER use `any` or `unknown` types - always provide proper typing
 

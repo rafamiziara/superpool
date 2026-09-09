@@ -31,7 +31,7 @@ pnpm build
 pnpm start
 
 # Type checking
-pnpm type-check
+pnpm typecheck
 
 # Linting
 pnpm lint

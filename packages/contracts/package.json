@@ -6,7 +6,7 @@
   "scripts": {
     "compile": "hardhat compile",
     "abis:generate": "hardhat run scripts/generate-abis.ts",
-    "type-check": "tsc --noEmit",
+    "typecheck": "tsc --noEmit",
     "test": "hardhat test",
     "test:gas": "hardhat test --gas-stats",
     "test:safe:local": "hardhat test test/SafeIntegration.test.ts --network localhost",

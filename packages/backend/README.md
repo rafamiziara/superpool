@@ -348,7 +348,7 @@ pnpm serve
 pnpm test
 
 # Type checking
-pnpm type-check
+pnpm typecheck
 ```
 
 ## Testing Scripts
