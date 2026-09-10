@@ -38,8 +38,8 @@
     "@superpool/types": "workspace:*",
     "dotenv": "^17.3.1",
     "ethers": "^6.15.0",
-    "firebase-admin": "^12.7.0",
-    "firebase-functions": "^6.4.0",
+    "firebase-admin": "^14.3.0",
+    "firebase-functions": "^7.3.2",
     "jsonwebtoken": "^9.0.3",
     "uuid": "^11.1.0",
     "zod": "^4.4.3"
