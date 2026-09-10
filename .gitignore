@@ -52,3 +52,6 @@ packages/*/coverage/
 apps/*/coverage/
 # Turbo
 .turbo
+
+# Graphify
+graphify-out/
