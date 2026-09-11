@@ -176,7 +176,7 @@ Future enhancements being explored:
 - **Decentralized Liquidation:** Automated liquidation processes using Chainlink Keepers
 - **Insurance Fund:** Collect loan interest into an insurance pool for default protection
 
-See the [Full Roadmap](ROADMAP.md) for detailed feature plans and timelines.
+See the [Full Roadmap](docs/ROADMAP.md) for detailed feature plans and timelines.
 
 ## 📝 License
 
