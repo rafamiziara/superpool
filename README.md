@@ -118,6 +118,12 @@ Detailed documentation for each component:
 - [Sprint Plan](docs/SPRINT_PLAN.md) - What is built and what is next
 - [Roadmap](docs/ROADMAP.md) - Post-MVP direction
 
+**Deep dives** — one mechanism each, examined to the bottom: how it works, why that and not
+the obvious alternative, and what it cost.
+
+- [Event Indexing](docs/EVENT_INDEXING.md) - Three racing paths, idempotent writes, reorg safety
+- [The Per-Share Accumulator](docs/PER_SHARE_ACCUMULATOR.md) - Distributing to an unbounded set without a loop
+
 ## 🚀 Getting Started
 
 ### Quick Start
